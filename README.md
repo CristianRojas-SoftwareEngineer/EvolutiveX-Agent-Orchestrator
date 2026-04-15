@@ -1,71 +1,116 @@
-# 🚀 Fastify + TypeScript SOLID API
+# 📡 Smart Code Proxy (Anthropic Observability)
 
-Un robusto esqueleto de servidor Backend moderno para Node.js. Utiliza **Fastify** (extremadamente veloz) y **TypeScript**, ensamblado desde cero bajo requerimientos estrictos enfocados en arquitecturas profesionales limpias y paralelizables.
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue.svg)](https://www.typescriptlang.org/)
+[![Fastify](https://img.shields.io/badge/Fastify-4.x-black.svg)](https://www.fastify.io/)
+[![Architecture](https://img.shields.io/badge/Architecture-SOLID-green.svg)](#🏛-diseño-del-sistema-solid)
 
----
+Una implementación de alto rendimiento, modular y basada en **Fastify + TypeScript** diseñada para interceptar, auditar y analizar en tiempo real el tráfico entre clientes de IA (como Claude Code / Cursor) y la API oficial de Anthropic.
 
-## 🏛 Arquitectura SOLID
-
-El proyecto destierra prácticas de acoplamiento rígido, optando por una división clara de responsabilidades. La carpeta `src` está estructurada para mantener flujos unidireccionales de datos:
-
-- **`index.ts`** — *El Gatillo*: Punto de entrada puro responsable de encender el servidor.
-- **`app.ts`** — *El Chasis*: Configuración inicial, middleware y cargador maestro de rutas (Agrupa plugins globales).
-- **`routes/`** — *La Antena*: Define netamente QUÉ url direcciona a QUÉ controlador. Nada más.
-- **`controllers/`** — *El Recepcionista*: Traduce el objeto Request de Fastify, invoca lógicas abstractas, y responde códigos HTTP. (Jamás toca directamente el negocio).
-- **`services/`** — *El Corazón*: Solo lógica de negocio pura. Los verdaderos responsables de qué sucede con los datos o cómo muta la base de datos subyacente.
-- **`interfaces/`** — *Los Contratos*: Archivos `.ts` que declaran modelos permitiendo Inversión de Dependencias entre quienes proveen información y quienes la reclaman.
+Este proyecto moderniza el flujo de observabilidad legacy, introduciendo un diseño desacoplado que garantiza **latencia cero** en la retransmisión mientras se procesan auditorías profundas en segundo plano.
 
 ---
 
-## ⚙️ Workflows & Scripts
+## 🏛 Diseño del Sistema (SOLID)
 
-Este proyecto integra un motor de _Pipelines_ en tiempo de desarrollo. Todos están basados en el archivo `package.json` y se dividen según tu ciclo de trabajo diario:
+El proxy utiliza un patrón de **Inversión de Control** y **Responsabilidad Única** para gestionar flujos de datos asíncronos y streams de larga duración.
 
-### 🛠 Entorno de Desarrollo (Local Workflow)
-Comandos pensados para programar día a día en modo local.
-
-| Script | Descripción Integral |
-|--------|----------------|
-| `npm run help` | **(START HERE)** Un poderoso comando interactivo a nivel local que lista y explica de forma coloreada absolutamente todos los posibles *npm scripts* y las rutinas a ejecutar en terminal al programador ingresante en el pipeline actual. |
-| `npm run dev` | Inicia tu entorno de desarrollo local vivo. Usa `ts-node` bajo el capó para interpretar TypeScript nativamente y ahorrar tiempo al no crear pesados achivos físicos JS. Responde por defecto en `http://localhost:3000`. |
-| `npm run lint` | Eje vertebral de calidad. Usa ESLint (parser TS) para escanear y quejar en frío la lógica de todo tu código (`src/**/*.ts`). Avisa tipos prohibidos (ej. `any`) o variables no usadas. |
-| `npm run lint:fix` | ¡Reparación mágica! Realiza el mismo scan de ESLint, pero intenta aplicar automáticamente las reparaciones estructurales y de indentación en todo el proyecto. |
-| `npm run format` | Dispara el formateador espartano oficial (Prettier). Lee todo tu repositorio y reasigna los espacios, llaves, líneas max. y tabulaciones para una consistencia universal entre programadores del equipo. |
+### 🧩 Capas de Responsabilidad
+- **[SessionService](file:///c:/Users/Cristian/Desktop/Proyectos/Smart%20Code%20Proxy/src/services/session.service.ts)**: Resuelve identidades de sesión mediante cabeceras dinámicas y gestiona el locking asíncrono para garantizar que el contador de peticiones en disco (`requests/`) sea secuencial y consistente.
+- **[AuditWriterService](file:///c:/Users/Cristian/Desktop/Proyectos/Smart%20Code%20Proxy/src/services/audit-writer.service.ts)**: Encargado de la persistencia atómica. Escribe cabeceras, cuerpos binarios y metadatos JSON usando flujos de escritura no bloqueantes.
+- **[RedactService](file:///c:/Users/Cristian/Desktop/Proyectos/Smart%20Code%20Proxy/src/services/redact.service.ts)**: Centraliza las reglas de privacidad. Sanitiza `x-api-key`, `Authorization` y campos sensibles dentro de JSON profundamente anidado antes de registrar cualquier dato.
+- **[ProxyController](file:///c:/Users/Cristian/Desktop/Proyectos/Smart%20Code%20Proxy/src/controllers/proxy.controller.ts)**: El cerebro del sistema. Orquestra la intercepción de streams, la descompresión **Gzip** al vuelo y el parsing de **SSE** línea por línea.
 
 ---
 
-### 📦 Entorno de Producción (CI/CD Workflow)
-Comandos agresivos que se asumen listos para ser despachados a Producción real.
+## 🔄 Flujo de Datos (Arquitectura de Intercepción)
 
-| Script | Descripción Integral |
-|--------|----------------|
-| `npm run build` | Toma el servidor y lo compila óptimamente. Internamente primero ejecuta `clean:dist` (para purgar la memoria anterior evitando condiciones de carrera o Race Conditions), y luego coordina con `concurrently` dos hilos en paralelo: <br> • **[1] `build:js`**: Utiliza `tsup` (esbuild) generando Javascript crudo extra-veloz a CJS dentro de `dist/`. <br> • **[2] `build:types`**: Utiliza `tsc` emitiendo las validaciones rígidas del contrato general de TypeScript sin chocar con herramientas transitorias. |
-| `npm start` | Corre directo en los clústers o contenedores. Apunta a la carpeta fría de salida en lugar de TypeScript. (`node dist/index.js`). |
-
----
-
-### 🧹 Limpieza y Mantenimiento Avanzado (Troubleshooting Flow)
-Cuando el gestor NPM pierde la cabeza con un módulo, la memoria de variables colisiona y VS Code marca falsos positivos, utiliza estos comandos de recuperación en tu terminal en este preciso orden:
-
-| Script | Explicación |
-|--------|-------------|
-| `npm run clean:dist` | Elimina quirúrgicamente y rápido toda la carpeta autogenerada `/dist` usando capacidades nativas de NodeJS. |
-| `npm run clean:modules` | Aniquila el enorme cache descargado dentro de `/node_modules`. |
-| `npm run clean` | **Botón de Pánico.** Paraleliza el uso de `dist` y `modules` al unísono destruyéndolos de un sablazo. Luego de correr este script, tu proyecto es casi una carpeta vacía que solo requiere de nuevo el uso clásico de `npm install`. |
+```mermaid
+graph TD
+    A[Cliente: Claude Code] -->|Request + Audit Session Header| B(Fastify Proxy)
+    B -->|Hook: preHandler| C{SessionService}
+    C -->|ID Resuelto| D[AuditWriter: Guardar Request Body]
+    B -->|Transmisión| E[Upstream: API Anthropic]
+    E -->|Response Stream| F{ProxyController: Interceptor}
+    F -->|Clonación de Stream| G[Transmisión al Cliente]
+    F -->|Clonación de Stream| H[AuditWriter: Procesamiento]
+    H -->|Si SSE| I[response.sse.jsonl]
+    H -->|Si Gzip| J[Gunzip -> response.body.json]
+    H -->|Finalización| K[meta.json + Markdown]
+```
 
 ---
 
-## 📡 Endpoints (API REST Básica)
+## 🚀 Casos de Uso del Sistema
 
-La API levanta bajo el puerto estandarizado `3000`. Como regla arquitectónica el versionado principal usa de prefijo: `/api/v1/items`.
+### 🔍 Observabilidad de Flujos SSE
+A diferencia de un proxy genérico, este sistema "entiende" los flujos binarios de Anthropic.
+- Extrae cada línea de datos y la convierte en una entrada con _timestamp_ en `response.sse.jsonl`.
+- Permite el volcado binario crudo (`response.sse.txt`) para depuración de paridad de protocolos.
 
-| Categoría | Método | Base | ID/Params | Descripción Funcional | Payload/Body Típico |
-|:---:|:---:|---|---|---|---|
-| Lectura | **GET** | `/` | *-* | Devuelve un listado genérico de de objetos `Item` activos en tabla. | `(Vacío)` |
-| Lectura Única | **GET** | `/:id` | `:id` alfanumérico | Rastrea en cache local el ítem que coincida con ese ID exacto. Devuelve 404 si falla. | `(Vacío)` |
-| Creación | **POST** | `/` | *-* | Ingresa e hidrata un nuevo elemento a memoria, devolviendo un ID autogenerado. | `{"name":"Laptop", "price": 1500}` |
-| Modificación | **PUT** | `/:id` | `:id` alfanumérico | Reemplaza destructivamente (overwrite total) los datos de la entidad referenciada por su ID. | `{"name":"MacBook", "price": 1500}` |
-| Borrado | **DELETE** | `/:id` | `:id` alfanumérico | Retira irrevocablemente de sistema al ítem seleccionado. Devuelve estatus `204`. | `(Vacío)` |
+### 🛡️ Privacidad Avanzada
+El diseño garantiza que nunca se filtren API Keys a los logs de servidor ni a los archivos de auditoría físicos, permitiendo compartir los volcados de sesión de forma segura entre equipos de desarrollo.
+
+### 📦 Gestión de Sesiones Persistentes
+Ideal para depurar comportamientos erráticos en herramientas de CLI (como `claude`):
+- Agrupa todas las peticiones bajo una carpeta de sesión nombrada (ej. `sessions/debug-feature-x/`).
+- Mantiene un archivo `meta.json` final por cada petición con estadísticas de duración, conteo de líneas SSE y bytes totales.
+
+> [!WARNING]
+> **Riesgos de Seguridad**: Los directorios de auditoría pueden contener API keys, tokens y contenido de conversaciones en claro si se desactiva la redacción. Restringe los permisos del directorio `sessions/` y manténlo fuera de repositorios públicos.
 
 ---
-*Desarrollo propulsado por Modelos Estrictos (Antigravity).*
+
+## 📂 Referencia de Archivos de Auditoría
+
+Cada petición genera una estructura jerárquica en `./sessions/<session-id>/requests/<seq>_<req-id>/`:
+
+| Archivo | Contenido |
+|---------|-----------|
+| `meta.json` | Informe final de la transacción (performance, estatus, truncado). |
+| `request.headers.json` | Cabeceras enviadas (sanitizadas). |
+| `request.body.bin` | Cuerpo crudo de la petición. |
+| `request.body.parsed.md` | Vista Markdown legible del JSON de petición. |
+| `response.headers.json` | Cabeceras de respuesta (específico para flujos SSE). |
+| `response.body.json` | Cuerpo de respuesta final (si no es SSE). |
+| `response.body.parsed.md` | Vista Markdown legible del JSON de respuesta. |
+| `response.sse.jsonl` | Cada evento del stream capturado secuencialmente. |
+| `response.sse.txt` | Volcado binario crudo del stream (si `AUDIT_SSE_RAW=1`). |
+
+---
+
+## ⚙️ Configuración (Matriz de Entorno)
+
+Personaliza el comportamiento ajustando estas variables en tu entorno o en un archivo `.env`:
+
+| Categoría | Variable | Descripción | Default |
+|:---:|---|---|---|
+| **Upstream** | `UPSTREAM_ORIGIN` | URL objetivo de Anthropic. | `https://api.anthropic.com` |
+| | `UPSTREAM_ACCEPT_ENCODING` | Control de compresión (`identity`, `gzip`, `pass`). | `identity` |
+| **Auditoría** | `AUDIT_ENABLED` | Activa/Desactiva el volcado de datos a disco. | `1` (Activo) |
+| | `AUDIT_SESSIONS_DIR` | Carpeta raíz para las capturas. | `sessions` |
+| | `AUDIT_SSE_RAW` | Activa el volcado binario `.sse.txt`. | `0` (Desactivo) |
+| | `AUDIT_SESSION_HASH_SUFFIX` | Reduce colisiones añadiendo hash8 al ID de sesión. | `0` (Desactivo) |
+| **Headers** | `AUDIT_SESSION_OVERRIDE_HEADER` | Cabecera primaria de sesión. | `x-cc-audit-session` |
+| | `AUDIT_SESSION_FALLBACK_HEADER` | Cabecera secundaria (ej. Claude Code original). | `x-claude-code-session-id` |
+| **Límites** | `MAX_RESPONSE_BUFFER_BYTES` | Tope de buffer en memoria para respuestas no-SSE. | `100MB` |
+| | `MAX_AUDIT_RESPONSE_BODY_BYTES` | Tope de archivo físico para el cuerpo. | `50MB` |
+
+---
+
+## 🛠 UX de Desarrollo (Workflow)
+
+### Instrucciones de Inicio Rápido
+1.  **Instalar dependencias**: `npm install`
+2.  **Modo Desarrollo**: `npm run dev` (Inicia en port `8787` por defecto).
+3.  **Compilación**: `npm run build` (Genera `/dist` optimizado con `tsup`).
+
+### Interpretación de Auditoría
+Tras cada petición, se genera una estructura en `./sessions/<session-id>/requests/<seq>_<uuid>/`:
+- `meta.json`: El informe final de la transacción.
+- `request.headers.json`: Cabeceras originales (sanitizadas por `RedactService`).
+- `response.body.json`: El cuerpo de respuesta final (si no es SSE).
+- `response.sse.jsonl`: Cada evento del stream capturado secuencialmente.
+
+---
+> [!NOTE]
+> Este proyecto utiliza **Inyección de Dependencias** manual para facilitar las pruebas unitarias de los servicios sin necesidad de levantar el servidor completo.

@@ -118,7 +118,7 @@ export class SseReconstructService {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ): Promise<any> {
     // Importación dinámica para evitar fallo si @anthropic-ai/sdk no está instalado
-     
+
     // Importación dinámica para compatibilidad con Native ESM
     const { default: Anthropic } = await import('@anthropic-ai/sdk');
 

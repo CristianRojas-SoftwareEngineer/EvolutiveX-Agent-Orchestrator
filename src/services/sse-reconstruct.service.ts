@@ -3,6 +3,7 @@ import * as fs from 'node:fs/promises';
 import { AuditWriterService } from './audit-writer.service.js';
 import { MarkdownRendererService } from './markdown-renderer.service.js';
 import { SseReconstructOptions, SseReconstructResult } from '../interfaces/audit.interface.js';
+import type Anthropic from '@anthropic-ai/sdk';
 import { JsonValue } from '../interfaces/json.interface.js';
 
 /** URL base utilizada internamente para el SDK durante el replay. */
@@ -115,8 +116,7 @@ export class SseReconstructService {
   private async reconstructMessageFromSseBytes(
     sseBuffer: Buffer,
     useBeta: boolean,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ): Promise<any> {
+  ): Promise<Anthropic.Message | Anthropic.Beta.Messages.BetaMessage> {
     // Importación dinámica para evitar fallo si @anthropic-ai/sdk no está instalado
 
     // Importación dinámica para compatibilidad con Native ESM
@@ -137,12 +137,10 @@ export class SseReconstructService {
     const params = {
       model: this.replayModel,
       max_tokens: 1024,
-      messages: [{ role: 'user', content: ' ' }],
+      messages: [{ role: 'user' as const, content: ' ' }],
     };
 
-    const stream = useBeta
-      ? client.beta.messages.stream(params as any)
-      : client.messages.stream(params as any);
+    const stream = useBeta ? client.beta.messages.stream(params) : client.messages.stream(params);
 
     return stream.finalMessage();
   }
@@ -162,8 +160,10 @@ export class SseReconstructService {
   /**
    * Escribe el cuerpo reconstruido del mensaje en los archivos estándar de auditoría.
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private async writeSseReconstructedResponseBody(requestDir: string, message: any): Promise<void> {
+  private async writeSseReconstructedResponseBody(
+    requestDir: string,
+    message: Anthropic.Message | Anthropic.Beta.Messages.BetaMessage,
+  ): Promise<void> {
     const plain = JSON.parse(JSON.stringify(message));
     await this.auditWriterService.writeFileAtomic(
       path.join(requestDir, 'response.body.json'),

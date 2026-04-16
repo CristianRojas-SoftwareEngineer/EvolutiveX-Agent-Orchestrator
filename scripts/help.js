@@ -12,9 +12,11 @@ console.log(`${bold}${cyan}=================================================${re
 
 console.log(`${bold}${magenta}🛠  ENTORNO LOCAL (Desarrollo)${reset}`);
 console.log(`  ${green}npm run dev${reset}       -> Levanta servidor TS en vivo (ts-node) ${yellow}[Principal usage]${reset}`);
-console.log(`  ${green}npm run lint${reset}      -> Analiza la calidad semántica del código (ESLint)`);
-console.log(`  ${green}npm run lint:fix${reset}  -> Repara auto. problemas lógicos del linting`);
+console.log(`  ${green}npm run lint${reset}      -> Analiza la calidad estática del código (ESLint)`);
+console.log(`  ${green}npm run lint:fix${reset}  -> Repara auto. problemas corregibles del linting`);
 console.log(`  ${green}npm run format${reset}    -> Unifica tabulaciones e identaciones (Prettier)`);
+console.log(`  ${green}npm run help${reset}      -> Muestra este panel de referencia de scripts`);
+console.log(`  ${green}npm test${reset}          -> Validación integral (Análisis estático + Compilación)`);
 
 console.log(`\n${bold}${magenta}📦  PRODUCCIÓN (CI/CD)${reset}`);
 console.log(`  ${green}npm run build${reset}     -> Compila óptimamente para Producción. Ejecuta:`);
@@ -25,5 +27,6 @@ console.log(`  ${green}npm start${reset}         -> Ejecuta servidor crudo desde
 
 console.log(`\n${bold}${magenta}🧹  SISTEMA DE RECUPERACIÓN (Troubleshooting)${reset}`);
 console.log(`  ${green}npm run clean:dist${reset}    -> Elimina carpeta compilada dist/`);
-console.log(`  ${green}npm run clean:modules${reset} -> Purga caché de node_modules/`);
-console.log(`  ${green}npm run clean${reset}         -> ${red}[Nuclear]${reset} Paraleliza borrado de dist y modules\n`);
+console.log(`  ${green}npm run clean:modules${reset}   -> Purga caché de node_modules/`);
+console.log(`  ${green}npm run clean:sessions${reset}  -> Elimina datos de auditoría (respeta AUDIT_SESSIONS_DIR)`);
+console.log(`  ${green}npm run clean${reset}           -> ${red}[Nuclear]${reset} Paraleliza borrado de dist y modules\n`);

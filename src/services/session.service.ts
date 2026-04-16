@@ -13,7 +13,7 @@ const FALLBACK_SESSION_DIR = '_unknown';
  */
 export class SessionService {
   /** Mapa para serializar la asignación asíncrona de secuencias por sesión. */
-  private sessionRequestChains = new Map<string, Promise<any>>();
+  private sessionRequestChains = new Map<string, Promise<void>>();
   /** La raíz del sistema de archivos donde se almacenan los datos de auditoría. */
   private auditBaseDir: string;
   /** Referencia a la configuración de entorno global. */
@@ -25,7 +25,9 @@ export class SessionService {
    */
   constructor(config: ProxyEnvironmentConfig, auditBaseDir: string = process.cwd()) {
     this.config = config;
-    this.auditBaseDir = path.isAbsolute(auditBaseDir) ? auditBaseDir : path.join(process.cwd(), auditBaseDir);
+    this.auditBaseDir = path.isAbsolute(auditBaseDir)
+      ? auditBaseDir
+      : path.join(process.cwd(), auditBaseDir);
   }
 
   /**
@@ -54,7 +56,7 @@ export class SessionService {
    * 2. Cabecera Secundaria (Fallback)
    * 3. ID de Sesión por Defecto
    * 4. Fallback a Desconocido
-   * 
+   *
    * @param headers Las cabeceras de la petición entrante.
    * @returns Un objeto que contiene el sessionId resuelto y la cabecera a eliminar.
    */
@@ -73,18 +75,24 @@ export class SessionService {
     const fb = tryNamedHeader(this.config.AUDIT_SESSION_FALLBACK_HEADER);
     if (fb) return fb;
 
-    if (this.config.DEFAULT_AUDIT_SESSION && String(this.config.DEFAULT_AUDIT_SESSION).trim() !== '') {
+    if (
+      this.config.DEFAULT_AUDIT_SESSION &&
+      String(this.config.DEFAULT_AUDIT_SESSION).trim() !== ''
+    ) {
       const raw = String(this.config.DEFAULT_AUDIT_SESSION).trim();
       return { sessionId: this.sessionIdFromRaw(raw), stripHeaderName: null };
     }
-    
+
     return { sessionId: FALLBACK_SESSION_DIR, stripHeaderName: null };
   }
 
   /**
    * Elimina una cabecera de sesión específica del objeto de cabeceras para evitar su exposición al upstream.
    */
-  public stripAuditHeaderInPlace(headers: Record<string, string | string[] | undefined>, headerName: string): void {
+  public stripAuditHeaderInPlace(
+    headers: Record<string, string | string[] | undefined>,
+    headerName: string,
+  ): void {
     if (!headers) return;
     const lower = String(headerName).toLowerCase();
     for (const k of Object.keys(headers)) {
@@ -97,7 +105,7 @@ export class SessionService {
   /**
    * Método thread-safe para obtener el siguiente número secuencial de petición para una sesión.
    * Utiliza una cadena de promesas para prevenir condiciones de carrera al leer/escribir archivos de secuencia.
-   * 
+   *
    * @param sessionId El ID de sesión resuelto.
    */
   public nextAuditRequestSequence(sessionId: string): Promise<number> {
@@ -120,7 +128,7 @@ export class SessionService {
     const key = String(sessionId);
     const prev = this.sessionRequestChains.get(key) || Promise.resolve();
     const result = prev.then(() => fn());
-    this.sessionRequestChains.set(key, result.catch(() => {}) as unknown as Promise<any>);
+    this.sessionRequestChains.set(key, result.catch(() => {}) as unknown as Promise<void>);
     return result;
   }
 
@@ -192,7 +200,10 @@ export class SessionService {
   /**
    * Ayudante para recuperar un único valor de cabecera de forma insensible a mayúsculas/minúsculas.
    */
-  private getHeaderValue(headers: Record<string, string | string[] | undefined>, name: string): string | undefined {
+  private getHeaderValue(
+    headers: Record<string, string | string[] | undefined>,
+    name: string,
+  ): string | undefined {
     const lower = String(name).toLowerCase();
     if (!headers) return undefined;
     for (const k of Object.keys(headers)) {
@@ -210,7 +221,11 @@ export class SessionService {
   private safeSessionDirName(raw: string): string {
     if (!raw) return FALLBACK_SESSION_DIR;
     const s = String(raw).trim().slice(0, 128);
-    const safe = s.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').replace(/^\.+/, '').replace(/\s+/g, '_');
+    const safe = s
+      // eslint-disable-next-line no-control-regex -- Requerido para compatibilidad con filenames en Windows
+      .replace(/[<>:"/\\|?*\x00-\x1f]/g, '_')
+      .replace(/^\.+/, '')
+      .replace(/\s+/g, '_');
     if (!safe || safe === '.' || safe === '..') return FALLBACK_SESSION_DIR;
     return safe;
   }
@@ -222,7 +237,7 @@ export class SessionService {
     const dir = this.safeSessionDirName(raw);
     if (!this.config.AUDIT_SESSION_HASH_SUFFIX) return dir;
     if (!raw || raw.trim() === '' || dir === FALLBACK_SESSION_DIR) return dir;
-    
+
     const h = createHash('sha256').update(raw.trim()).digest('hex').slice(0, 8);
     const base = dir.slice(0, 100);
     return `${base}-${h}`;

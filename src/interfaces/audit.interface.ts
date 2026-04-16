@@ -85,5 +85,16 @@ export interface AuditMetadata {
   /** Detalles sobre cualquier truncamiento de datos. */
   truncation: AuditTruncationMeta;
   /** Soporta extensiones arbitrarias (ej. sseLineCount). */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [key: string]: any;
+}
+
+declare module 'fastify' {
+  interface FastifyRequest {
+    auditSessionId?: string;
+    auditRequestDir?: string;
+    requestSequence?: number;
+    requestStartTime?: number;
+    requestBodyOmitted?: boolean;
+  }
 }

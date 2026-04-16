@@ -2,10 +2,9 @@ import { FastifyRequest, FastifyReply } from 'fastify';
 import { SessionService } from '../services/session.service';
 import { AuditWriterService } from '../services/audit-writer.service';
 import { ProxyEnvironmentConfig } from '../interfaces/config.interface';
-import * as http from 'http';
 import * as zlib from 'zlib';
 import { StringDecoder } from 'string_decoder';
-import { PassThrough, Readable } from 'stream';
+import { PassThrough } from 'stream';
 
 /**
  * Controlador principal que orquesta la lógica del proxy y la intercepción de auditoría.
@@ -15,7 +14,7 @@ export class ProxyController {
   constructor(
     private sessionService: SessionService,
     private auditWriterService: AuditWriterService,
-    private config: ProxyEnvironmentConfig
+    private config: ProxyEnvironmentConfig,
   ) {}
 
   /**
@@ -24,9 +23,9 @@ export class ProxyController {
    * - Elimina las cabeceras de sesión si está configurado.
    * - Inicializa la auditoría de la petición y guarda su cuerpo.
    */
-  public async preHandler(request: any, reply: any) {
+  public async preHandler(request: FastifyRequest, _reply: FastifyReply) {
     const rawBody = (request.body as Buffer) || Buffer.alloc(0);
-    
+
     const auditSession = this.sessionService.getAuditSessionId(request.headers);
     const auditSessionId = auditSession.sessionId;
     request.auditSessionId = auditSessionId;
@@ -53,8 +52,8 @@ export class ProxyController {
 
         request.auditRequestDir = wr.dir;
         request.requestBodyOmitted = wr.requestBodyOmitted;
-      } catch (err: any) {
-        request.log.error(err, 'Error en writeRequestAudit');
+      } catch (err: unknown) {
+        request.log.error(err as Error, 'Error en writeRequestAudit');
       }
     }
   }
@@ -65,13 +64,24 @@ export class ProxyController {
    * - Gestiona la descompresión Gzip en la rama de auditoría.
    * - Despacha a la lógica de captura para SSE o cuerpos estándar.
    */
-  public onResponseInterceptor(request: any, reply: any, res: any) {
+  public onResponseInterceptor(
+    request: FastifyRequest,
+    reply: FastifyReply,
+    res: {
+      statusCode: number;
+      headers: Record<string, string | string[] | undefined>;
+      stream: NodeJS.ReadableStream;
+      body?: unknown;
+    },
+  ) {
     reply.status(res.statusCode || 500);
-    
+
     const contentType = String(res.headers['content-type'] || '').toLowerCase();
     const isSse = contentType.includes('text/event-stream');
-    const isGzip = String(res.headers['content-encoding'] || '').toLowerCase().includes('gzip');
-    
+    const isGzip = String(res.headers['content-encoding'] || '')
+      .toLowerCase()
+      .includes('gzip');
+
     const headers = { ...res.headers };
     if (isGzip) {
       delete headers['content-encoding'];
@@ -82,9 +92,16 @@ export class ProxyController {
     const auditStream = new PassThrough();
     const clientStream = new PassThrough();
 
-    let sourceStream: any = res.stream || res;
-    if (typeof sourceStream.pipe !== 'function' && res.body && typeof res.body.pipe === 'function') {
-      sourceStream = res.body;
+    let sourceStream: NodeJS.ReadableStream =
+      res.stream || (res as unknown as NodeJS.ReadableStream);
+    if (
+      typeof sourceStream.pipe !== 'function' &&
+      res.body &&
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      typeof (res.body as any).pipe === 'function'
+    ) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      sourceStream = res.body as any;
     }
 
     sourceStream.pipe(auditStream);
@@ -103,11 +120,13 @@ export class ProxyController {
     let totalBytes = 0;
     let sseRawBytesWritten = 0;
     let sseRawTruncated = false;
-    
+
     if (isSse) {
       // Auditar cabeceras SSE si está habilitado
       if (this.config.AUDIT_ENABLED && auditDir) {
-        this.auditWriterService.writeResponseHeadersAudit(auditDir, res.headers).catch(e => request.log.error(e, 'Error al escribir cabeceras SSE'));
+        this.auditWriterService
+          .writeResponseHeadersAudit(auditDir, res.headers)
+          .catch((e) => request.log.error(e, 'Error al escribir cabeceras SSE'));
       }
 
       const decoder = new StringDecoder('utf8');
@@ -122,16 +141,27 @@ export class ProxyController {
 
       streamToAudit.on('data', (chunk: Buffer) => {
         totalBytes += chunk.length;
-        
+
         // Lógica de captura de SSE crudo (Raw)
-        if (this.config.AUDIT_ENABLED && this.config.AUDIT_SSE_RAW && auditDir && !sseRawTruncated) {
+        if (
+          this.config.AUDIT_ENABLED &&
+          this.config.AUDIT_SSE_RAW &&
+          auditDir &&
+          !sseRawTruncated
+        ) {
           if (sseRawBytesWritten + chunk.length <= maxSseRaw) {
-            this.auditWriterService.appendSseRawChunk(auditDir, chunk).catch(e => request.log.error(e, 'Error al escribir SSE crudo'));
+            this.auditWriterService
+              .appendSseRawChunk(auditDir, chunk)
+              .catch((e) => request.log.error(e, 'Error al escribir SSE crudo'));
             sseRawBytesWritten += chunk.length;
           } else {
             const remaining = maxSseRaw - sseRawBytesWritten;
             if (remaining > 0) {
-              this.auditWriterService.appendSseRawChunk(auditDir, chunk.subarray(0, remaining)).catch(e => request.log.error(e, 'Error al escribir fragmento final de SSE crudo'));
+              this.auditWriterService
+                .appendSseRawChunk(auditDir, chunk.subarray(0, remaining))
+                .catch((e) =>
+                  request.log.error(e, 'Error al escribir fragmento final de SSE crudo'),
+                );
               sseRawBytesWritten += remaining;
             }
             sseRawTruncated = true;
@@ -140,21 +170,23 @@ export class ProxyController {
 
         // Extracción de líneas SSE para auditoría en JSONL
         lineBuffer += decoder.write(chunk);
-        
+
         let idx;
         while ((idx = lineBuffer.indexOf('\n')) >= 0) {
           const line = lineBuffer.slice(0, idx);
           lineBuffer = lineBuffer.slice(idx + 1);
           const trimmed = line.replace(/\r$/, '').trim();
-          
+
           if (trimmed !== '') {
             sseLineIndex++;
             if (this.config.AUDIT_ENABLED && auditDir) {
-              this.auditWriterService.appendSseLine(auditDir, {
-                i: sseLineIndex,
-                ts: new Date().toISOString(),
-                line: trimmed
-              }).catch(err => request.log.error(err, 'Error en appendSseLine'));
+              this.auditWriterService
+                .appendSseLine(auditDir, {
+                  i: sseLineIndex,
+                  ts: new Date().toISOString(),
+                  line: trimmed,
+                })
+                .catch((err) => request.log.error(err, 'Error en appendSseLine'));
             }
           }
         }
@@ -166,11 +198,13 @@ export class ProxyController {
         if (finalTrimmed !== '') {
           sseLineIndex++;
           if (this.config.AUDIT_ENABLED && auditDir) {
-            await this.auditWriterService.appendSseLine(auditDir, {
-              i: sseLineIndex,
-              ts: new Date().toISOString(),
-              line: finalTrimmed
-            }).catch(err => request.log.error(err, 'Error en appendSseLine final'));
+            await this.auditWriterService
+              .appendSseLine(auditDir, {
+                i: sseLineIndex,
+                ts: new Date().toISOString(),
+                line: finalTrimmed,
+              })
+              .catch((err) => request.log.error(err, 'Error en appendSseLine final'));
           }
         }
 
@@ -178,11 +212,10 @@ export class ProxyController {
           await this.writeFinalMeta(request, res, totalBytes, true, sseLineIndex, {
             sseRawBytesWritten,
             sseRawTruncatedByLimit: sseRawTruncated,
-            streamError
+            streamError,
           });
         }
       });
-
     } else {
       // Lógica para capturar cuerpos de respuesta completos (JSON, etc.)
       const chunks: Buffer[] = [];
@@ -216,36 +249,54 @@ export class ProxyController {
   /**
    * Ayudante interno para compilar métricas y escribir el archivo meta.json final.
    */
-  private async writeFinalMeta(request: any, res: any, totalBytes: number, isSse: boolean, sseLineCount?: number, sseExtra?: any) {
+  private async writeFinalMeta(
+    request: FastifyRequest,
+    res: { statusCode: number; headers: Record<string, string | string[] | undefined> },
+    totalBytes: number,
+    isSse: boolean,
+    sseLineCount?: number,
+    sseExtra?: {
+      sseRawBytesWritten: number;
+      sseRawTruncatedByLimit: boolean;
+      streamError: boolean;
+    },
+  ) {
     const auditDir = request.auditRequestDir;
     if (!auditDir) return;
 
     await this.auditWriterService.writeMetaAtomic(auditDir, {
       requestId: request.id,
-      requestSequence: request.requestSequence,
-      auditSessionId: request.auditSessionId,
+      requestSequence: request.requestSequence || 0,
+      auditSessionId: request.auditSessionId || '',
       method: request.method,
       url: request.url,
       upstream: this.config.UPSTREAM_ORIGIN,
-      startedAt: new Date(request.requestStartTime).toISOString(),
+      startedAt: new Date(request.requestStartTime || 0).toISOString(),
       endedAt: new Date().toISOString(),
-      durationMs: Date.now() - request.requestStartTime,
+      durationMs: Date.now() - (request.requestStartTime || 0),
       statusCode: res.statusCode || null,
       sse: isSse,
-      requestBodyBytes: (request.body as Buffer)?.length || 0,
+      requestBodyBytes: (request.body as Buffer | undefined)?.length || 0,
       responseReceived: true,
       responseBodyComplete: !sseExtra?.streamError,
       sseLineCount: sseLineCount,
       truncation: {
         requestBodyOmitted: !!request.requestBodyOmitted,
         responseBodyBytesTotal: totalBytes,
-        responseBodyBytesAudited: isSse ? null : Math.min(totalBytes, this.config.MAX_AUDIT_RESPONSE_BODY_BYTES),
-        responseTruncatedByProxyBuffer: isSse ? false : totalBytes > this.config.MAX_RESPONSE_BUFFER_BYTES,
-        responseTruncatedByAuditLimit: isSse ? false : totalBytes > this.config.MAX_AUDIT_RESPONSE_BODY_BYTES,
+        responseBodyBytesAudited: isSse
+          ? null
+          : Math.min(totalBytes, this.config.MAX_AUDIT_RESPONSE_BODY_BYTES),
+        responseTruncatedByProxyBuffer: isSse
+          ? false
+          : totalBytes > this.config.MAX_RESPONSE_BUFFER_BYTES,
+        responseTruncatedByAuditLimit: isSse
+          ? false
+          : totalBytes > this.config.MAX_AUDIT_RESPONSE_BODY_BYTES,
         sseRawBytesAudited: sseExtra?.sseRawBytesWritten || null,
+        sseRawBytesLimit: isSse ? this.config.MAX_AUDIT_SSE_RAW_BYTES : null,
         sseRawTruncatedByLimit: sseExtra?.sseRawTruncatedByLimit || false,
-      }
+        sseRawWriteError: sseExtra?.streamError || false,
+      },
     });
   }
 }
-

@@ -1,7 +1,8 @@
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import { RedactService } from './redact.service';
-import { AuditMetadata } from '../interfaces/audit.interface';
+import { AuditMetadata, SseLine } from '../interfaces/audit.interface';
+import { JsonValue } from '../interfaces/json.interface';
 
 /**
  * Servicio encargado de la persistencia física de los logs de auditoría.
@@ -11,7 +12,7 @@ export class AuditWriterService {
   constructor(private redactService: RedactService) {}
 
   /**
-   * Escribe datos en un archivo de forma atómica escribiendo primero en un archivo temporal 
+   * Escribe datos en un archivo de forma atómica escribiendo primero en un archivo temporal
    * y luego renombrándolo. Asegura que fallos del sistema no dejen archivos parcialmente escritos.
    */
   public async writeFileAtomic(filePath: string, data: Buffer | string): Promise<void> {
@@ -25,7 +26,7 @@ export class AuditWriterService {
   /**
    * Ayudante para escribir un objeto como un archivo JSON con formato (pretty-print) de forma atómica.
    */
-  public async writeJsonAtomic(filePath: string, obj: any): Promise<void> {
+  public async writeJsonAtomic(filePath: string, obj: JsonValue): Promise<void> {
     return this.writeFileAtomic(filePath, Buffer.from(JSON.stringify(obj, null, 2), 'utf8'));
   }
 
@@ -33,11 +34,18 @@ export class AuditWriterService {
    * Genera tanto un JSON formateado como una vista en Markdown para un cuerpo parseado.
    * Útil para desarrolladores que revisan el tráfico capturado.
    */
-  public async writeFormattedAndMarkdown(requestDir: string, baseName: string, parsed: any): Promise<void> {
+  public async writeFormattedAndMarkdown(
+    requestDir: string,
+    baseName: string,
+    parsed: JsonValue,
+  ): Promise<void> {
     await this.writeJsonAtomic(path.join(requestDir, `${baseName}.formatted.json`), parsed);
     try {
       const md = `\`\`\`json\n${JSON.stringify(parsed, null, 2)}\n\`\`\`\n`;
-      await this.writeFileAtomic(path.join(requestDir, `${baseName}.parsed.md`), Buffer.from(md, 'utf8'));
+      await this.writeFileAtomic(
+        path.join(requestDir, `${baseName}.parsed.md`),
+        Buffer.from(md, 'utf8'),
+      );
     } catch {
       /* ignorar error de markdown */
     }
@@ -46,20 +54,23 @@ export class AuditWriterService {
   /**
    * Inicializa el directorio de auditoría de la petición y guarda los metadatos iniciales.
    * Gestiona la omisión del cuerpo si excede los límites configurados.
-   * 
+   *
    * @returns La ruta del directorio y si el cuerpo fue omitido.
    */
   public async writeRequestAudit(params: {
     baseDir: string;
     sessionId: string;
     folderName: string;
-    headers: any;
+    headers: Record<string, string | string[] | undefined>;
     bodyBuffer: Buffer | null;
     maxAuditRequestBytes: number;
   }): Promise<{ dir: string; requestBodyOmitted: boolean }> {
     const dir = path.join(params.baseDir, params.sessionId, 'requests', params.folderName);
     await fs.mkdir(dir, { recursive: true });
-    await this.writeJsonAtomic(path.join(dir, 'request.headers.json'), params.headers);
+    await this.writeJsonAtomic(
+      path.join(dir, 'request.headers.json'),
+      params.headers as unknown as JsonValue,
+    );
 
     const size = params.bodyBuffer ? params.bodyBuffer.length : 0;
     if (size === 0 || !params.bodyBuffer) {
@@ -77,7 +88,10 @@ export class AuditWriterService {
 
     await this.writeFileAtomic(
       path.join(dir, 'request.body.omitted.txt'),
-      Buffer.from(`Omitted: request body is ${size} bytes (limit MAX_AUDIT_REQUEST_BODY_BYTES=${params.maxAuditRequestBytes}).`, 'utf8')
+      Buffer.from(
+        `Omitted: request body is ${size} bytes (limit MAX_AUDIT_REQUEST_BODY_BYTES=${params.maxAuditRequestBytes}).`,
+        'utf8',
+      ),
     );
     return { dir, requestBodyOmitted: true };
   }
@@ -93,11 +107,15 @@ export class AuditWriterService {
     maxAuditResponseBytes: number;
     maxBufferBytes: number;
     contentType: string;
-  }): Promise<{ responseBodyBytesAudited: number; responseTruncatedByProxyBuffer: boolean; responseTruncatedByAuditLimit: boolean }> {
-    
+  }): Promise<{
+    responseBodyBytesAudited: number;
+    responseTruncatedByProxyBuffer: boolean;
+    responseTruncatedByAuditLimit: boolean;
+  }> {
     const slice = params.bodyBuffer.subarray(0, params.maxAuditResponseBytes);
     const lostInProxyBuffer = params.totalBytes > params.bodyBuffer.length;
-    const truncatedAudit = params.totalBytes > params.maxAuditResponseBytes || slice.length < params.totalBytes;
+    const truncatedAudit =
+      params.totalBytes > params.maxAuditResponseBytes || slice.length < params.totalBytes;
     const ext = String(params.contentType || '').includes('json') ? 'json' : 'bin';
 
     if (slice.length > 0) {
@@ -111,15 +129,24 @@ export class AuditWriterService {
     }
 
     if (truncatedAudit || lostInProxyBuffer) {
-       await this.writeFileAtomic(
-          path.join(params.requestDir, 'response.body.omitted.txt'),
-          Buffer.from([
+      await this.writeFileAtomic(
+        path.join(params.requestDir, 'response.body.omitted.txt'),
+        Buffer.from(
+          [
             `Total bytes received from upstream: ${params.totalBytes}.`,
             `Bytes available in proxy buffer: ${params.bodyBuffer.length}.`,
-            lostInProxyBuffer ? `Proxy buffer cap MAX_RESPONSE_BUFFER_BYTES=${params.maxBufferBytes}.` : '',
-            truncatedAudit ? `Audit stored up to MAX_AUDIT_RESPONSE_BODY_BYTES=${params.maxAuditResponseBytes}.` : '',
-          ].filter(Boolean).join(' '), 'utf8')
-       );
+            lostInProxyBuffer
+              ? `Proxy buffer cap MAX_RESPONSE_BUFFER_BYTES=${params.maxBufferBytes}.`
+              : '',
+            truncatedAudit
+              ? `Audit stored up to MAX_AUDIT_RESPONSE_BODY_BYTES=${params.maxAuditResponseBytes}.`
+              : '',
+          ]
+            .filter(Boolean)
+            .join(' '),
+          'utf8',
+        ),
+      );
     }
 
     return {
@@ -132,21 +159,27 @@ export class AuditWriterService {
   /**
    * Persiste las cabeceras de respuesta (generado solo para respuestas SSE en paridad con el sistema legacy).
    */
-  public async writeResponseHeadersAudit(requestDir: string, headers: any): Promise<void> {
-    await this.writeJsonAtomic(path.join(requestDir, 'response.headers.json'), headers);
+  public async writeResponseHeadersAudit(
+    requestDir: string,
+    headers: Record<string, string | string[] | undefined>,
+  ): Promise<void> {
+    await this.writeJsonAtomic(
+      path.join(requestDir, 'response.headers.json'),
+      headers as unknown as JsonValue,
+    );
   }
 
   /**
    * Guarda el archivo final meta.json con todas las métricas de petición/respuesta.
    */
   public async writeMetaAtomic(requestDir: string, meta: AuditMetadata): Promise<void> {
-    await this.writeJsonAtomic(path.join(requestDir, 'meta.json'), meta);
+    await this.writeJsonAtomic(path.join(requestDir, 'meta.json'), meta as unknown as JsonValue);
   }
 
   /**
    * Añade una línea de evento SSE capturada al log .jsonl.
    */
-  public async appendSseLine(requestDir: string, lineObj: any): Promise<void> {
+  public async appendSseLine(requestDir: string, lineObj: SseLine): Promise<void> {
     const p = path.join(requestDir, 'response.sse.jsonl');
     const line = `${JSON.stringify(lineObj)}\n`;
     await fs.appendFile(p, line, 'utf8');

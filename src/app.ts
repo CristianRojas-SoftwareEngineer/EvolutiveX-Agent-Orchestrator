@@ -1,5 +1,6 @@
 import fastify from 'fastify';
 import { proxyRoutes } from './routes/proxy';
+import { config } from './config/env.config';
 
 /**
  * Función factory para construir y configurar la instancia de la aplicación Fastify.
@@ -14,9 +15,9 @@ export function buildApp() {
    * Configura el límite global de cuerpo para el parsing de buffer crudo.
    * Esto es esencial para que el proxy gestione payloads binarios grandes.
    */
-  const bodyLimitRaw = process.env.MAX_REQUEST_BODY || '50mb';
-  const bodyLimit = bodyLimitRaw.toLowerCase().endsWith('mb') 
-    ? parseInt(bodyLimitRaw) * 1024 * 1024 
+  const bodyLimitRaw = config.MAX_REQUEST_BODY;
+  const bodyLimit = bodyLimitRaw.toLowerCase().endsWith('mb')
+    ? parseInt(bodyLimitRaw) * 1024 * 1024
     : 50 * 1024 * 1024;
 
   /**
@@ -24,12 +25,12 @@ export function buildApp() {
    * Esto permite que el proxy intercepte cualquier tipo de contenido como un Buffer.
    */
   app.removeAllContentTypeParsers();
-  app.addContentTypeParser('*', { parseAs: 'buffer', bodyLimit }, function (req, body, done) {
+  app.addContentTypeParser('*', { parseAs: 'buffer', bodyLimit }, function (_req, body, done) {
     done(null, body);
   });
 
   // Endpoint de salud para monitoreo
-  app.get('/health', async (request, reply) => {
+  app.get('/health', async (_request, _reply) => {
     return { status: 'OK' };
   });
 

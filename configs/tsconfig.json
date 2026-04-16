@@ -3,7 +3,7 @@
     "target": "ES2022",
     "module": "Node16",
     "moduleResolution": "Node16",
-    "rootDir": "src",
+    "rootDir": "../src",
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "strict": true,
@@ -11,5 +11,5 @@
     "types": ["node"],
     "declaration": true
   },
-  "include": ["src/**/*"]
+  "include": ["../src/**/*"]
 }

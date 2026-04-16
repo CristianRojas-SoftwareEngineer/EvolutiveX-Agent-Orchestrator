@@ -156,6 +156,31 @@ El sistema previene la saturación en memoria o disco ignorando la escritura si 
 3.  **Compilación**: `npm run build` (Genera `/dist` optimizado).
 4.  **Limpieza**: `npm run clean` (Purga `dist/` y `node_modules/`). Para eliminar datos de auditoría acumulados: `npm run clean:sessions`.
 
+## 🐳 Docker y Contenerización
+
+Los artefactos para la contenerización del proyecto se han centralizado en el directorio `containerization/`.
+
+- `containerization/Dockerfile`: imagen multi-etapa optimizada para producción.
+- `containerization/.dockerignore`: entradas ignoradas para construir la imagen sin archivos de desarrollo ni artefactos.
+
+Instrucciones básicas:
+
+1.  Construir la imagen (desde la raíz del repositorio):
+
+    - `docker build -f containerization/Dockerfile -t smart-code-proxy:latest .`
+
+2.  Ejecutar el contenedor (crea y monta `sessions/` como volumen):
+
+    - `docker run -it --rm -p 8787:8787 -v "$(pwd)/sessions:/app/sessions" --env-file configs/.env smart-code-proxy:latest`
+
+3.  Notas importantes:
+
+    - El `Dockerfile` usa una etapa `builder` para compilar TypeScript y una etapa final mínima basada en `node:20-alpine`.
+    - Asegúrate de no incluir `sessions/`, `dist/` ni `node_modules/` en la imagen: estos están listados en `containerization/.dockerignore`.
+    - Para desarrollo iterativo es recomendable usar `npm run dev` localmente en lugar de reconstruir la imagen cada cambio.
+
+Para más detalles y comandos alternativos, consulta `docs/dockerization.md`.
+
 ### Interpretación de Auditoría
 
 Tras cada petición, se genera una estructura en `./sessions/<session-id>/requests/<seq>_<uuid>/` con los archivos documentados en la [§ Referencia de Archivos de Auditoría](#archivos-auditoria).

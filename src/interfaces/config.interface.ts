@@ -24,7 +24,7 @@ export interface ProxyEnvironmentConfig {
   /** Límite para guardar el cuerpo de la respuesta en disco (response.body.json). */
   MAX_AUDIT_RESPONSE_BODY_BYTES: number;
 
-  /** Límite para guardar el volcado binario crudo de SSE en disco (response.sse.txt). */
+  /** Límite para guardar el volcado binario crudo de SSE en disco (response.sse.txt). 0 = ilimitado. */
   MAX_AUDIT_SSE_RAW_BYTES: number;
 
   /** Interruptor maestro global para la auditoría en disco. */
@@ -40,7 +40,7 @@ export interface ProxyEnvironmentConfig {
   AUDIT_SESSION_OVERRIDE_HEADER: string;
 
   /** Cabecera secundaria para resolver el Session ID si la primaria no existe. */
-  AUDIT_SESSION_FALLBACK_HEADER?: string;
+  AUDIT_SESSION_FALLBACK_HEADER: string;
 
   /** Nombre por defecto de la carpeta de sesión si no hay cabeceras que coincidan. */
   DEFAULT_AUDIT_SESSION: string;
@@ -50,4 +50,25 @@ export interface ProxyEnvironmentConfig {
 
   /** Control de compresión (gzip, identity) al comunicarse con el upstream. */
   UPSTREAM_ACCEPT_ENCODING: string;
+
+  /** Habilita la reconstrucción del cuerpo completo desde bytes SSE grabados. */
+  AUDIT_SSE_RESPONSE_BODY: boolean;
+
+  /** Si es true, requiere que AUDIT_SSE_RAW esté activo para intentar la reconstrucción. */
+  AUDIT_SSE_RESPONSE_BODY_REQUIRE_RAW: boolean;
+
+  /** Fuerza el uso de la API beta del SDK de Anthropic para la reconstrucción SSE. */
+  AUDIT_SSE_RESPONSE_BODY_FORCE_BETA: boolean;
+
+  /** Modelo usado internamente por el SDK para el replay SSE. */
+  AUDIT_SSE_REPLAY_MODEL: string;
+
+  /** Si es true, redacta datos sensibles en la salida de consola. */
+  CONSOLE_REDACT: boolean;
+
+  /** Si es true, loguea eventos SSE individuales a la consola. */
+  LOG_SSE: boolean;
+
+  /** Límite de bytes para loguear cuerpos en consola. */
+  MAX_BODY_LOG_BYTES: number;
 }

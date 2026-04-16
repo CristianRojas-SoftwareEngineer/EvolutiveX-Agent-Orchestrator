@@ -191,7 +191,7 @@ No hay un único formato de log impuesto por OpenRouter. En integraciones habitu
 - **Líneas JSONL** (p. ej. `router-requests.jsonl`): campos como `timestamp`, `launch_id`, `slot`, `model`, objeto `tokens` derivado de `usage`, y `cost` desde `usage.cost`.
 - **Cuerpos guardados** de respuestas HTTP: el mismo `usage` que en la API.
 
-**Contraste:** la auditoría del [proxy de observabilidad](../README.md) bajo `sessions/<session-id>/requests/NNNNNN_<id>/` describe el tráfico hacia **api.anthropic.com**, no un contrato oficial de OpenRouter. Para árbol de archivos y `meta.json` del proxy, la skill **`anthropic-observability-proxy`** aplica al proxy Anthropic, no a OpenRouter.
+**Contraste:** la auditoría del [proxy de observabilidad](../README.md) bajo `sessions/<session-id>/requests/NNNNNN_<id>/` describe el tráfico hacia **api.anthropic.com**, no un contrato oficial de OpenRouter. Para árbol de archivos y `meta.json` del proxy, la skill **`smart-code-proxy`** aplica al proxy Anthropic, no a OpenRouter.
 
 ---
 
@@ -225,6 +225,6 @@ Las peticiones y los logs pueden incluir **claves API** en cabeceras y **conteni
 
 ## 13. Misma guía en Claude Code (opcional)
 
-Las convenciones de esta guía están recogidas en la skill global **`openrouter-api-cost-estimation`** (instalación típica: `~/.claude/skills/openrouter-api-cost-estimation/`), pensada para interpretar `ResponseUsage`, streaming y agregación desde logs. Para la API Messages de Anthropic y sesiones del proxy en disco, usáis **`anthropic-api-cost-estimation`** y **`anthropic-observability-proxy`** según corresponda.
+Las convenciones de esta guía están recogidas en la skill global **`openrouter-api-cost-estimation`** (instalación típica: `~/.claude/skills/openrouter-api-cost-estimation/`), pensada para interpretar `ResponseUsage`, streaming y agregación desde logs. Para la API Messages de Anthropic y sesiones del proxy en disco, usáis **`anthropic-api-cost-estimation`** y **`smart-code-proxy`** según corresponda.
 
 Mantén alineados el presente documento y los archivos `references/*.md` de esa skill cuando cambie el contrato semántico (véase `MAINTENANCE.md` en el directorio de la skill).

@@ -1,8 +1,8 @@
-import * as path from 'path';
-import * as fs from 'fs/promises';
-import { createHash } from 'crypto';
-import { AuditSession } from '../interfaces/audit.interface';
-import { ProxyEnvironmentConfig } from '../interfaces/config.interface';
+import * as path from 'node:path';
+import * as fs from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { AuditSession } from '../interfaces/audit.interface.js';
+import { ProxyEnvironmentConfig } from '../interfaces/config.interface.js';
 
 const REQUEST_SEQUENCE_FILE = 'request-sequence.json';
 const FALLBACK_SESSION_DIR = '_unknown';

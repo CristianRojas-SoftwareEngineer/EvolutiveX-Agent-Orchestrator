@@ -16,7 +16,10 @@ console.log(`  ${green}npm run lint${reset}      -> Analiza la calidad estática
 console.log(`  ${green}npm run lint:fix${reset}  -> Repara auto. problemas corregibles del linting`);
 console.log(`  ${green}npm run format${reset}    -> Unifica tabulaciones e identaciones (Prettier)`);
 console.log(`  ${green}npm run help${reset}      -> Muestra este panel de referencia de scripts`);
-console.log(`  ${green}npm test${reset}          -> Validación integral (Análisis estático + Compilación)`);
+console.log(`  ${green}npm test${reset}          -> Validación integral (ESLint + Vitest + Compilación)`);
+console.log(`  ${green}npm run test:unit${reset}  -> Ejecuta pruebas unitarias aisladas`);
+console.log(`  ${green}npm run test:integration${reset} -> Ejecuta pruebas de integración`);
+console.log(`  ${green}npm run test:watch${reset} -> Modo observador para desarrollo TDD`);
 
 console.log(`\n${bold}${magenta}📦  PRODUCCIÓN (CI/CD)${reset}`);
 console.log(`  ${green}npm run build${reset}     -> Compila óptimamente para Producción. Ejecuta:`);

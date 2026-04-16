@@ -1,4 +1,4 @@
-import { JsonValue, JsonObject } from '../interfaces/json.interface';
+import { JsonValue, JsonObject } from '../interfaces/json.interface.js';
 
 /**
  * Servicio para sanitizar datos sensibles (API keys, tokens, cookies)

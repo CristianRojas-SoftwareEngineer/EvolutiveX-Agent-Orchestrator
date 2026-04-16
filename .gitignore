@@ -6,3 +6,14 @@ configs/.env
 build/
 coverage/
 .DS_Store
+
+# IDEs and editors
+.vs/
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+*.sqlite

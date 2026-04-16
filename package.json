@@ -5,15 +5,18 @@
   "main": "dist/index.js",
   "scripts": {
     "help": "node scripts/help.js",
-    "dev": "node --env-file-if-exists=configs/.env node_modules/ts-node/dist/bin.js -P configs/tsconfig.json src/index.ts",
+    "dev": "node --env-file-if-exists=configs/.env --loader ts-node/esm -P configs/tsconfig.json src/index.ts",
     "start": "node dist/index.js",
     "build": "npm run clean:dist && concurrently \"npm run build:js\" \"npm run build:types\"",
-    "build:js": "tsup src/index.ts --format cjs --tsconfig configs/tsconfig.json",
+    "build:js": "tsup src/index.ts --format esm --tsconfig configs/tsconfig.json",
     "build:types": "tsc -p configs/tsconfig.json --emitDeclarationOnly --outDir dist",
     "format": "prettier --config configs/.prettierrc --write \"src/**/*.ts\" \"docs/**/*.md\" \"*.md\" \"configs/*.json\" \"*.json\"",
     "lint": "eslint --config configs/eslint.config.mjs \"src/**/*.ts\"",
     "lint:fix": "eslint --config configs/eslint.config.mjs \"src/**/*.ts\" --fix",
-    "test": "npm run lint && npm run build",
+    "test": "npm run lint && npm run test:unit && npm run build",
+    "test:unit": "vitest run --config configs/vitest.config.ts",
+    "test:integration": "vitest run --config configs/vitest.config.ts",
+    "test:watch": "vitest --config configs/vitest.config.ts",
     "clean": "concurrently \"npm run clean:dist\" \"npm run clean:modules\"",
     "clean:dist": "node -e \"fs.rmSync('dist', { recursive: true, force: true })\"",
     "clean:modules": "node -e \"fs.rmSync('node_modules', { recursive: true, force: true })\"",
@@ -22,8 +25,9 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
+  "type": "module",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.89.0",
     "@fastify/http-proxy": "^11.4.4",
     "fastify": "^5.8.5"
   },
@@ -37,7 +41,8 @@
     "ts-node": "^10.9.2",
     "tsup": "^8.5.1",
     "typescript": "^6.0.2",
-    "typescript-eslint": "^8.58.2"
+    "typescript-eslint": "^8.58.2",
+    "vitest": "^4.1.4"
   },
   "ts-node": {
     "project": "configs/tsconfig.json"

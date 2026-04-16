@@ -301,13 +301,13 @@ El campo `model` para la §6.4 suele coincidir en petición y respuesta; si solo
 
 Convención detallada de nombres y reglas de presencia: [README del repositorio](../README.md) y referencia de auditoría del proyecto.
 
-Para la **matriz completa** de archivos por petición, campos de `meta.json` y catálogo de presencia de cada archivo, resulta útil la skill de Claude Code **`anthropic-observability-proxy`** y su `reference.md`. Esta sección solo indica **dónde** suele aparecer `usage` en relación con `sse`.
+Para la **matriz completa** de archivos por petición, campos de `meta.json` y catálogo de presencia de cada archivo, resulta útil la skill de Claude Code **`smart-code-proxy`** y su `reference.md`. Esta sección solo indica **dónde** suele aparecer `usage` en relación con `sse`.
 
 ---
 
 ## 11. Coste agregado de una sesión o de un intervalo
 
-La clasificación de rutas (`count_tokens` vs generación) debe ser coherente con el §2 y el §10. Para recorrer carpetas `requests/` con criterio estructural, la skill **`anthropic-observability-proxy`** describe la jerarquía bajo `sessions/`.
+La clasificación de rutas (`count_tokens` vs generación) debe ser coherente con el §2 y el §10. Para recorrer carpetas `requests/` con criterio estructural, la skill **`smart-code-proxy`** describe la jerarquía bajo `sessions/`.
 
 Para estimar el coste **total** de una sesión de Claude Code a partir de auditoría en disco:
 
@@ -326,6 +326,6 @@ Los directorios `sessions/` pueden contener **claves API** en cabeceras y **cont
 
 ## 13. Misma guía en Claude Code (opcional)
 
-La ecuación y convenciones de esta guía están recogidas en la skill global **`anthropic-api-cost-estimation`** (instalación típica: `~/.claude/skills/anthropic-api-cost-estimation/`), pensada para usarse junto con **`anthropic-observability-proxy`** cuando trabajes con sesiones auditadas y costes estimados en Claude Code. Para OpenRouter (guía y skill **`openrouter-api-cost-estimation`**), véase el enlace de §1.
+La ecuación y convenciones de esta guía están recogidas en la skill global **`anthropic-api-cost-estimation`** (instalación típica: `~/.claude/skills/anthropic-api-cost-estimation/`), pensada para usarse junto con **`smart-code-proxy`** cuando trabajes con sesiones auditadas y costes estimados en Claude Code. Para OpenRouter (guía y skill **`openrouter-api-cost-estimation`**), véase el enlace de §1.
 
 Mantén alineados el presente documento y los archivos `references/*.md` de la skill **`anthropic-api-cost-estimation`** cuando cambie el contrato semántico (véase `MAINTENANCE.md` en el directorio de la skill).

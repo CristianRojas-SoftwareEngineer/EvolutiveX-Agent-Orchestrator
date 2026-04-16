@@ -1,10 +1,12 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import proxyPlugin from '@fastify/http-proxy';
-import { ProxyController } from '../controllers/proxy.controller';
-import { SessionService } from '../services/session.service';
-import { AuditWriterService } from '../services/audit-writer.service';
-import { RedactService } from '../services/redact.service';
-import { config } from '../config/env.config';
+import { ProxyController } from '../controllers/proxy.controller.js';
+import { SessionService } from '../services/session.service.js';
+import { AuditWriterService } from '../services/audit-writer.service.js';
+import { RedactService } from '../services/redact.service.js';
+import { MarkdownRendererService } from '../services/markdown-renderer.service.js';
+import { SseReconstructService } from '../services/sse-reconstruct.service.js';
+import { config } from '../config/env.config.js';
 
 /**
  * Plugin de Fastify para registrar las rutas del proxy.
@@ -13,17 +15,27 @@ import { config } from '../config/env.config';
 export async function proxyRoutes(fastify: FastifyInstance) {
   // Inyección de dependencias mediante cableado manual
   const redactService = new RedactService();
+  const markdownRendererService = new MarkdownRendererService();
   const sessionService = new SessionService(config, config.AUDIT_SESSIONS_DIR);
-  const auditWriterService = new AuditWriterService(redactService);
-  const proxyController = new ProxyController(sessionService, auditWriterService, config);
+  const auditWriterService = new AuditWriterService(redactService, markdownRendererService);
+  const sseReconstructService = new SseReconstructService(
+    auditWriterService,
+    markdownRendererService,
+    config.AUDIT_SSE_REPLAY_MODEL,
+  );
+  const proxyController = new ProxyController(
+    sessionService,
+    auditWriterService,
+    sseReconstructService,
+    config,
+  );
 
   /**
    * Inicializa el directorio raíz de auditoría al arrancar si está habilitada.
+   * Un fallo aquí es fatal y detiene el servidor (Fase 8.4).
    */
   if (config.AUDIT_ENABLED) {
-    await sessionService.ensureAuditSessionsRoot().catch((err) => {
-      fastify.log.error(err, 'Error al inicializar la raíz de auditoría');
-    });
+    await sessionService.ensureAuditSessionsRoot();
   }
 
   /**
@@ -49,12 +61,20 @@ export async function proxyRoutes(fastify: FastifyInstance) {
   /**
    * Registra el plugin central de proxy.
    * Intercepta las respuestas mediante onResponseInterceptor para análisis profundo.
+   * Captura errores de conexión upstream (DNS, connection refused) mediante onError.
    */
   fastify.register(proxyPlugin, {
     upstream: config.UPSTREAM_ORIGIN,
+    xfwd: true,
     replyOptions: {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      onResponse: proxyController.onResponseInterceptor.bind(proxyController) as any,
+      onResponse: proxyController.onResponseInterceptor.bind(proxyController),
+      onError: (reply: FastifyReply, error: Error & { code?: string }) => {
+        const request = reply.request;
+        proxyController
+          .onUpstreamError(request, reply, error)
+          .catch((e) => request.log.error(e, 'Error en onUpstreamError'));
+      },
     },
-  });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any);
 }

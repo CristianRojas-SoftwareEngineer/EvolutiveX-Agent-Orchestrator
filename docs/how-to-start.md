@@ -68,7 +68,7 @@ Sigue estos pasos en orden:
    npm run build
    ```
 
-   El proyecto incluye un script de validación integral (`npm test`) que ejecuta el análisis estático (`lint`) y la compilación (`build`) para asegurar la integridad del código TypeScript. Se recomienda ejecutarlo antes de cada despliegue relevante.
+   El proyecto incluye un script de validación integral (`npm test`) que ejecuta el análisis estático (`lint`), la validación de pruebas integradas (`test:unit`) y la compilación (`build`) para asegurar la exactitud funcional y la integridad del código TypeScript. Se recomienda ejecutarlo antes de cada despliegue relevante.
 
 ---
 
@@ -133,7 +133,7 @@ Efecto práctico: las rutas que el SDK añada (por ejemplo `/v1/messages`) se pe
 
 ### Paso C — Identificar la sesión de auditoría en disco
 
-Con **Claude Code** y el proxy por defecto, las carpetas bajo `sessions/<sessionId>/` suelen **alinearse solas** con la sesión del CLI: el cliente envía `x-claude-code-session-id` (paso 2 por defecto). La cabecera `x-cc-audit-session` solo interviene si el cliente la envía (override; p. ej. `ANTHROPIC_CUSTOM_HEADERS`). Orden y variables en el [README](../README.md#correlación-de-sesión-sessionid).
+Con **Claude Code** y el proxy por defecto, las carpetas bajo `sessions/<sessionId>/` suelen **alinearse solas** con la sesión del CLI: el cliente envía `x-claude-code-session-id` (prioridad secundaria o fallback). La cabecera `x-cc-audit-session` solo interviene si el cliente la envía (override; p. ej. `ANTHROPIC_CUSTOM_HEADERS`). Orden y variables en el [README](../README.md#correlación-de-sesión-sessionid).
 
 **Opcional:** si quieres **otro** identificador (por ejemplo un UUID que tú elijas), envía cabeceras extra con **`ANTHROPIC_CUSTOM_HEADERS`**. El formato es: una o más líneas `Nombre: Valor`. Documentación oficial: [variables de entorno de Claude Code](https://code.claude.com/docs/en/env-vars).
 
@@ -180,11 +180,12 @@ No hace falta leer la tabla entera del README el primer día:
 | `UPSTREAM_ORIGIN`    | URL base del API al que el proxy reenvía (por defecto Anthropic).                                    |
 | `AUDIT_SESSIONS_DIR` | Carpeta raíz donde se guarda `sessions/` (por defecto `sessions` relativa al directorio de trabajo). |
 
-**`response.body` en respuestas streaming (SSE):** las respuestas SSE generan el archivo de métricas `response.headers.json` y capturan los eventos en `response.sse.jsonl` línea por línea. Paralelamente, se pueden volcar en crudo mediante `response.sse.txt` si se activa `AUDIT_SSE_RAW=1` y la auditoría cuenta con espacio que no excede `MAX_AUDIT_SSE_RAW_BYTES`.
+**`response.body` en respuestas streaming (SSE):** las respuestas SSE generan el archivo de métricas `response.headers.json` y capturan los eventos en `response.sse.jsonl` línea por línea. Paralelamente, se pueden volcar en crudo mediante `response.sse.txt` si se activa `AUDIT_SSE_RAW=1` y la auditoría cuenta con espacio que no excede `MAX_AUDIT_SSE_RAW_BYTES` (donde `0` equivale a ilimitado).
+Adicionalmente, dispones de una **reconstrucción nativa del cuerpo**: activando `AUDIT_SSE_RESPONSE_BODY=1`, el proxy agrupará el stream al finalizar para recrear internamente el `response.body.json` y su versión procesada `.parsed.md` de igual manera a como funcionan hoy las operaciones no-streaming, simplificando drásticamente el análisis de los costos y visual.
 
 El resto (límites de tamaño, volcado SSE crudo, etc.) está en la Matriz de Entorno del [README](../README.md#configuracion). Para ver cómo se aplican los límites de memoria y disco usa [Capas de Bytes y Convenciones de Logs](../README.md#capas-bytes-env).
 
-**Perfil rápido (Claude Code):** con `ANTHROPIC_BASE_URL` apuntando al proxy y el proxy en marcha (`npm run dev`), suele bastar correlacionar sesiones con la cabecera por defecto `x-claude-code-session-id` (paso 2). La correlación de sesión y overrides (`x-cc-audit-session`, etc.) está en el [README: correlación de sesión](../README.md#correlación-de-sesión-sessionid).
+**Perfil rápido (Claude Code):** con `ANTHROPIC_BASE_URL` apuntando al proxy y el proxy en marcha (`npm run dev`), suele bastar correlacionar sesiones con la cabecera por defecto `x-claude-code-session-id` (fallback/segunda prioridad). La correlación de sesión y overrides (`x-cc-audit-session`, etc.) está en el [README: correlación de sesión](../README.md#correlación-de-sesión-sessionid).
 
 ---
 

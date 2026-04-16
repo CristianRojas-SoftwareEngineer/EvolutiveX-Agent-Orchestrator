@@ -21,6 +21,44 @@ export interface SseLine {
 }
 
 /**
+ * Opciones para la reconstrucción del cuerpo de respuesta desde bytes SSE.
+ */
+export interface SseReconstructOptions {
+  /** Directorio de la petición donde se encuentran los archivos SSE. */
+  requestDir: string;
+  /** URL original de la petición (para detectar beta). */
+  originalUrl?: string;
+  /** Cabeceras originales de la petición (para detectar anthropic-beta). */
+  headers?: Record<string, string | string[] | undefined>;
+  /** Forzar uso de API beta para la reconstrucción. */
+  forceBeta?: boolean;
+  /** Bytes crudos SSE escritos en disco. */
+  sseRawBytesWritten: number;
+  /** Si la captura cruda de SSE está activa. */
+  auditSseRaw: boolean;
+  /** Si el volcado crudo de SSE fue truncado por límite. */
+  sseRawTruncatedByLimit: boolean;
+  /** Si hubo un error de escritura durante la captura cruda. */
+  sseRawWriteError: boolean;
+  /** Si se requiere el raw para la reconstrucción. */
+  requireRaw: boolean;
+}
+
+/**
+ * Resultado de un intento de reconstrucción SSE.
+ */
+export interface SseReconstructResult {
+  /** Si se intentó la reconstrucción. */
+  sseResponseBodyAttempted: boolean;
+  /** Si se escribió exitosamente el cuerpo reconstruido. */
+  sseResponseBodyWritten: boolean;
+  /** Mensaje de error si la reconstrucción falló. */
+  sseResponseBodyError?: string;
+  /** Fuente de los bytes SSE (file, memory). */
+  sseResponseBodySource?: string;
+}
+
+/**
  * Metadatos sobre el truncamiento de datos debido a los límites configurados.
  */
 export interface AuditTruncationMeta {
@@ -36,7 +74,7 @@ export interface AuditTruncationMeta {
   responseTruncatedByAuditLimit: boolean | null;
   /** Total de bytes registrados en el volcado crudo de SSE. */
   sseRawBytesAudited?: number | null;
-  /** El límite aplicado al volcado crudo de SSE. */
+  /** El límite aplicado al volcado crudo de SSE. null cuando el límite es infinito. */
   sseRawBytesLimit?: number | null;
   /** True si el volcado crudo de SSE fue cortado por el límite. */
   sseRawTruncatedByLimit?: boolean;
@@ -82,6 +120,14 @@ export interface AuditMetadata {
   errorMessage?: string;
   /** Código de error si aplica. */
   errorCode?: string;
+  /** Si se intentó la reconstrucción SSE del cuerpo de respuesta. */
+  sseResponseBodyAttempted?: boolean;
+  /** Si se escribió exitosamente el cuerpo reconstruido desde SSE. */
+  sseResponseBodyWritten?: boolean;
+  /** Mensaje de error de la reconstrucción SSE. */
+  sseResponseBodyError?: string;
+  /** Fuente de los bytes SSE usados para la reconstrucción. */
+  sseResponseBodySource?: string;
   /** Detalles sobre cualquier truncamiento de datos. */
   truncation: AuditTruncationMeta;
   /** Soporta extensiones arbitrarias (ej. sseLineCount). */

@@ -1,6 +1,7 @@
 import fastify from 'fastify';
-import { proxyRoutes } from './routes/proxy';
-import { config } from './config/env.config';
+import { randomUUID } from 'node:crypto';
+import { proxyRoutes } from './routes/proxy.js';
+import { config } from './config/env.config.js';
 
 /**
  * Función factory para construir y configurar la instancia de la aplicación Fastify.
@@ -9,6 +10,7 @@ import { config } from './config/env.config';
 export function buildApp() {
   const app = fastify({
     logger: true,
+    genReqId: () => randomUUID(),
   });
 
   /**

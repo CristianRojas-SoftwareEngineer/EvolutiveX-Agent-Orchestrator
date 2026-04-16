@@ -166,16 +166,13 @@ Los artefactos para la contenerización del proyecto se han centralizado en el d
 Instrucciones básicas:
 
 1.  Construir la imagen (desde la raíz del repositorio):
-
     - `docker build -f containerization/Dockerfile -t smart-code-proxy:latest .`
 
 2.  Ejecutar el contenedor (crea y monta `sessions/` como volumen):
-
     - `docker run -it --rm -p 8787:8787 -v "$(pwd)/sessions:/app/sessions" --env-file configs/.env smart-code-proxy:latest`
 
 3.  Notas importantes:
-
-    - El `Dockerfile` usa una etapa `builder` para compilar TypeScript y una etapa final mínima basada en `node:20-alpine`.
+    - El `Dockerfile` usa una etapa `builder` para compilar TypeScript y una etapa final mínima basada en `node:24-alpine`.
     - Asegúrate de no incluir `sessions/`, `dist/` ni `node_modules/` en la imagen: estos están listados en `containerization/Dockerfile.dockerignore`. Docker BuildKit (motor por defecto desde Docker 23.0+) reconoce automáticamente este archivo al construir con `-f containerization/Dockerfile`.
     - Para desarrollo iterativo es recomendable usar `npm run dev` localmente en lugar de reconstruir la imagen cada cambio.
 

@@ -80,7 +80,7 @@ Sigue estos pasos en orden:
    npm run dev
    ```
 
-   Esto levanta el servidor directamente desde TypeScript sin compilar (ts-node). Es la opción más rápida para empezar.
+   Esto levanta el servidor directamente desde TypeScript sin compilar (tsx). Es la opción más rápida para empezar.
 
    Para **producción**, compila primero con `npm run build` y luego ejecuta `npm start` (internamente es `node dist/index.js`).
 

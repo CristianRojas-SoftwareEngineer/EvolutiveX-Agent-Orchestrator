@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "scripts": {
     "help": "node scripts/help.js",
-    "dev": "node --env-file-if-exists=configs/.env --loader ts-node/esm -P configs/tsconfig.json src/index.ts",
+    "dev": "node --env-file-if-exists=configs/.env --import tsx src/index.ts",
     "start": "node dist/index.js",
     "build": "npm run clean:dist && concurrently \"npm run build:js\" \"npm run build:types\"",
     "build:js": "tsup src/index.ts --format esm --tsconfig configs/tsconfig.json",
@@ -38,13 +38,10 @@
     "eslint": "^10.2.0",
     "eslint-config-prettier": "^10.1.8",
     "prettier": "^3.8.3",
-    "ts-node": "^10.9.2",
     "tsup": "^8.5.1",
+    "tsx": "^4.21.0",
     "typescript": "^6.0.2",
     "typescript-eslint": "^8.58.2",
     "vitest": "^4.1.4"
-  },
-  "ts-node": {
-    "project": "configs/tsconfig.json"
   }
 }

@@ -10,24 +10,24 @@ Ubicación de artefactos:
 Diseño y decisiones principales
 
 - Multi-etapa: se compila TypeScript en una etapa `builder` y la imagen final contiene solo los artefactos necesarios (`dist`, `package.json`) y dependencias de runtime.
-- Base ligera: `node:20-alpine` para reducir tamaño de imagen.
+- Base ligera: `node:24-alpine` para reducir tamaño de imagen.
 - Volumen `sessions/`: el directorio de auditoría se monta como volumen para persistencia externa.
 
 Comandos de uso
 
-1) Construir la imagen (desde la raíz del repo):
+1. Construir la imagen (desde la raíz del repo):
 
 ```bash
 docker build -f containerization/Dockerfile -t smart-code-proxy:latest .
 ```
 
-2) Ejecutar el contenedor (ejemplo, mapeando puerto y persistencia de `sessions`):
+2. Ejecutar el contenedor (ejemplo, mapeando puerto y persistencia de `sessions`):
 
 ```bash
 docker run -it --rm -p 8787:8787 -v "$(pwd)/sessions:/app/sessions" --env-file configs/.env smart-code-proxy:latest
 ```
 
-3) Uso en CI/CD
+3. Uso en CI/CD
 
 - Construye la imagen en el pipeline usando el `Dockerfile` centralizado. Mantén `configs/.env` y secretos fuera del repositorio; usa variables de CI o secret stores.
 

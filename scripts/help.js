@@ -11,7 +11,7 @@ console.log(`${bold}${cyan}   🚀 SMART CODE PROXY - SCRIPTS DE MANTENIMIENTO �
 console.log(`${bold}${cyan}=================================================${reset}\n`);
 
 console.log(`${bold}${magenta}🛠  ENTORNO LOCAL (Desarrollo)${reset}`);
-console.log(`  ${green}npm run dev${reset}       -> Levanta servidor TS en vivo (ts-node) ${yellow}[Principal usage]${reset}`);
+console.log(`  ${green}npm run dev${reset}       -> Levanta servidor TS en vivo (tsx) ${yellow}[Principal usage]${reset}`);
 console.log(`  ${green}npm run lint${reset}      -> Analiza la calidad estática del código (ESLint)`);
 console.log(`  ${green}npm run lint:fix${reset}  -> Repara auto. problemas corregibles del linting`);
 console.log(`  ${green}npm run format${reset}    -> Unifica tabulaciones e identaciones (Prettier)`);

@@ -161,7 +161,7 @@ El sistema previene la saturación en memoria o disco ignorando la escritura si 
 Los artefactos para la contenerización del proyecto se han centralizado en el directorio `containerization/`.
 
 - `containerization/Dockerfile`: imagen multi-etapa optimizada para producción.
-- `containerization/.dockerignore`: entradas ignoradas para construir la imagen sin archivos de desarrollo ni artefactos.
+- `containerization/Dockerfile.dockerignore`: entradas ignoradas para construir la imagen sin archivos de desarrollo ni artefactos (convención [BuildKit](https://docs.docker.com/build/buildkit/): Docker asocia automáticamente este archivo al `Dockerfile` del mismo directorio).
 
 Instrucciones básicas:
 
@@ -176,7 +176,7 @@ Instrucciones básicas:
 3.  Notas importantes:
 
     - El `Dockerfile` usa una etapa `builder` para compilar TypeScript y una etapa final mínima basada en `node:20-alpine`.
-    - Asegúrate de no incluir `sessions/`, `dist/` ni `node_modules/` en la imagen: estos están listados en `containerization/.dockerignore`.
+    - Asegúrate de no incluir `sessions/`, `dist/` ni `node_modules/` en la imagen: estos están listados en `containerization/Dockerfile.dockerignore`. Docker BuildKit (motor por defecto desde Docker 23.0+) reconoce automáticamente este archivo al construir con `-f containerization/Dockerfile`.
     - Para desarrollo iterativo es recomendable usar `npm run dev` localmente en lugar de reconstruir la imagen cada cambio.
 
 Para más detalles y comandos alternativos, consulta `docs/dockerization.md`.

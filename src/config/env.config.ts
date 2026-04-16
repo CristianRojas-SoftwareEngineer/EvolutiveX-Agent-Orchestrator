@@ -48,13 +48,13 @@ export const config: ProxyEnvironmentConfig = {
 
   UPSTREAM_ACCEPT_ENCODING: process.env.UPSTREAM_ACCEPT_ENCODING || 'identity',
 
-  // Reconstrucción SSE (Fase 7)
+  // Reconstrucción SSE
   AUDIT_SSE_RESPONSE_BODY: process.env.AUDIT_SSE_RESPONSE_BODY === '1',
   AUDIT_SSE_RESPONSE_BODY_REQUIRE_RAW: process.env.AUDIT_SSE_RESPONSE_BODY_REQUIRE_RAW !== '0',
   AUDIT_SSE_RESPONSE_BODY_FORCE_BETA: process.env.AUDIT_SSE_RESPONSE_BODY_FORCE_BETA === '1',
   AUDIT_SSE_REPLAY_MODEL: process.env.AUDIT_SSE_REPLAY_MODEL || 'claude-3-5-sonnet-20241022',
 
-  // Variables de compatibilidad legacy (Fase 8.5)
+  // Compatibilidad y Logs
   CONSOLE_REDACT: process.env.CONSOLE_REDACT !== '0',
   LOG_SSE: process.env.LOG_SSE === '1',
   MAX_BODY_LOG_BYTES: process.env.MAX_BODY_LOG_BYTES

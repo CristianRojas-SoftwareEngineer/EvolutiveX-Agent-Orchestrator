@@ -7,5 +7,6 @@ declare module 'fastify' {
     requestSequence?: number;
     requestStartTime?: number;
     requestBodyOmitted?: boolean;
+    rawBodyBytes?: number;
   }
 }

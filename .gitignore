@@ -17,3 +17,5 @@ coverage/
 *.sln
 *.swp
 *.sqlite
+
+sessions/

@@ -1,4 +1,5 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
+import { Readable } from 'node:stream';
 import type { ProxyDependencies } from '../../4-api/composition-root.js';
 import { AuditRequestContext } from '../../1-domain/types/audit.types.js';
 
@@ -13,7 +14,22 @@ export class ProxyController {
    * Hook preHandler: extrae datos de la petición y delega al handler de auditoría de request.
    */
   public async preHandler(request: FastifyRequest, _reply: FastifyReply): Promise<void> {
-    const rawBody = (request.body as Buffer) || Buffer.alloc(0);
+    let rawBody: Buffer;
+
+    if (request.body != null && typeof (request.body as unknown as { pipe?: unknown }).pipe === 'function') {
+      const chunks: Buffer[] = [];
+      for await (const chunk of request.body as AsyncIterable<Buffer>) {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      }
+      rawBody = Buffer.concat(chunks);
+      (request as unknown as { body: unknown }).body = Readable.from(rawBody);
+    } else if (Buffer.isBuffer(request.body)) {
+      rawBody = request.body;
+    } else {
+      rawBody = Buffer.alloc(0);
+    }
+
+    request.rawBodyBytes = rawBody.length;
 
     const result = await this.deps.auditRequestHandler.execute({
       headers: request.headers,
@@ -50,7 +66,7 @@ export class ProxyController {
           method: request.method,
           url: request.url,
           requestStartTime: request.requestStartTime || Date.now(),
-          requestBodyBytes: (request.body as Buffer | undefined)?.length || 0,
+          requestBodyBytes: request.rawBodyBytes ?? 0,
           requestBodyOmitted: !!request.requestBodyOmitted,
           error,
         });
@@ -124,7 +140,7 @@ export class ProxyController {
       url: request.url,
       upstream: this.deps.config.UPSTREAM_ORIGIN,
       requestStartTime: request.requestStartTime || Date.now(),
-      requestBodyBytes: (request.body as Buffer | undefined)?.length || 0,
+      requestBodyBytes: request.rawBodyBytes ?? 0,
       requestBodyOmitted: !!request.requestBodyOmitted,
       auditRequestDir: request.auditRequestDir || '',
       responseStatusCode: res.statusCode,

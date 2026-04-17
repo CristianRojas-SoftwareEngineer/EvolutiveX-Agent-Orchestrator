@@ -84,7 +84,7 @@ export class AuditWriterService implements IAuditWriter {
       params.headers as unknown as JsonValue,
     );
 
-    const size = params.bodyBuffer ? params.bodyBuffer.length : 0;
+    const size = Buffer.isBuffer(params.bodyBuffer) ? params.bodyBuffer.length : 0;
     if (size === 0 || !params.bodyBuffer) {
       return { dir, requestBodyOmitted: false };
     }

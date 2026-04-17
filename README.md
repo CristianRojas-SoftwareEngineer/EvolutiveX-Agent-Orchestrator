@@ -10,18 +10,32 @@ Este proyecto moderniza el flujo de observabilidad legacy, introduciendo un dise
 
 ---
 
-## 🏛 Diseño del Sistema (SOLID)
+## 🏛 Diseño del Sistema (PKA - Progressive Kernel Architecture)
 
-El proxy utiliza un patrón de **Inversión de Control** y **Responsabilidad Única** para gestionar flujos de datos asíncronos y streams de larga duración.
+El proxy utiliza **Progressive Kernel Architecture (PKA)** — un modelo arquitectónico concéntrico de 6 capas que sintetiza los mejores patrones de **Clean Architecture**, **Hexagonal Architecture**, **Onion Architecture**, **DDD** y **CQRS**. Las dependencias del código fuente **solo apuntan hacia el centro** (Dominio). La Capa 6 (GUIs) no aplica a este proyecto.
 
 ### 🧩 Capas de Responsabilidad
 
-- **[SessionService](./src/services/session.service.ts)**: Resuelve identidades de sesión mediante cabeceras dinámicas y gestiona el locking asíncrono para garantizar que el contador de peticiones en disco (`requests/`) sea secuencial y consistente.
-- **[AuditWriterService](./src/services/audit-writer.service.ts)**: Encargado de la persistencia atómica. Escribe cabeceras, cuerpos binarios y metadatos JSON usando flujos de escritura no bloqueantes.
-- **[RedactService](./src/services/redact.service.ts)**: Centraliza las reglas de privacidad. Sanitiza `x-api-key`, `Authorization` y campos sensibles dentro de JSON profundamente anidado antes de registrar cualquier dato.
-- **[ProxyController](./src/controllers/proxy.controller.ts)**: El cerebro del sistema. Orquestra la intercepción de streams, la descompresión **Gzip** al vuelo y el parsing de **SSE** línea por línea.
-- **[SseReconstructService](./src/services/sse-reconstruct.service.ts)**: Realiza el "replay" de los bytes SSE capturados a través del parser oficial del SDK para reconstruir el cuerpo JSON final de la respuesta.
-- **[MarkdownRendererService](./src/services/markdown-renderer.service.ts)**: Transforma los cuerpos JSON (petición/respuesta) en documentación Markdown legible para facilitar la revisión humana.
+| Capa                           | Ubicación                | Responsabilidad                                                                   | Componentes Clave                                                                                                                                                   |
+| ------------------------------ | ------------------------ | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **1 - Dominio**                | `src/1-domain/`          | Tipos puros (entidades) y lógica de dominio sin dependencias externas             | `SessionResolverService`, `RedactService`, `MarkdownRendererService`, Tipos de auditoría                                                                            |
+| **2 - Servicios (Adapters)**   | `src/2-services/`        | Implementaciones concretas con I/O (filesystem, streams) y **ports** (interfaces) | `SessionStoreService`, `AuditWriterService`, `SseReconstructService`, `StreamTeeService`, Ports: `IAuditWriter`, `ISessionStore`, `ISseReconstructor`, `IStreamTee` |
+| **3 - Operaciones (Handlers)** | `src/3-operations/`      | Orquestación de casos de uso (Command Handlers)                                   | `AuditRequestHandler`, `AuditSseResponseHandler`, `AuditStandardResponseHandler`, `AuditUpstreamErrorHandler`                                                       |
+| **4 - API (Composition Root)** | `src/4-api/`             | Wiring de dependencias y configuración                                            | `createProxyDependencies()`, Configuración de entorno                                                                                                               |
+| **5 - Interfaces de Usuario**  | `src/5-user-interfaces/` | Adaptadores HTTP (reciben deps inyectadas via options)                            | `ProxyController`, `proxyRoutes`, `fastify.augments.d.ts`                                                                                                           |
+
+### 📐 Regla de Dependencia
+
+```
+Capa 5 → Capa 4 → Capa 3 → Capa 2 → Capa 1
+(UI)     (API)     (Ops)    (Svcs)   (Domain)
+```
+
+Las capas internas **nunca** importan de capas externas. Esta regla garantiza que:
+
+- El dominio (Capa 1) es puro y testeable sin mocks
+- Los servicios (Capa 2) pueden ser reemplazados sin afectar la lógica de negocio
+- La UI (Capa 5) es un detalle de implementación desechable
 
 ---
 
@@ -161,7 +175,7 @@ El sistema previene la saturación en memoria o disco ignorando la escritura si 
 Los artefactos para la contenerización del proyecto se han centralizado en el directorio `containerization/`.
 
 - `containerization/Dockerfile`: imagen multi-etapa optimizada para producción.
-- `containerization/Dockerfile.dockerignore`: entradas ignoradas para construir la imagen sin archivos de desarrollo ni artefactos (convención [BuildKit](https://docs.docker.com/build/buildkit/): Docker asocia automáticamente este archivo al `Dockerfile` del mismo directorio).
+- `containerization/.dockerignore`: entradas ignoradas para construir la imagen sin archivos de desarrollo ni artefactos (convención [BuildKit](https://docs.docker.com/build/buildkit/): Docker asocia automáticamente este archivo al `Dockerfile` del mismo directorio).
 
 Instrucciones básicas:
 
@@ -173,7 +187,8 @@ Instrucciones básicas:
 
 3.  Notas importantes:
     - El `Dockerfile` usa una etapa `builder` para compilar TypeScript y una etapa final mínima basada en `node:24-alpine`.
-    - Asegúrate de no incluir `sessions/`, `dist/` ni `node_modules/` en la imagen: estos están listados en `containerization/Dockerfile.dockerignore`. Docker BuildKit (motor por defecto desde Docker 23.0+) reconoce automáticamente este archivo al construir con `-f containerization/Dockerfile`.
+    - Asegúrate de no incluir `sessions/`, `dist/` ni `node_modules/` en la imagen: estos están listados en `containerization/.dockerignore`. Docker BuildKit (motor por defecto desde Docker 23.0+) reconoce automáticamente este archivo al construir con `-f containerization/Dockerfile`.
+    - La imagen final ejecuta como usuario `node` (no-root) e incluye un `HEALTHCHECK` contra `/health`.
     - Para desarrollo iterativo es recomendable usar `npm run dev` localmente en lugar de reconstruir la imagen cada cambio.
 
 Para más detalles y comandos alternativos, consulta `docs/dockerization.md`.

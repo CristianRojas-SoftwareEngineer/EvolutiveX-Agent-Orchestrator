@@ -1,13 +1,13 @@
 import fastify from 'fastify';
 import { randomUUID } from 'node:crypto';
-import { proxyRoutes } from './routes/proxy.js';
-import { config } from './config/env.config.js';
+import { proxyRoutes } from './5-user-interfaces/http/proxy.routes.js';
+import type { ProxyDependencies } from './4-api/composition-root.js';
 
 /**
  * Función factory para construir y configurar la instancia de la aplicación Fastify.
  * Configura el parsing del cuerpo, el logueo y registra las rutas del sistema.
  */
-export function buildApp() {
+export function buildApp(deps: ProxyDependencies) {
   const app = fastify({
     logger: true,
     genReqId: () => randomUUID(),
@@ -17,7 +17,7 @@ export function buildApp() {
    * Configura el límite global de cuerpo para el parsing de buffer crudo.
    * Esto es esencial para que el proxy gestione payloads binarios grandes.
    */
-  const bodyLimitRaw = config.MAX_REQUEST_BODY;
+  const bodyLimitRaw = deps.config.MAX_REQUEST_BODY;
   const bodyLimit = bodyLimitRaw.toLowerCase().endsWith('mb')
     ? parseInt(bodyLimitRaw) * 1024 * 1024
     : 50 * 1024 * 1024;
@@ -36,8 +36,8 @@ export function buildApp() {
     return { status: 'OK' };
   });
 
-  // Registrar las rutas principales de orquestación del proxy
-  app.register(proxyRoutes);
+  // Registrar las rutas principales de orquestación del proxy con deps inyectadas
+  app.register(proxyRoutes, { deps });
 
   return app;
 }

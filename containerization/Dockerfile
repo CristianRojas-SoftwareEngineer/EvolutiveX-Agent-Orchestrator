@@ -20,8 +20,11 @@ COPY --from=builder /app/package.json ./
 COPY --from=builder /app/package-lock.json* ./
 COPY configs ./configs
 RUN npm ci --omit=dev 2>/dev/null || npm install --omit=dev
-RUN mkdir -p /app/sessions
+RUN mkdir -p /app/sessions && chown node:node /app/sessions
 ENV NODE_ENV=production
 EXPOSE 8787
 VOLUME ["/app/sessions"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD wget -qO- http://localhost:8787/health || exit 1
+USER node
 CMD ["node", "dist/index.js"]

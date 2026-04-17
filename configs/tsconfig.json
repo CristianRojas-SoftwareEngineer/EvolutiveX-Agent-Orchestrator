@@ -8,8 +8,9 @@
     "forceConsistentCasingInFileNames": true,
     "strict": true,
     "skipLibCheck": true,
-    "types": ["node"],
+    "types": ["node", "fastify", "vitest/globals"],
     "declaration": true
   },
-  "include": ["../src/**/*"]
+  "include": ["../src/**/*"],
+  "exclude": ["../dist", "../node_modules"]
 }

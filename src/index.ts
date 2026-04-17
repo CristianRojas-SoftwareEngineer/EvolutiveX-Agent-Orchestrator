@@ -4,13 +4,15 @@
  */
 import process from 'process';
 import { buildApp } from './app.js';
-import { config } from './config/env.config.js';
+import { config } from './4-api/config/env.config.js';
+import { createProxyDependencies } from './4-api/composition-root.js';
 
 /**
  * Inicializa y arranca el servidor proxy.
  */
 async function start() {
-  const app = buildApp();
+  const deps = await createProxyDependencies(config);
+  const app = buildApp(deps);
   try {
     await app.listen({ port: config.PORT, host: '0.0.0.0' });
     app.log.info(

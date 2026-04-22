@@ -50,4 +50,7 @@ export const config: ProxyEnvironmentConfig = {
   MAX_BODY_LOG_BYTES: process.env.MAX_BODY_LOG_BYTES
     ? parseInt(process.env.MAX_BODY_LOG_BYTES, 10)
     : 2048,
+
+  // Unredact thinking content (opt-in, desactivado por defecto)
+  PROXY_UNREDACT_THINKING: process.env.PROXY_UNREDACT_THINKING === 'true',
 };

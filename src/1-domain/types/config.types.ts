@@ -50,4 +50,7 @@ export interface ProxyEnvironmentConfig {
 
   /** Límite de bytes para loguear cuerpos en consola. */
   MAX_BODY_LOG_BYTES: number;
+
+  /** Si es true, remueve el flag redact-thinking-2026-02-12 del header anthropic-beta para capturar thinking legible. */
+  PROXY_UNREDACT_THINKING?: boolean;
 }

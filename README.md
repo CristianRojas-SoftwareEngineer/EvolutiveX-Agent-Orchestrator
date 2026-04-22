@@ -210,6 +210,7 @@ Personaliza el comportamiento ajustando estas variables en tu entorno o en un ar
 | **Compat.**  | `CONSOLE_REDACT`                | Deshabilita prints con información en claro a la terminal.    | `1` (Activo)                |
 |              | `LOG_SSE`                       | Imprime por terminal cada línea de Event-Stream en vivo.      | `0` (Desactivo)             |
 |              | `MAX_BODY_LOG_BYTES`            | Límite restrictivo para visualizar cuerpos crudos por log.    | `2048`                      |
+| **Thinking** | `PROXY_UNREDACT_THINKING`       | Remueve el flag `redact-thinking-2026-02-12` del header `anthropic-beta` para capturar contenido thinking legible. | `false` (desactivado)       |
 
 > **Auditoría incondicional.** El proxy siempre escribe en `./sessions` (relativo al CWD). Para `agentic-turn` y `side-request` SSE terminales: (a) `steps/NNN/response/sse.jsonl` es la **fuente de verdad** (escritura síncrona, orden determinista); (b) `steps/NNN/response/sse.txt` es un raw dump de depuración acotado por `MAX_AUDIT_SSE_RAW_BYTES`; (c) `response/body.json` top-level es la reconstrucción final, generada siempre desde `sse.jsonl`. Detalle técnico en [`docs/how-sse-reconstruction-works.md`](docs/how-sse-reconstruction-works.md).
 

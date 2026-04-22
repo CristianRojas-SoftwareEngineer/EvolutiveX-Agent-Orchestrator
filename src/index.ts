@@ -19,12 +19,8 @@ async function start() {
       {
         event: 'listening',
         port: config.PORT,
-        sessionsDir: config.AUDIT_SESSIONS_DIR,
         upstream: config.UPSTREAM_ORIGIN,
         upstreamAcceptEncoding: config.UPSTREAM_ACCEPT_ENCODING,
-        auditEnabled: config.AUDIT_ENABLED,
-        auditSseRaw: config.AUDIT_SSE_RAW,
-        auditSseResponseBody: config.AUDIT_SSE_RESPONSE_BODY,
         maxResponseBufferBytes: config.MAX_RESPONSE_BUFFER_BYTES,
         maxAuditRequestBodyBytes: config.MAX_AUDIT_REQUEST_BODY_BYTES,
         maxAuditResponseBodyBytes: config.MAX_AUDIT_RESPONSE_BODY_BYTES,

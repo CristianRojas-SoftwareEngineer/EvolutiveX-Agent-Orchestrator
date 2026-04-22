@@ -61,10 +61,10 @@ export class SessionResolverService {
   }
 
   /**
-   * Formatea el nombre de un directorio de petición combinando el número de secuencia y el ID de petición.
+   * Formatea el nombre de un directorio de interacción combinando el número de secuencia y el ID de petición.
    * Ejemplo: '000001_req-a1b2'
    */
-  public formatAuditRequestDirName(sequence: number, requestId: string): string {
+  public formatAuditInteractionDirName(sequence: number, requestId: string): string {
     const seq = String(Math.max(0, Math.floor(sequence)) || 0).padStart(6, '0');
     return `${seq}_${requestId}`;
   }

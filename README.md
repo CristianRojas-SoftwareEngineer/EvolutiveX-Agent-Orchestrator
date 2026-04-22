@@ -4,9 +4,9 @@
 [![Fastify](https://img.shields.io/badge/Fastify-5.x-black.svg)](https://fastify.dev/)
 [![Architecture](https://img.shields.io/badge/Architecture-SOLID-green.svg)](#🏛-diseño-del-sistema-solid)
 
-Una implementación de alto rendimiento, modular y basada en **Fastify + TypeScript** diseñada para interceptar, auditar y analizar en tiempo real el tráfico entre clientes de IA (como Claude Code / Cursor) y la API oficial de Anthropic.
+Una implementación de alto rendimiento, modular y basada en **Fastify + TypeScript** diseñada específicamente para interceptar, auditar y analizar en tiempo real el tráfico entre **Claude Code** (el CLI oficial de Anthropic) y la API oficial de Anthropic. Claude Code permite redirigir sus peticiones al proxy vía la variable `ANTHROPIC_BASE_URL`, condición imprescindible para el funcionamiento del sistema; otros clientes (p. ej. Cursor) usan harnesses distintos y no están dentro del alcance de este proyecto.
 
-Este proyecto moderniza el flujo de observabilidad legacy, introduciendo un diseño desacoplado que garantiza **latencia cero** en la retransmisión mientras se procesan auditorías profundas en segundo plano.
+Diseño desacoplado que garantiza **latencia cero** en la retransmisión mientras se procesan auditorías profundas en segundo plano.
 
 ---
 
@@ -18,9 +18,9 @@ El proxy utiliza **Progressive Kernel Architecture (PKA)** — un modelo arquite
 
 | Capa                           | Ubicación                | Responsabilidad                                                                   | Componentes Clave                                                                                                                                                   |
 | ------------------------------ | ------------------------ | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **1 - Dominio**                | `src/1-domain/`          | Tipos puros (entidades) y lógica de dominio sin dependencias externas             | `SessionResolverService`, `RedactService`, `MarkdownRendererService`, Tipos de auditoría                                                                            |
+| **1 - Dominio**                | `src/1-domain/`          | Tipos puros (entidades) y lógica de dominio sin dependencias externas             | `SessionResolverService`, `TurnClassifierService`, `RedactService`, `MarkdownRendererService`, Tipos de auditoría                                                    |
 | **2 - Servicios (Adapters)**   | `src/2-services/`        | Implementaciones concretas con I/O (filesystem, streams) y **ports** (interfaces) | `SessionStoreService`, `AuditWriterService`, `SseReconstructService`, `StreamTeeService`, Ports: `IAuditWriter`, `ISessionStore`, `ISseReconstructor`, `IStreamTee` |
-| **3 - Operaciones (Handlers)** | `src/3-operations/`      | Orquestación de casos de uso (Command Handlers)                                   | `AuditRequestHandler`, `AuditSseResponseHandler`, `AuditStandardResponseHandler`, `AuditUpstreamErrorHandler`                                                       |
+| **3 - Operaciones (Handlers)** | `src/3-operations/`      | Orquestación de casos de uso (Command Handlers)                                   | `AuditInteractionHandler`, `AuditSseResponseHandler`, `AuditStandardResponseHandler`, `AuditUpstreamErrorHandler`                                                   |
 | **4 - API (Composition Root)** | `src/4-api/`             | Wiring de dependencias y configuración                                            | `createProxyDependencies()`, Configuración de entorno                                                                                                               |
 | **5 - Interfaces de Usuario**  | `src/5-user-interfaces/` | Adaptadores HTTP (reciben deps inyectadas via options)                            | `ProxyController`, `proxyRoutes`, `fastify.augments.d.ts`                                                                                                           |
 
@@ -44,18 +44,19 @@ Las capas internas **nunca** importan de capas externas. Esta regla garantiza qu
 ```mermaid
 graph TD
     A[Cliente: Claude Code] -->|Request + Audit Session Header| B(Fastify Proxy)
-    B -->|Hook: preHandler| C{SessionService}
-    C -->|ID Resuelto| D[AuditWriter: Guardar Request Body]
-    B -->|Transmisión| E[Upstream: API Anthropic]
-    E -->|Response Stream| F{ProxyController: Interceptor}
-    F -->|Clonación de Stream| G[Transmisión al Cliente]
-    F -->|Clonación de Stream| H[AuditWriter: Procesamiento]
-    H -->|Si SSE| I[response.sse.jsonl]
-    H -->|Si SSE (End)| L[SSEReconstructService]
-    L -->|Reconstrucción| M[response.body.json]
-    H -->|Si Gzip| J[Gunzip -> response.body.json]
-    M --> K[meta.json + Markdown]
-    J --> K
+    B -->|Hook: preHandler| C{SessionService + TurnClassifier}
+    C -->|Turno clasificado| D[AuditInteractionHandler\nfresh / continuation / preflight / side-request]
+    D -->|Guardar Request Body| E[AuditWriter]
+    B -->|Transmisión| F[Upstream: API Anthropic]
+    F -->|Response Stream| G{ProxyController: Interceptor}
+    G -->|Clonación de Stream| H[Transmisión al Cliente]
+    G -->|Clonación de Stream| I[Handler de Auditoría]
+    I -->|Si SSE| J[steps/NNN/response/sse.jsonl]
+    I -->|Si SSE, detecta stop_reason| K[SSEReconstructService\nagrupa steps, reconstruye]
+    K -->|Reconstrucción| L[response/body.json]
+    I -->|Si no-SSE, heurística terminal| M[steps/NNN/response/body.json]
+    L --> N[meta.json TurnMetadata + Markdown]
+    M --> N
 ```
 
 ---
@@ -66,8 +67,8 @@ graph TD
 
 A diferencia de un proxy genérico, este sistema "entiende" los flujos binarios de Anthropic.
 
-- Extrae cada línea de datos y la convierte en una entrada con _timestamp_ en `response.sse.jsonl`.
-- Permite el volcado binario crudo (`response.sse.txt`) para depuración de paridad de protocolos.
+- Extrae cada línea de datos y la convierte en una entrada con _timestamp_ en `response/sse.jsonl` (escrito **síncronamente**: fuente de verdad ordenada para la reconstrucción).
+- Mantiene un volcado binario crudo (`response/sse.txt`) para depuración de paridad de protocolos. **No** es la fuente de la reconstrucción y puede truncarse por `MAX_AUDIT_SSE_RAW_BYTES` sin afectar al mensaje final reconstruido.
 
 ### 🛡️ Privacidad Avanzada
 
@@ -77,8 +78,12 @@ El diseño garantiza que nunca se filtren API Keys a los logs de servidor ni a l
 
 Ideal para depurar comportamientos erráticos en herramientas de CLI (como `claude`):
 
-- Agrupa todas las peticiones bajo una carpeta de sesión nombrada (ej. `sessions/debug-feature-x/`).
-- Mantiene un archivo `meta.json` final por cada petición con estadísticas de duración, conteo de líneas SSE y bytes totales.
+- Agrupa las peticiones de un turno completo (prompt → respuesta final) bajo una interacción con subdirectorios `steps/`.
+- Dos tipos de interacción: `agentic-turn` (turno del usuario con prompt y respuesta) y `client-preflight` (quota check + cache warm-up).
+- Clasificación de `side-request`: peticiones con `"tools": []` (ej. count_tokens) se auditan en su propia interacción sin desplazar al turno activo principal, evitando corrupción de metadata por race conditions.
+- Los turnos activos se indexan por `interactionDir` (único por request) en vez de por `sessionId`, eliminando ghost turns por colisión cuando varias peticiones concurrentes comparten la misma sesión.
+- Los preflights (`client-preflight`) se cierran inmediatamente al recibir su respuesta, evitando turnos zombie que bloquean la sesión.
+- `meta.json` resume el turno completo: steps individuales, tokens agregados en `totals`, duración y `turnOutcome`.
 
 <a name="riesgos-seguridad"></a>
 
@@ -91,24 +96,93 @@ Ideal para depurar comportamientos erráticos en herramientas de CLI (como `clau
 
 ## 📂 Referencia de Archivos de Auditoría
 
-Cada petición genera una estructura jerárquica en `./sessions/<session-id>/requests/<seq>_<req-id>/`:
+Cada turno genera una estructura jerárquica en `./sessions/<session-id>/interactions/<seq>_<uuid>/`:
 
-| Archivo                               | Contenido                                                         |
-| ------------------------------------- | ----------------------------------------------------------------- |
-| `meta.json`                           | Informe final de la transacción (performance, estatus, truncado). |
-| `request.headers.json`                | Cabeceras enviadas (sanitizadas).                                 |
-| `request.body.bin`                    | Cuerpo crudo de la petición.                                      |
-| `request.body.formatted.json`         | JSON indentado del cuerpo de la petición (si aplica).             |
-| `request.body.parsed.md`              | Vista Markdown legible del JSON de petición.                      |
-| `request.body.omitted.txt`            | (Borde) Razón si la petición fue truncada por tamaño.             |
-| `response.headers.json`               | Cabeceras de respuesta (específico para flujos SSE).              |
-| `response.body.json` o `.bin`         | Cuerpo crudo de la respuesta final.                               |
-| `response.body.formatted.json`        | JSON indentado de la respuesta final.                             |
-| `response.body.parsed.md`             | Vista Markdown legible del JSON de respuesta.                     |
-| `response.body.omitted.txt`           | (Borde) Razón de escape si cayó la red o superamos el límite.     |
-| `response.body.reconstruct-error.txt` | (Borde) Mensaje de error si la reconstrucción SSE falla.          |
-| `response.sse.jsonl`                  | Cada evento del stream capturado secuencialmente.                 |
-| `response.sse.txt`                    | Volcado binario crudo del stream (si `AUDIT_SSE_RAW=1`).          |
+```
+interactions/NNNNNN_<uuid>/
+  meta.json                     # TurnMetadata: resumen del turno (interactionType, turnOutcome, steps[], totals)
+  state.json                    # Marcador "in-progress" (solo existe mientras la interacción está abierta)
+  request/                      # Solo agentic-turn y side-request: petición inicial top-level
+    headers.json
+    body.bin
+    body.formatted.json
+    body.parsed.md
+  response/                     # Solo agentic-turn/side-request SSE completados: respuesta final reconstruida
+    body.json
+    body.formatted.json
+    body.parsed.md
+    headers.json
+  steps/
+    001/                        # Cada step es una llamada HTTP individual; siempre contiene request/ para todos los tipos
+      request/                  # Petición del step (auto-contenida; desde step 001 en adelante)
+        headers.json, body.bin, body.formatted.json, body.parsed.md
+      response/                 # SSE: sse.jsonl (fuente de verdad) + archivos reconstruidos; No-SSE: body.json
+        sse.jsonl, sse.txt, headers.json                    (SSE crudo)
+        body.json, body.formatted.json, body.parsed.md      (SSE reconstruido ✅)
+    002/ ...
+```
+
+> **Nota:** Los preflights (`client-preflight`) no escriben `request/` en el nivel raíz de la interacción; sólo tienen `steps/` con sus archivos individuales. Todos los tipos de interacción (`agentic-turn`, `side-request`, `client-preflight`) escriben `steps/001/request/` para mantener simetría estructural.
+
+> **state.json:** Archivo marcador escrito al iniciar la interacción con `{ state: "in-progress", startedAt, interactionType }`. Se elimina al cerrar el turno (cuando se escribe `meta.json`). Su presencia indica una interacción huérfana por crash del proceso.
+
+### Tipos de Interacción
+
+| `interactionType`  | Origen                                                          | Cierre                                          |
+| ------------------ | --------------------------------------------------------------- | ----------------------------------------------- |
+| `agentic-turn`     | Prompt del usuario con `tools` no vacíos (fresh) + continuations | `stop_reason` terminal (`end_turn`, `max_tokens`) |
+| `client-preflight` | Quota check (`max_tokens:1`) o cache warm-up sin turno activo   | Al recibir la respuesta (inmediato)             |
+| `side-request`     | Peticiones con `tools: []` (ej. `count_tokens`, generación de títulos) | Respuesta terminal; no desplaza al turno activo |
+
+### Resultados de Turno (`turnOutcome`)
+
+El campo `turnOutcome` en `meta.json` indica el resultado final del turno:
+
+| `turnOutcome`   | Significado                                                               | `statusCode` típico |
+| --------------- | ------------------------------------------------------------------------- | ------------------- |
+| `completed`     | Turno completado exitosamente                                             | 2xx                 |
+| `client-error`  | Error del cliente (request mal formada, autenticación fallida, etc.)       | 4xx                 |
+| `upstream-error`| Error del servidor upstream (fallo de conexión, timeout, error interno)  | 5xx o `null`        |
+| `truncated`     | Respuesta truncada por `max_tokens`                                        | 2xx                 |
+| `interrupted`   | Turno interrumpido por un nuevo turno agentic                              | Variable            |
+
+### Correlación con Logs de Claude Code
+
+Cada step en `meta.json` incluye `anthropicMessageId` — el `message.id` de la API de Anthropic — permitiendo correlacionar directamente con los logs oficiales de Claude Code:
+
+```json
+{
+  "steps": [
+    {
+      "stepIndex": 1,
+      "anthropicMessageId": "msg_01SweCL7ReWWANWSRsPc8mfn",
+      "stopReason": "tool_use"
+    }
+  ]
+}
+```
+
+| Sistema | Ubicación del ID | Valor de ejemplo |
+|---------|------------------|------------------|
+| Log Claude Code (`.jsonl`) | `message.id` | `msg_01SweCL7ReWWANWSRsPc8mfn` |
+| Auditoría Proxy (`meta.json`) | `steps[].anthropicMessageId` | `msg_01SweCL7ReWWANWSRsPc8mfn` |
+
+**Proceso de correlación:**
+1. Extrae `"id"` del evento `assistant` en el log de Claude Code
+2. Busca ese valor en `sessions/<session>/interactions/*/meta.json` bajo `steps[].anthropicMessageId`
+3. El directorio contenedor es la interacción correspondiente
+
+### Filtrado de Health Checks
+
+El proxy detecta y **ignora silenciosamente** los health checks de conectividad que Claude Code (runtime Bun) envía antes de iniciar una sesión real. Un request se considera health check (y no se audita) si cumple **TODAS** estas condiciones:
+
+- `User-Agent` contiene "Bun" pero NO "claude-cli"
+- Body de la petición está vacío (`Content-Length: 0`)
+- Sin header `authorization`
+- Sin headers de sesión (`x-claude-code-session-id`, `x-cc-audit-session`)
+- Sesión resuelta a `_unknown` (fallback final)
+
+Esto evita la creación de directorios `_unknown/` con interacciones vacías que no aportan valor a la observabilidad.
 
 ---
 
@@ -120,29 +194,24 @@ Personaliza el comportamiento ajustando estas variables en tu entorno o en un ar
 
 |   Categoría   | Variable                              | Descripción                                                   | Default                      |
 | :-----------: | ------------------------------------- | ------------------------------------------------------------- | ---------------------------- |
-|   **Core**    | `PORT`                                | Puerto de escucha del proxy.                                  | `8787`                       |
-| **Upstream**  | `UPSTREAM_ORIGIN`                     | URL objetivo de Anthropic.                                    | `https://api.anthropic.com`  |
-|               | `UPSTREAM_ACCEPT_ENCODING`            | Control de compresión (`identity`, `gzip`, `pass`, `remove`). | `identity`                   |
-| **Auditoría** | `AUDIT_ENABLED`                       | Activa/Desactiva el volcado de datos a disco.                 | `1` (Activo)                 |
-|               | `AUDIT_SESSIONS_DIR`                  | Carpeta raíz para las capturas.                               | `sessions`                   |
-|               | `AUDIT_SSE_RAW`                       | Activa el volcado binario `.sse.txt`.                         | `0` (Desactivo)              |
-|               | `AUDIT_SESSION_HASH_SUFFIX`           | Añade hash al ID de sesión.                                   | `0` (Desactivo)              |
-|  **Headers**  | `AUDIT_SESSION_OVERRIDE_HEADER`       | Cabecera primaria de sesión.                                  | `x-cc-audit-session`         |
-|               | `AUDIT_SESSION_FALLBACK_HEADER`       | Cabecera secundaria.                                          | `x-claude-code-session-id`   |
-|               | `STRIP_AUDIT_SESSION_HEADER`          | Elimina cabeceras de sesión hacia upstream.                   | `1` (Activo)                 |
-|               | `DEFAULT_AUDIT_SESSION`               | Sesión si no hay cabeceras.                                   | _(vacío)_                    |
-|  **Límites**  | `MAX_REQUEST_BODY`                    | Límite del cuerpo de petición (memoria en proxy).             | `50mb`                       |
-|               | `MAX_RESPONSE_BUFFER_BYTES`           | Tope de buffer en memoria para respuestas no-SSE.             | `104857600`                  |
-|               | `MAX_AUDIT_RESPONSE_BODY_BYTES`       | Tope de archivo físico para el cuerpo de respuesta.           | `52428800`                   |
-|               | `MAX_AUDIT_REQUEST_BODY_BYTES`        | Tope de archivo físico para el cuerpo de petición.            | `52428800`                   |
-|               | `MAX_AUDIT_SSE_RAW_BYTES`             | Tope físico para SSE crudo (`0` equivale a ilimitado).        | `52428800`                   |
-| **SSE Rsp.**  | `AUDIT_SSE_RESPONSE_BODY`             | Reconstruye un JSON completo al finalizar el stream SSE.      | `0` (Desactivo)              |
-|               | `AUDIT_SSE_RESPONSE_BODY_REQUIRE_RAW` | Solo reconstruye si `AUDIT_SSE_RAW` está activo y persiste.   | `1` (Activo)                 |
-|               | `AUDIT_SSE_RESPONSE_BODY_FORCE_BETA`  | Fuerza modo Beta en SDK internamente al reconstruir.          | `0` (Desactivo)              |
-|               | `AUDIT_SSE_REPLAY_MODEL`              | Modelo de emulación si no se detecta (Anthropic SDK).         | `claude-3-5-sonnet-20241022` |
-|  **Compat.**  | `CONSOLE_REDACT`                      | Deshabilita prints con información en claro a la terminal.    | `1` (Activo)                 |
-|               | `LOG_SSE`                             | Imprime por terminal cada línea de Event-Stream en vivo.      | `0` (Desactivo)              |
-|               | `MAX_BODY_LOG_BYTES`                  | Límite restrictivo para visualizar cuerpos crudos por log.    | `2048`                       |
+|   **Core**   | `PORT`                          | Puerto de escucha del proxy.                                  | `8787`                      |
+| **Upstream** | `UPSTREAM_ORIGIN`               | URL objetivo de Anthropic.                                    | `https://api.anthropic.com` |
+|              | `UPSTREAM_ACCEPT_ENCODING`      | Control de compresión (`identity`, `gzip`, `pass`, `remove`). | `identity`                  |
+| **Headers**  | `AUDIT_SESSION_OVERRIDE_HEADER` | Cabecera primaria de sesión.                                  | `x-cc-audit-session`        |
+|              | `AUDIT_SESSION_FALLBACK_HEADER` | Cabecera secundaria.                                          | `x-claude-code-session-id`  |
+|              | `STRIP_AUDIT_SESSION_HEADER`    | Elimina cabeceras de sesión hacia upstream.                   | `1` (Activo)                |
+|              | `DEFAULT_AUDIT_SESSION`         | Sesión si no hay cabeceras.                                   | _(vacío)_                   |
+|              | `AUDIT_SESSION_HASH_SUFFIX`     | Añade hash al ID de sesión.                                   | `0` (Desactivo)             |
+| **Límites**  | `MAX_REQUEST_BODY`              | Límite del cuerpo de petición (memoria en proxy).             | `50mb`                      |
+|              | `MAX_RESPONSE_BUFFER_BYTES`     | Tope de buffer en memoria para respuestas no-SSE.             | `104857600`                 |
+|              | `MAX_AUDIT_REQUEST_BODY_BYTES`  | Tope de archivo físico para el cuerpo de petición.            | `52428800`                  |
+|              | `MAX_AUDIT_RESPONSE_BODY_BYTES` | Tope de archivo físico para el cuerpo de respuesta.           | `52428800`                  |
+|              | `MAX_AUDIT_SSE_RAW_BYTES`       | Tope físico para `response/sse.txt` (raw dump debug; `0` = ilimitado). **No afecta** a la reconstrucción (que lee `sse.jsonl`). | `52428800`                  |
+| **Compat.**  | `CONSOLE_REDACT`                | Deshabilita prints con información en claro a la terminal.    | `1` (Activo)                |
+|              | `LOG_SSE`                       | Imprime por terminal cada línea de Event-Stream en vivo.      | `0` (Desactivo)             |
+|              | `MAX_BODY_LOG_BYTES`            | Límite restrictivo para visualizar cuerpos crudos por log.    | `2048`                      |
+
+> **Auditoría incondicional.** El proxy siempre escribe en `./sessions` (relativo al CWD). Para `agentic-turn` y `side-request` SSE terminales: (a) `steps/NNN/response/sse.jsonl` es la **fuente de verdad** (escritura síncrona, orden determinista); (b) `steps/NNN/response/sse.txt` es un raw dump de depuración acotado por `MAX_AUDIT_SSE_RAW_BYTES`; (c) `response/body.json` top-level es la reconstrucción final, generada siempre desde `sse.jsonl`. Detalle técnico en [`docs/how-sse-reconstruction-works.md`](docs/how-sse-reconstruction-works.md).
 
 <a name="correlación-de-sesión-sessionid"></a>
 
@@ -195,7 +264,7 @@ Para más detalles y comandos alternativos, consulta `docs/dockerization.md`.
 
 ### Interpretación de Auditoría
 
-Tras cada petición, se genera una estructura en `./sessions/<session-id>/requests/<seq>_<uuid>/` con los archivos documentados en la [§ Referencia de Archivos de Auditoría](#archivos-auditoria).
+Tras cada turno, se genera una estructura en `./sessions/<session-id>/interactions/<seq>_<uuid>/` con los archivos documentados en la [§ Referencia de Archivos de Auditoría](#archivos-auditoria).
 
 ---
 

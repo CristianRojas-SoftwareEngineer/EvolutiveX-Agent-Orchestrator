@@ -23,13 +23,14 @@ describe('AuditWriterService - finalizeNonSseResponseAuditOnStreamError', () => 
   });
 
   it('debería escribir el cuerpo parcial y el archivo de omisión con mensaje de error', async () => {
-    const requestDir = path.join(tempDir, 'test-stream-error');
-    await fs.mkdir(requestDir, { recursive: true });
+    const interactionDir = path.join(tempDir, 'test-stream-error');
+    const responseDir = path.join(interactionDir, 'response');
+    await fs.mkdir(responseDir, { recursive: true });
 
     const partialBody = Buffer.from('{"id":"msg_partial","content":', 'utf8');
 
     const result = await service.finalizeNonSseResponseAuditOnStreamError({
-      requestDir,
+      interactionDir,
       bodyBuffer: partialBody,
       totalBytes: 1000,
       maxAuditResponseBytes: 52428800,
@@ -41,7 +42,7 @@ describe('AuditWriterService - finalizeNonSseResponseAuditOnStreamError', () => 
     expect(result.responseBodyBytesAudited).toBe(partialBody.length);
 
     // Verificar que se escribió el archivo de omisión con el mensaje de error
-    const omittedPath = path.join(requestDir, 'response.body.omitted.txt');
+    const omittedPath = path.join(responseDir, 'body.omitted.txt');
     const omitted = await fs.readFile(omittedPath, 'utf8');
     expect(omitted).toContain('Stream error: socket hang up');
     expect(omitted).toContain('Total bytes received from upstream before error: 1000');

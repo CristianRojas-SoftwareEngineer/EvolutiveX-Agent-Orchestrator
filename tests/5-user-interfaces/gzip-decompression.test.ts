@@ -43,8 +43,6 @@ describe('Test de Integración - Decompresión Gzip', () => {
     tempSessionsDir = path.join(os.tmpdir(), `scp-gzip-${Date.now()}`);
 
     process.env.UPSTREAM_ORIGIN = `http://127.0.0.1:${upstreamPort}`;
-    process.env.AUDIT_SESSIONS_DIR = tempSessionsDir;
-    process.env.AUDIT_ENABLED = '1';
     process.env.UPSTREAM_ACCEPT_ENCODING = 'gzip'; // Forzamos al proxy a pedir gzip
     process.env.DEFAULT_AUDIT_SESSION = 'test-gzip';
 
@@ -52,11 +50,12 @@ describe('Test de Integración - Decompresión Gzip', () => {
     const { vi } = await import('vitest');
     vi.resetModules();
 
-    // 3. Levantar la aplicación proxy en memoria
+    // 3. Levantar la aplicación proxy en memoria, inyectando tempSessionsDir
+    //    como base directory de auditoría (DI del composition-root).
     const { config } = await import('../../src/4-api/config/env.config.js');
     const { createProxyDependencies: createDeps } =
       await import('../../src/4-api/composition-root.js');
-    const deps = await createDeps(config);
+    const deps = await createDeps(config, tempSessionsDir);
     proxyApp = (await import('../../src/app.js')).buildApp(deps);
     await proxyApp.ready();
   });
@@ -91,11 +90,11 @@ describe('Test de Integración - Decompresión Gzip', () => {
     // Damos un pequeño margen para que el stream en background termine de volcar al disco
     await new Promise((r) => setTimeout(r, 200));
 
-    const dirs = await fs.readdir(path.join(tempSessionsDir, 'test-gzip', 'requests'));
+    const dirs = await fs.readdir(path.join(tempSessionsDir, 'test-gzip', 'interactions'));
     const requestDirName = dirs[0];
-    const sessionPath = path.join(tempSessionsDir, 'test-gzip', 'requests', requestDirName);
+    const sessionPath = path.join(tempSessionsDir, 'test-gzip', 'interactions', requestDirName);
 
-    const responseBodyPath = path.join(sessionPath, 'response.body.json');
+    const responseBodyPath = path.join(sessionPath, 'response', 'body.json');
     const content = await fs.readFile(responseBodyPath, 'utf8');
 
     // Assert 4: El file volcado es texto json válido (no un binario corrupto y no un stream mútiple)

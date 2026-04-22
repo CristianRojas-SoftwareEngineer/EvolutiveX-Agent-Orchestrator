@@ -6,24 +6,17 @@ function makeConfig(overrides: Partial<ProxyEnvironmentConfig> = {}): ProxyEnvir
   return {
     PORT: 8787,
     UPSTREAM_ORIGIN: 'https://api.anthropic.com',
-    AUDIT_SESSIONS_DIR: 'sessions',
     MAX_REQUEST_BODY: '50mb',
     MAX_RESPONSE_BUFFER_BYTES: 104857600,
     MAX_AUDIT_REQUEST_BODY_BYTES: 52428800,
     MAX_AUDIT_RESPONSE_BODY_BYTES: 52428800,
     MAX_AUDIT_SSE_RAW_BYTES: 52428800,
-    AUDIT_ENABLED: true,
-    AUDIT_SSE_RAW: false,
     AUDIT_SESSION_OVERRIDE_HEADER: 'x-cc-audit-session',
     AUDIT_SESSION_FALLBACK_HEADER: 'x-claude-code-session-id',
     DEFAULT_AUDIT_SESSION: '',
     STRIP_AUDIT_SESSION_HEADER: true,
     AUDIT_SESSION_HASH_SUFFIX: false,
     UPSTREAM_ACCEPT_ENCODING: 'identity',
-    AUDIT_SSE_RESPONSE_BODY: false,
-    AUDIT_SSE_RESPONSE_BODY_REQUIRE_RAW: true,
-    AUDIT_SSE_RESPONSE_BODY_FORCE_BETA: false,
-    AUDIT_SSE_REPLAY_MODEL: 'claude-3-5-sonnet-20241022',
     CONSOLE_REDACT: true,
     LOG_SSE: false,
     MAX_BODY_LOG_BYTES: 2048,
@@ -98,7 +91,7 @@ describe('SessionResolverService - Resolución de sesión', () => {
 describe('SessionResolverService - Formato de directorio', () => {
   it('debería formatear nombres con secuencia zero-padded', () => {
     const svc = new SessionResolverService(makeConfig());
-    expect(svc.formatAuditRequestDirName(1, 'abc-123')).toBe('000001_abc-123');
-    expect(svc.formatAuditRequestDirName(999999, 'xyz')).toBe('999999_xyz');
+    expect(svc.formatAuditInteractionDirName(1, 'abc-123')).toBe('000001_abc-123');
+    expect(svc.formatAuditInteractionDirName(999999, 'xyz')).toBe('999999_xyz');
   });
 });

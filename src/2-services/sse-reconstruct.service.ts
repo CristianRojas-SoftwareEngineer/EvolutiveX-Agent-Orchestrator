@@ -7,74 +7,118 @@ import type Anthropic from '@anthropic-ai/sdk';
 import { JsonValue } from '../1-domain/types/json.types.js';
 import type { ISseReconstructor } from './ports/sse-reconstructor.port.js';
 
-/** URL base utilizada internamente para el SDK durante el replay. */
 const REPLAY_BASE_URL = 'https://api.anthropic.com';
 
 /**
- * Servicio para reconstruir el mensaje final de respuesta a partir de bytes SSE grabados.
- * Utiliza `@anthropic-ai/sdk` con un `fetch` simulado para replayar los bytes SSE
- * a través del parser nativo del SDK, portado desde `sse-reconstruct-body.js`.
+ * Placeholder para `params.model` al reutilizar el SDK de Anthropic como
+ * parser de bytes SSE con `fetch` mockeado. Verificado empíricamente contra
+ * @anthropic-ai/sdk v0.89.0: el SDK no valida este valor en runtime (acepta
+ * cualquier string, incluido vacío, símbolos, unicode, null y undefined).
+ * Solo existe para satisfacer la firma TypeScript `model: Model | string & {}`.
+ * NO cambiar por un nombre de modelo real: puede inducir a error al lector.
+ * Detalle en docs/how-sse-reconstruction-works.md.
+ */
+const REPLAY_MODEL = 'claude-sse-replay';
+
+/**
+ * Servicio para reconstruir el mensaje final de respuesta a partir del volcado
+ * SSE grabado en disco. Lee `sse.jsonl` (orden determinista, escritura
+ * síncrona) desde `stepDir/response/` y escribe el resultado en
+ * `interactionDir/response/body.*`.
  */
 export class SseReconstructService implements ISseReconstructor {
   constructor(
     private auditWriterService: AuditWriterService,
     private markdownRendererService: MarkdownRendererService,
-    private replayModel: string,
   ) {}
 
   /**
-   * Ejecuta la reconstrucción del cuerpo de respuesta desde el volcado SSE en disco.
-   * Escribe `response.body.json`, `response.body.formatted.json` y `response.body.parsed.md`.
+   * Reconstruye un mensaje Anthropic desde el sse.jsonl de un step individual.
+   * Usa el SDK oficial para parsear eventos SSE y ensamblar el mensaje.
    */
-  public async runReconstruction(opts: SseReconstructOptions): Promise<SseReconstructResult> {
-    const {
-      requestDir,
-      originalUrl,
-      headers,
-      forceBeta,
-      sseRawBytesWritten,
-      auditSseRaw,
-      sseRawTruncatedByLimit,
-      sseRawWriteError,
-      requireRaw,
-    } = opts;
+  public async reconstructStepMessage(
+    stepDir: string,
+  ): Promise<Anthropic.Message | Anthropic.Beta.Messages.BetaMessage> {
+    const jsonlPath = path.join(stepDir, 'response', 'sse.jsonl');
 
-    const ssePath = path.join(requestDir, 'response.sse.txt');
-
-    const useBeta = this.computeUseBeta(originalUrl, headers, forceBeta);
-
-    // Verificar precondiciones
-    if (requireRaw && !auditSseRaw) {
-      return { sseResponseBodyAttempted: false, sseResponseBodyWritten: false };
+    let jsonlBuffer: Buffer;
+    try {
+      jsonlBuffer = await fs.readFile(jsonlPath);
+    } catch {
+      throw new Error('response/sse.jsonl missing or unreadable');
     }
 
-    if (!auditSseRaw || !sseRawBytesWritten) {
-      return { sseResponseBodyAttempted: false, sseResponseBodyWritten: false };
+    if (!jsonlBuffer.length) {
+      throw new Error('sse.jsonl empty');
     }
 
-    if (sseRawTruncatedByLimit || sseRawWriteError) {
-      return { sseResponseBodyAttempted: false, sseResponseBodyWritten: false };
-    }
-
-    // Leer el volcado SSE crudo del disco
     let sseBuffer: Buffer;
     try {
-      sseBuffer = await fs.readFile(ssePath);
-    } catch {
-      return {
-        sseResponseBodyAttempted: false,
-        sseResponseBodyWritten: false,
-        sseResponseBodyError: 'response.sse.txt missing or unreadable',
-      };
+      sseBuffer = this.reassembleSseBytesFromJsonl(jsonlBuffer);
+    } catch (cause: unknown) {
+      const errMsg = cause instanceof Error ? cause.message : String(cause);
+      throw new Error(`failed to reassemble SSE bytes from jsonl: ${errMsg}`, { cause });
     }
 
     if (!sseBuffer.length) {
-      return { sseResponseBodyAttempted: false, sseResponseBodyWritten: false };
+      throw new Error('no SSE bytes to reconstruct');
+    }
+
+    // Detectar beta mode desde headers del step
+    const headersPath = path.join(stepDir, 'response', 'headers.json');
+    let useBeta = false;
+    try {
+      const headersRaw = await fs.readFile(headersPath, 'utf8');
+      const headers = JSON.parse(headersRaw) as Record<string, unknown>;
+      useBeta = headers['anthropic-beta'] !== undefined;
+    } catch {
+      // default false
+    }
+
+    return this.reconstructMessageFromSseBytes(sseBuffer, useBeta);
+  }
+
+  /**
+   * Ejecuta la reconstrucción del cuerpo de respuesta a partir del volcado SSE
+   * en disco.
+   *
+   * Lee desde `stepDir/response/sse.jsonl` — fuente de verdad ordenada, escrita
+   * síncronamente por `AuditWriterService.appendSseLine`. NO se usa `sse.txt`
+   * porque su captura es asíncrona y bajo ráfagas puede quedar con eventos
+   * desordenados (ver `docs/how-sse-reconstruction-works.md`).
+   *
+   * Los flags `sseRawBytesWritten`/`sseRawTruncatedByLimit`/`sseRawWriteError`
+   * de `opts` describen el estado de `sse.txt` (raw dump) y son puramente
+   * informativos: no abortan la reconstrucción.
+   */
+  public async runReconstruction(opts: SseReconstructOptions): Promise<SseReconstructResult> {
+    const { stepDir, interactionDir, originalUrl, headers } = opts;
+
+    const useBeta = this.computeUseBeta(originalUrl, headers);
+
+    // Escribir headers.json en el step para uso futuro de reconstructStepMessage
+    const headersPath = path.join(stepDir, 'response', 'headers.json');
+    await fs.mkdir(path.dirname(headersPath), { recursive: true });
+    await fs.writeFile(
+      headersPath,
+      JSON.stringify({ 'anthropic-beta': useBeta ? 'true' : undefined }),
+      'utf8',
+    );
+
+    let message: Anthropic.Message | Anthropic.Beta.Messages.BetaMessage;
+    try {
+      message = await this.reconstructStepMessage(stepDir);
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      return {
+        sseResponseBodyAttempted: false,
+        sseResponseBodyWritten: false,
+        sseResponseBodyError: errMsg,
+      };
     }
 
     try {
-      const message = await this.reconstructMessageFromSseBytes(sseBuffer, useBeta);
-      await this.writeSseReconstructedResponseBody(requestDir, message);
+      await this.writeSseReconstructedResponseBody(interactionDir, message);
       return {
         sseResponseBodyAttempted: true,
         sseResponseBodyWritten: true,
@@ -82,7 +126,7 @@ export class SseReconstructService implements ISseReconstructor {
       };
     } catch (err: unknown) {
       try {
-        await this.writeSseReconstructError(requestDir, err);
+        await this.writeSseReconstructError(interactionDir, err);
       } catch {
         /* error al escribir el error — no bloquear */
       }
@@ -97,30 +141,83 @@ export class SseReconstructService implements ISseReconstructor {
   }
 
   /**
-   * Detecta si debe usarse la API beta basándose en la URL original o cabeceras.
+   * Reensambla el wire-format SSE a partir de las líneas capturadas en
+   * `sse.jsonl`. Cada entrada `{i, ts, line}` aporta una línea SSE ya trimada
+   * (sin `\r` final, sin trailing newline). El SDK de Anthropic exige que los
+   * eventos estén delimitados por línea en blanco (`\n\n`).
+   *
+   * Regla: cada línea se emite con `\n` final; además, cuando la siguiente
+   * línea arranca un evento nuevo (`event:` o `data:` de un evento standalone
+   * sin `event:` previo) o cuando hemos visto ya un `data:` en el evento
+   * actual, inyectamos un `\n` extra para cerrar el bloque anterior.
+   *
+   * Esta heurística es equivalente al stream real emitido por upstream, y es
+   * la que el SDK de Anthropic parsea sin quejas.
    */
+  private reassembleSseBytesFromJsonl(jsonlBuffer: Buffer): Buffer {
+    const text = jsonlBuffer.toString('utf8');
+    const rawLines = text.split('\n');
+    const events: string[] = [];
+    let current: string[] = [];
+
+    const flushCurrent = (): void => {
+      if (current.length === 0) return;
+      events.push(current.join('\n'));
+      current = [];
+    };
+
+    for (const raw of rawLines) {
+      if (raw.trim() === '') continue;
+      let parsed: { line?: unknown };
+      try {
+        parsed = JSON.parse(raw) as { line?: unknown };
+      } catch {
+        continue;
+      }
+      const line = typeof parsed.line === 'string' ? parsed.line : '';
+      if (!line) continue;
+
+      if (line.startsWith('event:')) {
+        flushCurrent();
+        current.push(line);
+        continue;
+      }
+
+      if (line.startsWith('data:')) {
+        current.push(line);
+        // En Anthropic cada evento trae exactamente un 'data:'. Tras registrarlo
+        // cerramos el bloque para que el SDK reciba el delimitador correcto.
+        flushCurrent();
+        continue;
+      }
+
+      // Otros campos SSE (id:, retry:, comentarios ':...') se agregan al bloque
+      // actual sin cerrarlo.
+      current.push(line);
+    }
+    flushCurrent();
+
+    if (events.length === 0) return Buffer.alloc(0);
+
+    // Unir eventos con línea en blanco y terminar con '\n\n' final.
+    const wire = `${events.join('\n\n')}\n\n`;
+    return Buffer.from(wire, 'utf8');
+  }
+
   private computeUseBeta(
     originalUrl?: string,
     headers?: Record<string, string | string[] | undefined>,
-    forceBeta?: boolean,
   ): boolean {
-    if (forceBeta) return true;
     const url = String(originalUrl || '');
     if (url.includes('beta=true')) return true;
     if (headers && headers['anthropic-beta']) return true;
     return false;
   }
 
-  /**
-   * Ensambla el Message final desde bytes SSE usando el parser del SDK en streaming.
-   */
   private async reconstructMessageFromSseBytes(
     sseBuffer: Buffer,
     useBeta: boolean,
   ): Promise<Anthropic.Message | Anthropic.Beta.Messages.BetaMessage> {
-    // Importación dinámica para evitar fallo si @anthropic-ai/sdk no está instalado
-
-    // Importación dinámica para compatibilidad con Native ESM
     const { default: Anthropic } = await import('@anthropic-ai/sdk');
 
     const mockFetch = async () =>
@@ -136,7 +233,7 @@ export class SseReconstructService implements ISseReconstructor {
     });
 
     const params = {
-      model: this.replayModel,
+      model: REPLAY_MODEL,
       max_tokens: 1024,
       messages: [{ role: 'user' as const, content: ' ' }],
     };
@@ -146,9 +243,6 @@ export class SseReconstructService implements ISseReconstructor {
     return stream.finalMessage();
   }
 
-  /**
-   * Envuelve un Buffer en un Web ReadableStream compatible con la API de Fetch/Response.
-   */
   private createSseWebReadableStream(buffer: Buffer): ReadableStream<Uint8Array> {
     return new ReadableStream({
       start(controller) {
@@ -158,36 +252,34 @@ export class SseReconstructService implements ISseReconstructor {
     });
   }
 
-  /**
-   * Escribe el cuerpo reconstruido del mensaje en los archivos estándar de auditoría.
-   */
   private async writeSseReconstructedResponseBody(
-    requestDir: string,
+    interactionDir: string,
     message: Anthropic.Message | Anthropic.Beta.Messages.BetaMessage,
   ): Promise<void> {
+    const responseDir = path.join(interactionDir, 'response');
+    await fs.mkdir(responseDir, { recursive: true });
     const plain = JSON.parse(JSON.stringify(message));
     await this.auditWriterService.writeFileAtomic(
-      path.join(requestDir, 'response.body.json'),
+      path.join(responseDir, 'body.json'),
       Buffer.from(JSON.stringify(plain), 'utf8'),
     );
     await this.auditWriterService.writeFormattedAndMarkdown(
-      requestDir,
-      'response.body',
+      responseDir,
+      'body',
       plain as JsonValue,
       'response',
     );
   }
 
-  /**
-   * Escribe un archivo con los detalles del error de reconstrucción para diagnóstico.
-   */
-  private async writeSseReconstructError(requestDir: string, err: unknown): Promise<void> {
+  private async writeSseReconstructError(interactionDir: string, err: unknown): Promise<void> {
+    const responseDir = path.join(interactionDir, 'response');
+    await fs.mkdir(responseDir, { recursive: true });
     const text =
       err instanceof Error && err.stack
         ? `${String(err.message)}\n${String(err.stack).slice(0, 8000)}`
         : String(err);
     await this.auditWriterService.writeFileAtomic(
-      path.join(requestDir, 'response.body.reconstruct-error.txt'),
+      path.join(responseDir, 'body.reconstruct-error.txt'),
       Buffer.from(text, 'utf8'),
     );
   }

@@ -1,18 +1,14 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { Readable } from 'node:stream';
 import type { ProxyDependencies } from '../../4-api/composition-root.js';
-import { AuditRequestContext } from '../../1-domain/types/audit.types.js';
+import { AuditInteractionContext } from '../../1-domain/types/audit.types.js';
 
 /**
  * Controlador delgado que actúa como traductor entre Fastify (Capa 5) y los handlers (Capa 3).
- * Solo maneja: parsing de FastifyRequest/Reply, setup de streams, piping, y construcción de contexto.
  */
 export class ProxyController {
   constructor(private deps: ProxyDependencies) {}
 
-  /**
-   * Hook preHandler: extrae datos de la petición y delega al handler de auditoría de request.
-   */
   public async preHandler(request: FastifyRequest, _reply: FastifyReply): Promise<void> {
     let rawBody: Buffer;
 
@@ -31,7 +27,7 @@ export class ProxyController {
 
     request.rawBodyBytes = rawBody.length;
 
-    const result = await this.deps.auditRequestHandler.execute({
+    const result = await this.deps.auditInteractionHandler.execute({
       headers: request.headers,
       rawBody,
       requestId: request.id,
@@ -41,25 +37,24 @@ export class ProxyController {
       request.auditSessionId = result.auditSessionId;
       request.requestSequence = result.requestSequence;
       request.requestStartTime = Date.now();
-      request.auditRequestDir = result.auditRequestDir;
+      request.auditInteractionDir = result.auditInteractionDir;
       request.requestBodyOmitted = result.requestBodyOmitted;
+      request.interactionType = result.interactionType;
+      request.turnClassification = result.turnClassification;
     }
   }
 
-  /**
-   * Manejador para errores de conexión con el upstream.
-   */
   public async onUpstreamError(
     request: FastifyRequest,
     reply: FastifyReply,
     error: Error & { code?: string },
   ): Promise<void> {
-    const auditDir = request.auditRequestDir;
+    const auditDir = request.auditInteractionDir;
 
     if (auditDir) {
       try {
         await this.deps.auditUpstreamErrorHandler.execute({
-          auditRequestDir: auditDir,
+          auditInteractionDir: auditDir,
           requestId: request.id,
           requestSequence: request.requestSequence || 0,
           auditSessionId: request.auditSessionId || '',
@@ -82,10 +77,6 @@ export class ProxyController {
     });
   }
 
-  /**
-   * Interceptor para la respuesta del proxy.
-   * Clona el stream, gestiona gzip, y delega al handler correspondiente (SSE o estándar).
-   */
   public onResponseInterceptor(
     request: FastifyRequest,
     reply: FastifyReply,
@@ -104,7 +95,6 @@ export class ProxyController {
       .toLowerCase()
       .includes('gzip');
 
-    // Preparar headers de respuesta (quitar gzip si es necesario)
     const headers = { ...res.headers };
     if (isGzip) {
       reply.removeHeader('content-encoding');
@@ -114,7 +104,6 @@ export class ProxyController {
     }
     reply.headers(headers);
 
-    // Resolver stream fuente
     let sourceStream: NodeJS.ReadableStream =
       res.stream || (res as unknown as NodeJS.ReadableStream);
     if (
@@ -125,14 +114,12 @@ export class ProxyController {
       sourceStream = res.body as NodeJS.ReadableStream;
     }
 
-    // Bifurcar stream usando StreamTeeService (descomprime gzip si corresponde)
     const { clientStream, auditStream } = this.deps.streamTee.teeAndDecompress(
       sourceStream,
       isGzip,
     );
 
-    // Construir contexto de auditoría
-    const context: AuditRequestContext = {
+    const context: AuditInteractionContext = {
       requestId: request.id,
       requestSequence: request.requestSequence || 0,
       auditSessionId: request.auditSessionId || '',
@@ -142,15 +129,16 @@ export class ProxyController {
       requestStartTime: request.requestStartTime || Date.now(),
       requestBodyBytes: request.rawBodyBytes ?? 0,
       requestBodyOmitted: !!request.requestBodyOmitted,
-      auditRequestDir: request.auditRequestDir || '',
+      auditInteractionDir: request.auditInteractionDir || '',
       responseStatusCode: res.statusCode,
+      interactionType: request.interactionType,
+      turnClassification: request.turnClassification,
     };
 
-    // Delegar al handler correspondiente
     if (isSse) {
       this.deps.auditSseResponseHandler.execute(auditStream, context, headers);
     } else {
-      this.deps.auditStandardResponseHandler.execute(auditStream, context, contentType);
+      this.deps.auditStandardResponseHandler.execute(auditStream, context, contentType, headers);
     }
 
     reply.send(clientStream);

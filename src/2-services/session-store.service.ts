@@ -1,19 +1,20 @@
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 
+import { ActiveTurn, StepMeta } from '../1-domain/types/audit.types.js';
 import type { ISessionStore } from './ports/session-store.port.js';
 
-const REQUEST_SEQUENCE_FILE = 'request-sequence.json';
+const INTERACTION_SEQUENCE_FILE = 'interaction-sequence.json';
 
 /**
  * Servicio adaptador para operaciones de filesystem de sesiones.
- * Gestiona secuencias en disco, mutex, y directorio raíz de auditoría.
+ * Gestiona secuencias en disco, mutex, directorio raíz de auditoría, y estado de turnos activos.
  */
 export class SessionStoreService implements ISessionStore {
-  /** Mapa para serializar la asignación asíncrona de secuencias por sesión. */
   private sessionRequestChains = new Map<string, Promise<void>>();
-  /** La raíz del sistema de archivos donde se almacenan los datos de auditoría. */
   private auditBaseDir: string;
+  private activeTurns = new Map<string, ActiveTurn>();
+  private turnRegistry = new Map<string, ActiveTurn>();
 
   constructor(auditBaseDir: string) {
     this.auditBaseDir = path.isAbsolute(auditBaseDir)
@@ -21,16 +22,10 @@ export class SessionStoreService implements ISessionStore {
       : path.join(process.cwd(), auditBaseDir);
   }
 
-  /**
-   * Devuelve la ruta absoluta del directorio base de auditoría.
-   */
   public getBaseDir(): string {
     return this.auditBaseDir;
   }
 
-  /**
-   * Asegura que el directorio raíz de auditoría existe y crea un archivo .gitkeep.
-   */
   public async ensureAuditSessionsRoot(): Promise<void> {
     await fs.mkdir(this.auditBaseDir, { recursive: true });
     const gitkeep = path.join(this.auditBaseDir, '.gitkeep');
@@ -41,17 +36,58 @@ export class SessionStoreService implements ISessionStore {
     }
   }
 
-  /**
-   * Método thread-safe para obtener el siguiente número secuencial de petición para una sesión.
-   * Utiliza una cadena de promesas para prevenir condiciones de carrera al leer/escribir archivos de secuencia.
-   */
-  public nextAuditRequestSequence(sessionId: string): Promise<number> {
-    return this.withSessionLock(sessionId, () => this.allocateNextAuditRequestSequence(sessionId));
+  public nextAuditInteractionSequence(sessionId: string): Promise<number> {
+    return this.withSessionLock(sessionId, () => this.allocateNextAuditInteractionSequence(sessionId));
   }
 
-  /**
-   * Implementación de mutex interno utilizando cadenas de Promesas.
-   */
+  public getActiveTurn(sessionId: string): Promise<ActiveTurn | null> {
+    return this.withSessionLock(sessionId, () => {
+      return Promise.resolve(this.activeTurns.get(sessionId) || null);
+    });
+  }
+
+  public setActiveTurn(sessionId: string, turn: ActiveTurn): Promise<void> {
+    return this.withSessionLock(sessionId, () => {
+      this.activeTurns.set(sessionId, turn);
+      this.turnRegistry.set(turn.interactionDir, turn);
+      return Promise.resolve();
+    });
+  }
+
+  public registerTurn(dir: string, turn: ActiveTurn): void {
+    this.turnRegistry.set(dir, turn);
+  }
+
+  public getTurnByDir(dir: string): Promise<ActiveTurn | null> {
+    return Promise.resolve(this.turnRegistry.get(dir) || null);
+  }
+
+  public getTurnByDirSync(dir: string): ActiveTurn | null {
+    return this.turnRegistry.get(dir) || null;
+  }
+
+  public incrementStepCountByDir(dir: string): number {
+    const turn = this.turnRegistry.get(dir);
+    if (!turn) return 1;
+    turn.stepCount += 1;
+    return turn.stepCount;
+  }
+
+  public async pushStepMetaByDir(dir: string, meta: StepMeta): Promise<void> {
+    const turn = this.turnRegistry.get(dir);
+    if (turn) turn.stepsMeta.push(meta);
+  }
+
+  public async closeTurn(dir: string, sessionId: string): Promise<void> {
+    this.turnRegistry.delete(dir);
+    await this.withSessionLock(sessionId, async () => {
+      const active = this.activeTurns.get(sessionId);
+      if (active?.interactionDir === dir) {
+        this.activeTurns.delete(sessionId);
+      }
+    });
+  }
+
   private withSessionLock<T>(sessionId: string, fn: () => Promise<T>): Promise<T> {
     const key = String(sessionId);
     const prev = this.sessionRequestChains.get(key) || Promise.resolve();
@@ -60,23 +96,17 @@ export class SessionStoreService implements ISessionStore {
     return result;
   }
 
-  /**
-   * Lógica para determinar el número de secuencia absolutamente siguiente consultando el estado local y el disco.
-   */
-  private async allocateNextAuditRequestSequence(sessionId: string): Promise<number> {
+  private async allocateNextAuditInteractionSequence(sessionId: string): Promise<number> {
     const fromFile = await this.readLastSequenceFromFile(sessionId);
-    const fromDirs = await this.maxSequenceFromExistingRequestDirs(sessionId);
+    const fromDirs = await this.maxSequenceFromExistingInteractionDirs(sessionId);
     const lastSeen = Math.max(fromFile ?? 0, fromDirs);
     const next = lastSeen + 1;
     await this.writeLastSequenceAtomic(sessionId, next);
     return next;
   }
 
-  /**
-   * Lee el último número de secuencia desde el archivo de metadatos de la sesión local.
-   */
   private async readLastSequenceFromFile(sessionId: string): Promise<number | null> {
-    const filePath = path.join(this.auditBaseDir, sessionId, REQUEST_SEQUENCE_FILE);
+    const filePath = path.join(this.auditBaseDir, sessionId, INTERACTION_SEQUENCE_FILE);
     try {
       const raw = await fs.readFile(filePath, 'utf8');
       const j = JSON.parse(raw);
@@ -89,12 +119,8 @@ export class SessionStoreService implements ISessionStore {
     return null;
   }
 
-  /**
-   * Escanea los directorios de Petición existentes en una sesión para encontrar el número de secuencia más alto.
-   * Se utiliza como fallback de robustez.
-   */
-  private async maxSequenceFromExistingRequestDirs(sessionId: string): Promise<number> {
-    const reqDir = path.join(this.auditBaseDir, sessionId, 'requests');
+  private async maxSequenceFromExistingInteractionDirs(sessionId: string): Promise<number> {
+    const reqDir = path.join(this.auditBaseDir, sessionId, 'interactions');
     let max = 0;
     try {
       const entries = await fs.readdir(reqDir, { withFileTypes: true });
@@ -112,13 +138,10 @@ export class SessionStoreService implements ISessionStore {
     return max;
   }
 
-  /**
-   * Escribe de forma atómica el siguiente número de secuencia en el disco.
-   */
   private async writeLastSequenceAtomic(sessionId: string, last: number): Promise<void> {
     const sessionDir = path.join(this.auditBaseDir, sessionId);
     await fs.mkdir(sessionDir, { recursive: true });
-    const filePath = path.join(sessionDir, REQUEST_SEQUENCE_FILE);
+    const filePath = path.join(sessionDir, INTERACTION_SEQUENCE_FILE);
     const tmp = `${filePath}.${process.pid}.${Date.now()}.tmp`;
     const body = `${JSON.stringify({ last }, null, 2)}\n`;
     await fs.writeFile(tmp, body, 'utf8');

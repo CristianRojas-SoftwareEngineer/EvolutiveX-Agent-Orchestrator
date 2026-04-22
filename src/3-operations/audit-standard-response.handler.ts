@@ -1,43 +1,56 @@
+import * as path from 'node:path';
 import type { IAuditWriter } from '../2-services/ports/audit-writer.port.js';
+import type { ISessionStore } from '../2-services/ports/session-store.port.js';
 import { ProxyEnvironmentConfig } from '../1-domain/types/config.types.js';
-import { AuditRequestContext } from '../1-domain/types/audit.types.js';
+import {
+  AuditInteractionContext,
+  ActiveTurn,
+  StepMeta,
+  TurnMetadata,
+  TurnOutcome,
+  computeTokenTotals,
+} from '../1-domain/types/audit.types.js';
 
 /**
  * Handler para orquestar la auditoría de respuestas estándar (no-SSE).
- * Patrón fire-and-subscribe: suscribe listeners al stream y retorna inmediatamente.
+ * Para agentic-turn: aplica heurística terminal-por-defecto.
+ * Para client-preflight: escribe step sin cerrar el turno.
  */
 export class AuditStandardResponseHandler {
   constructor(
     private auditWriter: IAuditWriter,
     private config: ProxyEnvironmentConfig,
+    private sessionStore: ISessionStore,
   ) {}
 
-  /**
-   * Ejecuta la auditoría de respuesta estándar.
-   * @param stream Stream a auditar (ya descomprimido si venía gzip)
-   * @param context Contexto de la petición
-   * @param contentType Content-Type de la respuesta
-   */
   public execute(
     stream: NodeJS.ReadableStream,
-    context: AuditRequestContext,
+    context: AuditInteractionContext,
     contentType: string,
+    responseHeaders?: Record<string, string | string[] | undefined>,
   ): void {
-    if (!this.config.AUDIT_ENABLED || !context.auditRequestDir) {
+    if (!context.auditInteractionDir) {
       return;
     }
+
+    const activeTurn = this.sessionStore.getTurnByDirSync(context.auditInteractionDir);
+    const stepNumber = activeTurn?.stepCount ?? 1;
+    const stepDir = path.join(
+      context.auditInteractionDir,
+      'steps',
+      String(stepNumber).padStart(3, '0'),
+    );
 
     const chunks: Buffer[] = [];
     const maxBuffer = this.config.MAX_RESPONSE_BUFFER_BYTES;
     let totalBytes = 0;
-    const auditDir = context.auditRequestDir;
 
     stream.on('error', async (err) => {
       console.error('Error en stream no-SSE:', err);
       try {
         const buf = Buffer.concat(chunks);
         await this.auditWriter.finalizeNonSseResponseAuditOnStreamError({
-          requestDir: auditDir,
+          interactionDir: stepDir,
           bodyBuffer: buf,
           totalBytes,
           maxAuditResponseBytes: this.config.MAX_AUDIT_RESPONSE_BODY_BYTES,
@@ -45,10 +58,23 @@ export class AuditStandardResponseHandler {
           contentType,
           streamErrorMessage: err?.message || String(err),
         });
-        await this.writeFinalMeta(context, totalBytes, false, {
-          streamError: true,
-          errorMessage: err?.message || String(err),
-        });
+
+        const stepMeta: StepMeta = {
+          stepIndex: stepNumber,
+          sse: false,
+          statusCode: context.responseStatusCode,
+        };
+
+        const turn = await this.sessionStore.getTurnByDir(context.auditInteractionDir);
+        await this.sessionStore.pushStepMetaByDir(context.auditInteractionDir, stepMeta);
+
+        if (context.interactionType !== 'client-preflight') {
+          // Cerrar turno con error
+          await this.sessionStore.closeTurn(context.auditInteractionDir, context.auditSessionId);
+          if (turn) {
+            await this.writeTurnMeta(turn, context, 'upstream-error' as TurnOutcome, false, totalBytes);
+          }
+        }
       } catch (writeErr) {
         console.error('Error al escribir meta de stream error:', writeErr);
       }
@@ -64,56 +90,180 @@ export class AuditStandardResponseHandler {
     stream.on('end', async () => {
       try {
         const buf = Buffer.concat(chunks);
+
+        // Extraer anthropicMessageId del body para correlación con logs de Claude Code
+        let anthropicMessageId: string | undefined;
+        try {
+          const json = JSON.parse(buf.toString('utf8'));
+          anthropicMessageId = json.id;
+        } catch {
+          // Body no es JSON válido — sin messageId
+        }
+
+        // Escribir body en el step dir
         await this.auditWriter.finalizeNonSseResponseAudit({
-          requestDir: auditDir,
+          interactionDir: stepDir,
           bodyBuffer: buf,
           totalBytes,
           maxAuditResponseBytes: this.config.MAX_AUDIT_RESPONSE_BODY_BYTES,
           maxBufferBytes: maxBuffer,
           contentType,
         });
-        await this.writeFinalMeta(context, totalBytes, false);
+
+        // Nota: No escribimos response/headers.json a nivel de step para non-SSE
+        // Los headers del step son idénticos a los del top-level y no aportan valor adicional
+
+        if (context.interactionType === 'client-preflight') {
+          // Preflight: solo acumular step meta, sin heurística terminal
+          const stepMeta: StepMeta = {
+            stepIndex: stepNumber,
+            label: context.turnClassification?.type === 'preflight-quota' ? 'quota-check' : undefined,
+            sse: false,
+            statusCode: context.responseStatusCode,
+            ...(anthropicMessageId ? { anthropicMessageId } : {}),
+          };
+          await this.sessionStore.pushStepMetaByDir(context.auditInteractionDir, stepMeta);
+
+          // Cerrar preflight inmediatamente
+          const preflightTurn = await this.sessionStore.getTurnByDir(context.auditInteractionDir);
+          await this.sessionStore.closeTurn(context.auditInteractionDir, context.auditSessionId);
+          if (preflightTurn) {
+            await this.writeTurnMeta(preflightTurn, context, 'completed', false, totalBytes);
+          }
+          return;
+        }
+
+        // Agentic turn: heurística terminal-por-defecto
+        const terminalStatus = checkTerminal(buf);
+
+        const stepMeta: StepMeta = {
+          stepIndex: stepNumber,
+          sse: false,
+          statusCode: context.responseStatusCode,
+          stopReason: terminalStatus === 'non-terminal' ? 'tool_use' : undefined,
+          ...(anthropicMessageId ? { anthropicMessageId } : {}),
+        };
+        await this.sessionStore.pushStepMetaByDir(context.auditInteractionDir, stepMeta);
+
+        if (terminalStatus !== 'terminal') {
+          // Raro: non-SSE con stop_reason=tool_use — mantener turno abierto
+          return;
+        }
+
+        // Terminal: escribir top-level response + cerrar turno
+        await this.auditWriter.finalizeNonSseResponseAudit({
+          interactionDir: context.auditInteractionDir,
+          bodyBuffer: buf,
+          totalBytes,
+          maxAuditResponseBytes: this.config.MAX_AUDIT_RESPONSE_BODY_BYTES,
+          maxBufferBytes: maxBuffer,
+          contentType,
+        });
+
+        if (responseHeaders) {
+          await this.auditWriter.writeResponseHeadersAudit(
+            context.auditInteractionDir,
+            responseHeaders,
+          );
+        }
+
+        const turn = await this.sessionStore.getTurnByDir(context.auditInteractionDir);
+        await this.sessionStore.closeTurn(context.auditInteractionDir, context.auditSessionId);
+
+        if (turn) {
+          const turnOutcome = this.computeTurnOutcome(context.responseStatusCode);
+          await this.writeTurnMeta(turn, context, turnOutcome, false, totalBytes);
+        }
       } catch (err) {
         console.error('Error al escribir meta final de respuesta estándar:', err);
       }
     });
   }
 
-  /**
-   * Escribe el archivo meta.json final para respuestas estándar.
-   */
-  private async writeFinalMeta(
-    context: AuditRequestContext,
-    totalBytes: number,
-    isSse: boolean,
-    errorInfo?: { streamError: boolean; errorMessage: string },
+  private async writeTurnMeta(
+    turn: ActiveTurn,
+    context: AuditInteractionContext,
+    turnOutcome: TurnOutcome,
+    sse: boolean,
+    totalResponseBytes: number,
   ): Promise<void> {
     const endedAt = Date.now();
-    const duration = endedAt - context.requestStartTime;
 
-    await this.auditWriter.writeMetaAtomic(context.auditRequestDir, {
-      requestId: context.requestId,
-      requestSequence: context.requestSequence,
-      auditSessionId: context.auditSessionId,
-      method: context.method,
-      url: context.url,
-      upstream: context.upstream,
-      startedAt: new Date(context.requestStartTime).toISOString(),
+    const totals =
+      turn.interactionType !== 'client-preflight'
+        ? computeTokenTotals(turn.stepsMeta)
+        : null;
+
+    const meta: TurnMetadata = {
+      interactionType: turn.interactionType,
+      turnOutcome,
+      stepCount: turn.stepsMeta.length,
+      startedAt: new Date(turn.startedAt).toISOString(),
       endedAt: new Date(endedAt).toISOString(),
-      durationMs: duration,
+      durationMs: endedAt - turn.startedAt,
       statusCode: context.responseStatusCode,
-      sse: isSse,
-      requestBodyBytes: context.requestBodyBytes,
-      responseReceived: true,
-      responseBodyComplete: errorInfo ? false : true,
-      ...(errorInfo ? { errorMessage: errorInfo.errorMessage } : {}),
+      sse,
+      steps: turn.stepsMeta,
+      totals,
+      sseResponseBodyAttempted: false,
+      sseResponseBodyWritten: false,
+      sseResponseBodyError: null,
+      sseResponseBodySource: null,
+      errorMessage: null,
+      errorCode: null,
       truncation: {
-        requestBodyOmitted: context.requestBodyOmitted,
-        responseBodyBytesTotal: totalBytes,
-        responseBodyBytesAudited: Math.min(totalBytes, this.config.MAX_AUDIT_RESPONSE_BODY_BYTES),
-        responseTruncatedByProxyBuffer: totalBytes > this.config.MAX_RESPONSE_BUFFER_BYTES,
-        responseTruncatedByAuditLimit: totalBytes > this.config.MAX_AUDIT_RESPONSE_BODY_BYTES,
+        requestBodyOmitted: turn.requestBodyOmitted,
+        responseBodyBytesTotal: totalResponseBytes,
+        responseBodyBytesAudited: Math.min(
+          totalResponseBytes,
+          this.config.MAX_AUDIT_RESPONSE_BODY_BYTES,
+        ),
+        responseTruncatedByProxyBuffer: totalResponseBytes > this.config.MAX_RESPONSE_BUFFER_BYTES,
+        responseTruncatedByAuditLimit:
+          totalResponseBytes > this.config.MAX_AUDIT_RESPONSE_BODY_BYTES,
+        sseRawBytesAudited: null,
+        sseRawBytesLimit: null,
+        sseRawTruncatedByLimit: false,
+        sseRawWriteError: false,
       },
-    });
+    };
+
+    await this.auditWriter.writeTurnMeta(turn.interactionDir, meta);
+    // Eliminar state.json al cerrar turno
+    await this.auditWriter.removeInteractionState(turn.interactionDir);
   }
+
+  /**
+   * Computa el outcome del turno basado en el status code HTTP.
+   * - 2xx → completed
+   * - 4xx → client-error (error del cliente/request)
+   * - 5xx → upstream-error (error del servidor upstream)
+   * - null → upstream-error (fallo de conexión)
+   */
+  private computeTurnOutcome(statusCode: number | null): TurnOutcome {
+    if (!statusCode || statusCode < 400) {
+      return 'completed';
+    }
+    if (statusCode >= 500) {
+      return 'upstream-error';
+    }
+    return 'client-error';
+  }
+}
+
+/**
+ * Determina si una respuesta non-SSE es terminal.
+ * Heurística: si no contiene "tool_use" → terminal.
+ * Si contiene "tool_use" → parsear y verificar stop_reason.
+ */
+function checkTerminal(buf: Buffer): 'terminal' | 'non-terminal' {
+  try {
+    const str = buf.toString('utf8');
+    if (!str.includes('"tool_use"')) return 'terminal';
+    const json = JSON.parse(str);
+    if (json.stop_reason === 'tool_use') return 'non-terminal';
+  } catch {
+    /* JSON inválido → asumir terminal */
+  }
+  return 'terminal';
 }

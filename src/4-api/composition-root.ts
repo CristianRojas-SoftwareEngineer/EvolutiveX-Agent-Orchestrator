@@ -1,3 +1,4 @@
+import * as path from 'node:path';
 import { SessionResolverService } from '../1-domain/services/session-resolver.service.js';
 import { RedactService } from '../1-domain/services/redact.service.js';
 import { MarkdownRendererService } from '../1-domain/services/markdown-renderer.service.js';
@@ -5,7 +6,7 @@ import { SessionStoreService } from '../2-services/session-store.service.js';
 import { AuditWriterService } from '../2-services/audit-writer.service.js';
 import { SseReconstructService } from '../2-services/sse-reconstruct.service.js';
 import { StreamTeeService } from '../2-services/stream-tee.service.js';
-import { AuditRequestHandler } from '../3-operations/audit-request.handler.js';
+import { AuditInteractionHandler } from '../3-operations/audit-interaction.handler.js';
 import { AuditSseResponseHandler } from '../3-operations/audit-sse-response.handler.js';
 import { AuditStandardResponseHandler } from '../3-operations/audit-standard-response.handler.js';
 import { AuditUpstreamErrorHandler } from '../3-operations/audit-upstream-error.handler.js';
@@ -13,42 +14,54 @@ import { ProxyEnvironmentConfig } from '../1-domain/types/config.types.js';
 
 /**
  * Crea el grafo completo de dependencias del proxy.
- * Función async para permitir inicialización de infraestructura (ej: ensureAuditSessionsRoot).
+ *
+ * @param auditBaseDir Directorio donde se escribirán las sesiones auditadas.
+ *   Por defecto `./sessions` relativo al CWD del proceso. Los tests de
+ *   integración pueden inyectar un path absoluto para aislar capturas.
  */
-export async function createProxyDependencies(config: ProxyEnvironmentConfig) {
+export async function createProxyDependencies(
+  config: ProxyEnvironmentConfig,
+  auditBaseDir: string = path.join(process.cwd(), 'sessions'),
+) {
   // Capa 1 — Domain Services
   const sessionResolver = new SessionResolverService(config);
 
   // Capa 2 — Adapters
   const redactService = new RedactService();
   const markdownRenderer = new MarkdownRendererService();
-  const sessionStore = new SessionStoreService(config.AUDIT_SESSIONS_DIR);
+  const sessionStore = new SessionStoreService(auditBaseDir);
   const auditWriter = new AuditWriterService(redactService, markdownRenderer);
-  const sseReconstruct = new SseReconstructService(
-    auditWriter,
-    markdownRenderer,
-    config.AUDIT_SSE_REPLAY_MODEL,
-  );
+  const sseReconstruct = new SseReconstructService(auditWriter, markdownRenderer);
   const streamTee = new StreamTeeService();
 
-  // Inicialización de infraestructura (Capa 2, invocada aquí para encapsular)
-  if (config.AUDIT_ENABLED) {
-    await sessionStore.ensureAuditSessionsRoot();
-  }
+  await sessionStore.ensureAuditSessionsRoot();
 
   // Capa 3 — Handlers
-  const auditRequestHandler = new AuditRequestHandler(
+  const auditInteractionHandler = new AuditInteractionHandler(
     sessionResolver,
     sessionStore,
     auditWriter,
     config,
   );
-  const auditSseResponseHandler = new AuditSseResponseHandler(auditWriter, sseReconstruct, config);
-  const auditStandardResponseHandler = new AuditStandardResponseHandler(auditWriter, config);
-  const auditUpstreamErrorHandler = new AuditUpstreamErrorHandler(auditWriter, config);
+  const auditSseResponseHandler = new AuditSseResponseHandler(
+    auditWriter,
+    sseReconstruct,
+    config,
+    sessionStore,
+  );
+  const auditStandardResponseHandler = new AuditStandardResponseHandler(
+    auditWriter,
+    config,
+    sessionStore,
+  );
+  const auditUpstreamErrorHandler = new AuditUpstreamErrorHandler(
+    auditWriter,
+    config,
+    sessionStore,
+  );
 
   return {
-    auditRequestHandler,
+    auditInteractionHandler,
     auditSseResponseHandler,
     auditStandardResponseHandler,
     auditUpstreamErrorHandler,
@@ -57,5 +70,4 @@ export async function createProxyDependencies(config: ProxyEnvironmentConfig) {
   };
 }
 
-/** Tipo inferido del struct de dependencias — Capa 5 importa solo este tipo. */
 export type ProxyDependencies = Awaited<ReturnType<typeof createProxyDependencies>>;

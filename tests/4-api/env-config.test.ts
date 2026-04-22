@@ -11,7 +11,6 @@ describe('Resolución de configuración de entorno', () => {
     vi.resetModules();
     delete process.env.MAX_AUDIT_SSE_RAW_BYTES;
     delete process.env.AUDIT_SESSION_FALLBACK_HEADER;
-    delete process.env.AUDIT_SSE_RESPONSE_BODY;
   });
 
   // Restaurar el entorno completo después de todos los tests
@@ -61,15 +60,4 @@ describe('Resolución de configuración de entorno', () => {
     expect(config.AUDIT_SESSION_FALLBACK_HEADER).toBe('x-claude-code-session-id');
   });
 
-  it('AUDIT_SSE_RESPONSE_BODY=1 debería activar la reconstrucción SSE', async () => {
-    process.env.AUDIT_SSE_RESPONSE_BODY = '1';
-    const { config } = await import('../../src/4-api/config/env.config.js');
-    expect(config.AUDIT_SSE_RESPONSE_BODY).toBe(true);
-  });
-
-  it('AUDIT_SSE_RESPONSE_BODY sin definir debería ser false', async () => {
-    delete process.env.AUDIT_SSE_RESPONSE_BODY;
-    const { config } = await import('../../src/4-api/config/env.config.js');
-    expect(config.AUDIT_SSE_RESPONSE_BODY).toBe(false);
-  });
 });

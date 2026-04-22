@@ -21,27 +21,168 @@ export interface SseLine {
 }
 
 /**
+ * Clasificación del tipo de request según el contenido del body.
+ */
+export type TurnClassification =
+  | { type: 'preflight-quota' }
+  | { type: 'preflight-warmup' }
+  | { type: 'fresh' }
+  | { type: 'continuation' }
+  | { type: 'side-request' };
+
+/**
+ * Metadatos de un step individual dentro de un turno.
+ */
+export interface StepMeta {
+  stepIndex: number;
+  label?: string;
+  sse: boolean;
+  statusCode: number | null;
+  sseLineCount?: number;
+  stopReason?: string;
+  toolCalls?: string[];
+  cacheCreationInputTokens?: number;
+  cacheReadInputTokens?: number;
+  inputTokens?: number;
+  outputTokens?: number;
+  /** Bytes crudos SSE escritos en disco para este step. */
+  sseRawBytesWritten?: number;
+  /** True si el volcado crudo de SSE de este step fue truncado por límite. */
+  sseRawTruncatedByLimit?: boolean;
+  /**
+   * ID del mensaje de Anthropic (message.id) extraído de la respuesta.
+   * Permite correlacionar con logs de Claude Code que incluyen este ID.
+   * @example "msg_01SweCL7ReWWANWSRsPc8mfn"
+   */
+  anthropicMessageId?: string;
+}
+
+/**
+ * Computa los totales de tokens sumando los campos de todos los StepMeta.
+ * Función pura de dominio, independiente de infraestructura.
+ */
+export function computeTokenTotals(steps: StepMeta[]): {
+  cacheCreationInputTokens: number;
+  cacheReadInputTokens: number;
+  inputTokens: number;
+  outputTokens: number;
+} {
+  return steps.reduce(
+    (acc, s) => ({
+      cacheCreationInputTokens: acc.cacheCreationInputTokens + (s.cacheCreationInputTokens ?? 0),
+      cacheReadInputTokens: acc.cacheReadInputTokens + (s.cacheReadInputTokens ?? 0),
+      inputTokens: acc.inputTokens + (s.inputTokens ?? 0),
+      outputTokens: acc.outputTokens + (s.outputTokens ?? 0),
+    }),
+    { cacheCreationInputTokens: 0, cacheReadInputTokens: 0, inputTokens: 0, outputTokens: 0 },
+  );
+}
+
+/**
+ * Computa la suma de bytes crudos SSE escritos a lo largo de todos los steps.
+ */
+export function computeSseRawBytesTotal(steps: StepMeta[]): number {
+  return steps.reduce((acc, s) => acc + (s.sseRawBytesWritten ?? 0), 0);
+}
+
+/**
+ * Estado en memoria de un turno activo en una sesión.
+ */
+export type InteractionType = 'client-preflight' | 'agentic-turn' | 'side-request';
+
+/**
+ * Resultado posible de un turno de interacción.
+ * - completed: Turno completado exitosamente (2xx)
+ * - client-error: Error del cliente (4xx)
+ * - upstream-error: Error del servidor upstream (5xx o fallo de conexión)
+ * - truncated: Truncado por max_tokens
+ * - interrupted: Turno interrumpido por nuevo turno agentic
+ */
+export type TurnOutcome = 'completed' | 'client-error' | 'upstream-error' | 'truncated' | 'interrupted';
+
+export interface ActiveTurn {
+  interactionDir: string;
+  interactionType: InteractionType;
+  stepCount: number;
+  requestSequence: number;
+  startedAt: number;
+  requestBodyOmitted: boolean;
+  requestBodyBytes: number;
+  stepsMeta: StepMeta[];
+}
+
+/**
+ * Metadatos del turno completo escritos en meta.json.
+ * Refleja la perspectiva de turno lógico del usuario.
+ */
+export interface TurnMetadata {
+  interactionType: InteractionType;
+  turnOutcome: TurnOutcome;
+  stepCount: number;
+  startedAt: string;
+  endedAt: string;
+  durationMs: number;
+  statusCode: number | null;
+  sse: boolean;
+  steps: StepMeta[];
+  totals: {
+    cacheCreationInputTokens: number;
+    cacheReadInputTokens: number;
+    inputTokens: number;
+    outputTokens: number;
+  } | null;
+  truncation: AuditTruncationMeta;
+  sseResponseBodyAttempted: boolean;
+  sseResponseBodyWritten: boolean;
+  sseResponseBodyError: string | null;
+  sseResponseBodySource: string | null;
+  errorMessage: string | null;
+  errorCode: string | null;
+}
+
+/**
+ * Estado persistente de una interacción en curso, escrito como state.json
+ * al crear la interacción y eliminado al cerrar el turno.
+ * Permite a herramientas externas detectar interacciones huérfanas por crash.
+ */
+export interface InteractionState {
+  state: 'in-progress';
+  startedAt: string;
+  interactionType: InteractionType;
+}
+
+/**
  * Opciones para la reconstrucción del cuerpo de respuesta desde bytes SSE.
  */
 export interface SseReconstructOptions {
-  /** Directorio de la petición donde se encuentran los archivos SSE. */
-  requestDir: string;
+  /**
+   * Directorio del step que contiene el archivo `sse.jsonl` (fuente de verdad
+   * para la reconstrucción, escrito de forma síncrona y por tanto con orden
+   * garantizado). El `sse.txt` del mismo directorio es solo raw dump de
+   * depuración y NO se lee aquí.
+   */
+  stepDir: string;
+  /** Directorio de la interacción donde se escribe el resultado (response/body.*). */
+  interactionDir: string;
   /** URL original de la petición (para detectar beta). */
   originalUrl?: string;
   /** Cabeceras originales de la petición (para detectar anthropic-beta). */
   headers?: Record<string, string | string[] | undefined>;
-  /** Forzar uso de API beta para la reconstrucción. */
-  forceBeta?: boolean;
-  /** Bytes crudos SSE escritos en disco. */
+  /**
+   * Bytes crudos SSE escritos en `sse.txt` (raw dump).
+   * Informativo: NO afecta a la reconstrucción (que lee `sse.jsonl`).
+   */
   sseRawBytesWritten: number;
-  /** Si la captura cruda de SSE está activa. */
-  auditSseRaw: boolean;
-  /** Si el volcado crudo de SSE fue truncado por límite. */
+  /**
+   * Si el raw dump `sse.txt` fue truncado por `MAX_AUDIT_SSE_RAW_BYTES`.
+   * Informativo: NO aborta la reconstrucción (fuente es `sse.jsonl`).
+   */
   sseRawTruncatedByLimit: boolean;
-  /** Si hubo un error de escritura durante la captura cruda. */
+  /**
+   * Si hubo un error de escritura durante la captura cruda del raw dump.
+   * Informativo: NO aborta la reconstrucción (fuente es `sse.jsonl`).
+   */
   sseRawWriteError: boolean;
-  /** Si se requiere el raw para la reconstrucción. */
-  requireRaw: boolean;
 }
 
 /**
@@ -73,73 +214,20 @@ export interface AuditTruncationMeta {
   /** True si el archivo de auditoría fue truncado por exceder MAX_AUDIT_RESPONSE_BODY_BYTES. */
   responseTruncatedByAuditLimit: boolean | null;
   /** Total de bytes registrados en el volcado crudo de SSE. */
-  sseRawBytesAudited?: number | null;
+  sseRawBytesAudited: number | null;
   /** El límite aplicado al volcado crudo de SSE. null cuando el límite es infinito. */
-  sseRawBytesLimit?: number | null;
+  sseRawBytesLimit: number | null;
   /** True si el volcado crudo de SSE fue cortado por el límite. */
-  sseRawTruncatedByLimit?: boolean;
+  sseRawTruncatedByLimit: boolean;
   /** True si ocurrió un error de escritura durante la captura cruda de SSE. */
-  sseRawWriteError?: boolean;
+  sseRawWriteError: boolean;
 }
 
 /**
- * El objeto de informe final guardado como `meta.json` en el directorio de auditoría.
- */
-export interface AuditMetadata {
-  /** ID interno de la petición en Fastify. */
-  requestId: string;
-  /** Número secuencial dentro de la sesión específica. */
-  requestSequence: number;
-  /** El ID de la sesión a la que pertenece esta petición. */
-  auditSessionId: string;
-  /** Método HTTP (GET, POST, etc.). */
-  method: string;
-  /** URL de la petición. */
-  url: string;
-  /** La URL del origin upstream. */
-  upstream: string;
-  /** Timestamp ISO del inicio de la petición. */
-  startedAt: string;
-  /** Timestamp ISO de la finalización de la respuesta. */
-  endedAt: string;
-  /** Tiempo total de reloj en milisegundos. */
-  durationMs: number;
-  /** Código de estado HTTP devuelto por el upstream. */
-  statusCode: number | null;
-  /** True si la respuesta fue un stream SSE. */
-  sse: boolean;
-  /** Tamaño en bytes del cuerpo de la petición. */
-  requestBodyBytes: number;
-  /** True si se recibió la respuesta inicial del upstream. */
-  responseReceived: boolean;
-  /** True si el cuerpo/stream de respuesta completo terminó sin errores. */
-  responseBodyComplete?: boolean;
-  /** True si hubo un error de comunicación con el upstream. */
-  upstreamError?: boolean;
-  /** Mensaje de error legible si el proxy falló. */
-  errorMessage?: string;
-  /** Código de error si aplica. */
-  errorCode?: string;
-  /** Si se intentó la reconstrucción SSE del cuerpo de respuesta. */
-  sseResponseBodyAttempted?: boolean;
-  /** Si se escribió exitosamente el cuerpo reconstruido desde SSE. */
-  sseResponseBodyWritten?: boolean;
-  /** Mensaje de error de la reconstrucción SSE. */
-  sseResponseBodyError?: string;
-  /** Fuente de los bytes SSE usados para la reconstrucción. */
-  sseResponseBodySource?: string;
-  /** Detalles sobre cualquier truncamiento de datos. */
-  truncation: AuditTruncationMeta;
-  /** Soporta extensiones arbitrarias (ej. sseLineCount). */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  [key: string]: any;
-}
-
-/**
- * Contexto de petición que los handlers de Capa 3 reciben del controller.
+ * Contexto de interacción que los handlers de Capa 3 reciben del controller.
  * Desacopla los handlers de Fastify.
  */
-export interface AuditRequestContext {
+export interface AuditInteractionContext {
   requestId: string;
   requestSequence: number;
   auditSessionId: string;
@@ -149,6 +237,8 @@ export interface AuditRequestContext {
   requestStartTime: number;
   requestBodyBytes: number;
   requestBodyOmitted: boolean;
-  auditRequestDir: string;
+  auditInteractionDir: string;
   responseStatusCode: number | null;
+  interactionType?: InteractionType;
+  turnClassification?: TurnClassification;
 }

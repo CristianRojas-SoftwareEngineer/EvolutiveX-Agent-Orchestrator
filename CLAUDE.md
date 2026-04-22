@@ -91,3 +91,9 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 ---
 
 **These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
+
+---
+
+## 5. Project-Specific Skill
+
+Para cualquier pregunta o tarea relacionada con este proyecto (explicar qué hace, arquitectura PKA, handlers, clasificador de turnos, reconstrucción SSE, estructura de `sessions/`, variables de entorno, etc.) **activa y consulta la skill `smart-code-proxy`** instalada en `~/.claude/skills/smart-code-proxy/`. Es la referencia canónica del proyecto; siempre está alineada con el código fuente actual. El `README.md` del repo aporta el resumen narrativo y la matriz de entorno, pero la skill contiene la jerarquía completa de archivos de auditoría, el catálogo de campos de `meta.json` y la tabla de enrutamiento de preguntas.

@@ -1,4 +1,8 @@
-import { AuditMetadata, SseLine } from '../../1-domain/types/audit.types.js';
+import {
+  InteractionState,
+  SseLine,
+  TurnMetadata,
+} from '../../1-domain/types/audit.types.js';
 import { JsonValue } from '../../1-domain/types/json.types.js';
 
 /**
@@ -9,21 +13,28 @@ export interface IAuditWriter {
   writeFileAtomic(filePath: string, data: Buffer | string): Promise<void>;
   writeJsonAtomic(filePath: string, obj: JsonValue): Promise<void>;
   writeFormattedAndMarkdown(
-    requestDir: string,
+    dir: string,
     baseName: string,
     parsed: JsonValue,
     type: 'request' | 'response',
   ): Promise<void>;
-  writeRequestAudit(params: {
+  writeInteractionRequest(params: {
     baseDir: string;
     sessionId: string;
     folderName: string;
     headers: Record<string, string | string[] | undefined>;
     bodyBuffer: Buffer | null;
     maxAuditRequestBytes: number;
+    skipTopLevelRequest?: boolean;
   }): Promise<{ dir: string; requestBodyOmitted: boolean }>;
+  writeStepRequest(params: {
+    stepDir: string;
+    headers: Record<string, string | string[] | undefined>;
+    bodyBuffer: Buffer | null;
+    maxAuditRequestBytes: number;
+  }): Promise<void>;
   finalizeNonSseResponseAudit(params: {
-    requestDir: string;
+    interactionDir: string;
     bodyBuffer: Buffer;
     totalBytes: number;
     maxAuditResponseBytes: number;
@@ -35,7 +46,7 @@ export interface IAuditWriter {
     responseTruncatedByAuditLimit: boolean;
   }>;
   finalizeNonSseResponseAuditOnStreamError(params: {
-    requestDir: string;
+    interactionDir: string;
     bodyBuffer: Buffer;
     totalBytes: number;
     maxAuditResponseBytes: number;
@@ -47,26 +58,34 @@ export interface IAuditWriter {
     responseTruncatedByProxyBuffer: boolean;
     responseTruncatedByAuditLimit: boolean;
   }>;
-  writeUpstreamFailureMeta(
-    requestDir: string,
-    payload: {
-      requestId: string;
-      requestSequence: number;
-      auditSessionId: string;
-      err: Error | { message?: string; code?: string };
-      requestStartTime: number;
-      upstream: string;
-      method: string;
-      url: string;
-      requestBodyBytes: number;
-      requestBodyOmitted: boolean;
-    },
-  ): Promise<void>;
   writeResponseHeadersAudit(
-    requestDir: string,
+    interactionDir: string,
     headers: Record<string, string | string[] | undefined>,
   ): Promise<void>;
-  writeMetaAtomic(requestDir: string, meta: AuditMetadata): Promise<void>;
-  appendSseLine(requestDir: string, lineObj: SseLine): void;
-  appendSseRawChunk(requestDir: string, chunk: Buffer): Promise<void>;
+  writeTurnMeta(interactionDir: string, meta: TurnMetadata): Promise<void>;
+  appendSseLine(interactionDir: string, lineObj: SseLine): void;
+  /**
+   * Apéndice síncrono del raw dump `sse.txt`. Síncrono para preservar el
+   * orden de los chunks bajo ráfagas. El raw dump es puramente de depuración;
+   * la reconstrucción SSE se basa en `sse.jsonl`.
+   */
+  appendSseRawChunk(interactionDir: string, chunk: Buffer): void;
+  /**
+   * Escribe un marcador `state.json` en el directorio de interaccion indicando
+   * que la interaccion esta en curso. Debe eliminarse al cerrar el turno.
+   */
+  writeInteractionState(interactionDir: string, state: InteractionState): Promise<void>;
+  /**
+   * Elimina el marcador `state.json` del directorio de interaccion. Idempotente:
+   * no falla si el archivo no existe.
+   */
+  removeInteractionState(interactionDir: string): Promise<void>;
+  /**
+   * Escribe body.json, body.formatted.json y body.parsed.md
+   * con el mensaje reconstruido de un step SSE.
+   */
+  writeStepResponseMarkdown(
+    stepDir: string,
+    message: JsonValue,
+  ): Promise<void>;
 }

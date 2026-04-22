@@ -1,20 +1,25 @@
 import type { IAuditWriter } from '../2-services/ports/audit-writer.port.js';
+import type { ISessionStore } from '../2-services/ports/session-store.port.js';
 import { ProxyEnvironmentConfig } from '../1-domain/types/config.types.js';
+import {
+  TurnMetadata,
+  computeTokenTotals,
+  computeSseRawBytesTotal,
+} from '../1-domain/types/audit.types.js';
 
 /**
  * Handler para escribir metadata de error cuando falla la conexión upstream.
+ * Si hay un turno activo, cierra el turno con turnOutcome: "upstream-error".
  */
 export class AuditUpstreamErrorHandler {
   constructor(
     private auditWriter: IAuditWriter,
     private config: ProxyEnvironmentConfig,
+    private sessionStore: ISessionStore,
   ) {}
 
-  /**
-   * Ejecuta la escritura de meta.json para errores de upstream.
-   */
   public async execute(params: {
-    auditRequestDir: string;
+    auditInteractionDir: string;
     requestId: string;
     requestSequence: number;
     auditSessionId: string;
@@ -25,21 +30,53 @@ export class AuditUpstreamErrorHandler {
     requestBodyOmitted: boolean;
     error: Error & { code?: string };
   }): Promise<void> {
-    if (!this.config.AUDIT_ENABLED) {
-      return;
-    }
+    const turn = await this.sessionStore.getTurnByDir(params.auditInteractionDir);
+    await this.sessionStore.closeTurn(params.auditInteractionDir, params.auditSessionId);
 
-    await this.auditWriter.writeUpstreamFailureMeta(params.auditRequestDir, {
-      requestId: params.requestId,
-      requestSequence: params.requestSequence,
-      auditSessionId: params.auditSessionId,
-      err: params.error,
-      requestStartTime: params.requestStartTime,
-      upstream: this.config.UPSTREAM_ORIGIN,
-      method: params.method,
-      url: params.url,
-      requestBodyBytes: params.requestBodyBytes,
-      requestBodyOmitted: params.requestBodyOmitted,
-    });
+    const endedAt = Date.now();
+    const interactionType = turn?.interactionType ?? 'agentic-turn';
+    const startedAt = turn?.startedAt ?? params.requestStartTime;
+    const stepsMeta = turn?.stepsMeta ?? [];
+    const requestBodyOmitted = turn?.requestBodyOmitted ?? params.requestBodyOmitted;
+
+    const totals =
+      interactionType !== 'client-preflight' ? computeTokenTotals(stepsMeta) : null;
+    const sseRawBytesTotal = computeSseRawBytesTotal(stepsMeta);
+    const sseRawTruncatedAny = stepsMeta.some((s) => s.sseRawTruncatedByLimit === true);
+    const hadSse = stepsMeta.some((s) => s.sse === true);
+    const errorMessage = params.error?.message ?? String(params.error);
+    const errorCode = params.error?.code ?? null;
+
+    const meta: TurnMetadata = {
+      interactionType,
+      turnOutcome: 'upstream-error',
+      stepCount: stepsMeta.length,
+      startedAt: new Date(startedAt).toISOString(),
+      endedAt: new Date(endedAt).toISOString(),
+      durationMs: endedAt - startedAt,
+      statusCode: null,
+      sse: hadSse,
+      steps: stepsMeta,
+      totals,
+      sseResponseBodyAttempted: false,
+      sseResponseBodyWritten: false,
+      sseResponseBodyError: null,
+      sseResponseBodySource: null,
+      errorMessage,
+      errorCode,
+      truncation: {
+        requestBodyOmitted,
+        responseBodyBytesTotal: null,
+        responseBodyBytesAudited: null,
+        responseTruncatedByProxyBuffer: null,
+        responseTruncatedByAuditLimit: null,
+        sseRawBytesAudited: sseRawBytesTotal > 0 ? sseRawBytesTotal : null,
+        sseRawBytesLimit: null,
+        sseRawTruncatedByLimit: sseRawTruncatedAny,
+        sseRawWriteError: false,
+      },
+    };
+    await this.auditWriter.writeTurnMeta(params.auditInteractionDir, meta);
+    await this.auditWriter.removeInteractionState(params.auditInteractionDir);
   }
 }

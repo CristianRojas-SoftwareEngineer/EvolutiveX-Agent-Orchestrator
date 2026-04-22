@@ -56,7 +56,7 @@ Sigue estos pasos en orden:
    Copy-Item configs/.env.example configs/.env
    ```
 
-   b. Abre `configs/.env` y edita solo las variables que quieras cambiar. Las que no definas tomarán su valor por defecto del código (ver la [tabla de variables](#variables-que-suelen-bastar-al-principio) y el [README](../README.md#configuracion)). Ejemplo: para activar el volcado SSE crudo, descomenta `AUDIT_SSE_RAW=1`.
+   b. Abre `configs/.env` y edita solo las variables que quieras cambiar. Las que no definas tomarán su valor por defecto del código (ver la [tabla de variables](#variables-que-suelen-bastar-al-principio) y el [README](../README.md#configuracion)).
 
    El archivo `.env` está en `.gitignore` (no se sube al repositorio). El archivo `.env.example` sí está versionado y sirve de guía: muestra todas las variables disponibles con sus valores por defecto.
 
@@ -162,9 +162,9 @@ Abre tu flujo habitual (proyecto, chat, lo que use la API). Las peticiones pasar
 | Qué quieres ver                                         | Dónde está                                                               | Qué es                                                                                                                                                                 |
 | ------------------------------------------------------- | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Actividad en vivo** (peticiones, respuestas, errores) | La **misma terminal** donde ejecutaste `npm run dev`                     | Líneas JSON estructuradas generadas por Fastify Logger: métricas de petición/respuesta (método, URL, status, tiempos, tamaños). Es la "observabilidad" en tiempo real. |
-| **Copias en disco** por petición                        | Carpeta **`sessions/`** en el ordenador (o la ruta `AUDIT_SESSIONS_DIR`) | Subcarpetas por sesión y por petición; dentro hay `meta.json` y otros archivos. Detalle de nombres en el [README](../README.md#archivos-auditoria).                    |
+| **Copias en disco** por turno                           | Carpeta **`sessions/`** en el ordenador (relativa al CWD desde donde arrancas el proxy) | Subcarpetas por sesión y por turno de interacción (`interactions/`); dentro hay `meta.json` (resumen del turno), `request/`, `response/` y `steps/`. Detalle de nombres en el [README](../README.md#archivos-auditoria). |
 
-Si `AUDIT_ENABLED=0`, el proxy no escribe en `sessions/`; la consola puede seguir mostrando tráfico según la configuración de logs.
+La auditoría en disco es incondicional: el proxy siempre escribe en `./sessions`. La consola muestra tráfico adicional según la configuración de logs.
 
 Para **limpiar** las sesiones acumuladas, ejecuta `npm run clean:sessions`. El próximo arranque con `npm run dev` recreará el directorio vacío automáticamente.
 
@@ -174,14 +174,14 @@ Para **limpiar** las sesiones acumuladas, ejecuta `npm run clean:sessions`. El p
 
 No hace falta leer la tabla entera del README el primer día:
 
-| Variable             | Para qué sirve (resumen)                                                                             |
-| -------------------- | ---------------------------------------------------------------------------------------------------- |
-| `PORT`               | Puerto donde escucha el proxy en tu máquina (por defecto `8787`).                                    |
-| `UPSTREAM_ORIGIN`    | URL base del API al que el proxy reenvía (por defecto Anthropic).                                    |
-| `AUDIT_SESSIONS_DIR` | Carpeta raíz donde se guarda `sessions/` (por defecto `sessions` relativa al directorio de trabajo). |
+| Variable          | Para qué sirve (resumen)                                          |
+| ----------------- | ----------------------------------------------------------------- |
+| `PORT`            | Puerto donde escucha el proxy en tu máquina (por defecto `8787`). |
+| `UPSTREAM_ORIGIN` | URL base del API al que el proxy reenvía (por defecto Anthropic). |
 
-**`response.body` en respuestas streaming (SSE):** las respuestas SSE generan el archivo de métricas `response.headers.json` y capturan los eventos en `response.sse.jsonl` línea por línea. Paralelamente, se pueden volcar en crudo mediante `response.sse.txt` si se activa `AUDIT_SSE_RAW=1` y la auditoría cuenta con espacio que no excede `MAX_AUDIT_SSE_RAW_BYTES` (donde `0` equivale a ilimitado).
-Adicionalmente, dispones de una **reconstrucción nativa del cuerpo**: activando `AUDIT_SSE_RESPONSE_BODY=1`, el proxy agrupará el stream al finalizar para recrear internamente el `response.body.json` y su versión procesada `.parsed.md` de igual manera a como funcionan hoy las operaciones no-streaming, simplificando drásticamente el análisis de los costos y visual.
+La carpeta de salida es siempre `./sessions`, relativa al directorio desde donde ejecutas el proxy.
+
+**`response.body` en respuestas streaming (SSE):** las respuestas SSE generan `response.headers.json`, capturan los eventos en `response.sse.jsonl` línea por línea y vuelcan los bytes crudos en `response.sse.txt` (acotado por `MAX_AUDIT_SSE_RAW_BYTES`; `0` = ilimitado). Al finalizar el stream, el proxy reconstruye el mensaje final del asistente como `response/body.json` top-level junto con su versión procesada `.parsed.md`, de igual manera a como funcionan las operaciones no-streaming. Detalle técnico en [`how-sse-reconstruction-works.md`](./how-sse-reconstruction-works.md).
 
 El resto (límites de tamaño, volcado SSE crudo, etc.) está en la Matriz de Entorno del [README](../README.md#configuracion). Para ver cómo se aplican los límites de memoria y disco usa [Capas de Bytes y Convenciones de Logs](../README.md#capas-bytes-env).
 

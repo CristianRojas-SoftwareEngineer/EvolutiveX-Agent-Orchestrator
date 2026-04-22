@@ -2,31 +2,25 @@ import { describe, it, expect } from 'vitest';
 import { PassThrough } from 'node:stream';
 import { AuditStandardResponseHandler } from '../../src/3-operations/audit-standard-response.handler.js';
 import type { IAuditWriter } from '../../src/2-services/ports/audit-writer.port.js';
+import type { ISessionStore } from '../../src/2-services/ports/session-store.port.js';
 import { ProxyEnvironmentConfig } from '../../src/1-domain/types/config.types.js';
-import { AuditRequestContext } from '../../src/1-domain/types/audit.types.js';
+import { AuditInteractionContext, ActiveTurn, StepMeta } from '../../src/1-domain/types/audit.types.js';
 
 function makeConfig(overrides: Partial<ProxyEnvironmentConfig> = {}): ProxyEnvironmentConfig {
   return {
     PORT: 8787,
     UPSTREAM_ORIGIN: 'https://api.anthropic.com',
-    AUDIT_SESSIONS_DIR: 'sessions',
     MAX_REQUEST_BODY: '50mb',
     MAX_RESPONSE_BUFFER_BYTES: 1024,
     MAX_AUDIT_REQUEST_BODY_BYTES: 52428800,
     MAX_AUDIT_RESPONSE_BODY_BYTES: 512,
     MAX_AUDIT_SSE_RAW_BYTES: 52428800,
-    AUDIT_ENABLED: true,
-    AUDIT_SSE_RAW: false,
     AUDIT_SESSION_OVERRIDE_HEADER: 'x-cc-audit-session',
     AUDIT_SESSION_FALLBACK_HEADER: 'x-claude-code-session-id',
     DEFAULT_AUDIT_SESSION: '',
     STRIP_AUDIT_SESSION_HEADER: true,
     AUDIT_SESSION_HASH_SUFFIX: false,
     UPSTREAM_ACCEPT_ENCODING: 'identity',
-    AUDIT_SSE_RESPONSE_BODY: false,
-    AUDIT_SSE_RESPONSE_BODY_REQUIRE_RAW: true,
-    AUDIT_SSE_RESPONSE_BODY_FORCE_BETA: false,
-    AUDIT_SSE_REPLAY_MODEL: 'claude-3-5-sonnet-20241022',
     CONSOLE_REDACT: true,
     LOG_SSE: false,
     MAX_BODY_LOG_BYTES: 2048,
@@ -34,7 +28,21 @@ function makeConfig(overrides: Partial<ProxyEnvironmentConfig> = {}): ProxyEnvir
   };
 }
 
-function makeContext(overrides: Partial<AuditRequestContext> = {}): AuditRequestContext {
+function makeActiveTurn(overrides: Partial<ActiveTurn> = {}): ActiveTurn {
+  return {
+    interactionDir: '/tmp/sessions/test/interactions/000001_req-1',
+    interactionType: 'agentic-turn',
+    stepCount: 1,
+    requestSequence: 1,
+    startedAt: Date.now(),
+    requestBodyOmitted: false,
+    requestBodyBytes: 100,
+    stepsMeta: [],
+    ...overrides,
+  };
+}
+
+function makeContext(overrides: Partial<AuditInteractionContext> = {}): AuditInteractionContext {
   return {
     requestId: 'req-1',
     requestSequence: 1,
@@ -45,8 +53,29 @@ function makeContext(overrides: Partial<AuditRequestContext> = {}): AuditRequest
     requestStartTime: Date.now(),
     requestBodyBytes: 100,
     requestBodyOmitted: false,
-    auditRequestDir: '/tmp/sessions/test/requests/000001_req-1',
+    auditInteractionDir: '/tmp/sessions/test/interactions/000001_req-1',
     responseStatusCode: 200,
+    interactionType: 'agentic-turn',
+    ...overrides,
+  };
+}
+
+function makeSessionStore(turn: ActiveTurn | null = makeActiveTurn(), overrides: Partial<ISessionStore> = {}): ISessionStore {
+  let activeTurn = turn;
+  const registry = new Map<string, ActiveTurn>();
+  if (turn) registry.set(turn.interactionDir, turn);
+  return {
+    getBaseDir: () => '/tmp/sessions',
+    ensureAuditSessionsRoot: async () => {},
+    nextAuditInteractionSequence: async () => 1,
+    getActiveTurn: async () => activeTurn,
+    setActiveTurn: async (_id: string, t: ActiveTurn) => { activeTurn = t; registry.set(t.interactionDir, t); },
+    registerTurn: (dir: string, t: ActiveTurn) => { registry.set(dir, t); },
+    getTurnByDir: async (dir: string) => registry.get(dir) || null,
+    getTurnByDirSync: (dir: string) => registry.get(dir) || null,
+    incrementStepCountByDir: (dir: string) => { const t = registry.get(dir); if (t) t.stepCount += 1; return t?.stepCount ?? 1; },
+    pushStepMetaByDir: async (dir: string, meta: StepMeta) => { registry.get(dir)?.stepsMeta.push(meta); },
+    closeTurn: async (dir: string, _sessionId: string) => { registry.delete(dir); activeTurn = null; },
     ...overrides,
   };
 }
@@ -56,7 +85,8 @@ function makeAuditWriter(overrides: Partial<IAuditWriter> = {}): IAuditWriter {
     writeFileAtomic: async () => {},
     writeJsonAtomic: async () => {},
     writeFormattedAndMarkdown: async () => {},
-    writeRequestAudit: async () => ({ dir: '', requestBodyOmitted: false }),
+    writeInteractionRequest: async () => ({ dir: '', requestBodyOmitted: false }),
+    writeStepRequest: async () => {},
     finalizeNonSseResponseAudit: async () => ({
       responseBodyBytesAudited: 0,
       responseTruncatedByProxyBuffer: false,
@@ -67,62 +97,36 @@ function makeAuditWriter(overrides: Partial<IAuditWriter> = {}): IAuditWriter {
       responseTruncatedByProxyBuffer: false,
       responseTruncatedByAuditLimit: false,
     }),
-    writeUpstreamFailureMeta: async () => {},
     writeResponseHeadersAudit: async () => {},
-    writeMetaAtomic: async () => {},
+    writeTurnMeta: async () => {},
     appendSseLine: () => {},
-    appendSseRawChunk: async () => {},
+    appendSseRawChunk: () => {},
+    writeInteractionState: async () => {},
+    removeInteractionState: async () => {},
+    writeStepResponseMarkdown: async () => {},
     ...overrides,
   };
 }
 
 describe('AuditStandardResponseHandler', () => {
-  it('debería no hacer nada si AUDIT_ENABLED=false', () => {
-    const config = makeConfig({ AUDIT_ENABLED: false });
-    let finalized = false;
-    const handler = new AuditStandardResponseHandler(
-      makeAuditWriter({
-        finalizeNonSseResponseAudit: async () => {
-          finalized = true;
-          return {
-            responseBodyBytesAudited: 0,
-            responseTruncatedByProxyBuffer: false,
-            responseTruncatedByAuditLimit: false,
-          };
-        },
-      }),
-      config,
-    );
-
-    const stream = new PassThrough();
-    handler.execute(stream, makeContext(), 'application/json');
-    stream.write('{"ok":true}');
-    stream.end();
-
-    // No debería invocar finalizeNonSseResponseAudit
-    expect(finalized).toBe(false);
-  });
-
-  it('debería acumular datos y finalizar auditoría al terminar el stream', async () => {
+  it('debería escribir en step dir y top-level, y cerrar turno (terminal)', async () => {
     const config = makeConfig();
-    let finalizeParams: unknown = null;
-    let metaWritten = false;
+    const finalizedDirs: string[] = [];
+    let turnMetaWritten = false;
+    let turnCleared = false;
 
     const handler = new AuditStandardResponseHandler(
       makeAuditWriter({
         finalizeNonSseResponseAudit: async (params) => {
-          finalizeParams = params;
-          return {
-            responseBodyBytesAudited: params.bodyBuffer.length,
-            responseTruncatedByProxyBuffer: false,
-            responseTruncatedByAuditLimit: false,
-          };
+          finalizedDirs.push(params.interactionDir);
+          return { responseBodyBytesAudited: params.bodyBuffer.length, responseTruncatedByProxyBuffer: false, responseTruncatedByAuditLimit: false };
         },
-        writeMetaAtomic: async () => {
-          metaWritten = true;
-        },
+        writeTurnMeta: async () => { turnMetaWritten = true; },
       }),
       config,
+      makeSessionStore(makeActiveTurn(), {
+        closeTurn: async (_dir, _sessionId) => { turnCleared = true; },
+      }),
     );
 
     const stream = new PassThrough();
@@ -132,27 +136,31 @@ describe('AuditStandardResponseHandler', () => {
 
     await new Promise((r) => setTimeout(r, 100));
 
-    expect(finalizeParams).not.toBeNull();
-    expect(metaWritten).toBe(true);
+    // Escribe en step dir y en interactionDir (top-level)
+    expect(finalizedDirs).toHaveLength(2);
+    expect(finalizedDirs[0]).toMatch(/steps[/\\]001/);
+    expect(finalizedDirs[1]).not.toMatch(/steps[/\\]/);
+    expect(turnMetaWritten).toBe(true);
+    expect(turnCleared).toBe(true);
   });
 
   it('debería respetar MAX_RESPONSE_BUFFER_BYTES al acumular chunks', async () => {
     const config = makeConfig({ MAX_RESPONSE_BUFFER_BYTES: 10 });
-    let finalizeParams: { bodyBuffer: Buffer; totalBytes: number } | null = null;
+    let capturedTotalBytes: number | null = null;
+    let capturedBufferLength: number | null = null;
 
     const handler = new AuditStandardResponseHandler(
       makeAuditWriter({
         finalizeNonSseResponseAudit: async (params) => {
-          finalizeParams = params as { bodyBuffer: Buffer; totalBytes: number };
-          return {
-            responseBodyBytesAudited: params.bodyBuffer.length,
-            responseTruncatedByProxyBuffer: true,
-            responseTruncatedByAuditLimit: false,
-          };
+          if (capturedTotalBytes === null) {
+            capturedTotalBytes = params.totalBytes;
+            capturedBufferLength = params.bodyBuffer.length;
+          }
+          return { responseBodyBytesAudited: params.bodyBuffer.length, responseTruncatedByProxyBuffer: true, responseTruncatedByAuditLimit: false };
         },
-        writeMetaAtomic: async () => {},
       }),
       config,
+      makeSessionStore(),
     );
 
     const stream = new PassThrough();
@@ -164,8 +172,66 @@ describe('AuditStandardResponseHandler', () => {
 
     await new Promise((r) => setTimeout(r, 100));
 
-    expect(finalizeParams).not.toBeNull();
-    expect(finalizeParams!.totalBytes).toBe(30);
-    expect(finalizeParams!.bodyBuffer.length).toBe(10);
+    expect(capturedTotalBytes).toBe(30);
+    expect(capturedBufferLength).toBe(10);
+  });
+
+  it('debería llamar removeInteractionState al cerrar turno agentic terminal', async () => {
+    const config = makeConfig();
+    let removeCalled = false;
+
+    const handler = new AuditStandardResponseHandler(
+      makeAuditWriter({
+        finalizeNonSseResponseAudit: async () => ({
+          responseBodyBytesAudited: 10,
+          responseTruncatedByProxyBuffer: false,
+          responseTruncatedByAuditLimit: false,
+        }),
+        removeInteractionState: async () => { removeCalled = true; },
+      }),
+      config,
+      makeSessionStore(),
+    );
+
+    const stream = new PassThrough();
+    handler.execute(stream, makeContext(), 'application/json');
+    stream.write(Buffer.from('{"message":"hello"}'));
+    stream.end();
+
+    await new Promise((r) => setTimeout(r, 100));
+    expect(removeCalled).toBe(true);
+  });
+
+  it('debería cerrar turno preflight inmediatamente y escribir turnMeta', async () => {
+    const config = makeConfig();
+    let turnMetaWritten = false;
+    let turnClosed = false;
+    let stepMetaPushed: StepMeta | null = null;
+    const preflightTurn = makeActiveTurn({ interactionType: 'client-preflight' });
+
+    const handler = new AuditStandardResponseHandler(
+      makeAuditWriter({ writeTurnMeta: async () => { turnMetaWritten = true; } }),
+      config,
+      makeSessionStore(preflightTurn, {
+        pushStepMetaByDir: async (_dir, meta) => { stepMetaPushed = meta; preflightTurn.stepsMeta.push(meta); },
+        closeTurn: async () => { turnClosed = true; },
+      }),
+    );
+
+    const stream = new PassThrough();
+    handler.execute(
+      stream,
+      makeContext({ interactionType: 'client-preflight', turnClassification: { type: 'preflight-quota' } }),
+      'application/json',
+    );
+    stream.write('{"ok":true}');
+    stream.end();
+
+    await new Promise((r) => setTimeout(r, 100));
+
+    expect(turnMetaWritten).toBe(true);
+    expect(turnClosed).toBe(true);
+    expect(stepMetaPushed).not.toBeNull();
+    expect(stepMetaPushed!.label).toBe('quota-check');
   });
 });

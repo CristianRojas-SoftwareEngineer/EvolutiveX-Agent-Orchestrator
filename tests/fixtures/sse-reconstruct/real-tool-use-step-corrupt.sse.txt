@@ -1,0 +1,99 @@
+event: content_block_start
+data: {"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":"","signature":""}      }
+
+event: message_start
+data: {"type":"message_start","message":{"model":"claude-haiku-4-5-20251001","id":"msg_01NMVYcHN9s6NGvQJdXJPn8L","type":"message","role":"assistant","content":[],"stop_reason":null,"stop_sequence":null,"stop_details":null,"usage":{"input_tokens":10,"cache_creation_input_tokens":29896,"cache_read_input_tokens":0,"cache_creation":{"ephemeral_5m_input_tokens":0,"ephemeral_1h_input_tokens":29896},"output_tokens":21,"service_tier":"standard","inference_geo":"not_available"}}   }
+
+event: ping
+data: {"type": "ping"}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"signature_delta","signature":"EqgGCmMIDBgCKkDnoE+pcgrtY09sb7LsLIdzY0Jie8kn26QbhybIosnUs9al4TaR/15HSRXL48wFiQLNq1Ea+vrq0i0FuaWUjvqgMhljbGF1ZGUtaGFpa3UtNC01LTIwMjUxMDAxOAASDAhRCjPNjrWbjFTaNhoMX15oKO7UyNEO/g3FIjA/Jp2dPnlpypGrho/iWoiiWldc1+MgAFpDgmrW/j+U6KigtjPhqZo+/UpPuegLRNwq8gRP0SzJDP2gs7aqh8vNmeKhYEgikL1jKfZIDb4M5jmz7qOEmVbftXPsKghDoSBilYcCJaKb8rm0AAOYGgEgneMeGMI0Ogtp1jaEC5mrkMlvxQx38crjGBrs0Ogp5QNypPCxXfsde6LrMqNPboA8qZjWDnWj/FF2/930yD9LttDpWDj5/2PB0aqzT7VUTF6X9NHgP7bST5AsGH6sOPqWD4BMPQ6772v8HeljVxZ4GeF6/YCo9rAl9ihm95ddkGWakasoM4Npbch18nVo8vzYBltuva5F1qO+ipDPLUwyoigev4AoZOST1ymhd0kZNA+J0gL1diDS7qKdM6VHMrJrNc8u4qGKC0A9AXFeIpTN/fAp7s9yH+Lq8vsJ5y99AZExA+z4WbjUTJOYru8Q4s3zfuH2okTjsAAXXvbBif8HWkoMuvSe/I5G6eI0CswL4pEPfu+eSIVlVAJmh8iRMcSmBRPZ+Ir5HtR8tuNREflrZbhPmlByfBrYxLYgNKSMNPZqXWBa/vfeXZ+rLzggSCQw+56/vg8kDKvkMY3PLOOrnOtsLPERCnh/v6hBYHrOJ0JTLKxdFrQV10YgFrA30R0S6pQtDH67itNd3x4MbE52eXcfpKQYMLIl575/hiaHq79szs7VSxGpHcHl1h2WIZU0lwADL833DOsDYpvwRp/ezamjeT2Tqnhb1E+dLFYQFEoPDjqMILT7ZN8c1MaR6VG/eMEIROddF8elfxKLy+oNrdcCAvlvrJNI4pO5FvE0TLFCbaSRvBIEONCfqWYyhrkTKDhAKuk7qmXoL1NRFiJ5SPDVYiG68kZsfzW+7D1ZjAhTZMx89RgB"}        }
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":0            }
+
+event: content_block_start
+data: {"type":"content_block_start","index":1,"content_block":{"type":"text","text":""}    }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"Voy a consultar la"}            }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":" skill especializada del proyecto para darte una explicación completa y alineada con el código actual."}       }
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":1          }
+
+event: content_block_start
+data: {"type":"content_block_start","index":2,"content_block":{"type":"tool_use","id":"toolu_01B4QECD34ykV8ovRheNDckt","name":"Skill","input":{},"caller":{"type":"direct"}}           }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":""}          }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"\": \"smart-"} }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"{\"skill"}       }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"code"}     }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"-pro"}             }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"xy\""}               }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":", \"args\": \""}  }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"Explicar qué"}          }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":" es "}        }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"Smart Code "} }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"Proxy, su pr"}    }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"opós"}       }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"ito, ar"}         }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"a general"}      }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":" y "}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"quitectur"}          }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"cómo f"}        }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"un"}  }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"cio"}       }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"na\"}"}}
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":2  }
+
+event: message_stop
+data: {"type":"message_stop"              }
+
+event: message_delta
+data: {"type":"message_delta","delta":{"stop_reason":"tool_use","stop_sequence":null,"stop_details":null},"usage":{"input_tokens":10,"cache_creation_input_tokens":29896,"cache_read_input_tokens":0,"output_tokens":298},"context_management":{"applied_edits":[]}     }
+

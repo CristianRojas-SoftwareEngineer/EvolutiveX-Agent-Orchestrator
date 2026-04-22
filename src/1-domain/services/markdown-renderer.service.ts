@@ -2,8 +2,7 @@ import { JsonValue } from '../types/json.types.js';
 
 /**
  * Servicio para renderizar cuerpos JSON de petición/respuesta como Markdown semántico legible.
- * Genera vistas enriquecidas para bloques `thinking`, `tool_use`, `tool_result` y `text`,
- * portado desde la lógica legacy de `audit-body-markdown.js`.
+ * Genera vistas enriquecidas para bloques `thinking`, `tool_use`, `tool_result` y `text`.
  */
 export class MarkdownRendererService {
   /**

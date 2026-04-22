@@ -1,7 +1,7 @@
 {
   "name": "smart-code-proxy",
   "version": "1.0.0",
-  "description": "Proxy de observabilidad de alto rendimiento para interceptar, auditar y analizar tráfico entre clientes IA y la API de Anthropic.",
+  "description": "Proxy de observabilidad de alto rendimiento para interceptar, auditar y analizar el tráfico entre Claude Code (CLI oficial de Anthropic) y la API de Anthropic.",
   "main": "dist/index.js",
   "scripts": {
     "help": "node scripts/help.js",
@@ -21,7 +21,7 @@
     "clean": "concurrently \"npm run clean:dist\" \"npm run clean:modules\"",
     "clean:dist": "node -e \"fs.rmSync('dist', { recursive: true, force: true })\"",
     "clean:modules": "node -e \"fs.rmSync('node_modules', { recursive: true, force: true })\"",
-    "clean:sessions": "node --env-file-if-exists=configs/.env -e \"fs.rmSync(process.env.AUDIT_SESSIONS_DIR || 'sessions', { recursive: true, force: true })\""
+    "clean:sessions": "node -e \"fs.rmSync('sessions', { recursive: true, force: true })\""
   },
   "keywords": [],
   "author": "",

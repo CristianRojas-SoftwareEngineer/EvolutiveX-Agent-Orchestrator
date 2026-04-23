@@ -88,7 +88,8 @@ describe('Test de Integración - SseReconstructService (fuente: sse.jsonl)', () 
     expect(parsed.stop_reason).toBe('end_turn');
 
     const mdContent = await fs.readFile(path.join(interactionDir, 'response', 'body.parsed.md'), 'utf8');
-    expect(mdContent).toContain('**stop_reason:** "end_turn"');
+    expect(mdContent).toContain('_(stop_reason: end_turn)_');
+    expect(mdContent).toContain('# Respuesta del Asistente');
     expect(mdContent).toContain('Hola mundo!');
   });
 });

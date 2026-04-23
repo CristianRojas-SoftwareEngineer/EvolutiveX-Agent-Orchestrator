@@ -42,8 +42,8 @@ export class AuditWriterService implements IAuditWriter {
     try {
       const md =
         type === 'request'
-          ? this.markdownRendererService.renderRequestBodyMarkdown(parsed)
-          : this.markdownRendererService.renderResponseBodyMarkdown(parsed);
+          ? this.markdownRendererService.renderRequestConversationMarkdown(parsed)
+          : this.markdownRendererService.renderResponseConversationMarkdown(parsed);
       await this.writeFileAtomic(
         path.join(dir, `${baseName}.parsed.md`),
         Buffer.from(`${md}\n`, 'utf8'),
@@ -341,8 +341,8 @@ export class AuditWriterService implements IAuditWriter {
       message,
     );
 
-    // body.parsed.md — vista markdown semántica
-    const md = this.markdownRendererService.renderResponseBodyMarkdown(message);
+    // body.parsed.md — vista markdown conversacional
+    const md = this.markdownRendererService.renderResponseConversationMarkdown(message);
     await this.writeFileAtomic(
       path.join(responseDir, 'body.parsed.md'),
       Buffer.from(`${md}\n`, 'utf8'),

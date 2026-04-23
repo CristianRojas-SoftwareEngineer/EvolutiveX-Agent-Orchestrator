@@ -6,61 +6,6 @@ import { JsonValue } from '../types/json.types.js';
  */
 export class MarkdownRendererService {
   /**
-   * Renderiza el cuerpo de una petición Anthropic como Markdown semántico.
-   * Muestra parámetros top-level y el array de mensajes con sus bloques de contenido.
-   */
-  public renderRequestBodyMarkdown(parsed: JsonValue): string {
-    try {
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        const obj = parsed as Record<string, JsonValue>;
-        const parts: string[] = [this.heading(1, 'Request body'), this.renderRequestTopFields(obj)];
-        if (Array.isArray(obj.messages)) {
-          parts.push(
-            this.heading(2, 'Messages'),
-            (obj.messages as JsonValue[]).map((m, i) => this.renderMessage(m, i)).join('\n\n'),
-          );
-        } else if (!obj.messages) {
-          parts.push(this.renderContentBlocks(obj.content));
-        }
-        return parts.filter(Boolean).join('\n\n');
-      }
-    } catch {
-      /* fallback */
-    }
-    return this.lines(this.heading(1, 'Request body'), this.fencedJson(parsed));
-  }
-
-  /**
-   * Renderiza el cuerpo de una respuesta Anthropic como Markdown semántico.
-   * Incluye metadatos (id, model, usage, stop_reason) y los bloques de contenido.
-   */
-  public renderResponseBodyMarkdown(parsed: JsonValue): string {
-    try {
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        const obj = parsed as Record<string, JsonValue>;
-        const meta: string[] = [];
-        for (const k of ['id', 'type', 'role', 'model', 'stop_reason', 'stop_sequence']) {
-          if (k in obj && obj[k] !== undefined && obj[k] !== null) {
-            meta.push(`- **${k}:** ${JSON.stringify(obj[k])}`);
-          }
-        }
-        if ('usage' in obj && obj.usage && typeof obj.usage === 'object') {
-          meta.push(`- **usage:**\n\n${this.fencedJson(obj.usage)}`);
-        }
-        const head =
-          meta.length > 0
-            ? [this.heading(1, 'Response message'), meta.join('\n')].join('\n\n')
-            : this.heading(1, 'Response message');
-        const content = this.renderContentBlocks(obj.content);
-        return [head, this.heading(2, 'Content'), content].join('\n\n');
-      }
-    } catch {
-      /* fallback */
-    }
-    return this.lines(this.heading(1, 'Response body'), this.fencedJson(parsed));
-  }
-
-  /**
    * Genera un code fence JSON formateado.
    */
   private fencedJson(value: JsonValue): string {
@@ -84,106 +29,223 @@ export class MarkdownRendererService {
   }
 
   /**
-   * Renderiza un bloque de texto plano.
+   * Renderiza el cuerpo de una petición Anthropic como Markdown conversacional legible.
+   * Extrae el prompt efectivo del usuario y muestra el contexto de tool_results si aplica.
    */
-  private renderTextBlock(text: JsonValue): string {
-    if (typeof text !== 'string') return this.fencedJson(text);
-    return text;
-  }
+  public renderRequestConversationMarkdown(parsed: JsonValue): string {
+    try {
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        const obj = parsed as Record<string, JsonValue>;
 
-  /**
-   * Despacha el renderizado de un bloque individual según su tipo.
-   * Soporta: text, thinking, tool_use, tool_result, y fallback genérico.
-   */
-  private renderBlock(block: JsonValue, index: number): string {
-    if (!block || typeof block !== 'object' || Array.isArray(block)) {
-      return [this.heading(4, `Block ${index + 1}`), this.fencedJson(block)].join('\n\n');
-    }
-    const obj = block as Record<string, JsonValue>;
-    const t = obj.type as string | undefined;
-    const title = `Block ${index + 1}: ${t || 'unknown'}`;
+        // Extraer metadata opcional
+        const model = obj.model ? String(obj.model) : undefined;
+        const maxTokens = obj.max_tokens ? Number(obj.max_tokens) : undefined;
 
-    if (t === 'text' && typeof obj.text === 'string') {
-      return [this.heading(4, title), this.renderTextBlock(obj.text)].join('\n\n');
-    }
-    if (t === 'thinking') {
-      const think = typeof obj.thinking === 'string' ? obj.thinking : '';
-      const sig =
-        typeof obj.signature === 'string' && (obj.signature as string).length > 0
-          ? `_(signature: ${(obj.signature as string).length} chars)_`
-          : '';
-      return [this.heading(4, title), sig, think || '_(empty)_'].filter(Boolean).join('\n\n');
-    }
-    if (t === 'tool_use') {
-      const name = obj.name ? String(obj.name) : '';
-      const id = obj.id ? String(obj.id) : '';
-      const head = [this.heading(4, title), `**tool:** ${name}`, id ? `**id:** \`${id}\`` : '']
-        .filter(Boolean)
-        .join('\n\n');
-      const input = 'input' in obj ? obj.input : undefined;
-      return [head, this.fencedJson(input !== undefined ? input : obj)].join('\n\n');
-    }
-    if (t === 'tool_result') {
-      const id = obj.tool_use_id ? String(obj.tool_use_id) : '';
-      const body = obj.content;
-      if (typeof body === 'string') {
-        return [
-          this.heading(4, title),
-          id ? `**tool_use_id:** \`${id}\`` : '',
-          this.renderTextBlock(body),
-        ]
-          .filter(Boolean)
-          .join('\n\n');
+        // Extraer mensajes
+        const messages = Array.isArray(obj.messages) ? obj.messages : [];
+        const { text: promptText, toolResults, attachments } = this.extractLastUserMessage(messages);
+
+        const parts: string[] = [this.heading(1, 'Prompt del Usuario')];
+
+        // Texto del prompt
+        if (promptText) {
+          parts.push(promptText);
+        } else {
+          parts.push('_[No se detectó mensaje de usuario]_');
+        }
+
+        // Adjuntos (imágenes, documentos)
+        if (attachments.length > 0) {
+          parts.push('');
+          parts.push('**Adjuntos:** ' + attachments.join(', '));
+        }
+
+        // Contexto de tool_results (para continuaciones)
+        if (toolResults.length > 0) {
+          parts.push('');
+          parts.push('---');
+          parts.push('');
+          const toolList = toolResults.map((tr) => `${tr.name} (${tr.id})`).join(', ');
+          parts.push(`**Contexto:** El harness recibió resultados de: ${toolList}`);
+        }
+
+        // Footer con metadata
+        if (model || maxTokens) {
+          const metaParts: string[] = [];
+          if (model) metaParts.push(`model: ${model}`);
+          if (maxTokens) metaParts.push(`max_tokens: ${maxTokens}`);
+          parts.push('');
+          parts.push(`<!-- ${metaParts.join(', ')} -->`);
+        }
+
+        return parts.join('\n');
       }
-      return [
-        this.heading(4, title),
-        id ? `**tool_use_id:** \`${id}\`` : '',
-        this.fencedJson(body !== undefined ? body : obj),
-      ]
-        .filter(Boolean)
-        .join('\n\n');
+    } catch {
+      /* fallback */
     }
-    return [this.heading(4, title), this.fencedJson(obj)].join('\n\n');
+    return this.lines(this.heading(1, 'Prompt del Usuario'), this.fencedJson(parsed));
   }
 
   /**
-   * Renderiza un array de bloques de contenido separados por reglas horizontales.
+   * Extrae el último mensaje del usuario del array de mensajes Anthropic.
+   * Retorna el texto del prompt, los tool_results recibidos y los adjuntos.
    */
-  private renderContentBlocks(content: JsonValue): string {
-    if (!Array.isArray(content)) {
-      return this.fencedJson(content);
-    }
-    return content.map((b, i) => this.renderBlock(b, i)).join('\n\n---\n\n');
-  }
+  private extractLastUserMessage(messages: JsonValue[]): {
+    text: string;
+    toolResults: Array<{ id: string; name: string }>;
+    attachments: string[];
+  } {
+    let promptText = '';
+    const toolResults: Array<{ id: string; name: string }> = [];
+    const attachments: string[] = [];
 
-  /**
-   * Renderiza un mensaje individual con su rol y bloques de contenido.
-   */
-  private renderMessage(msg: JsonValue, msgIndex: number): string {
-    if (!msg || typeof msg !== 'object' || Array.isArray(msg)) {
-      return [this.heading(3, `Message ${msgIndex + 1}`), this.fencedJson(msg)].join('\n\n');
-    }
-    const obj = msg as Record<string, JsonValue>;
-    const role = obj.role ? String(obj.role) : 'unknown';
-    const head = this.heading(3, `Message ${msgIndex + 1} (${role})`);
-    const inner = this.renderContentBlocks(obj.content);
-    return [head, inner].join('\n\n');
-  }
-
-  /**
-   * Renderiza los campos top-level de una petición (excluyendo messages).
-   */
-  private renderRequestTopFields(parsed: Record<string, JsonValue>): string {
-    const skip = new Set(['messages']);
-    const keys = Object.keys(parsed).filter((k) => !skip.has(k));
-    if (keys.length === 0) return '';
-    const rows = keys.map((k) => {
-      const v = parsed[k];
-      if (v === null || typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') {
-        return `- **${k}:** ${JSON.stringify(v)}`;
+    // Crear mapa de tool_use_id -> nombre de herramienta desde mensajes previos del assistant
+    const toolNameMap = new Map<string, string>();
+    for (const msg of messages) {
+      if (msg && typeof msg === 'object' && !Array.isArray(msg)) {
+        const m = msg as Record<string, JsonValue>;
+        if (m.role === 'assistant' && Array.isArray(m.content)) {
+          for (const block of m.content) {
+            if (block && typeof block === 'object' && !Array.isArray(block)) {
+              const b = block as Record<string, JsonValue>;
+              if (b.type === 'tool_use' && b.id && b.name) {
+                toolNameMap.set(String(b.id), String(b.name));
+              }
+            }
+          }
+        }
       }
-      return `- **${k}:**\n\n${this.fencedJson(v)}`;
-    });
-    return [this.heading(2, 'Request parameters'), rows.join('\n\n')].join('\n\n');
+    }
+
+    // Buscar el último mensaje user (de atrás hacia adelante)
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const msg = messages[i];
+      if (msg && typeof msg === 'object' && !Array.isArray(msg)) {
+        const m = msg as Record<string, JsonValue>;
+        if (m.role === 'user') {
+          // Extraer contenido del mensaje
+          if (Array.isArray(m.content)) {
+            const textParts: string[] = [];
+            for (const block of m.content) {
+              if (block && typeof block === 'object' && !Array.isArray(block)) {
+                const b = block as Record<string, JsonValue>;
+                if (b.type === 'text' && typeof b.text === 'string') {
+                  textParts.push(b.text);
+                } else if (b.type === 'tool_result') {
+                  const toolId = b.tool_use_id ? String(b.tool_use_id) : '';
+                  const toolName = toolNameMap.get(toolId) || 'tool';
+                  if (toolId) {
+                    toolResults.push({ id: toolId, name: toolName });
+                  }
+                } else if (b.type === 'image') {
+                  attachments.push('[Imagen adjunta]');
+                } else if (b.type === 'document') {
+                  const filename = b.title || b.file_name || 'documento';
+                  attachments.push(`[Documento: ${filename}]`);
+                }
+              }
+            }
+            promptText = textParts.join('\n\n');
+          } else if (typeof m.content === 'string') {
+            promptText = m.content;
+          }
+          break; // Solo el último mensaje user
+        }
+      }
+    }
+
+    return { text: promptText, toolResults, attachments };
+  }
+
+  /**
+   * Renderiza el cuerpo de una respuesta Anthropic como Markdown conversacional legible.
+   * Separa pensamiento interno (blockquote), respuesta al usuario (texto plano) y acciones solicitadas.
+   */
+  public renderResponseConversationMarkdown(parsed: JsonValue): string {
+    try {
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        const obj = parsed as Record<string, JsonValue>;
+        const stopReason = obj.stop_reason ? String(obj.stop_reason) : undefined;
+
+        // Extraer bloques de contenido
+        const content = Array.isArray(obj.content) ? obj.content : [];
+        const thinkingParts: string[] = [];
+        const textParts: string[] = [];
+        const toolUses: Array<{ name: string; id: string; input: JsonValue }> = [];
+
+        for (const block of content) {
+          if (block && typeof block === 'object' && !Array.isArray(block)) {
+            const b = block as Record<string, JsonValue>;
+            if (b.type === 'thinking' && typeof b.thinking === 'string') {
+              thinkingParts.push(b.thinking);
+            } else if (b.type === 'text' && typeof b.text === 'string') {
+              textParts.push(b.text);
+            } else if (b.type === 'tool_use') {
+              const name = b.name ? String(b.name) : 'tool';
+              const id = b.id ? String(b.id) : '';
+              const input = 'input' in b ? b.input : undefined;
+              toolUses.push({ name, id, input });
+            }
+          }
+        }
+
+        const parts: string[] = [this.heading(1, 'Respuesta del Asistente')];
+
+        // Pensamiento interno (blockquote)
+        if (thinkingParts.length > 0) {
+          const fullThinking = thinkingParts.join('\n\n');
+          const truncatedThinking = this.truncateWithIndicator(fullThinking, 5000, '_[Pensamiento truncado...]_');
+          const quotedThinking = truncatedThinking
+            .split('\n')
+            .map((line) => `> ${line}`)
+            .join('\n');
+          parts.push(this.heading(2, 'Razonamiento interno'));
+          parts.push(quotedThinking);
+        }
+
+        // Respuesta al usuario (texto plano)
+        if (textParts.length > 0) {
+          parts.push(this.heading(2, 'Respuesta'));
+          parts.push(textParts.join('\n\n'));
+        }
+
+        // Acciones solicitadas (tool_use)
+        if (toolUses.length > 0) {
+          parts.push(this.heading(2, 'Acciones solicitadas'));
+          for (const tool of toolUses) {
+            const idStr = tool.id ? `(id: \`${tool.id}\`)` : '';
+            parts.push(`- **${tool.name}** ${idStr}`);
+            // Mostrar input completo en JSON fence
+            if (tool.input !== undefined) {
+              const inputJson = JSON.stringify(tool.input, null, 2);
+              parts.push('  ```json');
+              // Indentar el JSON para que quede bajo el bullet
+              const indentedInput = inputJson.split('\n').map((l) => `  ${l}`).join('\n');
+              parts.push(indentedInput);
+              parts.push('  ```');
+            }
+          }
+        }
+
+        // Metadata sutil (stop_reason)
+        if (stopReason) {
+          parts.push('');
+          parts.push(`_(stop_reason: ${stopReason})_`);
+        }
+
+        return parts.join('\n\n');
+      }
+    } catch {
+      /* fallback */
+    }
+    return this.lines(this.heading(1, 'Respuesta del Asistente'), this.fencedJson(parsed));
+  }
+
+  /**
+   * Trunca un texto si excede el límite, agregando un indicador.
+   */
+  private truncateWithIndicator(text: string, maxLength: number, indicator: string): string {
+    if (text.length <= maxLength) return text;
+    return text.slice(0, maxLength) + '\n' + indicator;
   }
 }

@@ -237,7 +237,7 @@ describe('AuditWriterService - writeFormattedAndMarkdown semántico', () => {
     await fs.rm(tempDir, { recursive: true, force: true });
   });
 
-  it('debería generar markdown semántico para petición con tool_use', async () => {
+  it('debería generar markdown conversacional para petición sin mensaje de usuario', async () => {
     const parsed = {
       model: 'claude-3-5-sonnet-20241022',
       max_tokens: 1024,
@@ -255,7 +255,8 @@ describe('AuditWriterService - writeFormattedAndMarkdown semántico', () => {
     await service.writeFormattedAndMarkdown(requestDir, 'body', parsed, 'request');
 
     const md = await fs.readFile(path.join(requestDir, 'body.parsed.md'), 'utf8');
-    expect(md).toContain('**tool:** read_file');
-    expect(md).toContain('**id:** `toolu_abc`');
+    expect(md).toContain('# Prompt del Usuario');
+    expect(md).toContain('_[No se detectó mensaje de usuario]_');
+    expect(md).toContain('<!-- model: claude-3-5-sonnet-20241022, max_tokens: 1024 -->');
   });
 });

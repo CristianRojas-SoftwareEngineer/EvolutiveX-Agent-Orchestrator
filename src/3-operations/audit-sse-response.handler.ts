@@ -225,6 +225,7 @@ export class AuditSseResponseHandler {
           sseReconstructResult = await this.sseReconstruct.runReconstruction({
             stepDir,
             interactionDir: context.auditInteractionDir,
+            stepCount: stepNumber,
             originalUrl: context.url,
             headers: {},
             sseRawBytesWritten,

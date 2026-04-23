@@ -164,6 +164,8 @@ export interface SseReconstructOptions {
   stepDir: string;
   /** Directorio de la interacción donde se escribe el resultado (response/body.*). */
   interactionDir: string;
+  /** Total de steps en el turno al momento del cierre. */
+  stepCount: number;
   /** URL original de la petición (para detectar beta). */
   originalUrl?: string;
   /** Cabeceras originales de la petición (para detectar anthropic-beta). */

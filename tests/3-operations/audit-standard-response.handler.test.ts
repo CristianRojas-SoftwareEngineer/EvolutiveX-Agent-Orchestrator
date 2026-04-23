@@ -105,14 +105,16 @@ function makeAuditWriter(overrides: Partial<IAuditWriter> = {}): IAuditWriter {
     writeInteractionState: async () => {},
     removeInteractionState: async () => {},
     writeStepResponseMarkdown: async () => {},
+    writeTopLevelMultiStepResponse: async () => ({ written: true }),
     ...overrides,
   };
 }
 
 describe('AuditStandardResponseHandler', () => {
-  it('debería escribir en step dir y top-level, y cerrar turno (terminal)', async () => {
+  it('debería escribir en step dir (finalizeNonSseResponseAudit) y top-level (writeTopLevelMultiStepResponse), y cerrar turno (terminal)', async () => {
     const config = makeConfig();
     const finalizedDirs: string[] = [];
+    let topLevelCalls = 0;
     let turnMetaWritten = false;
     let turnCleared = false;
 
@@ -121,6 +123,10 @@ describe('AuditStandardResponseHandler', () => {
         finalizeNonSseResponseAudit: async (params) => {
           finalizedDirs.push(params.interactionDir);
           return { responseBodyBytesAudited: params.bodyBuffer.length, responseTruncatedByProxyBuffer: false, responseTruncatedByAuditLimit: false };
+        },
+        writeTopLevelMultiStepResponse: async () => {
+          topLevelCalls++;
+          return { written: true };
         },
         writeTurnMeta: async () => { turnMetaWritten = true; },
       }),
@@ -137,10 +143,11 @@ describe('AuditStandardResponseHandler', () => {
 
     await new Promise((r) => setTimeout(r, 100));
 
-    // Escribe en step dir y en interactionDir (top-level)
-    expect(finalizedDirs).toHaveLength(2);
+    // Step dir: finalizeNonSseResponseAudit llamado 1 vez
+    expect(finalizedDirs).toHaveLength(1);
     expect(finalizedDirs[0]).toMatch(/steps[/\\]001/);
-    expect(finalizedDirs[1]).not.toMatch(/steps[/\\]/);
+    // Top-level: writeTopLevelMultiStepResponse llamado 1 vez
+    expect(topLevelCalls).toBe(1);
     expect(turnMetaWritten).toBe(true);
     expect(turnCleared).toBe(true);
   });

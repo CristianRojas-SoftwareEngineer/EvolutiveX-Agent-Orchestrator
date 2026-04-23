@@ -38,7 +38,24 @@ describe('Test de Integración - SseReconstructService (fuente: sse.jsonl)', () 
     const redactService = new RedactService();
     const markdownRenderer = new MarkdownRendererService();
     auditWriterService = new AuditWriterService(redactService, markdownRenderer);
-    sseReconstructService = new SseReconstructService(auditWriterService, markdownRenderer);
+    sseReconstructService = new SseReconstructService(auditWriterService);
+
+    // Crear step body.json para que writeTopLevelMultiStepResponse lo encuentre
+    const stepBody = {
+      id: 'msg_mock',
+      type: 'message',
+      role: 'assistant',
+      content: [{ type: 'text', text: 'Hola mundo!' }],
+      model: 'claude-3-5-sonnet-20241022',
+      stop_reason: 'end_turn',
+      stop_sequence: null,
+      usage: { input_tokens: 10, output_tokens: 12 },
+    };
+    await fs.writeFile(
+      path.join(stepDir, 'response', 'body.json'),
+      JSON.stringify(stepBody, null, 2),
+      'utf8',
+    );
 
     const lines = [
       'event: message_start',
@@ -67,6 +84,7 @@ describe('Test de Integración - SseReconstructService (fuente: sse.jsonl)', () 
     const result = await sseReconstructService.runReconstruction({
       stepDir,
       interactionDir,
+      stepCount: 1,
       originalUrl: 'https://api.anthropic.com/v1/messages',
       headers: {},
       sseRawBytesWritten: 1024,
@@ -81,11 +99,15 @@ describe('Test de Integración - SseReconstructService (fuente: sse.jsonl)', () 
     const jsonContent = await fs.readFile(path.join(interactionDir, 'response', 'body.json'), 'utf8');
     const parsed = JSON.parse(jsonContent);
 
-    expect(parsed.id).toBe('msg_mock');
-    expect(parsed.role).toBe('assistant');
-    expect(parsed.content[0].type).toBe('text');
-    expect(parsed.content[0].text).toBe('Hola mundo!');
-    expect(parsed.stop_reason).toBe('end_turn');
+    // Formato multi-step-response
+    expect(parsed.type).toBe('multi-step-response');
+    expect(parsed.stepCount).toBe(1);
+    expect(parsed.steps).toBeInstanceOf(Array);
+    expect(parsed.steps[0].id).toBe('msg_mock');
+    expect(parsed.steps[0].role).toBe('assistant');
+    expect(parsed.steps[0].content[0].type).toBe('text');
+    expect(parsed.steps[0].content[0].text).toBe('Hola mundo!');
+    expect(parsed.steps[0].stop_reason).toBe('end_turn');
 
     const mdContent = await fs.readFile(path.join(interactionDir, 'response', 'body.parsed.md'), 'utf8');
     expect(mdContent).toContain('_(stop_reason: end_turn)_');
@@ -110,7 +132,24 @@ describe('SseReconstructService - resiliencia frente a sse.txt corrupto', () => 
     const redactService = new RedactService();
     const markdownRenderer = new MarkdownRendererService();
     const writer = new AuditWriterService(redactService, markdownRenderer);
-    service = new SseReconstructService(writer, markdownRenderer);
+    service = new SseReconstructService(writer);
+
+    // Crear step body.json para que writeTopLevelMultiStepResponse lo encuentre
+    const stepBody = {
+      id: 'msg_ok',
+      type: 'message',
+      role: 'assistant',
+      content: [{ type: 'text', text: 'ok' }],
+      model: 'claude',
+      stop_reason: 'end_turn',
+      stop_sequence: null,
+      usage: { input_tokens: 1, output_tokens: 1 },
+    };
+    await fs.writeFile(
+      path.join(stepDir, 'response', 'body.json'),
+      JSON.stringify(stepBody, null, 2),
+      'utf8',
+    );
 
     // sse.jsonl: ORDEN CORRECTO
     const correctOrder = [
@@ -153,6 +192,7 @@ describe('SseReconstructService - resiliencia frente a sse.txt corrupto', () => 
     const result = await service.runReconstruction({
       stepDir,
       interactionDir,
+      stepCount: 1,
       sseRawBytesWritten: 1,
       sseRawTruncatedByLimit: false,
       sseRawWriteError: false,
@@ -165,15 +205,19 @@ describe('SseReconstructService - resiliencia frente a sse.txt corrupto', () => 
     const body = JSON.parse(
       await fs.readFile(path.join(interactionDir, 'response', 'body.json'), 'utf8'),
     );
-    expect(body.id).toBe('msg_ok');
-    expect(body.role).toBe('assistant');
-    expect(body.content[0].text).toBe('ok');
+    // Formato multi-step-response
+    expect(body.type).toBe('multi-step-response');
+    expect(body.stepCount).toBe(1);
+    expect(body.steps[0].id).toBe('msg_ok');
+    expect(body.steps[0].role).toBe('assistant');
+    expect(body.steps[0].content[0].text).toBe('ok');
   });
 
   it('reconstruye aunque sse.txt haya sido truncado o haya fallado escritura', async () => {
     const result = await service.runReconstruction({
       stepDir,
       interactionDir,
+      stepCount: 1,
       sseRawBytesWritten: 0,
       sseRawTruncatedByLimit: true,
       sseRawWriteError: true,
@@ -198,7 +242,7 @@ describe('SseReconstructService - fixture real (sessions/ histórico)', () => {
     const redactService = new RedactService();
     const markdownRenderer = new MarkdownRendererService();
     const writer = new AuditWriterService(redactService, markdownRenderer);
-    service = new SseReconstructService(writer, markdownRenderer);
+    service = new SseReconstructService(writer);
 
     const here = path.dirname(fileURLToPath(import.meta.url));
     const fixturePath = path.resolve(
@@ -207,6 +251,23 @@ describe('SseReconstructService - fixture real (sessions/ histórico)', () => {
     );
     const jsonlBytes = await fs.readFile(fixturePath);
     await fs.writeFile(path.join(stepDir, 'response', 'sse.jsonl'), jsonlBytes);
+
+    // Crear step body.json para que writeTopLevelMultiStepResponse lo encuentre
+    const stepBody = {
+      id: 'msg_title_gen',
+      type: 'message',
+      role: 'assistant',
+      content: [{ type: 'text', text: '{"title": "Explain Smart Code Proxy project"}' }],
+      model: 'claude-3-5-sonnet',
+      stop_reason: 'end_turn',
+      stop_sequence: null,
+      usage: { input_tokens: 100, output_tokens: 50 },
+    };
+    await fs.writeFile(
+      path.join(stepDir, 'response', 'body.json'),
+      JSON.stringify(stepBody, null, 2),
+      'utf8',
+    );
   });
 
   afterAll(async () => {
@@ -217,6 +278,7 @@ describe('SseReconstructService - fixture real (sessions/ histórico)', () => {
     const result = await service.runReconstruction({
       stepDir,
       interactionDir,
+      stepCount: 1,
       sseRawBytesWritten: 1349,
       sseRawTruncatedByLimit: false,
       sseRawWriteError: false,
@@ -228,10 +290,13 @@ describe('SseReconstructService - fixture real (sessions/ histórico)', () => {
     const body = JSON.parse(
       await fs.readFile(path.join(interactionDir, 'response', 'body.json'), 'utf8'),
     );
-    expect(body.role).toBe('assistant');
-    expect(body.stop_reason).toBe('end_turn');
-    expect(body.content[0].type).toBe('text');
+    // Formato multi-step-response
+    expect(body.type).toBe('multi-step-response');
+    expect(body.stepCount).toBe(1);
+    expect(body.steps[0].role).toBe('assistant');
+    expect(body.steps[0].stop_reason).toBe('end_turn');
+    expect(body.steps[0].content[0].type).toBe('text');
     // El contenido es un JSON con el título generado por Claude Code
-    expect(body.content[0].text).toContain('Explain Smart Code Proxy project');
+    expect(body.steps[0].content[0].text).toContain('Explain Smart Code Proxy project');
   });
 });

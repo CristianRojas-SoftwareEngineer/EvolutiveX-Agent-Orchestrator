@@ -1,10 +1,8 @@
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import { AuditWriterService } from './audit-writer.service.js';
-import { MarkdownRendererService } from '../1-domain/services/markdown-renderer.service.js';
 import { SseReconstructOptions, SseReconstructResult } from '../1-domain/types/audit.types.js';
 import type Anthropic from '@anthropic-ai/sdk';
-import { JsonValue } from '../1-domain/types/json.types.js';
 import type { ISseReconstructor } from './ports/sse-reconstructor.port.js';
 
 const REPLAY_BASE_URL = 'https://api.anthropic.com';
@@ -27,10 +25,7 @@ const REPLAY_MODEL = 'claude-sse-replay';
  * `interactionDir/response/body.*`.
  */
 export class SseReconstructService implements ISseReconstructor {
-  constructor(
-    private auditWriterService: AuditWriterService,
-    private markdownRendererService: MarkdownRendererService,
-  ) {}
+  constructor(private auditWriterService: AuditWriterService) {}
 
   /**
    * Reconstruye un mensaje Anthropic desde el sse.jsonl de un step individual.
@@ -92,7 +87,7 @@ export class SseReconstructService implements ISseReconstructor {
    * informativos: no abortan la reconstrucción.
    */
   public async runReconstruction(opts: SseReconstructOptions): Promise<SseReconstructResult> {
-    const { stepDir, interactionDir, originalUrl, headers } = opts;
+    const { stepDir, interactionDir, stepCount, originalUrl, headers } = opts;
 
     const useBeta = this.computeUseBeta(originalUrl, headers);
 
@@ -105,37 +100,23 @@ export class SseReconstructService implements ISseReconstructor {
       'utf8',
     );
 
-    let message: Anthropic.Message | Anthropic.Beta.Messages.BetaMessage;
     try {
-      message = await this.reconstructStepMessage(stepDir);
-    } catch (err: unknown) {
-      const errMsg = err instanceof Error ? err.message : String(err);
-      return {
-        sseResponseBodyAttempted: false,
-        sseResponseBodyWritten: false,
-        sseResponseBodyError: errMsg,
-      };
-    }
-
-    try {
-      await this.writeSseReconstructedResponseBody(interactionDir, message);
+      const result = await this.auditWriterService.writeTopLevelMultiStepResponse(
+        interactionDir,
+        stepCount,
+      );
       return {
         sseResponseBodyAttempted: true,
-        sseResponseBodyWritten: true,
-        sseResponseBodySource: 'file',
+        sseResponseBodyWritten: result.written,
+        sseResponseBodyError: result.error,
+        sseResponseBodySource: result.written ? 'file' : undefined,
       };
     } catch (err: unknown) {
-      try {
-        await this.writeSseReconstructError(interactionDir, err);
-      } catch {
-        /* error al escribir el error — no bloquear */
-      }
       const errMsg = err instanceof Error ? err.message : String(err);
       return {
         sseResponseBodyAttempted: true,
         sseResponseBodyWritten: false,
         sseResponseBodyError: errMsg,
-        sseResponseBodySource: 'file',
       };
     }
   }
@@ -252,35 +233,4 @@ export class SseReconstructService implements ISseReconstructor {
     });
   }
 
-  private async writeSseReconstructedResponseBody(
-    interactionDir: string,
-    message: Anthropic.Message | Anthropic.Beta.Messages.BetaMessage,
-  ): Promise<void> {
-    const responseDir = path.join(interactionDir, 'response');
-    await fs.mkdir(responseDir, { recursive: true });
-    const plain = JSON.parse(JSON.stringify(message));
-    await this.auditWriterService.writeFileAtomic(
-      path.join(responseDir, 'body.json'),
-      Buffer.from(JSON.stringify(plain), 'utf8'),
-    );
-    await this.auditWriterService.writeFormattedAndMarkdown(
-      responseDir,
-      'body',
-      plain as JsonValue,
-      'response',
-    );
-  }
-
-  private async writeSseReconstructError(interactionDir: string, err: unknown): Promise<void> {
-    const responseDir = path.join(interactionDir, 'response');
-    await fs.mkdir(responseDir, { recursive: true });
-    const text =
-      err instanceof Error && err.stack
-        ? `${String(err.message)}\n${String(err.stack).slice(0, 8000)}`
-        : String(err);
-    await this.auditWriterService.writeFileAtomic(
-      path.join(responseDir, 'body.reconstruct-error.txt'),
-      Buffer.from(text, 'utf8'),
-    );
-  }
 }

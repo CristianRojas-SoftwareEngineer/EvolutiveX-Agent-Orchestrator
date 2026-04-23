@@ -97,7 +97,11 @@ describe('Test de Integración - Decompresión Gzip', () => {
     const responseBodyPath = path.join(sessionPath, 'response', 'body.json');
     const content = await fs.readFile(responseBodyPath, 'utf8');
 
-    // Assert 4: El file volcado es texto json válido formateado (no un binario corrupto y no un stream múltiple)
-    expect(JSON.parse(content)).toEqual({ message: 'Hola desde upstream comprimido' });
+    // Assert 4: El file volcado es texto json válido formateado en formato multi-step
+    const parsed = JSON.parse(content);
+    expect(parsed.type).toBe('multi-step-response');
+    expect(parsed.stepCount).toBeGreaterThanOrEqual(1);
+    expect(parsed.steps).toBeInstanceOf(Array);
+    expect(parsed.steps[0]).toHaveProperty('message', 'Hola desde upstream comprimido');
   });
 });

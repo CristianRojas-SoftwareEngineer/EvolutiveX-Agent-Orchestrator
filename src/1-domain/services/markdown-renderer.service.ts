@@ -162,78 +162,116 @@ export class MarkdownRendererService {
   public renderResponseConversationMarkdown(parsed: JsonValue): string {
     try {
       if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        const obj = parsed as Record<string, JsonValue>;
-        const stopReason = obj.stop_reason ? String(obj.stop_reason) : undefined;
-
-        // Extraer bloques de contenido
-        const content = Array.isArray(obj.content) ? obj.content : [];
-        const thinkingParts: string[] = [];
-        const textParts: string[] = [];
-        const toolUses: Array<{ name: string; id: string; input: JsonValue }> = [];
-
-        for (const block of content) {
-          if (block && typeof block === 'object' && !Array.isArray(block)) {
-            const b = block as Record<string, JsonValue>;
-            if (b.type === 'thinking' && typeof b.thinking === 'string') {
-              thinkingParts.push(b.thinking);
-            } else if (b.type === 'text' && typeof b.text === 'string') {
-              textParts.push(b.text);
-            } else if (b.type === 'tool_use') {
-              const name = b.name ? String(b.name) : 'tool';
-              const id = b.id ? String(b.id) : '';
-              const input = 'input' in b ? b.input : undefined;
-              toolUses.push({ name, id, input });
-            }
-          }
-        }
-
         const parts: string[] = [this.heading(1, 'Respuesta del Asistente')];
-
-        // Pensamiento interno (blockquote)
-        if (thinkingParts.length > 0) {
-          const fullThinking = thinkingParts.join('\n\n');
-          const truncatedThinking = this.truncateWithIndicator(fullThinking, 5000, '_[Pensamiento truncado...]_');
-          const quotedThinking = truncatedThinking
-            .split('\n')
-            .map((line) => `> ${line}`)
-            .join('\n');
-          parts.push(this.heading(2, 'Razonamiento interno'));
-          parts.push(quotedThinking);
-        }
-
-        // Respuesta al usuario (texto plano)
-        if (textParts.length > 0) {
-          parts.push(this.heading(2, 'Respuesta'));
-          parts.push(textParts.join('\n\n'));
-        }
-
-        // Acciones solicitadas (tool_use)
-        if (toolUses.length > 0) {
-          parts.push(this.heading(2, 'Acciones solicitadas'));
-          for (const tool of toolUses) {
-            const idStr = tool.id ? `(id: \`${tool.id}\`)` : '';
-            if (tool.input !== undefined) {
-              const inputJson = JSON.stringify(tool.input, null, 2);
-              const indentedInput = inputJson.split('\n').map((l) => `  ${l}`).join('\n');
-              parts.push(`- **${tool.name}** ${idStr}\n  \`\`\`json\n${indentedInput}\n  \`\`\``);
-            } else {
-              parts.push(`- **${tool.name}** ${idStr}`);
-            }
-          }
-        }
-
-        // Metadata sutil (stop_reason)
-        if (stopReason) {
-          parts.push('');
-          parts.push(`_(stop_reason: ${stopReason})_`);
-        }
-
+        parts.push(...this.renderStepSections(parsed, 2));
         return parts.join('\n\n');
       }
     } catch {
       /* fallback */
     }
     return this.lines(this.heading(1, 'Respuesta del Asistente'), this.fencedJson(parsed));
+  }
+
+  /**
+   * Renderiza una cadena completa de steps como Markdown.
+   * Si hay un solo step, el formato es idéntico al de renderResponseConversationMarkdown.
+   * Si hay múltiples steps, cada uno lleva encabezado `## Step N de M — <stop_reason>`.
+   */
+  public renderMultiStepResponseMarkdown(
+    steps: Array<{ stepIndex: number; parsed: JsonValue }>,
+  ): string {
+    if (steps.length === 1) {
+      return this.renderResponseConversationMarkdown(steps[0].parsed);
+    }
+
+    const total = steps.length;
+    const parts: string[] = [this.heading(1, 'Respuesta del Asistente')];
+
+    for (let i = 0; i < steps.length; i++) {
+      const { stepIndex, parsed } = steps[i];
+      const stopReason =
+        parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+          ? String((parsed as Record<string, JsonValue>).stop_reason ?? '')
+          : '';
+      const stepHeader = this.heading(
+        2,
+        `Step ${stepIndex} de ${total}${stopReason ? ` — ${stopReason}` : ''}`,
+      );
+      parts.push(stepHeader);
+      parts.push(...this.renderStepSections(parsed, 3));
+      if (i < steps.length - 1) {
+        parts.push('---');
+      }
+    }
+
+    return parts.join('\n\n');
+  }
+
+  /**
+   * Renderiza las secciones de contenido de un step (thinking, text, tool_use, stop_reason)
+   * usando el nivel de encabezado indicado. No incluye el título raíz del documento.
+   */
+  private renderStepSections(parsed: JsonValue, headingLevel: number): string[] {
+    const parts: string[] = [];
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return parts;
+
+    const obj = parsed as Record<string, JsonValue>;
+    const stopReason = obj.stop_reason ? String(obj.stop_reason) : undefined;
+    const content = Array.isArray(obj.content) ? obj.content : [];
+    const thinkingParts: string[] = [];
+    const textParts: string[] = [];
+    const toolUses: Array<{ name: string; id: string; input: JsonValue }> = [];
+
+    for (const block of content) {
+      if (block && typeof block === 'object' && !Array.isArray(block)) {
+        const b = block as Record<string, JsonValue>;
+        if (b.type === 'thinking' && typeof b.thinking === 'string') {
+          thinkingParts.push(b.thinking);
+        } else if (b.type === 'text' && typeof b.text === 'string') {
+          textParts.push(b.text);
+        } else if (b.type === 'tool_use') {
+          toolUses.push({
+            name: b.name ? String(b.name) : 'tool',
+            id: b.id ? String(b.id) : '',
+            input: 'input' in b ? b.input : undefined,
+          });
+        }
+      }
+    }
+
+    if (thinkingParts.length > 0) {
+      const fullThinking = thinkingParts.join('\n\n');
+      const truncated = this.truncateWithIndicator(fullThinking, 5000, '_[Pensamiento truncado...]_');
+      const quoted = truncated.split('\n').map((line) => `> ${line}`).join('\n');
+      parts.push(this.heading(headingLevel, 'Razonamiento interno'));
+      parts.push(quoted);
+    }
+
+    if (textParts.length > 0) {
+      parts.push(this.heading(headingLevel, 'Respuesta'));
+      parts.push(textParts.join('\n\n'));
+    }
+
+    if (toolUses.length > 0) {
+      parts.push(this.heading(headingLevel, 'Acciones solicitadas'));
+      for (const tool of toolUses) {
+        const idStr = tool.id ? `(id: \`${tool.id}\`)` : '';
+        if (tool.input !== undefined) {
+          const inputJson = JSON.stringify(tool.input, null, 2);
+          const indented = inputJson.split('\n').map((l) => `  ${l}`).join('\n');
+          parts.push(`- **${tool.name}** ${idStr}\n  \`\`\`json\n${indented}\n  \`\`\``);
+        } else {
+          parts.push(`- **${tool.name}** ${idStr}`);
+        }
+      }
+    }
+
+    if (stopReason) {
+      parts.push('');
+      parts.push(`_(stop_reason: ${stopReason})_`);
+    }
+
+    return parts;
   }
 
   /**

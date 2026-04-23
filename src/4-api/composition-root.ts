@@ -32,7 +32,7 @@ export async function createProxyDependencies(
   const markdownRenderer = new MarkdownRendererService();
   const sessionStore = new SessionStoreService(auditBaseDir);
   const auditWriter = new AuditWriterService(redactService, markdownRenderer);
-  const sseReconstruct = new SseReconstructService(auditWriter, markdownRenderer);
+  const sseReconstruct = new SseReconstructService(auditWriter);
   const streamTee = new StreamTeeService();
 
   await sessionStore.ensureAuditSessionsRoot();

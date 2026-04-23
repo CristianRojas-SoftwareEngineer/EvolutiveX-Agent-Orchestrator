@@ -335,17 +335,69 @@ export class AuditWriterService implements IAuditWriter {
     const responseDir = path.join(stepDir, 'response');
     await fs.mkdir(responseDir, { recursive: true });
 
-    // body.json — mensaje reconstruido completo
-    await this.writeJsonAtomic(
-      path.join(responseDir, 'body.json'),
-      message,
-    );
+    await this.writeJsonAtomic(path.join(responseDir, 'body.json'), message);
 
-    // body.parsed.md — vista markdown conversacional
     const md = this.markdownRendererService.renderResponseConversationMarkdown(message);
     await this.writeFileAtomic(
       path.join(responseDir, 'body.parsed.md'),
       Buffer.from(`${md}\n`, 'utf8'),
     );
+  }
+
+  /**
+   * Lee los body.json de cada step y escribe en el top-level de la interacción:
+   * - response/body.json  (objeto multi-step-response con todos los steps)
+   * - response/body.parsed.md  (markdown con secciones por step)
+   */
+  public async writeTopLevelMultiStepResponse(
+    interactionDir: string,
+    stepCount: number,
+  ): Promise<{ written: boolean; error?: string }> {
+    const steps: Array<{ stepIndex: number; parsed: JsonValue }> = [];
+
+    for (let i = 1; i <= stepCount; i++) {
+      const stepBodyPath = path.join(
+        interactionDir,
+        'steps',
+        String(i).padStart(3, '0'),
+        'response',
+        'body.json',
+      );
+      try {
+        const raw = await fs.readFile(stepBodyPath, 'utf8');
+        steps.push({ stepIndex: i, parsed: JSON.parse(raw) as JsonValue });
+      } catch {
+        // step body ausente — omitir (best-effort)
+      }
+    }
+
+    if (steps.length === 0) {
+      return { written: false, error: 'no step bodies found' };
+    }
+
+    const responseDir = path.join(interactionDir, 'response');
+    await fs.mkdir(responseDir, { recursive: true });
+
+    try {
+      const multiStepObj: JsonValue = {
+        type: 'multi-step-response',
+        stepCount,
+        steps: steps.map((s) => ({
+          stepIndex: s.stepIndex,
+          ...(s.parsed as Record<string, JsonValue>),
+        })),
+      };
+      await this.writeJsonAtomic(path.join(responseDir, 'body.json'), multiStepObj);
+
+      const md = this.markdownRendererService.renderMultiStepResponseMarkdown(steps);
+      await this.writeFileAtomic(
+        path.join(responseDir, 'body.parsed.md'),
+        Buffer.from(`${md}\n`, 'utf8'),
+      );
+
+      return { written: true };
+    } catch (err: unknown) {
+      return { written: false, error: err instanceof Error ? err.message : String(err) };
+    }
   }
 }

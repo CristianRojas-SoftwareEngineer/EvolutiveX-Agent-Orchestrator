@@ -88,4 +88,12 @@ export interface IAuditWriter {
     stepDir: string,
     message: JsonValue,
   ): Promise<void>;
+  /**
+   * Combina los body.json de todos los steps y escribe response/body.json
+   * (formato multi-step) y response/body.parsed.md en el top-level de la interacción.
+   */
+  writeTopLevelMultiStepResponse(
+    interactionDir: string,
+    stepCount: number,
+  ): Promise<{ written: boolean; error?: string }>;
 }

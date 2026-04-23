@@ -150,15 +150,14 @@ export class AuditStandardResponseHandler {
           return;
         }
 
-        // Terminal: escribir top-level response + cerrar turno
-        await this.auditWriter.finalizeNonSseResponseAudit({
-          interactionDir: context.auditInteractionDir,
-          bodyBuffer: buf,
-          totalBytes,
-          maxAuditResponseBytes: this.config.MAX_AUDIT_RESPONSE_BODY_BYTES,
-          maxBufferBytes: maxBuffer,
-          contentType,
-        });
+        // Terminal: combinar steps y escribir top-level response
+        const topLevel = await this.auditWriter.writeTopLevelMultiStepResponse(
+          context.auditInteractionDir,
+          stepNumber,
+        );
+        if (!topLevel.written) {
+          console.error('Error al escribir top-level multi-step non-SSE:', topLevel.error);
+        }
 
         if (responseHeaders) {
           await this.auditWriter.writeResponseHeadersAudit(

@@ -98,6 +98,28 @@ describe('MarkdownRendererService', () => {
       expect(md).toContain('# Prompt del Usuario');
       expect(md).toContain('_[No se detectó mensaje de usuario]_');
     });
+
+    it('debería retornar solo el último bloque text cuando el mensaje user tiene múltiples bloques text', () => {
+      const parsed = {
+        model: 'claude-haiku-4-5',
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: '<system-reminder>\nLista de skills inyectada\n</system-reminder>\n' },
+              { type: 'text', text: '<system-reminder>\nCLAUDE.md y entorno inyectados\n</system-reminder>\n' },
+              { type: 'text', text: 'Explicame este proyecto' },
+            ],
+          },
+        ],
+      };
+      const md = renderer.renderRequestConversationMarkdown(parsed);
+      expect(md).toContain('# Prompt del Usuario');
+      expect(md).toContain('Explicame este proyecto');
+      expect(md).not.toContain('<system-reminder>');
+      expect(md).not.toContain('Lista de skills inyectada');
+      expect(md).not.toContain('CLAUDE.md y entorno inyectados');
+    });
   });
 
   describe('renderResponseConversationMarkdown', () => {
@@ -214,6 +236,42 @@ describe('MarkdownRendererService', () => {
       const md = renderer.renderResponseConversationMarkdown('texto simple');
       expect(md).toContain('```json');
       expect(md).toContain('# Respuesta del Asistente');
+    });
+
+    it('debería renderizar el code fence de tool_use sin líneas en blanco internas', () => {
+      const parsed = {
+        id: 'msg_123',
+        type: 'message',
+        role: 'assistant',
+        stop_reason: 'tool_use',
+        content: [
+          { type: 'tool_use', id: 'toolu_abc', name: 'read_file', input: { path: '/src/app.ts' } },
+        ],
+      };
+      const md = renderer.renderResponseConversationMarkdown(parsed);
+      // El contenido del JSON debe estar directamente después del header del fence, sin línea en blanco
+      expect(md).toContain('  ```json\n  {\n    "path": "/src/app.ts"\n  }\n  ```');
+      // No debe haber líneas en blanco entre el header del fence y el contenido
+      expect(md).not.toMatch(/```json\n\n/);
+    });
+
+    it('debería separar múltiples tool_use con línea en blanco entre ellos pero sin blancos internos en cada fence', () => {
+      const parsed = {
+        id: 'msg_123',
+        type: 'message',
+        role: 'assistant',
+        stop_reason: 'tool_use',
+        content: [
+          { type: 'tool_use', id: 'toolu_111', name: 'read_file', input: { path: '/a.ts' } },
+          { type: 'tool_use', id: 'toolu_222', name: 'bash', input: { command: 'ls' } },
+        ],
+      };
+      const md = renderer.renderResponseConversationMarkdown(parsed);
+      // Cada tool_use debe renderizarse sin blancos internos
+      expect(md).toContain('  ```json\n  {\n    "path": "/a.ts"\n  }\n  ```');
+      expect(md).toContain('  ```json\n  {\n    "command": "ls"\n  }\n  ```');
+      // Los dos tool_use deben estar separados por \n\n (el join del array parts)
+      expect(md).toContain('  ```\n\n- **bash**');
     });
   });
 });

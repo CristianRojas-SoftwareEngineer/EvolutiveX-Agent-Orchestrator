@@ -125,12 +125,11 @@ export class MarkdownRendererService {
         if (m.role === 'user') {
           // Extraer contenido del mensaje
           if (Array.isArray(m.content)) {
-            const textParts: string[] = [];
             for (const block of m.content) {
               if (block && typeof block === 'object' && !Array.isArray(block)) {
                 const b = block as Record<string, JsonValue>;
                 if (b.type === 'text' && typeof b.text === 'string') {
-                  textParts.push(b.text);
+                  promptText = b.text;
                 } else if (b.type === 'tool_result') {
                   const toolId = b.tool_use_id ? String(b.tool_use_id) : '';
                   const toolName = toolNameMap.get(toolId) || 'tool';
@@ -145,7 +144,6 @@ export class MarkdownRendererService {
                 }
               }
             }
-            promptText = textParts.join('\n\n');
           } else if (typeof m.content === 'string') {
             promptText = m.content;
           }
@@ -214,15 +212,12 @@ export class MarkdownRendererService {
           parts.push(this.heading(2, 'Acciones solicitadas'));
           for (const tool of toolUses) {
             const idStr = tool.id ? `(id: \`${tool.id}\`)` : '';
-            parts.push(`- **${tool.name}** ${idStr}`);
-            // Mostrar input completo en JSON fence
             if (tool.input !== undefined) {
               const inputJson = JSON.stringify(tool.input, null, 2);
-              parts.push('  ```json');
-              // Indentar el JSON para que quede bajo el bullet
               const indentedInput = inputJson.split('\n').map((l) => `  ${l}`).join('\n');
-              parts.push(indentedInput);
-              parts.push('  ```');
+              parts.push(`- **${tool.name}** ${idStr}\n  \`\`\`json\n${indentedInput}\n  \`\`\``);
+            } else {
+              parts.push(`- **${tool.name}** ${idStr}`);
             }
           }
         }

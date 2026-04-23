@@ -25,11 +25,19 @@ export class ProxyController {
       rawBody = Buffer.alloc(0);
     }
 
-    request.rawBodyBytes = rawBody.length;
+    // Filtrar tools antes de auditoría y envío al upstream
+    const filteredBody = this.deps.filterToolsHandler.execute(rawBody);
+
+    // Actualizar request.body si el filtrado produjo cambios
+    if (filteredBody !== rawBody) {
+      (request as unknown as { body: unknown }).body = Readable.from(filteredBody);
+    }
+
+    request.rawBodyBytes = filteredBody.length;
 
     const result = await this.deps.auditInteractionHandler.execute({
       headers: request.headers,
-      rawBody,
+      rawBody: filteredBody,
       requestId: request.id,
     });
 

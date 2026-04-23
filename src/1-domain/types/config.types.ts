@@ -53,4 +53,7 @@ export interface ProxyEnvironmentConfig {
 
   /** Si es true, remueve el flag redact-thinking-2026-02-12 del header anthropic-beta para capturar thinking legible. */
   PROXY_UNREDACT_THINKING?: boolean;
+
+  /** Lista de tool names a excluir del request antes de enviar a la API. Ej: ['CronCreate','Agent'] */
+  FILTERED_TOOLS: string[];
 }

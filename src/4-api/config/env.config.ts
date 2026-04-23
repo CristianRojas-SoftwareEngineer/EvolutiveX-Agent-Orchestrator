@@ -53,4 +53,9 @@ export const config: ProxyEnvironmentConfig = {
 
   // Unredact thinking content (opt-in, desactivado por defecto)
   PROXY_UNREDACT_THINKING: process.env.PROXY_UNREDACT_THINKING === 'true',
+
+  // Filtrado de tools: lista de tool names a excluir del request
+  FILTERED_TOOLS: process.env.FILTERED_TOOLS
+    ? process.env.FILTERED_TOOLS.split(',').map(t => t.trim()).filter(Boolean)
+    : ['ScheduleWakeup', 'NotebookEdit', 'ExitWorktree', 'EnterWorktree', 'CronList', 'CronDelete', 'CronCreate'],
 };

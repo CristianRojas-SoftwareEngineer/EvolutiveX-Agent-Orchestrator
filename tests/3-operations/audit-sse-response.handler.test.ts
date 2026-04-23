@@ -26,6 +26,7 @@ function makeConfig(overrides: Partial<ProxyEnvironmentConfig> = {}): ProxyEnvir
     CONSOLE_REDACT: true,
     LOG_SSE: false,
     MAX_BODY_LOG_BYTES: 2048,
+    FILTERED_TOOLS: [],
     ...overrides,
   };
 }

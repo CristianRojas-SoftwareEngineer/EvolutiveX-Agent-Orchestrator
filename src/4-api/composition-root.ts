@@ -10,6 +10,7 @@ import { AuditInteractionHandler } from '../3-operations/audit-interaction.handl
 import { AuditSseResponseHandler } from '../3-operations/audit-sse-response.handler.js';
 import { AuditStandardResponseHandler } from '../3-operations/audit-standard-response.handler.js';
 import { AuditUpstreamErrorHandler } from '../3-operations/audit-upstream-error.handler.js';
+import { FilterToolsHandler } from '../3-operations/filter-tools.handler.js';
 import { ProxyEnvironmentConfig } from '../1-domain/types/config.types.js';
 
 /**
@@ -59,12 +60,14 @@ export async function createProxyDependencies(
     config,
     sessionStore,
   );
+  const filterToolsHandler = new FilterToolsHandler(config);
 
   return {
     auditInteractionHandler,
     auditSseResponseHandler,
     auditStandardResponseHandler,
     auditUpstreamErrorHandler,
+    filterToolsHandler,
     streamTee,
     config,
   };

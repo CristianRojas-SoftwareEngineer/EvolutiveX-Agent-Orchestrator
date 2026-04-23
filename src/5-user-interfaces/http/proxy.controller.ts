@@ -28,9 +28,10 @@ export class ProxyController {
     // Filtrar tools antes de auditoría y envío al upstream
     const filteredBody = this.deps.filterToolsHandler.execute(rawBody);
 
-    // Actualizar request.body si el filtrado produjo cambios
+    // Actualizar request.body y content-length si el filtrado produjo cambios
     if (filteredBody !== rawBody) {
       (request as unknown as { body: unknown }).body = Readable.from(filteredBody);
+      (request.headers as Record<string, string | string[] | undefined>)['content-length'] = String(filteredBody.length);
     }
 
     request.rawBodyBytes = filteredBody.length;

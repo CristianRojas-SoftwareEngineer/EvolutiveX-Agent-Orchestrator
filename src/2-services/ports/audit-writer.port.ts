@@ -81,7 +81,7 @@ export interface IAuditWriter {
    */
   removeInteractionState(interactionDir: string): Promise<void>;
   /**
-   * Escribe body.json, body.formatted.json y body.parsed.md
+   * Escribe body.json y body.parsed.md
    * con el mensaje reconstruido de un step SSE.
    */
   writeStepResponseMarkdown(

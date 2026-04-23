@@ -38,7 +38,7 @@ export class AuditWriterService implements IAuditWriter {
     parsed: JsonValue,
     type: 'request' | 'response',
   ): Promise<void> {
-    await this.writeJsonAtomic(path.join(dir, `${baseName}.formatted.json`), parsed);
+    await this.writeJsonAtomic(path.join(dir, `${baseName}.json`), parsed);
     try {
       const md =
         type === 'request'
@@ -325,8 +325,7 @@ export class AuditWriterService implements IAuditWriter {
 
   /**
    * Escribe los archivos de respuesta reconstruida de un step SSE:
-   * - body.json (mensaje completo)
-   * - body.formatted.json (pretty print)
+   * - body.json (mensaje completo, pretty print)
    * - body.parsed.md (vista markdown semántica)
    */
   public async writeStepResponseMarkdown(
@@ -339,12 +338,6 @@ export class AuditWriterService implements IAuditWriter {
     // body.json — mensaje reconstruido completo
     await this.writeJsonAtomic(
       path.join(responseDir, 'body.json'),
-      message,
-    );
-
-    // body.formatted.json — mismo contenido, pretty print
-    await this.writeJsonAtomic(
-      path.join(responseDir, 'body.formatted.json'),
       message,
     );
 

@@ -105,20 +105,19 @@ interactions/NNNNNN_<uuid>/
   request/                      # Solo agentic-turn y side-request: petición inicial top-level
     headers.json
     body.bin
-    body.formatted.json
+    body.json
     body.parsed.md
   response/                     # Solo agentic-turn/side-request SSE completados: respuesta final reconstruida
     body.json
-    body.formatted.json
     body.parsed.md
     headers.json
   steps/
     001/                        # Cada step es una llamada HTTP individual; siempre contiene request/ para todos los tipos
       request/                  # Petición del step (auto-contenida; desde step 001 en adelante)
-        headers.json, body.bin, body.formatted.json, body.parsed.md
+        headers.json, body.bin, body.json, body.parsed.md
       response/                 # SSE: sse.jsonl (fuente de verdad) + archivos reconstruidos; No-SSE: body.json
         sse.jsonl, sse.txt, headers.json                    (SSE crudo)
-        body.json, body.formatted.json, body.parsed.md      (SSE reconstruido ✅)
+        body.json, body.parsed.md                           (SSE reconstruido ✅)
     002/ ...
 ```
 

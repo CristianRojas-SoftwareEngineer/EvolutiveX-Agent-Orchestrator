@@ -110,8 +110,7 @@ steps/NNN/response/
   ├── sse.jsonl           # Eventos SSE crudos (existente)
   ├── sse.txt             # Raw dump de depuración (existente)
   ├── headers.json        # Headers de respuesta (existente)
-  ├── body.json           # ✅ Mensaje reconstruido (NUEVO)
-  ├── body.formatted.json # ✅ Pretty print JSON (NUEVO)
+  ├── body.json           # ✅ Mensaje reconstruido, pretty print (NUEVO)
   └── body.parsed.md      # ✅ Vista markdown semántica (NUEVO)
 ```
 
@@ -122,8 +121,7 @@ steps/NNN/response/
 2. **El servicio `SseReconstructService`** lee `steps/NNN/response/sse.jsonl` y reconstruye el mensaje usando el SDK de Anthropic (mismo mecanismo que el turno completo).
 
 3. **El mensaje reconstruido** se pasa a `IAuditWriter.writeStepResponseMarkdown(stepDir, message)`, que genera:
-   - `body.json` — mensaje completo en JSON
-   - `body.formatted.json` — mismo contenido con pretty print
+   - `body.json` — mensaje completo en JSON (pretty print)
    - `body.parsed.md` — vista markdown semántica legible
 
 ### Best-effort

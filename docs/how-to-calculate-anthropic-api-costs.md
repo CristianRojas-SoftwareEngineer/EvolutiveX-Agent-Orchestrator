@@ -64,7 +64,7 @@ Basado en la sesión de ejemplo sintética `claude-code-workflow-example` (no es
 | Patrón en `meta.json`                  | Rol típico                                                                                                                                                                                            |
 | -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `url` con `/v1/messages`, `sse: true`  | Turnos del agente con **streaming (SSE)**. El `usage` forma parte del mensaje final del stream (p. ej. evento que completa el mensaje). En auditoría: `response.sse.jsonl` siempre aloja los eventos. |
-| `url` con `/v1/messages`, `sse: false` | Respuesta JSON única; `usage` en el cuerpo (`response.body.json` / `response.body.formatted.json`). Ejemplo: llamadas pequeñas de comprobación.                                                       |
+| `url` con `/v1/messages`, `sse: false` | Respuesta JSON única; `usage` en el cuerpo (`response/body.json`). Ejemplo: llamadas pequeñas de comprobación.                                                                                        |
 | `url` con `/v1/messages/count_tokens`  | **Conteo de tokens** previo a enviar un mensaje grande; la respuesta suele ser solo un número de `input_tokens` — no facturable como generación en la política actual.                                |
 
 Cada respuesta **completada** de `POST /v1/messages` incluye **un** objeto `usage` asociado a ese id de mensaje asistente: **una** estimación de coste con la ecuación de más abajo por petición. Un turno de conversación con herramientas puede implicar **varias** peticiones seguidas (cada una con su propio `usage`); suma los costes por petición. Los **reintentos** HTTP duplican peticiones en auditoría: si ambas completan, tendrás dos costes (salvo que dedupliques por lógica de negocio).
@@ -255,7 +255,7 @@ Si no aplica, usar factor **1**. En muchos snapshots `inference_geo` es `not_ava
 
 ## 9. Ejemplo con datos de auditoría
 
-**Petición de referencia:** `sessions/claude-code-workflow-example/interactions/000006_5e0986b8-ff70-4afc-9534-701bb9c68597/response/body.formatted.json` (modelo `claude-haiku-4-5-20251001`).
+**Petición de referencia:** `sessions/claude-code-workflow-example/interactions/000006_5e0986b8-ff70-4afc-9534-701bb9c68597/response/body.json` (modelo `claude-haiku-4-5-20251001`).
 
 **`usage` (solo contadores agregados):**
 
@@ -296,13 +296,13 @@ En la nueva estructura, el `usage` de cada step SSE vive en `steps/{N}/response/
 | Nivel | Archivo | Cuándo |
 | ----- | ------- | ------ |
 | **Step SSE** | `steps/NNN/response/sse.jsonl` | Siempre en turnos SSE; contiene evento `message_delta` con `usage` |
-| **Top-level** | `response/body.json` / `response/body.formatted.json` | Siempre en agentic-turn/side-request SSE completados (reconstrucción exitosa) |
+| **Top-level** | `response/body.json` | Siempre en agentic-turn/side-request SSE completados (reconstrucción exitosa) |
 | **meta.json** | campo `totals` | Solo `agentic-turn` SSE; agrega tokens de todos los steps |
 | **meta.json** | campo `steps[].inputTokens` etc. | Tokens por step individual |
 
 Si **no** hay JSON reconstruido pero sí `steps/NNN/response/sse.jsonl`, el objeto `usage` aparece en el flujo SSE (p. ej. en el evento `message_delta` al finalizar el stream): parsea las líneas JSON del archivo hasta localizar el bloque `usage` asociado al mensaje completado.
 
-El campo `model` para la §6.4 suele coincidir en petición y respuesta; si solo tienes cuerpo de petición (`request/body.formatted.json`) por un fallo de auditoría, puedes leer `model` de ahí como respaldo.
+El campo `model` para la §6.4 suele coincidir en petición y respuesta; si solo tienes cuerpo de petición (`request/body.json`) por un fallo de auditoría, puedes leer `model` de ahí como respaldo.
 
 Convención detallada de nombres y reglas de presencia: [README del repositorio](../README.md) y referencia de auditoría del proyecto.
 

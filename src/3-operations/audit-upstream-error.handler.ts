@@ -31,7 +31,7 @@ export class AuditUpstreamErrorHandler {
     error: Error & { code?: string };
   }): Promise<void> {
     const turn = await this.sessionStore.getTurnByDir(params.auditInteractionDir);
-    await this.sessionStore.closeTurn(params.auditInteractionDir, params.auditSessionId);
+    this.sessionStore.closeTurn(params.auditInteractionDir);
 
     const endedAt = Date.now();
     const interactionType = turn?.interactionType ?? 'agentic-turn';

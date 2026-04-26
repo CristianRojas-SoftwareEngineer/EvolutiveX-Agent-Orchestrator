@@ -64,17 +64,17 @@ function makeContext(overrides: Partial<AuditInteractionContext> = {}): AuditInt
 }
 
 function makeSessionStore(turn: ActiveTurn | null = makeActiveTurn(), overrides: Partial<ISessionStore> = {}): ISessionStore {
-  let activeTurn = turn;
   const registry = new Map<string, ActiveTurn>();
+  const toolUseIndex = new Map<string, string>();
   if (turn) registry.set(turn.interactionDir, turn);
   const pushedMetas: StepMeta[] = [];
   return {
     getBaseDir: () => '/tmp/sessions',
     ensureAuditSessionsRoot: async () => {},
     nextAuditInteractionSequence: async () => 1,
-    getActiveTurn: async () => activeTurn,
-    setActiveTurn: async (_id: string, t: ActiveTurn) => { activeTurn = t; registry.set(t.interactionDir, t); },
-    registerTurn: (dir: string, t: ActiveTurn) => { registry.set(dir, t); },
+    registerTurn: (t: ActiveTurn) => { registry.set(t.interactionDir, t); },
+    registerToolUseId: (id: string, dir: string) => { toolUseIndex.set(id, dir); },
+    getTurnByToolUseId: (id: string) => { const dir = toolUseIndex.get(id); return dir ? (registry.get(dir) ?? null) : null; },
     getTurnByDir: async (dir: string) => registry.get(dir) || null,
     getTurnByDirSync: (dir: string) => registry.get(dir) || null,
     incrementStepCountByDir: (dir: string) => { const t = registry.get(dir); if (t) t.stepCount += 1; return t?.stepCount ?? 1; },
@@ -83,7 +83,7 @@ function makeSessionStore(turn: ActiveTurn | null = makeActiveTurn(), overrides:
       const t = registry.get(dir);
       if (t) t.stepsMeta.push(meta);
     },
-    closeTurn: async (dir: string, _sessionId: string) => { registry.delete(dir); activeTurn = null; },
+    closeTurn: (dir: string) => { registry.delete(dir); },
     ...overrides,
   };
 }
@@ -200,7 +200,7 @@ describe('AuditSseResponseHandler', () => {
 
     const preflightTurn = makeActiveTurn({ interactionType: 'client-preflight' });
     const store = makeSessionStore(preflightTurn, {
-      closeTurn: async (_dir, _sessionId) => { turnCleared = true; },
+      closeTurn: (_dir) => { turnCleared = true; },
     });
 
     const handler = new AuditSseResponseHandler(
@@ -301,7 +301,7 @@ describe('AuditSseResponseHandler', () => {
     // Turno subyacente es agentic-turn, no preflight
     const agenticTurn = makeActiveTurn({ interactionType: 'agentic-turn' });
     const store = makeSessionStore(agenticTurn, {
-      closeTurn: async () => { turnClosed = true; },
+      closeTurn: () => { turnClosed = true; },
     });
 
     const handler = new AuditSseResponseHandler(

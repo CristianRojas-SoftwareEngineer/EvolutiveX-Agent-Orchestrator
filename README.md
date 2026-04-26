@@ -81,8 +81,10 @@ Ideal para depurar comportamientos erráticos en herramientas de CLI (como `clau
 - Agrupa las peticiones de un turno completo (prompt → respuesta final) bajo una interacción con subdirectorios `steps/`.
 - Dos tipos de interacción: `agentic-turn` (turno del usuario con prompt y respuesta) y `client-preflight` (quota check + cache warm-up).
 - Clasificación de `side-request`: peticiones con `"tools": []` (ej. count_tokens) se auditan en su propia interacción sin desplazar al turno activo principal, evitando corrupción de metadata por race conditions.
-- Los turnos activos se indexan por `interactionDir` (único por request) en vez de por `sessionId`, eliminando ghost turns por colisión cuando varias peticiones concurrentes comparten la misma sesión.
+- Los turnos se indexan por `interactionDir` (único por request) permitiendo múltiples turnos concurrentes en la misma sesión (parallel subagents).
+- Las continuaciones (`tool_result`) se rutean al turno padre mediante correlación por `tool_use_id`, eliminando la misatribución de steps.
 - Los preflights (`client-preflight`) se cierran inmediatamente al recibir su respuesta, evitando turnos zombie que bloquean la sesión.
+- Cada step en `meta.json` puede incluir `toolUseIds: string[]` — los IDs de tool_use emitidos en ese step, usados para correlacionar con futuras continuaciones.
 - `meta.json` resume el turno completo: steps individuales, tokens agregados en `totals`, duración y `turnOutcome`.
 
 <a name="riesgos-seguridad"></a>
@@ -143,7 +145,7 @@ El campo `turnOutcome` en `meta.json` indica el resultado final del turno:
 | `client-error`  | Error del cliente (request mal formada, autenticación fallida, etc.)       | 4xx                 |
 | `upstream-error`| Error del servidor upstream (fallo de conexión, timeout, error interno)  | 5xx o `null`        |
 | `truncated`     | Respuesta truncada por `max_tokens`                                        | 2xx                 |
-| `interrupted`   | Turno interrumpido por un nuevo turno agentic                              | Variable            |
+| `interrupted`   | (Legacy) Turno interrumpido — ya no se genera en el modelo multi-turno      | Variable            |
 
 ### Correlación con Logs de Claude Code
 

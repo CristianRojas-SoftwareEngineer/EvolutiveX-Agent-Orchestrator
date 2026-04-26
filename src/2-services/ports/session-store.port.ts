@@ -8,12 +8,12 @@ export interface ISessionStore {
   getBaseDir(): string;
   ensureAuditSessionsRoot(): Promise<void>;
   nextAuditInteractionSequence(sessionId: string): Promise<number>;
-  getActiveTurn(sessionId: string): Promise<ActiveTurn | null>;
-  setActiveTurn(sessionId: string, turn: ActiveTurn): Promise<void>;
-  registerTurn(dir: string, turn: ActiveTurn): void;
+  registerTurn(turn: ActiveTurn): void;
+  registerToolUseId(toolUseId: string, interactionDir: string): void;
+  getTurnByToolUseId(toolUseId: string): ActiveTurn | null;
   getTurnByDir(dir: string): Promise<ActiveTurn | null>;
   getTurnByDirSync(dir: string): ActiveTurn | null;
   incrementStepCountByDir(dir: string): number;
   pushStepMetaByDir(dir: string, meta: StepMeta): Promise<void>;
-  closeTurn(dir: string, sessionId: string): Promise<void>;
+  closeTurn(dir: string): void;
 }

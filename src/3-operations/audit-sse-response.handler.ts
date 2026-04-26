@@ -59,6 +59,7 @@ export class AuditSseResponseHandler {
     let stopReason: string | null = null;
     let anthropicMessageId: string | undefined;
     const toolCalls: string[] = [];
+    const toolUseIds: string[] = [];
     const stepUsage = {
       input_tokens: 0,
       output_tokens: 0,
@@ -143,6 +144,10 @@ export class AuditSseResponseHandler {
                 evt.content_block?.type === 'tool_use'
               ) {
                 toolCalls.push(evt.content_block.name);
+                if (typeof evt.content_block.id === 'string') {
+                  toolUseIds.push(evt.content_block.id);
+                  this.sessionStore.registerToolUseId(evt.content_block.id, context.auditInteractionDir);
+                }
               }
             } catch {
               /* línea no JSON, ignorar */
@@ -173,6 +178,7 @@ export class AuditSseResponseHandler {
           sseLineCount: sseLineIndex,
           stopReason: stopReason ?? undefined,
           ...(toolCalls.length > 0 ? { toolCalls } : {}),
+          ...(toolUseIds.length > 0 ? { toolUseIds } : {}),
           ...(stepUsage.input_tokens ? { inputTokens: stepUsage.input_tokens } : {}),
           ...(stepUsage.output_tokens ? { outputTokens: stepUsage.output_tokens } : {}),
           ...(stepUsage.cache_creation_input_tokens
@@ -249,7 +255,7 @@ export class AuditSseResponseHandler {
         }
 
         const turn = await this.sessionStore.getTurnByDir(context.auditInteractionDir);
-        await this.sessionStore.closeTurn(context.auditInteractionDir, context.auditSessionId);
+        this.sessionStore.closeTurn(context.auditInteractionDir);
 
         if (turn) {
           await this.writeTurnMeta(
@@ -284,7 +290,7 @@ export class AuditSseResponseHandler {
       // Preflights no-warmup: cerrar inmediatamente (quota-check no llega por SSE
       // normalmente pero mantenemos simetría con standard handler).
       const turn = await this.sessionStore.getTurnByDir(context.auditInteractionDir);
-      await this.sessionStore.closeTurn(context.auditInteractionDir, context.auditSessionId);
+      this.sessionStore.closeTurn(context.auditInteractionDir);
       if (turn) {
         await this.writeTurnMeta(turn, context, 'completed', false, streamError);
       }
@@ -296,7 +302,7 @@ export class AuditSseResponseHandler {
     // no se cierra aquí: se cerrará por el flujo terminal.
     const turn = await this.sessionStore.getTurnByDir(context.auditInteractionDir);
     if (turn?.interactionType === 'client-preflight') {
-      await this.sessionStore.closeTurn(context.auditInteractionDir, context.auditSessionId);
+      this.sessionStore.closeTurn(context.auditInteractionDir);
       await this.writeTurnMeta(turn, context, 'completed', false, streamError);
     }
     // Si el turno es agentic-turn o side-request, sólo registramos el step

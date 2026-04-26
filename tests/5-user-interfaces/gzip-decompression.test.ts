@@ -70,12 +70,21 @@ describe('Test de Integración - Decompresión Gzip', () => {
   it('debería descomprimir el payload del upstream y quitar headers de compresión hacia el cliente', async () => {
     // Inject ejecuta el handler en memoria saltándose sockets,
     // ideal para tests rápidos con Fastify.
+    // Usamos un body con tools para que se clasifique como agentic-turn (no preflight)
+    const requestBody = JSON.stringify({
+      model: 'claude-3-5-sonnet',
+      messages: [{ role: 'user', content: 'test' }],
+      tools: [{ name: 'Read', description: 'lee', input_schema: { type: 'object', properties: {} } }],
+      max_tokens: 4096,
+    });
     const res = await proxyApp.inject({
-      method: 'GET',
-      url: '/test-gzip',
+      method: 'POST',
+      url: '/v1/messages',
       headers: {
         'x-cc-audit-session': 'test-gzip',
+        'content-type': 'application/json',
       },
+      payload: requestBody,
     });
 
     // Assert 1: Fastify remueve el `content-encoding` transparente al cliente.
@@ -88,14 +97,26 @@ describe('Test de Integración - Decompresión Gzip', () => {
 
     // Assert 3: Las grabaciones de auditoría (disco) están también descomprimidas.
     // Damos un pequeño margen para que el stream en background termine de volcar al disco
-    await new Promise((r) => setTimeout(r, 200));
+    await new Promise((r) => setTimeout(r, 500));
 
     const dirs = await fs.readdir(path.join(tempSessionsDir, 'test-gzip', 'interactions'));
     const requestDirName = dirs[0];
     const sessionPath = path.join(tempSessionsDir, 'test-gzip', 'interactions', requestDirName);
 
     const responseBodyPath = path.join(sessionPath, 'response', 'body.json');
-    const content = await fs.readFile(responseBodyPath, 'utf8');
+    // Retry con backoff para robustez en CI/sistemas lentos
+    let content: string | null = null;
+    for (let i = 0; i < 5; i++) {
+      try {
+        content = await fs.readFile(responseBodyPath, 'utf8');
+        break;
+      } catch {
+        await new Promise((r) => setTimeout(r, 200));
+      }
+    }
+    if (content === null) {
+      throw new Error(`No se pudo leer ${responseBodyPath} después de reintentos`);
+    }
 
     // Assert 4: El file volcado es texto json válido formateado en formato multi-step
     const parsed = JSON.parse(content);

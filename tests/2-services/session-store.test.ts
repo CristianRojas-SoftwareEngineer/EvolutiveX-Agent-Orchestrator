@@ -28,52 +28,49 @@ describe('SessionStoreService — turnRegistry', () => {
     store = new SessionStoreService(tmpDir);
   });
 
-  it('setActiveTurn registra en ambos índices (sessionId y dir)', async () => {
+  it('registerTurn registra el turno en el registry por interactionDir', async () => {
     const turn = makeTurn();
-    await store.setActiveTurn('s1', turn);
+    store.registerTurn(turn);
 
-    expect(await store.getActiveTurn('s1')).toBe(turn);
     expect(await store.getTurnByDir(turn.interactionDir)).toBe(turn);
   });
 
-  it('registerTurn registra solo en turnRegistry sin afectar activeTurns', async () => {
-    const turn = makeTurn({ interactionDir: '/tmp/side-req' });
-    store.registerTurn('/tmp/side-req', turn);
+  it('dos llamadas registerTurn coexisten sin interferirse', async () => {
+    const turnA = makeTurn({ interactionDir: '/tmp/a' });
+    const turnB = makeTurn({ interactionDir: '/tmp/b' });
+    store.registerTurn(turnA);
+    store.registerTurn(turnB);
 
-    expect(await store.getActiveTurn('s1')).toBeNull();
-    expect(await store.getTurnByDir('/tmp/side-req')).toBe(turn);
+    expect(store.getTurnByDirSync('/tmp/a')).toBe(turnA);
+    expect(store.getTurnByDirSync('/tmp/b')).toBe(turnB);
   });
 
-  it('closeTurn elimina del registry y del activeTurns si coincide', async () => {
+  it('closeTurn elimina del turnRegistry', async () => {
     const turn = makeTurn();
-    await store.setActiveTurn('s1', turn);
+    store.registerTurn(turn);
 
-    await store.closeTurn(turn.interactionDir, 's1');
+    store.closeTurn(turn.interactionDir);
 
-    expect(await store.getActiveTurn('s1')).toBeNull();
     expect(await store.getTurnByDir(turn.interactionDir)).toBeNull();
   });
 
-  it('closeTurn no elimina activeTurn si el dir no coincide', async () => {
+  it('closeTurn no afecta a otros turnos registrados', async () => {
     const turnA = makeTurn({ interactionDir: '/tmp/dir-a' });
     const turnB = makeTurn({ interactionDir: '/tmp/dir-b' });
+    store.registerTurn(turnA);
+    store.registerTurn(turnB);
 
-    await store.setActiveTurn('s1', turnA);
-    store.registerTurn('/tmp/dir-b', turnB);
+    store.closeTurn('/tmp/dir-b');
 
-    // Cerrar solo turnB; turnA sigue como activeTurn de s1
-    await store.closeTurn('/tmp/dir-b', 's1');
-
-    expect(await store.getActiveTurn('s1')).toBe(turnA);
-    expect(await store.getTurnByDir('/tmp/dir-b')).toBeNull();
-    expect(await store.getTurnByDir('/tmp/dir-a')).toBe(turnA);
+    expect(store.getTurnByDirSync('/tmp/dir-a')).toBe(turnA);
+    expect(store.getTurnByDirSync('/tmp/dir-b')).toBeNull();
   });
 
   it('pushStepMetaByDir acumula en el turno correcto', async () => {
     const turnA = makeTurn({ interactionDir: '/tmp/a' });
     const turnB = makeTurn({ interactionDir: '/tmp/b' });
-    store.registerTurn('/tmp/a', turnA);
-    store.registerTurn('/tmp/b', turnB);
+    store.registerTurn(turnA);
+    store.registerTurn(turnB);
 
     await store.pushStepMetaByDir('/tmp/a', { stepIndex: 1, sse: true, statusCode: 200 });
     await store.pushStepMetaByDir('/tmp/b', { stepIndex: 1, sse: false, statusCode: 200 });
@@ -86,7 +83,7 @@ describe('SessionStoreService — turnRegistry', () => {
 
   it('incrementStepCountByDir incrementa y retorna stepCount del turno por dir', async () => {
     const turn = makeTurn({ interactionDir: '/tmp/inc', stepCount: 1 });
-    store.registerTurn('/tmp/inc', turn);
+    store.registerTurn(turn);
 
     expect(store.incrementStepCountByDir('/tmp/inc')).toBe(2);
     expect(store.incrementStepCountByDir('/tmp/inc')).toBe(3);
@@ -97,21 +94,70 @@ describe('SessionStoreService — turnRegistry', () => {
     expect(store.incrementStepCountByDir('/tmp/nonexistent')).toBe(1);
   });
 
-  it('concurrent side-request no desplaza al turno activo principal', async () => {
-    const mainTurn = makeTurn({ interactionDir: '/tmp/main' });
-    const sideTurn = makeTurn({ interactionDir: '/tmp/side' });
+  it('registerToolUseId + getTurnByToolUseId correlaciona correctamente', () => {
+    const turn = makeTurn({ interactionDir: '/tmp/t1' });
+    store.registerTurn(turn);
+    store.registerToolUseId('tool-abc', '/tmp/t1');
 
-    await store.setActiveTurn('s1', mainTurn);
-    store.registerTurn('/tmp/side', sideTurn);
+    expect(store.getTurnByToolUseId('tool-abc')).toBe(turn);
+  });
+
+  it('getTurnByToolUseId retorna null para ID no registrado', () => {
+    expect(store.getTurnByToolUseId('nonexistent')).toBeNull();
+  });
+
+  it('múltiples tool_use_id apuntando al mismo turno', () => {
+    const turn = makeTurn({ interactionDir: '/tmp/t1' });
+    store.registerTurn(turn);
+    store.registerToolUseId('id-1', '/tmp/t1');
+    store.registerToolUseId('id-2', '/tmp/t1');
+    store.registerToolUseId('id-3', '/tmp/t1');
+
+    expect(store.getTurnByToolUseId('id-1')).toBe(turn);
+    expect(store.getTurnByToolUseId('id-2')).toBe(turn);
+    expect(store.getTurnByToolUseId('id-3')).toBe(turn);
+  });
+
+  it('closeTurn limpia los tool_use_id del turno cerrado', () => {
+    const turn = makeTurn({ interactionDir: '/tmp/t1' });
+    store.registerTurn(turn);
+    store.registerToolUseId('id-1', '/tmp/t1');
+    store.registerToolUseId('id-2', '/tmp/t1');
+
+    store.closeTurn('/tmp/t1');
+
+    expect(store.getTurnByToolUseId('id-1')).toBeNull();
+    expect(store.getTurnByToolUseId('id-2')).toBeNull();
+  });
+
+  it('closeTurn no limpia tool_use_id de otros turnos', () => {
+    const turnA = makeTurn({ interactionDir: '/tmp/a' });
+    const turnB = makeTurn({ interactionDir: '/tmp/b' });
+    store.registerTurn(turnA);
+    store.registerTurn(turnB);
+    store.registerToolUseId('id-a', '/tmp/a');
+    store.registerToolUseId('id-b', '/tmp/b');
+
+    store.closeTurn('/tmp/a');
+
+    expect(store.getTurnByToolUseId('id-a')).toBeNull();
+    expect(store.getTurnByToolUseId('id-b')).toBe(turnB);
+  });
+
+  it('concurrent side-request no interfiere con turno agentic registrado', () => {
+    const mainTurn = makeTurn({ interactionDir: '/tmp/main' });
+    const sideTurn = makeTurn({ interactionDir: '/tmp/side', interactionType: 'side-request' });
+
+    store.registerTurn(mainTurn);
+    store.registerTurn(sideTurn);
 
     // Ambos accesibles por dir
     expect(store.getTurnByDirSync('/tmp/main')).toBe(mainTurn);
     expect(store.getTurnByDirSync('/tmp/side')).toBe(sideTurn);
 
     // Cerrar side-request no afecta al turno principal
-    await store.closeTurn('/tmp/side', 's1');
-    expect(await store.getActiveTurn('s1')).toBe(mainTurn);
-    expect(await store.getTurnByDir('/tmp/main')).toBe(mainTurn);
-    expect(await store.getTurnByDir('/tmp/side')).toBeNull();
+    store.closeTurn('/tmp/side');
+    expect(store.getTurnByDir('/tmp/main')).resolves.toBe(mainTurn);
+    expect(store.getTurnByDir('/tmp/side')).resolves.toBeNull();
   });
 });

@@ -30,15 +30,18 @@ function makeConfig(overrides: Partial<ProxyEnvironmentConfig> = {}): ProxyEnvir
 }
 
 function makeSessionStore(overrides: Partial<ISessionStore> = {}): ISessionStore {
-  let activeTurn: ActiveTurn | null = null;
   const registry = new Map<string, ActiveTurn>();
+  const toolUseIndex = new Map<string, string>();
   return {
     getBaseDir: () => '/tmp/sessions',
     ensureAuditSessionsRoot: async () => {},
     nextAuditInteractionSequence: async () => 1,
-    getActiveTurn: async () => activeTurn,
-    setActiveTurn: async (_id: string, turn: ActiveTurn) => { activeTurn = turn; registry.set(turn.interactionDir, turn); },
-    registerTurn: (dir: string, turn: ActiveTurn) => { registry.set(dir, turn); },
+    registerTurn: (turn: ActiveTurn) => { registry.set(turn.interactionDir, turn); },
+    registerToolUseId: (id: string, dir: string) => { toolUseIndex.set(id, dir); },
+    getTurnByToolUseId: (id: string) => {
+      const dir = toolUseIndex.get(id);
+      return dir ? (registry.get(dir) ?? null) : null;
+    },
     getTurnByDir: async (dir: string) => registry.get(dir) || null,
     getTurnByDirSync: (dir: string) => registry.get(dir) || null,
     incrementStepCountByDir: (dir: string) => {
@@ -47,7 +50,7 @@ function makeSessionStore(overrides: Partial<ISessionStore> = {}): ISessionStore
       return t?.stepCount ?? 1;
     },
     pushStepMetaByDir: async (dir: string, meta: StepMeta) => { registry.get(dir)?.stepsMeta.push(meta); },
-    closeTurn: async (dir: string, _sessionId: string) => { registry.delete(dir); activeTurn = null; },
+    closeTurn: (dir: string) => { registry.delete(dir); },
     ...overrides,
   };
 }
@@ -94,7 +97,7 @@ const FRESH_BODY = Buffer.from(JSON.stringify({
 
 // Body con tool_result = continuation
 const CONTINUATION_BODY = Buffer.from(JSON.stringify({
-  messages: [{ role: 'user', content: [{ type: 'tool_result', tool_use_id: 'x', content: 'ok' }] }],
+  messages: [{ role: 'user', content: [{ type: 'tool_result', tool_use_id: 'tool-x', content: 'ok' }] }],
   max_tokens: 4096,
 }));
 
@@ -109,12 +112,20 @@ const SIDE_REQUEST_BODY = Buffer.from(JSON.stringify({
   max_tokens: 256,
 }));
 
+// Body con tool_result referenciando ID conocido
+function makeContinuationBody(toolUseId: string): Buffer {
+  return Buffer.from(JSON.stringify({
+    messages: [{ role: 'user', content: [{ type: 'tool_result', tool_use_id: toolUseId, content: 'result' }] }],
+    max_tokens: 4096,
+  }));
+}
+
 describe('AuditInteractionHandler', () => {
-  it('debería clasificar fresh: crear interacción y setActiveTurn', async () => {
+  it('debería clasificar fresh: crear interacción y registrar turno', async () => {
     const config = makeConfig();
-    let turnSet: ActiveTurn | null = null;
+    let registeredTurn: ActiveTurn | null = null;
     const store = makeSessionStore({
-      setActiveTurn: async (_id, turn) => { turnSet = turn; },
+      registerTurn: (turn: ActiveTurn) => { registeredTurn = turn; },
     });
     const handler = new AuditInteractionHandler(
       new SessionResolverService(config),
@@ -130,15 +141,49 @@ describe('AuditInteractionHandler', () => {
     expect(result).not.toBeNull();
     expect(result!.interactionType).toBe('agentic-turn');
     expect(result!.turnClassification).toEqual({ type: 'fresh' });
-    expect(turnSet).not.toBeNull();
-    expect(turnSet!.interactionType).toBe('agentic-turn');
-    expect(turnSet!.stepCount).toBe(1);
+    expect(registeredTurn).not.toBeNull();
+    expect(registeredTurn!.interactionType).toBe('agentic-turn');
+    expect(registeredTurn!.stepCount).toBe(1);
   });
 
-  it('debería clasificar continuation: incrementar step y escribir step request', async () => {
+  it('dos fresh concurrentes crean dos turnos independientes sin interrupción', async () => {
+    const config = makeConfig();
+    const registeredTurns: ActiveTurn[] = [];
+    let seq = 0;
+    const store = makeSessionStore({
+      nextAuditInteractionSequence: async () => { seq += 1; return seq; },
+      registerTurn: (turn: ActiveTurn) => { registeredTurns.push(turn); },
+    });
+    const dirs: string[] = [];
+    const handler = new AuditInteractionHandler(
+      new SessionResolverService(config),
+      store,
+      makeAuditWriter({
+        writeInteractionRequest: async () => {
+          const dir = `/tmp/sessions/s/interactions/00000${seq}_req`;
+          dirs.push(dir);
+          return { dir, requestBodyOmitted: false };
+        },
+      }),
+      config,
+    );
+
+    const [r1, r2] = await Promise.all([
+      handler.execute({ headers: {}, rawBody: FRESH_BODY, requestId: 'req-1' }),
+      handler.execute({ headers: {}, rawBody: FRESH_BODY, requestId: 'req-2' }),
+    ]);
+
+    expect(r1).not.toBeNull();
+    expect(r2).not.toBeNull();
+    expect(registeredTurns).toHaveLength(2);
+    // Ninguno es marcado como interrupted
+    expect(registeredTurns.every((t) => t.interactionType === 'agentic-turn')).toBe(true);
+  });
+
+  it('debería clasificar continuation: routear al turno padre por tool_use_id', async () => {
     const config = makeConfig();
     let stepRequestWritten = false;
-    const existingTurn: ActiveTurn = {
+    const parentTurn: ActiveTurn = {
       interactionDir: '/tmp/sessions/s/interactions/000001_req',
       interactionType: 'agentic-turn',
       stepCount: 1,
@@ -149,8 +194,8 @@ describe('AuditInteractionHandler', () => {
       stepsMeta: [],
     };
     const store = makeSessionStore({
-      getActiveTurn: async () => existingTurn,
-      incrementStepCountByDir: (_dir: string) => { existingTurn.stepCount = 2; return 2; },
+      getTurnByToolUseId: (id: string) => id === 'tool-x' ? parentTurn : null,
+      incrementStepCountByDir: (_dir: string) => { parentTurn.stepCount = 2; return 2; },
     });
     const handler = new AuditInteractionHandler(
       new SessionResolverService(config),
@@ -168,16 +213,43 @@ describe('AuditInteractionHandler', () => {
     expect(result).not.toBeNull();
     expect(result!.interactionType).toBe('agentic-turn');
     expect(result!.turnClassification).toEqual({ type: 'continuation' });
+    expect(result!.auditInteractionDir).toBe(parentTurn.interactionDir);
     expect(stepRequestWritten).toBe(true);
+  });
+
+  it('continuation sin tool_use_id registrado crea interacción orphan con continuationOrphan=true', async () => {
+    const config = makeConfig();
+    const stateWrites: Array<{ dir: string; state: unknown }> = [];
+    const store = makeSessionStore({
+      getTurnByToolUseId: () => null,
+    });
+    const handler = new AuditInteractionHandler(
+      new SessionResolverService(config),
+      store,
+      makeAuditWriter({
+        writeInteractionState: async (dir, state) => { stateWrites.push({ dir, state }); },
+      }),
+      config,
+    );
+    const result = await handler.execute({
+      headers: {},
+      rawBody: CONTINUATION_BODY,
+      requestId: 'req-1',
+    });
+    expect(result).not.toBeNull();
+    expect(result!.interactionType).toBe('agentic-turn');
+    // Debe haber escrito state.json con continuationOrphan: true
+    const orphanWrite = stateWrites.find((w) => (w.state as Record<string, unknown>).continuationOrphan === true);
+    expect(orphanWrite).toBeDefined();
   });
 
   it('debería clasificar preflight-quota: crear interacción sin top-level request', async () => {
     const config = makeConfig();
     let skipTopLevelRequest = false;
-    let turnSet: ActiveTurn | null = null;
+    let registeredTurn: ActiveTurn | null = null;
     const handler = new AuditInteractionHandler(
       new SessionResolverService(config),
-      makeSessionStore({ setActiveTurn: async (_id, t) => { turnSet = t; } }),
+      makeSessionStore({ registerTurn: (t: ActiveTurn) => { registeredTurn = t; } }),
       makeAuditWriter({
         writeInteractionRequest: async (params) => {
           skipTopLevelRequest = !!params.skipTopLevelRequest;
@@ -194,7 +266,7 @@ describe('AuditInteractionHandler', () => {
     expect(result!.interactionType).toBe('client-preflight');
     expect(result!.turnClassification).toEqual({ type: 'preflight-quota' });
     expect(skipTopLevelRequest).toBe(true);
-    expect(turnSet!.interactionType).toBe('client-preflight');
+    expect(registeredTurn!.interactionType).toBe('client-preflight');
   });
 
   it('debería strip header de sesión si STRIP_AUDIT_SESSION_HEADER=true', async () => {
@@ -234,7 +306,7 @@ describe('AuditInteractionHandler', () => {
     const config = makeConfig();
     let registered: ActiveTurn | null = null;
     const store = makeSessionStore({
-      registerTurn: (_dir, t) => { registered = t; },
+      registerTurn: (t: ActiveTurn) => { registered = t; },
     });
     const handler = new AuditInteractionHandler(
       new SessionResolverService(config),
@@ -291,54 +363,72 @@ describe('AuditInteractionHandler', () => {
     expect(stateDirs.some((s) => s.startsWith('client-preflight:'))).toBe(true);
   });
 
-  it('debería escribir metadata completa del turno interrumpido', async () => {
+  it('continuation con múltiples tool_use_ids: usa el primero para encontrar turno padre', async () => {
     const config = makeConfig();
-    const prevTurn: ActiveTurn = {
-      interactionDir: '/tmp/sessions/s/interactions/000001_prev',
+    const parentTurn: ActiveTurn = {
+      interactionDir: '/tmp/parent',
       interactionType: 'agentic-turn',
-      stepCount: 2,
+      stepCount: 1,
       requestSequence: 1,
-      startedAt: Date.now() - 1000,
+      startedAt: Date.now(),
       requestBodyOmitted: false,
       requestBodyBytes: 100,
-      stepsMeta: [
-        { stepIndex: 1, sse: true, statusCode: 200, stopReason: 'tool_use', inputTokens: 10, outputTokens: 5 },
-        { stepIndex: 2, sse: true, statusCode: 200, inputTokens: 3, outputTokens: 7, sseRawBytesWritten: 1024 },
-      ],
+      stepsMeta: [],
     };
-    let capturedMeta: { statusCode: number | null; sse: boolean; totals: { inputTokens: number } | null; truncation: { sseRawBytesAudited: number | null } } | null = null;
+    const store = makeSessionStore({
+      getTurnByToolUseId: (id: string) => id === 'first-id' ? parentTurn : null,
+    });
+    const body = Buffer.from(JSON.stringify({
+      messages: [{ role: 'user', content: [
+        { type: 'tool_result', tool_use_id: 'first-id', content: 'r1' },
+        { type: 'tool_result', tool_use_id: 'second-id', content: 'r2' },
+      ]}],
+      max_tokens: 4096,
+    }));
     const handler = new AuditInteractionHandler(
       new SessionResolverService(config),
-      makeSessionStore({ getActiveTurn: async () => prevTurn }),
-      makeAuditWriter({
-        writeTurnMeta: async (_dir, meta) => { capturedMeta = meta; },
-      }),
-      config,
-    );
-    await handler.execute({ headers: {}, rawBody: FRESH_BODY, requestId: 'new-req' });
-    expect(capturedMeta).not.toBeNull();
-    expect(capturedMeta!.statusCode).toBe(200);
-    expect(capturedMeta!.sse).toBe(true);
-    expect(capturedMeta!.totals).toBeDefined();
-    expect(capturedMeta!.totals!.inputTokens).toBe(13);
-    expect(capturedMeta!.truncation!.sseRawBytesAudited).toBe(1024);
-  });
-
-  it('debería fallback a fresh si continuation llega sin activeTurn', async () => {
-    const config = makeConfig();
-    const handler = new AuditInteractionHandler(
-      new SessionResolverService(config),
-      makeSessionStore({ getActiveTurn: async () => null }),
+      store,
       makeAuditWriter(),
       config,
     );
-    const result = await handler.execute({
-      headers: {},
-      rawBody: CONTINUATION_BODY,
-      requestId: 'req-1',
+    const result = await handler.execute({ headers: {}, rawBody: body, requestId: 'r' });
+    expect(result!.auditInteractionDir).toBe('/tmp/parent');
+  });
+
+  it('extractToolUseIdsFromBody extrae IDs correctamente de body válido', async () => {
+    const config = makeConfig();
+    const captured: string[] = [];
+    const store = makeSessionStore({
+      getTurnByToolUseId: (id: string) => { captured.push(id); return null; },
     });
-    // Fallback to fresh: interactionType = agentic-turn
-    expect(result!.interactionType).toBe('agentic-turn');
+    const handler = new AuditInteractionHandler(
+      new SessionResolverService(config),
+      store,
+      makeAuditWriter(),
+      config,
+    );
+    await handler.execute({ headers: {}, rawBody: makeContinuationBody('my-tool-id'), requestId: 'r' });
+    expect(captured).toContain('my-tool-id');
+  });
+
+  it('extractToolUseIdsFromBody retorna vacío para body JSON inválido (no crash)', async () => {
+    const config = makeConfig();
+    // Body que clasifica como continuation por tener tool_result pero JSON inválido como buffer
+    // Usamos cuerpo con tool_result válido para que clasifique, pero que no tenga IDs parseable
+    const bodyNoIds = Buffer.from(JSON.stringify({
+      messages: [{ role: 'user', content: [{ type: 'tool_result', content: 'no-id-field' }] }],
+      max_tokens: 4096,
+    }));
+    const store = makeSessionStore({ getTurnByToolUseId: () => null });
+    const handler = new AuditInteractionHandler(
+      new SessionResolverService(config),
+      store,
+      makeAuditWriter(),
+      config,
+    );
+    // No debe lanzar excepción
+    const result = await handler.execute({ headers: {}, rawBody: bodyNoIds, requestId: 'r' });
+    expect(result).not.toBeNull();
   });
 
   it('debería ignorar health checks de Bun (sin body, sin auth, sin session headers)', async () => {
@@ -356,7 +446,6 @@ describe('AuditInteractionHandler', () => {
       config,
     );
 
-    // Request tipo Bun health check: Bun UA, sin body, sin auth, sin session headers
     const result = await handler.execute({
       headers: {
         'user-agent': 'Bun/1.3.13',
@@ -367,7 +456,6 @@ describe('AuditInteractionHandler', () => {
       requestId: 'health-check-1',
     });
 
-    // Debería retornar null (ignorado)
     expect(result).toBeNull();
     expect(interactionWritten).toBe(false);
   });
@@ -387,7 +475,6 @@ describe('AuditInteractionHandler', () => {
       config,
     );
 
-    // Request de Bun CON authorization (no es health check)
     const result = await handler.execute({
       headers: {
         'user-agent': 'Bun/1.3.13',
@@ -398,7 +485,6 @@ describe('AuditInteractionHandler', () => {
       requestId: 'req-1',
     });
 
-    // NO debería ser ignorado porque tiene auth
     expect(result).not.toBeNull();
     expect(interactionWritten).toBe(true);
   });
@@ -418,7 +504,6 @@ describe('AuditInteractionHandler', () => {
       config,
     );
 
-    // Request de Bun CON body (no es health check)
     const result = await handler.execute({
       headers: {
         'user-agent': 'Bun/1.3.13',
@@ -428,7 +513,6 @@ describe('AuditInteractionHandler', () => {
       requestId: 'req-1',
     });
 
-    // NO debería ser ignorado porque tiene body
     expect(result).not.toBeNull();
     expect(interactionWritten).toBe(true);
   });
@@ -448,7 +532,6 @@ describe('AuditInteractionHandler', () => {
       config,
     );
 
-    // Request de claude-cli sin session headers (causa _unknown) pero CON body real
     const result = await handler.execute({
       headers: {
         'user-agent': 'claude-cli/2.1.113',
@@ -459,7 +542,6 @@ describe('AuditInteractionHandler', () => {
       requestId: 'req-1',
     });
 
-    // NO debería ser ignorado porque tiene body (es request real de Claude Code)
     expect(result).not.toBeNull();
     expect(interactionWritten).toBe(true);
   });

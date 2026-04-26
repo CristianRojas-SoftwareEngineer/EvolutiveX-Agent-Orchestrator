@@ -13,8 +13,8 @@ const INTERACTION_SEQUENCE_FILE = 'interaction-sequence.json';
 export class SessionStoreService implements ISessionStore {
   private sessionRequestChains = new Map<string, Promise<void>>();
   private auditBaseDir: string;
-  private activeTurns = new Map<string, ActiveTurn>();
   private turnRegistry = new Map<string, ActiveTurn>();
+  private toolUseIdToTurnDir = new Map<string, string>();
 
   constructor(auditBaseDir: string) {
     this.auditBaseDir = path.isAbsolute(auditBaseDir)
@@ -40,22 +40,18 @@ export class SessionStoreService implements ISessionStore {
     return this.withSessionLock(sessionId, () => this.allocateNextAuditInteractionSequence(sessionId));
   }
 
-  public getActiveTurn(sessionId: string): Promise<ActiveTurn | null> {
-    return this.withSessionLock(sessionId, () => {
-      return Promise.resolve(this.activeTurns.get(sessionId) || null);
-    });
+  public registerTurn(turn: ActiveTurn): void {
+    this.turnRegistry.set(turn.interactionDir, turn);
   }
 
-  public setActiveTurn(sessionId: string, turn: ActiveTurn): Promise<void> {
-    return this.withSessionLock(sessionId, () => {
-      this.activeTurns.set(sessionId, turn);
-      this.turnRegistry.set(turn.interactionDir, turn);
-      return Promise.resolve();
-    });
+  public registerToolUseId(toolUseId: string, interactionDir: string): void {
+    this.toolUseIdToTurnDir.set(toolUseId, interactionDir);
   }
 
-  public registerTurn(dir: string, turn: ActiveTurn): void {
-    this.turnRegistry.set(dir, turn);
+  public getTurnByToolUseId(toolUseId: string): ActiveTurn | null {
+    const dir = this.toolUseIdToTurnDir.get(toolUseId);
+    if (!dir) return null;
+    return this.turnRegistry.get(dir) ?? null;
   }
 
   public getTurnByDir(dir: string): Promise<ActiveTurn | null> {
@@ -78,14 +74,11 @@ export class SessionStoreService implements ISessionStore {
     if (turn) turn.stepsMeta.push(meta);
   }
 
-  public async closeTurn(dir: string, sessionId: string): Promise<void> {
+  public closeTurn(dir: string): void {
     this.turnRegistry.delete(dir);
-    await this.withSessionLock(sessionId, async () => {
-      const active = this.activeTurns.get(sessionId);
-      if (active?.interactionDir === dir) {
-        this.activeTurns.delete(sessionId);
-      }
-    });
+    for (const [id, d] of this.toolUseIdToTurnDir) {
+      if (d === dir) this.toolUseIdToTurnDir.delete(id);
+    }
   }
 
   private withSessionLock<T>(sessionId: string, fn: () => Promise<T>): Promise<T> {

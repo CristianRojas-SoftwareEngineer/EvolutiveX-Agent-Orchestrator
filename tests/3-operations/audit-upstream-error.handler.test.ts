@@ -29,21 +29,20 @@ function makeConfig(overrides: Partial<ProxyEnvironmentConfig> = {}): ProxyEnvir
 }
 
 function makeSessionStore(turn: ActiveTurn | null = null, overrides: Partial<ISessionStore> = {}): ISessionStore {
-  let activeTurn = turn;
   const registry = new Map<string, ActiveTurn>();
   if (turn) registry.set(turn.interactionDir, turn);
   return {
     getBaseDir: () => '/tmp/sessions',
     ensureAuditSessionsRoot: async () => {},
     nextAuditInteractionSequence: async () => 1,
-    getActiveTurn: async () => activeTurn,
-    setActiveTurn: async (_id: string, t: ActiveTurn) => { activeTurn = t; registry.set(t.interactionDir, t); },
-    registerTurn: (dir: string, t: ActiveTurn) => { registry.set(dir, t); },
+    registerTurn: (t: ActiveTurn) => { registry.set(t.interactionDir, t); },
+    registerToolUseId: () => {},
+    getTurnByToolUseId: () => null,
     getTurnByDir: async (dir: string) => registry.get(dir) || null,
     getTurnByDirSync: (dir: string) => registry.get(dir) || null,
     incrementStepCountByDir: (dir: string) => { const t = registry.get(dir); if (t) t.stepCount += 1; return t?.stepCount ?? 1; },
     pushStepMetaByDir: async (dir: string, meta: StepMeta) => { registry.get(dir)?.stepsMeta.push(meta); },
-    closeTurn: async (dir: string, _sessionId: string) => { registry.delete(dir); activeTurn = null; },
+    closeTurn: (dir: string) => { registry.delete(dir); },
     ...overrides,
   };
 }

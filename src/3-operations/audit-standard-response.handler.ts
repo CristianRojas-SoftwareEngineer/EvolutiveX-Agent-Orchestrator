@@ -70,7 +70,7 @@ export class AuditStandardResponseHandler {
 
         if (context.interactionType !== 'client-preflight') {
           // Cerrar turno con error
-          await this.sessionStore.closeTurn(context.auditInteractionDir, context.auditSessionId);
+          this.sessionStore.closeTurn(context.auditInteractionDir);
           if (turn) {
             await this.writeTurnMeta(turn, context, 'upstream-error' as TurnOutcome, false, totalBytes);
           }
@@ -126,7 +126,7 @@ export class AuditStandardResponseHandler {
 
           // Cerrar preflight inmediatamente
           const preflightTurn = await this.sessionStore.getTurnByDir(context.auditInteractionDir);
-          await this.sessionStore.closeTurn(context.auditInteractionDir, context.auditSessionId);
+          this.sessionStore.closeTurn(context.auditInteractionDir);
           if (preflightTurn) {
             await this.writeTurnMeta(preflightTurn, context, 'completed', false, totalBytes);
           }
@@ -167,7 +167,7 @@ export class AuditStandardResponseHandler {
         }
 
         const turn = await this.sessionStore.getTurnByDir(context.auditInteractionDir);
-        await this.sessionStore.closeTurn(context.auditInteractionDir, context.auditSessionId);
+        this.sessionStore.closeTurn(context.auditInteractionDir);
 
         if (turn) {
           const turnOutcome = this.computeTurnOutcome(context.responseStatusCode);

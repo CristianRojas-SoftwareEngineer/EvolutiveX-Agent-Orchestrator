@@ -41,6 +41,8 @@ export interface StepMeta {
   sseLineCount?: number;
   stopReason?: string;
   toolCalls?: string[];
+  /** IDs de tool_use emitidos en este step; usados para correlacionar continuations con su turno padre. */
+  toolUseIds?: string[];
   cacheCreationInputTokens?: number;
   cacheReadInputTokens?: number;
   inputTokens?: number;
@@ -96,9 +98,8 @@ export type InteractionType = 'client-preflight' | 'agentic-turn' | 'side-reques
  * - client-error: Error del cliente (4xx)
  * - upstream-error: Error del servidor upstream (5xx o fallo de conexión)
  * - truncated: Truncado por max_tokens
- * - interrupted: Turno interrumpido por nuevo turno agentic
  */
-export type TurnOutcome = 'completed' | 'client-error' | 'upstream-error' | 'truncated' | 'interrupted';
+export type TurnOutcome = 'completed' | 'client-error' | 'upstream-error' | 'truncated';
 
 export interface ActiveTurn {
   interactionDir: string;
@@ -149,6 +150,8 @@ export interface InteractionState {
   state: 'in-progress';
   startedAt: string;
   interactionType: InteractionType;
+  /** Presente cuando la continuation no encontró su turno padre vía tool_use_id (degradación). */
+  continuationOrphan?: boolean;
 }
 
 /**

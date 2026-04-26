@@ -4,12 +4,8 @@ import type { ISessionStore } from '../2-services/ports/session-store.port.js';
 import type { IAuditWriter } from '../2-services/ports/audit-writer.port.js';
 import { classifyRequestBody } from '../1-domain/services/turn-classifier.service.js';
 import {
-  ActiveTurn,
   InteractionType,
-  StepMeta,
   TurnClassification,
-  computeTokenTotals,
-  computeSseRawBytesTotal,
 } from '../1-domain/types/audit.types.js';
 import { ProxyEnvironmentConfig } from '../1-domain/types/config.types.js';
 
@@ -55,22 +51,17 @@ export class AuditInteractionHandler {
     }
 
     const classification = classifyRequestBody(params.rawBody);
-    const activeTurn = await this.sessionStore.getActiveTurn(auditSessionId);
 
     if (classification.type === 'side-request') {
       return this.handleSideRequest(params, headersForAudit, auditSessionId, classification);
     }
 
     if (classification.type === 'fresh') {
-      return this.handleFresh(params, headersForAudit, auditSessionId, classification, activeTurn ? true : false);
+      return this.handleFresh(params, headersForAudit, auditSessionId, classification);
     }
 
     if (classification.type === 'continuation') {
-      if (!activeTurn) {
-        console.warn('[audit] No active turn found for continuation request — fallback to fresh');
-        return this.handleFresh(params, headersForAudit, auditSessionId, { type: 'fresh' }, false);
-      }
-      return this.handleContinuation(params, headersForAudit, auditSessionId, classification, activeTurn);
+      return this.handleContinuation(params, headersForAudit, auditSessionId, classification);
     }
 
     if (classification.type === 'preflight-quota') {
@@ -78,15 +69,11 @@ export class AuditInteractionHandler {
     }
 
     if (classification.type === 'preflight-warmup') {
-      if (!activeTurn) {
-        // Sin turno activo: tratar como fresh (cliente sin herramientas)
-        return this.handleFresh(params, headersForAudit, auditSessionId, { type: 'fresh' }, false);
-      }
-      return this.handlePreflightWarmup(params, headersForAudit, auditSessionId, classification, activeTurn);
+      return this.handlePreflightWarmup(params, headersForAudit, auditSessionId, classification);
     }
 
     // Fallback inalcanzable
-    return this.handleFresh(params, headersForAudit, auditSessionId, { type: 'fresh' }, false);
+    return this.handleFresh(params, headersForAudit, auditSessionId, { type: 'fresh' });
   }
 
   private async handleFresh(
@@ -94,17 +81,7 @@ export class AuditInteractionHandler {
     headersForAudit: Record<string, string | string[] | undefined>,
     auditSessionId: string,
     classification: TurnClassification,
-    hasInterruptedTurn: boolean,
   ): Promise<AuditInteractionResult> {
-    if (hasInterruptedTurn) {
-      // Forzar cierre del turno anterior con metadata completa
-      const prev = await this.sessionStore.getActiveTurn(auditSessionId);
-      if (prev) {
-        await this.sessionStore.closeTurn(prev.interactionDir, auditSessionId);
-        await this.writeInterruptedTurnMeta(prev);
-      }
-    }
-
     const seq = await this.sessionStore.nextAuditInteractionSequence(auditSessionId);
     const folderName = this.sessionResolver.formatAuditInteractionDirName(seq, params.requestId);
 
@@ -135,7 +112,7 @@ export class AuditInteractionHandler {
       interactionType: 'agentic-turn',
     });
 
-    await this.sessionStore.setActiveTurn(auditSessionId, {
+    this.sessionStore.registerTurn({
       interactionDir: wr.dir,
       interactionType: 'agentic-turn',
       stepCount: 1,
@@ -161,10 +138,27 @@ export class AuditInteractionHandler {
     headersForAudit: Record<string, string | string[] | undefined>,
     auditSessionId: string,
     classification: TurnClassification,
-    activeTurn: NonNullable<Awaited<ReturnType<ISessionStore['getActiveTurn']>>>,
   ): Promise<AuditInteractionResult> {
-    const stepCount = this.sessionStore.incrementStepCountByDir(activeTurn.interactionDir);
-    const stepDir = path.join(activeTurn.interactionDir, 'steps', String(stepCount).padStart(3, '0'));
+    const toolUseIds = this.extractToolUseIdsFromBody(params.rawBody);
+    const parentTurn = toolUseIds.length > 0
+      ? this.sessionStore.getTurnByToolUseId(toolUseIds[0])
+      : null;
+
+    if (!parentTurn) {
+      console.warn('[audit] No se encontró turno padre para continuation (tool_use_ids:', toolUseIds, ') — creando interacción standalone');
+      const result = await this.handleFresh(params, headersForAudit, auditSessionId, { type: 'fresh' });
+      // Marcar la interacción como orphan en state.json
+      await this.auditWriter.writeInteractionState(result.auditInteractionDir, {
+        state: 'in-progress',
+        startedAt: new Date().toISOString(),
+        interactionType: 'agentic-turn',
+        continuationOrphan: true,
+      });
+      return { ...result, turnClassification: classification };
+    }
+
+    const stepCount = this.sessionStore.incrementStepCountByDir(parentTurn.interactionDir);
+    const stepDir = path.join(parentTurn.interactionDir, 'steps', String(stepCount).padStart(3, '0'));
 
     await this.auditWriter.writeStepRequest({
       stepDir,
@@ -174,11 +168,11 @@ export class AuditInteractionHandler {
     });
 
     return {
-      auditInteractionDir: activeTurn.interactionDir,
-      requestBodyOmitted: activeTurn.requestBodyOmitted,
-      requestSequence: activeTurn.requestSequence,
+      auditInteractionDir: parentTurn.interactionDir,
+      requestBodyOmitted: parentTurn.requestBodyOmitted,
+      requestSequence: parentTurn.requestSequence,
       auditSessionId,
-      interactionType: activeTurn.interactionType,
+      interactionType: parentTurn.interactionType,
       turnClassification: classification,
     };
   }
@@ -218,7 +212,7 @@ export class AuditInteractionHandler {
       interactionType: 'client-preflight',
     });
 
-    await this.sessionStore.setActiveTurn(auditSessionId, {
+    this.sessionStore.registerTurn({
       interactionDir: wr.dir,
       interactionType: 'client-preflight',
       stepCount: 1,
@@ -274,8 +268,8 @@ export class AuditInteractionHandler {
       interactionType: 'side-request',
     });
 
-    // Side-request con interactionType propio (no desplaza al turno agentic activo)
-    const turn: ActiveTurn = {
+    // Side-request con interactionType propio (no desplaza a ningún turno agentic)
+    this.sessionStore.registerTurn({
       interactionDir: wr.dir,
       interactionType: 'side-request',
       stepCount: 1,
@@ -284,9 +278,7 @@ export class AuditInteractionHandler {
       requestBodyOmitted: wr.requestBodyOmitted,
       requestBodyBytes: params.rawBody.length,
       stepsMeta: [],
-    };
-
-    this.sessionStore.registerTurn(wr.dir, turn);
+    });
 
     return {
       auditInteractionDir: wr.dir,
@@ -303,11 +295,20 @@ export class AuditInteractionHandler {
     headersForAudit: Record<string, string | string[] | undefined>,
     auditSessionId: string,
     classification: TurnClassification,
-    activeTurn: NonNullable<Awaited<ReturnType<ISessionStore['getActiveTurn']>>>,
   ): Promise<AuditInteractionResult> {
-    const stepCount = this.sessionStore.incrementStepCountByDir(activeTurn.interactionDir);
-    const stepDir = path.join(activeTurn.interactionDir, 'steps', String(stepCount).padStart(3, '0'));
+    const seq = await this.sessionStore.nextAuditInteractionSequence(auditSessionId);
+    const folderName = this.sessionResolver.formatAuditInteractionDirName(seq, params.requestId);
 
+    const wr = await this.auditWriter.writeInteractionRequest({
+      baseDir: this.sessionStore.getBaseDir(),
+      sessionId: auditSessionId,
+      folderName,
+      headers: headersForAudit,
+      bodyBuffer: params.rawBody,
+      maxAuditRequestBytes: this.config.MAX_AUDIT_REQUEST_BODY_BYTES,
+    });
+
+    const stepDir = path.join(wr.dir, 'steps', '001');
     await this.auditWriter.writeStepRequest({
       stepDir,
       headers: headersForAudit,
@@ -315,10 +316,29 @@ export class AuditInteractionHandler {
       maxAuditRequestBytes: this.config.MAX_AUDIT_REQUEST_BODY_BYTES,
     });
 
+    const startedAt = Date.now();
+
+    await this.auditWriter.writeInteractionState(wr.dir, {
+      state: 'in-progress',
+      startedAt: new Date(startedAt).toISOString(),
+      interactionType: 'client-preflight',
+    });
+
+    this.sessionStore.registerTurn({
+      interactionDir: wr.dir,
+      interactionType: 'client-preflight',
+      stepCount: 1,
+      requestSequence: seq,
+      startedAt,
+      requestBodyOmitted: wr.requestBodyOmitted,
+      requestBodyBytes: params.rawBody.length,
+      stepsMeta: [],
+    });
+
     return {
-      auditInteractionDir: activeTurn.interactionDir,
-      requestBodyOmitted: false,
-      requestSequence: activeTurn.requestSequence,
+      auditInteractionDir: wr.dir,
+      requestBodyOmitted: wr.requestBodyOmitted,
+      requestSequence: seq,
       auditSessionId,
       interactionType: 'client-preflight',
       turnClassification: classification,
@@ -326,52 +346,28 @@ export class AuditInteractionHandler {
   }
 
   /**
-   * Escribe el meta.json de un turno interrumpido conservando
-   * la información ya disponible (statusCode, sse, totals, sseRawBytes).
+   * Extrae todos los tool_use_id de los bloques tool_result del body de una continuation.
+   * Path: messages[-1].content[*].tool_use_id donde type === "tool_result".
    */
-  private async writeInterruptedTurnMeta(prev: ActiveTurn): Promise<void> {
-    const steps: StepMeta[] = prev.stepsMeta;
-    const lastStep = steps.length > 0 ? steps[steps.length - 1] : undefined;
-    const statusCode = lastStep?.statusCode ?? null;
-    const sse = steps.some((s) => s.sse === true);
-    const totals = prev.interactionType !== 'client-preflight'
-      ? computeTokenTotals(steps)
-      : null;
-    const sseRawBytesTotal = computeSseRawBytesTotal(steps);
-    const sseRawTruncated = steps.some((s) => s.sseRawTruncatedByLimit === true);
-
-    await this.auditWriter.writeTurnMeta(prev.interactionDir, {
-      interactionType: prev.interactionType,
-      turnOutcome: 'interrupted',
-      stepCount: steps.length,
-      startedAt: new Date(prev.startedAt).toISOString(),
-      endedAt: new Date().toISOString(),
-      durationMs: Date.now() - prev.startedAt,
-      statusCode,
-      sse,
-      steps,
-      totals,
-      sseResponseBodyAttempted: false,
-      sseResponseBodyWritten: false,
-      sseResponseBodyError: null,
-      sseResponseBodySource: null,
-      errorMessage: null,
-      errorCode: null,
-      truncation: {
-        requestBodyOmitted: prev.requestBodyOmitted,
-        responseBodyBytesTotal: null,
-        responseBodyBytesAudited: null,
-        responseTruncatedByProxyBuffer: null,
-        responseTruncatedByAuditLimit: null,
-        sseRawBytesAudited: sseRawBytesTotal > 0 ? sseRawBytesTotal : null,
-        sseRawBytesLimit: null,
-        sseRawTruncatedByLimit: sseRawTruncated,
-        sseRawWriteError: false,
-      },
-    });
-
-    // Eliminar state.json al cerrar turno
-    await this.auditWriter.removeInteractionState(prev.interactionDir);
+  private extractToolUseIdsFromBody(body: Buffer): string[] {
+    try {
+      const json = JSON.parse(body.toString('utf8'));
+      const messages: unknown[] = json?.messages;
+      if (!Array.isArray(messages) || messages.length === 0) return [];
+      const lastMsg = messages[messages.length - 1] as Record<string, unknown>;
+      const content = lastMsg?.content;
+      if (!Array.isArray(content)) return [];
+      const ids: string[] = [];
+      for (const item of content) {
+        const block = item as Record<string, unknown>;
+        if (block.type === 'tool_result' && typeof block.tool_use_id === 'string') {
+          ids.push(block.tool_use_id);
+        }
+      }
+      return ids;
+    } catch {
+      return [];
+    }
   }
 
   /**

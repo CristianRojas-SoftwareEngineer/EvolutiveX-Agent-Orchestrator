@@ -5,6 +5,8 @@ import type { IAuditWriter } from '../2-services/ports/audit-writer.port.js';
 import { classifyRequestBody } from '../1-domain/services/turn-classifier.service.js';
 import {
   InteractionType,
+  ParentContext,
+  PendingAgentToolUse,
   TurnClassification,
 } from '../1-domain/types/audit.types.js';
 import { ProxyEnvironmentConfig } from '../1-domain/types/config.types.js';
@@ -57,6 +59,20 @@ export class AuditInteractionHandler {
     }
 
     if (classification.type === 'fresh') {
+      // Antes de tratar la request como un nuevo turn raíz, comprobar si en la
+      // misma sesión hay un agentic-turn padre con tool_uses `Agent` aún sin
+      // resolver: si lo hay, esta fresh se anida como subagente bajo el step
+      // padre correspondiente.
+      const pendingMatch = this.sessionStore.findTurnWithPendingAgents(auditSessionId);
+      if (pendingMatch) {
+        return this.handleSubagent(
+          params,
+          headersForAudit,
+          auditSessionId,
+          classification,
+          pendingMatch,
+        );
+      }
       return this.handleFresh(params, headersForAudit, auditSessionId, classification);
     }
 
@@ -121,6 +137,8 @@ export class AuditInteractionHandler {
       requestBodyOmitted: wr.requestBodyOmitted,
       requestBodyBytes: params.rawBody.length,
       stepsMeta: [],
+      sessionId: auditSessionId,
+      pendingAgentToolUses: [],
     });
 
     return {
@@ -131,6 +149,108 @@ export class AuditInteractionHandler {
       interactionType: 'agentic-turn',
       turnClassification: classification,
     };
+  }
+
+  /**
+   * Crea una interacción de subagente anidada bajo el step padre que emitió
+   * el tool_use `Agent`. La asignación de la secuencia local del subagente y
+   * la escritura del request van serializadas dentro de `withSessionLock`
+   * para evitar colisiones con subagentes paralelos en la misma sesión.
+   */
+  private async handleSubagent(
+    params: { rawBody: Buffer; requestId: string },
+    headersForAudit: Record<string, string | string[] | undefined>,
+    auditSessionId: string,
+    classification: TurnClassification,
+    match: { turn: { interactionDir: string; pendingAgentToolUses: PendingAgentToolUse[] }; pendings: PendingAgentToolUse[] },
+  ): Promise<AuditInteractionResult> {
+    return this.sessionStore.withSessionLock(auditSessionId, async () => {
+      const parentInteractionDir = match.turn.interactionDir;
+      // Si todos los pendings comparten el mismo step padre, lo usamos; si no,
+      // tomamos el menor (caso defensivo: en la práctica el SSE registra todos
+      // los pendings durante el mismo step antes de ceder el control al cliente).
+      const parentStepIndex = match.pendings.reduce(
+        (min, p) => Math.min(min, p.stepIndex),
+        match.pendings[0].stepIndex,
+      );
+
+      // Correlación tool_use ↔ subagente:
+      // - 1 pending → unívoco, lo consumimos ya.
+      // - >1 pending → ambiguo; dejamos null y el id correcto se conocerá al
+      //   recibir el tool_result en la continuation del padre.
+      const triggeringToolUseId =
+        match.pendings.length === 1 ? match.pendings[0].toolUseId : null;
+      const subagentType =
+        match.pendings.length === 1 ? match.pendings[0].subagentType : undefined;
+
+      const subSeq = await this.auditWriter.nextSubInteractionSequence(
+        parentInteractionDir,
+        parentStepIndex,
+      );
+      const folderName = this.sessionResolver.formatAuditInteractionDirName(subSeq, params.requestId);
+
+      const wr = await this.auditWriter.writeSubInteractionRequest({
+        parentInteractionDir,
+        parentStepIndex,
+        folderName,
+        headers: headersForAudit,
+        bodyBuffer: params.rawBody,
+        maxAuditRequestBytes: this.config.MAX_AUDIT_REQUEST_BODY_BYTES,
+      });
+
+      // Escribir steps/001/request del subagente para mantener simetría
+      // estructural con el resto de turns.
+      const stepDir = path.join(wr.dir, 'steps', '001');
+      await this.auditWriter.writeStepRequest({
+        stepDir,
+        headers: headersForAudit,
+        bodyBuffer: params.rawBody,
+        maxAuditRequestBytes: this.config.MAX_AUDIT_REQUEST_BODY_BYTES,
+      });
+
+      const startedAt = Date.now();
+      const parentContext: ParentContext = {
+        parentInteractionDir,
+        parentStepIndex,
+        triggeringToolUseId,
+        ...(subagentType ? { subagentType } : {}),
+      };
+
+      await this.auditWriter.writeInteractionState(wr.dir, {
+        state: 'in-progress',
+        startedAt: new Date(startedAt).toISOString(),
+        interactionType: 'agentic-turn',
+        parentContext,
+      });
+
+      // Si la correlación fue unívoca, consumimos el pending en este momento.
+      if (triggeringToolUseId) {
+        this.sessionStore.consumePendingAgentToolUse(parentInteractionDir, triggeringToolUseId);
+      }
+
+      this.sessionStore.registerTurn({
+        interactionDir: wr.dir,
+        interactionType: 'agentic-turn',
+        stepCount: 1,
+        requestSequence: subSeq,
+        startedAt,
+        requestBodyOmitted: wr.requestBodyOmitted,
+        requestBodyBytes: params.rawBody.length,
+        stepsMeta: [],
+        sessionId: auditSessionId,
+        pendingAgentToolUses: [],
+        parentContext,
+      });
+
+      return {
+        auditInteractionDir: wr.dir,
+        requestBodyOmitted: wr.requestBodyOmitted,
+        requestSequence: subSeq,
+        auditSessionId,
+        interactionType: 'agentic-turn',
+        turnClassification: classification,
+      };
+    });
   }
 
   private async handleContinuation(
@@ -166,6 +286,14 @@ export class AuditInteractionHandler {
       bodyBuffer: params.rawBody,
       maxAuditRequestBytes: this.config.MAX_AUDIT_REQUEST_BODY_BYTES,
     });
+
+    // Si la continuation trae tool_result_ids que correspondan a Agents que
+    // quedaron como pending (caso ambiguo no resuelto en handleSubagent),
+    // los consumimos aquí: la llegada del tool_result evidencia que el
+    // subagente correspondiente ya completó su ciclo.
+    for (const toolUseId of toolUseIds) {
+      this.sessionStore.consumePendingAgentToolUse(parentTurn.interactionDir, toolUseId);
+    }
 
     return {
       auditInteractionDir: parentTurn.interactionDir,
@@ -221,6 +349,8 @@ export class AuditInteractionHandler {
       requestBodyOmitted: false,
       requestBodyBytes: params.rawBody.length,
       stepsMeta: [],
+      sessionId: auditSessionId,
+      pendingAgentToolUses: [],
     });
 
     return {
@@ -278,6 +408,8 @@ export class AuditInteractionHandler {
       requestBodyOmitted: wr.requestBodyOmitted,
       requestBodyBytes: params.rawBody.length,
       stepsMeta: [],
+      sessionId: auditSessionId,
+      pendingAgentToolUses: [],
     });
 
     return {
@@ -333,6 +465,8 @@ export class AuditInteractionHandler {
       requestBodyOmitted: wr.requestBodyOmitted,
       requestBodyBytes: params.rawBody.length,
       stepsMeta: [],
+      sessionId: auditSessionId,
+      pendingAgentToolUses: [],
     });
 
     return {

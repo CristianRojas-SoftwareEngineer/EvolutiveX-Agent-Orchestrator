@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 
-import { ActiveTurn, StepMeta } from '../1-domain/types/audit.types.js';
+import { ActiveTurn, PendingAgentToolUse, StepMeta } from '../1-domain/types/audit.types.js';
 import type { ISessionStore } from './ports/session-store.port.js';
 
 const INTERACTION_SEQUENCE_FILE = 'interaction-sequence.json';
@@ -15,6 +15,8 @@ export class SessionStoreService implements ISessionStore {
   private auditBaseDir: string;
   private turnRegistry = new Map<string, ActiveTurn>();
   private toolUseIdToTurnDir = new Map<string, string>();
+  /** Índice por sesión: sessionId → set de interactionDir de turns activos. */
+  private sessionToActiveTurns = new Map<string, Set<string>>();
 
   constructor(auditBaseDir: string) {
     this.auditBaseDir = path.isAbsolute(auditBaseDir)
@@ -42,6 +44,62 @@ export class SessionStoreService implements ISessionStore {
 
   public registerTurn(turn: ActiveTurn): void {
     this.turnRegistry.set(turn.interactionDir, turn);
+    let set = this.sessionToActiveTurns.get(turn.sessionId);
+    if (!set) {
+      set = new Set<string>();
+      this.sessionToActiveTurns.set(turn.sessionId, set);
+    }
+    set.add(turn.interactionDir);
+  }
+
+  public registerPendingAgentToolUse(
+    interactionDir: string,
+    stepIndex: number,
+    toolUseId: string,
+    subagentType?: string,
+  ): void {
+    const turn = this.turnRegistry.get(interactionDir);
+    if (!turn) return;
+    const existing = turn.pendingAgentToolUses.find((p) => p.toolUseId === toolUseId);
+    if (existing) {
+      // Idempotente: si ya existe, sólo enriquecer subagentType si llega ahora.
+      if (subagentType && !existing.subagentType) {
+        existing.subagentType = subagentType;
+      }
+      return;
+    }
+    const entry: PendingAgentToolUse = { stepIndex, toolUseId };
+    if (subagentType) entry.subagentType = subagentType;
+    turn.pendingAgentToolUses.push(entry);
+  }
+
+  public findTurnWithPendingAgents(
+    sessionId: string,
+  ): { turn: ActiveTurn; pendings: PendingAgentToolUse[] } | null {
+    const dirs = this.sessionToActiveTurns.get(sessionId);
+    if (!dirs) return null;
+    for (const dir of dirs) {
+      const turn = this.turnRegistry.get(dir);
+      if (!turn) continue;
+      // Filtros: sólo agentic-turn de nivel 1 con pendings activos.
+      // - interactionType !== 'agentic-turn' excluye client-preflight y side-request.
+      // - parentContext definido excluye subagentes (refuerza profundidad ≤ 2).
+      // - pendingAgentToolUses vacío descarta el resto.
+      if (turn.interactionType !== 'agentic-turn') continue;
+      if (turn.parentContext) continue;
+      if (turn.pendingAgentToolUses.length === 0) continue;
+      return { turn, pendings: [...turn.pendingAgentToolUses] };
+    }
+    return null;
+  }
+
+  public consumePendingAgentToolUse(interactionDir: string, toolUseId: string): void {
+    const turn = this.turnRegistry.get(interactionDir);
+    if (!turn) return;
+    const idx = turn.pendingAgentToolUses.findIndex((p) => p.toolUseId === toolUseId);
+    if (idx >= 0) {
+      turn.pendingAgentToolUses.splice(idx, 1);
+    }
   }
 
   public registerToolUseId(toolUseId: string, interactionDir: string): void {
@@ -75,13 +133,23 @@ export class SessionStoreService implements ISessionStore {
   }
 
   public closeTurn(dir: string): void {
+    const turn = this.turnRegistry.get(dir);
     this.turnRegistry.delete(dir);
+    if (turn) {
+      const set = this.sessionToActiveTurns.get(turn.sessionId);
+      if (set) {
+        set.delete(dir);
+        if (set.size === 0) {
+          this.sessionToActiveTurns.delete(turn.sessionId);
+        }
+      }
+    }
     for (const [id, d] of this.toolUseIdToTurnDir) {
       if (d === dir) this.toolUseIdToTurnDir.delete(id);
     }
   }
 
-  private withSessionLock<T>(sessionId: string, fn: () => Promise<T>): Promise<T> {
+  public withSessionLock<T>(sessionId: string, fn: () => Promise<T>): Promise<T> {
     const key = String(sessionId);
     const prev = this.sessionRequestChains.get(key) || Promise.resolve();
     const result = prev.then(() => fn());

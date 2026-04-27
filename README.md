@@ -125,6 +125,8 @@ interactions/NNNNNN_<uuid>/
 
 > **Nota:** Los preflights (`client-preflight`) no escriben `request/` en el nivel raíz de la interacción; sólo tienen `steps/` con sus archivos individuales. Todos los tipos de interacción (`agentic-turn`, `side-request`, `client-preflight`) escriben `steps/001/request/` para mantener simetría estructural.
 
+> **Subagentes (`Task` / herramienta `Agent`):** Cuando el turno principal emite un `tool_use` con `name: "Agent"`, la siguiente petición fresh de la misma sesión NO se trata como nuevo turno raíz: se anida bajo el step que la disparó como `steps/<NNN>/sub-interactions/<MMM>_<uuid>/` con la misma estructura interna (`request/`, `response/`, `steps/`, `meta.json`, `state.json`). El `meta.json` del subagente incluye un bloque `parentContext: { parentInteractionDir, parentStepIndex, triggeringToolUseId, subagentType }` para reconstruir el árbol padre→hijo. La profundidad está acotada a 2 niveles (un subagente no puede ser padre de otros subagentes).
+
 > **state.json:** Archivo marcador escrito al iniciar la interacción con `{ state: "in-progress", startedAt, interactionType }`. Se elimina al cerrar el turno (cuando se escribe `meta.json`). Su presencia indica una interacción huérfana por crash del proceso.
 
 ### Tipos de Interacción

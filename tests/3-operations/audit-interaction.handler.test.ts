@@ -51,6 +51,10 @@ function makeSessionStore(overrides: Partial<ISessionStore> = {}): ISessionStore
     },
     pushStepMetaByDir: async (dir: string, meta: StepMeta) => { registry.get(dir)?.stepsMeta.push(meta); },
     closeTurn: (dir: string) => { registry.delete(dir); },
+    registerPendingAgentToolUse: () => {},
+    findTurnWithPendingAgents: () => null,
+    consumePendingAgentToolUse: () => {},
+    withSessionLock: async <T,>(_sessionId: string, fn: () => Promise<T>): Promise<T> => fn(),
     ...overrides,
   };
 }
@@ -64,6 +68,11 @@ function makeAuditWriter(overrides: Partial<IAuditWriter> = {}): IAuditWriter {
       dir: '/tmp/sessions/s/interactions/000001_req',
       requestBodyOmitted: false,
     }),
+    writeSubInteractionRequest: async () => ({
+      dir: '/tmp/sessions/s/interactions/000001_req/steps/001/sub-interactions/001_sub',
+      requestBodyOmitted: false,
+    }),
+    nextSubInteractionSequence: async () => 1,
     writeStepRequest: async () => {},
     finalizeNonSseResponseAudit: async () => ({
       responseBodyBytesAudited: 0,
@@ -192,6 +201,8 @@ describe('AuditInteractionHandler', () => {
       requestBodyOmitted: false,
       requestBodyBytes: 100,
       stepsMeta: [],
+      sessionId: 's',
+      pendingAgentToolUses: [],
     };
     const store = makeSessionStore({
       getTurnByToolUseId: (id: string) => id === 'tool-x' ? parentTurn : null,
@@ -374,6 +385,8 @@ describe('AuditInteractionHandler', () => {
       requestBodyOmitted: false,
       requestBodyBytes: 100,
       stepsMeta: [],
+      sessionId: 's',
+      pendingAgentToolUses: [],
     };
     const store = makeSessionStore({
       getTurnByToolUseId: (id: string) => id === 'first-id' ? parentTurn : null,
@@ -515,6 +528,245 @@ describe('AuditInteractionHandler', () => {
 
     expect(result).not.toBeNull();
     expect(interactionWritten).toBe(true);
+  });
+
+  it('subagente unívoco: fresh + 1 pending → handleSubagent crea sub-interaction y consume pending', async () => {
+    const config = makeConfig();
+    const parentTurn: ActiveTurn = {
+      interactionDir: '/tmp/sessions/s/interactions/000001_parent',
+      interactionType: 'agentic-turn',
+      stepCount: 3,
+      requestSequence: 1,
+      startedAt: Date.now(),
+      requestBodyOmitted: false,
+      requestBodyBytes: 100,
+      stepsMeta: [],
+      sessionId: 's',
+      pendingAgentToolUses: [
+        { stepIndex: 2, toolUseId: 'toolu_unique', subagentType: 'general-purpose' },
+      ],
+    };
+    let consumed: { dir: string; id: string } | null = null;
+    let registeredSub: ActiveTurn | null = null;
+    const subWrites: unknown[] = [];
+    const stateWrites: Array<{ dir: string; state: unknown }> = [];
+
+    const store = makeSessionStore({
+      findTurnWithPendingAgents: () => ({
+        turn: parentTurn,
+        pendings: [...parentTurn.pendingAgentToolUses],
+      }),
+      consumePendingAgentToolUse: (dir, id) => { consumed = { dir, id }; },
+      registerTurn: (t: ActiveTurn) => { registeredSub = t; },
+    });
+    const handler = new AuditInteractionHandler(
+      new SessionResolverService(config),
+      store,
+      makeAuditWriter({
+        nextSubInteractionSequence: async () => 1,
+        writeSubInteractionRequest: async (p) => {
+          subWrites.push(p);
+          return {
+            dir: `${p.parentInteractionDir}/steps/002/sub-interactions/${p.folderName}`,
+            requestBodyOmitted: false,
+          };
+        },
+        writeInteractionState: async (dir, state) => { stateWrites.push({ dir, state }); },
+      }),
+      config,
+    );
+
+    const result = await handler.execute({
+      headers: { 'x-cc-audit-session': 's' },
+      rawBody: FRESH_BODY,
+      requestId: 'sub-req-1',
+    });
+
+    expect(result).not.toBeNull();
+    expect(result!.interactionType).toBe('agentic-turn');
+    expect(result!.auditInteractionDir).toContain('sub-interactions');
+    expect(result!.auditInteractionDir).toContain('steps/002');
+    expect(consumed).toEqual({ dir: parentTurn.interactionDir, id: 'toolu_unique' });
+    expect(subWrites).toHaveLength(1);
+    expect(registeredSub).not.toBeNull();
+    expect(registeredSub!.parentContext).toEqual({
+      parentInteractionDir: parentTurn.interactionDir,
+      parentStepIndex: 2,
+      triggeringToolUseId: 'toolu_unique',
+      subagentType: 'general-purpose',
+    });
+    const subState = stateWrites.find((s) =>
+      (s.state as Record<string, unknown>).parentContext !== undefined
+    );
+    expect(subState).toBeDefined();
+  });
+
+  it('subagente ambiguo: fresh + >1 pending → triggeringToolUseId=null y NO se consume pending', async () => {
+    const config = makeConfig();
+    const parentTurn: ActiveTurn = {
+      interactionDir: '/tmp/sessions/s/interactions/000001_parent',
+      interactionType: 'agentic-turn',
+      stepCount: 2,
+      requestSequence: 1,
+      startedAt: Date.now(),
+      requestBodyOmitted: false,
+      requestBodyBytes: 100,
+      stepsMeta: [],
+      sessionId: 's',
+      pendingAgentToolUses: [
+        { stepIndex: 1, toolUseId: 'toolu_a', subagentType: 'Explore' },
+        { stepIndex: 1, toolUseId: 'toolu_b', subagentType: 'Plan' },
+      ],
+    };
+    let consumeCalls = 0;
+    let registeredSub: ActiveTurn | null = null;
+
+    const store = makeSessionStore({
+      findTurnWithPendingAgents: () => ({
+        turn: parentTurn,
+        pendings: [...parentTurn.pendingAgentToolUses],
+      }),
+      consumePendingAgentToolUse: () => { consumeCalls += 1; },
+      registerTurn: (t: ActiveTurn) => { registeredSub = t; },
+    });
+    const handler = new AuditInteractionHandler(
+      new SessionResolverService(config),
+      store,
+      makeAuditWriter({
+        nextSubInteractionSequence: async () => 1,
+        writeSubInteractionRequest: async (p) => ({
+          dir: `${p.parentInteractionDir}/steps/001/sub-interactions/${p.folderName}`,
+          requestBodyOmitted: false,
+        }),
+      }),
+      config,
+    );
+
+    const result = await handler.execute({
+      headers: { 'x-cc-audit-session': 's' },
+      rawBody: FRESH_BODY,
+      requestId: 'sub-amb',
+    });
+
+    expect(result).not.toBeNull();
+    expect(consumeCalls).toBe(0);
+    expect(registeredSub!.parentContext).toEqual({
+      parentInteractionDir: parentTurn.interactionDir,
+      parentStepIndex: 1,
+      triggeringToolUseId: null,
+    });
+  });
+
+  it('handleSubagent serializa la asignación de secuencia dentro de withSessionLock', async () => {
+    const config = makeConfig();
+    const parentTurn: ActiveTurn = {
+      interactionDir: '/tmp/sessions/s/interactions/000001_parent',
+      interactionType: 'agentic-turn',
+      stepCount: 2,
+      requestSequence: 1,
+      startedAt: Date.now(),
+      requestBodyOmitted: false,
+      requestBodyBytes: 100,
+      stepsMeta: [],
+      sessionId: 's',
+      pendingAgentToolUses: [{ stepIndex: 1, toolUseId: 'toolu_x' }],
+    };
+    const order: string[] = [];
+    const store = makeSessionStore({
+      findTurnWithPendingAgents: () => ({
+        turn: parentTurn,
+        pendings: [...parentTurn.pendingAgentToolUses],
+      }),
+      withSessionLock: async <T,>(_sessionId: string, fn: () => Promise<T>): Promise<T> => {
+        order.push('lock-acquire');
+        const r = await fn();
+        order.push('lock-release');
+        return r;
+      },
+    });
+    const handler = new AuditInteractionHandler(
+      new SessionResolverService(config),
+      store,
+      makeAuditWriter({
+        nextSubInteractionSequence: async () => { order.push('next-seq'); return 5; },
+        writeSubInteractionRequest: async (p) => {
+          order.push('write-sub');
+          return { dir: `${p.parentInteractionDir}/sub`, requestBodyOmitted: false };
+        },
+      }),
+      config,
+    );
+
+    await handler.execute({ headers: {}, rawBody: FRESH_BODY, requestId: 'sub' });
+    expect(order[0]).toBe('lock-acquire');
+    expect(order[order.length - 1]).toBe('lock-release');
+    expect(order.indexOf('next-seq')).toBeGreaterThan(order.indexOf('lock-acquire'));
+    expect(order.indexOf('next-seq')).toBeLessThan(order.indexOf('lock-release'));
+    expect(order.indexOf('write-sub')).toBeGreaterThan(order.indexOf('next-seq'));
+  });
+
+  it('continuation consume pendings cuyo toolUseId aparece en tool_result_ids del body', async () => {
+    const config = makeConfig();
+    const parentTurn: ActiveTurn = {
+      interactionDir: '/tmp/sessions/s/interactions/000001_parent',
+      interactionType: 'agentic-turn',
+      stepCount: 1,
+      requestSequence: 1,
+      startedAt: Date.now(),
+      requestBodyOmitted: false,
+      requestBodyBytes: 100,
+      stepsMeta: [],
+      sessionId: 's',
+      pendingAgentToolUses: [
+        { stepIndex: 1, toolUseId: 'tool-x', subagentType: 'Plan' },
+      ],
+    };
+    const consumed: Array<{ dir: string; id: string }> = [];
+
+    const store = makeSessionStore({
+      getTurnByToolUseId: (id: string) => (id === 'tool-x' ? parentTurn : null),
+      consumePendingAgentToolUse: (dir, id) => { consumed.push({ dir, id }); },
+    });
+    const handler = new AuditInteractionHandler(
+      new SessionResolverService(config),
+      store,
+      makeAuditWriter(),
+      config,
+    );
+
+    const result = await handler.execute({
+      headers: {},
+      rawBody: CONTINUATION_BODY, // contiene tool_result con tool_use_id 'tool-x'
+      requestId: 'cont-1',
+    });
+
+    expect(result).not.toBeNull();
+    expect(consumed).toEqual([
+      { dir: parentTurn.interactionDir, id: 'tool-x' },
+    ]);
+  });
+
+  it('fresh sin pendings agent → handleFresh (no se invoca writeSubInteractionRequest)', async () => {
+    const config = makeConfig();
+    let subCalled = false;
+    const handler = new AuditInteractionHandler(
+      new SessionResolverService(config),
+      makeSessionStore({ findTurnWithPendingAgents: () => null }),
+      makeAuditWriter({
+        writeSubInteractionRequest: async () => {
+          subCalled = true;
+          return { dir: '', requestBodyOmitted: false };
+        },
+      }),
+      config,
+    );
+    const result = await handler.execute({
+      headers: {},
+      rawBody: FRESH_BODY,
+      requestId: 'r-plain',
+    });
+    expect(result).not.toBeNull();
+    expect(subCalled).toBe(false);
   });
 
   it('debería auditar request de claude-cli aunque tenga session _unknown', async () => {

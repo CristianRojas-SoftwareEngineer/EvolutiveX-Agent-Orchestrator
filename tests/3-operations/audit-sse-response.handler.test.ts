@@ -6,7 +6,7 @@ import type { IAuditWriter } from '../../src/2-services/ports/audit-writer.port.
 import type { ISessionStore } from '../../src/2-services/ports/session-store.port.js';
 import type { ISseReconstructor } from '../../src/2-services/ports/sse-reconstructor.port.js';
 import { ProxyEnvironmentConfig } from '../../src/1-domain/types/config.types.js';
-import { AuditInteractionContext, ActiveTurn, StepMeta } from '../../src/1-domain/types/audit.types.js';
+import { AuditInteractionContext, ActiveTurn, StepMeta, TurnMetadata } from '../../src/1-domain/types/audit.types.js';
 
 function makeConfig(overrides: Partial<ProxyEnvironmentConfig> = {}): ProxyEnvironmentConfig {
   return {
@@ -38,6 +38,8 @@ function makeActiveTurn(overrides: Partial<ActiveTurn> = {}): ActiveTurn {
     stepCount: 1,
     requestSequence: 1,
     startedAt: Date.now(),
+    sessionId: 'test',
+    pendingAgentToolUses: [],
     requestBodyOmitted: false,
     requestBodyBytes: 100,
     stepsMeta: [],
@@ -84,6 +86,10 @@ function makeSessionStore(turn: ActiveTurn | null = makeActiveTurn(), overrides:
       if (t) t.stepsMeta.push(meta);
     },
     closeTurn: (dir: string) => { registry.delete(dir); },
+    registerPendingAgentToolUse: () => {},
+    findTurnWithPendingAgents: () => null,
+    consumePendingAgentToolUse: () => {},
+    withSessionLock: async <T,>(_sessionId: string, fn: () => Promise<T>): Promise<T> => fn(),
     ...overrides,
   };
 }
@@ -94,6 +100,8 @@ function makeAuditWriter(overrides: Partial<IAuditWriter> = {}): IAuditWriter {
     writeJsonAtomic: async () => {},
     writeFormattedAndMarkdown: async () => {},
     writeInteractionRequest: async () => ({ dir: '', requestBodyOmitted: false }),
+    writeSubInteractionRequest: async () => ({ dir: '', requestBodyOmitted: false }),
+    nextSubInteractionSequence: async () => 1,
     writeStepRequest: async () => {},
     finalizeNonSseResponseAudit: async () => ({
       responseBodyBytesAudited: 0,
@@ -372,5 +380,156 @@ describe('AuditSseResponseHandler', () => {
 
     await new Promise((r) => setTimeout(r, 100));
     expect(reconstructCalled).toBe(true);
+  });
+
+  it('debería registrar pendingAgentToolUse al ver content_block_start tool_use name=Agent', async () => {
+    const config = makeConfig();
+    const calls: Array<{ dir: string; step: number; id: string; type?: string }> = [];
+    const turn = makeActiveTurn();
+    const store = makeSessionStore(turn, {
+      registerPendingAgentToolUse: (dir, step, id, type) => {
+        calls.push({ dir, step, id, type });
+      },
+    });
+    const handler = new AuditSseResponseHandler(
+      makeAuditWriter(),
+      makeSseReconstructor(),
+      config,
+      store,
+    );
+
+    const sse = [
+      'data: {"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"toolu_a","name":"Agent"}}',
+      '',
+      'data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{\\"description\\":\\"x\\","}}',
+      '',
+      'data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"\\"prompt\\":\\"do it\\","}}',
+      '',
+      'data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"\\"subagent_type\\":\\"Explore\\"}"}}',
+      '',
+      'data: {"type":"content_block_stop","index":0}',
+      '',
+      'data: {"type":"message_delta","delta":{"stop_reason":"tool_use"}}',
+      '',
+    ].join('\n');
+
+    const stream = new PassThrough();
+    handler.execute(stream, makeContext(), {});
+    stream.write(sse);
+    stream.end();
+
+    await new Promise((r) => setTimeout(r, 100));
+
+    // Dos llamadas esperadas: una en content_block_start (sin subagent_type)
+    // y una al cerrar el bloque (con subagent_type='Explore').
+    expect(calls.length).toBeGreaterThanOrEqual(2);
+    expect(calls[0]).toEqual({ dir: turn.interactionDir, step: 1, id: 'toolu_a', type: undefined });
+    const enriched = calls.find((c) => c.type === 'Explore');
+    expect(enriched).toBeDefined();
+    expect(enriched!.id).toBe('toolu_a');
+  });
+
+  it('NO debería registrar pendingAgentToolUse para tool_use con name distinto de Agent', async () => {
+    const config = makeConfig();
+    const calls: unknown[] = [];
+    const store = makeSessionStore(makeActiveTurn(), {
+      registerPendingAgentToolUse: (...args) => { calls.push(args); },
+    });
+    const handler = new AuditSseResponseHandler(
+      makeAuditWriter(),
+      makeSseReconstructor(),
+      config,
+      store,
+    );
+
+    const sse = [
+      'data: {"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"toolu_b","name":"Read"}}',
+      '',
+      'data: {"type":"content_block_stop","index":0}',
+      '',
+      'data: {"type":"message_delta","delta":{"stop_reason":"tool_use"}}',
+      '',
+    ].join('\n');
+
+    const stream = new PassThrough();
+    handler.execute(stream, makeContext(), {});
+    stream.write(sse);
+    stream.end();
+
+    await new Promise((r) => setTimeout(r, 100));
+    expect(calls).toHaveLength(0);
+  });
+
+  it('debería tolerar input_json incompleto / inválido sin lanzar (sin enriquecer subagent_type)', async () => {
+    const config = makeConfig();
+    const calls: Array<{ id: string; type?: string }> = [];
+    const store = makeSessionStore(makeActiveTurn(), {
+      registerPendingAgentToolUse: (_dir, _step, id, type) => { calls.push({ id, type }); },
+    });
+    const handler = new AuditSseResponseHandler(
+      makeAuditWriter(),
+      makeSseReconstructor(),
+      config,
+      store,
+    );
+
+    // JSON parcial nunca cierra correctamente.
+    const sse = [
+      'data: {"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"toolu_c","name":"Agent"}}',
+      '',
+      'data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{\\"subagent_type\\":\\"Plan"}}',
+      '',
+      'data: {"type":"content_block_stop","index":0}',
+      '',
+      'data: {"type":"message_delta","delta":{"stop_reason":"tool_use"}}',
+      '',
+    ].join('\n');
+
+    const stream = new PassThrough();
+    handler.execute(stream, makeContext(), {});
+    stream.write(sse);
+    stream.end();
+
+    await new Promise((r) => setTimeout(r, 100));
+    // Sólo el primer registro (sin subagent_type), no hay segunda llamada porque parse falló.
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toEqual({ id: 'toolu_c', type: undefined });
+  });
+
+  it('debería propagar parentContext al meta.json si el turn es subagente', async () => {
+    const config = makeConfig();
+    let captured: TurnMetadata | null = null;
+    const subTurn = makeActiveTurn({
+      parentContext: {
+        parentInteractionDir: '/tmp/parent',
+        parentStepIndex: 1,
+        triggeringToolUseId: 'toolu_zzz',
+        subagentType: 'Explore',
+      },
+    });
+
+    const handler = new AuditSseResponseHandler(
+      makeAuditWriter({
+        writeTurnMeta: async (_dir, meta) => { captured = meta; },
+      }),
+      makeSseReconstructor(),
+      config,
+      makeSessionStore(subTurn),
+    );
+
+    const sseData = [
+      'event: message_delta',
+      'data: {"type":"message_delta","delta":{"stop_reason":"end_turn"}}',
+      '',
+    ].join('\n');
+
+    const stream = new PassThrough();
+    handler.execute(stream, makeContext(), { 'content-type': 'text/event-stream' });
+    stream.write(sseData);
+    stream.end();
+
+    await new Promise((r) => setTimeout(r, 100));
+    expect(captured).not.toBeNull();
+    expect(captured!.parentContext).toEqual(subTurn.parentContext);
   });
 });

@@ -73,35 +73,106 @@ export class AuditWriterService implements IAuditWriter {
       return { dir, requestBodyOmitted: false };
     }
 
-    const requestDir = path.join(dir, 'request');
+    const requestBodyOmitted = await this.writeRequestPayload(
+      dir,
+      params.headers,
+      params.bodyBuffer,
+      params.maxAuditRequestBytes,
+    );
+    return { dir, requestBodyOmitted };
+  }
+
+  public async writeSubInteractionRequest(params: {
+    parentInteractionDir: string;
+    parentStepIndex: number;
+    folderName: string;
+    headers: Record<string, string | string[] | undefined>;
+    bodyBuffer: Buffer | null;
+    maxAuditRequestBytes: number;
+  }): Promise<{ dir: string; requestBodyOmitted: boolean }> {
+    const dir = path.join(
+      params.parentInteractionDir,
+      'steps',
+      String(params.parentStepIndex).padStart(3, '0'),
+      'sub-interactions',
+      params.folderName,
+    );
+    const requestBodyOmitted = await this.writeRequestPayload(
+      dir,
+      params.headers,
+      params.bodyBuffer,
+      params.maxAuditRequestBytes,
+    );
+    return { dir, requestBodyOmitted };
+  }
+
+  public async nextSubInteractionSequence(
+    parentInteractionDir: string,
+    parentStepIndex: number,
+  ): Promise<number> {
+    const subDir = path.join(
+      parentInteractionDir,
+      'steps',
+      String(parentStepIndex).padStart(3, '0'),
+      'sub-interactions',
+    );
+    let max = 0;
+    try {
+      const entries = await fs.readdir(subDir, { withFileTypes: true });
+      for (const e of entries) {
+        if (!e.isDirectory()) continue;
+        const m = /^(\d{3})_/.exec(e.name);
+        if (m) {
+          const n = parseInt(m[1], 10);
+          if (!Number.isNaN(n)) max = Math.max(max, n);
+        }
+      }
+    } catch {
+      /* directorio inexistente: secuencia arranca en 1 */
+    }
+    return max + 1;
+  }
+
+  /**
+   * Helper interno: escribe `request/headers.json`, `request/body.bin` y los
+   * derivados markdown si el body cabe en el límite. Devuelve si el body fue
+   * omitido por exceder el tamaño máximo.
+   */
+  private async writeRequestPayload(
+    interactionDir: string,
+    headers: Record<string, string | string[] | undefined>,
+    bodyBuffer: Buffer | null,
+    maxAuditRequestBytes: number,
+  ): Promise<boolean> {
+    const requestDir = path.join(interactionDir, 'request');
     await fs.mkdir(requestDir, { recursive: true });
     await this.writeJsonAtomic(
       path.join(requestDir, 'headers.json'),
-      params.headers as unknown as JsonValue,
+      headers as unknown as JsonValue,
     );
 
-    const size = Buffer.isBuffer(params.bodyBuffer) ? params.bodyBuffer.length : 0;
-    if (size === 0 || !params.bodyBuffer) {
-      return { dir, requestBodyOmitted: false };
+    const size = Buffer.isBuffer(bodyBuffer) ? bodyBuffer.length : 0;
+    if (size === 0 || !bodyBuffer) {
+      return false;
     }
 
-    if (size <= params.maxAuditRequestBytes) {
-      await this.writeFileAtomic(path.join(requestDir, 'body.bin'), params.bodyBuffer);
-      const parsed = this.redactService.tryParseJson(params.bodyBuffer);
+    if (size <= maxAuditRequestBytes) {
+      await this.writeFileAtomic(path.join(requestDir, 'body.bin'), bodyBuffer);
+      const parsed = this.redactService.tryParseJson(bodyBuffer);
       if (parsed !== null) {
         await this.writeFormattedAndMarkdown(requestDir, 'body', parsed, 'request');
       }
-      return { dir, requestBodyOmitted: false };
+      return false;
     }
 
     await this.writeFileAtomic(
       path.join(requestDir, 'body.omitted.txt'),
       Buffer.from(
-        `Omitted: request body is ${size} bytes (limit MAX_AUDIT_REQUEST_BODY_BYTES=${params.maxAuditRequestBytes}).`,
+        `Omitted: request body is ${size} bytes (limit MAX_AUDIT_REQUEST_BODY_BYTES=${maxAuditRequestBytes}).`,
         'utf8',
       ),
     );
-    return { dir, requestBodyOmitted: true };
+    return true;
   }
 
   /**

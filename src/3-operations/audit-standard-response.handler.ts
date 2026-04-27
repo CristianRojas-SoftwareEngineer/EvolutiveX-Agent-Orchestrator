@@ -210,6 +210,7 @@ export class AuditStandardResponseHandler {
       sseResponseBodySource: null,
       errorMessage: null,
       errorCode: null,
+      ...(turn.parentContext ? { parentContext: turn.parentContext } : {}),
       truncation: {
         requestBodyOmitted: turn.requestBodyOmitted,
         responseBodyBytesTotal: totalResponseBytes,

@@ -15,6 +15,8 @@ function makeTurn(overrides: Partial<ActiveTurn> = {}): ActiveTurn {
     requestBodyOmitted: false,
     requestBodyBytes: 100,
     stepsMeta: [],
+    sessionId: 's1',
+    pendingAgentToolUses: [],
     ...overrides,
   };
 }
@@ -159,5 +161,156 @@ describe('SessionStoreService — turnRegistry', () => {
     store.closeTurn('/tmp/side');
     expect(store.getTurnByDir('/tmp/main')).resolves.toBe(mainTurn);
     expect(store.getTurnByDir('/tmp/side')).resolves.toBeNull();
+  });
+});
+
+describe('SessionStoreService — pending Agent tool_uses', () => {
+  let tmpDir: string;
+  let store: SessionStoreService;
+
+  beforeEach(async () => {
+    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'sstore-pending-'));
+    store = new SessionStoreService(tmpDir);
+  });
+
+  it('registerPendingAgentToolUse + findTurnWithPendingAgents (caso unívoco)', () => {
+    const turn = makeTurn({ interactionDir: '/tmp/p1', sessionId: 'sA' });
+    store.registerTurn(turn);
+    store.registerPendingAgentToolUse('/tmp/p1', 1, 'tool-aaa', 'general-purpose');
+
+    const found = store.findTurnWithPendingAgents('sA');
+    expect(found).not.toBeNull();
+    expect(found!.turn).toBe(turn);
+    expect(found!.pendings).toHaveLength(1);
+    expect(found!.pendings[0]).toEqual({
+      stepIndex: 1,
+      toolUseId: 'tool-aaa',
+      subagentType: 'general-purpose',
+    });
+  });
+
+  it('findTurnWithPendingAgents devuelve null cuando no hay pendings', () => {
+    const turn = makeTurn({ interactionDir: '/tmp/p1', sessionId: 'sA' });
+    store.registerTurn(turn);
+    expect(store.findTurnWithPendingAgents('sA')).toBeNull();
+  });
+
+  it('findTurnWithPendingAgents excluye turns con interactionType !== agentic-turn', () => {
+    const sideTurn = makeTurn({
+      interactionDir: '/tmp/side',
+      sessionId: 'sA',
+      interactionType: 'side-request',
+    });
+    const preflightTurn = makeTurn({
+      interactionDir: '/tmp/pre',
+      sessionId: 'sA',
+      interactionType: 'client-preflight',
+    });
+    store.registerTurn(sideTurn);
+    store.registerTurn(preflightTurn);
+    store.registerPendingAgentToolUse('/tmp/side', 1, 'tool-x');
+    store.registerPendingAgentToolUse('/tmp/pre', 1, 'tool-y');
+
+    expect(store.findTurnWithPendingAgents('sA')).toBeNull();
+  });
+
+  it('findTurnWithPendingAgents excluye turns con parentContext (refuerza profundidad ≤ 2)', () => {
+    const subagentTurn = makeTurn({
+      interactionDir: '/tmp/sub',
+      sessionId: 'sA',
+      parentContext: {
+        parentInteractionDir: '/tmp/parent',
+        parentStepIndex: 1,
+        triggeringToolUseId: 'tool-a',
+      },
+    });
+    store.registerTurn(subagentTurn);
+    store.registerPendingAgentToolUse('/tmp/sub', 1, 'nested-agent');
+
+    // Aunque el subagente tenga un Agent pendiente, no puede ser padre de nadie.
+    expect(store.findTurnWithPendingAgents('sA')).toBeNull();
+  });
+
+  it('findTurnWithPendingAgents devuelve copia del array (mutación local no afecta al turn)', () => {
+    const turn = makeTurn({ interactionDir: '/tmp/p1', sessionId: 'sA' });
+    store.registerTurn(turn);
+    store.registerPendingAgentToolUse('/tmp/p1', 1, 'tool-1');
+    store.registerPendingAgentToolUse('/tmp/p1', 1, 'tool-2');
+
+    const found = store.findTurnWithPendingAgents('sA');
+    expect(found!.pendings).toHaveLength(2);
+    found!.pendings.pop();
+    expect(turn.pendingAgentToolUses).toHaveLength(2);
+  });
+
+  it('registerPendingAgentToolUse es idempotente y enriquece subagentType si llega después', () => {
+    const turn = makeTurn({ interactionDir: '/tmp/p1', sessionId: 'sA' });
+    store.registerTurn(turn);
+    store.registerPendingAgentToolUse('/tmp/p1', 1, 'tool-aaa');
+    store.registerPendingAgentToolUse('/tmp/p1', 1, 'tool-aaa', 'Explore');
+
+    expect(turn.pendingAgentToolUses).toHaveLength(1);
+    expect(turn.pendingAgentToolUses[0].subagentType).toBe('Explore');
+  });
+
+  it('consumePendingAgentToolUse elimina la entrada y deja las demás intactas', () => {
+    const turn = makeTurn({ interactionDir: '/tmp/p1', sessionId: 'sA' });
+    store.registerTurn(turn);
+    store.registerPendingAgentToolUse('/tmp/p1', 1, 'tool-1');
+    store.registerPendingAgentToolUse('/tmp/p1', 1, 'tool-2');
+
+    store.consumePendingAgentToolUse('/tmp/p1', 'tool-1');
+    expect(turn.pendingAgentToolUses).toHaveLength(1);
+    expect(turn.pendingAgentToolUses[0].toolUseId).toBe('tool-2');
+  });
+
+  it('consumePendingAgentToolUse es idempotente sobre entrada inexistente', () => {
+    const turn = makeTurn({ interactionDir: '/tmp/p1', sessionId: 'sA' });
+    store.registerTurn(turn);
+    store.consumePendingAgentToolUse('/tmp/p1', 'no-existe');
+    expect(turn.pendingAgentToolUses).toHaveLength(0);
+  });
+
+  it('closeTurn limpia sessionToActiveTurns y borra la clave si queda vacío', () => {
+    const turn = makeTurn({ interactionDir: '/tmp/p1', sessionId: 'sA' });
+    store.registerTurn(turn);
+    expect(store.findTurnWithPendingAgents('sA')).toBeNull(); // no pendings, pero el set existe
+
+    // Tras cerrar, la sesión queda sin turns activos y find devuelve null
+    store.closeTurn('/tmp/p1');
+    store.registerPendingAgentToolUse('/tmp/p1', 1, 'tool-x'); // no-op (turn ya cerrado)
+    expect(store.findTurnWithPendingAgents('sA')).toBeNull();
+  });
+
+  it('sesiones distintas no interfieren', () => {
+    const turnA = makeTurn({ interactionDir: '/tmp/a', sessionId: 'sA' });
+    const turnB = makeTurn({ interactionDir: '/tmp/b', sessionId: 'sB' });
+    store.registerTurn(turnA);
+    store.registerTurn(turnB);
+    store.registerPendingAgentToolUse('/tmp/a', 1, 'tool-a');
+
+    expect(store.findTurnWithPendingAgents('sA')).not.toBeNull();
+    expect(store.findTurnWithPendingAgents('sB')).toBeNull();
+    expect(store.findTurnWithPendingAgents('sX')).toBeNull();
+  });
+
+  it('withSessionLock serializa ejecuciones concurrentes en la misma sesión', async () => {
+    const observed: string[] = [];
+    const slow = (label: string, ms: number) => async () => {
+      observed.push(`start:${label}`);
+      await new Promise((r) => setTimeout(r, ms));
+      observed.push(`end:${label}`);
+      return label;
+    };
+
+    const [a, b] = await Promise.all([
+      store.withSessionLock('sX', slow('A', 30)),
+      store.withSessionLock('sX', slow('B', 5)),
+    ]);
+
+    expect(a).toBe('A');
+    expect(b).toBe('B');
+    // Si está serializado, B sólo arranca tras end:A.
+    expect(observed).toEqual(['start:A', 'end:A', 'start:B', 'end:B']);
   });
 });

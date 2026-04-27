@@ -60,6 +60,13 @@ export class AuditSseResponseHandler {
     let anthropicMessageId: string | undefined;
     const toolCalls: string[] = [];
     const toolUseIds: string[] = [];
+    /**
+     * Tracker de bloques tool_use cuyo `name` es `Agent`. Indexado por el
+     * `index` del content_block para acumular el JSON parcial del input
+     * (vía `input_json_delta`) y, al recibir `content_block_stop`, extraer
+     * `subagent_type` para enriquecer la entrada en `pendingAgentToolUses`.
+     */
+    const agentBlockTracker = new Map<number, { toolUseId: string; jsonAcc: string }>();
     const stepUsage = {
       input_tokens: 0,
       output_tokens: 0,
@@ -147,6 +154,63 @@ export class AuditSseResponseHandler {
                 if (typeof evt.content_block.id === 'string') {
                   toolUseIds.push(evt.content_block.id);
                   this.sessionStore.registerToolUseId(evt.content_block.id, context.auditInteractionDir);
+
+                  // Detección de Agent: registrar pending para que la siguiente
+                  // fresh request en la misma sesión se clasifique como subagente.
+                  // El subagent_type llegará después vía input_json_delta y se
+                  // enriquecerá al cierre del bloque.
+                  if (
+                    typeof evt.content_block.name === 'string' &&
+                    evt.content_block.name.toLowerCase() === 'agent' &&
+                    typeof evt.index === 'number'
+                  ) {
+                    this.sessionStore.registerPendingAgentToolUse(
+                      context.auditInteractionDir,
+                      stepNumber,
+                      evt.content_block.id,
+                    );
+                    agentBlockTracker.set(evt.index, {
+                      toolUseId: evt.content_block.id,
+                      jsonAcc: '',
+                    });
+                  }
+                }
+              }
+              if (
+                evt.type === 'content_block_delta' &&
+                evt.delta?.type === 'input_json_delta' &&
+                typeof evt.index === 'number' &&
+                typeof evt.delta.partial_json === 'string'
+              ) {
+                const tracked = agentBlockTracker.get(evt.index);
+                if (tracked) {
+                  tracked.jsonAcc += evt.delta.partial_json;
+                }
+              }
+              if (
+                evt.type === 'content_block_stop' &&
+                typeof evt.index === 'number'
+              ) {
+                const tracked = agentBlockTracker.get(evt.index);
+                if (tracked) {
+                  let subagentType: string | undefined;
+                  try {
+                    const inputObj = JSON.parse(tracked.jsonAcc) as Record<string, unknown>;
+                    if (typeof inputObj.subagent_type === 'string') {
+                      subagentType = inputObj.subagent_type;
+                    }
+                  } catch {
+                    /* JSON parcial inválido — sin subagent_type */
+                  }
+                  if (subagentType) {
+                    this.sessionStore.registerPendingAgentToolUse(
+                      context.auditInteractionDir,
+                      stepNumber,
+                      tracked.toolUseId,
+                      subagentType,
+                    );
+                  }
+                  agentBlockTracker.delete(evt.index);
                 }
               }
             } catch {
@@ -348,6 +412,7 @@ export class AuditSseResponseHandler {
       sseResponseBodySource: sseResult?.sseResponseBodySource ?? null,
       errorMessage: null,
       errorCode: null,
+      ...(turn.parentContext ? { parentContext: turn.parentContext } : {}),
       truncation: {
         requestBodyOmitted: turn.requestBodyOmitted,
         responseBodyBytesTotal: null,

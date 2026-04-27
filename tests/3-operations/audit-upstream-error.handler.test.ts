@@ -43,6 +43,10 @@ function makeSessionStore(turn: ActiveTurn | null = null, overrides: Partial<ISe
     incrementStepCountByDir: (dir: string) => { const t = registry.get(dir); if (t) t.stepCount += 1; return t?.stepCount ?? 1; },
     pushStepMetaByDir: async (dir: string, meta: StepMeta) => { registry.get(dir)?.stepsMeta.push(meta); },
     closeTurn: (dir: string) => { registry.delete(dir); },
+    registerPendingAgentToolUse: () => {},
+    findTurnWithPendingAgents: () => null,
+    consumePendingAgentToolUse: () => {},
+    withSessionLock: async <T,>(_sessionId: string, fn: () => Promise<T>): Promise<T> => fn(),
     ...overrides,
   };
 }
@@ -53,6 +57,8 @@ function makeAuditWriter(overrides: Partial<IAuditWriter> = {}): IAuditWriter {
     writeJsonAtomic: async () => {},
     writeFormattedAndMarkdown: async () => {},
     writeInteractionRequest: async () => ({ dir: '', requestBodyOmitted: false }),
+    writeSubInteractionRequest: async () => ({ dir: '', requestBodyOmitted: false }),
+    nextSubInteractionSequence: async () => 1,
     writeStepRequest: async () => {},
     finalizeNonSseResponseAudit: async () => ({
       responseBodyBytesAudited: 0,
@@ -107,6 +113,8 @@ describe('AuditUpstreamErrorHandler', () => {
       stepsMeta: [
         { stepIndex: 1, sse: true, statusCode: 200, inputTokens: 5, outputTokens: 3 },
       ],
+      sessionId: 's',
+      pendingAgentToolUses: [],
     };
 
     const handler = new AuditUpstreamErrorHandler(
@@ -159,5 +167,38 @@ describe('AuditUpstreamErrorHandler', () => {
     expect(capturedMeta!.errorCode).toBe('ECONNRESET');
     expect(capturedMeta!.stepCount).toBe(0);
     expect(capturedMeta!.steps).toEqual([]);
+  });
+
+  it('debería propagar parentContext si el turn activo es subagente', async () => {
+    const config = makeConfig();
+    let capturedMeta: TurnMetadata | null = null;
+    const subTurn: ActiveTurn = {
+      interactionDir: '/tmp/sessions/s/interactions/000001_req-1',
+      interactionType: 'agentic-turn',
+      stepCount: 1,
+      requestSequence: 1,
+      startedAt: Date.now() - 100,
+      requestBodyOmitted: false,
+      requestBodyBytes: 100,
+      stepsMeta: [],
+      sessionId: 's',
+      pendingAgentToolUses: [],
+      parentContext: {
+        parentInteractionDir: '/tmp/parent',
+        parentStepIndex: 1,
+        triggeringToolUseId: 'toolu_z',
+        subagentType: 'Plan',
+      },
+    };
+
+    const handler = new AuditUpstreamErrorHandler(
+      makeAuditWriter({ writeTurnMeta: async (_dir, meta) => { capturedMeta = meta; } }),
+      config,
+      makeSessionStore(subTurn),
+    );
+
+    await handler.execute({ ...BASE_PARAMS, error: Object.assign(new Error('boom'), { code: 'ECONNREFUSED' }) });
+
+    expect(capturedMeta!.parentContext).toEqual(subTurn.parentContext);
   });
 });

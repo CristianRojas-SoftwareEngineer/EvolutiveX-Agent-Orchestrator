@@ -27,6 +27,27 @@ export interface IAuditWriter {
     maxAuditRequestBytes: number;
     skipTopLevelRequest?: boolean;
   }): Promise<{ dir: string; requestBodyOmitted: boolean }>;
+  /**
+   * Inicializa el directorio de un subagente bajo
+   * `<parentInteractionDir>/steps/<NNN>/sub-interactions/<MMM>_<requestId>/`
+   * y guarda el request top-level con la misma estructura que
+   * `writeInteractionRequest`. No usa `sessions/<id>/interactions/` porque la
+   * sub-interacción es hija lógica del step padre.
+   */
+  writeSubInteractionRequest(params: {
+    parentInteractionDir: string;
+    parentStepIndex: number;
+    folderName: string;
+    headers: Record<string, string | string[] | undefined>;
+    bodyBuffer: Buffer | null;
+    maxAuditRequestBytes: number;
+  }): Promise<{ dir: string; requestBodyOmitted: boolean }>;
+  /**
+   * Devuelve la siguiente secuencia local para sub-interacciones bajo el step
+   * indicado. Examina los directorios existentes con prefijo numérico de 3
+   * dígitos y devuelve `max + 1` (1-indexado). Idempotente y stateless.
+   */
+  nextSubInteractionSequence(parentInteractionDir: string, parentStepIndex: number): Promise<number>;
   writeStepRequest(params: {
     stepDir: string;
     headers: Record<string, string | string[] | undefined>;

@@ -4,7 +4,7 @@ import { AuditStandardResponseHandler } from '../../src/3-operations/audit-stand
 import type { IAuditWriter } from '../../src/2-services/ports/audit-writer.port.js';
 import type { ISessionStore } from '../../src/2-services/ports/session-store.port.js';
 import { ProxyEnvironmentConfig } from '../../src/1-domain/types/config.types.js';
-import { AuditInteractionContext, ActiveTurn, StepMeta } from '../../src/1-domain/types/audit.types.js';
+import { AuditInteractionContext, ActiveTurn, StepMeta, TurnMetadata } from '../../src/1-domain/types/audit.types.js';
 
 function makeConfig(overrides: Partial<ProxyEnvironmentConfig> = {}): ProxyEnvironmentConfig {
   return {
@@ -36,6 +36,8 @@ function makeActiveTurn(overrides: Partial<ActiveTurn> = {}): ActiveTurn {
     stepCount: 1,
     requestSequence: 1,
     startedAt: Date.now(),
+    sessionId: 'test',
+    pendingAgentToolUses: [],
     requestBodyOmitted: false,
     requestBodyBytes: 100,
     stepsMeta: [],
@@ -77,6 +79,10 @@ function makeSessionStore(turn: ActiveTurn | null = makeActiveTurn(), overrides:
     incrementStepCountByDir: (dir: string) => { const t = registry.get(dir); if (t) t.stepCount += 1; return t?.stepCount ?? 1; },
     pushStepMetaByDir: async (dir: string, meta: StepMeta) => { registry.get(dir)?.stepsMeta.push(meta); },
     closeTurn: (dir: string) => { registry.delete(dir); for (const [id, d] of toolUseIndex) { if (d === dir) toolUseIndex.delete(id); } },
+    registerPendingAgentToolUse: () => {},
+    findTurnWithPendingAgents: () => null,
+    consumePendingAgentToolUse: () => {},
+    withSessionLock: async <T,>(_sessionId: string, fn: () => Promise<T>): Promise<T> => fn(),
     ...overrides,
   };
 }
@@ -87,6 +93,8 @@ function makeAuditWriter(overrides: Partial<IAuditWriter> = {}): IAuditWriter {
     writeJsonAtomic: async () => {},
     writeFormattedAndMarkdown: async () => {},
     writeInteractionRequest: async () => ({ dir: '', requestBodyOmitted: false }),
+    writeSubInteractionRequest: async () => ({ dir: '', requestBodyOmitted: false }),
+    nextSubInteractionSequence: async () => 1,
     writeStepRequest: async () => {},
     finalizeNonSseResponseAudit: async () => ({
       responseBodyBytesAudited: 0,
@@ -241,5 +249,35 @@ describe('AuditStandardResponseHandler', () => {
     expect(turnClosed).toBe(true);
     expect(stepMetaPushed).not.toBeNull();
     expect(stepMetaPushed!.label).toBe('quota-check');
+  });
+
+  it('debería propagar parentContext al meta.json si el turn es subagente', async () => {
+    const config = makeConfig();
+    let captured: TurnMetadata | null = null;
+    const subTurn = makeActiveTurn({
+      parentContext: {
+        parentInteractionDir: '/tmp/parent',
+        parentStepIndex: 2,
+        triggeringToolUseId: 'toolu_zzz',
+        subagentType: 'general-purpose',
+      },
+    });
+
+    const handler = new AuditStandardResponseHandler(
+      makeAuditWriter({
+        writeTurnMeta: async (_dir, meta) => { captured = meta; },
+      }),
+      config,
+      makeSessionStore(subTurn),
+    );
+
+    const stream = new PassThrough();
+    handler.execute(stream, makeContext(), 'application/json');
+    stream.write(Buffer.from('{"id":"msg_1","stop_reason":"end_turn"}'));
+    stream.end();
+
+    await new Promise((r) => setTimeout(r, 100));
+    expect(captured).not.toBeNull();
+    expect(captured!.parentContext).toEqual(subTurn.parentContext);
   });
 });

@@ -64,6 +64,7 @@ export class AuditUpstreamErrorHandler {
       sseResponseBodySource: null,
       errorMessage,
       errorCode,
+      ...(turn?.parentContext ? { parentContext: turn.parentContext } : {}),
       truncation: {
         requestBodyOmitted,
         responseBodyBytesTotal: null,

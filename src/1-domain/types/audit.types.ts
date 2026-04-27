@@ -101,6 +101,46 @@ export type InteractionType = 'client-preflight' | 'agentic-turn' | 'side-reques
  */
 export type TurnOutcome = 'completed' | 'client-error' | 'upstream-error' | 'truncated';
 
+/**
+ * Referencia de parentezco entre una interacción de subagente y el step del
+ * turno padre que la originó vía un tool_use `Agent`.
+ */
+export interface ParentContext {
+  /** Directorio absoluto del turno padre. */
+  parentInteractionDir: string;
+  /** Índice del step del padre (1-indexado) donde se emitió el tool_use `Agent`. */
+  parentStepIndex: number;
+  /**
+   * `tool_use_id` específico que originó este subagente.
+   * `null` cuando hubo varios tool_use `Agent` paralelos en el mismo step y la
+   * correlación no fue unívoca al crear el subagente; el id correcto se
+   * conocerá al llegar el `tool_result` correspondiente en la continuation
+   * del padre.
+   */
+  triggeringToolUseId: string | null;
+  /**
+   * Tipo de subagente declarado por el cliente en `tool_use.input.subagent_type`
+   * (`general-purpose`, `Explore`, `Plan`, `claude-code-guide`, `statusline-setup`, ...).
+   * Opcional porque puede no haberse capturado a tiempo o no haberse provisto.
+   */
+  subagentType?: string;
+}
+
+/**
+ * Entrada que tracquea un tool_use `Agent` emitido por el SSE del padre y aún
+ * no correlacionado con el subagente correspondiente. Cada entrada se consume
+ * o bien al crear el subagente (caso unívoco) o bien al recibir la
+ * continuation con el `tool_result` (caso paralelo).
+ */
+export interface PendingAgentToolUse {
+  /** Step del padre donde se emitió el tool_use. */
+  stepIndex: number;
+  /** Identificador único del tool_use bloque emitido por Anthropic. */
+  toolUseId: string;
+  /** `subagent_type` del input del tool_use, capturado vía input_json_delta. */
+  subagentType?: string;
+}
+
 export interface ActiveTurn {
   interactionDir: string;
   interactionType: InteractionType;
@@ -110,6 +150,18 @@ export interface ActiveTurn {
   requestBodyOmitted: boolean;
   requestBodyBytes: number;
   stepsMeta: StepMeta[];
+  /**
+   * Identificador de la sesión a la que pertenece el turno. Necesario para
+   * correlacionar subagentes con su padre dentro de la misma sesión.
+   */
+  sessionId: string;
+  /**
+   * Tool_uses `Agent` emitidos por el SSE de este turn que aún esperan su
+   * `tool_result`. Vacío en turns que no son padres de subagentes.
+   */
+  pendingAgentToolUses: PendingAgentToolUse[];
+  /** Definido sólo en turns que son subagentes. */
+  parentContext?: ParentContext;
 }
 
 /**
@@ -139,6 +191,8 @@ export interface TurnMetadata {
   sseResponseBodySource: string | null;
   errorMessage: string | null;
   errorCode: string | null;
+  /** Presente sólo en interacciones de subagentes anidadas bajo el step padre. */
+  parentContext?: ParentContext;
 }
 
 /**
@@ -152,6 +206,8 @@ export interface InteractionState {
   interactionType: InteractionType;
   /** Presente cuando la continuation no encontró su turno padre vía tool_use_id (degradación). */
   continuationOrphan?: boolean;
+  /** Presente sólo en interacciones de subagentes anidadas bajo el step padre. */
+  parentContext?: ParentContext;
 }
 
 /**

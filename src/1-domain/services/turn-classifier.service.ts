@@ -12,5 +12,7 @@ export function classifyRequestBody(bodyBuffer: Buffer): TurnClassification {
   if (str.includes('"quota"') && str.includes('"max_tokens":1')) return { type: 'preflight-quota' };
   if (!str.includes('"tools"')) return { type: 'preflight-warmup' };
   if (/"tools"\s*:\s*\[\s*\]/.test(str)) return { type: 'side-request' };
+  // Detectar ejecuciones de built-in tools: tools con campo "type" que empieza con web_search_, web_fetch_, o text_editor_
+  if (/'"type"\s*:\s*"(web_search_|web_fetch_|text_editor_)'/.test(str)) return { type: 'builtin-tool-execution' };
   return { type: 'fresh' };
 }

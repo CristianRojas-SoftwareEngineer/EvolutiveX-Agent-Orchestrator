@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Read(//c/Users/Cristian/.claude/skills/smart-code-proxy/**)",
-      "Read(//c/Users/Cristian/.claude/skills/anthropic-api-cost-estimation/**)"
+      "Read(//c/Users/Cristian/.claude/skills/anthropic-api-cost-estimation/**)",
+      "WebFetch(domain:mysummit.school)"
     ]
   }
 }

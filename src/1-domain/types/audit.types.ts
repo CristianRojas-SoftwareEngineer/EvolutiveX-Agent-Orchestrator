@@ -28,7 +28,8 @@ export type TurnClassification =
   | { type: 'preflight-warmup' }
   | { type: 'fresh' }
   | { type: 'continuation' }
-  | { type: 'side-request' };
+  | { type: 'side-request' }
+  | { type: 'builtin-tool-execution' };
 
 /**
  * Metadatos de un step individual dentro de un turno.
@@ -142,6 +143,21 @@ export interface PendingAgentToolUse {
   subagentType?: string;
 }
 
+/**
+ * Entrada que tracquea un tool_use de built-in tool (web_search, web_fetch,
+ * text_editor) emitido por el SSE y aún no correlacionado con la ejecución
+ * correspondiente. Cada entrada se consume al crear la sub-interacción de
+ * ejecución de la herramienta built-in.
+ */
+export interface PendingBuiltinToolUse {
+  /** Step donde se emitió el tool_use. */
+  stepIndex: number;
+  /** Identificador único del tool_use bloque emitido por Anthropic. */
+  toolUseId: string;
+  /** Tipo de built-in tool: web_search, web_fetch, o text_editor. */
+  toolType: 'web_search' | 'web_fetch' | 'text_editor';
+}
+
 export interface ActiveTurn {
   interactionDir: string;
   interactionType: InteractionType;
@@ -161,6 +177,12 @@ export interface ActiveTurn {
    * `tool_result`. Vacío en turns que no son padres de subagentes.
    */
   pendingAgentToolUses: PendingAgentToolUse[];
+  /**
+   * Tool_uses de built-in tools (web_search, web_fetch, text_editor) emitidos
+   * por el SSE de este turn que aún no han sido correlacionados con sus
+   * ejecuciones. Vacío en turns que no emiten built-in tool uses.
+   */
+  pendingBuiltinToolUses: PendingBuiltinToolUse[];
   /** Definido sólo en turns que son subagentes. */
   parentContext?: ParentContext;
   /**
@@ -207,6 +229,12 @@ export interface TurnMetadata {
    * graceful shutdown). Información forense para correlación offline.
    */
   lostPendingAgents?: PendingAgentToolUse[];
+  /**
+   * Presente cuando el turno se cierra habiendo registrado built-in tool_uses
+   * que no se consumieron antes del cierre. Información forense para
+   * correlación offline.
+   */
+  lostPendingBuiltinTools?: PendingBuiltinToolUse[];
 }
 
 /**

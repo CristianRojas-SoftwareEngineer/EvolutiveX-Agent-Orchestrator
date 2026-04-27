@@ -54,6 +54,9 @@ function makeSessionStore(overrides: Partial<ISessionStore> = {}): ISessionStore
     registerPendingAgentToolUse: () => {},
     findTurnWithPendingAgents: () => null,
     consumePendingAgentToolUse: () => {},
+    registerPendingBuiltinToolUse: () => {},
+    findTurnWithPendingBuiltinTools: () => null,
+    consumePendingBuiltinToolUse: () => {},
     findStaleTurnsAwaitingContinuation: () => [],
     getAllOpenTurns: () => [],
     withSessionLock: async <T,>(_sessionId: string, fn: () => Promise<T>): Promise<T> => fn(),
@@ -205,6 +208,7 @@ describe('AuditInteractionHandler', () => {
       stepsMeta: [],
       sessionId: 's',
       pendingAgentToolUses: [],
+      pendingBuiltinToolUses: [],
     };
     const store = makeSessionStore({
       getTurnByToolUseId: (id: string) => id === 'tool-x' ? parentTurn : null,
@@ -389,6 +393,7 @@ describe('AuditInteractionHandler', () => {
       stepsMeta: [],
       sessionId: 's',
       pendingAgentToolUses: [],
+      pendingBuiltinToolUses: [],
     };
     const store = makeSessionStore({
       getTurnByToolUseId: (id: string) => id === 'first-id' ? parentTurn : null,
@@ -547,6 +552,7 @@ describe('AuditInteractionHandler', () => {
       pendingAgentToolUses: [
         { stepIndex: 2, toolUseId: 'toolu_unique', subagentType: 'general-purpose' },
       ],
+      pendingBuiltinToolUses: [],
     };
     let consumed: { dir: string; id: string } | null = null;
     let registeredSub: ActiveTurn | null = null;
@@ -619,6 +625,7 @@ describe('AuditInteractionHandler', () => {
         { stepIndex: 1, toolUseId: 'toolu_a', subagentType: 'Explore' },
         { stepIndex: 1, toolUseId: 'toolu_b', subagentType: 'Plan' },
       ],
+      pendingBuiltinToolUses: [],
     };
     let consumeCalls = 0;
     let registeredSub: ActiveTurn | null = null;
@@ -672,6 +679,7 @@ describe('AuditInteractionHandler', () => {
       stepsMeta: [],
       sessionId: 's',
       pendingAgentToolUses: [{ stepIndex: 1, toolUseId: 'toolu_x' }],
+      pendingBuiltinToolUses: [],
     };
     const order: string[] = [];
     const store = makeSessionStore({
@@ -722,6 +730,7 @@ describe('AuditInteractionHandler', () => {
       pendingAgentToolUses: [
         { stepIndex: 1, toolUseId: 'tool-x', subagentType: 'Plan' },
       ],
+      pendingBuiltinToolUses: [],
     };
     const consumed: Array<{ dir: string; id: string }> = [];
 
@@ -784,6 +793,7 @@ describe('AuditInteractionHandler', () => {
       stepsMeta: [{ stepIndex: 1, sse: true, statusCode: 200, stopReason: 'tool_use' }],
       sessionId: 'test-session',
       pendingAgentToolUses: [{ stepIndex: 1, toolUseId: 'toolu_orphan' }],
+      pendingBuiltinToolUses: [],
       awaitingContinuation: true,
       awaitingSince: Date.now() - 120_000,
     };

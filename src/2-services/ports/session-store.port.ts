@@ -1,4 +1,4 @@
-import { ActiveTurn, PendingAgentToolUse, StepMeta } from '../../1-domain/types/audit.types.js';
+import { ActiveTurn, PendingAgentToolUse, PendingBuiltinToolUse, StepMeta } from '../../1-domain/types/audit.types.js';
 
 /**
  * Port que define el contrato público de almacenamiento de sesiones.
@@ -43,6 +43,31 @@ export interface ISessionStore {
    * entrada no existen.
    */
   consumePendingAgentToolUse(interactionDir: string, toolUseId: string): void;
+  /**
+   * Registra un tool_use de built-in tool (web_search, web_fetch, text_editor)
+   * emitido por el SSE del turn cuya ejecución aún no ha llegado.
+   * Idempotente: si la entrada ya existe, no hace nada.
+   */
+  registerPendingBuiltinToolUse(
+    interactionDir: string,
+    stepIndex: number,
+    toolUseId: string,
+    toolType: 'web_search' | 'web_fetch' | 'text_editor',
+  ): void;
+  /**
+   * Busca en la sesión el primer turn con `pendingBuiltinToolUses` no vacío.
+   * A diferencia de `findTurnWithPendingAgents`, este método SÍ considera
+   * turns con `parentContext` (subagentes pueden ser padres de builtin tools).
+   * Devuelve copia del array de pendings.
+   */
+  findTurnWithPendingBuiltinTools(
+    sessionId: string,
+  ): { turn: ActiveTurn; pendings: PendingBuiltinToolUse[] } | null;
+  /**
+   * Consume (elimina) la entrada de `pendingBuiltinToolUses` cuyo `toolUseId`
+   * coincide en el turn registrado. Idempotente.
+   */
+  consumePendingBuiltinToolUse(interactionDir: string, toolUseId: string): void;
   /**
    * Busca en la sesión turnos con `awaitingContinuation === true` cuyo
    * `awaitingSince` supera `maxAgeMs` milisegundos. Devuelve los turnos

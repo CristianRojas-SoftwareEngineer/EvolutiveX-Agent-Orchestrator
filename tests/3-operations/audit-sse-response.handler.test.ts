@@ -40,6 +40,7 @@ function makeActiveTurn(overrides: Partial<ActiveTurn> = {}): ActiveTurn {
     startedAt: Date.now(),
     sessionId: 'test',
     pendingAgentToolUses: [],
+    pendingBuiltinToolUses: [],
     requestBodyOmitted: false,
     requestBodyBytes: 100,
     stepsMeta: [],
@@ -89,6 +90,9 @@ function makeSessionStore(turn: ActiveTurn | null = makeActiveTurn(), overrides:
     registerPendingAgentToolUse: () => {},
     findTurnWithPendingAgents: () => null,
     consumePendingAgentToolUse: () => {},
+    registerPendingBuiltinToolUse: () => {},
+    findTurnWithPendingBuiltinTools: () => null,
+    consumePendingBuiltinToolUse: () => {},
     findStaleTurnsAwaitingContinuation: () => [],
     getAllOpenTurns: () => [],
     withSessionLock: async <T,>(_sessionId: string, fn: () => Promise<T>): Promise<T> => fn(),
@@ -544,6 +548,7 @@ describe('AuditSseResponseHandler', () => {
         { stepIndex: 1, toolUseId: 'toolu_agent_1' },
         { stepIndex: 1, toolUseId: 'toolu_agent_2', subagentType: 'Explore' },
       ],
+      pendingBuiltinToolUses: [],
     });
 
     const sseData = [

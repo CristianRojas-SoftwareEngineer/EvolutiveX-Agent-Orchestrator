@@ -17,6 +17,7 @@ function makeTurn(overrides: Partial<ActiveTurn> = {}): ActiveTurn {
     stepsMeta: [],
     sessionId: 's1',
     pendingAgentToolUses: [],
+    pendingBuiltinToolUses: [],
     ...overrides,
   };
 }

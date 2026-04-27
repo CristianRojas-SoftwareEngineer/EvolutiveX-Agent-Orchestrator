@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 
-import { ActiveTurn, PendingAgentToolUse, StepMeta } from '../1-domain/types/audit.types.js';
+import { ActiveTurn, PendingAgentToolUse, PendingBuiltinToolUse, StepMeta } from '../1-domain/types/audit.types.js';
 import type { ISessionStore } from './ports/session-store.port.js';
 
 const INTERACTION_SEQUENCE_FILE = 'interaction-sequence.json';
@@ -99,6 +99,45 @@ export class SessionStoreService implements ISessionStore {
     const idx = turn.pendingAgentToolUses.findIndex((p) => p.toolUseId === toolUseId);
     if (idx >= 0) {
       turn.pendingAgentToolUses.splice(idx, 1);
+    }
+  }
+
+  public registerPendingBuiltinToolUse(
+    interactionDir: string,
+    stepIndex: number,
+    toolUseId: string,
+    toolType: 'web_search' | 'web_fetch' | 'text_editor',
+  ): void {
+    const turn = this.turnRegistry.get(interactionDir);
+    if (!turn) return;
+    const existing = turn.pendingBuiltinToolUses.find((p) => p.toolUseId === toolUseId);
+    if (existing) return; // Idempotente: ya existe, no hacer nada
+    const entry: PendingBuiltinToolUse = { stepIndex, toolUseId, toolType };
+    turn.pendingBuiltinToolUses.push(entry);
+  }
+
+  public findTurnWithPendingBuiltinTools(
+    sessionId: string,
+  ): { turn: ActiveTurn; pendings: PendingBuiltinToolUse[] } | null {
+    const dirs = this.sessionToActiveTurns.get(sessionId);
+    if (!dirs) return null;
+    for (const dir of dirs) {
+      const turn = this.turnRegistry.get(dir);
+      if (!turn) continue;
+      // A diferencia de findTurnWithPendingAgents, SÍ consideramos turns con
+      // parentContext (subagentes pueden ser padres de builtin tools)
+      if (turn.pendingBuiltinToolUses.length === 0) continue;
+      return { turn, pendings: [...turn.pendingBuiltinToolUses] };
+    }
+    return null;
+  }
+
+  public consumePendingBuiltinToolUse(interactionDir: string, toolUseId: string): void {
+    const turn = this.turnRegistry.get(interactionDir);
+    if (!turn) return;
+    const idx = turn.pendingBuiltinToolUses.findIndex((p) => p.toolUseId === toolUseId);
+    if (idx >= 0) {
+      turn.pendingBuiltinToolUses.splice(idx, 1);
     }
   }
 

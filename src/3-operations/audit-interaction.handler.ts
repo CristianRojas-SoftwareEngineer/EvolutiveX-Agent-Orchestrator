@@ -8,6 +8,7 @@ import {
   InteractionType,
   ParentContext,
   PendingAgentToolUse,
+  PendingBuiltinToolUse,
   TurnClassification,
   computeTokenTotals,
   computeSseRawBytesTotal,
@@ -98,6 +99,22 @@ export class AuditInteractionHandler {
       return this.handlePreflightWarmup(params, headersForAudit, auditSessionId, classification);
     }
 
+    if (classification.type === 'builtin-tool-execution') {
+      // Buscar un turno (incluyendo subagentes) con pending builtin tools
+      const builtinPendingMatch = this.sessionStore.findTurnWithPendingBuiltinTools(auditSessionId);
+      if (builtinPendingMatch) {
+        return this.handleBuiltinToolExecution(
+          params,
+          headersForAudit,
+          auditSessionId,
+          classification,
+          builtinPendingMatch,
+        );
+      }
+      // Si no hay match, tratar como fresh (degradación graceful)
+      return this.handleFresh(params, headersForAudit, auditSessionId, { type: 'fresh' });
+    }
+
     // Fallback inalcanzable
     return this.handleFresh(params, headersForAudit, auditSessionId, { type: 'fresh' });
   }
@@ -149,6 +166,7 @@ export class AuditInteractionHandler {
       stepsMeta: [],
       sessionId: auditSessionId,
       pendingAgentToolUses: [],
+      pendingBuiltinToolUses: [],
     });
 
     return {
@@ -159,6 +177,100 @@ export class AuditInteractionHandler {
       interactionType: 'agentic-turn',
       turnClassification: classification,
     };
+  }
+
+  /**
+   * Crea una interacción de ejecución de built-in tool anidada bajo el step del
+   * subagente que emitió el tool_use. Similar a handleSubagent, pero para
+   * web_search/web_fetch/text_editor en lugar de Agent.
+   */
+  private async handleBuiltinToolExecution(
+    params: { rawBody: Buffer; requestId: string },
+    headersForAudit: Record<string, string | string[] | undefined>,
+    auditSessionId: string,
+    classification: TurnClassification,
+    match: { turn: { interactionDir: string; pendingBuiltinToolUses: PendingBuiltinToolUse[] }; pendings: PendingBuiltinToolUse[] },
+  ): Promise<AuditInteractionResult> {
+    return this.sessionStore.withSessionLock(auditSessionId, async () => {
+      const parentInteractionDir = match.turn.interactionDir;
+      const parentStepIndex = match.pendings.reduce(
+        (min, p) => Math.min(min, p.stepIndex),
+        match.pendings[0].stepIndex,
+      );
+
+      // Correlación tool_use ↔ ejecución builtin:
+      // - 1 pending → unívoco, lo consumimos ya.
+      // - >1 pending → ambiguo; dejamos null.
+      const triggeringToolUseId =
+        match.pendings.length === 1 ? match.pendings[0].toolUseId : null;
+
+      const subSeq = await this.auditWriter.nextSubInteractionSequence(
+        parentInteractionDir,
+        parentStepIndex,
+      );
+      const folderName = this.sessionResolver.formatAuditInteractionDirName(subSeq, params.requestId);
+
+      const wr = await this.auditWriter.writeSubInteractionRequest({
+        parentInteractionDir,
+        parentStepIndex,
+        folderName,
+        headers: headersForAudit,
+        bodyBuffer: params.rawBody,
+        maxAuditRequestBytes: this.config.MAX_AUDIT_REQUEST_BODY_BYTES,
+      });
+
+      // Escribir steps/001/request para simetría estructural
+      const stepDir = path.join(wr.dir, 'steps', '001');
+      await this.auditWriter.writeStepRequest({
+        stepDir,
+        headers: headersForAudit,
+        bodyBuffer: params.rawBody,
+        maxAuditRequestBytes: this.config.MAX_AUDIT_REQUEST_BODY_BYTES,
+      });
+
+      const startedAt = Date.now();
+      const parentContext: ParentContext = {
+        parentInteractionDir,
+        parentStepIndex,
+        triggeringToolUseId,
+      };
+
+      await this.auditWriter.writeInteractionState(wr.dir, {
+        state: 'in-progress',
+        startedAt: new Date(startedAt).toISOString(),
+        interactionType: 'agentic-turn',
+        parentContext,
+      });
+
+      // Si la correlación fue unívoca, consumimos el pending en este momento.
+      if (triggeringToolUseId) {
+        this.sessionStore.consumePendingBuiltinToolUse(parentInteractionDir, triggeringToolUseId);
+      }
+
+      this.sessionStore.registerTurn({
+        interactionDir: wr.dir,
+        interactionType: 'agentic-turn',
+        stepCount: 1,
+        requestSequence: subSeq,
+        startedAt,
+        requestBodyOmitted: wr.requestBodyOmitted,
+        requestBodyBytes: params.rawBody.length,
+        stepsMeta: [],
+        sessionId: auditSessionId,
+        pendingAgentToolUses: [],
+        pendingBuiltinToolUses: [],
+        parentContext,
+      });
+
+      return {
+        auditInteractionDir: wr.dir,
+        requestBodyOmitted: wr.requestBodyOmitted,
+        requestSequence: subSeq,
+        auditSessionId,
+        interactionType: 'agentic-turn',
+        turnClassification: classification,
+      };
+    });
   }
 
   /**
@@ -249,6 +361,7 @@ export class AuditInteractionHandler {
         stepsMeta: [],
         sessionId: auditSessionId,
         pendingAgentToolUses: [],
+        pendingBuiltinToolUses: [],
         parentContext,
       });
 
@@ -309,6 +422,12 @@ export class AuditInteractionHandler {
       this.sessionStore.consumePendingAgentToolUse(parentTurn.interactionDir, toolUseId);
     }
 
+    // También consumir cualquier pending builtin tool que corresponda a los
+    // tool_result_ids recibidos (por si la ejecución de builtin tool ya completó).
+    for (const toolUseId of toolUseIds) {
+      this.sessionStore.consumePendingBuiltinToolUse(parentTurn.interactionDir, toolUseId);
+    }
+
     return {
       auditInteractionDir: parentTurn.interactionDir,
       requestBodyOmitted: parentTurn.requestBodyOmitted,
@@ -365,6 +484,7 @@ export class AuditInteractionHandler {
       stepsMeta: [],
       sessionId: auditSessionId,
       pendingAgentToolUses: [],
+      pendingBuiltinToolUses: [],
     });
 
     return {
@@ -424,6 +544,7 @@ export class AuditInteractionHandler {
       stepsMeta: [],
       sessionId: auditSessionId,
       pendingAgentToolUses: [],
+      pendingBuiltinToolUses: [],
     });
 
     return {
@@ -481,6 +602,7 @@ export class AuditInteractionHandler {
       stepsMeta: [],
       sessionId: auditSessionId,
       pendingAgentToolUses: [],
+      pendingBuiltinToolUses: [],
     });
 
     return {

@@ -46,6 +46,9 @@ function makeSessionStore(turn: ActiveTurn | null = null, overrides: Partial<ISe
     registerPendingAgentToolUse: () => {},
     findTurnWithPendingAgents: () => null,
     consumePendingAgentToolUse: () => {},
+    registerPendingBuiltinToolUse: () => {},
+    findTurnWithPendingBuiltinTools: () => null,
+    consumePendingBuiltinToolUse: () => {},
     findStaleTurnsAwaitingContinuation: () => [],
     getAllOpenTurns: () => [],
     withSessionLock: async <T,>(_sessionId: string, fn: () => Promise<T>): Promise<T> => fn(),
@@ -117,6 +120,7 @@ describe('AuditUpstreamErrorHandler', () => {
       ],
       sessionId: 's',
       pendingAgentToolUses: [],
+      pendingBuiltinToolUses: [],
     };
 
     const handler = new AuditUpstreamErrorHandler(
@@ -185,6 +189,7 @@ describe('AuditUpstreamErrorHandler', () => {
       stepsMeta: [],
       sessionId: 's',
       pendingAgentToolUses: [],
+      pendingBuiltinToolUses: [],
       parentContext: {
         parentInteractionDir: '/tmp/parent',
         parentStepIndex: 1,

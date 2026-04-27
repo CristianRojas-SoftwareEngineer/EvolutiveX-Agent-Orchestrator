@@ -89,6 +89,8 @@ function makeSessionStore(turn: ActiveTurn | null = makeActiveTurn(), overrides:
     registerPendingAgentToolUse: () => {},
     findTurnWithPendingAgents: () => null,
     consumePendingAgentToolUse: () => {},
+    findStaleTurnsAwaitingContinuation: () => [],
+    getAllOpenTurns: () => [],
     withSessionLock: async <T,>(_sessionId: string, fn: () => Promise<T>): Promise<T> => fn(),
     ...overrides,
   };
@@ -494,6 +496,127 @@ describe('AuditSseResponseHandler', () => {
     // Sólo el primer registro (sin subagent_type), no hay segunda llamada porque parse falló.
     expect(calls).toHaveLength(1);
     expect(calls[0]).toEqual({ id: 'toolu_c', type: undefined });
+  });
+
+  it('debería detectar SSE event: error y cerrar con upstream-error + errorMessage/errorCode', async () => {
+    const config = makeConfig();
+    let captured: TurnMetadata | null = null;
+
+    const sseData = [
+      'event: message_start',
+      'data: {"type":"message_start","message":{"id":"msg_test","usage":{"input_tokens":5}}}',
+      '',
+      'event: content_block_start',
+      'data: {"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":"","signature":""}}',
+      '',
+      'event: error',
+      'data: {"type":"error","error":{"type":"overloaded_error","message":"Overloaded","details":null}}',
+      '',
+    ].join('\n');
+
+    const handler = new AuditSseResponseHandler(
+      makeAuditWriter({
+        writeTurnMeta: async (_dir, meta) => { captured = meta; },
+      }),
+      makeSseReconstructor(),
+      config,
+      makeSessionStore(),
+    );
+
+    const stream = new PassThrough();
+    handler.execute(stream, makeContext(), {});
+    stream.write(sseData);
+    stream.end();
+
+    await new Promise((r) => setTimeout(r, 100));
+    expect(captured).not.toBeNull();
+    expect(captured!.turnOutcome).toBe('upstream-error');
+    expect(captured!.errorMessage).toBe('Overloaded');
+    expect(captured!.errorCode).toBe('overloaded_error');
+  });
+
+  it('debería incluir lostPendingAgents en meta cuando SSE error ocurre con pendings activos', async () => {
+    const config = makeConfig();
+    let captured: TurnMetadata | null = null;
+
+    const turn = makeActiveTurn({
+      pendingAgentToolUses: [
+        { stepIndex: 1, toolUseId: 'toolu_agent_1' },
+        { stepIndex: 1, toolUseId: 'toolu_agent_2', subagentType: 'Explore' },
+      ],
+    });
+
+    const sseData = [
+      'event: error',
+      'data: {"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}',
+      '',
+    ].join('\n');
+
+    const handler = new AuditSseResponseHandler(
+      makeAuditWriter({
+        writeTurnMeta: async (_dir, meta) => { captured = meta; },
+      }),
+      makeSseReconstructor(),
+      config,
+      makeSessionStore(turn),
+    );
+
+    const stream = new PassThrough();
+    handler.execute(stream, makeContext(), {});
+    stream.write(sseData);
+    stream.end();
+
+    await new Promise((r) => setTimeout(r, 100));
+    expect(captured).not.toBeNull();
+    expect(captured!.turnOutcome).toBe('upstream-error');
+    expect(captured!.lostPendingAgents).toHaveLength(2);
+    expect(captured!.lostPendingAgents![0].toolUseId).toBe('toolu_agent_1');
+    expect(captured!.lostPendingAgents![1].subagentType).toBe('Explore');
+  });
+
+  it('debería marcar awaitingContinuation=true cuando stop_reason=tool_use', async () => {
+    const config = makeConfig();
+    const turn = makeActiveTurn();
+    const store = makeSessionStore(turn);
+
+    const sseData = [
+      'data: {"type":"message_delta","delta":{"stop_reason":"tool_use"}}',
+      '',
+    ].join('\n');
+
+    const handler = new AuditSseResponseHandler(makeAuditWriter(), makeSseReconstructor(), config, store);
+    const stream = new PassThrough();
+    handler.execute(stream, makeContext(), {});
+    stream.write(sseData);
+    stream.end();
+
+    await new Promise((r) => setTimeout(r, 100));
+    expect(turn.awaitingContinuation).toBe(true);
+    expect(turn.awaitingSince).toBeTypeOf('number');
+  });
+
+  it('NO debería incluir lostPendingAgents cuando no hay pendings activos', async () => {
+    const config = makeConfig();
+    let captured: TurnMetadata | null = null;
+
+    const handler = new AuditSseResponseHandler(
+      makeAuditWriter({
+        writeTurnMeta: async (_dir, meta) => { captured = meta; },
+      }),
+      makeSseReconstructor(),
+      config,
+      makeSessionStore(),
+    );
+
+    const sseData = 'event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"end_turn"}}\n\n';
+    const stream = new PassThrough();
+    handler.execute(stream, makeContext(), {});
+    stream.write(sseData);
+    stream.end();
+
+    await new Promise((r) => setTimeout(r, 100));
+    expect(captured).not.toBeNull();
+    expect(captured!.lostPendingAgents).toBeUndefined();
   });
 
   it('debería propagar parentContext al meta.json si el turn es subagente', async () => {

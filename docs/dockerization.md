@@ -5,7 +5,7 @@ Este documento describe el enfoque y los pasos recomendados para contenerizar `S
 Ubicación de artefactos:
 
 - `containerization/Dockerfile` — Imagen Docker multi-etapa optimizada para producción.
-- `containerization/Dockerfile.dockerignore` — Evita incluir directorios/archivos no deseados en el contexto de build. Sigue la convención de [Docker BuildKit](https://docs.docker.com/build/buildkit/) donde `<nombre-del-Dockerfile>.dockerignore` se asocia automáticamente al Dockerfile del mismo directorio (BuildKit es el motor de build por defecto desde Docker 23.0+).
+- `containerization/.dockerignore` — Evita incluir directorios/archivos no deseados en el contexto de build. Sigue la convención de [Docker BuildKit](https://docs.docker.com/build/buildkit/) donde el `.dockerignore` del mismo directorio que el Dockerfile se asocia automáticamente (BuildKit es el motor de build por defecto desde Docker 23.0+).
 
 Diseño y decisiones principales
 
@@ -34,7 +34,7 @@ docker run -it --rm -p 8787:8787 -v "$(pwd)/sessions:/app/sessions" --env-file c
 Pautas y buenas prácticas
 
 - No incluir secretos en el `Dockerfile` ni en la imagen.
-- Mantener `containerization/Dockerfile.dockerignore` actualizado para evitar subir archivos grandes o sensibles al contexto de build.
+- Mantener `containerization/.dockerignore` actualizado para evitar subir archivos grandes o sensibles al contexto de build.
 - Para desarrollo local, usar `npm run dev` y montar código fuente en un contenedor si se desea hot-reload.
 
 Limpieza temporal

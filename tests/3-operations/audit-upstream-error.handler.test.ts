@@ -46,6 +46,8 @@ function makeSessionStore(turn: ActiveTurn | null = null, overrides: Partial<ISe
     registerPendingAgentToolUse: () => {},
     findTurnWithPendingAgents: () => null,
     consumePendingAgentToolUse: () => {},
+    findStaleTurnsAwaitingContinuation: () => [],
+    getAllOpenTurns: () => [],
     withSessionLock: async <T,>(_sessionId: string, fn: () => Promise<T>): Promise<T> => fn(),
     ...overrides,
   };

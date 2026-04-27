@@ -98,8 +98,9 @@ export type InteractionType = 'client-preflight' | 'agentic-turn' | 'side-reques
  * - client-error: Error del cliente (4xx)
  * - upstream-error: Error del servidor upstream (5xx o fallo de conexión)
  * - truncated: Truncado por max_tokens
+ * - orphaned: Turno cerrado por cleanup (continuation nunca llegó, graceful shutdown, etc.)
  */
-export type TurnOutcome = 'completed' | 'client-error' | 'upstream-error' | 'truncated';
+export type TurnOutcome = 'completed' | 'client-error' | 'upstream-error' | 'truncated' | 'orphaned';
 
 /**
  * Referencia de parentezco entre una interacción de subagente y el step del
@@ -162,6 +163,13 @@ export interface ActiveTurn {
   pendingAgentToolUses: PendingAgentToolUse[];
   /** Definido sólo en turns que son subagentes. */
   parentContext?: ParentContext;
+  /**
+   * True cuando el SSE handler procesó un step con `stop_reason: "tool_use"`
+   * y retornó early esperando una continuation que aún no ha llegado.
+   */
+  awaitingContinuation?: boolean;
+  /** Timestamp (epoch ms) de cuándo el turno empezó a esperar la continuation. */
+  awaitingSince?: number;
 }
 
 /**
@@ -193,6 +201,12 @@ export interface TurnMetadata {
   errorCode: string | null;
   /** Presente sólo en interacciones de subagentes anidadas bajo el step padre. */
   parentContext?: ParentContext;
+  /**
+   * Presente cuando el turno se cierra habiendo registrado Agent tool_uses
+   * que no se consumieron antes del cierre (error upstream, orphan timeout,
+   * graceful shutdown). Información forense para correlación offline.
+   */
+  lostPendingAgents?: PendingAgentToolUse[];
 }
 
 /**

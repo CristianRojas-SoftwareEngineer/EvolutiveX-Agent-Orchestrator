@@ -223,6 +223,54 @@ describe('AuditWriterService - writeInteractionState / removeInteractionState', 
   });
 });
 
+describe('AuditWriterService - nextSubInteractionSequence', () => {
+  let tempDir: string;
+  let service: AuditWriterService;
+
+  beforeEach(async () => {
+    tempDir = path.join(os.tmpdir(), `scp-test-subseq-${Date.now()}`);
+    await fs.mkdir(tempDir, { recursive: true });
+    service = new AuditWriterService(new RedactService(), new MarkdownRendererService());
+  });
+
+  afterEach(async () => {
+    await fs.rm(tempDir, { recursive: true, force: true });
+  });
+
+  it('retorna 1 cuando no existen sub-interacciones previas', async () => {
+    const seq = await service.nextSubInteractionSequence(tempDir, 1);
+    expect(seq).toBe(1);
+  });
+
+  it('retorna max+1 con sub-interacciones de 6 dígitos existentes', async () => {
+    const subDir = path.join(tempDir, 'steps', '001', 'sub-interactions');
+    await fs.mkdir(path.join(subDir, '000001_aaaa-bbbb'), { recursive: true });
+    await fs.mkdir(path.join(subDir, '000003_cccc-dddd'), { recursive: true });
+
+    const seq = await service.nextSubInteractionSequence(tempDir, 1);
+    expect(seq).toBe(4);
+  });
+
+  it('ignora nombres de directorio malformados (sin prefijo de 6 dígitos)', async () => {
+    const subDir = path.join(tempDir, 'steps', '001', 'sub-interactions');
+    await fs.mkdir(path.join(subDir, 'abc_invalid'), { recursive: true });
+    await fs.mkdir(path.join(subDir, '00_short'), { recursive: true });
+    await fs.mkdir(path.join(subDir, '000002_valid-uuid'), { recursive: true });
+
+    const seq = await service.nextSubInteractionSequence(tempDir, 1);
+    expect(seq).toBe(3);
+  });
+
+  it('ignora archivos (no directorios) en sub-interactions', async () => {
+    const subDir = path.join(tempDir, 'steps', '001', 'sub-interactions');
+    await fs.mkdir(subDir, { recursive: true });
+    await fs.writeFile(path.join(subDir, '000005_not-a-dir'), 'file content');
+
+    const seq = await service.nextSubInteractionSequence(tempDir, 1);
+    expect(seq).toBe(1);
+  });
+});
+
 describe('AuditWriterService - writeFormattedAndMarkdown semántico', () => {
   let tempDir: string;
   let service: AuditWriterService;

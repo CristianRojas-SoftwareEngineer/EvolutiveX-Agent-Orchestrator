@@ -4,10 +4,13 @@ import type { ISessionStore } from '../2-services/ports/session-store.port.js';
 import type { IAuditWriter } from '../2-services/ports/audit-writer.port.js';
 import { classifyRequestBody } from '../1-domain/services/turn-classifier.service.js';
 import {
+  ActiveTurn,
   InteractionType,
   ParentContext,
   PendingAgentToolUse,
   TurnClassification,
+  computeTokenTotals,
+  computeSseRawBytesTotal,
 } from '../1-domain/types/audit.types.js';
 import { ProxyEnvironmentConfig } from '../1-domain/types/config.types.js';
 
@@ -25,6 +28,9 @@ interface AuditInteractionResult {
  * Clasifica el request, gestiona turnos activos y escribe la auditoría del request.
  */
 export class AuditInteractionHandler {
+  /** Umbral de antigüedad (ms) para considerar un turno awaiting como orphan. */
+  static readonly ORPHAN_MAX_AGE_MS = 60_000;
+
   constructor(
     private sessionResolver: SessionResolverService,
     private sessionStore: ISessionStore,
@@ -59,6 +65,10 @@ export class AuditInteractionHandler {
     }
 
     if (classification.type === 'fresh') {
+      // Cleanup de turnos orphan: cerrar turnos stale que esperan continuation
+      // que nunca llegó (tool call malformado, cancelación, etc.).
+      await this.closeOrphanTurns(auditSessionId);
+
       // Antes de tratar la request como un nuevo turn raíz, comprobar si en la
       // misma sesión hay un agentic-turn padre con tool_uses `Agent` aún sin
       // resolver: si lo hay, esta fresh se anida como subagente bajo el step
@@ -276,6 +286,10 @@ export class AuditInteractionHandler {
       });
       return { ...result, turnClassification: classification };
     }
+
+    // Limpiar flag de espera: la continuation esperada acaba de llegar.
+    parentTurn.awaitingContinuation = false;
+    parentTurn.awaitingSince = undefined;
 
     const stepCount = this.sessionStore.incrementStepCountByDir(parentTurn.interactionDir);
     const stepDir = path.join(parentTurn.interactionDir, 'steps', String(stepCount).padStart(3, '0'));
@@ -547,6 +561,76 @@ export class AuditInteractionHandler {
     }
 
     return true;
+  }
+
+  /**
+   * Cierra turnos orphan de la sesión: aquellos marcados como
+   * `awaitingContinuation` cuyo tiempo de espera supera el umbral.
+   * Se invoca antes de procesar un nuevo fresh turn.
+   */
+  private async closeOrphanTurns(sessionId: string): Promise<void> {
+    const stale = this.sessionStore.findStaleTurnsAwaitingContinuation(
+      sessionId,
+      AuditInteractionHandler.ORPHAN_MAX_AGE_MS,
+    );
+    for (const turn of stale) {
+      await this.closeOrphanTurn(turn);
+    }
+  }
+
+  /**
+   * Cierra un turno orphan individual, escribiendo meta.json con
+   * `turnOutcome: 'orphaned'` e información forense, y eliminando state.json.
+   */
+  public async closeOrphanTurn(turn: ActiveTurn): Promise<void> {
+    const endedAt = Date.now();
+    const sseRawBytesLimit = Number.isFinite(this.config.MAX_AUDIT_SSE_RAW_BYTES)
+      ? this.config.MAX_AUDIT_SSE_RAW_BYTES
+      : null;
+    const sseRawBytesTotal = computeSseRawBytesTotal(turn.stepsMeta);
+    const sseRawTruncatedAny = turn.stepsMeta.some((s) => s.sseRawTruncatedByLimit === true);
+    const totals = turn.interactionType !== 'client-preflight'
+      ? computeTokenTotals(turn.stepsMeta)
+      : null;
+    const lostPendings = turn.pendingAgentToolUses.length > 0
+      ? turn.pendingAgentToolUses
+      : undefined;
+
+    this.sessionStore.closeTurn(turn.interactionDir);
+
+    await this.auditWriter.writeTurnMeta(turn.interactionDir, {
+      interactionType: turn.interactionType,
+      turnOutcome: 'orphaned',
+      stepCount: turn.stepsMeta.length,
+      startedAt: new Date(turn.startedAt).toISOString(),
+      endedAt: new Date(endedAt).toISOString(),
+      durationMs: endedAt - turn.startedAt,
+      statusCode: null,
+      sse: turn.stepsMeta.some((s) => s.sse),
+      steps: turn.stepsMeta,
+      totals,
+      sseResponseBodyAttempted: false,
+      sseResponseBodyWritten: false,
+      sseResponseBodyError: null,
+      sseResponseBodySource: null,
+      errorMessage: null,
+      errorCode: null,
+      ...(turn.parentContext ? { parentContext: turn.parentContext } : {}),
+      ...(lostPendings ? { lostPendingAgents: lostPendings } : {}),
+      truncation: {
+        requestBodyOmitted: turn.requestBodyOmitted,
+        responseBodyBytesTotal: null,
+        responseBodyBytesAudited: null,
+        responseTruncatedByProxyBuffer: false,
+        responseTruncatedByAuditLimit: false,
+        sseRawBytesAudited: sseRawBytesTotal || null,
+        sseRawBytesLimit,
+        sseRawTruncatedByLimit: sseRawTruncatedAny,
+        sseRawWriteError: false,
+      },
+    });
+
+    await this.auditWriter.removeInteractionState(turn.interactionDir);
   }
 
   /**

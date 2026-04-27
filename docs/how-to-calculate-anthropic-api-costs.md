@@ -38,7 +38,7 @@ sessions/<session-id>/interactions/NNNNNN_<uuid>/
 
 - `NNNNNN` es el orden dentro de la sesión (coherente con el prefijo del directorio y con `interaction-sequence.json` en la raíz de la sesión).
 - Una interacción puede contener **múltiples steps** (llamadas HTTP individuales), agrupados bajo `steps/`. Por ejemplo, un turno agentic con herramientas puede tener 2-3 steps SSE seguidos.
-- `meta.json` es de tipo `TurnMetadata`: describe `interactionType` (`agentic-turn` o `client-preflight`), `steps[]` con metadatos por step, y `totals` con tokens agregados.
+- `meta.json` es de tipo `TurnMetadata`: describe `interactionType` (`agentic-turn`, `client-preflight` o `side-request`), `steps[]` con metadatos por step, y `totals` con tokens agregados.
 
 Eso es una **interacción de turno** única: una fila en el historial de auditoría, que puede abarcar varias llamadas HTTP.
 

@@ -121,7 +121,7 @@ export class AuditWriterService implements IAuditWriter {
       const entries = await fs.readdir(subDir, { withFileTypes: true });
       for (const e of entries) {
         if (!e.isDirectory()) continue;
-        const m = /^(\d{3})_/.exec(e.name);
+        const m = /^(\d{6})_/.exec(e.name);
         if (m) {
           const n = parseInt(m[1], 10);
           if (!Number.isNaN(n)) max = Math.max(max, n);

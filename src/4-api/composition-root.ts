@@ -69,6 +69,7 @@ export async function createProxyDependencies(
     auditUpstreamErrorHandler,
     filterToolsHandler,
     streamTee,
+    sessionStore,
     config,
   };
 }

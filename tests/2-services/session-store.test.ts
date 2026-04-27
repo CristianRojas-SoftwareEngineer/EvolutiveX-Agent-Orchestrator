@@ -294,6 +294,48 @@ describe('SessionStoreService — pending Agent tool_uses', () => {
     expect(store.findTurnWithPendingAgents('sX')).toBeNull();
   });
 
+  it('findStaleTurnsAwaitingContinuation retorna turnos stale con awaitingContinuation', async () => {
+    const staleTurn = makeTurn({
+      interactionDir: '/tmp/stale',
+      awaitingContinuation: true,
+      awaitingSince: Date.now() - 120_000, // 2 min ago
+    });
+    const freshTurn = makeTurn({
+      interactionDir: '/tmp/fresh',
+      awaitingContinuation: true,
+      awaitingSince: Date.now() - 5_000, // 5 sec ago
+    });
+    const normalTurn = makeTurn({ interactionDir: '/tmp/normal' });
+
+    store.registerTurn(staleTurn);
+    store.registerTurn(freshTurn);
+    store.registerTurn(normalTurn);
+
+    const stale = store.findStaleTurnsAwaitingContinuation('s1', 60_000);
+    expect(stale).toHaveLength(1);
+    expect(stale[0].interactionDir).toBe('/tmp/stale');
+  });
+
+  it('findStaleTurnsAwaitingContinuation retorna vacío si no hay stale', async () => {
+    const turn = makeTurn({ awaitingContinuation: false });
+    store.registerTurn(turn);
+    expect(store.findStaleTurnsAwaitingContinuation('s1', 60_000)).toHaveLength(0);
+  });
+
+  it('getAllOpenTurns retorna todos los turnos en el registry', async () => {
+    const t1 = makeTurn({ interactionDir: '/tmp/t1' });
+    const t2 = makeTurn({ interactionDir: '/tmp/t2', sessionId: 's2' });
+    store.registerTurn(t1);
+    store.registerTurn(t2);
+    const all = store.getAllOpenTurns();
+    expect(all).toHaveLength(2);
+    expect(all.map((t) => t.interactionDir).sort()).toEqual(['/tmp/t1', '/tmp/t2']);
+  });
+
+  it('getAllOpenTurns retorna vacío si no hay turnos', async () => {
+    expect(store.getAllOpenTurns()).toHaveLength(0);
+  });
+
   it('withSessionLock serializa ejecuciones concurrentes en la misma sesión', async () => {
     const observed: string[] = [];
     const slow = (label: string, ms: number) => async () => {

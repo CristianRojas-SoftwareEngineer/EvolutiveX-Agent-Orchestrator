@@ -2,7 +2,7 @@
 
 [![TypeScript](https://img.shields.io/badge/TypeScript-6.x-blue.svg)](https://www.typescriptlang.org/)
 [![Fastify](https://img.shields.io/badge/Fastify-5.x-black.svg)](https://fastify.dev/)
-[![Architecture](https://img.shields.io/badge/Architecture-SOLID-green.svg)](#🏛-diseño-del-sistema-solid)
+[![Architecture](https://img.shields.io/badge/Architecture-PKA-green.svg)](#-diseño-del-sistema-pka---progressive-kernel-architecture)
 
 Una implementación de alto rendimiento, modular y basada en **Fastify + TypeScript** diseñada específicamente para interceptar, auditar y analizar en tiempo real el tráfico entre **Claude Code** (el CLI oficial de Anthropic) y la API oficial de Anthropic. Claude Code permite redirigir sus peticiones al proxy vía la variable `ANTHROPIC_BASE_URL`, condición imprescindible para el funcionamiento del sistema; otros clientes (p. ej. Cursor) usan harnesses distintos y no están dentro del alcance de este proyecto.
 
@@ -79,8 +79,8 @@ El diseño garantiza que nunca se filtren API Keys a los logs de servidor ni a l
 Ideal para depurar comportamientos erráticos en herramientas de CLI (como `claude`):
 
 - Agrupa las peticiones de un turno completo (prompt → respuesta final) bajo una interacción con subdirectorios `steps/`.
-- Dos tipos de interacción: `agentic-turn` (turno del usuario con prompt y respuesta) y `client-preflight` (quota check + cache warm-up).
-- Clasificación de `side-request`: peticiones con `"tools": []` (ej. count_tokens) se auditan en su propia interacción sin desplazar al turno activo principal, evitando corrupción de metadata por race conditions.
+- Tres tipos de interacción: `agentic-turn` (turno del usuario con prompt y respuesta), `client-preflight` (quota check + cache warm-up) y `side-request` (peticiones con `"tools": []`, ej. count_tokens, generación de títulos).
+- Los `side-request` se auditan en su propia interacción sin desplazar al turno activo principal, evitando corrupción de metadata por race conditions.
 - Los turnos se indexan por `interactionDir` (único por request) permitiendo múltiples turnos concurrentes en la misma sesión (parallel subagents).
 - Las continuaciones (`tool_result`) se rutean al turno padre mediante correlación por `tool_use_id`, eliminando la misatribución de steps.
 - Los preflights (`client-preflight`) se cierran inmediatamente al recibir su respuesta, evitando turnos zombie que bloquean la sesión.
@@ -127,7 +127,7 @@ interactions/NNNNNN_<uuid>/
 
 > **Subagentes (`Task` / herramienta `Agent`):** Cuando el turno principal emite un `tool_use` con `name: "Agent"`, la siguiente petición fresh de la misma sesión NO se trata como nuevo turno raíz: se anida bajo el step que la disparó como `steps/<NNN>/sub-interactions/<MMM>_<uuid>/` con la misma estructura interna (`request/`, `response/`, `steps/`, `meta.json`, `state.json`). El `meta.json` del subagente incluye un bloque `parentContext: { parentInteractionDir, parentStepIndex, triggeringToolUseId, subagentType }` para reconstruir el árbol padre→hijo. La profundidad está acotada a 2 niveles (un subagente no puede ser padre de otros subagentes).
 
-> **state.json:** Archivo marcador escrito al iniciar la interacción con `{ state: "in-progress", startedAt, interactionType }`. Se elimina al cerrar el turno (cuando se escribe `meta.json`). Su presencia indica una interacción huérfana por crash del proceso.
+> **state.json:** Archivo marcador escrito al iniciar la interacción con `{ state: "in-progress", startedAt, interactionType, parentContext? }`. Se elimina al cerrar el turno (cuando se escribe `meta.json`). Su presencia indica una interacción huérfana por crash del proceso.
 
 ### Tipos de Interacción
 
@@ -145,9 +145,11 @@ El campo `turnOutcome` en `meta.json` indica el resultado final del turno:
 | --------------- | ------------------------------------------------------------------------- | ------------------- |
 | `completed`     | Turno completado exitosamente                                             | 2xx                 |
 | `client-error`  | Error del cliente (request mal formada, autenticación fallida, etc.)       | 4xx                 |
-| `upstream-error`| Error del servidor upstream (fallo de conexión, timeout, error interno)  | 5xx o `null`        |
+| `upstream-error`| Error del servidor upstream (fallo de conexión, timeout, error SSE)       | 5xx o `null`        |
 | `truncated`     | Respuesta truncada por `max_tokens`                                        | 2xx                 |
-| `interrupted`   | (Legacy) Turno interrumpido — ya no se genera en el modelo multi-turno      | Variable            |
+| `orphaned`      | Turno cerrado por cleanup (continuation nunca llegó, graceful shutdown)    | `null`              |
+
+> **Campos forenses en `meta.json`:** Cuando un turno se cierra con `upstream-error` o `orphaned` habiendo emitido `tool_use` de tipo `Agent` que no se correlacionaron con subagentes, el campo `lostPendingAgents?: PendingAgentToolUse[]` registra los IDs de esos tool_uses pendientes para facilitar correlación offline.
 
 ### Correlación con Logs de Claude Code
 

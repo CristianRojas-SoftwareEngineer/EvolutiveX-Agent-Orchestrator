@@ -54,6 +54,8 @@ function makeSessionStore(overrides: Partial<ISessionStore> = {}): ISessionStore
     registerPendingAgentToolUse: () => {},
     findTurnWithPendingAgents: () => null,
     consumePendingAgentToolUse: () => {},
+    findStaleTurnsAwaitingContinuation: () => [],
+    getAllOpenTurns: () => [],
     withSessionLock: async <T,>(_sessionId: string, fn: () => Promise<T>): Promise<T> => fn(),
     ...overrides,
   };
@@ -767,6 +769,59 @@ describe('AuditInteractionHandler', () => {
     });
     expect(result).not.toBeNull();
     expect(subCalled).toBe(false);
+  });
+
+  it('fresh turn debe cerrar orphan turns stale de la misma sesión', async () => {
+    const config = makeConfig();
+    const orphanTurn = {
+      interactionDir: '/tmp/sessions/test/interactions/000001_orphan',
+      interactionType: 'agentic-turn' as const,
+      stepCount: 1,
+      requestSequence: 1,
+      startedAt: Date.now() - 120_000,
+      requestBodyOmitted: false,
+      requestBodyBytes: 100,
+      stepsMeta: [{ stepIndex: 1, sse: true, statusCode: 200, stopReason: 'tool_use' }],
+      sessionId: 'test-session',
+      pendingAgentToolUses: [{ stepIndex: 1, toolUseId: 'toolu_orphan' }],
+      awaitingContinuation: true,
+      awaitingSince: Date.now() - 120_000,
+    };
+
+    let orphanMetaWritten: Record<string, unknown> | null = null;
+    let orphanStateRemoved = false;
+    let orphanClosed = false;
+
+    const store = makeSessionStore({
+      findStaleTurnsAwaitingContinuation: (_sid: string, _maxAge: number) => [orphanTurn],
+      closeTurn: (dir: string) => { if (dir === orphanTurn.interactionDir) orphanClosed = true; },
+    });
+
+    const handler = new AuditInteractionHandler(
+      new SessionResolverService(config),
+      store,
+      makeAuditWriter({
+        writeTurnMeta: async (dir, meta) => {
+          if (dir === orphanTurn.interactionDir) orphanMetaWritten = meta as unknown as Record<string, unknown>;
+        },
+        removeInteractionState: async (dir) => {
+          if (dir === orphanTurn.interactionDir) orphanStateRemoved = true;
+        },
+      }),
+      config,
+    );
+
+    await handler.execute({
+      headers: {},
+      rawBody: FRESH_BODY,
+      requestId: 'req-new',
+    });
+
+    expect(orphanClosed).toBe(true);
+    expect(orphanMetaWritten).not.toBeNull();
+    expect(orphanMetaWritten!.turnOutcome).toBe('orphaned');
+    expect(orphanMetaWritten!.lostPendingAgents).toHaveLength(1);
+    expect(orphanStateRemoved).toBe(true);
   });
 
   it('debería auditar request de claude-cli aunque tenga session _unknown', async () => {

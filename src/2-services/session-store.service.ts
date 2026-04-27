@@ -149,6 +149,29 @@ export class SessionStoreService implements ISessionStore {
     }
   }
 
+  public findStaleTurnsAwaitingContinuation(sessionId: string, maxAgeMs: number): ActiveTurn[] {
+    const dirs = this.sessionToActiveTurns.get(sessionId);
+    if (!dirs) return [];
+    const now = Date.now();
+    const stale: ActiveTurn[] = [];
+    for (const dir of dirs) {
+      const turn = this.turnRegistry.get(dir);
+      if (!turn) continue;
+      if (
+        turn.awaitingContinuation === true &&
+        typeof turn.awaitingSince === 'number' &&
+        now - turn.awaitingSince > maxAgeMs
+      ) {
+        stale.push(turn);
+      }
+    }
+    return stale;
+  }
+
+  public getAllOpenTurns(): ActiveTurn[] {
+    return [...this.turnRegistry.values()];
+  }
+
   public withSessionLock<T>(sessionId: string, fn: () => Promise<T>): Promise<T> {
     const key = String(sessionId);
     const prev = this.sessionRequestChains.get(key) || Promise.resolve();

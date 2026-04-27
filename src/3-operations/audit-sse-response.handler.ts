@@ -58,6 +58,8 @@ export class AuditSseResponseHandler {
     let sseRawTruncated = false;
     let stopReason: string | null = null;
     let anthropicMessageId: string | undefined;
+    let sseErrorMessage: string | null = null;
+    let sseErrorType: string | null = null;
     const toolCalls: string[] = [];
     const toolUseIds: string[] = [];
     /**
@@ -187,6 +189,11 @@ export class AuditSseResponseHandler {
                   tracked.jsonAcc += evt.delta.partial_json;
                 }
               }
+              if (evt.type === 'error') {
+                streamError = true;
+                sseErrorMessage = evt.error?.message ?? String(evt);
+                sseErrorType = evt.error?.type ?? null;
+              }
               if (
                 evt.type === 'content_block_stop' &&
                 typeof evt.index === 'number'
@@ -277,7 +284,14 @@ export class AuditSseResponseHandler {
         }
 
         if (stopReason === 'tool_use') {
-          // Turno no terminal — continúa con el próximo step (continuation)
+          // Turno no terminal — continúa con el próximo step (continuation).
+          // Marcar el turno como awaiting para que el cleanup pueda detectar
+          // orphans cuya continuation nunca llegó.
+          const awaitTurn = this.sessionStore.getTurnByDirSync(context.auditInteractionDir);
+          if (awaitTurn) {
+            awaitTurn.awaitingContinuation = true;
+            awaitTurn.awaitingSince = Date.now();
+          }
           return;
         }
 
@@ -329,6 +343,8 @@ export class AuditSseResponseHandler {
             true,
             streamError,
             sseReconstructResult,
+            sseErrorMessage,
+            sseErrorType,
           );
         }
       } catch (err) {
@@ -380,6 +396,8 @@ export class AuditSseResponseHandler {
     sse: boolean,
     streamError: boolean,
     sseResult?: SseReconstructResult,
+    sseErrorMessage?: string | null,
+    sseErrorType?: string | null,
   ): Promise<void> {
     const endedAt = Date.now();
     const sseRawBytesLimit = Number.isFinite(this.config.MAX_AUDIT_SSE_RAW_BYTES)
@@ -394,6 +412,11 @@ export class AuditSseResponseHandler {
       turn.interactionType !== 'client-preflight'
         ? computeTokenTotals(turn.stepsMeta)
         : null;
+
+    // Información forense: pending agents no consumidos al cierre
+    const lostPendings = turn.pendingAgentToolUses.length > 0
+      ? turn.pendingAgentToolUses
+      : undefined;
 
     const meta: TurnMetadata = {
       interactionType: turn.interactionType,
@@ -410,9 +433,10 @@ export class AuditSseResponseHandler {
       sseResponseBodyWritten: sseResult?.sseResponseBodyWritten ?? false,
       sseResponseBodyError: sseResult?.sseResponseBodyError ?? null,
       sseResponseBodySource: sseResult?.sseResponseBodySource ?? null,
-      errorMessage: null,
-      errorCode: null,
+      errorMessage: sseErrorMessage ?? null,
+      errorCode: sseErrorType ?? null,
       ...(turn.parentContext ? { parentContext: turn.parentContext } : {}),
+      ...(lostPendings ? { lostPendingAgents: lostPendings } : {}),
       truncation: {
         requestBodyOmitted: turn.requestBodyOmitted,
         responseBodyBytesTotal: null,

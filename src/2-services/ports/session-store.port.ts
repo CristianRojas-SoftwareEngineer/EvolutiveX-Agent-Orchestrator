@@ -44,6 +44,17 @@ export interface ISessionStore {
    */
   consumePendingAgentToolUse(interactionDir: string, toolUseId: string): void;
   /**
+   * Busca en la sesión turnos con `awaitingContinuation === true` cuyo
+   * `awaitingSince` supera `maxAgeMs` milisegundos. Devuelve los turnos
+   * stale para que el caller los cierre como orphans.
+   */
+  findStaleTurnsAwaitingContinuation(sessionId: string, maxAgeMs: number): ActiveTurn[];
+  /**
+   * Devuelve todos los turnos actualmente abiertos en el registry.
+   * Usado para graceful shutdown.
+   */
+  getAllOpenTurns(): ActiveTurn[];
+  /**
    * Ejecuta `fn` serializado por sesión. Garantiza que dos llamadas
    * concurrentes con el mismo `sessionId` se ejecuten en orden, lo cual
    * permite serializar la asignación de secuencia local de subagentes

@@ -23,6 +23,8 @@ function makeConfig(overrides: Partial<ProxyEnvironmentConfig> = {}): ProxyEnvir
     CONSOLE_REDACT: true,
     LOG_SSE: false,
     MAX_BODY_LOG_BYTES: 2048,
+    CONTEXT_SYNC_CACHE_ENABLED: true,
+    CONTEXT_SYNC_MAX_WAIT_MS: 5000,
     FILTERED_TOOLS: [],
     ...overrides,
   };
@@ -51,6 +53,11 @@ function makeSessionStore(turn: ActiveTurn | null = null, overrides: Partial<ISe
     consumePendingBuiltinToolUse: () => {},
     findStaleTurnsAwaitingContinuation: () => [],
     getAllOpenTurns: () => [],
+    registerWebFetchToolUseUrl: () => {},
+    getWebFetchUrlByToolUseId: () => null,
+    registerWebFetchStepResolution: () => {},
+    resolveWebFetchStep: () => null,
+    onceWebFetchStepResolved: async () => null,
     withSessionLock: async <T,>(_sessionId: string, fn: () => Promise<T>): Promise<T> => fn(),
     ...overrides,
   };

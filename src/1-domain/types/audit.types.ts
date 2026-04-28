@@ -32,6 +32,21 @@ export type TurnClassification =
   | { type: 'builtin-tool-execution' };
 
 /**
+ * Subclasificación de side-requests.
+ */
+export type SideRequestSubType = 'context-sync-webfetch' | 'harness-auxiliary';
+
+/**
+ * Resolución de step de subagente que ya procesó un WebFetch para una URL.
+ */
+export interface WebFetchStepResolution {
+  stepDir: string;
+  url: string;
+  sessionId: string;
+  completedAt: number;
+}
+
+/**
  * Metadatos de un step individual dentro de un turno.
  */
 export interface StepMeta {
@@ -186,6 +201,11 @@ export interface ActiveTurn {
   /** Definido sólo en turns que son subagentes. */
   parentContext?: ParentContext;
   /**
+   * Presente en side-requests de Context Sync cuando hubo cache MISS y se
+   * degradó a forward+auditoría normal.
+   */
+  contextSyncFallback?: boolean;
+  /**
    * True cuando el SSE handler procesó un step con `stop_reason: "tool_use"`
    * y retornó early esperando una continuation que aún no ha llegado.
    */
@@ -223,6 +243,11 @@ export interface TurnMetadata {
   errorCode: string | null;
   /** Presente sólo en interacciones de subagentes anidadas bajo el step padre. */
   parentContext?: ParentContext;
+  /**
+   * Presente en side-request de Context Sync cuando no hubo HIT de caché y se
+   * hizo fallback a upstream con auditoría normal.
+   */
+  contextSyncFallback?: boolean;
   /**
    * Presente cuando el turno se cierra habiendo registrado Agent tool_uses
    * que no se consumieron antes del cierre (error upstream, orphan timeout,

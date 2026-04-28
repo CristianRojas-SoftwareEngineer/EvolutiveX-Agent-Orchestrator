@@ -2,7 +2,12 @@ import * as path from 'node:path';
 import { SessionResolverService } from '../1-domain/services/session-resolver.service.js';
 import type { ISessionStore } from '../2-services/ports/session-store.port.js';
 import type { IAuditWriter } from '../2-services/ports/audit-writer.port.js';
-import { classifyRequestBody } from '../1-domain/services/turn-classifier.service.js';
+import {
+  classifyRequestBody,
+  classifySideRequestSubType,
+  extractModelFromRequestBody,
+  extractWebFetchUrlFromRequestBody,
+} from '../1-domain/services/turn-classifier.service.js';
 import {
   ActiveTurn,
   InteractionType,
@@ -14,14 +19,18 @@ import {
   computeSseRawBytesTotal,
 } from '../1-domain/types/audit.types.js';
 import { ProxyEnvironmentConfig } from '../1-domain/types/config.types.js';
+import { ContextSyncHandler } from './context-sync.handler.js';
 
-interface AuditInteractionResult {
+export interface AuditInteractionResult {
   auditInteractionDir: string;
   requestBodyOmitted: boolean;
   requestSequence: number;
   auditSessionId: string;
   interactionType: InteractionType;
   turnClassification: TurnClassification;
+  contextSyncCacheHit?: boolean;
+  contextSyncSseStream?: NodeJS.ReadableStream;
+  contextSyncUrl?: string;
 }
 
 /**
@@ -37,6 +46,7 @@ export class AuditInteractionHandler {
     private sessionStore: ISessionStore,
     private auditWriter: IAuditWriter,
     private config: ProxyEnvironmentConfig,
+    private contextSyncHandler?: ContextSyncHandler,
   ) {}
 
   public async execute(params: {
@@ -203,6 +213,8 @@ export class AuditInteractionHandler {
       // - >1 pending → ambiguo; dejamos null.
       const triggeringToolUseId =
         match.pendings.length === 1 ? match.pendings[0].toolUseId : null;
+      const triggeringBuiltinType =
+        match.pendings.length === 1 ? match.pendings[0].toolType : null;
 
       const subSeq = await this.auditWriter.nextSubInteractionSequence(
         parentInteractionDir,
@@ -245,6 +257,17 @@ export class AuditInteractionHandler {
       // Si la correlación fue unívoca, consumimos el pending en este momento.
       if (triggeringToolUseId) {
         this.sessionStore.consumePendingBuiltinToolUse(parentInteractionDir, triggeringToolUseId);
+
+        if (triggeringBuiltinType === 'web_fetch') {
+          const fetchedUrl = extractWebFetchUrlFromRequestBody(params.rawBody);
+          if (fetchedUrl) {
+            this.sessionStore.registerWebFetchToolUseUrl(
+              triggeringToolUseId,
+              auditSessionId,
+              fetchedUrl,
+            );
+          }
+        }
       }
 
       this.sessionStore.registerTurn({
@@ -503,6 +526,35 @@ export class AuditInteractionHandler {
     auditSessionId: string,
     classification: TurnClassification,
   ): Promise<AuditInteractionResult> {
+    let contextSyncFallback = false;
+
+    if (this.config.CONTEXT_SYNC_CACHE_ENABLED && this.contextSyncHandler) {
+      const subType = classifySideRequestSubType(params.rawBody);
+      if (subType.subType === 'context-sync-webfetch' && subType.url) {
+        const cacheResult = await this.contextSyncHandler.tryServeFromCache({
+          sessionId: auditSessionId,
+          url: subType.url,
+          model: extractModelFromRequestBody(params.rawBody) || 'unknown',
+        });
+
+        if (cacheResult.kind === 'hit') {
+          return {
+            auditInteractionDir: '',
+            requestBodyOmitted: false,
+            requestSequence: 0,
+            auditSessionId,
+            interactionType: 'side-request',
+            turnClassification: classification,
+            contextSyncCacheHit: true,
+            contextSyncSseStream: cacheResult.sseStream,
+            contextSyncUrl: subType.url,
+          };
+        }
+
+        contextSyncFallback = true;
+      }
+    }
+
     const seq = await this.sessionStore.nextAuditInteractionSequence(auditSessionId);
     const folderName = this.sessionResolver.formatAuditInteractionDirName(seq, params.requestId);
 
@@ -543,6 +595,7 @@ export class AuditInteractionHandler {
       requestBodyBytes: params.rawBody.length,
       stepsMeta: [],
       sessionId: auditSessionId,
+      contextSyncFallback,
       pendingAgentToolUses: [],
       pendingBuiltinToolUses: [],
     });
@@ -738,6 +791,7 @@ export class AuditInteractionHandler {
       errorMessage: null,
       errorCode: null,
       ...(turn.parentContext ? { parentContext: turn.parentContext } : {}),
+      ...(turn.contextSyncFallback ? { contextSyncFallback: true } : {}),
       ...(lostPendings ? { lostPendingAgents: lostPendings } : {}),
       truncation: {
         requestBodyOmitted: turn.requestBodyOmitted,

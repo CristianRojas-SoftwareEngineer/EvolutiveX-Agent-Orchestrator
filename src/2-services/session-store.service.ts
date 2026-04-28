@@ -1,7 +1,14 @@
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
+import { EventEmitter } from 'node:events';
 
-import { ActiveTurn, PendingAgentToolUse, PendingBuiltinToolUse, StepMeta } from '../1-domain/types/audit.types.js';
+import {
+  ActiveTurn,
+  PendingAgentToolUse,
+  PendingBuiltinToolUse,
+  StepMeta,
+  WebFetchStepResolution,
+} from '../1-domain/types/audit.types.js';
 import type { ISessionStore } from './ports/session-store.port.js';
 
 const INTERACTION_SEQUENCE_FILE = 'interaction-sequence.json';
@@ -17,6 +24,11 @@ export class SessionStoreService implements ISessionStore {
   private toolUseIdToTurnDir = new Map<string, string>();
   /** Índice por sesión: sessionId → set de interactionDir de turns activos. */
   private sessionToActiveTurns = new Map<string, Set<string>>();
+  /** Correlación de tool_use_id web_fetch a URL/session. */
+  private webFetchToolUseToUrl = new Map<string, { sessionId: string; url: string }>();
+  /** Índice context-sync: (sessionId,url) -> step ya resuelto. */
+  private webFetchStepIndex = new Map<string, WebFetchStepResolution>();
+  private webFetchEmitter = new EventEmitter();
 
   constructor(auditBaseDir: string) {
     this.auditBaseDir = path.isAbsolute(auditBaseDir)
@@ -186,6 +198,17 @@ export class SessionStoreService implements ISessionStore {
     for (const [id, d] of this.toolUseIdToTurnDir) {
       if (d === dir) this.toolUseIdToTurnDir.delete(id);
     }
+    for (const [id] of this.webFetchToolUseToUrl) {
+      const mappedDir = this.toolUseIdToTurnDir.get(id);
+      if (!mappedDir || mappedDir === dir) {
+        this.webFetchToolUseToUrl.delete(id);
+      }
+    }
+    for (const [key, entry] of this.webFetchStepIndex) {
+      if (entry.stepDir.startsWith(dir + path.sep) || entry.stepDir.startsWith(dir + '/')) {
+        this.webFetchStepIndex.delete(key);
+      }
+    }
   }
 
   public findStaleTurnsAwaitingContinuation(sessionId: string, maxAgeMs: number): ActiveTurn[] {
@@ -209,6 +232,51 @@ export class SessionStoreService implements ISessionStore {
 
   public getAllOpenTurns(): ActiveTurn[] {
     return [...this.turnRegistry.values()];
+  }
+
+  public registerWebFetchToolUseUrl(toolUseId: string, sessionId: string, url: string): void {
+    this.webFetchToolUseToUrl.set(toolUseId, { sessionId, url });
+  }
+
+  public getWebFetchUrlByToolUseId(toolUseId: string): { sessionId: string; url: string } | null {
+    return this.webFetchToolUseToUrl.get(toolUseId) ?? null;
+  }
+
+  public registerWebFetchStepResolution(entry: WebFetchStepResolution): void {
+    const key = this.webFetchKey(entry.sessionId, entry.url);
+    this.webFetchStepIndex.set(key, entry);
+    this.webFetchEmitter.emit(this.webFetchEventName(key), entry);
+  }
+
+  public resolveWebFetchStep(sessionId: string, url: string): WebFetchStepResolution | null {
+    return this.webFetchStepIndex.get(this.webFetchKey(sessionId, url)) ?? null;
+  }
+
+  public onceWebFetchStepResolved(
+    sessionId: string,
+    url: string,
+    timeoutMs: number,
+  ): Promise<WebFetchStepResolution | null> {
+    const key = this.webFetchKey(sessionId, url);
+    const cached = this.webFetchStepIndex.get(key);
+    if (cached) {
+      return Promise.resolve(cached);
+    }
+
+    return new Promise((resolve) => {
+      const eventName = this.webFetchEventName(key);
+      const onResolved = (entry: WebFetchStepResolution) => {
+        clearTimeout(timer);
+        this.webFetchEmitter.removeListener(eventName, onResolved);
+        resolve(entry);
+      };
+      const timer = setTimeout(() => {
+        this.webFetchEmitter.removeListener(eventName, onResolved);
+        resolve(null);
+      }, Math.max(0, timeoutMs));
+
+      this.webFetchEmitter.once(eventName, onResolved);
+    });
   }
 
   public withSessionLock<T>(sessionId: string, fn: () => Promise<T>): Promise<T> {
@@ -269,5 +337,13 @@ export class SessionStoreService implements ISessionStore {
     const body = `${JSON.stringify({ last }, null, 2)}\n`;
     await fs.writeFile(tmp, body, 'utf8');
     await fs.rename(tmp, filePath);
+  }
+
+  private webFetchKey(sessionId: string, url: string): string {
+    return `${sessionId}::${url}`;
+  }
+
+  private webFetchEventName(key: string): string {
+    return `webfetch-step:${key}`;
   }
 }

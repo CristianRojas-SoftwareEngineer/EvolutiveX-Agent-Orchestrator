@@ -1,8 +1,10 @@
 import * as path from 'node:path';
+import * as fs from 'node:fs/promises';
 import { StringDecoder } from 'node:string_decoder';
 import type { IAuditWriter } from '../2-services/ports/audit-writer.port.js';
 import type { ISseReconstructor } from '../2-services/ports/sse-reconstructor.port.js';
 import type { ISessionStore } from '../2-services/ports/session-store.port.js';
+import { extractToolResultIdsFromRequestBody } from '../1-domain/services/turn-classifier.service.js';
 import { ProxyEnvironmentConfig } from '../1-domain/types/config.types.js';
 import { JsonValue } from '../1-domain/types/json.types.js';
 import {
@@ -305,6 +307,7 @@ export class AuditSseResponseHandler {
             stepDir,
             stepMessage as unknown as JsonValue,
           );
+          await this.registerWebFetchStepResolutionIfApplicable(stepDir, context);
         } catch (reconstructErr) {
           // No fallar el step si la reconstrucción falla; solo loggear
           console.error('Error reconstruyendo mensaje del step:', reconstructErr);
@@ -378,6 +381,38 @@ export class AuditSseResponseHandler {
         console.error('Error al procesar fin de stream SSE:', err);
       }
     });
+  }
+
+  private async registerWebFetchStepResolutionIfApplicable(
+    stepDir: string,
+    context: AuditInteractionContext,
+  ): Promise<void> {
+    const turn = this.sessionStore.getTurnByDirSync(context.auditInteractionDir);
+    if (!turn) return;
+    if (!turn.parentContext) return;
+
+    const requestBodyPath = path.join(stepDir, 'request', 'body.bin');
+    let requestBody: Buffer;
+    try {
+      requestBody = await fs.readFile(requestBodyPath);
+    } catch {
+      return;
+    }
+
+    const toolResultIds = extractToolResultIdsFromRequestBody(requestBody);
+    if (toolResultIds.length === 0) return;
+
+    for (const toolUseId of toolResultIds) {
+      const mapped = this.sessionStore.getWebFetchUrlByToolUseId(toolUseId);
+      if (!mapped) continue;
+      if (mapped.sessionId !== turn.sessionId) continue;
+      this.sessionStore.registerWebFetchStepResolution({
+        stepDir,
+        url: mapped.url,
+        sessionId: mapped.sessionId,
+        completedAt: Date.now(),
+      });
+    }
   }
 
   private async handlePreflightStepEnd(
@@ -467,6 +502,7 @@ export class AuditSseResponseHandler {
       errorMessage: sseErrorMessage ?? null,
       errorCode: sseErrorType ?? null,
       ...(turn.parentContext ? { parentContext: turn.parentContext } : {}),
+      ...(turn.contextSyncFallback ? { contextSyncFallback: true } : {}),
       ...(lostPendings ? { lostPendingAgents: lostPendings } : {}),
       ...(lostBuiltinPendings ? { lostPendingBuiltinTools: lostBuiltinPendings } : {}),
       truncation: {

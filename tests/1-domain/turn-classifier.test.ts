@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { classifyRequestBody } from '../../src/1-domain/services/turn-classifier.service.js';
+import {
+  classifyRequestBody,
+  classifySideRequestSubType,
+  extractModelFromRequestBody,
+  extractToolResultIdsFromRequestBody,
+  extractWebFetchUrlFromRequestBody,
+} from '../../src/1-domain/services/turn-classifier.service.js';
 
 describe('classifyRequestBody', () => {
   it('clasifica buffer vacío como preflight-warmup', () => {
@@ -67,5 +73,69 @@ describe('classifyRequestBody', () => {
       max_tokens: 4096,
     }));
     expect(classifyRequestBody(body)).toEqual({ type: 'continuation' });
+  });
+
+  it('classifySideRequestSubType detecta context-sync-webfetch y extrae URL', () => {
+    const body = Buffer.from(JSON.stringify({
+      model: 'claude-sonnet-4-6',
+      tools: [],
+      messages: [{ role: 'user', content: 'Web page content:\n---\nhttps://example.com/path\n<html>ok</html>\n---\nResume' }],
+    }));
+
+    expect(classifySideRequestSubType(body)).toEqual({
+      subType: 'context-sync-webfetch',
+      url: 'https://example.com/path',
+    });
+  });
+
+  it('classifySideRequestSubType retorna harness-auxiliary si no hay patrón Web page content', () => {
+    const body = Buffer.from(JSON.stringify({
+      model: 'claude-sonnet-4-6',
+      tools: [],
+      messages: [{ role: 'user', content: 'count tokens' }],
+    }));
+
+    expect(classifySideRequestSubType(body)).toEqual({ subType: 'harness-auxiliary' });
+  });
+
+  it('classifySideRequestSubType retorna harness-auxiliary si la URL no está entre los dos primeros ---', () => {
+    const body = Buffer.from(JSON.stringify({
+      model: 'claude-sonnet-4-6',
+      tools: [],
+      messages: [{ role: 'user', content: 'Web page content:\n---\n<html>sin url</html>\n---\nFuera del bloque: https://example.com/outside' }],
+    }));
+
+    expect(classifySideRequestSubType(body)).toEqual({ subType: 'harness-auxiliary' });
+  });
+
+  it('extractWebFetchUrlFromRequestBody extrae URL de bloque tool_use web_fetch', () => {
+    const body = Buffer.from(JSON.stringify({
+      messages: [{
+        role: 'assistant',
+        content: [{ type: 'tool_use', name: 'web_fetch', input: { url: 'https://example.org/a' } }],
+      }],
+      tools: [{ type: 'web_fetch_20250305', name: 'web_fetch' }],
+    }));
+
+    expect(extractWebFetchUrlFromRequestBody(body)).toBe('https://example.org/a');
+  });
+
+  it('extractToolResultIdsFromRequestBody extrae ids de tool_result', () => {
+    const body = Buffer.from(JSON.stringify({
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'tool_result', tool_use_id: 'tool-1', content: 'ok' },
+          { type: 'tool_result', tool_use_id: 'tool-2', content: 'ok' },
+        ],
+      }],
+    }));
+
+    expect(extractToolResultIdsFromRequestBody(body)).toEqual(['tool-1', 'tool-2']);
+  });
+
+  it('extractModelFromRequestBody retorna model o null', () => {
+    expect(extractModelFromRequestBody(Buffer.from('{"model":"claude-sonnet-4-6"}'))).toBe('claude-sonnet-4-6');
+    expect(extractModelFromRequestBody(Buffer.from('{"messages":[]}'))).toBeNull();
   });
 });

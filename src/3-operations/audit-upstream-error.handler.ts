@@ -65,6 +65,7 @@ export class AuditUpstreamErrorHandler {
       errorMessage,
       errorCode,
       ...(turn?.parentContext ? { parentContext: turn.parentContext } : {}),
+      ...(turn?.contextSyncFallback ? { contextSyncFallback: true } : {}),
       truncation: {
         requestBodyOmitted,
         responseBodyBytesTotal: null,

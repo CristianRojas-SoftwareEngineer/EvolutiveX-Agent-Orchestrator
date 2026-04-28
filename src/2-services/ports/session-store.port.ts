@@ -1,4 +1,10 @@
-import { ActiveTurn, PendingAgentToolUse, PendingBuiltinToolUse, StepMeta } from '../../1-domain/types/audit.types.js';
+import {
+  ActiveTurn,
+  PendingAgentToolUse,
+  PendingBuiltinToolUse,
+  StepMeta,
+  WebFetchStepResolution,
+} from '../../1-domain/types/audit.types.js';
 
 /**
  * Port que define el contrato público de almacenamiento de sesiones.
@@ -79,6 +85,32 @@ export interface ISessionStore {
    * Usado para graceful shutdown.
    */
   getAllOpenTurns(): ActiveTurn[];
+  /**
+   * Registra correlación tool_use_id -> URL para built-in web_fetch.
+   * Se consume luego al detectar el step del subagente que recibe el tool_result.
+   */
+  registerWebFetchToolUseUrl(toolUseId: string, sessionId: string, url: string): void;
+  /**
+   * Devuelve la correlación URL de un tool_use_id de web_fetch, si existe.
+   */
+  getWebFetchUrlByToolUseId(toolUseId: string): { sessionId: string; url: string } | null;
+  /**
+   * Registra la resolución (sessionId + url -> stepDir) del step que ya
+   * procesó y resumió un WebFetch.
+   */
+  registerWebFetchStepResolution(entry: WebFetchStepResolution): void;
+  /**
+   * Busca una resolución de step para (sessionId, url).
+   */
+  resolveWebFetchStep(sessionId: string, url: string): WebFetchStepResolution | null;
+  /**
+   * Espera (event-driven) la resolución de step para (sessionId, url).
+   */
+  onceWebFetchStepResolved(
+    sessionId: string,
+    url: string,
+    timeoutMs: number,
+  ): Promise<WebFetchStepResolution | null>;
   /**
    * Ejecuta `fn` serializado por sesión. Garantiza que dos llamadas
    * concurrentes con el mismo `sessionId` se ejecuten en orden, lo cual

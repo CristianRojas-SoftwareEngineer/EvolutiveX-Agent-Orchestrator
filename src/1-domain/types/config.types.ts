@@ -54,6 +54,12 @@ export interface ProxyEnvironmentConfig {
   /** Si es true, remueve el flag redact-thinking-2026-02-12 del header anthropic-beta para capturar thinking legible. */
   PROXY_UNREDACT_THINKING?: boolean;
 
+  /** Si es true, habilita caché para side-request artificial de Context Sync WebFetch. */
+  CONTEXT_SYNC_CACHE_ENABLED: boolean;
+
+  /** Tiempo máximo (ms) para esperar el step de WebFetch resumido antes de fallback. */
+  CONTEXT_SYNC_MAX_WAIT_MS: number;
+
   /** Lista de tool names a excluir del request antes de enviar a la API. Ej: ['CronCreate','Agent'] */
   FILTERED_TOOLS: string[];
 }

@@ -46,6 +46,7 @@ export async function proxyRoutes(fastify: FastifyInstance, opts: { deps: ProxyD
 
     // 3. Orquestar la sesión de auditoría y captura de petición
     await proxyController.preHandler(request, reply);
+    if (reply.sent) return;
   });
 
   /**

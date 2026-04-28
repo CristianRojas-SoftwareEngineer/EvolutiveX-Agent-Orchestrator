@@ -5,6 +5,7 @@ import type { ISessionStore } from '../../src/2-services/ports/session-store.por
 import type { IAuditWriter } from '../../src/2-services/ports/audit-writer.port.js';
 import { ProxyEnvironmentConfig } from '../../src/1-domain/types/config.types.js';
 import { ActiveTurn, StepMeta } from '../../src/1-domain/types/audit.types.js';
+import { ContextSyncHandler } from '../../src/3-operations/context-sync.handler.js';
 
 function makeConfig(overrides: Partial<ProxyEnvironmentConfig> = {}): ProxyEnvironmentConfig {
   return {
@@ -24,6 +25,8 @@ function makeConfig(overrides: Partial<ProxyEnvironmentConfig> = {}): ProxyEnvir
     CONSOLE_REDACT: true,
     LOG_SSE: false,
     MAX_BODY_LOG_BYTES: 2048,
+    CONTEXT_SYNC_CACHE_ENABLED: true,
+    CONTEXT_SYNC_MAX_WAIT_MS: 5000,
     FILTERED_TOOLS: [],
     ...overrides,
   };
@@ -59,6 +62,11 @@ function makeSessionStore(overrides: Partial<ISessionStore> = {}): ISessionStore
     consumePendingBuiltinToolUse: () => {},
     findStaleTurnsAwaitingContinuation: () => [],
     getAllOpenTurns: () => [],
+    registerWebFetchToolUseUrl: () => {},
+    getWebFetchUrlByToolUseId: () => null,
+    registerWebFetchStepResolution: () => {},
+    resolveWebFetchStep: () => null,
+    onceWebFetchStepResolved: async () => null,
     withSessionLock: async <T,>(_sessionId: string, fn: () => Promise<T>): Promise<T> => fn(),
     ...overrides,
   };
@@ -135,6 +143,81 @@ function makeContinuationBody(toolUseId: string): Buffer {
 }
 
 describe('AuditInteractionHandler', () => {
+  it('side-request context-sync HIT no audita y retorna stream SSE simulado', async () => {
+    const config = makeConfig({ CONTEXT_SYNC_CACHE_ENABLED: true });
+    const store = makeSessionStore();
+    const contextSyncHandler = {
+      tryServeFromCache: async () => ({
+        kind: 'hit' as const,
+        contextSyncUrl: 'https://example.com',
+        sseStream: { pipe: () => {} } as unknown as NodeJS.ReadableStream,
+      }),
+    } as unknown as ContextSyncHandler;
+    let writeInteractionRequestCalled = false;
+
+    const handler = new AuditInteractionHandler(
+      new SessionResolverService(config),
+      store,
+      makeAuditWriter({
+        writeInteractionRequest: async () => {
+          writeInteractionRequestCalled = true;
+          return { dir: '/tmp/should-not-be-used', requestBodyOmitted: false };
+        },
+      }),
+      config,
+      contextSyncHandler,
+    );
+
+    const ctxBody = Buffer.from(JSON.stringify({
+      model: 'claude-sonnet-4-6',
+      tools: [],
+      messages: [{ role: 'user', content: 'Web page content:\n---\nhttps://example.com\n<html>x</html>\n---\nResume' }],
+    }));
+
+    const result = await handler.execute({ headers: {}, rawBody: ctxBody, requestId: 'req-side-cache' });
+
+    expect(result).not.toBeNull();
+    expect(result!.contextSyncCacheHit).toBe(true);
+    expect(result!.contextSyncSseStream).toBeDefined();
+    expect(writeInteractionRequestCalled).toBe(false);
+  });
+
+  it('side-request context-sync MISS audita como side-request normal', async () => {
+    const config = makeConfig({ CONTEXT_SYNC_CACHE_ENABLED: true });
+    let writeInteractionRequestCalled = false;
+    let registeredContextSyncFallback: boolean | undefined;
+    const contextSyncHandler = {
+      tryServeFromCache: async () => ({ kind: 'miss' as const }),
+    } as unknown as ContextSyncHandler;
+    const handler = new AuditInteractionHandler(
+      new SessionResolverService(config),
+      makeSessionStore({
+        registerTurn: (turn: ActiveTurn) => { registeredContextSyncFallback = turn.contextSyncFallback; },
+      }),
+      makeAuditWriter({
+        writeInteractionRequest: async () => {
+          writeInteractionRequestCalled = true;
+          return { dir: '/tmp/sessions/s/interactions/000001_req-side', requestBodyOmitted: false };
+        },
+      }),
+      config,
+      contextSyncHandler,
+    );
+
+    const ctxBody = Buffer.from(JSON.stringify({
+      model: 'claude-sonnet-4-6',
+      tools: [],
+      messages: [{ role: 'user', content: 'Web page content:\n---\nhttps://example.com\n<html>x</html>\n---\nResume' }],
+    }));
+
+    const result = await handler.execute({ headers: {}, rawBody: ctxBody, requestId: 'req-side-cache-miss' });
+    expect(result).not.toBeNull();
+    expect(result!.contextSyncCacheHit).toBeUndefined();
+    expect(result!.interactionType).toBe('side-request');
+    expect(writeInteractionRequestCalled).toBe(true);
+    expect(registeredContextSyncFallback).toBe(true);
+  });
+
   it('debería clasificar fresh: crear interacción y registrar turno', async () => {
     const config = makeConfig();
     let registeredTurn: ActiveTurn | null = null;

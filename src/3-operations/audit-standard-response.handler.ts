@@ -211,6 +211,7 @@ export class AuditStandardResponseHandler {
       errorMessage: null,
       errorCode: null,
       ...(turn.parentContext ? { parentContext: turn.parentContext } : {}),
+      ...(turn.contextSyncFallback ? { contextSyncFallback: true } : {}),
       truncation: {
         requestBodyOmitted: turn.requestBodyOmitted,
         responseBodyBytesTotal: totalResponseBytes,

@@ -155,6 +155,6 @@ function extractContextSyncUrl(text: string): string | null {
   const secondFence = text.indexOf('---', firstFence + 3);
   if (secondFence < 0) return null;
   const betweenFences = text.slice(firstFence + 3, secondFence);
-  const m = betweenFences.match(/https?:\/\/[^\s"'`<>]+/i);
+  const m = betweenFences.match(/https?:\/\/[^\s"'`<>()]+/i);
   return m?.[0] ?? null;
 }

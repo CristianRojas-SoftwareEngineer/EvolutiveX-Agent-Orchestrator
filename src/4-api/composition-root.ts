@@ -13,16 +13,20 @@ import { AuditUpstreamErrorHandler } from '../3-operations/audit-upstream-error.
 import { ContextSyncHandler } from '../3-operations/context-sync.handler.js';
 import { FilterToolsHandler } from '../3-operations/filter-tools.handler.js';
 import { ProxyEnvironmentConfig } from '../1-domain/types/config.types.js';
+import type { Logger } from '../1-domain/types/logger.types.js';
 
 /**
  * Crea el grafo completo de dependencias del proxy.
  *
+ * @param config Configuración del entorno del proxy.
+ * @param logger Logger de Fastify para logging estructurado.
  * @param auditBaseDir Directorio donde se escribirán las sesiones auditadas.
  *   Por defecto `./sessions` relativo al CWD del proceso. Los tests de
  *   integración pueden inyectar un path absoluto para aislar capturas.
  */
 export async function createProxyDependencies(
   config: ProxyEnvironmentConfig,
+  logger: Logger,
   auditBaseDir: string = path.join(process.cwd(), 'sessions'),
 ) {
   // Capa 1 — Domain Services
@@ -31,7 +35,7 @@ export async function createProxyDependencies(
   // Capa 2 — Adapters
   const redactService = new RedactService();
   const markdownRenderer = new MarkdownRendererService();
-  const sessionStore = new SessionStoreService(auditBaseDir);
+  const sessionStore = new SessionStoreService(auditBaseDir, logger);
   const auditWriter = new AuditWriterService(redactService, markdownRenderer);
   const sseReconstruct = new SseReconstructService(auditWriter);
   const streamTee = new StreamTeeService();
@@ -39,19 +43,21 @@ export async function createProxyDependencies(
   await sessionStore.ensureAuditSessionsRoot();
 
   // Capa 3 — Handlers
-  const contextSyncHandler = new ContextSyncHandler(sessionStore, config);
+  const contextSyncHandler = new ContextSyncHandler(sessionStore, config, logger);
   const auditInteractionHandler = new AuditInteractionHandler(
     sessionResolver,
     sessionStore,
     auditWriter,
     config,
     contextSyncHandler,
+    logger,
   );
   const auditSseResponseHandler = new AuditSseResponseHandler(
     auditWriter,
     sseReconstruct,
     config,
     sessionStore,
+    logger,
   );
   const auditStandardResponseHandler = new AuditStandardResponseHandler(
     auditWriter,

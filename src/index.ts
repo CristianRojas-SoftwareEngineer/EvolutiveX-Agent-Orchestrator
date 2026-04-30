@@ -3,6 +3,7 @@
  * Arranca el servidor Fastify y comienza a escuchar peticiones.
  */
 import process from 'process';
+import pino from 'pino';
 import { buildApp } from './app.js';
 import { config } from './4-api/config/env.config.js';
 import { createProxyDependencies } from './4-api/composition-root.js';
@@ -11,11 +12,16 @@ import { createProxyDependencies } from './4-api/composition-root.js';
  * Inicializa y arranca el servidor proxy.
  */
 async function start() {
-  const deps = await createProxyDependencies(config);
-  const app = buildApp(deps);
+  // Crear logger Pino para uso en toda la aplicación
+  const logger = pino({
+    level: process.env.LOG_LEVEL || 'info',
+  });
+
+  const deps = await createProxyDependencies(config, logger);
+  const app = buildApp(deps, logger);
   try {
     await app.listen({ port: config.PORT, host: '0.0.0.0' });
-    app.log.info(
+    logger.info(
       {
         event: 'listening',
         port: config.PORT,
@@ -33,7 +39,7 @@ async function start() {
       'Proxy levantado correctamente',
     );
   } catch (err) {
-    app.log.error(err);
+    logger.error(err);
     process.exit(1);
   }
 }

@@ -5,6 +5,21 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import type { FastifyInstance } from 'fastify';
+import type { Logger } from '../../src/1-domain/types/logger.types.js';
+
+const mockLogger: Logger = {
+  debug: () => {},
+  info: () => {},
+  warn: () => {},
+  error: () => {},
+  trace: () => {},
+  fatal: () => {},
+  child: () => mockLogger,
+  level: 'info',
+  silent: false,
+  bindings: () => ({}),
+  flush: async () => {},
+} as unknown as Logger;
 
 // El objetivo central es probar que la Fase 1 funciona:
 // proxy.controller.ts intercepta el GZIP y lo descomprime correctamente
@@ -55,8 +70,8 @@ describe('Test de Integración - Decompresión Gzip', () => {
     const { config } = await import('../../src/4-api/config/env.config.js');
     const { createProxyDependencies: createDeps } =
       await import('../../src/4-api/composition-root.js');
-    const deps = await createDeps(config, tempSessionsDir);
-    proxyApp = (await import('../../src/app.js')).buildApp(deps);
+    const deps = await createDeps(config, mockLogger, tempSessionsDir);
+    proxyApp = (await import('../../src/app.js')).buildApp(deps, mockLogger);
     await proxyApp.ready();
   });
 

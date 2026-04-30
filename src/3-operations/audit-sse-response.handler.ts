@@ -17,6 +17,7 @@ import {
   computeTokenTotals,
   computeSseRawBytesTotal,
 } from '../1-domain/types/audit.types.js';
+import type { Logger } from '../1-domain/types/logger.types.js';
 
 /**
  * Handler para orquestar la auditoría de respuestas SSE.
@@ -28,6 +29,7 @@ export class AuditSseResponseHandler {
     private sseReconstruct: ISseReconstructor,
     private config: ProxyEnvironmentConfig,
     private sessionStore: ISessionStore,
+    private logger?: Logger,
   ) {}
 
   /**
@@ -387,32 +389,131 @@ export class AuditSseResponseHandler {
     stepDir: string,
     context: AuditInteractionContext,
   ): Promise<void> {
+    const startTime = Date.now();
+
+    this.logger?.debug({
+      event: 'sse_webfetch_register_start',
+      stepDir,
+      interactionDir: context.auditInteractionDir,
+      startTime,
+    }, 'WebFetch: iniciando registro de resolución');
+
     const turn = this.sessionStore.getTurnByDirSync(context.auditInteractionDir);
-    if (!turn) return;
-    if (!turn.parentContext) return;
+    if (!turn) {
+      this.logger?.warn({
+        event: 'sse_webfetch_register_no_turn',
+        stepDir,
+        interactionDir: context.auditInteractionDir,
+      }, 'WebFetch: no se encontró turno');
+      return;
+    }
+
+    if (!turn.parentContext) {
+      this.logger?.debug({
+        event: 'sse_webfetch_register_not_subagent',
+        stepDir,
+        interactionDir: context.auditInteractionDir,
+        hasParentContext: false,
+        turnType: turn.interactionType,
+        note: 'Only subagent turns register WebFetch resolutions',
+      }, 'WebFetch: no es subagente, omitiendo registro');
+      return;
+    }
+
+    this.logger?.debug({
+      event: 'sse_webfetch_register_subagent_confirmed',
+      stepDir,
+      interactionDir: context.auditInteractionDir,
+      sessionId: turn.sessionId,
+      parentInteractionDir: turn.parentContext?.parentInteractionDir,
+    }, 'WebFetch: subagente confirmado');
 
     const requestBodyPath = path.join(stepDir, 'request', 'body.bin');
     let requestBody: Buffer;
     try {
       requestBody = await fs.readFile(requestBodyPath);
-    } catch {
+    } catch (err) {
+      this.logger?.warn({
+        event: 'sse_webfetch_register_no_request_body',
+        stepDir,
+        requestBodyPath,
+        error: (err as Error).message,
+      }, 'WebFetch: no se pudo leer request body');
       return;
     }
 
     const toolResultIds = extractToolResultIdsFromRequestBody(requestBody);
-    if (toolResultIds.length === 0) return;
 
+    this.logger?.debug({
+      event: 'sse_webfetch_register_tool_results',
+      stepDir,
+      interactionDir: context.auditInteractionDir,
+      toolResultIds,
+      toolResultCount: toolResultIds.length,
+    }, `WebFetch: encontrados ${toolResultIds.length} tool results`);
+
+    if (toolResultIds.length === 0) {
+      this.logger?.debug({
+        event: 'sse_webfetch_register_no_tool_results',
+        stepDir,
+        interactionDir: context.auditInteractionDir,
+        note: 'No tool_result IDs found in request body',
+      }, 'WebFetch: no hay tool results para registrar');
+      return;
+    }
+
+    let registeredCount = 0;
     for (const toolUseId of toolResultIds) {
       const mapped = this.sessionStore.getWebFetchUrlByToolUseId(toolUseId);
+
+      this.logger?.debug({
+        event: 'sse_webfetch_register_lookup_tooluse',
+        stepDir,
+        toolUseId,
+        found: !!mapped,
+        mappedUrl: mapped?.url ?? null,
+        mappedSessionId: mapped?.sessionId ?? null,
+      }, `WebFetch: lookup toolUseId ${toolUseId} ${mapped ? 'encontrado' : 'no encontrado'}`);
+
       if (!mapped) continue;
-      if (mapped.sessionId !== turn.sessionId) continue;
+      if (mapped.sessionId !== turn.sessionId) {
+        this.logger?.warn({
+          event: 'sse_webfetch_register_session_mismatch',
+          stepDir,
+          toolUseId,
+          mappedSessionId: mapped.sessionId,
+          turnSessionId: turn.sessionId,
+        }, 'WebFetch: session mismatch');
+        continue;
+      }
+
       this.sessionStore.registerWebFetchStepResolution({
         stepDir,
         url: mapped.url,
         sessionId: mapped.sessionId,
         completedAt: Date.now(),
       });
+      registeredCount++;
+
+      this.logger?.info({
+        event: 'sse_webfetch_register_emitted',
+        stepDir,
+        toolUseId,
+        url: mapped.url,
+        sessionId: mapped.sessionId,
+        completedAt: Date.now(),
+        elapsedMs: Date.now() - startTime,
+      }, 'WebFetch: resolución registrada y evento emitido');
     }
+
+    this.logger?.debug({
+      event: 'sse_webfetch_register_complete',
+      stepDir,
+      interactionDir: context.auditInteractionDir,
+      toolResultCount: toolResultIds.length,
+      registeredCount,
+      elapsedMs: Date.now() - startTime,
+    }, `WebFetch: registro completo (${registeredCount}/${toolResultIds.length})`);
   }
 
   private async handlePreflightStepEnd(

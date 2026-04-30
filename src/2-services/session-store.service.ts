@@ -10,6 +10,7 @@ import {
   WebFetchStepResolution,
 } from '../1-domain/types/audit.types.js';
 import type { ISessionStore } from './ports/session-store.port.js';
+import type { Logger } from '../1-domain/types/logger.types.js';
 
 const INTERACTION_SEQUENCE_FILE = 'interaction-sequence.json';
 
@@ -30,7 +31,10 @@ export class SessionStoreService implements ISessionStore {
   private webFetchStepIndex = new Map<string, WebFetchStepResolution>();
   private webFetchEmitter = new EventEmitter();
 
-  constructor(auditBaseDir: string) {
+  constructor(
+    auditBaseDir: string,
+    private logger?: Logger,
+  ) {
     this.auditBaseDir = path.isAbsolute(auditBaseDir)
       ? auditBaseDir
       : path.join(process.cwd(), auditBaseDir);
@@ -244,8 +248,33 @@ export class SessionStoreService implements ISessionStore {
 
   public registerWebFetchStepResolution(entry: WebFetchStepResolution): void {
     const key = this.webFetchKey(entry.sessionId, entry.url);
+    const eventName = this.webFetchEventName(key);
+
+    this.logger?.debug({
+      event: 'sessionstore_index_register',
+      sessionId: entry.sessionId,
+      url: entry.url,
+      key,
+      stepDir: entry.stepDir,
+      completedAt: entry.completedAt,
+      previousEntry: this.webFetchStepIndex.has(key) ? 'EXISTS' : 'NEW',
+    }, 'SessionStore: registrando WebFetch step en índice');
+
     this.webFetchStepIndex.set(key, entry);
-    this.webFetchEmitter.emit(this.webFetchEventName(key), entry);
+
+    const listenersCount = this.webFetchEmitter.listenerCount(eventName);
+    const emitResult = this.webFetchEmitter.emit(eventName, entry);
+
+    this.logger?.debug({
+      event: 'sessionstore_emit_result',
+      sessionId: entry.sessionId,
+      url: entry.url,
+      key,
+      eventName,
+      listenersCount,
+      emitReturned: emitResult,
+      note: listenersCount === 0 ? 'NO_LISTENERS_WAITING' : emitResult ? 'LISTENERS_NOTIFIED' : 'EMIT_FAILED',
+    }, `SessionStore: emitió evento (${listenersCount} listeners, returned=${emitResult})`);
   }
 
   public resolveWebFetchStep(sessionId: string, url: string): WebFetchStepResolution | null {
@@ -258,24 +287,94 @@ export class SessionStoreService implements ISessionStore {
     timeoutMs: number,
   ): Promise<WebFetchStepResolution | null> {
     const key = this.webFetchKey(sessionId, url);
+    const entryTime = Date.now();
+
+    this.logger?.debug({
+      event: 'sessionstore_wait_init',
+      sessionId,
+      url,
+      key,
+      configuredTimeoutMs: timeoutMs,
+      entryTime,
+      currentIndexSize: this.webFetchStepIndex.size,
+    }, 'SessionStore: iniciando espera WebFetch step');
+
     const cached = this.webFetchStepIndex.get(key);
     if (cached) {
+      this.logger?.debug({
+        event: 'sessionstore_wait_hit_sync',
+        sessionId,
+        url,
+        key,
+        elapsedMs: Date.now() - entryTime,
+        cachedCompletedAt: cached.completedAt,
+      }, 'SessionStore: HIT síncrono, no es necesario esperar');
       return Promise.resolve(cached);
     }
 
     return new Promise((resolve) => {
       const eventName = this.webFetchEventName(key);
+
+      this.logger?.debug({
+        event: 'sessionstore_wait_setup_listener',
+        sessionId,
+        url,
+        key,
+        eventName,
+        currentListeners: this.webFetchEmitter.listenerCount(eventName),
+        setupTime: Date.now(),
+      }, 'SessionStore: configurando listener para evento');
+
       const onResolved = (entry: WebFetchStepResolution) => {
+        const resolveTime = Date.now();
+        this.logger?.debug({
+          event: 'sessionstore_wait_event_received',
+          sessionId,
+          url,
+          key,
+          elapsedSinceInitMs: resolveTime - entryTime,
+          entryCompletedAt: entry.completedAt,
+        }, 'SessionStore: evento recibido, resolviendo promesa');
         clearTimeout(timer);
         this.webFetchEmitter.removeListener(eventName, onResolved);
         resolve(entry);
       };
+
       const timer = setTimeout(() => {
+        const timeoutTime = Date.now();
+        const actualWaitMs = timeoutTime - entryTime;
+
+        this.logger?.debug({
+          event: 'sessionstore_wait_timeout',
+          sessionId,
+          url,
+          key,
+          configuredTimeoutMs: timeoutMs,
+          actualWaitMs,
+          differenceMs: actualWaitMs - timeoutMs,
+          premature: actualWaitMs < timeoutMs * 0.5,
+          extended: actualWaitMs > timeoutMs * 1.1,
+        }, actualWaitMs < timeoutMs * 0.5
+          ? 'SessionStore: timeout prematuro'
+          : actualWaitMs > timeoutMs * 1.1
+            ? 'SessionStore: timeout extendido'
+            : 'SessionStore: timeout normal');
+
         this.webFetchEmitter.removeListener(eventName, onResolved);
         resolve(null);
       }, Math.max(0, timeoutMs));
 
       this.webFetchEmitter.once(eventName, onResolved);
+
+      this.logger?.debug({
+        event: 'sessionstore_wait_listener_active',
+        sessionId,
+        url,
+        key,
+        eventName,
+        listenerSetTime: Date.now(),
+        totalListenersForEvent: this.webFetchEmitter.listenerCount(eventName),
+      }, 'SessionStore: listener activo, esperando evento o timeout');
     });
   }
 

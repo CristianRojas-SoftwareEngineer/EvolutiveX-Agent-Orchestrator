@@ -6,7 +6,9 @@
       "WebFetch(domain:*)",
       "WebFetch(domain:docs.anthropic.com)",
       "WebFetch(domain:www.example.com)",
-      "WebFetch(domain:raw.githubusercontent.com)"
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:anthropic.com)",
+      "WebFetch(domain:releasebot.io)"
     ]
   }
 }

@@ -20,6 +20,7 @@ import {
 } from '../1-domain/types/audit.types.js';
 import { ProxyEnvironmentConfig } from '../1-domain/types/config.types.js';
 import { ContextSyncHandler } from './context-sync.handler.js';
+import type { Logger } from '../1-domain/types/logger.types.js';
 
 export interface AuditInteractionResult {
   auditInteractionDir: string;
@@ -47,6 +48,7 @@ export class AuditInteractionHandler {
     private auditWriter: IAuditWriter,
     private config: ProxyEnvironmentConfig,
     private contextSyncHandler?: ContextSyncHandler,
+    private logger?: Logger,
   ) {}
 
   public async execute(params: {
@@ -528,16 +530,49 @@ export class AuditInteractionHandler {
   ): Promise<AuditInteractionResult> {
     let contextSyncFallback = false;
 
+    this.logger?.debug({
+      event: 'audit_side_request_start',
+      sessionId: auditSessionId,
+      requestId: params.requestId,
+      cacheEnabled: this.config.CONTEXT_SYNC_CACHE_ENABLED,
+      hasContextSyncHandler: !!this.contextSyncHandler,
+    }, 'Side-request: iniciando procesamiento');
+
     if (this.config.CONTEXT_SYNC_CACHE_ENABLED && this.contextSyncHandler) {
       const subType = classifySideRequestSubType(params.rawBody);
+
+      this.logger?.debug({
+        event: 'audit_side_request_classified',
+        sessionId: auditSessionId,
+        requestId: params.requestId,
+        subType: subType.subType,
+        extractedUrl: subType.url,
+        hasWebPageContent: subType.subType === 'context-sync-webfetch',
+      }, `Side-request: clasificado como ${subType.subType}`);
+
       if (subType.subType === 'context-sync-webfetch' && subType.url) {
+        this.logger?.debug({
+          event: 'audit_side_request_cache_attempt',
+          sessionId: auditSessionId,
+          requestId: params.requestId,
+          url: subType.url,
+        }, 'Side-request: intentando servir desde caché');
+
         const cacheResult = await this.contextSyncHandler.tryServeFromCache({
           sessionId: auditSessionId,
           url: subType.url,
           model: extractModelFromRequestBody(params.rawBody) || 'unknown',
+          requestId: params.requestId,
         });
 
         if (cacheResult.kind === 'hit') {
+          this.logger?.info({
+            event: 'audit_side_request_cache_hit',
+            sessionId: auditSessionId,
+            requestId: params.requestId,
+            url: subType.url,
+            note: 'Transparent side-request, no disk audit',
+          }, 'Side-request: HIT desde caché (transparente)');
           return {
             auditInteractionDir: '',
             requestBodyOmitted: false,
@@ -552,7 +587,31 @@ export class AuditInteractionHandler {
         }
 
         contextSyncFallback = true;
+        this.logger?.info({
+          event: 'audit_side_request_cache_miss',
+          sessionId: auditSessionId,
+          requestId: params.requestId,
+          url: subType.url,
+          contextSyncFallback: true,
+          note: 'Will audit as normal side-request',
+        }, 'Side-request: MISS, se auditará como side-request normal');
+      } else {
+        this.logger?.debug({
+          event: 'audit_side_request_not_context_sync',
+          sessionId: auditSessionId,
+          requestId: params.requestId,
+          subType: subType.subType,
+          reason: subType.subType !== 'context-sync-webfetch' ? 'different_subtype' : 'no_url',
+        }, `Side-request: no es context-sync (${subType.subType !== 'context-sync-webfetch' ? 'different_subtype' : 'no_url'})`);
       }
+    } else {
+      this.logger?.debug({
+        event: 'audit_side_request_cache_disabled',
+        sessionId: auditSessionId,
+        requestId: params.requestId,
+        cacheEnabled: this.config.CONTEXT_SYNC_CACHE_ENABLED,
+        hasHandler: !!this.contextSyncHandler,
+      }, 'Side-request: caché deshabilitado o sin handler');
     }
 
     const seq = await this.sessionStore.nextAuditInteractionSequence(auditSessionId);

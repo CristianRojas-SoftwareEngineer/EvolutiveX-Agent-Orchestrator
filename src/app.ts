@@ -2,14 +2,15 @@ import fastify from 'fastify';
 import { randomUUID } from 'node:crypto';
 import { proxyRoutes } from './5-user-interfaces/http/proxy.routes.js';
 import type { ProxyDependencies } from './4-api/composition-root.js';
+import type { Logger } from './1-domain/types/logger.types.js';
 
 /**
  * Función factory para construir y configurar la instancia de la aplicación Fastify.
  * Configura el parsing del cuerpo, el logueo y registra las rutas del sistema.
  */
-export function buildApp(deps: ProxyDependencies) {
+export function buildApp(deps: ProxyDependencies, logger: Logger) {
   const app = fastify({
-    logger: true,
+    loggerInstance: logger as unknown as import('fastify').FastifyBaseLogger,
     genReqId: () => randomUUID(),
   });
 

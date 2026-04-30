@@ -88,6 +88,19 @@ describe('classifyRequestBody', () => {
     });
   });
 
+  it('classifySideRequestSubType extrae URL correctamente sin incluir paréntesis de markdown', () => {
+    const body = Buffer.from(JSON.stringify({
+      model: 'claude-sonnet-4-6',
+      tools: [],
+      messages: [{ role: 'user', content: 'Web page content:\n---\n[Learn more](https://example.com/path)\n<html>ok</html>\n---\nResume' }],
+    }));
+
+    expect(classifySideRequestSubType(body)).toEqual({
+      subType: 'context-sync-webfetch',
+      url: 'https://example.com/path',
+    });
+  });
+
   it('classifySideRequestSubType retorna harness-auxiliary si no hay patrón Web page content', () => {
     const body = Buffer.from(JSON.stringify({
       model: 'claude-sonnet-4-6',

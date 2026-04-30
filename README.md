@@ -6,7 +6,7 @@
 
 Una implementación de alto rendimiento, modular y basada en **Fastify + TypeScript** diseñada específicamente para interceptar, auditar y analizar en tiempo real el tráfico entre **Claude Code** (el CLI oficial de Anthropic) y la API oficial de Anthropic. Claude Code permite redirigir sus peticiones al proxy vía la variable `ANTHROPIC_BASE_URL`, condición imprescindible para el funcionamiento del sistema; otros clientes (p. ej. Cursor) usan harnesses distintos y no están dentro del alcance de este proyecto.
 
-Diseño desacoplado que garantiza **latencia cero** en la retransmisión mientras se procesan auditorías profundas en segundo plano.
+Diseño desacoplado que garantiza **latencia cero** en la retransmisión mientras procesa auditorías enfocadas en la **observabilidad inteligente para análisis humana** — no busca registrar todo lo técnicamente posible, sino presentar los flujos lógicos que el usuario orquesta (secuenciales y/o paralelos con subagentes) de forma natural y trazable.
 
 ---
 
@@ -81,8 +81,10 @@ Ideal para depurar comportamientos erráticos en herramientas de CLI (como `clau
 - Agrupa las peticiones de un turno completo (prompt → respuesta final) bajo una interacción con subdirectorios `steps/`.
 - Tres tipos de interacción: `agentic-turn` (turno del usuario con prompt y respuesta), `client-preflight` (quota check + cache warm-up) y `side-request` (peticiones con `"tools": []`, ej. count_tokens, generación de títulos).
 - Los `side-request` se auditan en su propia interacción sin desplazar al turno activo principal, evitando corrupción de metadata por race conditions.
-- Los `side-request` de Context Sync WebFetch (`context-sync-webfetch`) se detectan por heurística y, si hay caché HIT, se responden localmente con SSE simulada sin llamar a Anthropic y sin escribir interacción en `sessions/`.
-- Si el Context Sync tiene caché MISS (timeout o falta de step resuelto), degrada a flujo side-request normal (forward + auditoría) y marca `contextSyncFallback: true` en `meta.json`.
+- Los `side-request` de Context Sync WebFetch (`context-sync-webfetch`) implementan **caché inteligente para observabilidad transparente**:
+  - **HIT**: Se detecta por heurística, se responde localmente con SSE simulada reutilizando el resumen del subagente, **sin llamar a Anthropic** y **sin crear interacción en disco** (completamente transparente para el observador humano).
+  - **MISS**: El step resuelto no aparece dentro de `CONTEXT_SYNC_MAX_WAIT_MS`. Se degrada a side-request normal de primer nivel con `contextSyncFallback: true` en `meta.json`. Esto es un indicador de **potencial inconsistencia** si el subagente ya había completado (el caché debería haber resuelto el HIT). Ver diagnóstico en [`docs/context-sync-cache.md`](docs/context-sync-cache.md).
+- **Principio de observabilidad**: Las ejecuciones internas de built-in tools (WebFetch/WebSearch) por subagentes sí se registran como sub-interacciones (aportan valor al entender qué información consumió cada subagente). Las reinyecciones de Context Sync deben ser transparentes (HIT sin registro) para no duplicar la información ni crear ambigüedad.
 - Los turnos se indexan por `interactionDir` (único por request) permitiendo múltiples turnos concurrentes en la misma sesión (parallel subagents).
 - Las continuaciones (`tool_result`) se rutean al turno padre mediante correlación por `tool_use_id`, eliminando la misatribución de steps.
 - Los preflights (`client-preflight`) se cierran inmediatamente al recibir su respuesta, evitando turnos zombie que bloquean la sesión.

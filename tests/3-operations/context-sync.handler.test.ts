@@ -6,6 +6,21 @@ import type { ISessionStore } from '../../src/2-services/ports/session-store.por
 import { ContextSyncHandler } from '../../src/3-operations/context-sync.handler.js';
 import type { ProxyEnvironmentConfig } from '../../src/1-domain/types/config.types.js';
 import type { ActiveTurn, StepMeta, WebFetchStepResolution } from '../../src/1-domain/types/audit.types.js';
+import type { Logger } from '../../src/1-domain/types/logger.types.js';
+
+const mockLogger: Logger = {
+  debug: () => {},
+  info: () => {},
+  warn: () => {},
+  error: () => {},
+  trace: () => {},
+  fatal: () => {},
+  child: () => mockLogger,
+  level: 'info',
+  silent: false,
+  bindings: () => ({}),
+  flush: async () => {},
+} as unknown as Logger;
 
 function makeConfig(overrides: Partial<ProxyEnvironmentConfig> = {}): ProxyEnvironmentConfig {
   return {
@@ -83,6 +98,7 @@ describe('ContextSyncHandler', () => {
         completedAt: Date.now(),
       }),
       makeConfig({ CONTEXT_SYNC_MAX_WAIT_MS: 50 }),
+      mockLogger,
     );
 
     const result = await handler.tryServeFromCache({
@@ -104,7 +120,7 @@ describe('ContextSyncHandler', () => {
   });
 
   it('retorna miss cuando no hay step resuelto', async () => {
-    const handler = new ContextSyncHandler(makeStore(null), makeConfig({ CONTEXT_SYNC_MAX_WAIT_MS: 10 }));
+    const handler = new ContextSyncHandler(makeStore(null), makeConfig({ CONTEXT_SYNC_MAX_WAIT_MS: 10 }), mockLogger);
     const result = await handler.tryServeFromCache({
       sessionId: 's1',
       url: 'https://example.com',

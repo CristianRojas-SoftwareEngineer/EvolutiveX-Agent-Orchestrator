@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "WebFetch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"C:/Users/Cristian/Desktop/Proyectos/Smart Code Proxy/hooks/webfetch-event.mjs\""
+          }
+        ]
+      }
+    ]
+  }
+}

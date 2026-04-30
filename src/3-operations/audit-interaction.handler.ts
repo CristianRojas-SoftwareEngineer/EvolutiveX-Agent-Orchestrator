@@ -1,4 +1,6 @@
 import * as path from 'node:path';
+import { createHash } from 'node:crypto';
+import { Readable } from 'node:stream';
 import { SessionResolverService } from '../1-domain/services/session-resolver.service.js';
 import type { ISessionStore } from '../2-services/ports/session-store.port.js';
 import type { IAuditWriter } from '../2-services/ports/audit-writer.port.js';
@@ -6,8 +8,9 @@ import {
   classifyRequestBody,
   classifySideRequestSubType,
   extractModelFromRequestBody,
-  extractWebFetchUrlFromRequestBody,
+  HARNESS_CONTEXT_SYNC_SUFFIX,
 } from '../1-domain/services/turn-classifier.service.js';
+import { buildSimulatedSseFromText } from '../1-domain/services/sse-simulator.service.js';
 import {
   ActiveTurn,
   InteractionType,
@@ -19,8 +22,19 @@ import {
   computeSseRawBytesTotal,
 } from '../1-domain/types/audit.types.js';
 import { ProxyEnvironmentConfig } from '../1-domain/types/config.types.js';
-import { ContextSyncHandler } from './context-sync.handler.js';
 import type { Logger } from '../1-domain/types/logger.types.js';
+
+/**
+ * Extrae el contenido HTML entre los primeros dos fences `---` de un mensaje
+ * de Context Sync. El HTML es el contenido reinyectado por el harness.
+ */
+function extractHtmlBetweenFences(bodyStr: string): string {
+  const firstFence = bodyStr.indexOf('---');
+  if (firstFence < 0) return '';
+  const secondFence = bodyStr.indexOf('---', firstFence + 3);
+  if (secondFence < 0) return '';
+  return bodyStr.slice(firstFence + 3, secondFence);
+}
 
 export interface AuditInteractionResult {
   auditInteractionDir: string;
@@ -31,7 +45,8 @@ export interface AuditInteractionResult {
   turnClassification: TurnClassification;
   contextSyncCacheHit?: boolean;
   contextSyncSseStream?: NodeJS.ReadableStream;
-  contextSyncUrl?: string;
+  webFetchHtmlHash?: string;
+  webFetchPromptHash?: string;
 }
 
 /**
@@ -47,7 +62,6 @@ export class AuditInteractionHandler {
     private sessionStore: ISessionStore,
     private auditWriter: IAuditWriter,
     private config: ProxyEnvironmentConfig,
-    private contextSyncHandler?: ContextSyncHandler,
     private logger?: Logger,
   ) {}
 
@@ -215,8 +229,6 @@ export class AuditInteractionHandler {
       // - >1 pending → ambiguo; dejamos null.
       const triggeringToolUseId =
         match.pendings.length === 1 ? match.pendings[0].toolUseId : null;
-      const triggeringBuiltinType =
-        match.pendings.length === 1 ? match.pendings[0].toolType : null;
 
       const subSeq = await this.auditWriter.nextSubInteractionSequence(
         parentInteractionDir,
@@ -259,17 +271,6 @@ export class AuditInteractionHandler {
       // Si la correlación fue unívoca, consumimos el pending en este momento.
       if (triggeringToolUseId) {
         this.sessionStore.consumePendingBuiltinToolUse(parentInteractionDir, triggeringToolUseId);
-
-        if (triggeringBuiltinType === 'web_fetch') {
-          const fetchedUrl = extractWebFetchUrlFromRequestBody(params.rawBody);
-          if (fetchedUrl) {
-            this.sessionStore.registerWebFetchToolUseUrl(
-              triggeringToolUseId,
-              auditSessionId,
-              fetchedUrl,
-            );
-          }
-        }
       }
 
       this.sessionStore.registerTurn({
@@ -528,90 +529,47 @@ export class AuditInteractionHandler {
     auditSessionId: string,
     classification: TurnClassification,
   ): Promise<AuditInteractionResult> {
-    let contextSyncFallback = false;
+    const subType = classifySideRequestSubType(params.rawBody);
 
-    this.logger?.debug({
-      event: 'audit_side_request_start',
-      sessionId: auditSessionId,
-      requestId: params.requestId,
-      cacheEnabled: this.config.CONTEXT_SYNC_CACHE_ENABLED,
-      hasContextSyncHandler: !!this.contextSyncHandler,
-    }, 'Side-request: iniciando procesamiento');
+    if (subType.subType === 'context-sync-webfetch') {
+      // Extraer HTML entre los fences para calcular hashes
+      const bodyStr = params.rawBody.toString('utf8');
+      const htmlHash = createHash('sha256').update(extractHtmlBetweenFences(bodyStr)).digest('hex');
+      const promptHash = createHash('sha256').update(HARNESS_CONTEXT_SYNC_SUFFIX).digest('hex');
 
-    if (this.config.CONTEXT_SYNC_CACHE_ENABLED && this.contextSyncHandler) {
-      const subType = classifySideRequestSubType(params.rawBody);
-
-      this.logger?.debug({
-        event: 'audit_side_request_classified',
-        sessionId: auditSessionId,
-        requestId: params.requestId,
-        subType: subType.subType,
-        extractedUrl: subType.url,
-        hasWebPageContent: subType.subType === 'context-sync-webfetch',
-      }, `Side-request: clasificado como ${subType.subType}`);
-
-      if (subType.subType === 'context-sync-webfetch' && subType.url) {
-        this.logger?.debug({
-          event: 'audit_side_request_cache_attempt',
-          sessionId: auditSessionId,
-          requestId: params.requestId,
-          url: subType.url,
-        }, 'Side-request: intentando servir desde caché');
-
-        const cacheResult = await this.contextSyncHandler.tryServeFromCache({
-          sessionId: auditSessionId,
-          url: subType.url,
-          model: extractModelFromRequestBody(params.rawBody) || 'unknown',
-          requestId: params.requestId,
-        });
-
-        if (cacheResult.kind === 'hit') {
-          this.logger?.info({
-            event: 'audit_side_request_cache_hit',
-            sessionId: auditSessionId,
-            requestId: params.requestId,
-            url: subType.url,
-            note: 'Transparent side-request, no disk audit',
-          }, 'Side-request: HIT desde caché (transparente)');
-          return {
-            auditInteractionDir: '',
-            requestBodyOmitted: false,
-            requestSequence: 0,
-            auditSessionId,
-            interactionType: 'side-request',
-            turnClassification: classification,
-            contextSyncCacheHit: true,
-            contextSyncSseStream: cacheResult.sseStream,
-            contextSyncUrl: subType.url,
-          };
-        }
-
-        contextSyncFallback = true;
+      const cachedResponse = this.sessionStore.resolveContextSyncCache(htmlHash, promptHash);
+      if (cachedResponse) {
         this.logger?.info({
-          event: 'audit_side_request_cache_miss',
+          event: 'audit_side_request_cache_hit',
           sessionId: auditSessionId,
           requestId: params.requestId,
-          url: subType.url,
-          contextSyncFallback: true,
-          note: 'Will audit as normal side-request',
-        }, 'Side-request: MISS, se auditará como side-request normal');
-      } else {
-        this.logger?.debug({
-          event: 'audit_side_request_not_context_sync',
-          sessionId: auditSessionId,
-          requestId: params.requestId,
-          subType: subType.subType,
-          reason: subType.subType !== 'context-sync-webfetch' ? 'different_subtype' : 'no_url',
-        }, `Side-request: no es context-sync (${subType.subType !== 'context-sync-webfetch' ? 'different_subtype' : 'no_url'})`);
+          htmlHash,
+          promptHash,
+        }, 'Side-request: HIT desde caché (transparente)');
+
+        const model = extractModelFromRequestBody(params.rawBody) || 'unknown';
+        const ssePayload = buildSimulatedSseFromText({ text: cachedResponse, model });
+        return {
+          auditInteractionDir: '',
+          requestBodyOmitted: false,
+          requestSequence: 0,
+          auditSessionId,
+          interactionType: 'side-request',
+          turnClassification: classification,
+          contextSyncCacheHit: true,
+          contextSyncSseStream: Readable.from([ssePayload]),
+          webFetchHtmlHash: htmlHash,
+          webFetchPromptHash: promptHash,
+        };
       }
-    } else {
+
       this.logger?.debug({
-        event: 'audit_side_request_cache_disabled',
+        event: 'audit_side_request_cache_miss',
         sessionId: auditSessionId,
         requestId: params.requestId,
-        cacheEnabled: this.config.CONTEXT_SYNC_CACHE_ENABLED,
-        hasHandler: !!this.contextSyncHandler,
-      }, 'Side-request: caché deshabilitado o sin handler');
+        htmlHash,
+        promptHash,
+      }, 'Side-request: MISS, se auditará como side-request normal');
     }
 
     const seq = await this.sessionStore.nextAuditInteractionSequence(auditSessionId);
@@ -654,7 +612,6 @@ export class AuditInteractionHandler {
       requestBodyBytes: params.rawBody.length,
       stepsMeta: [],
       sessionId: auditSessionId,
-      contextSyncFallback,
       pendingAgentToolUses: [],
       pendingBuiltinToolUses: [],
     });

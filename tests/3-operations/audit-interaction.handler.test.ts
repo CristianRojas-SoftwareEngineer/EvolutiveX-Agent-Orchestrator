@@ -5,7 +5,6 @@ import type { ISessionStore } from '../../src/2-services/ports/session-store.por
 import type { IAuditWriter } from '../../src/2-services/ports/audit-writer.port.js';
 import { ProxyEnvironmentConfig } from '../../src/1-domain/types/config.types.js';
 import { ActiveTurn, StepMeta } from '../../src/1-domain/types/audit.types.js';
-import { ContextSyncHandler } from '../../src/3-operations/context-sync.handler.js';
 
 function makeConfig(overrides: Partial<ProxyEnvironmentConfig> = {}): ProxyEnvironmentConfig {
   return {
@@ -62,11 +61,8 @@ function makeSessionStore(overrides: Partial<ISessionStore> = {}): ISessionStore
     consumePendingBuiltinToolUse: () => {},
     findStaleTurnsAwaitingContinuation: () => [],
     getAllOpenTurns: () => [],
-    registerWebFetchToolUseUrl: () => {},
-    getWebFetchUrlByToolUseId: () => null,
-    registerWebFetchStepResolution: () => {},
-    resolveWebFetchStep: () => null,
-    onceWebFetchStepResolved: async () => null,
+    registerContextSyncCache: () => {},
+    resolveContextSyncCache: () => null,
     withSessionLock: async <T,>(_sessionId: string, fn: () => Promise<T>): Promise<T> => fn(),
     ...overrides,
   };
@@ -145,14 +141,17 @@ function makeContinuationBody(toolUseId: string): Buffer {
 describe('AuditInteractionHandler', () => {
   it('side-request context-sync HIT no audita y retorna stream SSE simulado', async () => {
     const config = makeConfig({ CONTEXT_SYNC_CACHE_ENABLED: true });
-    const store = makeSessionStore();
-    const contextSyncHandler = {
-      tryServeFromCache: async () => ({
-        kind: 'hit' as const,
-        contextSyncUrl: 'https://example.com',
-        sseStream: { pipe: () => {} } as unknown as NodeJS.ReadableStream,
-      }),
-    } as unknown as ContextSyncHandler;
+    const HARNESS_CONTEXT_SYNC_SUFFIX = `Provide a concise response based only on the content above. In your response:
+    - Enforce a strict 125-character maximum for quotes from any source document. Open Source Software is ok as long as we respect the license.
+    - Use quotation marks for exact language from articles; any language outside of the quotation should never be word-for-word the same.
+    - You are not a lawyer and never comment on the legality of your own prompts and responses.
+    - Never produce or reproduce exact song lyrics.`;
+    const html = '<html><body>contenido</body></html>';
+    const content = `Web page content:\n---\n${html}\n---\n${HARNESS_CONTEXT_SYNC_SUFFIX}`;
+
+    const store = makeSessionStore({
+      resolveContextSyncCache: (_h: string, _p: string) => 'cached response',
+    });
     let writeInteractionRequestCalled = false;
 
     const handler = new AuditInteractionHandler(
@@ -165,13 +164,12 @@ describe('AuditInteractionHandler', () => {
         },
       }),
       config,
-      contextSyncHandler,
     );
 
     const ctxBody = Buffer.from(JSON.stringify({
       model: 'claude-sonnet-4-6',
       tools: [],
-      messages: [{ role: 'user', content: 'Web page content:\n---\nhttps://example.com\n<html>x</html>\n---\nResume' }],
+      messages: [{ role: 'user', content }],
     }));
 
     const result = await handler.execute({ headers: {}, rawBody: ctxBody, requestId: 'req-side-cache' });
@@ -184,15 +182,19 @@ describe('AuditInteractionHandler', () => {
 
   it('side-request context-sync MISS audita como side-request normal', async () => {
     const config = makeConfig({ CONTEXT_SYNC_CACHE_ENABLED: true });
+    const HARNESS_CONTEXT_SYNC_SUFFIX = `Provide a concise response based only on the content above. In your response:
+    - Enforce a strict 125-character maximum for quotes from any source document. Open Source Software is ok as long as we respect the license.
+    - Use quotation marks for exact language from articles; any language outside of the quotation should never be word-for-word the same.
+    - You are not a lawyer and never comment on the legality of your own prompts and responses.
+    - Never produce or reproduce exact song lyrics.`;
+    const html = '<html><body>contenido</body></html>';
+    const content = `Web page content:\n---\n${html}\n---\n${HARNESS_CONTEXT_SYNC_SUFFIX}`;
+
     let writeInteractionRequestCalled = false;
-    let registeredContextSyncFallback: boolean | undefined;
-    const contextSyncHandler = {
-      tryServeFromCache: async () => ({ kind: 'miss' as const }),
-    } as unknown as ContextSyncHandler;
     const handler = new AuditInteractionHandler(
       new SessionResolverService(config),
       makeSessionStore({
-        registerTurn: (turn: ActiveTurn) => { registeredContextSyncFallback = turn.contextSyncFallback; },
+        resolveContextSyncCache: () => null,
       }),
       makeAuditWriter({
         writeInteractionRequest: async () => {
@@ -201,13 +203,12 @@ describe('AuditInteractionHandler', () => {
         },
       }),
       config,
-      contextSyncHandler,
     );
 
     const ctxBody = Buffer.from(JSON.stringify({
       model: 'claude-sonnet-4-6',
       tools: [],
-      messages: [{ role: 'user', content: 'Web page content:\n---\nhttps://example.com\n<html>x</html>\n---\nResume' }],
+      messages: [{ role: 'user', content }],
     }));
 
     const result = await handler.execute({ headers: {}, rawBody: ctxBody, requestId: 'req-side-cache-miss' });
@@ -215,7 +216,6 @@ describe('AuditInteractionHandler', () => {
     expect(result!.contextSyncCacheHit).toBeUndefined();
     expect(result!.interactionType).toBe('side-request');
     expect(writeInteractionRequestCalled).toBe(true);
-    expect(registeredContextSyncFallback).toBe(true);
   });
 
   it('debería clasificar fresh: crear interacción y registrar turno', async () => {

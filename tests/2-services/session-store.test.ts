@@ -356,86 +356,54 @@ describe('SessionStoreService — pending Agent tool_uses', () => {
     // Si está serializado, B sólo arranca tras end:A.
     expect(observed).toEqual(['start:A', 'end:A', 'start:B', 'end:B']);
   });
+});
 
-  it('registerWebFetchToolUseUrl + getWebFetchUrlByToolUseId retorna correlación guardada', () => {
-    store.registerWebFetchToolUseUrl('toolu_fetch_1', 's1', 'https://example.com');
-    expect(store.getWebFetchUrlByToolUseId('toolu_fetch_1')).toEqual({
-      sessionId: 's1',
-      url: 'https://example.com',
-    });
+describe('SessionStoreService — contextSyncCache', () => {
+  let tmpDir: string;
+  let store: SessionStoreService;
+
+  beforeEach(async () => {
+    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'sstore-cache-'));
+    store = new SessionStoreService(tmpDir);
   });
 
-  it('resolveWebFetchStep retorna null si no existe entrada', () => {
-    expect(store.resolveWebFetchStep('s1', 'https://none.example')).toBeNull();
+  it('registerContextSyncCache + resolveContextSyncCache funciona por clave (htmlHash:promptHash)', () => {
+    store.registerContextSyncCache('hash1', 'hash2', 'response text');
+    const found = store.resolveContextSyncCache('hash1', 'hash2');
+    expect(found).toBe('response text');
   });
 
-  it('registerWebFetchStepResolution + resolveWebFetchStep funciona por clave sessionId/url', () => {
-    store.registerWebFetchStepResolution({
-      stepDir: '/tmp/sessions/s1/interactions/000001_req/steps/002',
-      sessionId: 's1',
-      url: 'https://example.com',
-      completedAt: 123,
-    });
-    const found = store.resolveWebFetchStep('s1', 'https://example.com');
-    expect(found).not.toBeNull();
-    expect(found!.stepDir).toContain('steps/002');
-    expect(found!.completedAt).toBe(123);
+  it('resolveContextSyncCache retorna null si no existe entrada', () => {
+    expect(store.resolveContextSyncCache('no', 'existe')).toBeNull();
   });
 
-  it('onceWebFetchStepResolved resuelve inmediato si ya está cacheado', async () => {
-    store.registerWebFetchStepResolution({
-      stepDir: '/tmp/sessions/s1/interactions/000001_req/steps/003',
-      sessionId: 's1',
-      url: 'https://immediate.example',
-      completedAt: 456,
-    });
-    const found = await store.onceWebFetchStepResolved('s1', 'https://immediate.example', 1000);
-    expect(found).not.toBeNull();
-    expect(found!.completedAt).toBe(456);
+  it('resolveContextSyncCache retorna null después de expirar el TTL', async () => {
+    // Usar Date.now() mock para simular expiración
+    const originalNow = Date.now;
+    let mockNow = 1000;
+    Date.now = () => mockNow;
+
+    store.registerContextSyncCache('h1', 'h2', 'cached');
+    expect(store.resolveContextSyncCache('h1', 'h2')).toBe('cached');
+
+    // Avanzar más allá del TTL (5 min = 300_000 ms)
+    mockNow = 1000 + 300_001;
+    expect(store.resolveContextSyncCache('h1', 'h2')).toBeNull();
+
+    Date.now = originalNow;
   });
 
-  it('onceWebFetchStepResolved resuelve por evento antes del timeout', async () => {
-    const wait = store.onceWebFetchStepResolved('s1', 'https://event.example', 1000);
-    setTimeout(() => {
-      store.registerWebFetchStepResolution({
-        stepDir: '/tmp/sessions/s1/interactions/000001_req/steps/004',
-        sessionId: 's1',
-        url: 'https://event.example',
-        completedAt: 789,
-      });
-    }, 20);
-
-    const found = await wait;
-    expect(found).not.toBeNull();
-    expect(found!.completedAt).toBe(789);
+  it('registerContextSyncCache sobrescribe entrada existente', () => {
+    store.registerContextSyncCache('h1', 'h2', 'old');
+    store.registerContextSyncCache('h1', 'h2', 'new');
+    expect(store.resolveContextSyncCache('h1', 'h2')).toBe('new');
   });
 
-  it('onceWebFetchStepResolved devuelve null por timeout', async () => {
-    const found = await store.onceWebFetchStepResolved('s1', 'https://timeout.example', 25);
-    expect(found).toBeNull();
-  });
-
-  it('closeTurn limpia entradas webfetch index asociadas al interactionDir cerrado', () => {
-    const interactionDir = '/tmp/sessions/s1/interactions/000010_req';
-    const turn = makeTurn({ interactionDir, sessionId: 's1' });
+  it('closeTurn no limpia el caché de Context Sync', () => {
+    store.registerContextSyncCache('h1', 'h2', 'cached');
+    const turn = makeTurn({ interactionDir: '/tmp/t1' });
     store.registerTurn(turn);
-
-    store.registerWebFetchStepResolution({
-      sessionId: 's1',
-      url: 'https://example.com/a',
-      stepDir: '/tmp/sessions/s1/interactions/000010_req/steps/002',
-      completedAt: 111,
-    });
-    store.registerWebFetchStepResolution({
-      sessionId: 's1',
-      url: 'https://example.com/b',
-      stepDir: '/tmp/sessions/s1/interactions/000011_req/steps/001',
-      completedAt: 222,
-    });
-
-    store.closeTurn(interactionDir);
-
-    expect(store.resolveWebFetchStep('s1', 'https://example.com/a')).toBeNull();
-    expect(store.resolveWebFetchStep('s1', 'https://example.com/b')).not.toBeNull();
+    store.closeTurn('/tmp/t1');
+    expect(store.resolveContextSyncCache('h1', 'h2')).toBe('cached');
   });
 });

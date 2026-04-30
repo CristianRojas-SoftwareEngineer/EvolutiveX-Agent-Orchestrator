@@ -53,11 +53,8 @@ function makeSessionStore(turn: ActiveTurn | null = null, overrides: Partial<ISe
     consumePendingBuiltinToolUse: () => {},
     findStaleTurnsAwaitingContinuation: () => [],
     getAllOpenTurns: () => [],
-    registerWebFetchToolUseUrl: () => {},
-    getWebFetchUrlByToolUseId: () => null,
-    registerWebFetchStepResolution: () => {},
-    resolveWebFetchStep: () => null,
-    onceWebFetchStepResolved: async () => null,
+    registerContextSyncCache: () => {},
+    resolveContextSyncCache: () => null,
     withSessionLock: async <T,>(_sessionId: string, fn: () => Promise<T>): Promise<T> => fn(),
     ...overrides,
   };

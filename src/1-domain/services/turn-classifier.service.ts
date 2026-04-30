@@ -1,6 +1,17 @@
 import { SideRequestSubType, TurnClassification } from '../types/audit.types.js';
 
 /**
+ * Sufijo fijo inyectado por el harness en los side-requests de tipo Context Sync
+ * cuando el subagente completa un WebFetch. Este texto es el marcador determinista
+ * que reemplazó la heurística anterior de extraer URLs desde el HTML reinyectado.
+ */
+export const HARNESS_CONTEXT_SYNC_SUFFIX = `Provide a concise response based only on the content above. In your response:
+    - Enforce a strict 125-character maximum for quotes from any source document. Open Source Software is ok as long as we respect the license.
+    - Use quotation marks for exact language from articles; any language outside of the quotation should never be word-for-word the same.
+    - You are not a lawyer and never comment on the legality of your own prompts and responses.
+    - Never produce or reproduce exact song lyrics.`;
+
+/**
  * Clasifica el tipo de request según el contenido del body.
  * Búsqueda string-based sobre el buffer sin parsear JSON completo.
  * Asume protocolo Claude Code donde los mensajes de usuario incluyen "tools".
@@ -63,7 +74,7 @@ function extractLastUserMessageText(root: Record<string, unknown>): string {
 
 export function classifySideRequestSubType(
   bodyBuffer: Buffer,
-): { subType: SideRequestSubType; url?: string } {
+): { subType: SideRequestSubType } {
   const parsed = safeParse(bodyBuffer);
   if (!parsed) {
     return { subType: 'harness-auxiliary' };
@@ -79,48 +90,11 @@ export function classifySideRequestSubType(
     return { subType: 'harness-auxiliary' };
   }
 
-  const url = extractContextSyncUrl(text);
-  if (!url) {
+  if (!text.includes(HARNESS_CONTEXT_SYNC_SUFFIX)) {
     return { subType: 'harness-auxiliary' };
   }
 
-  return { subType: 'context-sync-webfetch', url };
-}
-
-function findWebFetchUrlInObject(node: unknown): string | null {
-  if (!node || typeof node !== 'object') return null;
-
-  const obj = node as Record<string, unknown>;
-  const name = typeof obj.name === 'string' ? obj.name.toLowerCase() : '';
-  const type = typeof obj.type === 'string' ? obj.type.toLowerCase() : '';
-
-  if (name === 'web_fetch' || type === 'web_fetch' || type.startsWith('web_fetch_')) {
-    if (obj.input && typeof obj.input === 'object' && !Array.isArray(obj.input)) {
-      const input = obj.input as Record<string, unknown>;
-      if (typeof input.url === 'string') return input.url;
-    }
-  }
-
-  if (Array.isArray(node)) {
-    for (const item of node) {
-      const found = findWebFetchUrlInObject(item);
-      if (found) return found;
-    }
-    return null;
-  }
-
-  for (const value of Object.values(obj)) {
-    const found = findWebFetchUrlInObject(value);
-    if (found) return found;
-  }
-
-  return null;
-}
-
-export function extractWebFetchUrlFromRequestBody(bodyBuffer: Buffer): string | null {
-  const parsed = safeParse(bodyBuffer);
-  if (!parsed) return null;
-  return findWebFetchUrlInObject(parsed);
+  return { subType: 'context-sync-webfetch' };
 }
 
 export function extractToolResultIdsFromRequestBody(bodyBuffer: Buffer): string[] {
@@ -147,14 +121,4 @@ export function extractModelFromRequestBody(bodyBuffer: Buffer): string | null {
   const parsed = safeParse(bodyBuffer);
   if (!parsed) return null;
   return typeof parsed.model === 'string' ? parsed.model : null;
-}
-
-function extractContextSyncUrl(text: string): string | null {
-  const firstFence = text.indexOf('---');
-  if (firstFence < 0) return null;
-  const secondFence = text.indexOf('---', firstFence + 3);
-  if (secondFence < 0) return null;
-  const betweenFences = text.slice(firstFence + 3, secondFence);
-  const m = betweenFences.match(/https?:\/\/[^\s"'`<>()]+/i);
-  return m?.[0] ?? null;
 }

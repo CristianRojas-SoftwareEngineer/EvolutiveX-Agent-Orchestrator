@@ -1,6 +1,7 @@
 import fastify from 'fastify';
 import { randomUUID } from 'node:crypto';
 import { proxyRoutes } from './5-user-interfaces/http/proxy.routes.js';
+import { registerInternalRoutes } from './5-user-interfaces/http/internal.controller.js';
 import type { ProxyDependencies } from './4-api/composition-root.js';
 import type { Logger } from './1-domain/types/logger.types.js';
 
@@ -36,6 +37,9 @@ export function buildApp(deps: ProxyDependencies, logger: Logger) {
   app.get('/health', async (_request, _reply) => {
     return { status: 'OK' };
   });
+
+  // Registrar rutas internas (localhost cache, etc.) antes del pipeline principal
+  registerInternalRoutes(app, deps.sessionStore);
 
   // Registrar las rutas principales de orquestación del proxy con deps inyectadas
   app.register(proxyRoutes, { deps });

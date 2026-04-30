@@ -56,7 +56,8 @@ export class ProxyController {
         {
           event: 'context-sync.hit',
           sessionId: result.auditSessionId,
-          url: result.contextSyncUrl,
+          htmlHash: result.webFetchHtmlHash,
+          promptHash: result.webFetchPromptHash,
           latencyMs: Date.now() - preHandlerStart,
         },
         'Context Sync side-request servido desde caché local',

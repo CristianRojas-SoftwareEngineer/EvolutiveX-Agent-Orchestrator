@@ -37,16 +37,6 @@ export type TurnClassification =
 export type SideRequestSubType = 'context-sync-webfetch' | 'harness-auxiliary';
 
 /**
- * Resolución de step de subagente que ya procesó un WebFetch para una URL.
- */
-export interface WebFetchStepResolution {
-  stepDir: string;
-  url: string;
-  sessionId: string;
-  completedAt: number;
-}
-
-/**
  * Metadatos de un step individual dentro de un turno.
  */
 export interface StepMeta {

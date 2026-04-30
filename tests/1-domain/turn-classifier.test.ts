@@ -4,7 +4,7 @@ import {
   classifySideRequestSubType,
   extractModelFromRequestBody,
   extractToolResultIdsFromRequestBody,
-  extractWebFetchUrlFromRequestBody,
+  HARNESS_CONTEXT_SYNC_SUFFIX,
 } from '../../src/1-domain/services/turn-classifier.service.js';
 
 describe('classifyRequestBody', () => {
@@ -74,34 +74,34 @@ describe('classifyRequestBody', () => {
     }));
     expect(classifyRequestBody(body)).toEqual({ type: 'continuation' });
   });
+});
 
-  it('classifySideRequestSubType detecta context-sync-webfetch y extrae URL', () => {
+describe('classifySideRequestSubType — detección por sufijo del harness', () => {
+  it('detecta context-sync-webfetch por HARNESS_CONTEXT_SYNC_SUFFIX', () => {
+    const html = '<html><body>contenido</body></html>';
+    const content = `Web page content:\n---\n${html}\n---\n${HARNESS_CONTEXT_SYNC_SUFFIX}`;
     const body = Buffer.from(JSON.stringify({
       model: 'claude-sonnet-4-6',
       tools: [],
-      messages: [{ role: 'user', content: 'Web page content:\n---\nhttps://example.com/path\n<html>ok</html>\n---\nResume' }],
+      messages: [{ role: 'user', content }],
     }));
 
     expect(classifySideRequestSubType(body)).toEqual({
       subType: 'context-sync-webfetch',
-      url: 'https://example.com/path',
     });
   });
 
-  it('classifySideRequestSubType extrae URL correctamente sin incluir paréntesis de markdown', () => {
+  it('retorna harness-auxiliary si no contiene HARNESS_CONTEXT_SYNC_SUFFIX', () => {
     const body = Buffer.from(JSON.stringify({
       model: 'claude-sonnet-4-6',
       tools: [],
-      messages: [{ role: 'user', content: 'Web page content:\n---\n[Learn more](https://example.com/path)\n<html>ok</html>\n---\nResume' }],
+      messages: [{ role: 'user', content: 'Web page content:\n---\n<html>ok</html>\n---\nResume' }],
     }));
 
-    expect(classifySideRequestSubType(body)).toEqual({
-      subType: 'context-sync-webfetch',
-      url: 'https://example.com/path',
-    });
+    expect(classifySideRequestSubType(body)).toEqual({ subType: 'harness-auxiliary' });
   });
 
-  it('classifySideRequestSubType retorna harness-auxiliary si no hay patrón Web page content', () => {
+  it('retorna harness-auxiliary si no hay patrón Web page content', () => {
     const body = Buffer.from(JSON.stringify({
       model: 'claude-sonnet-4-6',
       tools: [],
@@ -111,29 +111,26 @@ describe('classifyRequestBody', () => {
     expect(classifySideRequestSubType(body)).toEqual({ subType: 'harness-auxiliary' });
   });
 
-  it('classifySideRequestSubType retorna harness-auxiliary si la URL no está entre los dos primeros ---', () => {
+  it('retorna harness-auxiliary si tools no es array vacío', () => {
+    const content = `Web page content:\n---\n<html></html>\n---\n${HARNESS_CONTEXT_SYNC_SUFFIX}`;
     const body = Buffer.from(JSON.stringify({
       model: 'claude-sonnet-4-6',
-      tools: [],
-      messages: [{ role: 'user', content: 'Web page content:\n---\n<html>sin url</html>\n---\nFuera del bloque: https://example.com/outside' }],
+      tools: [{ name: 'Read' }],
+      messages: [{ role: 'user', content }],
     }));
 
     expect(classifySideRequestSubType(body)).toEqual({ subType: 'harness-auxiliary' });
   });
 
-  it('extractWebFetchUrlFromRequestBody extrae URL de bloque tool_use web_fetch', () => {
-    const body = Buffer.from(JSON.stringify({
-      messages: [{
-        role: 'assistant',
-        content: [{ type: 'tool_use', name: 'web_fetch', input: { url: 'https://example.org/a' } }],
-      }],
-      tools: [{ type: 'web_fetch_20250305', name: 'web_fetch' }],
-    }));
-
-    expect(extractWebFetchUrlFromRequestBody(body)).toBe('https://example.org/a');
+  it('HARNESS_CONTEXT_SYNC_SUFFIX está exportado y es un string no vacío', () => {
+    expect(typeof HARNESS_CONTEXT_SYNC_SUFFIX).toBe('string');
+    expect(HARNESS_CONTEXT_SYNC_SUFFIX.length).toBeGreaterThan(10);
+    expect(HARNESS_CONTEXT_SYNC_SUFFIX).toContain('125-character');
   });
+});
 
-  it('extractToolResultIdsFromRequestBody extrae ids de tool_result', () => {
+describe('extractToolResultIdsFromRequestBody', () => {
+  it('extrae ids de tool_result', () => {
     const body = Buffer.from(JSON.stringify({
       messages: [{
         role: 'user',
@@ -146,8 +143,10 @@ describe('classifyRequestBody', () => {
 
     expect(extractToolResultIdsFromRequestBody(body)).toEqual(['tool-1', 'tool-2']);
   });
+});
 
-  it('extractModelFromRequestBody retorna model o null', () => {
+describe('extractModelFromRequestBody', () => {
+  it('retorna model o null', () => {
     expect(extractModelFromRequestBody(Buffer.from('{"model":"claude-sonnet-4-6"}'))).toBe('claude-sonnet-4-6');
     expect(extractModelFromRequestBody(Buffer.from('{"messages":[]}'))).toBeNull();
   });

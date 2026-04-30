@@ -1,13 +1,11 @@
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
-import { EventEmitter } from 'node:events';
 
 import {
   ActiveTurn,
   PendingAgentToolUse,
   PendingBuiltinToolUse,
   StepMeta,
-  WebFetchStepResolution,
 } from '../1-domain/types/audit.types.js';
 import type { ISessionStore } from './ports/session-store.port.js';
 import type { Logger } from '../1-domain/types/logger.types.js';
@@ -25,11 +23,9 @@ export class SessionStoreService implements ISessionStore {
   private toolUseIdToTurnDir = new Map<string, string>();
   /** Índice por sesión: sessionId → set de interactionDir de turns activos. */
   private sessionToActiveTurns = new Map<string, Set<string>>();
-  /** Correlación de tool_use_id web_fetch a URL/session. */
-  private webFetchToolUseToUrl = new Map<string, { sessionId: string; url: string }>();
-  /** Índice context-sync: (sessionId,url) -> step ya resuelto. */
-  private webFetchStepIndex = new Map<string, WebFetchStepResolution>();
-  private webFetchEmitter = new EventEmitter();
+  /** Caché de Context Sync: (htmlHash:promptHash) → { response, expiresAt }. TTL 5 min. */
+  private contextSyncCache = new Map<string, { response: string; expiresAt: number }>();
+  private static readonly CONTEXT_SYNC_CACHE_TTL_MS = 5 * 60 * 1000;
 
   constructor(
     auditBaseDir: string,
@@ -202,17 +198,6 @@ export class SessionStoreService implements ISessionStore {
     for (const [id, d] of this.toolUseIdToTurnDir) {
       if (d === dir) this.toolUseIdToTurnDir.delete(id);
     }
-    for (const [id] of this.webFetchToolUseToUrl) {
-      const mappedDir = this.toolUseIdToTurnDir.get(id);
-      if (!mappedDir || mappedDir === dir) {
-        this.webFetchToolUseToUrl.delete(id);
-      }
-    }
-    for (const [key, entry] of this.webFetchStepIndex) {
-      if (entry.stepDir.startsWith(dir + path.sep) || entry.stepDir.startsWith(dir + '/')) {
-        this.webFetchStepIndex.delete(key);
-      }
-    }
   }
 
   public findStaleTurnsAwaitingContinuation(sessionId: string, maxAgeMs: number): ActiveTurn[] {
@@ -238,152 +223,42 @@ export class SessionStoreService implements ISessionStore {
     return [...this.turnRegistry.values()];
   }
 
-  public registerWebFetchToolUseUrl(toolUseId: string, sessionId: string, url: string): void {
-    this.webFetchToolUseToUrl.set(toolUseId, { sessionId, url });
-  }
-
-  public getWebFetchUrlByToolUseId(toolUseId: string): { sessionId: string; url: string } | null {
-    return this.webFetchToolUseToUrl.get(toolUseId) ?? null;
-  }
-
-  public registerWebFetchStepResolution(entry: WebFetchStepResolution): void {
-    const key = this.webFetchKey(entry.sessionId, entry.url);
-    const eventName = this.webFetchEventName(key);
-
-    this.logger?.debug({
-      event: 'sessionstore_index_register',
-      sessionId: entry.sessionId,
-      url: entry.url,
-      key,
-      stepDir: entry.stepDir,
-      completedAt: entry.completedAt,
-      previousEntry: this.webFetchStepIndex.has(key) ? 'EXISTS' : 'NEW',
-    }, 'SessionStore: registrando WebFetch step en índice');
-
-    this.webFetchStepIndex.set(key, entry);
-
-    const listenersCount = this.webFetchEmitter.listenerCount(eventName);
-    const emitResult = this.webFetchEmitter.emit(eventName, entry);
-
-    this.logger?.debug({
-      event: 'sessionstore_emit_result',
-      sessionId: entry.sessionId,
-      url: entry.url,
-      key,
-      eventName,
-      listenersCount,
-      emitReturned: emitResult,
-      note: listenersCount === 0 ? 'NO_LISTENERS_WAITING' : emitResult ? 'LISTENERS_NOTIFIED' : 'EMIT_FAILED',
-    }, `SessionStore: emitió evento (${listenersCount} listeners, returned=${emitResult})`);
-  }
-
-  public resolveWebFetchStep(sessionId: string, url: string): WebFetchStepResolution | null {
-    return this.webFetchStepIndex.get(this.webFetchKey(sessionId, url)) ?? null;
-  }
-
-  public onceWebFetchStepResolved(
-    sessionId: string,
-    url: string,
-    timeoutMs: number,
-  ): Promise<WebFetchStepResolution | null> {
-    const key = this.webFetchKey(sessionId, url);
-    const entryTime = Date.now();
-
-    this.logger?.debug({
-      event: 'sessionstore_wait_init',
-      sessionId,
-      url,
-      key,
-      configuredTimeoutMs: timeoutMs,
-      entryTime,
-      currentIndexSize: this.webFetchStepIndex.size,
-    }, 'SessionStore: iniciando espera WebFetch step');
-
-    const cached = this.webFetchStepIndex.get(key);
-    if (cached) {
-      this.logger?.debug({
-        event: 'sessionstore_wait_hit_sync',
-        sessionId,
-        url,
-        key,
-        elapsedMs: Date.now() - entryTime,
-        cachedCompletedAt: cached.completedAt,
-      }, 'SessionStore: HIT síncrono, no es necesario esperar');
-      return Promise.resolve(cached);
-    }
-
-    return new Promise((resolve) => {
-      const eventName = this.webFetchEventName(key);
-
-      this.logger?.debug({
-        event: 'sessionstore_wait_setup_listener',
-        sessionId,
-        url,
-        key,
-        eventName,
-        currentListeners: this.webFetchEmitter.listenerCount(eventName),
-        setupTime: Date.now(),
-      }, 'SessionStore: configurando listener para evento');
-
-      const onResolved = (entry: WebFetchStepResolution) => {
-        const resolveTime = Date.now();
-        this.logger?.debug({
-          event: 'sessionstore_wait_event_received',
-          sessionId,
-          url,
-          key,
-          elapsedSinceInitMs: resolveTime - entryTime,
-          entryCompletedAt: entry.completedAt,
-        }, 'SessionStore: evento recibido, resolviendo promesa');
-        clearTimeout(timer);
-        this.webFetchEmitter.removeListener(eventName, onResolved);
-        resolve(entry);
-      };
-
-      const timer = setTimeout(() => {
-        const timeoutTime = Date.now();
-        const actualWaitMs = timeoutTime - entryTime;
-
-        this.logger?.debug({
-          event: 'sessionstore_wait_timeout',
-          sessionId,
-          url,
-          key,
-          configuredTimeoutMs: timeoutMs,
-          actualWaitMs,
-          differenceMs: actualWaitMs - timeoutMs,
-          premature: actualWaitMs < timeoutMs * 0.5,
-          extended: actualWaitMs > timeoutMs * 1.1,
-        }, actualWaitMs < timeoutMs * 0.5
-          ? 'SessionStore: timeout prematuro'
-          : actualWaitMs > timeoutMs * 1.1
-            ? 'SessionStore: timeout extendido'
-            : 'SessionStore: timeout normal');
-
-        this.webFetchEmitter.removeListener(eventName, onResolved);
-        resolve(null);
-      }, Math.max(0, timeoutMs));
-
-      this.webFetchEmitter.once(eventName, onResolved);
-
-      this.logger?.debug({
-        event: 'sessionstore_wait_listener_active',
-        sessionId,
-        url,
-        key,
-        eventName,
-        listenerSetTime: Date.now(),
-        totalListenersForEvent: this.webFetchEmitter.listenerCount(eventName),
-      }, 'SessionStore: listener activo, esperando evento o timeout');
-    });
-  }
-
   public withSessionLock<T>(sessionId: string, fn: () => Promise<T>): Promise<T> {
     const key = String(sessionId);
     const prev = this.sessionRequestChains.get(key) || Promise.resolve();
     const result = prev.then(() => fn());
     this.sessionRequestChains.set(key, result.catch(() => {}) as unknown as Promise<void>);
     return result;
+  }
+
+  public registerContextSyncCache(htmlHash: string, promptHash: string, response: string): void {
+    this.cleanExpiredContextSyncCache();
+    const key = `${htmlHash}:${promptHash}`;
+    this.contextSyncCache.set(key, {
+      response,
+      expiresAt: Date.now() + SessionStoreService.CONTEXT_SYNC_CACHE_TTL_MS,
+    });
+  }
+
+  public resolveContextSyncCache(htmlHash: string, promptHash: string): string | null {
+    this.cleanExpiredContextSyncCache();
+    const key = `${htmlHash}:${promptHash}`;
+    const entry = this.contextSyncCache.get(key);
+    if (!entry) return null;
+    if (Date.now() > entry.expiresAt) {
+      this.contextSyncCache.delete(key);
+      return null;
+    }
+    return entry.response;
+  }
+
+  private cleanExpiredContextSyncCache(): void {
+    const now = Date.now();
+    for (const [key, entry] of this.contextSyncCache) {
+      if (now > entry.expiresAt) {
+        this.contextSyncCache.delete(key);
+      }
+    }
   }
 
   private async allocateNextAuditInteractionSequence(sessionId: string): Promise<number> {
@@ -436,13 +311,5 @@ export class SessionStoreService implements ISessionStore {
     const body = `${JSON.stringify({ last }, null, 2)}\n`;
     await fs.writeFile(tmp, body, 'utf8');
     await fs.rename(tmp, filePath);
-  }
-
-  private webFetchKey(sessionId: string, url: string): string {
-    return `${sessionId}::${url}`;
-  }
-
-  private webFetchEventName(key: string): string {
-    return `webfetch-step:${key}`;
   }
 }

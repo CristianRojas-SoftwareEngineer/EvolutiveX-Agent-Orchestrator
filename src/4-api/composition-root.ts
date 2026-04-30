@@ -10,7 +10,6 @@ import { AuditInteractionHandler } from '../3-operations/audit-interaction.handl
 import { AuditSseResponseHandler } from '../3-operations/audit-sse-response.handler.js';
 import { AuditStandardResponseHandler } from '../3-operations/audit-standard-response.handler.js';
 import { AuditUpstreamErrorHandler } from '../3-operations/audit-upstream-error.handler.js';
-import { ContextSyncHandler } from '../3-operations/context-sync.handler.js';
 import { FilterToolsHandler } from '../3-operations/filter-tools.handler.js';
 import { ProxyEnvironmentConfig } from '../1-domain/types/config.types.js';
 import type { Logger } from '../1-domain/types/logger.types.js';
@@ -43,13 +42,11 @@ export async function createProxyDependencies(
   await sessionStore.ensureAuditSessionsRoot();
 
   // Capa 3 — Handlers
-  const contextSyncHandler = new ContextSyncHandler(sessionStore, config, logger);
   const auditInteractionHandler = new AuditInteractionHandler(
     sessionResolver,
     sessionStore,
     auditWriter,
     config,
-    contextSyncHandler,
     logger,
   );
   const auditSseResponseHandler = new AuditSseResponseHandler(

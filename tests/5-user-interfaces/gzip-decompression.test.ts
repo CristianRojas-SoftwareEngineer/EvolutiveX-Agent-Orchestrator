@@ -89,7 +89,9 @@ describe('Test de Integración - Decompresión Gzip', () => {
     const requestBody = JSON.stringify({
       model: 'claude-3-5-sonnet',
       messages: [{ role: 'user', content: 'test' }],
-      tools: [{ name: 'Read', description: 'lee', input_schema: { type: 'object', properties: {} } }],
+      tools: [
+        { name: 'Read', description: 'lee', input_schema: { type: 'object', properties: {} } },
+      ],
       max_tokens: 4096,
     });
     const res = await proxyApp.inject({

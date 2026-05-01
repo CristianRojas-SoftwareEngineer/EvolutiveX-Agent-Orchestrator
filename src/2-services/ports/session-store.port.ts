@@ -1,4 +1,9 @@
-import { ActiveTurn, PendingAgentToolUse, PendingBuiltinToolUse, StepMeta } from '../../1-domain/types/audit.types.js';
+import {
+  ActiveTurn,
+  PendingAgentToolUse,
+  PendingBuiltinToolUse,
+  StepMeta,
+} from '../../1-domain/types/audit.types.js';
 
 /**
  * Port que define el contrato público de almacenamiento de sesiones.

@@ -106,7 +106,12 @@ export type InteractionType = 'client-preflight' | 'agentic-turn' | 'side-reques
  * - truncated: Truncado por max_tokens
  * - orphaned: Turno cerrado por cleanup (continuation nunca llegó, graceful shutdown, etc.)
  */
-export type TurnOutcome = 'completed' | 'client-error' | 'upstream-error' | 'truncated' | 'orphaned';
+export type TurnOutcome =
+  | 'completed'
+  | 'client-error'
+  | 'upstream-error'
+  | 'truncated'
+  | 'orphaned';
 
 /**
  * Referencia de parentezco entre una interacción de subagente y el step del

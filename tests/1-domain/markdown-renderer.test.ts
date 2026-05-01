@@ -41,9 +41,7 @@ describe('MarkdownRendererService', () => {
         messages: [
           {
             role: 'assistant',
-            content: [
-              { type: 'tool_use', id: 'toolu_123', name: 'read_file', input: {} },
-            ],
+            content: [{ type: 'tool_use', id: 'toolu_123', name: 'read_file', input: {} }],
           },
           {
             role: 'user',
@@ -70,7 +68,11 @@ describe('MarkdownRendererService', () => {
             content: [
               { type: 'text', text: 'Revisa esta imagen' },
               { type: 'image', source: { type: 'base64', data: 'abc123' } },
-              { type: 'document', title: 'documento.pdf', source: { type: 'base64', data: 'xyz789' } },
+              {
+                type: 'document',
+                title: 'documento.pdf',
+                source: { type: 'base64', data: 'xyz789' },
+              },
             ],
           },
         ],
@@ -106,8 +108,14 @@ describe('MarkdownRendererService', () => {
           {
             role: 'user',
             content: [
-              { type: 'text', text: '<system-reminder>\nLista de skills inyectada\n</system-reminder>\n' },
-              { type: 'text', text: '<system-reminder>\nCLAUDE.md y entorno inyectados\n</system-reminder>\n' },
+              {
+                type: 'text',
+                text: '<system-reminder>\nLista de skills inyectada\n</system-reminder>\n',
+              },
+              {
+                type: 'text',
+                text: '<system-reminder>\nCLAUDE.md y entorno inyectados\n</system-reminder>\n',
+              },
               { type: 'text', text: 'Explicame este proyecto' },
             ],
           },
@@ -220,8 +228,18 @@ describe('MarkdownRendererService', () => {
         role: 'assistant',
         stop_reason: 'tool_use',
         content: [
-          { type: 'tool_use', id: 'toolu_111', name: 'skill', input: { skill: 'test', args: 'arg1' } },
-          { type: 'tool_use', id: 'toolu_222', name: 'bash', input: { command: 'ls', description: 'Listar' } },
+          {
+            type: 'tool_use',
+            id: 'toolu_111',
+            name: 'skill',
+            input: { skill: 'test', args: 'arg1' },
+          },
+          {
+            type: 'tool_use',
+            id: 'toolu_222',
+            name: 'bash',
+            input: { command: 'ls', description: 'Listar' },
+          },
         ],
       };
       const md = renderer.renderResponseConversationMarkdown(parsed);

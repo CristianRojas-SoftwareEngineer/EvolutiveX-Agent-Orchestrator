@@ -6,7 +6,12 @@ import type { IAuditWriter } from '../../src/2-services/ports/audit-writer.port.
 import type { ISessionStore } from '../../src/2-services/ports/session-store.port.js';
 import type { ISseReconstructor } from '../../src/2-services/ports/sse-reconstructor.port.js';
 import { ProxyEnvironmentConfig } from '../../src/1-domain/types/config.types.js';
-import { AuditInteractionContext, ActiveTurn, StepMeta, TurnMetadata } from '../../src/1-domain/types/audit.types.js';
+import {
+  AuditInteractionContext,
+  ActiveTurn,
+  StepMeta,
+  TurnMetadata,
+} from '../../src/1-domain/types/audit.types.js';
 
 function makeConfig(overrides: Partial<ProxyEnvironmentConfig> = {}): ProxyEnvironmentConfig {
   return {
@@ -68,7 +73,10 @@ function makeContext(overrides: Partial<AuditInteractionContext> = {}): AuditInt
   };
 }
 
-function makeSessionStore(turn: ActiveTurn | null = makeActiveTurn(), overrides: Partial<ISessionStore> = {}): ISessionStore {
+function makeSessionStore(
+  turn: ActiveTurn | null = makeActiveTurn(),
+  overrides: Partial<ISessionStore> = {},
+): ISessionStore {
   const registry = new Map<string, ActiveTurn>();
   const toolUseIndex = new Map<string, string>();
   if (turn) registry.set(turn.interactionDir, turn);
@@ -77,18 +85,31 @@ function makeSessionStore(turn: ActiveTurn | null = makeActiveTurn(), overrides:
     getBaseDir: () => '/tmp/sessions',
     ensureAuditSessionsRoot: async () => {},
     nextAuditInteractionSequence: async () => 1,
-    registerTurn: (t: ActiveTurn) => { registry.set(t.interactionDir, t); },
-    registerToolUseId: (id: string, dir: string) => { toolUseIndex.set(id, dir); },
-    getTurnByToolUseId: (id: string) => { const dir = toolUseIndex.get(id); return dir ? (registry.get(dir) ?? null) : null; },
+    registerTurn: (t: ActiveTurn) => {
+      registry.set(t.interactionDir, t);
+    },
+    registerToolUseId: (id: string, dir: string) => {
+      toolUseIndex.set(id, dir);
+    },
+    getTurnByToolUseId: (id: string) => {
+      const dir = toolUseIndex.get(id);
+      return dir ? (registry.get(dir) ?? null) : null;
+    },
     getTurnByDir: async (dir: string) => registry.get(dir) || null,
     getTurnByDirSync: (dir: string) => registry.get(dir) || null,
-    incrementStepCountByDir: (dir: string) => { const t = registry.get(dir); if (t) t.stepCount += 1; return t?.stepCount ?? 1; },
+    incrementStepCountByDir: (dir: string) => {
+      const t = registry.get(dir);
+      if (t) t.stepCount += 1;
+      return t?.stepCount ?? 1;
+    },
     pushStepMetaByDir: async (dir: string, meta: StepMeta) => {
       pushedMetas.push(meta);
       const t = registry.get(dir);
       if (t) t.stepsMeta.push(meta);
     },
-    closeTurn: (dir: string) => { registry.delete(dir); },
+    closeTurn: (dir: string) => {
+      registry.delete(dir);
+    },
     registerPendingAgentToolUse: () => {},
     findTurnWithPendingAgents: () => null,
     consumePendingAgentToolUse: () => {},
@@ -99,7 +120,7 @@ function makeSessionStore(turn: ActiveTurn | null = makeActiveTurn(), overrides:
     getAllOpenTurns: () => [],
     registerContextSyncCache: () => {},
     resolveContextSyncCache: () => null,
-    withSessionLock: async <T,>(_sessionId: string, fn: () => Promise<T>): Promise<T> => fn(),
+    withSessionLock: async <T>(_sessionId: string, fn: () => Promise<T>): Promise<T> => fn(),
     ...overrides,
   };
 }
@@ -166,8 +187,12 @@ describe('AuditSseResponseHandler', () => {
 
     const handler = new AuditSseResponseHandler(
       makeAuditWriter({
-        appendSseLine: (_dir, line) => { appendedLines.push(line); },
-        writeTurnMeta: async () => { turnMetaWritten = true; },
+        appendSseLine: (_dir, line) => {
+          appendedLines.push(line);
+        },
+        writeTurnMeta: async () => {
+          turnMetaWritten = true;
+        },
       }),
       makeSseReconstructor(),
       config,
@@ -196,7 +221,11 @@ describe('AuditSseResponseHandler', () => {
     ].join('\n');
 
     const handler = new AuditSseResponseHandler(
-      makeAuditWriter({ writeTurnMeta: async () => { turnMetaWritten = true; } }),
+      makeAuditWriter({
+        writeTurnMeta: async () => {
+          turnMetaWritten = true;
+        },
+      }),
       makeSseReconstructor(),
       config,
       makeSessionStore(),
@@ -218,11 +247,17 @@ describe('AuditSseResponseHandler', () => {
 
     const preflightTurn = makeActiveTurn({ interactionType: 'client-preflight' });
     const store = makeSessionStore(preflightTurn, {
-      closeTurn: (_dir) => { turnCleared = true; },
+      closeTurn: (_dir) => {
+        turnCleared = true;
+      },
     });
 
     const handler = new AuditSseResponseHandler(
-      makeAuditWriter({ writeTurnMeta: async () => { turnMetaWritten = true; } }),
+      makeAuditWriter({
+        writeTurnMeta: async () => {
+          turnMetaWritten = true;
+        },
+      }),
       makeSseReconstructor(),
       config,
       store,
@@ -231,7 +266,10 @@ describe('AuditSseResponseHandler', () => {
     const stream = new PassThrough();
     handler.execute(
       stream,
-      makeContext({ interactionType: 'client-preflight', turnClassification: { type: 'preflight-warmup' } }),
+      makeContext({
+        interactionType: 'client-preflight',
+        turnClassification: { type: 'preflight-warmup' },
+      }),
       {},
     );
     stream.write('data: {"type":"message_start"}\n\n');
@@ -247,11 +285,20 @@ describe('AuditSseResponseHandler', () => {
     let capturedMeta: StepMeta | null = null;
     const turn = makeActiveTurn();
     const store = makeSessionStore(turn, {
-      pushStepMetaByDir: async (_dir, meta) => { capturedMeta = meta; turn.stepsMeta.push(meta); },
+      pushStepMetaByDir: async (_dir, meta) => {
+        capturedMeta = meta;
+        turn.stepsMeta.push(meta);
+      },
     });
 
-    const sseData = 'event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"end_turn"}}\n\n';
-    const handler = new AuditSseResponseHandler(makeAuditWriter(), makeSseReconstructor(), config, store);
+    const sseData =
+      'event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"end_turn"}}\n\n';
+    const handler = new AuditSseResponseHandler(
+      makeAuditWriter(),
+      makeSseReconstructor(),
+      config,
+      store,
+    );
     const stream = new PassThrough();
     handler.execute(stream, makeContext(), {});
     stream.write(sseData);
@@ -267,16 +314,22 @@ describe('AuditSseResponseHandler', () => {
     const headerDirs: string[] = [];
     const handler = new AuditSseResponseHandler(
       makeAuditWriter({
-        writeResponseHeadersAudit: async (dir) => { headerDirs.push(dir); },
+        writeResponseHeadersAudit: async (dir) => {
+          headerDirs.push(dir);
+        },
       }),
       makeSseReconstructor({
-        runReconstruction: async () => ({ sseResponseBodyAttempted: true, sseResponseBodyWritten: false }),
+        runReconstruction: async () => ({
+          sseResponseBodyAttempted: true,
+          sseResponseBodyWritten: false,
+        }),
       }),
       config,
       makeSessionStore(),
     );
 
-    const sseData = 'event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"end_turn"}}\n\n';
+    const sseData =
+      'event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"end_turn"}}\n\n';
     const stream = new PassThrough();
     handler.execute(stream, makeContext(), {});
     stream.write(sseData);
@@ -292,16 +345,22 @@ describe('AuditSseResponseHandler', () => {
     const headerDirs: string[] = [];
     const handler = new AuditSseResponseHandler(
       makeAuditWriter({
-        writeResponseHeadersAudit: async (dir) => { headerDirs.push(dir); },
+        writeResponseHeadersAudit: async (dir) => {
+          headerDirs.push(dir);
+        },
       }),
       makeSseReconstructor({
-        runReconstruction: async () => ({ sseResponseBodyAttempted: true, sseResponseBodyWritten: true }),
+        runReconstruction: async () => ({
+          sseResponseBodyAttempted: true,
+          sseResponseBodyWritten: true,
+        }),
       }),
       config,
       makeSessionStore(),
     );
 
-    const sseData = 'event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"end_turn"}}\n\n';
+    const sseData =
+      'event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"end_turn"}}\n\n';
     const stream = new PassThrough();
     handler.execute(stream, makeContext(), {});
     stream.write(sseData);
@@ -319,11 +378,17 @@ describe('AuditSseResponseHandler', () => {
     // Turno subyacente es agentic-turn, no preflight
     const agenticTurn = makeActiveTurn({ interactionType: 'agentic-turn' });
     const store = makeSessionStore(agenticTurn, {
-      closeTurn: () => { turnClosed = true; },
+      closeTurn: () => {
+        turnClosed = true;
+      },
     });
 
     const handler = new AuditSseResponseHandler(
-      makeAuditWriter({ writeTurnMeta: async () => { turnMetaWritten = true; } }),
+      makeAuditWriter({
+        writeTurnMeta: async () => {
+          turnMetaWritten = true;
+        },
+      }),
       makeSseReconstructor(),
       config,
       store,
@@ -332,7 +397,10 @@ describe('AuditSseResponseHandler', () => {
     const stream = new PassThrough();
     handler.execute(
       stream,
-      makeContext({ interactionType: 'client-preflight', turnClassification: { type: 'preflight-warmup' } }),
+      makeContext({
+        interactionType: 'client-preflight',
+        turnClassification: { type: 'preflight-warmup' },
+      }),
       {},
     );
     stream.write('data: {"type":"message_start"}\n\n');
@@ -348,14 +416,17 @@ describe('AuditSseResponseHandler', () => {
     let removeCalled = false;
     const handler = new AuditSseResponseHandler(
       makeAuditWriter({
-        removeInteractionState: async () => { removeCalled = true; },
+        removeInteractionState: async () => {
+          removeCalled = true;
+        },
       }),
       makeSseReconstructor(),
       config,
       makeSessionStore(),
     );
 
-    const sseData = 'event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"end_turn"}}\n\n';
+    const sseData =
+      'event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"end_turn"}}\n\n';
     const stream = new PassThrough();
     handler.execute(stream, makeContext(), {});
     stream.write(sseData);
@@ -369,7 +440,8 @@ describe('AuditSseResponseHandler', () => {
     const config = makeConfig();
     let reconstructCalled = false;
 
-    const sseData = 'event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"end_turn"}}\n\n';
+    const sseData =
+      'event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"end_turn"}}\n\n';
 
     const handler = new AuditSseResponseHandler(
       makeAuditWriter(),
@@ -443,7 +515,9 @@ describe('AuditSseResponseHandler', () => {
     const config = makeConfig();
     const calls: unknown[] = [];
     const store = makeSessionStore(makeActiveTurn(), {
-      registerPendingAgentToolUse: (...args) => { calls.push(args); },
+      registerPendingAgentToolUse: (...args) => {
+        calls.push(args);
+      },
     });
     const handler = new AuditSseResponseHandler(
       makeAuditWriter(),
@@ -474,7 +548,9 @@ describe('AuditSseResponseHandler', () => {
     const config = makeConfig();
     const calls: Array<{ id: string; type?: string }> = [];
     const store = makeSessionStore(makeActiveTurn(), {
-      registerPendingAgentToolUse: (_dir, _step, id, type) => { calls.push({ id, type }); },
+      registerPendingAgentToolUse: (_dir, _step, id, type) => {
+        calls.push({ id, type });
+      },
     });
     const handler = new AuditSseResponseHandler(
       makeAuditWriter(),
@@ -524,7 +600,9 @@ describe('AuditSseResponseHandler', () => {
 
     const handler = new AuditSseResponseHandler(
       makeAuditWriter({
-        writeTurnMeta: async (_dir, meta) => { captured = meta; },
+        writeTurnMeta: async (_dir, meta) => {
+          captured = meta;
+        },
       }),
       makeSseReconstructor(),
       config,
@@ -563,7 +641,9 @@ describe('AuditSseResponseHandler', () => {
 
     const handler = new AuditSseResponseHandler(
       makeAuditWriter({
-        writeTurnMeta: async (_dir, meta) => { captured = meta; },
+        writeTurnMeta: async (_dir, meta) => {
+          captured = meta;
+        },
       }),
       makeSseReconstructor(),
       config,
@@ -588,12 +668,16 @@ describe('AuditSseResponseHandler', () => {
     const turn = makeActiveTurn();
     const store = makeSessionStore(turn);
 
-    const sseData = [
-      'data: {"type":"message_delta","delta":{"stop_reason":"tool_use"}}',
-      '',
-    ].join('\n');
+    const sseData = ['data: {"type":"message_delta","delta":{"stop_reason":"tool_use"}}', ''].join(
+      '\n',
+    );
 
-    const handler = new AuditSseResponseHandler(makeAuditWriter(), makeSseReconstructor(), config, store);
+    const handler = new AuditSseResponseHandler(
+      makeAuditWriter(),
+      makeSseReconstructor(),
+      config,
+      store,
+    );
     const stream = new PassThrough();
     handler.execute(stream, makeContext(), {});
     stream.write(sseData);
@@ -610,14 +694,17 @@ describe('AuditSseResponseHandler', () => {
 
     const handler = new AuditSseResponseHandler(
       makeAuditWriter({
-        writeTurnMeta: async (_dir, meta) => { captured = meta; },
+        writeTurnMeta: async (_dir, meta) => {
+          captured = meta;
+        },
       }),
       makeSseReconstructor(),
       config,
       makeSessionStore(),
     );
 
-    const sseData = 'event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"end_turn"}}\n\n';
+    const sseData =
+      'event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"end_turn"}}\n\n';
     const stream = new PassThrough();
     handler.execute(stream, makeContext(), {});
     stream.write(sseData);
@@ -642,7 +729,9 @@ describe('AuditSseResponseHandler', () => {
 
     const handler = new AuditSseResponseHandler(
       makeAuditWriter({
-        writeTurnMeta: async (_dir, meta) => { captured = meta; },
+        writeTurnMeta: async (_dir, meta) => {
+          captured = meta;
+        },
       }),
       makeSseReconstructor(),
       config,

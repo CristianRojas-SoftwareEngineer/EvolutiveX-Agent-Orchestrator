@@ -12,7 +12,10 @@ export class ProxyController {
   public async preHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
     let rawBody: Buffer;
 
-    if (request.body != null && typeof (request.body as unknown as { pipe?: unknown }).pipe === 'function') {
+    if (
+      request.body != null &&
+      typeof (request.body as unknown as { pipe?: unknown }).pipe === 'function'
+    ) {
       const chunks: Buffer[] = [];
       for await (const chunk of request.body as AsyncIterable<Buffer>) {
         chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
@@ -31,7 +34,9 @@ export class ProxyController {
     // Actualizar request.body y content-length si el filtrado produjo cambios
     if (filteredBody !== rawBody) {
       (request as unknown as { body: unknown }).body = Readable.from(filteredBody);
-      (request.headers as Record<string, string | string[] | undefined>)['content-length'] = String(filteredBody.length);
+      (request.headers as Record<string, string | string[] | undefined>)['content-length'] = String(
+        filteredBody.length,
+      );
     }
 
     request.rawBodyBytes = filteredBody.length;

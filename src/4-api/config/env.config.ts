@@ -72,6 +72,16 @@ export const config: ProxyEnvironmentConfig = {
 
   // Filtrado de tools: lista de tool names a excluir del request
   FILTERED_TOOLS: process.env.FILTERED_TOOLS
-    ? process.env.FILTERED_TOOLS.split(',').map(t => t.trim()).filter(Boolean)
-    : ['ScheduleWakeup', 'NotebookEdit', 'ExitWorktree', 'EnterWorktree', 'CronList', 'CronDelete', 'CronCreate'],
+    ? process.env.FILTERED_TOOLS.split(',')
+        .map((t) => t.trim())
+        .filter(Boolean)
+    : [
+        'ScheduleWakeup',
+        'NotebookEdit',
+        'ExitWorktree',
+        'EnterWorktree',
+        'CronList',
+        'CronDelete',
+        'CronCreate',
+      ],
 };

@@ -4,7 +4,12 @@ import { AuditStandardResponseHandler } from '../../src/3-operations/audit-stand
 import type { IAuditWriter } from '../../src/2-services/ports/audit-writer.port.js';
 import type { ISessionStore } from '../../src/2-services/ports/session-store.port.js';
 import { ProxyEnvironmentConfig } from '../../src/1-domain/types/config.types.js';
-import { AuditInteractionContext, ActiveTurn, StepMeta, TurnMetadata } from '../../src/1-domain/types/audit.types.js';
+import {
+  AuditInteractionContext,
+  ActiveTurn,
+  StepMeta,
+  TurnMetadata,
+} from '../../src/1-domain/types/audit.types.js';
 
 function makeConfig(overrides: Partial<ProxyEnvironmentConfig> = {}): ProxyEnvironmentConfig {
   return {
@@ -66,7 +71,10 @@ function makeContext(overrides: Partial<AuditInteractionContext> = {}): AuditInt
   };
 }
 
-function makeSessionStore(turn: ActiveTurn | null = makeActiveTurn(), overrides: Partial<ISessionStore> = {}): ISessionStore {
+function makeSessionStore(
+  turn: ActiveTurn | null = makeActiveTurn(),
+  overrides: Partial<ISessionStore> = {},
+): ISessionStore {
   const registry = new Map<string, ActiveTurn>();
   const toolUseIndex = new Map<string, string>();
   if (turn) registry.set(turn.interactionDir, turn);
@@ -74,14 +82,32 @@ function makeSessionStore(turn: ActiveTurn | null = makeActiveTurn(), overrides:
     getBaseDir: () => '/tmp/sessions',
     ensureAuditSessionsRoot: async () => {},
     nextAuditInteractionSequence: async () => 1,
-    registerTurn: (t: ActiveTurn) => { registry.set(t.interactionDir, t); },
-    registerToolUseId: (id: string, dir: string) => { toolUseIndex.set(id, dir); },
-    getTurnByToolUseId: (id: string) => { const dir = toolUseIndex.get(id); return dir ? (registry.get(dir) ?? null) : null; },
+    registerTurn: (t: ActiveTurn) => {
+      registry.set(t.interactionDir, t);
+    },
+    registerToolUseId: (id: string, dir: string) => {
+      toolUseIndex.set(id, dir);
+    },
+    getTurnByToolUseId: (id: string) => {
+      const dir = toolUseIndex.get(id);
+      return dir ? (registry.get(dir) ?? null) : null;
+    },
     getTurnByDir: async (dir: string) => registry.get(dir) || null,
     getTurnByDirSync: (dir: string) => registry.get(dir) || null,
-    incrementStepCountByDir: (dir: string) => { const t = registry.get(dir); if (t) t.stepCount += 1; return t?.stepCount ?? 1; },
-    pushStepMetaByDir: async (dir: string, meta: StepMeta) => { registry.get(dir)?.stepsMeta.push(meta); },
-    closeTurn: (dir: string) => { registry.delete(dir); for (const [id, d] of toolUseIndex) { if (d === dir) toolUseIndex.delete(id); } },
+    incrementStepCountByDir: (dir: string) => {
+      const t = registry.get(dir);
+      if (t) t.stepCount += 1;
+      return t?.stepCount ?? 1;
+    },
+    pushStepMetaByDir: async (dir: string, meta: StepMeta) => {
+      registry.get(dir)?.stepsMeta.push(meta);
+    },
+    closeTurn: (dir: string) => {
+      registry.delete(dir);
+      for (const [id, d] of toolUseIndex) {
+        if (d === dir) toolUseIndex.delete(id);
+      }
+    },
     registerPendingAgentToolUse: () => {},
     findTurnWithPendingAgents: () => null,
     consumePendingAgentToolUse: () => {},
@@ -92,7 +118,7 @@ function makeSessionStore(turn: ActiveTurn | null = makeActiveTurn(), overrides:
     getAllOpenTurns: () => [],
     registerContextSyncCache: () => {},
     resolveContextSyncCache: () => null,
-    withSessionLock: async <T,>(_sessionId: string, fn: () => Promise<T>): Promise<T> => fn(),
+    withSessionLock: async <T>(_sessionId: string, fn: () => Promise<T>): Promise<T> => fn(),
     ...overrides,
   };
 }
@@ -140,17 +166,25 @@ describe('AuditStandardResponseHandler', () => {
       makeAuditWriter({
         finalizeNonSseResponseAudit: async (params) => {
           finalizedDirs.push(params.interactionDir);
-          return { responseBodyBytesAudited: params.bodyBuffer.length, responseTruncatedByProxyBuffer: false, responseTruncatedByAuditLimit: false };
+          return {
+            responseBodyBytesAudited: params.bodyBuffer.length,
+            responseTruncatedByProxyBuffer: false,
+            responseTruncatedByAuditLimit: false,
+          };
         },
         writeTopLevelMultiStepResponse: async () => {
           topLevelCalls++;
           return { written: true };
         },
-        writeTurnMeta: async () => { turnMetaWritten = true; },
+        writeTurnMeta: async () => {
+          turnMetaWritten = true;
+        },
       }),
       config,
       makeSessionStore(makeActiveTurn(), {
-        closeTurn: (_dir: string) => { turnCleared = true; },
+        closeTurn: (_dir: string) => {
+          turnCleared = true;
+        },
       }),
     );
 
@@ -182,7 +216,11 @@ describe('AuditStandardResponseHandler', () => {
             capturedTotalBytes = params.totalBytes;
             capturedBufferLength = params.bodyBuffer.length;
           }
-          return { responseBodyBytesAudited: params.bodyBuffer.length, responseTruncatedByProxyBuffer: true, responseTruncatedByAuditLimit: false };
+          return {
+            responseBodyBytesAudited: params.bodyBuffer.length,
+            responseTruncatedByProxyBuffer: true,
+            responseTruncatedByAuditLimit: false,
+          };
         },
       }),
       config,
@@ -213,7 +251,9 @@ describe('AuditStandardResponseHandler', () => {
           responseTruncatedByProxyBuffer: false,
           responseTruncatedByAuditLimit: false,
         }),
-        removeInteractionState: async () => { removeCalled = true; },
+        removeInteractionState: async () => {
+          removeCalled = true;
+        },
       }),
       config,
       makeSessionStore(),
@@ -236,18 +276,30 @@ describe('AuditStandardResponseHandler', () => {
     const preflightTurn = makeActiveTurn({ interactionType: 'client-preflight' });
 
     const handler = new AuditStandardResponseHandler(
-      makeAuditWriter({ writeTurnMeta: async () => { turnMetaWritten = true; } }),
+      makeAuditWriter({
+        writeTurnMeta: async () => {
+          turnMetaWritten = true;
+        },
+      }),
       config,
       makeSessionStore(preflightTurn, {
-        pushStepMetaByDir: async (_dir, meta) => { stepMetaPushed = meta; preflightTurn.stepsMeta.push(meta); },
-        closeTurn: () => { turnClosed = true; },
+        pushStepMetaByDir: async (_dir, meta) => {
+          stepMetaPushed = meta;
+          preflightTurn.stepsMeta.push(meta);
+        },
+        closeTurn: () => {
+          turnClosed = true;
+        },
       }),
     );
 
     const stream = new PassThrough();
     handler.execute(
       stream,
-      makeContext({ interactionType: 'client-preflight', turnClassification: { type: 'preflight-quota' } }),
+      makeContext({
+        interactionType: 'client-preflight',
+        turnClassification: { type: 'preflight-quota' },
+      }),
       'application/json',
     );
     stream.write('{"ok":true}');
@@ -275,7 +327,9 @@ describe('AuditStandardResponseHandler', () => {
 
     const handler = new AuditStandardResponseHandler(
       makeAuditWriter({
-        writeTurnMeta: async (_dir, meta) => { captured = meta; },
+        writeTurnMeta: async (_dir, meta) => {
+          captured = meta;
+        },
       }),
       config,
       makeSessionStore(subTurn),

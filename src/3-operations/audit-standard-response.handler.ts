@@ -72,7 +72,13 @@ export class AuditStandardResponseHandler {
           // Cerrar turno con error
           this.sessionStore.closeTurn(context.auditInteractionDir);
           if (turn) {
-            await this.writeTurnMeta(turn, context, 'upstream-error' as TurnOutcome, false, totalBytes);
+            await this.writeTurnMeta(
+              turn,
+              context,
+              'upstream-error' as TurnOutcome,
+              false,
+              totalBytes,
+            );
           }
         }
       } catch (writeErr) {
@@ -117,7 +123,8 @@ export class AuditStandardResponseHandler {
           // Preflight: solo acumular step meta, sin heurística terminal
           const stepMeta: StepMeta = {
             stepIndex: stepNumber,
-            label: context.turnClassification?.type === 'preflight-quota' ? 'quota-check' : undefined,
+            label:
+              context.turnClassification?.type === 'preflight-quota' ? 'quota-check' : undefined,
             sse: false,
             statusCode: context.responseStatusCode,
             ...(anthropicMessageId ? { anthropicMessageId } : {}),
@@ -189,9 +196,7 @@ export class AuditStandardResponseHandler {
     const endedAt = Date.now();
 
     const totals =
-      turn.interactionType !== 'client-preflight'
-        ? computeTokenTotals(turn.stepsMeta)
-        : null;
+      turn.interactionType !== 'client-preflight' ? computeTokenTotals(turn.stepsMeta) : null;
 
     const meta: TurnMetadata = {
       interactionType: turn.interactionType,

@@ -51,7 +51,9 @@ export class SessionStoreService implements ISessionStore {
   }
 
   public nextAuditInteractionSequence(sessionId: string): Promise<number> {
-    return this.withSessionLock(sessionId, () => this.allocateNextAuditInteractionSequence(sessionId));
+    return this.withSessionLock(sessionId, () =>
+      this.allocateNextAuditInteractionSequence(sessionId),
+    );
   }
 
   public registerTurn(turn: ActiveTurn): void {

@@ -165,14 +165,14 @@ export class AuditSseResponseHandler {
               if (evt.type === 'message_delta' && evt.usage) {
                 stepUsage.output_tokens = evt.usage.output_tokens ?? 0;
               }
-              if (
-                evt.type === 'content_block_start' &&
-                evt.content_block?.type === 'tool_use'
-              ) {
+              if (evt.type === 'content_block_start' && evt.content_block?.type === 'tool_use') {
                 toolCalls.push(evt.content_block.name);
                 if (typeof evt.content_block.id === 'string') {
                   toolUseIds.push(evt.content_block.id);
-                  this.sessionStore.registerToolUseId(evt.content_block.id, context.auditInteractionDir);
+                  this.sessionStore.registerToolUseId(
+                    evt.content_block.id,
+                    context.auditInteractionDir,
+                  );
 
                   // Detección de Agent: registrar pending para que la siguiente
                   // fresh request en la misma sesión se clasifique como subagente.
@@ -223,10 +223,7 @@ export class AuditSseResponseHandler {
                 sseErrorMessage = evt.error?.message ?? String(evt);
                 sseErrorType = evt.error?.type ?? null;
               }
-              if (
-                evt.type === 'content_block_stop' &&
-                typeof evt.index === 'number'
-              ) {
+              if (evt.type === 'content_block_stop' && typeof evt.index === 'number') {
                 const tracked = agentBlockTracker.get(evt.index);
                 if (tracked) {
                   let subagentType: string | undefined;
@@ -325,13 +322,14 @@ export class AuditSseResponseHandler {
         }
 
         // Terminal: end_turn, max_tokens, null/error
-        const turnOutcome: TurnOutcome = stopReason === 'end_turn'
-          ? 'completed'
-          : stopReason === 'max_tokens'
-            ? 'truncated'
-            : streamError
-              ? 'upstream-error'
-              : 'completed';
+        const turnOutcome: TurnOutcome =
+          stopReason === 'end_turn'
+            ? 'completed'
+            : stopReason === 'max_tokens'
+              ? 'truncated'
+              : streamError
+                ? 'upstream-error'
+                : 'completed';
 
         let sseReconstructResult: SseReconstructResult | undefined;
         try {
@@ -438,18 +436,14 @@ export class AuditSseResponseHandler {
     const sseRawTruncatedAny = turn.stepsMeta.some((s) => s.sseRawTruncatedByLimit === true);
 
     const totals =
-      turn.interactionType !== 'client-preflight'
-        ? computeTokenTotals(turn.stepsMeta)
-        : null;
+      turn.interactionType !== 'client-preflight' ? computeTokenTotals(turn.stepsMeta) : null;
 
     // Información forense: pending agents no consumidos al cierre
-    const lostPendings = turn.pendingAgentToolUses.length > 0
-      ? turn.pendingAgentToolUses
-      : undefined;
+    const lostPendings =
+      turn.pendingAgentToolUses.length > 0 ? turn.pendingAgentToolUses : undefined;
     // Información forense: pending builtin tools no consumidos al cierre
-    const lostBuiltinPendings = turn.pendingBuiltinToolUses.length > 0
-      ? turn.pendingBuiltinToolUses
-      : undefined;
+    const lostBuiltinPendings =
+      turn.pendingBuiltinToolUses.length > 0 ? turn.pendingBuiltinToolUses : undefined;
 
     const meta: TurnMetadata = {
       interactionType: turn.interactionType,

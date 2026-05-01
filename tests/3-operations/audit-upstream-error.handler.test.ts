@@ -30,21 +30,34 @@ function makeConfig(overrides: Partial<ProxyEnvironmentConfig> = {}): ProxyEnvir
   };
 }
 
-function makeSessionStore(turn: ActiveTurn | null = null, overrides: Partial<ISessionStore> = {}): ISessionStore {
+function makeSessionStore(
+  turn: ActiveTurn | null = null,
+  overrides: Partial<ISessionStore> = {},
+): ISessionStore {
   const registry = new Map<string, ActiveTurn>();
   if (turn) registry.set(turn.interactionDir, turn);
   return {
     getBaseDir: () => '/tmp/sessions',
     ensureAuditSessionsRoot: async () => {},
     nextAuditInteractionSequence: async () => 1,
-    registerTurn: (t: ActiveTurn) => { registry.set(t.interactionDir, t); },
+    registerTurn: (t: ActiveTurn) => {
+      registry.set(t.interactionDir, t);
+    },
     registerToolUseId: () => {},
     getTurnByToolUseId: () => null,
     getTurnByDir: async (dir: string) => registry.get(dir) || null,
     getTurnByDirSync: (dir: string) => registry.get(dir) || null,
-    incrementStepCountByDir: (dir: string) => { const t = registry.get(dir); if (t) t.stepCount += 1; return t?.stepCount ?? 1; },
-    pushStepMetaByDir: async (dir: string, meta: StepMeta) => { registry.get(dir)?.stepsMeta.push(meta); },
-    closeTurn: (dir: string) => { registry.delete(dir); },
+    incrementStepCountByDir: (dir: string) => {
+      const t = registry.get(dir);
+      if (t) t.stepCount += 1;
+      return t?.stepCount ?? 1;
+    },
+    pushStepMetaByDir: async (dir: string, meta: StepMeta) => {
+      registry.get(dir)?.stepsMeta.push(meta);
+    },
+    closeTurn: (dir: string) => {
+      registry.delete(dir);
+    },
     registerPendingAgentToolUse: () => {},
     findTurnWithPendingAgents: () => null,
     consumePendingAgentToolUse: () => {},
@@ -55,7 +68,7 @@ function makeSessionStore(turn: ActiveTurn | null = null, overrides: Partial<ISe
     getAllOpenTurns: () => [],
     registerContextSyncCache: () => {},
     resolveContextSyncCache: () => null,
-    withSessionLock: async <T,>(_sessionId: string, fn: () => Promise<T>): Promise<T> => fn(),
+    withSessionLock: async <T>(_sessionId: string, fn: () => Promise<T>): Promise<T> => fn(),
     ...overrides,
   };
 }
@@ -119,9 +132,7 @@ describe('AuditUpstreamErrorHandler', () => {
       startedAt: Date.now() - 200,
       requestBodyOmitted: false,
       requestBodyBytes: 100,
-      stepsMeta: [
-        { stepIndex: 1, sse: true, statusCode: 200, inputTokens: 5, outputTokens: 3 },
-      ],
+      stepsMeta: [{ stepIndex: 1, sse: true, statusCode: 200, inputTokens: 5, outputTokens: 3 }],
       sessionId: 's',
       pendingAgentToolUses: [],
       pendingBuiltinToolUses: [],
@@ -133,15 +144,22 @@ describe('AuditUpstreamErrorHandler', () => {
           capturedDir = dir;
           capturedMeta = meta;
         },
-        removeInteractionState: async () => { stateRemoved = true; },
+        removeInteractionState: async () => {
+          stateRemoved = true;
+        },
       }),
       config,
       makeSessionStore(activeTurn, {
-        closeTurn: async () => { turnCleared = true; },
+        closeTurn: async () => {
+          turnCleared = true;
+        },
       }),
     );
 
-    await handler.execute({ ...BASE_PARAMS, error: Object.assign(new Error('ECONNREFUSED'), { code: 'ECONNREFUSED' }) });
+    await handler.execute({
+      ...BASE_PARAMS,
+      error: Object.assign(new Error('ECONNREFUSED'), { code: 'ECONNREFUSED' }),
+    });
 
     expect(capturedDir).toBe('/tmp/sessions/s/interactions/000001_req-1');
     expect(capturedMeta!.turnOutcome).toBe('upstream-error');
@@ -162,13 +180,18 @@ describe('AuditUpstreamErrorHandler', () => {
 
     const handler = new AuditUpstreamErrorHandler(
       makeAuditWriter({
-        writeTurnMeta: async (_dir, meta) => { capturedMeta = meta; },
+        writeTurnMeta: async (_dir, meta) => {
+          capturedMeta = meta;
+        },
       }),
       config,
       makeSessionStore(null),
     );
 
-    await handler.execute({ ...BASE_PARAMS, error: Object.assign(new Error('socket hang up'), { code: 'ECONNRESET' }) });
+    await handler.execute({
+      ...BASE_PARAMS,
+      error: Object.assign(new Error('socket hang up'), { code: 'ECONNRESET' }),
+    });
 
     expect(capturedMeta).not.toBeNull();
     expect(capturedMeta!.turnOutcome).toBe('upstream-error');
@@ -203,12 +226,19 @@ describe('AuditUpstreamErrorHandler', () => {
     };
 
     const handler = new AuditUpstreamErrorHandler(
-      makeAuditWriter({ writeTurnMeta: async (_dir, meta) => { capturedMeta = meta; } }),
+      makeAuditWriter({
+        writeTurnMeta: async (_dir, meta) => {
+          capturedMeta = meta;
+        },
+      }),
       config,
       makeSessionStore(subTurn),
     );
 
-    await handler.execute({ ...BASE_PARAMS, error: Object.assign(new Error('boom'), { code: 'ECONNREFUSED' }) });
+    await handler.execute({
+      ...BASE_PARAMS,
+      error: Object.assign(new Error('boom'), { code: 'ECONNREFUSED' }),
+    });
 
     expect(capturedMeta!.parentContext).toEqual(subTurn.parentContext);
   });

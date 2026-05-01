@@ -10,19 +10,19 @@ import { MANAGED_ENV_VARS } from './types.js';
 class WindowsEnvManager implements IEnvManager {
   async setEnvVar(name: string, value: string): Promise<void> {
     const psValue = value.replace(/'/g, "''");
-    execSync(
-      `[Environment]::SetEnvironmentVariable('${name}', '${psValue}', 'User')`,
-      { shell: 'powershell.exe', stdio: 'pipe' },
-    );
+    execSync(`[Environment]::SetEnvironmentVariable('${name}', '${psValue}', 'User')`, {
+      shell: 'powershell.exe',
+      stdio: 'pipe',
+    });
     process.env[name] = value;
   }
 
   async removeEnvVar(name: string): Promise<void> {
     try {
-      execSync(
-        `Remove-ItemProperty -Path 'HKCU:\\Environment' -Name '${name}' -ErrorAction Stop`,
-        { shell: 'powershell.exe', stdio: 'pipe' },
-      );
+      execSync(`Remove-ItemProperty -Path 'HKCU:\\Environment' -Name '${name}' -ErrorAction Stop`, {
+        shell: 'powershell.exe',
+        stdio: 'pipe',
+      });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       if (!/was not found|does not exist|No se encontr/.test(msg)) {
@@ -34,10 +34,11 @@ class WindowsEnvManager implements IEnvManager {
 
   getEnvVar(name: string): string | undefined {
     try {
-      const result = execSync(
-        `[Environment]::GetEnvironmentVariable('${name}', 'User')`,
-        { shell: 'powershell.exe', encoding: 'utf-8', stdio: 'pipe' },
-      ).trim();
+      const result = execSync(`[Environment]::GetEnvironmentVariable('${name}', 'User')`, {
+        shell: 'powershell.exe',
+        encoding: 'utf-8',
+        stdio: 'pipe',
+      }).trim();
       return result || undefined;
     } catch {
       return undefined;

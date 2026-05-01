@@ -215,7 +215,10 @@ export class AuditInteractionHandler {
     headersForAudit: Record<string, string | string[] | undefined>,
     auditSessionId: string,
     classification: TurnClassification,
-    match: { turn: { interactionDir: string; pendingBuiltinToolUses: PendingBuiltinToolUse[] }; pendings: PendingBuiltinToolUse[] },
+    match: {
+      turn: { interactionDir: string; pendingBuiltinToolUses: PendingBuiltinToolUse[] };
+      pendings: PendingBuiltinToolUse[];
+    },
   ): Promise<AuditInteractionResult> {
     return this.sessionStore.withSessionLock(auditSessionId, async () => {
       const parentInteractionDir = match.turn.interactionDir;
@@ -227,14 +230,16 @@ export class AuditInteractionHandler {
       // Correlación tool_use ↔ ejecución builtin:
       // - 1 pending → unívoco, lo consumimos ya.
       // - >1 pending → ambiguo; dejamos null.
-      const triggeringToolUseId =
-        match.pendings.length === 1 ? match.pendings[0].toolUseId : null;
+      const triggeringToolUseId = match.pendings.length === 1 ? match.pendings[0].toolUseId : null;
 
       const subSeq = await this.auditWriter.nextSubInteractionSequence(
         parentInteractionDir,
         parentStepIndex,
       );
-      const folderName = this.sessionResolver.formatAuditInteractionDirName(subSeq, params.requestId);
+      const folderName = this.sessionResolver.formatAuditInteractionDirName(
+        subSeq,
+        params.requestId,
+      );
 
       const wr = await this.auditWriter.writeSubInteractionRequest({
         parentInteractionDir,
@@ -310,7 +315,10 @@ export class AuditInteractionHandler {
     headersForAudit: Record<string, string | string[] | undefined>,
     auditSessionId: string,
     classification: TurnClassification,
-    match: { turn: { interactionDir: string; pendingAgentToolUses: PendingAgentToolUse[] }; pendings: PendingAgentToolUse[] },
+    match: {
+      turn: { interactionDir: string; pendingAgentToolUses: PendingAgentToolUse[] };
+      pendings: PendingAgentToolUse[];
+    },
   ): Promise<AuditInteractionResult> {
     return this.sessionStore.withSessionLock(auditSessionId, async () => {
       const parentInteractionDir = match.turn.interactionDir;
@@ -326,16 +334,17 @@ export class AuditInteractionHandler {
       // - 1 pending → unívoco, lo consumimos ya.
       // - >1 pending → ambiguo; dejamos null y el id correcto se conocerá al
       //   recibir el tool_result en la continuation del padre.
-      const triggeringToolUseId =
-        match.pendings.length === 1 ? match.pendings[0].toolUseId : null;
-      const subagentType =
-        match.pendings.length === 1 ? match.pendings[0].subagentType : undefined;
+      const triggeringToolUseId = match.pendings.length === 1 ? match.pendings[0].toolUseId : null;
+      const subagentType = match.pendings.length === 1 ? match.pendings[0].subagentType : undefined;
 
       const subSeq = await this.auditWriter.nextSubInteractionSequence(
         parentInteractionDir,
         parentStepIndex,
       );
-      const folderName = this.sessionResolver.formatAuditInteractionDirName(subSeq, params.requestId);
+      const folderName = this.sessionResolver.formatAuditInteractionDirName(
+        subSeq,
+        params.requestId,
+      );
 
       const wr = await this.auditWriter.writeSubInteractionRequest({
         parentInteractionDir,
@@ -409,13 +418,18 @@ export class AuditInteractionHandler {
     classification: TurnClassification,
   ): Promise<AuditInteractionResult> {
     const toolUseIds = this.extractToolUseIdsFromBody(params.rawBody);
-    const parentTurn = toolUseIds.length > 0
-      ? this.sessionStore.getTurnByToolUseId(toolUseIds[0])
-      : null;
+    const parentTurn =
+      toolUseIds.length > 0 ? this.sessionStore.getTurnByToolUseId(toolUseIds[0]) : null;
 
     if (!parentTurn) {
-      console.warn('[audit] No se encontró turno padre para continuation (tool_use_ids:', toolUseIds, ') — creando interacción standalone');
-      const result = await this.handleFresh(params, headersForAudit, auditSessionId, { type: 'fresh' });
+      console.warn(
+        '[audit] No se encontró turno padre para continuation (tool_use_ids:',
+        toolUseIds,
+        ') — creando interacción standalone',
+      );
+      const result = await this.handleFresh(params, headersForAudit, auditSessionId, {
+        type: 'fresh',
+      });
       // Marcar la interacción como orphan en state.json
       await this.auditWriter.writeInteractionState(result.auditInteractionDir, {
         state: 'in-progress',
@@ -431,7 +445,11 @@ export class AuditInteractionHandler {
     parentTurn.awaitingSince = undefined;
 
     const stepCount = this.sessionStore.incrementStepCountByDir(parentTurn.interactionDir);
-    const stepDir = path.join(parentTurn.interactionDir, 'steps', String(stepCount).padStart(3, '0'));
+    const stepDir = path.join(
+      parentTurn.interactionDir,
+      'steps',
+      String(stepCount).padStart(3, '0'),
+    );
 
     await this.auditWriter.writeStepRequest({
       stepDir,
@@ -539,13 +557,16 @@ export class AuditInteractionHandler {
 
       const cachedResponse = this.sessionStore.resolveContextSyncCache(htmlHash, promptHash);
       if (cachedResponse) {
-        this.logger?.info({
-          event: 'audit_side_request_cache_hit',
-          sessionId: auditSessionId,
-          requestId: params.requestId,
-          htmlHash,
-          promptHash,
-        }, 'Side-request: HIT desde caché (transparente)');
+        this.logger?.info(
+          {
+            event: 'audit_side_request_cache_hit',
+            sessionId: auditSessionId,
+            requestId: params.requestId,
+            htmlHash,
+            promptHash,
+          },
+          'Side-request: HIT desde caché (transparente)',
+        );
 
         const model = extractModelFromRequestBody(params.rawBody) || 'unknown';
         const ssePayload = buildSimulatedSseFromText({ text: cachedResponse, model });
@@ -563,13 +584,16 @@ export class AuditInteractionHandler {
         };
       }
 
-      this.logger?.debug({
-        event: 'audit_side_request_cache_miss',
-        sessionId: auditSessionId,
-        requestId: params.requestId,
-        htmlHash,
-        promptHash,
-      }, 'Side-request: MISS, se auditará como side-request normal');
+      this.logger?.debug(
+        {
+          event: 'audit_side_request_cache_miss',
+          sessionId: auditSessionId,
+          requestId: params.requestId,
+          htmlHash,
+          promptHash,
+        },
+        'Side-request: MISS, se auditará como side-request normal',
+      );
     }
 
     const seq = await this.sessionStore.nextAuditInteractionSequence(auditSessionId);
@@ -780,12 +804,10 @@ export class AuditInteractionHandler {
       : null;
     const sseRawBytesTotal = computeSseRawBytesTotal(turn.stepsMeta);
     const sseRawTruncatedAny = turn.stepsMeta.some((s) => s.sseRawTruncatedByLimit === true);
-    const totals = turn.interactionType !== 'client-preflight'
-      ? computeTokenTotals(turn.stepsMeta)
-      : null;
-    const lostPendings = turn.pendingAgentToolUses.length > 0
-      ? turn.pendingAgentToolUses
-      : undefined;
+    const totals =
+      turn.interactionType !== 'client-preflight' ? computeTokenTotals(turn.stepsMeta) : null;
+    const lostPendings =
+      turn.pendingAgentToolUses.length > 0 ? turn.pendingAgentToolUses : undefined;
 
     this.sessionStore.closeTurn(turn.interactionDir);
 

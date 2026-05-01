@@ -3,11 +3,7 @@ import * as fs from 'node:fs/promises';
 import * as fsSync from 'node:fs';
 import { RedactService } from '../1-domain/services/redact.service.js';
 import { MarkdownRendererService } from '../1-domain/services/markdown-renderer.service.js';
-import {
-  InteractionState,
-  SseLine,
-  TurnMetadata,
-} from '../1-domain/types/audit.types.js';
+import { InteractionState, SseLine, TurnMetadata } from '../1-domain/types/audit.types.js';
 import { JsonValue } from '../1-domain/types/json.types.js';
 import type { IAuditWriter } from './ports/audit-writer.port.js';
 
@@ -343,7 +339,10 @@ export class AuditWriterService implements IAuditWriter {
   }
 
   public async writeTurnMeta(interactionDir: string, meta: TurnMetadata): Promise<void> {
-    await this.writeJsonAtomic(path.join(interactionDir, 'meta.json'), meta as unknown as JsonValue);
+    await this.writeJsonAtomic(
+      path.join(interactionDir, 'meta.json'),
+      meta as unknown as JsonValue,
+    );
   }
 
   public appendSseLine(interactionDir: string, lineObj: SseLine): void {
@@ -399,10 +398,7 @@ export class AuditWriterService implements IAuditWriter {
    * - body.json (mensaje completo, pretty print)
    * - body.parsed.md (vista markdown semántica)
    */
-  public async writeStepResponseMarkdown(
-    stepDir: string,
-    message: JsonValue,
-  ): Promise<void> {
+  public async writeStepResponseMarkdown(stepDir: string, message: JsonValue): Promise<void> {
     const responseDir = path.join(stepDir, 'response');
     await fs.mkdir(responseDir, { recursive: true });
 

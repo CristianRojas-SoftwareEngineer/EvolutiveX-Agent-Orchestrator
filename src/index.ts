@@ -29,9 +29,11 @@ async function start() {
       level: process.env.LOG_LEVEL || 'info',
     },
     pino.multistream([
-      { stream: pinoPretty({ colorize: true, translateTime: 'HH:MM:ss Z', ignore: 'pid,hostname' }) },
+      {
+        stream: pinoPretty({ colorize: true, translateTime: 'HH:MM:ss Z', ignore: 'pid,hostname' }),
+      },
       { stream: logFile },
-    ])
+    ]),
   );
 
   const deps = await createProxyDependencies(config, logger);

@@ -9,6 +9,7 @@
 Claude Code Router (CCR) es una solución **producción-ready** que permite usar Claude Code (la interfaz CLI de Anthropic) con **cualquier modelo LLM** disponible a través de OpenRouter, DeepSeek, Gemini, Ollama, y otros proveedores, sin necesidad de una cuenta de Anthropic.
 
 La clave del sistema es su **arquitectura de transformers** que realiza la traducción bidireccional entre:
+
 - **API Messages de Anthropic** (formato que espera Claude Code)
 - **API Chat Completions de OpenAI** (formato usado por OpenRouter y la mayoría de proveedores)
 
@@ -136,29 +137,20 @@ export interface Transformer {
    * Transformar response entrante del Provider
    * Se ejecuta DESPUÉS de recibir del upstream, ANTES de transformar a Anthropic
    */
-  transformResponseIn?: (
-    response: Response, 
-    context?: TransformerContext
-  ) => Promise<Response>;
+  transformResponseIn?: (response: Response, context?: TransformerContext) => Promise<Response>;
 
   /**
    * Transformar request saliente a formato común
    * (Usado internamente para normalización)
    */
-  transformRequestOut?: (
-    request: any, 
-    context: TransformerContext
-  ) => Promise<UnifiedChatRequest>;
+  transformRequestOut?: (request: any, context: TransformerContext) => Promise<UnifiedChatRequest>;
 
   /**
    * Transformar response saliente de formato Provider a formato Anthropic
    * Se ejecuta ANTES de enviar la respuesta a Claude Code
    * Esta es la transformación CRÍTICA para SSE streaming
    */
-  transformResponseOut?: (
-    response: Response, 
-    context: TransformerContext
-  ) => Promise<Response>;
+  transformResponseOut?: (response: Response, context: TransformerContext) => Promise<Response>;
 
   /**
    * Endpoint específico del provider
@@ -174,12 +166,8 @@ export interface Transformer {
   /**
    * Función de autenticación opcional
    */
-  auth?: (
-    request: any, 
-    provider: LLMProvider, 
-    context: TransformerContext
-  ) => Promise<any>;
-  
+  auth?: (request: any, provider: LLMProvider, context: TransformerContext) => Promise<any>;
+
   /**
    * Logger para debugging
    */
@@ -199,17 +187,14 @@ Este es el transformer más relevante para tu caso de uso. Demuestra cómo manej
 // packages/core/src/transformer/openrouter.transformer.ts
 
 export class OpenrouterTransformer implements Transformer {
-  static TransformerName = "openrouter";
+  static TransformerName = 'openrouter';
 
   constructor(private readonly options?: TransformerOptions) {}
 
-  async transformRequestIn(
-    request: UnifiedChatRequest
-  ): Promise<UnifiedChatRequest> {
-    
+  async transformRequestIn(request: UnifiedChatRequest): Promise<UnifiedChatRequest> {
     // CASO 1: Modelos NO Anthropic (ej. Llama, Qwen, GPT)
     // Eliminar características Anthropic-specific
-    if (!request.model.includes("claude")) {
+    if (!request.model.includes('claude')) {
       request.messages.forEach((msg) => {
         if (Array.isArray(msg.content)) {
           msg.content.forEach((item: any) => {
@@ -217,10 +202,10 @@ export class OpenrouterTransformer implements Transformer {
             if (item.cache_control) {
               delete item.cache_control;
             }
-            
+
             // Transformar imágenes de formato Anthropic a OpenAI
-            if (item.type === "image_url") {
-              if (!item.image_url.url.startsWith("http")) {
+            if (item.type === 'image_url') {
+              if (!item.image_url.url.startsWith('http')) {
                 item.image_url.url = `${item.image_url.url}`;
               }
               // Eliminar media_type (campo Anthropic)
@@ -231,16 +216,16 @@ export class OpenrouterTransformer implements Transformer {
           delete msg.cache_control;
         }
       });
-    } 
-    
+    }
+
     // CASO 2: Modelos Anthropic vía OpenRouter (ej. "anthropic/claude-3.5-sonnet")
     // Mantener formato pero ajustar imágenes
     else {
       request.messages.forEach((msg) => {
         if (Array.isArray(msg.content)) {
           msg.content.forEach((item: any) => {
-            if (item.type === "image_url") {
-              if (!item.image_url.url.startsWith("http")) {
+            if (item.type === 'image_url') {
+              if (!item.image_url.url.startsWith('http')) {
                 // Convertir base64 a data URL completo
                 item.image_url.url = `data:${item.media_type};base64,${item.image_url.url}`;
               }
@@ -250,7 +235,7 @@ export class OpenrouterTransformer implements Transformer {
         }
       });
     }
-    
+
     // Aplicar opciones adicionales del transformer
     Object.assign(request, this.options || {});
     return request;
@@ -304,7 +289,7 @@ async transformResponseOut(response: Response): Promise<Response> {
         // Solo procesar líneas de datos SSE
         if (line.startsWith("data: ") && line.trim() !== "data: [DONE]") {
           const jsonStr = line.slice(6);
-          
+
           try {
             const data = JSON.parse(jsonStr);
 
@@ -335,7 +320,7 @@ async transformResponseOut(response: Response): Promise<Response> {
               context.appendReasoningContent(
                 data.choices[0].delta.reasoning
               );
-              
+
               const thinkingChunk = {
                 ...data,
                 choices: [
@@ -350,12 +335,12 @@ async transformResponseOut(response: Response): Promise<Response> {
                   },
                 ],
               };
-              
+
               // Limpiar campo reasoning (OpenAI)
               if (thinkingChunk.choices?.[0]?.delta) {
                 delete thinkingChunk.choices[0].delta.reasoning;
               }
-              
+
               const thinkingLine = `data: ${JSON.stringify(
                 thinkingChunk
               )}\n\n`;
@@ -388,11 +373,11 @@ async transformResponseOut(response: Response): Promise<Response> {
                   },
                 ],
               };
-              
+
               if (thinkingChunk.choices?.[0]?.delta) {
                 delete thinkingChunk.choices[0].delta.reasoning;
               }
-              
+
               const thinkingLine = `data: ${JSON.stringify(
                 thinkingChunk
               )}\n\n`;
@@ -439,12 +424,12 @@ async transformResponseOut(response: Response): Promise<Response> {
             // Emitir línea transformada
             const modifiedLine = `data: ${JSON.stringify(data)}\n\n`;
             controller.enqueue(encoder.encode(modifiedLine));
-            
+
           } catch (e) {
             // Si falla el parsing, pasar línea original
             controller.enqueue(encoder.encode(line + "\n"));
           }
-          
+
         } else {
           // Pasar líneas no-data ([DONE], etc.)
           controller.enqueue(encoder.encode(line + "\n"));
@@ -561,40 +546,40 @@ async transformResponseOut(response: Response): Promise<Response> {
 
 ### Requests: Anthropic → OpenAI
 
-| Campo Anthropic | Campo OpenAI | Transformación |
-|-----------------|--------------|----------------|
-| `model` | `model` | Directo. Ej: `"claude-3-5-sonnet"` → `"anthropic/claude-3.5-sonnet"` |
-| `messages[].role` | `messages[].role` | Directo: `user`/`assistant`/`system` |
-| `messages[].content` (string) | `messages[].content` (string) | Directo |
-| `messages[].content` (array de blocks) | `messages[].content` (string) | **Flatten**: Concatenar textos, extraer tool_calls |
-| `content_blocks.text` | `content` | Extraer string |
-| `content_blocks.tool_use` | `tool_calls` | Transformar a formato OpenAI |
-| `content_blocks.tool_result` | `tool` role message | Transformar a mensaje con `role: "tool"` |
-| `tools[].name` | `tools[].function.name` | Anidar bajo `function` |
-| `tools[].input_schema` | `tools[].function.parameters` | Renombrar campo |
-| `tool_choice` | `tool_choice` | Directo |
-| `max_tokens` | `max_tokens` | Directo |
-| `temperature` | `temperature` | Directo |
-| `top_p` | `top_p` | Directo |
-| `system` (string) | `messages[0]` con `role: "system"` | Convertir a mensaje |
-| `metadata.user_id` | `user` | Renombrar campo |
-| `cache_control` | — | **Eliminar** (Anthropic-specific) |
-| `media_type` (en imágenes) | — | **Eliminar** |
+| Campo Anthropic                        | Campo OpenAI                       | Transformación                                                       |
+| -------------------------------------- | ---------------------------------- | -------------------------------------------------------------------- |
+| `model`                                | `model`                            | Directo. Ej: `"claude-3-5-sonnet"` → `"anthropic/claude-3.5-sonnet"` |
+| `messages[].role`                      | `messages[].role`                  | Directo: `user`/`assistant`/`system`                                 |
+| `messages[].content` (string)          | `messages[].content` (string)      | Directo                                                              |
+| `messages[].content` (array de blocks) | `messages[].content` (string)      | **Flatten**: Concatenar textos, extraer tool_calls                   |
+| `content_blocks.text`                  | `content`                          | Extraer string                                                       |
+| `content_blocks.tool_use`              | `tool_calls`                       | Transformar a formato OpenAI                                         |
+| `content_blocks.tool_result`           | `tool` role message                | Transformar a mensaje con `role: "tool"`                             |
+| `tools[].name`                         | `tools[].function.name`            | Anidar bajo `function`                                               |
+| `tools[].input_schema`                 | `tools[].function.parameters`      | Renombrar campo                                                      |
+| `tool_choice`                          | `tool_choice`                      | Directo                                                              |
+| `max_tokens`                           | `max_tokens`                       | Directo                                                              |
+| `temperature`                          | `temperature`                      | Directo                                                              |
+| `top_p`                                | `top_p`                            | Directo                                                              |
+| `system` (string)                      | `messages[0]` con `role: "system"` | Convertir a mensaje                                                  |
+| `metadata.user_id`                     | `user`                             | Renombrar campo                                                      |
+| `cache_control`                        | —                                  | **Eliminar** (Anthropic-specific)                                    |
+| `media_type` (en imágenes)             | —                                  | **Eliminar**                                                         |
 
 ### Responses: OpenAI → Anthropic (SSE Events)
 
-| Evento OpenAI | Evento Anthropic | Transformación |
-|---------------|------------------|----------------|
-| `chunk.choices[0].delta.content` | `content_block_delta` con `text_delta` | Envolver en estructura Anthropic |
-| `chunk.choices[0].delta.tool_calls[]` | `content_block_start` con `tool_use` | Crear content block |
-| `chunk.choices[0].delta.tool_calls[].function.name` | `content_block.name` | Mapear a tool_use |
-| `chunk.choices[0].delta.tool_calls[].function.arguments` | `content_block.input` | Parsear JSON string → object |
-| `chunk.choices[0].delta.tool_calls[].id` | `content_block.id` | Preservar o generar UUID |
-| `chunk.choices[0].finish_reason: "stop"` | `message_delta.stop_reason: "end_turn"` | Mapear valor |
-| `chunk.choices[0].finish_reason: "tool_calls"` | `message_delta.stop_reason: "tool_use"` | Mapear valor |
-| `chunk.choices[0].delta.reasoning` | `content_block_delta.thinking` | Transformar a thinking block |
-| `chunk.usage.prompt_tokens` | `usage.input_tokens` | Renombrar campo |
-| `chunk.usage.completion_tokens` | `usage.output_tokens` | Renombrar campo |
+| Evento OpenAI                                            | Evento Anthropic                        | Transformación                   |
+| -------------------------------------------------------- | --------------------------------------- | -------------------------------- |
+| `chunk.choices[0].delta.content`                         | `content_block_delta` con `text_delta`  | Envolver en estructura Anthropic |
+| `chunk.choices[0].delta.tool_calls[]`                    | `content_block_start` con `tool_use`    | Crear content block              |
+| `chunk.choices[0].delta.tool_calls[].function.name`      | `content_block.name`                    | Mapear a tool_use                |
+| `chunk.choices[0].delta.tool_calls[].function.arguments` | `content_block.input`                   | Parsear JSON string → object     |
+| `chunk.choices[0].delta.tool_calls[].id`                 | `content_block.id`                      | Preservar o generar UUID         |
+| `chunk.choices[0].finish_reason: "stop"`                 | `message_delta.stop_reason: "end_turn"` | Mapear valor                     |
+| `chunk.choices[0].finish_reason: "tool_calls"`           | `message_delta.stop_reason: "tool_use"` | Mapear valor                     |
+| `chunk.choices[0].delta.reasoning`                       | `content_block_delta.thinking`          | Transformar a thinking block     |
+| `chunk.usage.prompt_tokens`                              | `usage.input_tokens`                    | Renombrar campo                  |
+| `chunk.usage.completion_tokens`                          | `usage.output_tokens`                   | Renombrar campo                  |
 
 ---
 
@@ -610,7 +595,7 @@ CCR permite configurar múltiples providers y reglas de enrutamiento:
   "HOST": "127.0.0.1",
   "LOG": true,
   "API_TIMEOUT_MS": 600000,
-  
+
   "Providers": [
     {
       "name": "openrouter-oss",
@@ -639,7 +624,7 @@ CCR permite configurar múltiples providers y reglas de enrutamiento:
       }
     }
   ],
-  
+
   "Router": {
     "default": "openrouter-oss,meta-llama/llama-3.3-70b-instruct",
     "background": "openrouter-oss,qwen/qwen-2.5-72b-instruct",
@@ -672,12 +657,14 @@ Claude Code ──> Smart Code Proxy ──> CCR ──> OpenRouter
 ```
 
 **Configuración de Smart Code Proxy** (`.env`):
+
 ```bash
 UPSTREAM_ORIGIN=http://127.0.0.1:3456
 PORT=8787
 ```
 
 **Iniciar servicios**:
+
 ```bash
 # 1. Iniciar CCR en puerto 3456
 ccr start
@@ -690,6 +677,7 @@ ANTHROPIC_BASE_URL=http://localhost:8787 claude
 ```
 
 **Ventajas**:
+
 - ✅ No duplicar código de traducción
 - ✅ CCR ya resuelve todos los edge cases
 - ✅ Auditoría completa en Smart Code Proxy
@@ -702,6 +690,7 @@ ANTHROPIC_BASE_URL=http://localhost:8787 claude
 Si necesitas un sistema unificado, puedes adaptar el código de CCR:
 
 **Nuevos archivos a crear en Smart Code Proxy**:
+
 ```
 src/
 ├── 2-services/
@@ -716,6 +705,7 @@ src/
 
 **Adaptación de `OpenrouterTransformer`**:
 El código puede reutilizarse casi directamente, solo necesitas:
+
 1. Reemplazar `UnifiedChatRequest` con el tipo de request de tu dominio
 2. Adaptar el manejo de streams a la API de Node.js (vs Web Streams)
 3. Integrar con tu sistema de logging existente
@@ -739,10 +729,12 @@ CCR acumula estos chunks hasta que el JSON está completo, luego emite el `conte
 ### 2. Manejo de Reasoning (DeepSeek-style)
 
 Algunos modelos (DeepSeek) envían razonamiento separado del contenido:
+
 - **Fase 1**: Solo `delta.reasoning` (sin content)
 - **Fase 2**: `delta.content` aparece
 
 CCR detecta esta transición y:
+
 1. Envía reasoning como `thinking` block
 2. Marca con signature cuando reasoning está completo
 3. Luego procede con content normal
@@ -750,6 +742,7 @@ CCR detecta esta transición y:
 ### 3. Eliminación Condicional de Cache
 
 El `cache_control` de Anthropic causa errores en providers que no lo entienden. CCR:
+
 - Lo elimina para modelos no-Anthropic
 - Lo preserva para modelos Anthropic vía OpenRouter
 
@@ -761,15 +754,15 @@ CCR usa siempre `/v1/chat/completions` para todos los providers OpenAI-compatibl
 
 ## Referencias
 
-| Recurso | Ubicación |
-|---------|-----------|
-| CCR Instalado | `C:\Users\Cristian\AppData\Roaming\npm\node_modules\@musistudio\claude-code-router` |
-| Transformers Core | `packages/core/src/transformer/` |
-| Interfaz Transformer | `packages/core/src/types/transformer.ts` |
-| OpenRouter Transformer | `packages/core/src/transformer/openrouter.transformer.ts` |
-| DeepSeek Transformer | `packages/core/src/transformer/deepseek.transformer.ts` |
-| Documentación | https://musistudio.github.io/claude-code-router/ |
-| Repositorio | https://github.com/musistudio/claude-code-router |
+| Recurso                | Ubicación                                                                           |
+| ---------------------- | ----------------------------------------------------------------------------------- |
+| CCR Instalado          | `C:\Users\Cristian\AppData\Roaming\npm\node_modules\@musistudio\claude-code-router` |
+| Transformers Core      | `packages/core/src/transformer/`                                                    |
+| Interfaz Transformer   | `packages/core/src/types/transformer.ts`                                            |
+| OpenRouter Transformer | `packages/core/src/transformer/openrouter.transformer.ts`                           |
+| DeepSeek Transformer   | `packages/core/src/transformer/deepseek.transformer.ts`                             |
+| Documentación          | https://musistudio.github.io/claude-code-router/                                    |
+| Repositorio            | https://github.com/musistudio/claude-code-router                                    |
 
 ---
 

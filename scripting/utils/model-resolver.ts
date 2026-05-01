@@ -8,9 +8,7 @@ import type { ModelMetadata } from './types.js';
  */
 export function resolveModelId(modelPath: string, providerDir: string): string {
   if (!modelPath.startsWith('models/')) {
-    throw new Error(
-      `Ruta de modelo inválida: "${modelPath}". Debe comenzar con "models/".`,
-    );
+    throw new Error(`Ruta de modelo inválida: "${modelPath}". Debe comenzar con "models/".`);
   }
 
   const metadataPath = join(providerDir, modelPath, 'metadata.json');
@@ -19,24 +17,18 @@ export function resolveModelId(modelPath: string, providerDir: string): string {
   try {
     raw = readFileSync(metadataPath, 'utf-8');
   } catch {
-    throw new Error(
-      `No se encontró metadata.json en: ${metadataPath}`,
-    );
+    throw new Error(`No se encontró metadata.json en: ${metadataPath}`);
   }
 
   let metadata: ModelMetadata;
   try {
     metadata = JSON.parse(raw) as ModelMetadata;
   } catch {
-    throw new Error(
-      `Error al parsear JSON en: ${metadataPath}`,
-    );
+    throw new Error(`Error al parsear JSON en: ${metadataPath}`);
   }
 
   if (!metadata.modelId) {
-    throw new Error(
-      `metadata.json no contiene campo "modelId": ${metadataPath}`,
-    );
+    throw new Error(`metadata.json no contiene campo "modelId": ${metadataPath}`);
   }
 
   return metadata.modelId;

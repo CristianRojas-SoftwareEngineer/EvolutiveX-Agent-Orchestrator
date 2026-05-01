@@ -91,5 +91,4 @@ describe('Resolución de configuración de entorno', () => {
     const { config } = await import('../../src/4-api/config/env.config.js');
     expect(config.CONTEXT_SYNC_MAX_WAIT_MS).toBe(1500);
   });
-
 });

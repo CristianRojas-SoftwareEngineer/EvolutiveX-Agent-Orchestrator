@@ -36,8 +36,8 @@ export async function proxyRoutes(fastify: FastifyInstance, opts: { deps: ProxyD
       if (typeof betaHeader === 'string' && betaHeader.includes('redact-thinking-2026-02-12')) {
         const newBeta = betaHeader
           .split(',')
-          .map(s => s.trim())
-          .filter(s => s !== 'redact-thinking-2026-02-12')
+          .map((s) => s.trim())
+          .filter((s) => s !== 'redact-thinking-2026-02-12')
           .join(', ');
         headers['anthropic-beta'] = newBeta;
         request.log.info({ original: betaHeader, modified: newBeta }, 'Unredacted thinking header');

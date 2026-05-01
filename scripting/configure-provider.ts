@@ -32,7 +32,9 @@ function showCurrentState(env = createEnvManager()): void {
   } else if (apiKey) {
     console.log(chalk.green('  API_KEY activo (X-Api-Key header)'));
   } else {
-    console.log(chalk.green('  OAuth de suscripción (PRO/Max) - ninguna variable de API configurada'));
+    console.log(
+      chalk.green('  OAuth de suscripción (PRO/Max) - ninguna variable de API configurada'),
+    );
   }
 
   // Providers disponibles
@@ -67,10 +69,7 @@ async function removeManagedVars(env = createEnvManager()): Promise<void> {
   }
 }
 
-async function applyConfig(
-  config: ProviderConfig,
-  env = createEnvManager(),
-): Promise<void> {
+async function applyConfig(config: ProviderConfig, env = createEnvManager()): Promise<void> {
   for (const name of MANAGED_ENV_VARS) {
     const value = config[name];
     if (value === undefined) continue;
@@ -90,21 +89,27 @@ async function verifyApplied(
   if (provider === 'default') {
     const remaining = MANAGED_ENV_VARS.filter((n) => vars[n]);
     if (remaining.length === 0) {
-      console.log(chalk.green('  OK: variables eliminadas. Claude Code usará suscripción OAuth (PRO/Max).'));
+      console.log(
+        chalk.green('  OK: variables eliminadas. Claude Code usará suscripción OAuth (PRO/Max).'),
+      );
     } else {
-      console.log(chalk.yellow('  AVISO: las siguientes variables persisten y podrían interferir con la suscripción:'));
+      console.log(
+        chalk.yellow(
+          '  AVISO: las siguientes variables persisten y podrían interferir con la suscripción:',
+        ),
+      );
       for (const name of remaining) {
         console.log(chalk.yellow(`    - ${name} = ${vars[name]}`));
       }
     }
   } else if (config) {
-    const errors = MANAGED_ENV_VARS.filter(
-      (n) => config[n] !== undefined && vars[n] !== config[n],
-    );
+    const errors = MANAGED_ENV_VARS.filter((n) => config[n] !== undefined && vars[n] !== config[n]);
     if (errors.length === 0) {
       console.log(chalk.green(`  OK: provider '${provider}' configurado correctamente.`));
     } else {
-      console.log(chalk.yellow(`  AVISO: las siguientes variables no se aplicaron: ${errors.join(', ')}`));
+      console.log(
+        chalk.yellow(`  AVISO: las siguientes variables no se aplicaron: ${errors.join(', ')}`),
+      );
     }
   }
 }
@@ -115,7 +120,9 @@ const program = new Command();
 
 program
   .name('configure-provider')
-  .description('Configura el proveedor de Claude Code para usar Anthropic, Ollama, OpenRouter o Xiaomi.')
+  .description(
+    'Configura el proveedor de Claude Code para usar Anthropic, Ollama, OpenRouter o Xiaomi.',
+  )
   .argument('[provider]', 'Proveedor a configurar', 'default')
   .option('--show-current', 'Muestra las variables de entorno actuales y sale')
   .option('--dry-run', 'Simula la ejecución sin modificar el entorno')
@@ -129,7 +136,9 @@ program
 
     const validProviders = ['default', 'ollama', 'openrouter', 'xiaomi'];
     if (!validProviders.includes(provider)) {
-      console.error(chalk.red(`Proveedor inválido: "${provider}". Opciones: ${validProviders.join(', ')}`));
+      console.error(
+        chalk.red(`Proveedor inválido: "${provider}". Opciones: ${validProviders.join(', ')}`),
+      );
       process.exit(1);
     }
 
@@ -137,7 +146,9 @@ program
     console.log(`Provider seleccionado: ${provider}`);
 
     if (provider === 'default') {
-      console.log(chalk.cyan('\nRestaurando configuración nativa de Anthropic (suscripción PRO/Max)...'));
+      console.log(
+        chalk.cyan('\nRestaurando configuración nativa de Anthropic (suscripción PRO/Max)...'),
+      );
       if (!opts.dryRun) {
         await removeManagedVars(env);
       } else {
@@ -180,7 +191,9 @@ program
       }
     }
 
-    console.log(chalk.cyan('\nConfiguración completada. Reinicie Claude Code para aplicar los cambios.'));
+    console.log(
+      chalk.cyan('\nConfiguración completada. Reinicie Claude Code para aplicar los cambios.'),
+    );
   });
 
 program.parse();

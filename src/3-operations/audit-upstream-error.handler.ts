@@ -39,8 +39,7 @@ export class AuditUpstreamErrorHandler {
     const stepsMeta = turn?.stepsMeta ?? [];
     const requestBodyOmitted = turn?.requestBodyOmitted ?? params.requestBodyOmitted;
 
-    const totals =
-      interactionType !== 'client-preflight' ? computeTokenTotals(stepsMeta) : null;
+    const totals = interactionType !== 'client-preflight' ? computeTokenTotals(stepsMeta) : null;
     const sseRawBytesTotal = computeSseRawBytesTotal(stepsMeta);
     const sseRawTruncatedAny = stepsMeta.some((s) => s.sseRawTruncatedByLimit === true);
     const hadSse = stepsMeta.some((s) => s.sse === true);

@@ -96,7 +96,10 @@ describe('Test de Integración - SseReconstructService (fuente: sse.jsonl)', () 
     expect(result.sseResponseBodyWritten).toBe(true);
     expect(result.sseResponseBodySource).toBe('file');
 
-    const jsonContent = await fs.readFile(path.join(interactionDir, 'response', 'body.json'), 'utf8');
+    const jsonContent = await fs.readFile(
+      path.join(interactionDir, 'response', 'body.json'),
+      'utf8',
+    );
     const parsed = JSON.parse(jsonContent);
 
     // Formato multi-step-response
@@ -109,7 +112,10 @@ describe('Test de Integración - SseReconstructService (fuente: sse.jsonl)', () 
     expect(parsed.steps[0].content[0].text).toBe('Hola mundo!');
     expect(parsed.steps[0].stop_reason).toBe('end_turn');
 
-    const mdContent = await fs.readFile(path.join(interactionDir, 'response', 'body.parsed.md'), 'utf8');
+    const mdContent = await fs.readFile(
+      path.join(interactionDir, 'response', 'body.parsed.md'),
+      'utf8',
+    );
     expect(mdContent).toContain('_(stop_reason: end_turn)_');
     expect(mdContent).toContain('# Respuesta del Asistente');
     expect(mdContent).toContain('Hola mundo!');
@@ -245,10 +251,7 @@ describe('SseReconstructService - fixture real (sessions/ histórico)', () => {
     service = new SseReconstructService(writer);
 
     const here = path.dirname(fileURLToPath(import.meta.url));
-    const fixturePath = path.resolve(
-      here,
-      '../fixtures/sse-reconstruct/real-title-gen-step.jsonl',
-    );
+    const fixturePath = path.resolve(here, '../fixtures/sse-reconstruct/real-title-gen-step.jsonl');
     const jsonlBytes = await fs.readFile(fixturePath);
     await fs.writeFile(path.join(stepDir, 'response', 'sse.jsonl'), jsonlBytes);
 

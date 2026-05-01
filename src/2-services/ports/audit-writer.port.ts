@@ -1,8 +1,4 @@
-import {
-  InteractionState,
-  SseLine,
-  TurnMetadata,
-} from '../../1-domain/types/audit.types.js';
+import { InteractionState, SseLine, TurnMetadata } from '../../1-domain/types/audit.types.js';
 import { JsonValue } from '../../1-domain/types/json.types.js';
 
 /**
@@ -47,7 +43,10 @@ export interface IAuditWriter {
    * indicado. Examina los directorios existentes con prefijo numérico de 3
    * dígitos y devuelve `max + 1` (1-indexado). Idempotente y stateless.
    */
-  nextSubInteractionSequence(parentInteractionDir: string, parentStepIndex: number): Promise<number>;
+  nextSubInteractionSequence(
+    parentInteractionDir: string,
+    parentStepIndex: number,
+  ): Promise<number>;
   writeStepRequest(params: {
     stepDir: string;
     headers: Record<string, string | string[] | undefined>;
@@ -105,10 +104,7 @@ export interface IAuditWriter {
    * Escribe body.json y body.parsed.md
    * con el mensaje reconstruido de un step SSE.
    */
-  writeStepResponseMarkdown(
-    stepDir: string,
-    message: JsonValue,
-  ): Promise<void>;
+  writeStepResponseMarkdown(stepDir: string, message: JsonValue): Promise<void>;
   /**
    * Combina los body.json de todos los steps y escribe response/body.json
    * (formato multi-step) y response/body.parsed.md en el top-level de la interacción.

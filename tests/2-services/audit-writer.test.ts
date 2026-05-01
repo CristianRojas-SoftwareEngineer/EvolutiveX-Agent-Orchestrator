@@ -149,7 +149,12 @@ describe('AuditWriterService - writeTurnMeta', () => {
         { stepIndex: 1, sse: true, statusCode: 200, stopReason: 'tool_use', toolCalls: ['Read'] },
         { stepIndex: 2, sse: true, statusCode: 200, stopReason: 'end_turn' },
       ],
-      totals: { cacheCreationInputTokens: 100, cacheReadInputTokens: 200, inputTokens: 10, outputTokens: 50 },
+      totals: {
+        cacheCreationInputTokens: 100,
+        cacheReadInputTokens: 200,
+        inputTokens: 10,
+        outputTokens: 50,
+      },
       sseResponseBodyAttempted: true,
       sseResponseBodyWritten: true,
       sseResponseBodyError: null,

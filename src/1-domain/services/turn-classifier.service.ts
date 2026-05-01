@@ -24,7 +24,8 @@ export function classifyRequestBody(bodyBuffer: Buffer): TurnClassification {
   if (!str.includes('"tools"')) return { type: 'preflight-warmup' };
   if (/"tools"\s*:\s*\[\s*\]/.test(str)) return { type: 'side-request' };
   // Detectar ejecuciones de built-in tools: tools con campo "type" que empieza con web_search_, web_fetch_, o text_editor_
-  if (/"type"\s*:\s*"(web_search_|web_fetch_|text_editor_)/.test(str)) return { type: 'builtin-tool-execution' };
+  if (/"type"\s*:\s*"(web_search_|web_fetch_|text_editor_)/.test(str))
+    return { type: 'builtin-tool-execution' };
   return { type: 'fresh' };
 }
 
@@ -72,9 +73,7 @@ function extractLastUserMessageText(root: Record<string, unknown>): string {
   return '';
 }
 
-export function classifySideRequestSubType(
-  bodyBuffer: Buffer,
-): { subType: SideRequestSubType } {
+export function classifySideRequestSubType(bodyBuffer: Buffer): { subType: SideRequestSubType } {
   const parsed = safeParse(bodyBuffer);
   if (!parsed) {
     return { subType: 'harness-auxiliary' };

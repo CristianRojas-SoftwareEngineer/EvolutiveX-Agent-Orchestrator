@@ -17,12 +17,12 @@ Sin filtrado, estas peticiones crean directorios `_unknown/` con interacciones v
 
 Un request se clasifica como health check (y se ignora silenciosamente) si cumple **TODAS** estas condiciones:
 
-| Condición | Descripción |
-|-----------|-------------|
-| User-Agent | Contiene "Bun" pero **NO** contiene "claude-cli" |
-| Body vacío | `rawBody.length === 0` |
-| Sin autorización | Ausencia de header `authorization` |
-| Sin sesión | Ausencia de `x-claude-code-session-id` y `x-cc-audit-session` |
+| Condición           | Descripción                                                    |
+| ------------------- | -------------------------------------------------------------- |
+| User-Agent          | Contiene "Bun" pero **NO** contiene "claude-cli"               |
+| Body vacío          | `rawBody.length === 0`                                         |
+| Sin autorización    | Ausencia de header `authorization`                             |
+| Sin sesión          | Ausencia de `x-claude-code-session-id` y `x-cc-audit-session`  |
 | Fallback `_unknown` | La sesión resuelta es `_unknown` (fallback final del resolver) |
 
 ## Comportamiento
@@ -46,6 +46,7 @@ Accept-Encoding: identity
 ```
 
 Este request típico de Bun sería filtrado porque:
+
 - User-Agent es "Bun/1.3.13" (sin "claude-cli")
 - No tiene body
 - No tiene `authorization`

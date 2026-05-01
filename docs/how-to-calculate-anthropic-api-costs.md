@@ -16,7 +16,7 @@ Esta guía define qué cuenta como **interacción** en el tráfico auditado por 
 | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Lógica de coste**             | Alineada con la documentación oficial de Anthropic: [Pricing](https://platform.claude.com/docs/en/about-claude/pricing), [Prompt caching](https://platform.claude.com/docs/en/build-with-claude/prompt-caching), [Token counting](https://platform.claude.com/docs/en/build-with-claude/token-counting). |
 | **Fuente humana de verdad**     | La página de **precios** de Anthropic (USD por millón de tokens, MTok) para validar o actualizar el archivo local cuando cambien tarifas o modelos.                                                                                                                                                      |
-| **Fuente máquina para cálculo** | Los archivos `routing/providers/<provider>/models/<model>/metadata.json`: el proxy o cualquier herramienta de análisis debe leer los coeficientes desde ahí, no desde constantes en el código. Cada proveedor y modelo tiene su propio archivo de precios.                                |
+| **Fuente máquina para cálculo** | Los archivos `routing/providers/<provider>/models/<model>/metadata.json`: el proxy o cualquier herramienta de análisis debe leer los coeficientes desde ahí, no desde constantes en el código. Cada proveedor y modelo tiene su propio archivo de precios.                                               |
 
 **Restricción de diseño:** los importes **no deben estar hardcodeados** en la lógica del servidor. Los costes por categoría y modelo se cargan desde el JSON; al cambiar precios, solo se edita (o despliega) ese archivo. El JSON debe mantenerse al día copiando valores desde la página oficial (columnas por MTok) para cada `modelId` que uses.
 
@@ -293,12 +293,12 @@ Para localizar `usage` en disco (jerarquía general: `sessions/<session-id>/inte
 
 En la nueva estructura, el `usage` de cada step SSE vive en `steps/{N}/response/sse.jsonl`. Si existe reconstrucción top-level, también en `response/body.json`. El `meta.json` del turno incluye `totals` con tokens agregados por turno (solo para `agentic-turn` SSE) y `steps[]` donde cada step puede incluir tokens individuales.
 
-| Nivel | Archivo | Cuándo |
-| ----- | ------- | ------ |
-| **Step SSE** | `steps/NNN/response/sse.jsonl` | Siempre en turnos SSE; contiene evento `message_delta` con `usage` |
-| **Top-level** | `response/body.json` | Siempre en agentic-turn/side-request SSE completados (reconstrucción exitosa) |
-| **meta.json** | campo `totals` | Solo `agentic-turn` SSE; agrega tokens de todos los steps |
-| **meta.json** | campo `steps[].inputTokens` etc. | Tokens por step individual |
+| Nivel         | Archivo                          | Cuándo                                                                        |
+| ------------- | -------------------------------- | ----------------------------------------------------------------------------- |
+| **Step SSE**  | `steps/NNN/response/sse.jsonl`   | Siempre en turnos SSE; contiene evento `message_delta` con `usage`            |
+| **Top-level** | `response/body.json`             | Siempre en agentic-turn/side-request SSE completados (reconstrucción exitosa) |
+| **meta.json** | campo `totals`                   | Solo `agentic-turn` SSE; agrega tokens de todos los steps                     |
+| **meta.json** | campo `steps[].inputTokens` etc. | Tokens por step individual                                                    |
 
 Si **no** hay JSON reconstruido pero sí `steps/NNN/response/sse.jsonl`, el objeto `usage` aparece en el flujo SSE (p. ej. en el evento `message_delta` al finalizar el stream): parsea las líneas JSON del archivo hasta localizar el bloque `usage` asociado al mensaje completado.
 

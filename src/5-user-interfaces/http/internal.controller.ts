@@ -27,7 +27,10 @@ function isCacheWebFetchPayload(body: unknown): body is CacheWebFetchPayload {
  * Registra rutas internas de administración y cacheo.
  * Estas rutas son localhost-only y no hacen auditoría de request.
  */
-export async function registerInternalRoutes(fastify: FastifyInstance, sessionStore: ISessionStore) {
+export async function registerInternalRoutes(
+  fastify: FastifyInstance,
+  sessionStore: ISessionStore,
+) {
   fastify.post<{ Body: unknown }>(
     '/__internal/cacheWebFetchResponse',
     async (request: FastifyRequest<{ Body: unknown }>, reply: FastifyReply) => {
@@ -36,18 +39,28 @@ export async function registerInternalRoutes(fastify: FastifyInstance, sessionSt
         return;
       }
 
-      const { sessionId, url, prompt: _prompt, htmlHash, promptHash, response } = request.body as CacheWebFetchPayload;
+      const {
+        sessionId,
+        url,
+        prompt: _prompt,
+        htmlHash,
+        promptHash,
+        response,
+      } = request.body as CacheWebFetchPayload;
 
       sessionStore.registerContextSyncCache(htmlHash, promptHash, response);
 
-      request.log.debug({
-        event: 'internal.cache_webfetch.registered',
-        sessionId,
-        url,
-        htmlHash,
-        promptHash,
-        responseLength: response.length,
-      }, 'Cache WebFetch response registered');
+      request.log.debug(
+        {
+          event: 'internal.cache_webfetch.registered',
+          sessionId,
+          url,
+          htmlHash,
+          promptHash,
+          responseLength: response.length,
+        },
+        'Cache WebFetch response registered',
+      );
 
       reply.status(200).send({ ok: true });
     },

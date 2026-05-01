@@ -43,7 +43,11 @@ export class MarkdownRendererService {
 
         // Extraer mensajes
         const messages = Array.isArray(obj.messages) ? obj.messages : [];
-        const { text: promptText, toolResults, attachments } = this.extractLastUserMessage(messages);
+        const {
+          text: promptText,
+          toolResults,
+          attachments,
+        } = this.extractLastUserMessage(messages);
 
         const parts: string[] = [this.heading(1, 'Prompt del Usuario')];
 
@@ -241,8 +245,15 @@ export class MarkdownRendererService {
 
     if (thinkingParts.length > 0) {
       const fullThinking = thinkingParts.join('\n\n');
-      const truncated = this.truncateWithIndicator(fullThinking, 5000, '_[Pensamiento truncado...]_');
-      const quoted = truncated.split('\n').map((line) => `> ${line}`).join('\n');
+      const truncated = this.truncateWithIndicator(
+        fullThinking,
+        5000,
+        '_[Pensamiento truncado...]_',
+      );
+      const quoted = truncated
+        .split('\n')
+        .map((line) => `> ${line}`)
+        .join('\n');
       parts.push(this.heading(headingLevel, 'Razonamiento interno'));
       parts.push(quoted);
     }
@@ -258,7 +269,10 @@ export class MarkdownRendererService {
         const idStr = tool.id ? `(id: \`${tool.id}\`)` : '';
         if (tool.input !== undefined) {
           const inputJson = JSON.stringify(tool.input, null, 2);
-          const indented = inputJson.split('\n').map((l) => `  ${l}`).join('\n');
+          const indented = inputJson
+            .split('\n')
+            .map((l) => `  ${l}`)
+            .join('\n');
           parts.push(`- **${tool.name}** ${idStr}\n  \`\`\`json\n${indented}\n  \`\`\``);
         } else {
           parts.push(`- **${tool.name}** ${idStr}`);

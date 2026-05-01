@@ -58,20 +58,20 @@ const REPLAY_MODEL = 'claude-sse-replay';
 
 **Experimento realizado (21 Abr 2026) contra `@anthropic-ai/sdk` v0.89.0, 13/13 valores OK:**
 
-| Valor | Resultado |
-|---|---|
-| `claude-sse-replay` | OK |
-| `claude-3-5-sonnet-20241022` | OK |
-| `claude-sonnet-4-5` | OK |
-| `not-a-real-model` | OK |
-| `""` (string vacío) | OK |
-| `"   "` (whitespace) | OK |
-| `"weird !@#$ value"` | OK |
-| `"modelo-á-β-🤖"` | OK |
-| `"x"` (un carácter) | OK |
-| `null` | OK |
-| `undefined` (omitido) | OK |
-| `client.beta.messages.stream` con `claude-sse-replay` | OK |
+| Valor                                                 | Resultado |
+| ----------------------------------------------------- | --------- |
+| `claude-sse-replay`                                   | OK        |
+| `claude-3-5-sonnet-20241022`                          | OK        |
+| `claude-sonnet-4-5`                                   | OK        |
+| `not-a-real-model`                                    | OK        |
+| `""` (string vacío)                                   | OK        |
+| `"   "` (whitespace)                                  | OK        |
+| `"weird !@#$ value"`                                  | OK        |
+| `"modelo-á-β-🤖"`                                     | OK        |
+| `"x"` (un carácter)                                   | OK        |
+| `null`                                                | OK        |
+| `undefined` (omitido)                                 | OK        |
+| `client.beta.messages.stream` con `claude-sse-replay` | OK        |
 
 **Conclusión:** el SDK **no valida `model` en runtime** cuando el `fetch` está mockeado; el valor es opaco. El string `'claude-sse-replay'` es solo una etiqueta autodescriptiva que deja claro al lector que no se trata de un modelo real.
 
@@ -127,6 +127,7 @@ steps/NNN/response/
 ### Reconstrucción del body top-level
 
 `runReconstruction()` delega en `AuditWriterService.writeTopLevelMultiStepResponse(interactionDir, stepCount)` para producir el `response/body.json` top-level. Este método:
+
 - Copia la reconstrucción del **último step** como body top-level del turno
 - No realiza una reconstrucción independiente del turno completo
 - El body top-level es semánticamente equivalente a la respuesta final del asistente
@@ -142,10 +143,12 @@ La reconstrucción por step es **best-effort**: si falla (por ejemplo, `sse.json
 El servicio implementa detección de modo beta como **safeguard** para futura compatibilidad. El modo beta (`client.beta.messages.stream()`) expone características experimentales de Anthropic antes de su estabilización.
 
 **¿Cuándo se activaría?**
+
 - Si la URL contiene `beta=true`
 - Si el request original incluye header `anthropic-beta`
 
 **Implementación:**
+
 - `runReconstruction()` guarda el flag en `headers.json` del step
 - `reconstructStepMessage()` lo lee para decidir qué cliente SDK usar
 - Por defecto es `false` (modo estable)

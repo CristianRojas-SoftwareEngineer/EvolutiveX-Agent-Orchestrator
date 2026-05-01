@@ -19,3 +19,7 @@ coverage/
 *.sqlite
 
 sessions/
+logs/
+
+# Secrets de providers (API keys)
+routing/providers/*/secrets.json

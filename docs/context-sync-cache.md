@@ -22,19 +22,23 @@ Si no cumple todo, se clasifica como `harness-auxiliary`.
 
 ### HIT
 
-1. `AuditInteractionHandler` detecta side-request Context Sync.
-2. `ContextSyncHandler` busca `(sessionId, url)` en `SessionStore`.
-3. Si no existe aún, espera evento `onceWebFetchStepResolved(...)` hasta `CONTEXT_SYNC_MAX_WAIT_MS`.
-4. Si aparece el step, extrae texto asistente de `steps/NNN/response/body.json`.
-5. Construye SSE simulada (`message_start`, `content_block_*`, `message_delta`, `message_stop`).
-6. `ProxyController` responde stream SSE al cliente y corta el upstream.
-7. No se crea interacción en `sessions/` para ese side-request.
+1. `AuditInteractionHandler.handleSideRequest()` detecta side-request Context Sync.
+2. Calcula `htmlHash` (SHA-256 del HTML extraído entre fences) y `promptHash` (SHA-256 del sufijo constante del harness).
+3. `SessionStoreService.resolveContextSyncCache(htmlHash, promptHash)` busca en el caché in-memory.
+4. Si encuentra entrada válida (no expirada): retorna el response cacheado.
+5. `buildSimulatedSseFromText()` construye SSE simulada (`message_start`, `content_block_*`, `message_delta`, `message_stop`).
+6. El proxy responde stream SSE al cliente y corta el upstream.
+7. **No se crea interacción en `sessions/`** para ese side-request (completamente transparente).
 
 ### MISS
 
-1. No hay step resuelto dentro del timeout (o falla extracción).
+1. No hay entrada en caché (o expirada).
 2. Se degrada a flujo estándar side-request: forward a upstream + auditoría normal.
 3. El `meta.json` resultante incluye `contextSyncFallback: true`.
+
+### Registro en caché (post-MISS)
+
+Cuando un side-request Context Sync se procesa como fallback (MISS), el proxy audita normalmente. El registro en caché se realiza cuando el step de WebFetch del subagente se completa, permitiendo que futuros Context Sync para la misma URL beneficien del HIT.
 
 ## Reglas de auditoría y observabilidad
 
@@ -51,28 +55,29 @@ Un `contextSyncFallback: true` en `meta.json` es **comportamiento esperado** sol
 Es **inconsistencia potencial** (requiere investigación) si:
 - El subagente completó **antes** del Context Sync (timestamps lo confirman)
 - La URL coincide exactamente pero el caché no resolvió
-- Indica race condition en el índice de `SessionStore` o timeout insuficiente
+- Indica race condition en el registro o TTL insuficiente
 
 ## Integración técnica
 
 - Dominio:
-  - `SideRequestSubType`
-  - `WebFetchStepResolution`
-  - `buildSimulatedSseFromText(...)`
+  - `SideRequestSubType` (`context-sync-webfetch` | `harness-auxiliary`)
+  - `buildSimulatedSseFromText()` — construye payload SSE simulado
+  - `extractHtmlBetweenFences()` — extrae HTML del body para calcular hash
 - SessionStore:
-  - Índice `(sessionId,url) -> stepDir`
-  - EventEmitter para resolución tardía
+  - `registerContextSyncCache(htmlHash, promptHash, response)` — registra respuesta en caché
+  - `resolveContextSyncCache(htmlHash, promptHash)` — busca respuesta por hashes
+  - Caché in-memory con TTL de 5 minutos (limpieza automática por expiración)
+  - Key: `${htmlHash}:${promptHash}`
 - Handlers:
-  - `ContextSyncHandler`
-  - Branching en `AuditInteractionHandler.handleSideRequest`
-  - Registro de resolución en `AuditSseResponseHandler` (solo turnos subagente)
+  - `AuditInteractionHandler.handleSideRequest()` — branching Context Sync (HIT/MISS)
+  - `FilterToolsHandler` — filtra tools del request antes de forward
 - HTTP:
-  - Respuesta short-circuit en `ProxyController.preHandler`
+  - Respuesta short-circuit en `ProxyController` (vía `contextSyncSseStream`)
 
 ## Variables de entorno
 
-- `CONTEXT_SYNC_CACHE_ENABLED` (default `true`): habilita/deshabilita caché.
-- `CONTEXT_SYNC_MAX_WAIT_MS` (default `5000`): timeout de espera del step resuelto.
+- `CONTEXT_SYNC_CACHE_ENABLED` (default `true`): habilita/deshabilita caché. Si está en `0/false`, siempre hace forward+auditoría normal.
+- `CONTEXT_SYNC_MAX_WAIT_MS` (default `5000`): timeout de espera del step resuelto (usado en mecanismo de espera cuando el step aún no está registrado).
 
 ## Diagnóstico de gaps: Cuándo MISS es una inconsistencia
 
@@ -96,24 +101,14 @@ Si encuentras `contextSyncFallback: true` en una sesión auditada:
 3. **Verificar URL**: ¿La URL en el side-request coincide exactamente con la del WebFetch del subagente?
    - Diferencias en query params, fragments, o normalización pueden causar MISS
 4. **Revisar `steps/NNN/response/` del subagente**: ¿El step de WebFetch tiene `body.json` reconstruido correctamente?
-   - Si el step falló o está incompleto, no hay entrada en el índice de caché
-
-### Ejemplo real de inconsistencia
-
-**Sesión:** `9810c57a-2168-40b8-ba51-5695ffafec5a`
-
-- Subagente `000001` (WebFetch) completó en ~11.6s → step 001 con `response/body.json` reconstruido
-- Context Sync (`000004`) llegó después → `contextSyncFallback: true`
-- **Timestamps confirman**: Subagente terminó antes, Context Sync llegó después
-- **Diagnóstico**: El `SessionStore` índice `(sessionId, url)` debería haber tenido la entrada
-- **Acción**: Investigar `CONTEXT_SYNC_MAX_WAIT_MS` (¿5s fue suficiente?), race condition en registro de step resuelto, o posible limpieza prematura del índice
+   - Si el step falló o está incompleto, no hay entrada en el caché
 
 ### Prevención y mejora continua
 
 Para minimizar Context Sync MISS inesperados:
 
 1. **Aumentar `CONTEXT_SYNC_MAX_WAIT_MS`** si la carga del sistema causa latencias en el registro de steps
-2. **Verificar índice `SessionStore`**: El índice `(sessionId, url) → stepDir` debe persistir hasta que el Context Sync se resuelva o expire
+2. **Verificar caché**: El caché in-memory debe mantenerse vivo hasta que el Context Sync se resuelva o expire (TTL 5 min)
 3. **Monitorear métricas**: Contar ratio HIT vs MISS en side-requests de tipo `context-sync-webfetch`
 
 ---

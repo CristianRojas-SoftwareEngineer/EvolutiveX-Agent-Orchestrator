@@ -697,6 +697,8 @@ ANTHROPIC_BASE_URL=http://localhost:8787 claude
 
 ### Opción 2: Portar Lógica a Smart Code Proxy
 
+> **Nota:** Esta sección es una **propuesta no implementada** (futuro). Los archivos y rutas mencionados (`src/2-services/protocol-translator/`, `src/2-services/upstream-router.service.ts`) no existen actualmente en el código fuente. Se documenta como referencia de diseño para una posible implementación futura.
+
 Si necesitas un sistema unificado, puedes adaptar el código de CCR:
 
 **Nuevos archivos a crear en Smart Code Proxy**:

@@ -124,6 +124,13 @@ steps/NNN/response/
    - `body.json` — mensaje completo en JSON (pretty print)
    - `body.parsed.md` — vista markdown semántica legible
 
+### Reconstrucción del body top-level
+
+`runReconstruction()` delega en `AuditWriterService.writeTopLevelMultiStepResponse(interactionDir, stepCount)` para producir el `response/body.json` top-level. Este método:
+- Copia la reconstrucción del **último step** como body top-level del turno
+- No realiza una reconstrucción independiente del turno completo
+- El body top-level es semánticamente equivalente a la respuesta final del asistente
+
 ### Best-effort
 
 La reconstrucción por step es **best-effort**: si falla (por ejemplo, `sse.jsonl` corrupto o incompleto), se loggea el error pero el step continúa normalmente. Esto garantiza que un error en la reconstrucción no afecte el flujo principal del proxy.

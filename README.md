@@ -18,11 +18,11 @@ El proxy utiliza **Progressive Kernel Architecture (PKA)** — un modelo arquite
 
 | Capa                           | Ubicación                | Responsabilidad                                                                   | Componentes Clave                                                                                                                                                   |
 | ------------------------------ | ------------------------ | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **1 - Dominio**                | `src/1-domain/`          | Tipos puros (entidades) y lógica de dominio sin dependencias externas             | `SessionResolverService`, `TurnClassifierService`, `RedactService`, `MarkdownRendererService`, Tipos de auditoría                                                    |
+| **1 - Dominio**                | `src/1-domain/`          | Tipos puros (entidades) y lógica de dominio sin dependencias externas             | `SessionResolverService`, `TurnClassifierService`, `RedactService`, `MarkdownRendererService`, `SseSimulatorService`, Tipos de auditoría                            |
 | **2 - Servicios (Adapters)**   | `src/2-services/`        | Implementaciones concretas con I/O (filesystem, streams) y **ports** (interfaces) | `SessionStoreService`, `AuditWriterService`, `SseReconstructService`, `StreamTeeService`, Ports: `IAuditWriter`, `ISessionStore`, `ISseReconstructor`, `IStreamTee` |
-| **3 - Operaciones (Handlers)** | `src/3-operations/`      | Orquestación de casos de uso (Command Handlers)                                   | `AuditInteractionHandler`, `AuditSseResponseHandler`, `AuditStandardResponseHandler`, `AuditUpstreamErrorHandler`                                                   |
+| **3 - Operaciones (Handlers)** | `src/3-operations/`      | Orquestación de casos de uso (Command Handlers)                                   | `AuditInteractionHandler`, `AuditSseResponseHandler`, `AuditStandardResponseHandler`, `AuditUpstreamErrorHandler`, `FilterToolsHandler`                             |
 | **4 - API (Composition Root)** | `src/4-api/`             | Wiring de dependencias y configuración                                            | `createProxyDependencies()`, Configuración de entorno                                                                                                               |
-| **5 - Interfaces de Usuario**  | `src/5-user-interfaces/` | Adaptadores HTTP (reciben deps inyectadas via options)                            | `ProxyController`, `proxyRoutes`, `fastify.augments.d.ts`                                                                                                           |
+| **5 - Interfaces de Usuario**  | `src/5-user-interfaces/` | Adaptadores HTTP (reciben deps inyectadas via options)                            | `ProxyController`, `InternalController`, `proxyRoutes`, `registerInternalRoutes`, `fastify.augments.d.ts`                                                          |
 
 ### 📐 Regla de Dependencia
 
@@ -250,9 +250,50 @@ El sistema previene la saturación en memoria o disco ignorando la escritura si 
 ### Instrucciones de Inicio Rápido
 
 1.  **Instalar dependencias**: `npm install`
-2.  **Modo Desarrollo**: `npm run dev` (Carga `configs/.env` mediante flag nativo de Node v22.9+; **v24 LTS recomendado**).
-3.  **Compilación**: `npm run build` (Genera `/dist` optimizado).
-4.  **Limpieza**: `npm run clean` (Purga `dist/` y `node_modules/`). Para eliminar datos de auditoría acumulados: `npm run clean:sessions`.
+2.  **Configurar proveedor** (opcional): `npm run configure:provider` (asistente interactivo para configurar API keys y modelos de diferentes proveedores).
+3.  **Modo Desarrollo**: `npm run dev` (Carga `configs/.env` mediante flag nativo de Node v22.9+; **v24 LTS recomendado**).
+4.  **Compilación**: `npm run build` (Genera `/dist` optimizado).
+5.  **Referencia de scripts**: `npm run help` (muestra todos los scripts disponibles con descripciones).
+6.  **Limpieza**: `npm run clean` (Purga `dist/` y `node_modules/`). Para eliminar datos de auditoría acumulados: `npm run clean:sessions`.
+
+> Para una guía detallada de onboarding, consultar [docs/how-to-start.md](docs/how-to-start.md).
+
+## 📡 Enrutamiento de Proveedores
+
+El directorio `routing/providers/` contiene la configuración de los diferentes proveedores de modelos LLM soportados:
+
+```
+routing/providers/
+├── anthropic/           # API nativa de Anthropic
+│   ├── config.json      # Configuración del proveedor
+│   ├── secrets.json     # API keys (no versionado)
+│   ├── secrets.json.example
+│   └── models/          # Metadatos por modelo
+│       ├── claude-haiku-4-5/metadata.json
+│       ├── claude-opus-4-6/metadata.json
+│       └── claude-sonnet-4-6/metadata.json
+├── openrouter/          # OpenRouter (multi-proveedor)
+│   ├── config.json
+│   ├── secrets.json
+│   ├── secrets.json.example
+│   └── models/
+│       ├── deepseek-v4-flash/metadata.json
+│       ├── deepseek-v4-pro/metadata.json
+│       └── minimax-m2-5/metadata.json
+├── ollama/              # Ollama (local)
+│   ├── config.json
+│   ├── secrets.json
+│   ├── secrets.json.example
+│   └── models/
+│       ├── gemini-3-flash-preview/metadata.json
+│       └── minimax-m2.5/metadata.json
+└── xiaomi/              # Xiaomi (Mimo)
+    ├── config.json
+    └── models/
+        └── mimo-v2-5/metadata.json
+```
+
+Cada proveedor contiene un `config.json` con la configuración de conexión y un directorio `models/` con archivos `metadata.json` por modelo. Los archivos `secrets.json` contienen API keys y **no deben versionarse** (están en `.gitignore`). Usar `secrets.json.example` como plantilla.
 
 ## 🐳 Docker y Contenerización
 

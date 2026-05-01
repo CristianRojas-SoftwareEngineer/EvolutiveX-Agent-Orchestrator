@@ -68,7 +68,7 @@ Sigue estos pasos en orden:
    npm run build
    ```
 
-   El proyecto incluye un script de validación integral (`npm test`) que ejecuta el análisis estático (`lint`), la validación de pruebas integradas (`test:unit`) y la compilación (`build`) para asegurar la exactitud funcional y la integridad del código TypeScript. Se recomienda ejecutarlo antes de cada despliegue relevante.
+   El proyecto incluye un script de validación integral (`npm test`) que ejecuta el análisis estático (`lint`), la validación de tipos (`typecheck`), la validación de pruebas integradas (`test:unit`) y la compilación (`build`) para asegurar la exactitud funcional y la integridad del código TypeScript. Se recomienda ejecutarlo antes de cada despliegue relevante.
 
 ---
 
@@ -86,7 +86,7 @@ Sigue estos pasos en orden:
 
 2. **No cierres esa terminal** mientras quieras usar el proxy: el proceso debe seguir en marcha.
 
-3. Comprueba el arranque: debería imprimirse **una línea JSON** con el mensaje `Proxy levantado correctamente` junto con campos como `port`, `sessionsDir`, `upstream` y `upstreamAcceptEncoding` (lista de variables de entorno en el [README](../README.md#configuracion)). Si ves esa línea, el proxy está escuchando en tu PC.
+3. Comprueba el arranque: debería imprimirse **una línea JSON** con el mensaje `Proxy levantado correctamente` junto con campos como `port`, `upstream`, `upstreamAcceptEncoding`, `maxResponseBufferBytes`, `maxAuditRequestBodyBytes`, `maxAuditResponseBodyBytes`, `maxAuditSseRawBytes`, `stripAuditSessionHeader` y `auditSessionHashSuffix` (lista de variables de entorno en el [README](../README.md#configuracion)). Si ves esa línea, el proxy está escuchando en tu PC.
 
 Por defecto el proxy reenvía a `https://api.anthropic.com`. Puedes cambiar la URL de destino con la variable `UPSTREAM_ORIGIN` si tu organización usa otro host (véase el README).
 
@@ -178,6 +178,10 @@ No hace falta leer la tabla entera del README el primer día:
 | ----------------- | ----------------------------------------------------------------- |
 | `PORT`            | Puerto donde escucha el proxy en tu máquina (por defecto `8787`). |
 | `UPSTREAM_ORIGIN` | URL base del API al que el proxy reenvía (por defecto Anthropic). |
+| `FILTERED_TOOLS`  | Lista de tool names a excluir del request (coma-separado). Para desactivar: `FILTERED_TOOLS=""`. |
+| `CONTEXT_SYNC_CACHE_ENABLED` | Habilita caché inteligente para side-request Context Sync WebFetch (por defecto `true`). |
+| `CONTEXT_SYNC_MAX_WAIT_MS` | Timeout en ms para esperar step de WebFetch antes de fallback (por defecto `5000`). |
+| `PROXY_UNREDACT_THINKING` | Remueve flag de redacción de thinking para capturar contenido legible (por defecto `false`). |
 
 La carpeta de salida es siempre `./sessions`, relativa al directorio desde donde ejecutas el proxy.
 

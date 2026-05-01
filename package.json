@@ -4,7 +4,7 @@
   "description": "Proxy de observabilidad de alto rendimiento para interceptar, auditar y analizar el tráfico entre Claude Code (CLI oficial de Anthropic) y la API de Anthropic.",
   "main": "dist/index.js",
   "scripts": {
-    "help": "tsx scripting/src/help.ts",
+    "help": "tsx scripting/help.ts",
     "dev": "node --env-file-if-exists=configs/.env --import tsx src/index.ts",
     "start": "node dist/index.js",
     "build": "npm run clean:dist && concurrently \"npm run build:js\" \"npm run build:types\"",
@@ -23,7 +23,7 @@
     "clean:modules": "node -e \"fs.rmSync('node_modules', { recursive: true, force: true })\"",
     "clean:sessions": "node -e \"fs.rmSync('sessions', { recursive: true, force: true })\"",
     "clean:logs": "node -e \"fs.rmSync('logs', { recursive: true, force: true })\"",
-    "configure:provider": "tsx scripting/src/configure-provider.ts"
+    "configure:provider": "tsx scripting/configure-provider.ts"
   },
   "keywords": [],
   "author": "",

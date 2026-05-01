@@ -2,10 +2,10 @@
  * Tipos reservados para la futura integración de cálculo de costos.
  *
  * Este archivo establece la correspondencia tipada con el esquema JSON
- * documentado en \`how-to-calculate-anthropic-api-costs.md\` (configs/anthropic-model-pricing.json),
- * diseñado para ser consumido externamente o usado en integraciones futuras.
+ * documentado en \`how-to-calculate-anthropic-api-costs.md\`:
+ * los precios viven en \`routing/providers/<provider>/models/<model>/metadata.json\`.
  *
- * @see configs/anthropic-model-pricing.json
+ * @see routing/providers/anthropic/models/claude-sonnet-4-6/metadata.json
  */
 
 /**

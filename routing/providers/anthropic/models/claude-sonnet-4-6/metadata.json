@@ -1,0 +1,12 @@
+{
+  "modelId": "claude-sonnet-4-6",
+  "costs": {
+    "input": {
+      "base": 3.0,
+      "cacheWrite5m": 3.75,
+      "cacheWrite1h": 6.0,
+      "cacheRead": 0.3
+    },
+    "output": 15.0
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "modelId": "gemini-3-flash-preview",
+  "costs": {
+    "input": {
+      "base": 0.0,
+      "cacheWrite5m": 0.0,
+      "cacheWrite1h": 0.0,
+      "cacheRead": 0.0
+    },
+    "output": 0.0
+  }
+}

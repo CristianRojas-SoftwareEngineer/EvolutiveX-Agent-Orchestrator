@@ -16,7 +16,7 @@ Esta guía define qué cuenta como **interacción** en el tráfico auditado por 
 | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Lógica de coste**             | Alineada con la documentación oficial de Anthropic: [Pricing](https://platform.claude.com/docs/en/about-claude/pricing), [Prompt caching](https://platform.claude.com/docs/en/build-with-claude/prompt-caching), [Token counting](https://platform.claude.com/docs/en/build-with-claude/token-counting). |
 | **Fuente humana de verdad**     | La página de **precios** de Anthropic (USD por millón de tokens, MTok) para validar o actualizar el archivo local cuando cambien tarifas o modelos.                                                                                                                                                      |
-| **Fuente máquina para cálculo** | El archivo [`configs/anthropic-model-pricing.json`](../configs/anthropic-model-pricing.json): el proxy o cualquier herramienta de análisis debe leer los coeficientes desde ahí, no desde constantes en el código.                                                                                       |
+| **Fuente máquina para cálculo** | Los archivos `routing/providers/<provider>/models/<model>/metadata.json`: el proxy o cualquier herramienta de análisis debe leer los coeficientes desde ahí, no desde constantes en el código. Cada proveedor y modelo tiene su propio archivo de precios.                                |
 
 **Restricción de diseño:** los importes **no deben estar hardcodeados** en la lógica del servidor. Los costes por categoría y modelo se cargan desde el JSON; al cambiar precios, solo se edita (o despliega) ese archivo. El JSON debe mantenerse al día copiando valores desde la página oficial (columnas por MTok) para cada `modelId` que uses.
 
@@ -125,13 +125,13 @@ Anthropic publica precios por **MTok** en columnas equivalentes a:
 4. Lectura de caché (hits / refreshes).
 5. Salida (`output_tokens`).
 
-En la documentación, los **multiplicadores conceptuales** sobre el precio base de entrada son: escritura 5m **1.25×**, escritura 1h **2×**, lectura **0.1×** (véase [Prompt caching en pricing](https://platform.claude.com/docs/en/about-claude/pricing#prompt-caching)). Los **valores absolutos en USD/MTok** para tu implementación deben vivir en [`configs/anthropic-model-pricing.json`](../configs/anthropic-model-pricing.json), no en el código fuente.
+En la documentación, los **multiplicadores conceptuales** sobre el precio base de entrada son: escritura 5m **1.25×**, escritura 1h **2×**, lectura **0.1×** (véase [Prompt caching en pricing](https://platform.claude.com/docs/en/about-claude/pricing#prompt-caching)). Los **valores absolutos en USD/MTok** para tu implementación deben vivir en `routing/providers/<provider>/models/<model>/metadata.json`, no en el código fuente.
 
 ---
 
-## 6. Esquema del archivo de precios (`configs/anthropic-model-pricing.json`)
+## 6. Esquema del archivo de precios (`routing/providers/<provider>/models/<model>/metadata.json`)
 
-Objetivo: **un solo archivo** editable para actualizar costes sin modificar TypeScript/JavaScript del proxy.
+Objetivo: **un archivo por modelo y proveedor** editable para actualizar costes sin modificar TypeScript/JavaScript del proxy. Cada directorio de proveedor (`routing/providers/<nombre>/`) contiene un subdirectorio `models/<nombre-modelo>/metadata.json` con los precios de ese modelo específico.
 
 ### 6.1 Campos en la raíz
 
@@ -198,7 +198,7 @@ En la implementación:
 
 ## 8. Ecuación del coste por interacción (Messages)
 
-Los precios por categoría y el mapeo `model` → fila de `models[]` están en el §6; la carga del archivo y el modificador geográfico opcional, en el §7. Aquí se resume **cómo combinar** `usage` y `costs`.
+Los precios por categoría y el mapeo `model` → `costs` están en el §6; la carga del archivo y el modificador geográfico opcional, en el §7. Aquí se resume **cómo combinar** `usage` y `costs`.
 
 ### 8.1 Qué interviene
 
@@ -207,7 +207,7 @@ El coste de una respuesta Messages es una **suma de productos**: en cada categor
 Hacen falta **dos fuentes de datos distintas**:
 
 1. **Cantidades (tokens)** — Salen del objeto **`usage`** en la respuesta de la API una vez completado el mensaje (`input_tokens`, `cache_read_input_tokens`, etc.).
-2. **Tarifas (USD/MTok)** — Las define el proyecto en **`anthropic-model-pricing.json`**: resuelves la fila de `models[]` según `model` / `aliases` (§6.4) y usas el objeto anidado **`costs`** (`costs.input.base`, `costs.output`, …).
+2. **Tarifas (USD/MTok)** — Las define el proyecto en `routing/providers/<provider>/models/<model>/metadata.json`: resuelves el `modelId` y usas el objeto anidado **`costs`** (`costs.input.base`, `costs.output`, …).
 
 **Regla de cada sumando:** `(tokens de esa categoría) / 1_000_000 × (USD/MTok de esa categoría)` — equivalente a `tokens × USD/MTok × 1e-6`.
 
@@ -270,7 +270,7 @@ Si no aplica, usar factor **1**. En muchos snapshots `inference_geo` es `not_ava
 
 En este snapshot, `cache_creation_input_tokens` es **11011**, igual a `ephemeral_5m_input_tokens + ephemeral_1h_input_tokens` (11011 + 0), coherente con la §4.
 
-**Precios:** tomados de [`configs/anthropic-model-pricing.json`](../configs/anthropic-model-pricing.json) para ese `modelId` (snapshot alineado con la tabla oficial de Claude Haiku 4.5 en la documentación).
+**Precios:** tomados de `routing/providers/anthropic/models/claude-haiku-4-5/metadata.json` para ese `modelId` (snapshot alineado con la tabla oficial de Claude Haiku 4.5 en la documentación).
 
 | Categoría          | Tokens | USD / MTok |                                                 Parcial (USD) |
 | ------------------ | -----: | ---------: | ------------------------------------------------------------: |

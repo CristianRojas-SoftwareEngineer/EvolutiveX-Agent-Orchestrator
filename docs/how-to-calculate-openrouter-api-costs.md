@@ -19,7 +19,7 @@ Esta guía define cómo interpretar **`usage`** (`ResponseUsage`) en respuestas 
 | **Generación tras la respuesta** | [Get a generation](https://openrouter.ai/docs/api-reference/get-a-generation): estadísticas por `id` de generación.                                                                                                   |
 | **Precios para estimación**      | Lista de modelos: [GET /api/v1/models](https://openrouter.ai/api/v1/models) o ficha del modelo en el sitio.                                                                                                           |
 
-**Qué queda fuera de esta guía:** la API **Messages** de Anthropic (`/v1/messages`), el archivo [`configs/anthropic-model-pricing.json`](../configs/anthropic-model-pricing.json) (solo aplica al flujo del proxy documentado en la otra guía), la jerarquía `sessions/.../requests/` del proxy (auditoría distinta), y cargos de **plugins** u **herramientas de servidor** no modelados solo con tokens (ampliar el modelo de coste según la documentación de OpenRouter).
+**Qué queda fuera de esta guía:** la API **Messages** de Anthropic (`/v1/messages`), los archivos de precios por proveedor en `routing/providers/<provider>/models/<model>/metadata.json` (solo aplica al flujo del proxy documentado en la otra guía), la jerarquía `sessions/.../requests/` del proxy (auditoría distinta), y cargos de **plugins** u **herramientas de servidor** no modelados solo con tokens (ampliar el modelo de coste según la documentación de OpenRouter).
 
 ---
 
@@ -143,7 +143,7 @@ Esta guía **no** define una ecuación única tipo la §8 de [la guía Anthropic
 
 ## 7. BYOK (Bring Your Own Key) — no es §7 de la guía Anthropic
 
-El título recuerda que **esta sección no corresponde** al §7 de la guía Anthropic (carga de JSON y `inference_geo`). En OpenRouter, con **`is_byok: true`**, el reparto entre margen de OpenRouter y coste upstream puede reflejarse en **`cost_details`** y campos de coste upstream. No confundas este flujo con el consumo de la **API Anthropic en primera persona** documentada en la skill **`anthropic-api-cost-estimation`** (Messages + `anthropic-model-pricing.json`).
+El título recuerda que **esta sección no corresponde** al §7 de la guía Anthropic (carga de JSON y `inference_geo`). En OpenRouter, con **`is_byok: true`**, el reparto entre margen de OpenRouter y coste upstream puede reflejarse en **`cost_details`** y campos de coste upstream. No confundas este flujo con el consumo de la **API Anthropic en primera persona** documentado en la skill **`anthropic-api-cost-estimation`** (Messages + `metadata.json` por proveedor).
 
 ---
 

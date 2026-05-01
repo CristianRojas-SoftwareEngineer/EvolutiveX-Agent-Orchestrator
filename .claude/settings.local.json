@@ -8,7 +8,12 @@
       "WebFetch(domain:www.example.com)",
       "WebFetch(domain:raw.githubusercontent.com)",
       "WebFetch(domain:anthropic.com)",
-      "WebFetch(domain:releasebot.io)"
+      "WebFetch(domain:releasebot.io)",
+      "Skill(powershell-syntax-guard)",
+      "Bash(pwsh *)",
+      "WebFetch(domain:www.anthropic.com)",
+      "WebFetch(domain:claude.com)",
+      "WebFetch(domain:openrouter.ai)"
     ]
   }
 }

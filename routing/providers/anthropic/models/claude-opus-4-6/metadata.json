@@ -1,0 +1,12 @@
+{
+  "modelId": "claude-opus-4-6",
+  "costs": {
+    "input": {
+      "base": 5.0,
+      "cacheWrite5m": 6.25,
+      "cacheWrite1h": 10.0,
+      "cacheRead": 0.5
+    },
+    "output": 25.0
+  }
+}

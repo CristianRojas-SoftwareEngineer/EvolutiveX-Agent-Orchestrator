@@ -1,0 +1,15 @@
+{
+  "ANTHROPIC_BASE_URL": "http://localhost:11434",
+  "ANTHROPIC_DEFAULT_HAIKU_MODEL": "models/gemini-3-flash-preview",
+  "ANTHROPIC_DEFAULT_SONNET_MODEL": "models/minimax-m2.5",
+  "ANTHROPIC_DEFAULT_OPUS_MODEL": "models/minimax-m2.7",
+  "CLAUDE_CODE_SUBAGENT_MODEL": "models/minimax-m2.5",
+  "pricing_rules": {
+    "schemaVersion": 1,
+    "updatedAt": "2026-04-30T00:00:00.000Z",
+    "pricingSourceUrl": "https://ollama.com/pricing",
+    "currency": "USD",
+    "unit": "per_million_tokens",
+    "defaultModifiers": {}
+  }
+}

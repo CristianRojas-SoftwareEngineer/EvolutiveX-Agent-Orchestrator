@@ -3,7 +3,9 @@
  * Arranca el servidor Fastify y comienza a escuchar peticiones.
  */
 import process from 'process';
+import * as fs from 'node:fs';
 import pino from 'pino';
+import pinoPretty from 'pino-pretty';
 import { buildApp } from './app.js';
 import { config } from './4-api/config/env.config.js';
 import { createProxyDependencies } from './4-api/composition-root.js';
@@ -12,10 +14,25 @@ import { createProxyDependencies } from './4-api/composition-root.js';
  * Inicializa y arranca el servidor proxy.
  */
 async function start() {
-  // Crear logger Pino para uso en toda la aplicación
-  const logger = pino({
-    level: process.env.LOG_LEVEL || 'info',
-  });
+  // Crear directorio de logs si no existe
+  const logsDir = './logs';
+  if (!fs.existsSync(logsDir)) {
+    fs.mkdirSync(logsDir, { recursive: true });
+  }
+
+  // Crear stream de archivo para logs JSON crudos
+  const logFile = fs.createWriteStream('./logs/proxy.log', { flags: 'a' });
+
+  // Crear logger Pino con dual-transport: terminal (formateada) + archivo (JSON crudo)
+  const logger = pino(
+    {
+      level: process.env.LOG_LEVEL || 'info',
+    },
+    pino.multistream([
+      { stream: pinoPretty({ colorize: true, translateTime: 'HH:MM:ss Z', ignore: 'pid,hostname' }) },
+      { stream: logFile },
+    ])
+  );
 
   const deps = await createProxyDependencies(config, logger);
   const app = buildApp(deps, logger);

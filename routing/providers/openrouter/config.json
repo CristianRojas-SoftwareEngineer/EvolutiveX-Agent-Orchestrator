@@ -1,0 +1,15 @@
+{
+  "ANTHROPIC_BASE_URL": "https://openrouter.ai/api",
+  "ANTHROPIC_DEFAULT_HAIKU_MODEL": "models/minimax-m2-5",
+  "ANTHROPIC_DEFAULT_SONNET_MODEL": "models/deepseek-v4-flash",
+  "ANTHROPIC_DEFAULT_OPUS_MODEL": "models/deepseek-v4-pro",
+  "CLAUDE_CODE_SUBAGENT_MODEL": "models/deepseek-v4-flash",
+  "pricing_rules": {
+    "schemaVersion": 1,
+    "updatedAt": "2026-04-30T00:00:00.000Z",
+    "pricingSourceUrl": "https://openrouter.ai/api/v1/models",
+    "currency": "USD",
+    "unit": "per_million_tokens",
+    "defaultModifiers": {}
+  }
+}

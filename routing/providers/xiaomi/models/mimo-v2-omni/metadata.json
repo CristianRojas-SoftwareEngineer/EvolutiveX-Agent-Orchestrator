@@ -1,0 +1,12 @@
+{
+  "modelId": "mimo-v2-omni",
+  "costs": {
+    "input": {
+      "base": null,
+      "cacheWrite5m": null,
+      "cacheWrite1h": null,
+      "cacheRead": null
+    },
+    "output": null
+  }
+}

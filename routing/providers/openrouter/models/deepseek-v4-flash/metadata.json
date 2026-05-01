@@ -1,0 +1,12 @@
+{
+  "modelId": "atlas-cloud/deepseek/deepseek-v4-flash",
+  "costs": {
+    "input": {
+      "base": 0.14,
+      "cacheWrite5m": 0.14,
+      "cacheWrite1h": 0.14,
+      "cacheRead": 0.028
+    },
+    "output": 0.28
+  }
+}

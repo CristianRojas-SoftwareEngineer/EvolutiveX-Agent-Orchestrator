@@ -70,6 +70,14 @@ Sigue estos pasos en orden:
 
    El proyecto incluye un script de validación integral (`npm test`) que ejecuta el análisis estático (`lint`), la validación de tipos (`typecheck`), la validación de pruebas integradas (`test:unit`) y la compilación (`build`) para asegurar la exactitud funcional y la integridad del código TypeScript. Se recomienda ejecutarlo antes de cada despliegue relevante.
 
+6. **Opcional — compatibilidad multi-agente:** Si usas otros agentes de código además de Claude Code (Codex CLI, Copilot, Cursor, etc.), puedes crear un hardlink `AGENTS.md` → `CLAUDE.md` para que también lean las instrucciones del proyecto:
+
+   ```bash
+   npm run create:agents-reference
+   ```
+
+   El hardlink comparte el mismo inodo que `CLAUDE.md`, por lo que cualquier cambio en uno se refleja automáticamente en el otro. No requiere permisos especiales en ninguna plataforma. El script es idempotente: ejecutarlo varias veces recrea el enlace sin duplicar contenido.
+
 ---
 
 ## Arrancar el proxy (servidor local)
@@ -159,9 +167,9 @@ Abre tu flujo habitual (proyecto, chat, lo que use la API). Las peticiones pasar
 
 ### Paso E — Dónde mirar el resultado (dos sitios distintos)
 
-| Qué quieres ver                                         | Dónde está                                                               | Qué es                                                                                                                                                                 |
-| ------------------------------------------------------- | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Actividad en vivo** (peticiones, respuestas, errores) | La **misma terminal** donde ejecutaste `npm run dev`                     | Líneas JSON estructuradas generadas por Fastify Logger: métricas de petición/respuesta (método, URL, status, tiempos, tamaños). Es la "observabilidad" en tiempo real. |
+| Qué quieres ver                                         | Dónde está                                                                              | Qué es                                                                                                                                                                                                                   |
+| ------------------------------------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Actividad en vivo** (peticiones, respuestas, errores) | La **misma terminal** donde ejecutaste `npm run dev`                                    | Líneas JSON estructuradas generadas por Fastify Logger: métricas de petición/respuesta (método, URL, status, tiempos, tamaños). Es la "observabilidad" en tiempo real.                                                   |
 | **Copias en disco** por turno                           | Carpeta **`sessions/`** en el ordenador (relativa al CWD desde donde arrancas el proxy) | Subcarpetas por sesión y por turno de interacción (`interactions/`); dentro hay `meta.json` (resumen del turno), `request/`, `response/` y `steps/`. Detalle de nombres en el [README](../README.md#archivos-auditoria). |
 
 La auditoría en disco es incondicional: el proxy siempre escribe en `./sessions`. La consola muestra tráfico adicional según la configuración de logs.
@@ -174,14 +182,14 @@ Para **limpiar** las sesiones acumuladas, ejecuta `npm run clean:sessions`. El p
 
 No hace falta leer la tabla entera del README el primer día:
 
-| Variable          | Para qué sirve (resumen)                                          |
-| ----------------- | ----------------------------------------------------------------- |
-| `PORT`            | Puerto donde escucha el proxy en tu máquina (por defecto `8787`). |
-| `UPSTREAM_ORIGIN` | URL base del API al que el proxy reenvía (por defecto Anthropic). |
-| `FILTERED_TOOLS`  | Lista de tool names a excluir del request (coma-separado). Para desactivar: `FILTERED_TOOLS=""`. |
-| `CONTEXT_SYNC_CACHE_ENABLED` | Habilita caché inteligente para side-request Context Sync WebFetch (por defecto `true`). |
-| `CONTEXT_SYNC_MAX_WAIT_MS` | Timeout en ms para esperar step de WebFetch antes de fallback (por defecto `5000`). |
-| `PROXY_UNREDACT_THINKING` | Remueve flag de redacción de thinking para capturar contenido legible (por defecto `false`). |
+| Variable                     | Para qué sirve (resumen)                                                                         |
+| ---------------------------- | ------------------------------------------------------------------------------------------------ |
+| `PORT`                       | Puerto donde escucha el proxy en tu máquina (por defecto `8787`).                                |
+| `UPSTREAM_ORIGIN`            | URL base del API al que el proxy reenvía (por defecto Anthropic).                                |
+| `FILTERED_TOOLS`             | Lista de tool names a excluir del request (coma-separado). Para desactivar: `FILTERED_TOOLS=""`. |
+| `CONTEXT_SYNC_CACHE_ENABLED` | Habilita caché inteligente para side-request Context Sync WebFetch (por defecto `true`).         |
+| `CONTEXT_SYNC_MAX_WAIT_MS`   | Timeout en ms para esperar step de WebFetch antes de fallback (por defecto `5000`).              |
+| `PROXY_UNREDACT_THINKING`    | Remueve flag de redacción de thinking para capturar contenido legible (por defecto `false`).     |
 
 La carpeta de salida es siempre `./sessions`, relativa al directorio desde donde ejecutas el proxy.
 

@@ -22,7 +22,7 @@ El proxy utiliza **Progressive Kernel Architecture (PKA)** — un modelo arquite
 | **2 - Servicios (Adapters)**   | `src/2-services/`        | Implementaciones concretas con I/O (filesystem, streams) y **ports** (interfaces) | `SessionStoreService`, `AuditWriterService`, `SseReconstructService`, `StreamTeeService`, Ports: `IAuditWriter`, `ISessionStore`, `ISseReconstructor`, `IStreamTee` |
 | **3 - Operaciones (Handlers)** | `src/3-operations/`      | Orquestación de casos de uso (Command Handlers)                                   | `AuditInteractionHandler`, `AuditSseResponseHandler`, `AuditStandardResponseHandler`, `AuditUpstreamErrorHandler`, `FilterToolsHandler`                             |
 | **4 - API (Composition Root)** | `src/4-api/`             | Wiring de dependencias y configuración                                            | `createProxyDependencies()`, Configuración de entorno                                                                                                               |
-| **5 - Interfaces de Usuario**  | `src/5-user-interfaces/` | Adaptadores HTTP (reciben deps inyectadas via options)                            | `ProxyController`, `InternalController`, `proxyRoutes`, `registerInternalRoutes`, `fastify.augments.d.ts`                                                          |
+| **5 - Interfaces de Usuario**  | `src/5-user-interfaces/` | Adaptadores HTTP (reciben deps inyectadas via options)                            | `ProxyController`, `InternalController`, `proxyRoutes`, `registerInternalRoutes`, `fastify.augments.d.ts`                                                           |
 
 ### 📐 Regla de Dependencia
 
@@ -135,23 +135,23 @@ interactions/NNNNNN_<uuid>/
 
 ### Tipos de Interacción
 
-| `interactionType`  | Origen                                                          | Cierre                                          |
-| ------------------ | --------------------------------------------------------------- | ----------------------------------------------- |
-| `agentic-turn`     | Prompt del usuario con `tools` no vacíos (fresh) + continuations | `stop_reason` terminal (`end_turn`, `max_tokens`) |
-| `client-preflight` | Quota check (`max_tokens:1`) o cache warm-up sin turno activo   | Al recibir la respuesta (inmediato)             |
-| `side-request`     | Peticiones con `tools: []` (ej. `count_tokens`, generación de títulos) | Respuesta terminal; no desplaza al turno activo |
+| `interactionType`  | Origen                                                                 | Cierre                                            |
+| ------------------ | ---------------------------------------------------------------------- | ------------------------------------------------- |
+| `agentic-turn`     | Prompt del usuario con `tools` no vacíos (fresh) + continuations       | `stop_reason` terminal (`end_turn`, `max_tokens`) |
+| `client-preflight` | Quota check (`max_tokens:1`) o cache warm-up sin turno activo          | Al recibir la respuesta (inmediato)               |
+| `side-request`     | Peticiones con `tools: []` (ej. `count_tokens`, generación de títulos) | Respuesta terminal; no desplaza al turno activo   |
 
 ### Resultados de Turno (`turnOutcome`)
 
 El campo `turnOutcome` en `meta.json` indica el resultado final del turno:
 
-| `turnOutcome`   | Significado                                                               | `statusCode` típico |
-| --------------- | ------------------------------------------------------------------------- | ------------------- |
-| `completed`     | Turno completado exitosamente                                             | 2xx                 |
-| `client-error`  | Error del cliente (request mal formada, autenticación fallida, etc.)       | 4xx                 |
-| `upstream-error`| Error del servidor upstream (fallo de conexión, timeout, error SSE)       | 5xx o `null`        |
-| `truncated`     | Respuesta truncada por `max_tokens`                                        | 2xx                 |
-| `orphaned`      | Turno cerrado por cleanup (continuation nunca llegó, graceful shutdown)    | `null`              |
+| `turnOutcome`    | Significado                                                             | `statusCode` típico |
+| ---------------- | ----------------------------------------------------------------------- | ------------------- |
+| `completed`      | Turno completado exitosamente                                           | 2xx                 |
+| `client-error`   | Error del cliente (request mal formada, autenticación fallida, etc.)    | 4xx                 |
+| `upstream-error` | Error del servidor upstream (fallo de conexión, timeout, error SSE)     | 5xx o `null`        |
+| `truncated`      | Respuesta truncada por `max_tokens`                                     | 2xx                 |
+| `orphaned`       | Turno cerrado por cleanup (continuation nunca llegó, graceful shutdown) | `null`              |
 
 > **Campos forenses en `meta.json`:** Cuando un turno se cierra con `upstream-error` o `orphaned` habiendo emitido `tool_use` de tipo `Agent` que no se correlacionaron con subagentes, el campo `lostPendingAgents?: PendingAgentToolUse[]` registra los IDs de esos tool_uses pendientes para facilitar correlación offline.
 
@@ -171,12 +171,13 @@ Cada step en `meta.json` incluye `anthropicMessageId` — el `message.id` de la 
 }
 ```
 
-| Sistema | Ubicación del ID | Valor de ejemplo |
-|---------|------------------|------------------|
-| Log Claude Code (`.jsonl`) | `message.id` | `msg_01SweCL7ReWWANWSRsPc8mfn` |
+| Sistema                       | Ubicación del ID             | Valor de ejemplo               |
+| ----------------------------- | ---------------------------- | ------------------------------ |
+| Log Claude Code (`.jsonl`)    | `message.id`                 | `msg_01SweCL7ReWWANWSRsPc8mfn` |
 | Auditoría Proxy (`meta.json`) | `steps[].anthropicMessageId` | `msg_01SweCL7ReWWANWSRsPc8mfn` |
 
 **Proceso de correlación:**
+
 1. Extrae `"id"` del evento `assistant` en el log de Claude Code
 2. Busca ese valor en `sessions/<session>/interactions/*/meta.json` bajo `steps[].anthropicMessageId`
 3. El directorio contenedor es la interacción correspondiente
@@ -201,30 +202,30 @@ Esto evita la creación de directorios `_unknown/` con interacciones vacías que
 
 Personaliza el comportamiento ajustando estas variables en tu entorno o en un archivo `configs/.env`:
 
-|   Categoría   | Variable                              | Descripción                                                   | Default                      |
-| :-----------: | ------------------------------------- | ------------------------------------------------------------- | ---------------------------- |
-|   **Core**   | `PORT`                          | Puerto de escucha del proxy.                                  | `8787`                      |
-| **Upstream** | `UPSTREAM_ORIGIN`               | URL objetivo de Anthropic.                                    | `https://api.anthropic.com` |
-|              | `UPSTREAM_ACCEPT_ENCODING`      | Control de compresión (`identity`, `gzip`, `pass`, `remove`). | `identity`                  |
-| **Headers**  | `AUDIT_SESSION_OVERRIDE_HEADER` | Cabecera primaria de sesión.                                  | `x-cc-audit-session`        |
-|              | `AUDIT_SESSION_FALLBACK_HEADER` | Cabecera secundaria.                                          | `x-claude-code-session-id`  |
-|              | `STRIP_AUDIT_SESSION_HEADER`    | Elimina cabeceras de sesión hacia upstream.                   | `1` (Activo)                |
-|              | `DEFAULT_AUDIT_SESSION`         | Sesión si no hay cabeceras.                                   | _(vacío)_                   |
-|              | `AUDIT_SESSION_HASH_SUFFIX`     | Añade hash al ID de sesión.                                   | `0` (Desactivo)             |
-| **Límites**  | `MAX_REQUEST_BODY`              | Límite del cuerpo de petición (memoria en proxy).             | `50mb`                      |
-|              | `MAX_RESPONSE_BUFFER_BYTES`     | Tope de buffer en memoria para respuestas no-SSE.             | `104857600`                 |
-|              | `MAX_AUDIT_REQUEST_BODY_BYTES`  | Tope de archivo físico para el cuerpo de petición.            | `52428800`                  |
-|              | `MAX_AUDIT_RESPONSE_BODY_BYTES` | Tope de archivo físico para el cuerpo de respuesta.           | `52428800`                  |
-|              | `MAX_AUDIT_SSE_RAW_BYTES`       | Tope físico para `response/sse.txt` (raw dump debug; `0` = ilimitado). **No afecta** a la reconstrucción (que lee `sse.jsonl`). | `52428800`                  |
-| **Compat.**  | `CONSOLE_REDACT`                | Deshabilita prints con información en claro a la terminal.    | `1` (Activo)                |
-|              | `LOG_SSE`                       | Imprime por terminal cada línea de Event-Stream en vivo.      | `0` (Desactivo)             |
-| **Logging**  | `LOG_LEVEL`                     | Nivel de severidad del logger Pino (`trace`–`fatal`).          | `info`                      |
-|              |                                 | Logs dual-transport: terminal formateada + `logs/proxy.log` (JSON crudo). | —                     |
-|              | `MAX_BODY_LOG_BYTES`            | Límite restrictivo para visualizar cuerpos crudos por log.    | `2048`                      |
-| **Thinking** | `PROXY_UNREDACT_THINKING`       | Remueve el flag `redact-thinking-2026-02-12` del header `anthropic-beta` para capturar contenido thinking legible. | `false` (desactivado)       |
-| **Context Sync** | `CONTEXT_SYNC_CACHE_ENABLED` | Habilita caché inteligente para side-request `context-sync-webfetch`. Si está en `0/false`, siempre hace forward+auditoría normal. | `true` |
-|              | `CONTEXT_SYNC_MAX_WAIT_MS`      | Tiempo máximo (ms) para esperar el step de WebFetch ya resumido antes de fallback. | `5000` |
-| **Filtrado** | `FILTERED_TOOLS`                | Lista de tool names a excluir del request (coma-separado). Reduce tokens y ruido en auditoría. | `ScheduleWakeup,NotebookEdit,ExitWorktree,EnterWorktree,CronList,CronDelete,CronCreate` |
+|    Categoría     | Variable                        | Descripción                                                                                                                        | Default                                                                                 |
+| :--------------: | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+|     **Core**     | `PORT`                          | Puerto de escucha del proxy.                                                                                                       | `8787`                                                                                  |
+|   **Upstream**   | `UPSTREAM_ORIGIN`               | URL objetivo de Anthropic.                                                                                                         | `https://api.anthropic.com`                                                             |
+|                  | `UPSTREAM_ACCEPT_ENCODING`      | Control de compresión (`identity`, `gzip`, `pass`, `remove`).                                                                      | `identity`                                                                              |
+|   **Headers**    | `AUDIT_SESSION_OVERRIDE_HEADER` | Cabecera primaria de sesión.                                                                                                       | `x-cc-audit-session`                                                                    |
+|                  | `AUDIT_SESSION_FALLBACK_HEADER` | Cabecera secundaria.                                                                                                               | `x-claude-code-session-id`                                                              |
+|                  | `STRIP_AUDIT_SESSION_HEADER`    | Elimina cabeceras de sesión hacia upstream.                                                                                        | `1` (Activo)                                                                            |
+|                  | `DEFAULT_AUDIT_SESSION`         | Sesión si no hay cabeceras.                                                                                                        | _(vacío)_                                                                               |
+|                  | `AUDIT_SESSION_HASH_SUFFIX`     | Añade hash al ID de sesión.                                                                                                        | `0` (Desactivo)                                                                         |
+|   **Límites**    | `MAX_REQUEST_BODY`              | Límite del cuerpo de petición (memoria en proxy).                                                                                  | `50mb`                                                                                  |
+|                  | `MAX_RESPONSE_BUFFER_BYTES`     | Tope de buffer en memoria para respuestas no-SSE.                                                                                  | `104857600`                                                                             |
+|                  | `MAX_AUDIT_REQUEST_BODY_BYTES`  | Tope de archivo físico para el cuerpo de petición.                                                                                 | `52428800`                                                                              |
+|                  | `MAX_AUDIT_RESPONSE_BODY_BYTES` | Tope de archivo físico para el cuerpo de respuesta.                                                                                | `52428800`                                                                              |
+|                  | `MAX_AUDIT_SSE_RAW_BYTES`       | Tope físico para `response/sse.txt` (raw dump debug; `0` = ilimitado). **No afecta** a la reconstrucción (que lee `sse.jsonl`).    | `52428800`                                                                              |
+|   **Compat.**    | `CONSOLE_REDACT`                | Deshabilita prints con información en claro a la terminal.                                                                         | `1` (Activo)                                                                            |
+|                  | `LOG_SSE`                       | Imprime por terminal cada línea de Event-Stream en vivo.                                                                           | `0` (Desactivo)                                                                         |
+|   **Logging**    | `LOG_LEVEL`                     | Nivel de severidad del logger Pino (`trace`–`fatal`).                                                                              | `info`                                                                                  |
+|                  |                                 | Logs dual-transport: terminal formateada + `logs/proxy.log` (JSON crudo).                                                          | —                                                                                       |
+|                  | `MAX_BODY_LOG_BYTES`            | Límite restrictivo para visualizar cuerpos crudos por log.                                                                         | `2048`                                                                                  |
+|   **Thinking**   | `PROXY_UNREDACT_THINKING`       | Remueve el flag `redact-thinking-2026-02-12` del header `anthropic-beta` para capturar contenido thinking legible.                 | `false` (desactivado)                                                                   |
+| **Context Sync** | `CONTEXT_SYNC_CACHE_ENABLED`    | Habilita caché inteligente para side-request `context-sync-webfetch`. Si está en `0/false`, siempre hace forward+auditoría normal. | `true`                                                                                  |
+|                  | `CONTEXT_SYNC_MAX_WAIT_MS`      | Tiempo máximo (ms) para esperar el step de WebFetch ya resumido antes de fallback.                                                 | `5000`                                                                                  |
+|   **Filtrado**   | `FILTERED_TOOLS`                | Lista de tool names a excluir del request (coma-separado). Reduce tokens y ruido en auditoría.                                     | `ScheduleWakeup,NotebookEdit,ExitWorktree,EnterWorktree,CronList,CronDelete,CronCreate` |
 
 > **Auditoría por defecto (con excepción explícita).** El proxy escribe en `./sessions` para `agentic-turn`, `client-preflight` y `side-request` normales. Excepción: side-request Context Sync de WebFetch con caché HIT (`context-sync-webfetch`) se responden localmente sin crear interacción en disco. En side-request SSE auditados: (a) `steps/NNN/response/sse.jsonl` es la **fuente de verdad** (escritura síncrona, orden determinista); (b) `steps/NNN/response/sse.txt` es raw dump de depuración acotado por `MAX_AUDIT_SSE_RAW_BYTES`; (c) `response/body.json` top-level se reconstruye desde `sse.jsonl`. Detalle en [`docs/how-sse-reconstruction-works.md`](docs/how-sse-reconstruction-works.md).
 
@@ -251,10 +252,11 @@ El sistema previene la saturación en memoria o disco ignorando la escritura si 
 
 1.  **Instalar dependencias**: `npm install`
 2.  **Configurar proveedor** (opcional): `npm run configure:provider` (asistente interactivo para configurar API keys y modelos de diferentes proveedores).
-3.  **Modo Desarrollo**: `npm run dev` (Carga `configs/.env` mediante flag nativo de Node v22.9+; **v24 LTS recomendado**).
-4.  **Compilación**: `npm run build` (Genera `/dist` optimizado).
-5.  **Referencia de scripts**: `npm run help` (muestra todos los scripts disponibles con descripciones).
-6.  **Limpieza**: `npm run clean` (Purga `dist/` y `node_modules/`). Para eliminar datos de auditoría acumulados: `npm run clean:sessions`.
+3.  **Referencia multi-agente** (opcional): `npm run create:agents-reference` (Crea hardlink `AGENTS.md` → `CLAUDE.md` para compatibilidad con otros agentes de código).
+4.  **Modo Desarrollo**: `npm run dev` (Carga `configs/.env` mediante flag nativo de Node v22.9+; **v24 LTS recomendado**).
+5.  **Compilación**: `npm run build` (Genera `/dist` optimizado).
+6.  **Referencia de scripts**: `npm run help` (muestra todos los scripts disponibles con descripciones).
+7.  **Limpieza**: `npm run clean` (Purga `dist/` y `node_modules/`). Para eliminar datos de auditoría acumulados: `npm run clean:sessions`.
 
 > Para una guía detallada de onboarding, consultar [docs/how-to-start.md](docs/how-to-start.md).
 

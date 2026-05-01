@@ -23,7 +23,8 @@
     "clean:modules": "node -e \"fs.rmSync('node_modules', { recursive: true, force: true })\"",
     "clean:sessions": "node -e \"fs.rmSync('sessions', { recursive: true, force: true })\"",
     "clean:logs": "node -e \"fs.rmSync('logs', { recursive: true, force: true })\"",
-    "configure:provider": "tsx scripting/configure-provider.ts"
+    "configure:provider": "tsx scripting/configure-provider.ts",
+    "create:agents-reference": "tsx scripting/create-agents-reference.ts"
   },
   "keywords": [],
   "author": "",

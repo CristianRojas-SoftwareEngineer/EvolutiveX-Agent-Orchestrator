@@ -22,6 +22,8 @@ const scripts: NpmScript[] = [
 
   // Producción
   { name: 'build', description: 'Compila óptimamente para Producción (tsup + tsc)', category: 'production' },
+  { name: 'build:js', description: 'Compila JavaScript con tsup (ESM)', category: 'production' },
+  { name: 'build:types', description: 'Genera declaraciones de tipos TypeScript (.d.ts)', category: 'production' },
   { name: 'start', description: 'Ejecuta servidor crudo desde dist/index.js', category: 'production' },
 
   // Sistema de Recuperación

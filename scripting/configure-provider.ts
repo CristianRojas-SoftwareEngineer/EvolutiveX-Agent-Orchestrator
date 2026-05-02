@@ -116,8 +116,13 @@ function loadProviderConfig(
   // Leer config.json
   const configJson = JSON.parse(readFileSync(configPath, 'utf-8')) as Record<string, string>;
 
-  // Método de autenticación del proveedor: "api_key" (X-Api-Key) o "bearer" (Authorization: Bearer)
-  const authMethod: 'api_key' | 'bearer' = configJson.AUTH_METHOD === 'api_key' ? 'api_key' : 'bearer';
+  // Método de autenticación del proveedor: "api_key" (X-Api-Key), "bearer" (Authorization: Bearer) u "oauth"
+  const authMethod: 'api_key' | 'bearer' | 'oauth' =
+    configJson.AUTH_METHOD === 'api_key'
+      ? 'api_key'
+      : configJson.AUTH_METHOD === 'oauth'
+        ? 'oauth'
+        : 'bearer';
 
   // Resolver rutas relativas de modelos
   const config: Record<string, string> = {};
@@ -154,12 +159,16 @@ function loadProviderConfig(
       config.ANTHROPIC_API_KEY = `<${providerName.toUpperCase()}_API_KEY>`;
     }
     config.ANTHROPIC_AUTH_TOKEN = '';
-  } else {
+  } else if (authMethod === 'bearer') {
     // Gateway/proxy (ej. OpenRouter, Ollama, Xiaomi): usar ANTHROPIC_AUTH_TOKEN (header Authorization: Bearer)
     if (!config.ANTHROPIC_AUTH_TOKEN || /^<.*>$/.test(config.ANTHROPIC_AUTH_TOKEN)) {
       config.ANTHROPIC_AUTH_TOKEN = `<${providerName.toUpperCase()}_API_KEY>`;
     }
     config.ANTHROPIC_API_KEY = '';
+  } else if (authMethod === 'oauth') {
+    // Suscripción PRO/Max o configuración nativa a través de proxy
+    config.ANTHROPIC_API_KEY = '';
+    config.ANTHROPIC_AUTH_TOKEN = '';
   }
 
   return config as ProviderConfig;
@@ -415,7 +424,7 @@ program
       return;
     }
 
-    const validProviders = ['default', 'ollama', 'openrouter', 'xiaomi'];
+    const validProviders = ['default', 'anthropic', 'ollama', 'openrouter', 'xiaomi'];
     if (!validProviders.includes(provider)) {
       console.error(
         chalk.red(`Proveedor inválido: "${provider}". Opciones: ${validProviders.join(', ')}`),

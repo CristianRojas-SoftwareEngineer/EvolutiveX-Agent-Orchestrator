@@ -1,5 +1,5 @@
 {
-  "AUTH_METHOD": "api_key",
+  "AUTH_METHOD": "oauth",
   "ANTHROPIC_BASE_URL": "https://api.anthropic.com",
   "ANTHROPIC_DEFAULT_HAIKU_MODEL": "models/claude-haiku-4-5",
   "ANTHROPIC_DEFAULT_SONNET_MODEL": "models/claude-sonnet-4-6",

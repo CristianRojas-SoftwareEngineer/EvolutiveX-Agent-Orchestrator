@@ -266,7 +266,7 @@ El directorio `routing/providers/` contiene la configuración de los diferentes 
 
 ```
 routing/providers/
-├── anthropic/           # AUTH_METHOD: api_key
+├── anthropic/           # AUTH_METHOD: oauth
 │   ├── config.json      # Configuración del proveedor
 │   ├── secrets.json     # API keys (no versionado)
 │   ├── secrets.json.example
@@ -300,6 +300,7 @@ Cada `config.json` incluye el campo `AUTH_METHOD` que determina qué variable de
 
 | `AUTH_METHOD` | Variable de entorno | Header HTTP | Cuándo usarlo |
 |---|---|---|---|
+| `oauth` | Ninguna (`ANTHROPIC_API_KEY` vacía) | `Authorization: Bearer` (vía OAuth) | Autenticación nativa (Suscripción Pro/Max) |
 | `api_key` | `ANTHROPIC_API_KEY` | `X-Api-Key` | Acceso directo a la API de Anthropic (pay-as-you-go) |
 | `bearer` | `ANTHROPIC_AUTH_TOKEN` | `Authorization: Bearer` | Gateways y proxies LLM (OpenRouter, Ollama, Xiaomi) |
 

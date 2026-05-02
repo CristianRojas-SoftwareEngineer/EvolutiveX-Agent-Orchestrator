@@ -169,11 +169,20 @@ function loadProviderConfig(
 
 class WindowsEnvManager implements IEnvManager {
   async setEnvVar(name: string, value: string): Promise<void> {
-    const psValue = value.replace(/'/g, "''");
-    execSync(`[Environment]::SetEnvironmentVariable('${name}', '${psValue}', 'User')`, {
-      shell: 'powershell.exe',
-      stdio: 'pipe',
-    });
+    if (value === '') {
+      // SetEnvironmentVariable con valor vacío elimina la clave en Windows. 
+      // Usamos Set-ItemProperty para forzar la creación de la variable vacía en el registro.
+      execSync(`Set-ItemProperty -Path 'HKCU:\\Environment' -Name '${name}' -Value ''`, {
+        shell: 'powershell.exe',
+        stdio: 'pipe',
+      });
+    } else {
+      const psValue = value.replace(/'/g, "''");
+      execSync(`[Environment]::SetEnvironmentVariable('${name}', '${psValue}', 'User')`, {
+        shell: 'powershell.exe',
+        stdio: 'pipe',
+      });
+    }
     process.env[name] = value;
   }
 
@@ -195,12 +204,14 @@ class WindowsEnvManager implements IEnvManager {
 
   getEnvVar(name: string): string | undefined {
     try {
-      const result = execSync(`[Environment]::GetEnvironmentVariable('${name}', 'User')`, {
+      // Usar Get-ItemProperty permite leer variables que existen pero están vacías,
+      // a diferencia de [Environment]::GetEnvironmentVariable que devuelve nulo.
+      const result = execSync(`(Get-ItemProperty -Path 'HKCU:\\Environment' -Name '${name}' -ErrorAction Stop).'${name}'`, {
         shell: 'powershell.exe',
         encoding: 'utf-8',
         stdio: 'pipe',
-      }).trim();
-      return result || undefined;
+      }).replace(/\r?\n$/, '');
+      return result;
     } catch {
       return undefined;
     }

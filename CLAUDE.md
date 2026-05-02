@@ -22,7 +22,13 @@ Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-s
 
 ---
 
-## 1. Think Before Coding
+## 1. Project-Specific Skill
+
+For any question or task related to this project (explaining what it does, PKA architecture, handlers, turn classifier, SSE reconstruction, `sessions/` structure, environment variables, etc.) **activate and consult the `smart-code-proxy` skill** installed in `~/.claude/skills/smart-code-proxy/`. It is the canonical reference for the project; it is always aligned with the current source code. The repo's `README.md` provides the narrative summary and environment matrix, but the skill contains the complete audit file hierarchy, the `meta.json` field catalog, and the question routing table.
+
+---
+
+## 2. Think Before Coding
 
 **Don't assume. Don't hide confusion. Surface tradeoffs.**
 
@@ -35,7 +41,7 @@ Before implementing:
 
 ---
 
-## 2. Simplicity First
+## 3. Simplicity First
 
 **Minimum code that solves the problem. Nothing speculative.**
 
@@ -49,7 +55,7 @@ Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, sim
 
 ---
 
-## 3. Surgical Changes
+## 4. Surgical Changes
 
 **Touch only what you must. Clean up only your own mess.**
 
@@ -69,7 +75,7 @@ The test: Every changed line should trace directly to the user's request.
 
 ---
 
-## 4. Goal-Driven Execution
+## 5. Goal-Driven Execution
 
 **Define success criteria. Loop until verified.**
 
@@ -95,6 +101,9 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 ---
 
-## 5. Project-Specific Skill
+## 6. Version Control
 
-For any question or task related to this project (explaining what it does, PKA architecture, handlers, turn classifier, SSE reconstruction, `sessions/` structure, environment variables, etc.) **activate and consult the `smart-code-proxy` skill** installed in `~/.claude/skills/smart-code-proxy/`. It is the canonical reference for the project; it is always aligned with the current source code. The repo's `README.md` provides the narrative summary and environment matrix, but the skill contains the complete audit file hierarchy, the `meta.json` field catalog, and the question routing table.
+**Make every commit self-explanatory and descriptive.**
+
+- All commits must include a message describing the purpose, objectives, and functionality of the implemented changes.
+- Messages generated for `git commit` MUST be in Spanish.

@@ -266,7 +266,7 @@ El directorio `routing/providers/` contiene la configuración de los diferentes 
 
 ```
 routing/providers/
-├── anthropic/           # API nativa de Anthropic
+├── anthropic/           # API nativa de Anthropic (AUTH_METHOD: api_key)
 │   ├── config.json      # Configuración del proveedor
 │   ├── secrets.json     # API keys (no versionado)
 │   ├── secrets.json.example
@@ -274,7 +274,7 @@ routing/providers/
 │       ├── claude-haiku-4-5/metadata.json
 │       ├── claude-opus-4-6/metadata.json
 │       └── claude-sonnet-4-6/metadata.json
-├── openrouter/          # OpenRouter (multi-proveedor)
+├── openrouter/          # OpenRouter (multi-proveedor) (AUTH_METHOD: bearer)
 │   ├── config.json
 │   ├── secrets.json
 │   ├── secrets.json.example
@@ -282,20 +282,28 @@ routing/providers/
 │       ├── deepseek-v4-flash/metadata.json
 │       ├── deepseek-v4-pro/metadata.json
 │       └── minimax-m2-5/metadata.json
-├── ollama/              # Ollama (local)
+├── ollama/              # Ollama (local) (AUTH_METHOD: bearer)
 │   ├── config.json
 │   ├── secrets.json
 │   ├── secrets.json.example
 │   └── models/
 │       ├── gemini-3-flash-preview/metadata.json
 │       └── minimax-m2.5/metadata.json
-└── xiaomi/              # Xiaomi (Mimo)
+└── xiaomi/              # Xiaomi (Mimo) (AUTH_METHOD: bearer)
     ├── config.json
     └── models/
         └── mimo-v2-5/metadata.json
 ```
 
-Cada proveedor contiene un `config.json` con la configuración de conexión y un directorio `models/` con archivos `metadata.json` por modelo. Los archivos `secrets.json` contienen API keys y **no deben versionarse** (están en `.gitignore`). Usar `secrets.json.example` como plantilla.
+Cada `config.json` incluye el campo `AUTH_METHOD` que determina qué variable de entorno de autenticación usa Claude Code al comunicarse con ese proveedor:
+
+| `AUTH_METHOD` | Variable de entorno | Header HTTP | Cuándo usarlo |
+|---|---|---|---|
+| `api_key` | `ANTHROPIC_API_KEY` | `X-Api-Key` | Acceso directo a la API de Anthropic (pay-as-you-go) |
+| `bearer` | `ANTHROPIC_AUTH_TOKEN` | `Authorization: Bearer` | Gateways y proxies LLM (OpenRouter, Ollama, Xiaomi) |
+
+Los archivos `secrets.json` contienen la credencial real y **no deben versionarse** (están en `.gitignore`). Usar `secrets.json.example` como plantilla — su contenido refleja el campo correcto según el `AUTH_METHOD` del proveedor.
+
 
 ## 🐳 Docker y Contenerización
 

@@ -116,6 +116,9 @@ function loadProviderConfig(
   // Leer config.json
   const configJson = JSON.parse(readFileSync(configPath, 'utf-8')) as Record<string, string>;
 
+  // Método de autenticación del proveedor: "api_key" (X-Api-Key) o "bearer" (Authorization: Bearer)
+  const authMethod: 'api_key' | 'bearer' = configJson.AUTH_METHOD === 'api_key' ? 'api_key' : 'bearer';
+
   // Resolver rutas relativas de modelos
   const config: Record<string, string> = {};
   for (const [key, value] of Object.entries(configJson)) {
@@ -144,13 +147,20 @@ function loadProviderConfig(
     );
   }
 
-  // AUTH_TOKEN: si falta o sigue con placeholder, usar placeholder genérico
-  if (!config.ANTHROPIC_AUTH_TOKEN || /^<.*>$/.test(config.ANTHROPIC_AUTH_TOKEN)) {
-    config.ANTHROPIC_AUTH_TOKEN = `<${providerName.toUpperCase()}_API_KEY>`;
+  // Aplicar lógica de autenticación según el método del proveedor
+  if (authMethod === 'api_key') {
+    // Acceso directo a la API (ej. Anthropic): usar ANTHROPIC_API_KEY (header X-Api-Key)
+    if (!config.ANTHROPIC_API_KEY || /^<.*>$/.test(config.ANTHROPIC_API_KEY)) {
+      config.ANTHROPIC_API_KEY = `<${providerName.toUpperCase()}_API_KEY>`;
+    }
+    config.ANTHROPIC_AUTH_TOKEN = '';
+  } else {
+    // Gateway/proxy (ej. OpenRouter, Ollama, Xiaomi): usar ANTHROPIC_AUTH_TOKEN (header Authorization: Bearer)
+    if (!config.ANTHROPIC_AUTH_TOKEN || /^<.*>$/.test(config.ANTHROPIC_AUTH_TOKEN)) {
+      config.ANTHROPIC_AUTH_TOKEN = `<${providerName.toUpperCase()}_API_KEY>`;
+    }
+    config.ANTHROPIC_API_KEY = '';
   }
-
-  // Siempre deshabilitar API_KEY para que no compita con AUTH_TOKEN
-  config.ANTHROPIC_API_KEY = '';
 
   return config as ProviderConfig;
 }

@@ -1,4 +1,5 @@
 {
+  "AUTH_METHOD": "bearer",
   "ANTHROPIC_BASE_URL": "http://localhost:11434",
   "ANTHROPIC_DEFAULT_HAIKU_MODEL": "models/gemini-3-flash-preview",
   "ANTHROPIC_DEFAULT_SONNET_MODEL": "models/minimax-m2.5",

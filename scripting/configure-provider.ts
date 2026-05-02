@@ -102,14 +102,14 @@ function loadProviderConfig(
     const available = getAvailableProviders(basePath);
     throw new Error(
       `El provider "${providerName}" no existe en ${basePath}. ` +
-        `Proveedores disponibles: ${available.join(', ')}`,
+      `Proveedores disponibles: ${available.join(', ')}`,
     );
   }
 
   if (!existsSync(configPath)) {
     throw new Error(
       `No se encontró config.json en: ${configPath}\n` +
-        `Cree el archivo con URLs y modelos para el provider "${providerName}".`,
+      `Cree el archivo con URLs y modelos para el provider "${providerName}".`,
     );
   }
 
@@ -178,17 +178,18 @@ class WindowsEnvManager implements IEnvManager {
   }
 
   async removeEnvVar(name: string): Promise<void> {
-    try {
-      execSync(`Remove-ItemProperty -Path 'HKCU:\\Environment' -Name '${name}' -ErrorAction Stop`, {
-        shell: 'powershell.exe',
-        stdio: 'pipe',
-      });
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      if (!/was not found|does not exist|No se encontr/.test(msg)) {
-        throw err;
-      }
+    // Comprobar la existencia de la variable de entorno antes de eliminarla
+    const exists = this.getEnvVar(name) !== undefined;
+    if (!exists) {
+      delete process.env[name];
+      return;
     }
+
+    execSync(`Remove-ItemProperty -Path 'HKCU:\\Environment' -Name '${name}' -ErrorAction Stop`, {
+      shell: 'powershell.exe',
+      stdio: 'pipe',
+    });
+
     delete process.env[name];
   }
 

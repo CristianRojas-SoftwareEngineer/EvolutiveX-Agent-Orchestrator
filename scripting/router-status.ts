@@ -75,21 +75,20 @@ const C = {
   reset: '\x1B[0m',
   bold: '\x1B[1m',
   dim: '\x1B[2m',
-  // Headers
-  title: '\x1B[1;36m',     // cyan bold
+  // Headers y títulos
+  title: '\x1B[1;34m',     // azul bold
+  header: '\x1B[1;34m',    // azul bold
   // Valores
-  value: '\x1B[1;33m',     // amarillo bold
-  provider: '\x1B[1;32m',  // verde bold
-  model: '\x1B[1;35m',     // magenta bold
-  // Niveles
-  lite: '\x1B[32m',        // verde
-  standard: '\x1B[33m',    // amarillo
-  reasoning: '\x1B[31m',   // rojo
+  value: '\x1B[1;94m',     // azul rey bold (bright blue)
+  provider: '\x1B[1;94m',  // azul rey bold
+  model: '\x1B[1;94m',     // azul rey bold
+  // Niveles (azul claro, azul rey, blanco)
+  lite: '\x1B[34m',        // azul
+  standard: '\x1B[1;94m',  // azul rey bold
+  reasoning: '\x1B[37m',   // blanco
   total: '\x1B[1;37m',     // blanco bold
-  // Barra de progreso
-  barGreen: '\x1B[32m',
-  barAmber: '\x1B[33m',
-  barRed: '\x1B[31m',
+  // Barra de progreso (azul claro, azul rey, blanco)
+  barFilled: '\x1B[1;94m', // azul rey bold
   barEmpty: '\x1B[90m',    // gris
   // Bordes de tabla
   border: '\x1B[90m',      // gris
@@ -147,18 +146,9 @@ function renderBar(percentage: number, width: number = 10): string {
   const filled = Math.round((percentage / 100) * width);
   const empty = width - filled;
 
-  let colorFn: (s: string) => string;
-  if (percentage <= 39) {
-    colorFn = (s) => `${C.barGreen}${s}${C.reset}`;
-  } else if (percentage <= 69) {
-    colorFn = (s) => `${C.barAmber}${s}${C.reset}`;
-  } else {
-    colorFn = (s) => `${C.barRed}${s}${C.reset}`;
-  }
-
-  const filledBar = '█'.repeat(filled);
+  const filledBar = `${C.barFilled}${'█'.repeat(filled)}${C.reset}`;
   const emptyBar = `${C.barEmpty}${'░'.repeat(empty)}${C.reset}`;
-  return `${colorFn(filledBar)}${emptyBar}`;
+  return `${filledBar}${emptyBar}`;
 }
 
 function formatTimeRemaining(resetEpoch?: number): string {

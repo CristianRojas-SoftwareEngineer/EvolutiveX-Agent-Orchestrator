@@ -10,13 +10,13 @@ El harness implementa "Context Synchronization" para mitigar el aislamiento de c
 
 ### Impacto medido (sesion de referencia)
 
-| Interaccion                          | Input Tokens | Output Tokens | Costo Est. (Haiku 4.5) |
-| ------------------------------------ | ------------ | ------------- | ---------------------- |
-| Subagente A (WebFetch + Resumen)     | 8            | 241           | ~$0.0012               |
-| Side-Request 0004 (mismo HTML)       | 236          | 49            | ~$0.0003               |
-| Side-Request 0005                    | 3,041        | 314           | ~$0.0035               |
-| Side-Request 0006                    | 24,394       | 318           | ~$0.0259               |
-| **Total Side-Requests**              | **27,671**   | **681**       | **~$0.0297**           |
+| Interaccion                      | Input Tokens | Output Tokens | Costo Est. (Haiku 4.5) |
+| -------------------------------- | ------------ | ------------- | ---------------------- |
+| Subagente A (WebFetch + Resumen) | 8            | 241           | ~$0.0012               |
+| Side-Request 0004 (mismo HTML)   | 236          | 49            | ~$0.0003               |
+| Side-Request 0005                | 3,041        | 314           | ~$0.0035               |
+| Side-Request 0006                | 24,394       | 318           | ~$0.0259               |
+| **Total Side-Requests**          | **27,671**   | **681**       | **~$0.0297**           |
 
 Los side-requests de context sync representaron el **94% de los tokens de entrada** de la sesion, a pesar de que el contenido ya habia sido procesado por los subagentes.
 
@@ -36,12 +36,12 @@ Si no cumple todo, se clasifica como `harness-auxiliary`.
 
 ### Diferenciacion de side-requests legitimos
 
-| Caracteristica     | Context Sync                                | Side-Request legitimo (count_tokens) |
-| ------------------ | ------------------------------------------- | ------------------------------------ |
-| **`tools`**        | `[]` (vacio)                                | `[]` (vacio)                         |
-| **Contenido**      | HTML crudo re-inyectado                     | Prompts simples del harness          |
-| **User message**   | "Web page content:\n---\n[HTML]\n---\n..."  | "Count tokens..." o similar          |
-| **Proposito**      | Re-procesar HTML ya procesado por subagente | Operaciones auxiliares del harness   |
+| Caracteristica   | Context Sync                                | Side-Request legitimo (count_tokens) |
+| ---------------- | ------------------------------------------- | ------------------------------------ |
+| **`tools`**      | `[]` (vacio)                                | `[]` (vacio)                         |
+| **Contenido**    | HTML crudo re-inyectado                     | Prompts simples del harness          |
+| **User message** | "Web page content:\n---\n[HTML]\n---\n..."  | "Count tokens..." o similar          |
+| **Proposito**    | Re-procesar HTML ya procesado por subagente | Operaciones auxiliares del harness   |
 
 Ambos tipos comparten `tools: []` y system prompt identico. El diferenciador clave es el **contenido del user message**: context-sync contiene HTML entre delimitadores `---`, mientras que los legitimos contienen instrucciones auxiliares del harness.
 
@@ -176,19 +176,20 @@ El siguiente ejemplo proviene de la sesion de analisis `d6f082cb-8088-4c13-901d-
 ```
 
 **Claves del ejemplo:**
+
 - El side-request 000004 llega **antes** de que el subagente A termine (race condition).
 - Los side-requests 000005 y 000006 son duplicados de otros subagentes.
 - Tools siempre es `[]` -- la heuristica de deteccion lo identifica como context-sync.
 
 ## Riesgos y mitigaciones
 
-| Riesgo                                           | Probabilidad | Mitigacion                                            |
-| ------------------------------------------------ | ------------ | ----------------------------------------------------- |
-| Falso positivo (cachear request legitima)        | Baja         | Heuristicas estrictas + validacion de URL             |
-| Timeout en espera del step de WebFetch           | Media        | Fallback inmediato a Anthropic, sin penalizar usuario |
-| Respuesta cacheada incompatible con harness       | Baja         | Testing exhaustivo con sesiones reales                |
-| Perdida de informacion al no auditar             | Controlada   | Logs estructurados en metadata del subagente          |
-| Cambio en patron del harness de Claude Code      | Baja         | Monitoreo periodico de side-request patterns          |
+| Riesgo                                      | Probabilidad | Mitigacion                                            |
+| ------------------------------------------- | ------------ | ----------------------------------------------------- |
+| Falso positivo (cachear request legitima)   | Baja         | Heuristicas estrictas + validacion de URL             |
+| Timeout en espera del step de WebFetch      | Media        | Fallback inmediato a Anthropic, sin penalizar usuario |
+| Respuesta cacheada incompatible con harness | Baja         | Testing exhaustivo con sesiones reales                |
+| Perdida de informacion al no auditar        | Controlada   | Logs estructurados en metadata del subagente          |
+| Cambio en patron del harness de Claude Code | Baja         | Monitoreo periodico de side-request patterns          |
 
 ---
 

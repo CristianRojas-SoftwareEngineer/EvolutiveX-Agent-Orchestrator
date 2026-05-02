@@ -1,8 +1,8 @@
 /**
  * Statusline de Claude Code para Smart Code Proxy.
  *
- * Renderiza 2-3 tablas Unicode según el contexto:
- *  - Tabla 1: Sesión y proveedor activo
+ * Renderiza 2-3 tablas según el contexto:
+ *  - Tabla 1: Sesión y proveedor activo (formato compacto con colores)
  *  - Tabla 2: Métricas de interacciones por nivel de razonamiento
  *  - Tabla 3: Rate limits (solo si authMethod === 'oauth')
  *
@@ -68,37 +68,68 @@ const PROJECT_ROOT = join(process.cwd());
 const ROUTING_PATH = join(PROJECT_ROOT, 'routing', 'providers');
 const SESSIONS_PATH = join(PROJECT_ROOT, 'sessions');
 const ENV_PATH = join(PROJECT_ROOT, 'configs', '.env');
-const BOX = {
-  tl: '╭', tr: '╮', bl: '╰', br: '╯',
-  h: '─', v: '│',
-  ml: '├', mr: '┤', mt: '┬', mb: '┴', mm: '┼',
+
+// ── Colores ANSI ────────────────────────────────────────────────
+
+const C = {
+  reset: '\x1B[0m',
+  bold: '\x1B[1m',
+  dim: '\x1B[2m',
+  // Headers
+  header: '\x1B[1;36m',    // cyan bold
+  // Valores
+  value: '\x1B[1;33m',     // amarillo bold (para valores importantes)
+  provider: '\x1B[1;32m',  // verde bold
+  model: '\x1B[1;35m',     // magenta bold
+  // Niveles
+  lite: '\x1B[32m',        // verde
+  standard: '\x1B[33m',    // amarillo
+  reasoning: '\x1B[31m',   // rojo
+  total: '\x1B[1;37m',     // blanco bold
+  // Barra de progreso
+  barGreen: '\x1B[32m',
+  barAmber: '\x1B[33m',
+  barRed: '\x1B[31m',
+  barEmpty: '\x1B[90m',    // gris
+  // Tabla
+  separator: '\x1B[90m',   // gris
+  label: '\x1B[37m',       // blanco
 };
 
 // ── Helpers de renderizado ──────────────────────────────────────
 
-function pad(str: string, len: number): string {
-  // Eliminar caracteres de control ANSI para calcular longitud real
-  const stripped = str.replace(/\x1B\[[0-9;]*m/g, '');
-  const padding = Math.max(0, len - stripped.length);
-  return str + ' '.repeat(padding);
-}
-
-function bar(percentage: number, width: number = 10): string {
-  const filled = Math.round((percentage / 100) * width);
-  const empty = width - filled;
-  let colorFn: (s: string) => string = (s) => s;
-  if (percentage <= 39) {
-    colorFn = (s) => `\x1B[32m${s}\x1B[0m`; // verde
-  } else if (percentage <= 69) {
-    colorFn = (s) => `\x1B[33m${s}\x1B[0m`; // ámbar
-  } else {
-    colorFn = (s) => `\x1B[31m${s}\x1B[0m`; // rojo
-  }
-  return colorFn('█'.repeat(filled)) + '\x1B[90m' + '░'.repeat(empty) + '\x1B[0m';
-}
-
 function formatNumber(n: number): string {
   return new Intl.NumberFormat('es').format(n);
+}
+
+function formatTokens(n: number): string {
+  if (n === 0) return '-';
+  return formatNumber(n);
+}
+
+function formatContextSize(size?: number): string {
+  if (!size) return 'N/A';
+  if (size >= 1000000) return `${(size / 1000000).toFixed(0)}M`;
+  if (size >= 1000) return `${Math.round(size / 1000)}K`;
+  return String(size);
+}
+
+function renderBar(percentage: number, width: number = 10): string {
+  const filled = Math.round((percentage / 100) * width);
+  const empty = width - filled;
+
+  let colorFn: (s: string) => string;
+  if (percentage <= 39) {
+    colorFn = (s) => `${C.barGreen}${s}${C.reset}`;
+  } else if (percentage <= 69) {
+    colorFn = (s) => `${C.barAmber}${s}${C.reset}`;
+  } else {
+    colorFn = (s) => `${C.barRed}${s}${C.reset}`;
+  }
+
+  const filledBar = '█'.repeat(filled);
+  const emptyBar = `${C.barEmpty}${'░'.repeat(empty)}${C.reset}`;
+  return `${colorFn(filledBar)}${emptyBar}`;
 }
 
 function formatTimeRemaining(resetEpoch?: number): string {
@@ -113,23 +144,6 @@ function formatTimeRemaining(resetEpoch?: number): string {
   const diffD = Math.floor(diffH / 24);
   const remH = diffH % 24;
   return remH > 0 ? `${diffD}d ${remH}h` : `${diffD}d`;
-}
-
-function boxLine(cells: string[], widths: number[]): string {
-  const content = cells.map((c, i) => pad(c, widths[i])).join(' │ ');
-  return `${BOX.v} ${content} ${BOX.v}`;
-}
-
-function boxTop(widths: number[]): string {
-  return BOX.tl + widths.map((w) => BOX.h.repeat(w + 2)).join(BOX.mt) + BOX.tr;
-}
-
-function boxMid(widths: number[]): string {
-  return BOX.ml + widths.map((w) => BOX.h.repeat(w + 2)).join(BOX.mm) + BOX.mr;
-}
-
-function boxBot(widths: number[]): string {
-  return BOX.bl + widths.map((w) => BOX.h.repeat(w + 2)).join(BOX.mb) + BOX.br;
 }
 
 // ── Lógica de resolución ────────────────────────────────────────
@@ -321,39 +335,28 @@ function aggregateInteractionMetrics(sessionPath: string): {
 // ── Renderizado de tablas ───────────────────────────────────────
 
 function renderSessionTable(ctx: ClaudeCodeContext): string {
-  const lines: string[] = [];
-  const widths = [18, 30];
-
-  lines.push(boxTop(widths));
-  lines.push(boxLine(['Sesión', 'Proveedor'], widths));
-  lines.push(boxMid(widths));
-
   const provider = resolveActiveProvider();
   const sessionId = ctx.session_id || 'N/A';
-  const sessionDisplay = sessionId.length > 28 ? sessionId.slice(0, 25) + '...' : sessionId;
-  lines.push(boxLine([sessionDisplay, provider.providerName], widths));
-
-  lines.push(boxMid(widths));
-
   const modelName = ctx.model?.display_name || 'N/A';
   const contextSize = ctx.context_window?.context_window_size;
   const usedPct = ctx.context_window?.used_percentage;
 
-  const contextDisplay = contextSize ? `${formatNumber(contextSize)} tokens` : 'N/A';
-  const pctDisplay = usedPct !== undefined && usedPct !== null ? `${usedPct.toFixed(1)}%` : 'N/A';
-
-  lines.push(boxLine(['Modelo activo', modelName], widths));
-  lines.push(boxMid(widths));
-  lines.push(boxLine(['Ventana ctx', contextDisplay], widths));
-  lines.push(boxMid(widths));
-
-  // Barra de progreso
-  const pctBar = usedPct !== undefined && usedPct !== null
-    ? `${bar(usedPct)} ${pctDisplay}`
+  const contextDisplay = formatContextSize(contextSize);
+  const pctDisplay = usedPct !== undefined && usedPct !== null ? `${usedPct.toFixed(0)}%` : 'N/A';
+  const barDisplay = usedPct !== undefined && usedPct !== null
+    ? `\`${renderBar(usedPct)} ${pctDisplay}\``
     : 'N/A';
-  lines.push(boxLine(['Uso ctx', pctBar], widths));
 
-  lines.push(boxBot(widths));
+  // Truncar session_id si es muy largo
+  const sessionDisplay = sessionId.length > 36
+    ? sessionId.slice(0, 33) + '...'
+    : sessionId;
+
+  const lines: string[] = [];
+  lines.push(`${C.header}### Sesión actual «${sessionDisplay}»${C.reset}`);
+  lines.push('');
+  lines.push(`| ${C.label}Proveedor${C.reset} | ${C.provider}${provider.providerName}${C.reset} | ${C.label}Modelo activo${C.reset} | ${C.model}${modelName}${C.reset} | ${C.label}Ventana de contexto${C.reset} | ${C.value}${contextDisplay}${C.reset} | ${C.label}Porcentaje de uso${C.reset} | ${barDisplay} |`);
+  lines.push(`|${C.separator}---|---|---|---|---|---|---|---${C.reset}|`);
 
   return lines.join('\n');
 }
@@ -363,18 +366,17 @@ function renderTokenTable(metrics: {
   standard: TokenMetrics;
   reasoning: TokenMetrics;
 }): string {
-  const lines: string[] = [];
-  const widths = [10, 18, 6, 12, 14, 12];
-
-  lines.push(boxTop(widths));
-  lines.push(boxLine(['Nivel', 'Modelo', 'N.º', 'Tokens Input', 'Cache Input', 'Tokens Output'], widths));
-  lines.push(boxMid(widths));
-
-  const levels: Array<{ key: keyof typeof metrics; label: string; modelExample: string }> = [
-    { key: 'lite', label: 'Lite', modelExample: 'Haiku/Flash' },
-    { key: 'standard', label: 'Standard', modelExample: 'Sonnet' },
-    { key: 'reasoning', label: 'Reasoning', modelExample: 'Opus/Pro' },
+  const levels: Array<{ key: keyof typeof metrics; label: string; modelExample: string; color: string }> = [
+    { key: 'lite', label: 'Lite', modelExample: 'MiMo 2 Omni', color: C.lite },
+    { key: 'standard', label: 'Standard', modelExample: 'MiMo 2.5', color: C.standard },
+    { key: 'reasoning', label: 'Reasoning', modelExample: 'MiMo 2.5 Pro', color: C.reasoning },
   ];
+
+  const lines: string[] = [];
+  lines.push(`${C.header}### Interacciones por niveles de razonamiento y consumo de tokens${C.reset}`);
+  lines.push('');
+  lines.push(`| ${C.label}Nivel${C.reset} | ${C.label}Modelo${C.reset} | ${C.label}Número de Interacciones${C.reset} | ${C.label}Tokens de Input${C.reset} | ${C.label}Tokens de Input Cacheado${C.reset} | ${C.label}Tokens de Output${C.reset} |`);
+  lines.push(`|${C.separator}---|---|---:|---:|---:|---:${C.reset}|`);
 
   let totalInput = 0;
   let totalCache = 0;
@@ -388,30 +390,11 @@ function renderTokenTable(metrics: {
     totalOutput += m.outputTokens;
     totalCount += m.count;
 
-    lines.push(boxLine([
-      level.label,
-      level.modelExample,
-      String(m.count),
-      formatNumber(m.inputTokens),
-      formatNumber(m.cacheReadInputTokens),
-      formatNumber(m.outputTokens),
-    ], widths));
-
-    if (level.key !== 'reasoning') {
-      lines.push(boxMid(widths));
-    }
+    lines.push(`| ${level.color}${level.label}${C.reset} | ${level.color}${level.modelExample}${C.reset} | ${C.value}${m.count}${C.reset} | ${C.value}${formatTokens(m.inputTokens)}${C.reset} | ${C.value}${formatTokens(m.cacheReadInputTokens)}${C.reset} | ${C.value}${formatTokens(m.outputTokens)}${C.reset} |`);
   }
 
-  lines.push(boxMid(widths));
-  lines.push(boxLine([
-    'Total',
-    '-',
-    String(totalCount),
-    formatNumber(totalInput),
-    formatNumber(totalCache),
-    formatNumber(totalOutput),
-  ], widths));
-  lines.push(boxBot(widths));
+  // Fila de total
+  lines.push(`| ${C.total}Sesión actual${C.reset} | ${C.total}Total${C.reset} | ${C.total}${totalCount}${C.reset} | ${C.total}${formatTokens(totalInput)}${C.reset} | ${C.total}${formatTokens(totalCache)}${C.reset} | ${C.total}${formatTokens(totalOutput)}${C.reset} |`);
 
   return lines.join('\n');
 }
@@ -423,20 +406,18 @@ function renderRateLimitTable(ctx: ClaudeCodeContext): string | null {
   if (!limit_5h && !limit_7d) return null;
 
   const lines: string[] = [];
-  const widths = [12, 22, 14];
-
-  lines.push(boxTop(widths));
-  lines.push(boxLine(['Cuota', 'Barra de uso', 'Reinicio'], widths));
-  lines.push(boxMid(widths));
+  lines.push(`${C.header}### Límites de tasa (Rate Limits)${C.reset}`);
+  lines.push('');
+  lines.push(`| ${C.label}Cuota${C.reset} | ${C.label}Barra de uso${C.reset} | ${C.label}Reinicio${C.reset} |`);
+  lines.push(`|${C.separator}---|---|---${C.reset}|`);
 
   if (limit_5h) {
     const used = limit_5h.used || 0;
     const remaining = limit_5h.remaining || 0;
     const total = used + remaining;
     const pct = total > 0 ? (used / total) * 100 : 0;
-    const barStr = `${bar(pct)} ${formatNumber(used)}/${formatNumber(total)}`;
-    lines.push(boxLine(['5 horas', barStr, formatTimeRemaining(limit_5h.reset)], widths));
-    lines.push(boxMid(widths));
+    const barStr = `${renderBar(pct)} ${formatNumber(used)}/${formatNumber(total)}`;
+    lines.push(`| ${C.label}5 horas${C.reset} | ${barStr} | ${C.value}${formatTimeRemaining(limit_5h.reset)}${C.reset} |`);
   }
 
   if (limit_7d) {
@@ -444,14 +425,9 @@ function renderRateLimitTable(ctx: ClaudeCodeContext): string | null {
     const remaining = limit_7d.remaining || 0;
     const total = used + remaining;
     const pct = total > 0 ? (used / total) * 100 : 0;
-    const barStr = `${bar(pct)} ${formatNumber(used)}/${formatNumber(total)}`;
-    lines.push(boxLine(['7 días', barStr, formatTimeRemaining(limit_7d.reset)], widths));
-  } else {
-    // Eliminar la última línea de separación si no hay limit_7d
-    lines.pop();
+    const barStr = `${renderBar(pct)} ${formatNumber(used)}/${formatNumber(total)}`;
+    lines.push(`| ${C.label}7 días${C.reset} | ${barStr} | ${C.value}${formatTimeRemaining(limit_7d.reset)}${C.reset} |`);
   }
-
-  lines.push(boxBot(widths));
 
   return lines.join('\n');
 }

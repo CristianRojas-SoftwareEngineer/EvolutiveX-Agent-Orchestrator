@@ -39,6 +39,44 @@ interface IEnvManager {
 
 const PROVIDERS_BASE_PATH = join(process.cwd(), 'routing', 'providers');
 
+// ── Utilidades para .env del Proxy ──────────────────────────────
+
+const ENV_PATH = join(process.cwd(), 'configs', '.env');
+
+function getProxyPort(): number {
+  if (existsSync(ENV_PATH)) {
+    const content = readFileSync(ENV_PATH, 'utf-8');
+    const match = /^PORT\s*=\s*(.*)$/m.exec(content);
+    if (match && match[1]) {
+      const port = parseInt(match[1].trim(), 10);
+      if (!isNaN(port)) return port;
+    }
+  }
+  return 8787; // default
+}
+
+function updateDotEnv(key: string, value: string): void {
+  let content = '';
+  if (existsSync(ENV_PATH)) {
+    content = readFileSync(ENV_PATH, 'utf-8');
+  }
+
+  const regex = new RegExp(`^${key}\\s*=.*$`, 'm');
+  const newLine = `${key}=${value}`;
+
+  if (regex.test(content)) {
+    content = content.replace(regex, newLine);
+  } else {
+    // Si no termina en salto de línea y no está vacío, agregamos uno
+    if (content && !content.endsWith('\n')) {
+      content += '\n';
+    }
+    content += newLine + '\n';
+  }
+
+  writeFileSync(ENV_PATH, content, 'utf-8');
+}
+
 // ── Resolución de modelos ───────────────────────────────────────
 
 /**
@@ -377,10 +415,10 @@ async function verifyApplied(
   const vars = env.getAllManagedVars();
 
   if (provider === 'default') {
-    const remaining = MANAGED_ENV_VARS.filter((n) => vars[n]);
+    const remaining = MANAGED_ENV_VARS.filter((n) => n !== 'ANTHROPIC_BASE_URL' && vars[n]);
     if (remaining.length === 0) {
       console.log(
-        chalk.green('  OK: variables eliminadas. Claude Code usará suscripción OAuth (PRO/Max).'),
+        chalk.green('  OK: variables de autenticación eliminadas. Claude Code usará suscripción OAuth (PRO/Max) auditada por el Proxy.'),
       );
     } else {
       console.log(
@@ -437,14 +475,30 @@ program
 
     if (provider === 'default') {
       console.log(
-        chalk.cyan('\nRestaurando configuración nativa de Anthropic (suscripción PRO/Max)...'),
+        chalk.cyan('\nRestaurando configuración nativa de Anthropic (suscripción PRO/Max) vía Proxy...'),
       );
+      
+      const proxyPort = getProxyPort();
+      const proxyUrl = `http://127.0.0.1:${proxyPort}`;
+      const defaultUpstream = 'https://api.anthropic.com';
+
       if (!opts.dryRun) {
         await removeManagedVars(env);
+        // Establecer ANTHROPIC_BASE_URL para enrutar el tráfico OAuth al proxy
+        await env.setEnvVar('ANTHROPIC_BASE_URL', proxyUrl);
+        updateDotEnv('UPSTREAM_ORIGIN', defaultUpstream);
+        console.log(chalk.green(`  [SET] ANTHROPIC_BASE_URL = ${proxyUrl}`));
+        console.log(chalk.green(`  [PROXY] UPSTREAM_ORIGIN configurado a ${defaultUpstream} en configs/.env`));
       } else {
         for (const name of MANAGED_ENV_VARS) {
           console.log(chalk.yellow(`  [REMOVE] ${name}`));
         }
+        console.log(chalk.yellow(`  [SET] ANTHROPIC_BASE_URL = ${proxyUrl}`));
+        console.log(chalk.yellow(`  [PROXY] UPSTREAM_ORIGIN configurado a ${defaultUpstream} en configs/.env`));
+      }
+      
+      if (!opts.dryRun) {
+        await verifyApplied(provider, null, env);
       }
     } else {
       let config: ProviderConfig;
@@ -465,8 +519,18 @@ program
       }
 
       console.log(chalk.cyan(`\nAplicando configuración de ${provider}...`));
+      
+      const proxyPort = getProxyPort();
+      const proxyUrl = `http://127.0.0.1:${proxyPort}`;
+      const originalBaseUrl = config.ANTHROPIC_BASE_URL;
+      
+      // Sobrescribir el destino para enrutar a través del Proxy local
+      config.ANTHROPIC_BASE_URL = proxyUrl;
+
       if (!opts.dryRun) {
         await applyConfig(config, env);
+        updateDotEnv('UPSTREAM_ORIGIN', originalBaseUrl);
+        console.log(chalk.green(`  [PROXY] UPSTREAM_ORIGIN configurado a ${originalBaseUrl} en configs/.env`));
       } else {
         for (const name of MANAGED_ENV_VARS) {
           const value = config[name];
@@ -474,6 +538,7 @@ program
             console.log(chalk.yellow(`  [SET] ${name} = ${value}`));
           }
         }
+        console.log(chalk.yellow(`  [PROXY] UPSTREAM_ORIGIN configurado a ${originalBaseUrl} en configs/.env`));
       }
 
       if (!opts.dryRun) {
@@ -483,6 +548,9 @@ program
 
     console.log(
       chalk.cyan('\nConfiguración completada. Reinicie Claude Code para aplicar los cambios.'),
+    );
+    console.log(
+      chalk.cyan('Si Smart Code Proxy ya estaba corriendo, debe reiniciarse para aplicar el nuevo UPSTREAM_ORIGIN.'),
     );
   });
 

@@ -33,14 +33,6 @@ export class SessionResolverService {
     const fb = tryNamedHeader(this.config.AUDIT_SESSION_FALLBACK_HEADER);
     if (fb) return fb;
 
-    if (
-      this.config.DEFAULT_AUDIT_SESSION &&
-      String(this.config.DEFAULT_AUDIT_SESSION).trim() !== ''
-    ) {
-      const raw = String(this.config.DEFAULT_AUDIT_SESSION).trim();
-      return { sessionId: this.sessionIdFromRaw(raw), stripHeaderName: null };
-    }
-
     return { sessionId: FALLBACK_SESSION_DIR, stripHeaderName: null };
   }
 

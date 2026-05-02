@@ -1,5 +1,6 @@
 {
   "modelId": "mimo-v2.5",
+  "displayName": "MiMo 2.5",
   "costs": {
     "input": {
       "base": null,

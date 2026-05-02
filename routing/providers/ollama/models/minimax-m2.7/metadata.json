@@ -1,5 +1,6 @@
 {
   "modelId": "minimax-m2.7",
+  "displayName": "MiniMax M2.7",
   "costs": {
     "input": {
       "base": 0.0,

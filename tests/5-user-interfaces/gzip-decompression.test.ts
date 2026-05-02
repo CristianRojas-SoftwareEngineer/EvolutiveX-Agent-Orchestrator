@@ -59,7 +59,6 @@ describe('Test de Integración - Decompresión Gzip', () => {
 
     process.env.UPSTREAM_ORIGIN = `http://127.0.0.1:${upstreamPort}`;
     process.env.UPSTREAM_ACCEPT_ENCODING = 'gzip'; // Forzamos al proxy a pedir gzip
-    process.env.DEFAULT_AUDIT_SESSION = 'test-gzip';
 
     // Reload conf
     const { vi } = await import('vitest');

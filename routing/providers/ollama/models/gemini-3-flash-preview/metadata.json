@@ -1,5 +1,6 @@
 {
   "modelId": "gemini-3-flash-preview",
+  "displayName": "Gemini 3 Flash",
   "costs": {
     "input": {
       "base": 0.0,

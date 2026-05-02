@@ -1,5 +1,6 @@
 {
   "modelId": "claude-sonnet-4-6",
+  "displayName": "Sonnet 4.6",
   "costs": {
     "input": {
       "base": 3.0,

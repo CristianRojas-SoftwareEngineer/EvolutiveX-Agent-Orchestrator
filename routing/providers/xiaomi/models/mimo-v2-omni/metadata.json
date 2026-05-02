@@ -1,5 +1,6 @@
 {
   "modelId": "mimo-v2-omni",
+  "displayName": "MiMo 2 Omni",
   "costs": {
     "input": {
       "base": null,

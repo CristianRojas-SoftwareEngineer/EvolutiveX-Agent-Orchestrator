@@ -1,13 +1,12 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { execSync } from 'node:child_process';
-import { readFileSync, writeFileSync, readdirSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, readdirSync, existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 
 // ── Tipos y constantes ──────────────────────────────────────────
 
-type ModelMetadata = { modelId: string };
+type ModelMetadata = { modelId: string; displayName?: string };
 
 interface ProviderConfig {
   ANTHROPIC_BASE_URL: string;
@@ -214,124 +213,68 @@ function loadProviderConfig(
 
 // ── Gestión de variables de entorno ─────────────────────────────
 
-class WindowsEnvManager implements IEnvManager {
+const CLAUDE_SETTINGS_PATH = join(homedir(), '.claude', 'settings.json');
+
+interface ClaudeSettings {
+  env?: Record<string, string>;
+  [key: string]: unknown;
+}
+
+function readClaudeSettings(): ClaudeSettings {
+  if (!existsSync(CLAUDE_SETTINGS_PATH)) return {};
+  try {
+    return JSON.parse(readFileSync(CLAUDE_SETTINGS_PATH, 'utf-8')) as ClaudeSettings;
+  } catch {
+    return {};
+  }
+}
+
+function writeClaudeSettings(settings: ClaudeSettings): void {
+  const dir = join(homedir(), '.claude');
+  if (!existsSync(dir)) {
+    mkdirSync(dir, { recursive: true });
+  }
+  writeFileSync(CLAUDE_SETTINGS_PATH, JSON.stringify(settings, null, 2) + '\n', 'utf-8');
+}
+
+class ClaudeSettingsEnvManager implements IEnvManager {
   async setEnvVar(name: string, value: string): Promise<void> {
-    if (value === '') {
-      // SetEnvironmentVariable con valor vacío elimina la clave en Windows. 
-      // Usamos Set-ItemProperty para forzar la creación de la variable vacía en el registro.
-      execSync(`Set-ItemProperty -Path 'HKCU:\\Environment' -Name '${name}' -Value ''`, {
-        shell: 'powershell.exe',
-        stdio: 'pipe',
-      });
-    } else {
-      const psValue = value.replace(/'/g, "''");
-      execSync(`[Environment]::SetEnvironmentVariable('${name}', '${psValue}', 'User')`, {
-        shell: 'powershell.exe',
-        stdio: 'pipe',
-      });
-    }
+    const settings = readClaudeSettings();
+    if (!settings.env) settings.env = {};
+    settings.env[name] = value;
+    writeClaudeSettings(settings);
     process.env[name] = value;
   }
 
   async removeEnvVar(name: string): Promise<void> {
-    // Comprobar la existencia de la variable de entorno antes de eliminarla
-    const exists = this.getEnvVar(name) !== undefined;
-    if (!exists) {
-      delete process.env[name];
-      return;
+    const settings = readClaudeSettings();
+    if (settings.env) {
+      delete settings.env[name];
+      if (Object.keys(settings.env).length === 0) {
+        delete settings.env;
+      }
     }
-
-    execSync(`Remove-ItemProperty -Path 'HKCU:\\Environment' -Name '${name}' -ErrorAction Stop`, {
-      shell: 'powershell.exe',
-      stdio: 'pipe',
-    });
-
+    writeClaudeSettings(settings);
     delete process.env[name];
   }
 
   getEnvVar(name: string): string | undefined {
-    try {
-      // Usar Get-ItemProperty permite leer variables que existen pero están vacías,
-      // a diferencia de [Environment]::GetEnvironmentVariable que devuelve nulo.
-      const result = execSync(`(Get-ItemProperty -Path 'HKCU:\\Environment' -Name '${name}' -ErrorAction Stop).'${name}'`, {
-        shell: 'powershell.exe',
-        encoding: 'utf-8',
-        stdio: 'pipe',
-      }).replace(/\r?\n$/, '');
-      return result;
-    } catch {
-      return undefined;
-    }
+    const settings = readClaudeSettings();
+    return settings.env?.[name] ?? process.env[name];
   }
 
   getAllManagedVars(): Record<string, string | undefined> {
+    const settings = readClaudeSettings();
     const result: Record<string, string | undefined> = {};
     for (const name of MANAGED_ENV_VARS) {
-      result[name] = this.getEnvVar(name);
-    }
-    return result;
-  }
-}
-
-function getRcPath(): string {
-  const shell = process.env.SHELL || '';
-  if (shell.includes('zsh')) return join(homedir(), '.zshrc');
-  if (shell.includes('bash')) return join(homedir(), '.bashrc');
-  return join(homedir(), '.profile');
-}
-
-function updateRcFile(rcPath: string, name: string, value: string): void {
-  let content = existsSync(rcPath) ? readFileSync(rcPath, 'utf-8') : '';
-  const exportRegex = new RegExp(`^export\\s+${name}=.*$`, 'm');
-  const exportLine = `export ${name}="${value}"`;
-
-  if (exportRegex.test(content)) {
-    content = content.replace(exportRegex, exportLine);
-  } else {
-    content = content.trimEnd() + '\n' + exportLine + '\n';
-  }
-
-  writeFileSync(rcPath, content, 'utf-8');
-}
-
-function removeRcEntry(rcPath: string, name: string): void {
-  if (!existsSync(rcPath)) return;
-
-  const content = readFileSync(rcPath, 'utf-8');
-  const exportRegex = new RegExp(`^export\\s+${name}=.*$\\n?`, 'm');
-  const updated = content.replace(exportRegex, '');
-  writeFileSync(rcPath, updated, 'utf-8');
-}
-
-class UnixEnvManager implements IEnvManager {
-  async setEnvVar(name: string, value: string): Promise<void> {
-    const rcPath = getRcPath();
-    updateRcFile(rcPath, name, value);
-    process.env[name] = value;
-  }
-
-  async removeEnvVar(name: string): Promise<void> {
-    const rcPath = getRcPath();
-    removeRcEntry(rcPath, name);
-    delete process.env[name];
-  }
-
-  getEnvVar(name: string): string | undefined {
-    return process.env[name] || undefined;
-  }
-
-  getAllManagedVars(): Record<string, string | undefined> {
-    const result: Record<string, string | undefined> = {};
-    for (const name of MANAGED_ENV_VARS) {
-      result[name] = this.getEnvVar(name);
+      result[name] = settings.env?.[name] ?? process.env[name];
     }
     return result;
   }
 }
 
 function createEnvManager(): IEnvManager {
-  if (process.platform === 'win32') return new WindowsEnvManager();
-  return new UnixEnvManager();
+  return new ClaudeSettingsEnvManager();
 }
 
 // ── Funciones del CLI ───────────────────────────────────────────

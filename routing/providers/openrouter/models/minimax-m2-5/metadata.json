@@ -1,5 +1,6 @@
 {
   "modelId": "open-inference/minimax/minimax-m2.5:free",
+  "displayName": "MiniMax M2.5",
   "costs": {
     "input": {
       "base": 0.0,

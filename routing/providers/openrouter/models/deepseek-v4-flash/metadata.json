@@ -1,5 +1,6 @@
 {
   "modelId": "atlas-cloud/deepseek/deepseek-v4-flash",
+  "displayName": "DeepSeek V4 Flash",
   "costs": {
     "input": {
       "base": 0.14,

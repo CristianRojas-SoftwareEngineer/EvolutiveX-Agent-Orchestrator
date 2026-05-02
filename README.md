@@ -210,7 +210,6 @@ Personaliza el comportamiento ajustando estas variables en tu entorno o en un ar
 |   **Headers**    | `AUDIT_SESSION_OVERRIDE_HEADER` | Cabecera primaria de sesión.                                                                                                       | `x-cc-audit-session`                                                                    |
 |                  | `AUDIT_SESSION_FALLBACK_HEADER` | Cabecera secundaria.                                                                                                               | `x-claude-code-session-id`                                                              |
 |                  | `STRIP_AUDIT_SESSION_HEADER`    | Elimina cabeceras de sesión hacia upstream.                                                                                        | `1` (Activo)                                                                            |
-|                  | `DEFAULT_AUDIT_SESSION`         | Sesión si no hay cabeceras.                                                                                                        | _(vacío)_                                                                               |
 |                  | `AUDIT_SESSION_HASH_SUFFIX`     | Añade hash al ID de sesión.                                                                                                        | `0` (Desactivo)                                                                         |
 |   **Límites**    | `MAX_REQUEST_BODY`              | Límite del cuerpo de petición (memoria en proxy).                                                                                  | `50mb`                                                                                  |
 |                  | `MAX_RESPONSE_BUFFER_BYTES`     | Tope de buffer en memoria para respuestas no-SSE.                                                                                  | `104857600`                                                                             |
@@ -233,7 +232,7 @@ Personaliza el comportamiento ajustando estas variables en tu entorno o en un ar
 
 ### Correlación de Sesión (SessionId)
 
-El directorio de auditoría se nombra utilizando las cabeceras definidas en `AUDIT_SESSION_OVERRIDE_HEADER` o `AUDIT_SESSION_FALLBACK_HEADER`. Si ninguna está presente en la solicitud, se usa el valor de `DEFAULT_AUDIT_SESSION`.
+El directorio de auditoría se nombra utilizando las cabeceras definidas en `AUDIT_SESSION_OVERRIDE_HEADER` o `AUDIT_SESSION_FALLBACK_HEADER`. Si ninguna está presente en la solicitud, se usa `_unknown` como nombre de sesión por defecto.
 
 <a name="capas-bytes-env"></a>
 

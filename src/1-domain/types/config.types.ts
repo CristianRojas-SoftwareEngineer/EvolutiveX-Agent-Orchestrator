@@ -33,9 +33,6 @@ export interface ProxyEnvironmentConfig {
   /** Cabecera secundaria para resolver el Session ID si la primaria no existe. */
   AUDIT_SESSION_FALLBACK_HEADER: string;
 
-  /** Nombre por defecto de la carpeta de sesión si no hay cabeceras que coincidan. */
-  DEFAULT_AUDIT_SESSION: string;
-
   /** Si es true, elimina las cabeceras de sesión antes de reenviar al upstream. */
   STRIP_AUDIT_SESSION_HEADER: boolean;
 

@@ -13,7 +13,6 @@ function makeConfig(overrides: Partial<ProxyEnvironmentConfig> = {}): ProxyEnvir
     MAX_AUDIT_SSE_RAW_BYTES: 52428800,
     AUDIT_SESSION_OVERRIDE_HEADER: 'x-cc-audit-session',
     AUDIT_SESSION_FALLBACK_HEADER: 'x-claude-code-session-id',
-    DEFAULT_AUDIT_SESSION: '',
     STRIP_AUDIT_SESSION_HEADER: true,
     AUDIT_SESSION_HASH_SUFFIX: false,
     UPSTREAM_ACCEPT_ENCODING: 'identity',
@@ -47,16 +46,7 @@ describe('SessionResolverService - Resolución de sesión', () => {
     expect(result.stripHeaderName).toBe('x-claude-code-session-id');
   });
 
-  it('debería usar el default si no hay cabeceras', () => {
-    const svc = new SessionResolverService(
-      makeConfig({ DEFAULT_AUDIT_SESSION: 'default-session' }),
-    );
-    const result = svc.getAuditSessionId({});
-    expect(result.sessionId).toBe('default-session');
-    expect(result.stripHeaderName).toBeNull();
-  });
-
-  it('debería caer a _unknown si no hay cabeceras ni default', () => {
+  it('debería caer a _unknown si no hay cabeceras', () => {
     const svc = new SessionResolverService(makeConfig());
     const result = svc.getAuditSessionId({});
     expect(result.sessionId).toBe('_unknown');

@@ -1,5 +1,6 @@
 {
   "modelId": "atlas-cloud/deepseek/deepseek-v4-pro",
+  "displayName": "DeepSeek V4 Pro",
   "costs": {
     "input": {
       "base": 1.70,

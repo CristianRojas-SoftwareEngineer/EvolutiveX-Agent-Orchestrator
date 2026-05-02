@@ -50,7 +50,6 @@ export const config: ProxyEnvironmentConfig = {
     process.env.AUDIT_SESSION_FALLBACK_HEADER !== undefined
       ? process.env.AUDIT_SESSION_FALLBACK_HEADER
       : 'x-claude-code-session-id',
-  DEFAULT_AUDIT_SESSION: process.env.DEFAULT_AUDIT_SESSION || '',
   STRIP_AUDIT_SESSION_HEADER: process.env.STRIP_AUDIT_SESSION_HEADER !== '0',
   AUDIT_SESSION_HASH_SUFFIX: process.env.AUDIT_SESSION_HASH_SUFFIX === '1',
 

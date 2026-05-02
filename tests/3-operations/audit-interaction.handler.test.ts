@@ -17,7 +17,6 @@ function makeConfig(overrides: Partial<ProxyEnvironmentConfig> = {}): ProxyEnvir
     MAX_AUDIT_SSE_RAW_BYTES: 52428800,
     AUDIT_SESSION_OVERRIDE_HEADER: 'x-cc-audit-session',
     AUDIT_SESSION_FALLBACK_HEADER: 'x-claude-code-session-id',
-    DEFAULT_AUDIT_SESSION: '',
     STRIP_AUDIT_SESSION_HEADER: true,
     AUDIT_SESSION_HASH_SUFFIX: false,
     UPSTREAM_ACCEPT_ENCODING: 'identity',

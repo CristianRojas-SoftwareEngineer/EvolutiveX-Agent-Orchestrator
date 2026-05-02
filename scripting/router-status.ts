@@ -442,6 +442,9 @@ function renderSessionTable(ctx: ClaudeCodeContext): string {
 
   const contextDisplay = formatContextSize(contextSize);
 
+  // Capitalizar nombre del proveedor
+  const providerDisplay = provider.providerName.charAt(0).toUpperCase() + provider.providerName.slice(1);
+
   // Determinar mostrar del porcentaje de uso
   let barDisplay: string;
   if (usedPct === undefined || usedPct === null) {
@@ -464,9 +467,9 @@ function renderSessionTable(ctx: ClaudeCodeContext): string {
   lines.push(`${C.title}╭─ Sesión actual «${sessionDisplay}»${'─'.repeat(Math.max(0, 40 - sessionDisplay.length))}╮${C.reset}`);
 
   const table = renderTable(
-    ['Proveedor', 'Modelo activo', 'Ventana ctx', 'Uso'],
+    ['Proveedor', 'Modelo activo', 'Ventana de Contexto', 'Porcentaje de uso'],
     [[
-      `${C.provider}${provider.providerName}${C.reset}`,
+      `${C.provider}${providerDisplay}${C.reset}`,
       `${C.model}${modelName}${C.reset}`,
       `${C.value}${contextDisplay}${C.reset}`,
       barDisplay,

@@ -13,6 +13,7 @@ Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-s
 - Internal reasoning may be conducted in English to optimize token usage and reduce verbosity.
 - All user-facing responses MUST be in Spanish.
 - Comments generated or modified in source code MUST also be in Spanish.
+- Messages generated for `git commit` MUST also be in Spanish.
 - Exception: keep highly standardized technical terms in English when:
   - translating them adds no value, or
   - translation introduces ambiguity (e.g., "prompt", "token", "runtime", "framework", "API").

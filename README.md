@@ -83,7 +83,7 @@ Ideal para depurar comportamientos erráticos en herramientas de CLI (como `clau
 - Los `side-request` se auditan en su propia interacción sin desplazar al turno activo principal, evitando corrupción de metadata por race conditions.
 - Los `side-request` de Context Sync WebFetch (`context-sync-webfetch`) implementan **caché inteligente para observabilidad transparente**:
   - **HIT**: Se detecta por heurística, se responde localmente con SSE simulada reutilizando el resumen del subagente, **sin llamar a Anthropic** y **sin crear interacción en disco** (completamente transparente para el observador humano).
-  - **MISS**: El step resuelto no aparece dentro de `CONTEXT_SYNC_MAX_WAIT_MS`. Se degrada a side-request normal de primer nivel con `contextSyncFallback: true` en `meta.json`. Esto es un indicador de **potencial inconsistencia** si el subagente ya había completado (el caché debería haber resuelto el HIT). Ver diagnóstico en [`docs/context-sync-cache.md`](docs/context-sync-cache.md).
+  - **MISS**: El step resuelto no aparece dentro de `CONTEXT_SYNC_MAX_WAIT_MS`. Se degrada a side-request normal de primer nivel con `contextSyncFallback: true` en `meta.json`. Esto es un indicador de **potencial inconsistencia** si el subagente ya había completado (el caché debería haber resuelto el HIT). Ver diagnóstico en [`docs/issues/context-sync-cache.md`](docs/issues/context-sync-cache.md).
 - **Principio de observabilidad**: Las ejecuciones internas de built-in tools (WebFetch/WebSearch) por subagentes sí se registran como sub-interacciones (aportan valor al entender qué información consumió cada subagente). Las reinyecciones de Context Sync deben ser transparentes (HIT sin registro) para no duplicar la información ni crear ambigüedad.
 - Los turnos se indexan por `interactionDir` (único por request) permitiendo múltiples turnos concurrentes en la misma sesión (parallel subagents).
 - Las continuaciones (`tool_result`) se rutean al turno padre mediante correlación por `tool_use_id`, eliminando la misatribución de steps.
@@ -333,6 +333,6 @@ Tras cada turno, se genera una estructura en `./sessions/<session-id>/interactio
 
 El proxy intercepta métricas de uso de tokens que pueden ser cuantificadas. Consulta estas guías adicionales para configurar precios y estimar costos según el tráfico auditado:
 
-- [Caché inteligente de Context Sync WebFetch (HIT/MISS y reglas de auditoría)](./docs/context-sync-cache.md)
+- [Caché inteligente de Context Sync WebFetch (HIT/MISS y reglas de auditoría)](./docs/issues/context-sync-cache.md)
 - [Coste por interacción: Claude Code y la API de Anthropic](./docs/how-to-calculate-anthropic-api-costs.md)
 - [Coste por generación: OpenRouter y la API Chat Completions](./docs/how-to-calculate-openrouter-api-costs.md)

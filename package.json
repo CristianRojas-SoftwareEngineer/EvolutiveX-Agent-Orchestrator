@@ -33,7 +33,7 @@
   "license": "ISC",
   "type": "module",
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.89.0",
+    "@anthropic-ai/sdk": "^0.92.0",
     "@fastify/http-proxy": "^11.4.4",
     "fastify": "^5.8.5",
     "pino": "^10.3.1",

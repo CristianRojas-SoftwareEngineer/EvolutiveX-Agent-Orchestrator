@@ -1,8 +1,8 @@
 /**
  * Statusline de Claude Code para Smart Code Proxy.
  *
- * Renderiza 2-3 tablas según el contexto:
- *  - Tabla 1: Sesión y proveedor activo (formato compacto con colores)
+ * Renderiza 2-3 tablas Unicode con bordes redondeados y anchos calculados:
+ *  - Tabla 1: Sesión y proveedor activo
  *  - Tabla 2: Métricas de interacciones por nivel de razonamiento
  *  - Tabla 3: Rate limits (solo si authMethod === 'oauth')
  *
@@ -76,9 +76,9 @@ const C = {
   bold: '\x1B[1m',
   dim: '\x1B[2m',
   // Headers
-  header: '\x1B[1;36m',    // cyan bold
+  title: '\x1B[1;36m',     // cyan bold
   // Valores
-  value: '\x1B[1;33m',     // amarillo bold (para valores importantes)
+  value: '\x1B[1;33m',     // amarillo bold
   provider: '\x1B[1;32m',  // verde bold
   model: '\x1B[1;35m',     // magenta bold
   // Niveles
@@ -91,12 +91,41 @@ const C = {
   barAmber: '\x1B[33m',
   barRed: '\x1B[31m',
   barEmpty: '\x1B[90m',    // gris
-  // Tabla
-  separator: '\x1B[90m',   // gris
+  // Bordes de tabla
+  border: '\x1B[90m',      // gris
   label: '\x1B[37m',       // blanco
 };
 
+// ── Bordes Unicode ──────────────────────────────────────────────
+
+const B = {
+  tl: '╭', tr: '╮', bl: '╰', br: '╯',
+  h: '─', v: '│',
+  ml: '├', mr: '┤', mt: '┬', mb: '┴', mm: '┼',
+};
+
 // ── Helpers de renderizado ──────────────────────────────────────
+
+/** Longitud visible de un string (sin contar códigos ANSI) */
+function visibleLength(str: string): number {
+  return str.replace(/\x1B\[[0-9;]*m/g, '').length;
+}
+
+/** Padding a longitud fija con color */
+function padRight(str: string, len: number): string {
+  const vis = visibleLength(str);
+  const pad = Math.max(0, len - vis);
+  return str + ' '.repeat(pad);
+}
+
+/** Padding centrado con color */
+function padCenter(str: string, len: number): string {
+  const vis = visibleLength(str);
+  const totalPad = Math.max(0, len - vis);
+  const left = Math.floor(totalPad / 2);
+  const right = totalPad - left;
+  return ' '.repeat(left) + str + ' '.repeat(right);
+}
 
 function formatNumber(n: number): string {
   return new Intl.NumberFormat('es').format(n);
@@ -144,6 +173,92 @@ function formatTimeRemaining(resetEpoch?: number): string {
   const diffD = Math.floor(diffH / 24);
   const remH = diffH % 24;
   return remH > 0 ? `${diffD}d ${remH}h` : `${diffD}d`;
+}
+
+// ── Renderizado de tablas con bordes ────────────────────────────
+
+/**
+ * Renderiza una tabla con bordes Unicode redondeados.
+ * @param headers - Array de labels de columnas (texto plano)
+ * @param rows - Array de filas, cada una array de celdas (texto con colores ANSI)
+ * @param alignments - Alineación por columna: 'left' | 'center' | 'right'
+ */
+function renderTable(
+  headers: string[],
+  rows: string[][],
+  alignments: ('left' | 'center' | 'right')[] = [],
+): string {
+  const colCount = headers.length;
+  if (alignments.length === 0) {
+    alignments = headers.map(() => 'left');
+  }
+
+  // Calcular ancho máximo por columna (basado en contenido visible)
+  const widths: number[] = [];
+  for (let i = 0; i < colCount; i++) {
+    let maxW = visibleLength(headers[i]);
+    for (const row of rows) {
+      if (i < row.length) {
+        maxW = Math.max(maxW, visibleLength(row[i]));
+      }
+    }
+    widths[i] = maxW;
+  }
+
+  // Función para alinear celda
+  function alignCell(text: string, width: number, align: 'left' | 'center' | 'right'): string {
+    switch (align) {
+      case 'right': return padRight(text, width); // padRight ya hace left, invertimos
+      case 'center': return padCenter(text, width);
+      default: return padRight(text, width);
+    }
+  }
+
+  // Para alineación a la derecha, necesitamos padding manual
+  function alignRight(text: string, width: number): string {
+    const vis = visibleLength(text);
+    const pad = Math.max(0, width - vis);
+    return ' '.repeat(pad) + text;
+  }
+
+  const lines: string[] = [];
+
+  // Línea superior: ╭───┬───╮
+  const topParts = widths.map((w) => B.h.repeat(w + 2));
+  lines.push(`${C.border}${B.tl}${topParts.join(B.mt)}${B.tr}${C.reset}`);
+
+  // Header: │ Header │ Header │
+  const headerCells = headers.map((h, i) => {
+    const colored = `${C.label}${h}${C.reset}`;
+    const aligned = alignments[i] === 'right'
+      ? alignRight(colored, widths[i])
+      : padCenter(colored, widths[i]);
+    return aligned;
+  });
+  lines.push(`${C.border}${B.v}${C.reset} ${headerCells.join(` ${C.border}${B.v}${C.reset} `)} ${C.border}${B.v}${C.reset}`);
+
+  // Separador de header: ├───┼───┤
+  const midParts = widths.map((w) => B.h.repeat(w + 2));
+  lines.push(`${C.border}${B.ml}${midParts.join(B.mm)}${B.mr}${C.reset}`);
+
+  // Filas de datos
+  for (const row of rows) {
+    const cells = row.map((cell, i) => {
+      const aligned = alignments[i] === 'right'
+        ? alignRight(cell, widths[i])
+        : alignments[i] === 'center'
+          ? padCenter(cell, widths[i])
+          : padRight(cell, widths[i]);
+      return aligned;
+    });
+    lines.push(`${C.border}${B.v}${C.reset} ${cells.join(` ${C.border}${B.v}${C.reset} `)} ${C.border}${B.v}${C.reset}`);
+  }
+
+  // Línea inferior: ╰───┴───╯
+  const botParts = widths.map((w) => B.h.repeat(w + 2));
+  lines.push(`${C.border}${B.bl}${botParts.join(B.mb)}${B.br}${C.reset}`);
+
+  return lines.join('\n');
 }
 
 // ── Lógica de resolución ────────────────────────────────────────
@@ -211,13 +326,11 @@ function resolveSessionPath(sessionId?: string): string | null {
 
   if (sessions.length === 0) return null;
 
-  // Buscar por prefijo del session_id
   if (sessionId) {
     const match = sessions.find((s) => s.name.startsWith(sessionId));
     if (match) return join(SESSIONS_PATH, match.name);
   }
 
-  // Fallback: directorio más reciente
   let newest: { name: string; mtime: number } | null = null;
   for (const s of sessions) {
     const stat = statSync(join(SESSIONS_PATH, s.name));
@@ -264,14 +377,12 @@ function classifyModel(modelId: string): 'lite' | 'standard' | 'reasoning' {
   const sonnet = process.env.ANTHROPIC_DEFAULT_SONNET_MODEL || '';
   const opus = process.env.ANTHROPIC_DEFAULT_OPUS_MODEL || '';
 
-  // Extraer el nombre del modelo de la ruta (ej. "models/claude-haiku-4-5" → "claude-haiku-4-5")
   const modelBase = modelId.split('/').pop() || modelId;
 
   if (haiku && (modelId.includes(haiku) || modelBase.includes('haiku'))) return 'lite';
   if (opus && (modelId.includes(opus) || modelBase.includes('opus'))) return 'reasoning';
   if (sonnet && (modelId.includes(sonnet) || modelBase.includes('sonnet'))) return 'standard';
 
-  // Fallback: clasificar por nombre
   if (modelBase.includes('haiku') || modelBase.includes('flash') || modelBase.includes('mini')) return 'lite';
   if (modelBase.includes('opus') || modelBase.includes('pro') || modelBase.includes('reasoning')) return 'reasoning';
   return 'standard';
@@ -298,10 +409,8 @@ function aggregateInteractionMetrics(sessionPath: string): {
     try {
       const meta = JSON.parse(readFileSync(metaPath, 'utf-8')) as InteractionMeta;
 
-      // Solo contar agentic-turn y side-request
       if (meta.interactionType !== 'agentic-turn' && meta.interactionType !== 'side-request') continue;
 
-      // Leer model del request
       const bodyPath = join(interactionsPath, interaction.name, 'request', 'body.json');
       let modelId = '';
       if (existsSync(bodyPath)) {
@@ -332,7 +441,7 @@ function aggregateInteractionMetrics(sessionPath: string): {
   return metrics;
 }
 
-// ── Renderizado de tablas ───────────────────────────────────────
+// ── Renderizado de tablas completas ─────────────────────────────
 
 function renderSessionTable(ctx: ClaudeCodeContext): string {
   const provider = resolveActiveProvider();
@@ -344,20 +453,28 @@ function renderSessionTable(ctx: ClaudeCodeContext): string {
   const contextDisplay = formatContextSize(contextSize);
   const pctDisplay = usedPct !== undefined && usedPct !== null ? `${usedPct.toFixed(0)}%` : 'N/A';
   const barDisplay = usedPct !== undefined && usedPct !== null
-    ? `\`${renderBar(usedPct)} ${pctDisplay}\``
+    ? `${renderBar(usedPct)} ${pctDisplay}`
     : 'N/A';
 
-  // Truncar session_id si es muy largo
   const sessionDisplay = sessionId.length > 36
     ? sessionId.slice(0, 33) + '...'
     : sessionId;
 
   const lines: string[] = [];
-  lines.push(`${C.header}### Sesión actual «${sessionDisplay}»${C.reset}`);
-  lines.push('');
-  lines.push(`| ${C.label}Proveedor${C.reset} | ${C.provider}${provider.providerName}${C.reset} | ${C.label}Modelo activo${C.reset} | ${C.model}${modelName}${C.reset} | ${C.label}Ventana de contexto${C.reset} | ${C.value}${contextDisplay}${C.reset} | ${C.label}Porcentaje de uso${C.reset} | ${barDisplay} |`);
-  lines.push(`|${C.separator}---|---|---|---|---|---|---|---${C.reset}|`);
+  lines.push(`${C.title}╭─ Sesión actual «${sessionDisplay}»${'─'.repeat(Math.max(0, 40 - sessionDisplay.length))}╮${C.reset}`);
 
+  const table = renderTable(
+    ['Proveedor', 'Modelo activo', 'Ventana ctx', 'Uso'],
+    [[
+      `${C.provider}${provider.providerName}${C.reset}`,
+      `${C.model}${modelName}${C.reset}`,
+      `${C.value}${contextDisplay}${C.reset}`,
+      barDisplay,
+    ]],
+    ['left', 'left', 'center', 'left'],
+  );
+
+  lines.push(table);
   return lines.join('\n');
 }
 
@@ -372,11 +489,7 @@ function renderTokenTable(metrics: {
     { key: 'reasoning', label: 'Reasoning', modelExample: 'MiMo 2.5 Pro', color: C.reasoning },
   ];
 
-  const lines: string[] = [];
-  lines.push(`${C.header}### Interacciones por niveles de razonamiento y consumo de tokens${C.reset}`);
-  lines.push('');
-  lines.push(`| ${C.label}Nivel${C.reset} | ${C.label}Modelo${C.reset} | ${C.label}Número de Interacciones${C.reset} | ${C.label}Tokens de Input${C.reset} | ${C.label}Tokens de Input Cacheado${C.reset} | ${C.label}Tokens de Output${C.reset} |`);
-  lines.push(`|${C.separator}---|---|---:|---:|---:|---:${C.reset}|`);
+  const rows: string[][] = [];
 
   let totalInput = 0;
   let totalCache = 0;
@@ -390,12 +503,36 @@ function renderTokenTable(metrics: {
     totalOutput += m.outputTokens;
     totalCount += m.count;
 
-    lines.push(`| ${level.color}${level.label}${C.reset} | ${level.color}${level.modelExample}${C.reset} | ${C.value}${m.count}${C.reset} | ${C.value}${formatTokens(m.inputTokens)}${C.reset} | ${C.value}${formatTokens(m.cacheReadInputTokens)}${C.reset} | ${C.value}${formatTokens(m.outputTokens)}${C.reset} |`);
+    rows.push([
+      `${level.color}${level.label}${C.reset}`,
+      `${level.color}${level.modelExample}${C.reset}`,
+      `${C.value}${m.count}${C.reset}`,
+      `${C.value}${formatTokens(m.inputTokens)}${C.reset}`,
+      `${C.value}${formatTokens(m.cacheReadInputTokens)}${C.reset}`,
+      `${C.value}${formatTokens(m.outputTokens)}${C.reset}`,
+    ]);
   }
 
   // Fila de total
-  lines.push(`| ${C.total}Sesión actual${C.reset} | ${C.total}Total${C.reset} | ${C.total}${totalCount}${C.reset} | ${C.total}${formatTokens(totalInput)}${C.reset} | ${C.total}${formatTokens(totalCache)}${C.reset} | ${C.total}${formatTokens(totalOutput)}${C.reset} |`);
+  rows.push([
+    `${C.total}Sesión actual${C.reset}`,
+    `${C.total}Total${C.reset}`,
+    `${C.total}${totalCount}${C.reset}`,
+    `${C.total}${formatTokens(totalInput)}${C.reset}`,
+    `${C.total}${formatTokens(totalCache)}${C.reset}`,
+    `${C.total}${formatTokens(totalOutput)}${C.reset}`,
+  ]);
 
+  const lines: string[] = [];
+  lines.push(`${C.title}╭─ Interacciones por nivel de razonamiento ─╮${C.reset}`);
+
+  const table = renderTable(
+    ['Nivel', 'Modelo', 'N.º', 'Input', 'Cache In', 'Output'],
+    rows,
+    ['left', 'left', 'right', 'right', 'right', 'right'],
+  );
+
+  lines.push(table);
   return lines.join('\n');
 }
 
@@ -405,11 +542,7 @@ function renderRateLimitTable(ctx: ClaudeCodeContext): string | null {
   const { limit_5h, limit_7d } = ctx.rate_limits.requests;
   if (!limit_5h && !limit_7d) return null;
 
-  const lines: string[] = [];
-  lines.push(`${C.header}### Límites de tasa (Rate Limits)${C.reset}`);
-  lines.push('');
-  lines.push(`| ${C.label}Cuota${C.reset} | ${C.label}Barra de uso${C.reset} | ${C.label}Reinicio${C.reset} |`);
-  lines.push(`|${C.separator}---|---|---${C.reset}|`);
+  const rows: string[][] = [];
 
   if (limit_5h) {
     const used = limit_5h.used || 0;
@@ -417,7 +550,11 @@ function renderRateLimitTable(ctx: ClaudeCodeContext): string | null {
     const total = used + remaining;
     const pct = total > 0 ? (used / total) * 100 : 0;
     const barStr = `${renderBar(pct)} ${formatNumber(used)}/${formatNumber(total)}`;
-    lines.push(`| ${C.label}5 horas${C.reset} | ${barStr} | ${C.value}${formatTimeRemaining(limit_5h.reset)}${C.reset} |`);
+    rows.push([
+      `${C.label}5 horas${C.reset}`,
+      barStr,
+      `${C.value}${formatTimeRemaining(limit_5h.reset)}${C.reset}`,
+    ]);
   }
 
   if (limit_7d) {
@@ -426,16 +563,29 @@ function renderRateLimitTable(ctx: ClaudeCodeContext): string | null {
     const total = used + remaining;
     const pct = total > 0 ? (used / total) * 100 : 0;
     const barStr = `${renderBar(pct)} ${formatNumber(used)}/${formatNumber(total)}`;
-    lines.push(`| ${C.label}7 días${C.reset} | ${barStr} | ${C.value}${formatTimeRemaining(limit_7d.reset)}${C.reset} |`);
+    rows.push([
+      `${C.label}7 días${C.reset}`,
+      barStr,
+      `${C.value}${formatTimeRemaining(limit_7d.reset)}${C.reset}`,
+    ]);
   }
 
+  const lines: string[] = [];
+  lines.push(`${C.title}╭─ Rate Limits (OAuth) ─╮${C.reset}`);
+
+  const table = renderTable(
+    ['Cuota', 'Uso', 'Reinicio'],
+    rows,
+    ['left', 'left', 'center'],
+  );
+
+  lines.push(table);
   return lines.join('\n');
 }
 
 // ── Main ────────────────────────────────────────────────────────
 
 function main(): void {
-  // Leer stdin
   const chunks: string[] = [];
   process.stdin.on('data', (chunk) => chunks.push(String(chunk)));
   process.stdin.on('end', () => {

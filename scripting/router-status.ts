@@ -75,24 +75,24 @@ const C = {
   reset: '\x1B[0m',
   bold: '\x1B[1m',
   dim: '\x1B[2m',
-  // Headers y títulos
+  // Cabeceras y títulos
   title: '\x1B[1;34m',     // azul bold
-  header: '\x1B[1;34m',    // azul bold
-  // Valores
-  value: '\x1B[1;94m',     // azul rey bold (bright blue)
-  provider: '\x1B[1;94m',  // azul rey bold
-  model: '\x1B[1;94m',     // azul rey bold
-  // Niveles (azul claro, azul rey, blanco)
-  lite: '\x1B[34m',        // azul
-  standard: '\x1B[1;94m',  // azul rey bold
-  reasoning: '\x1B[37m',   // blanco
+  header: '\x1B[1;94m',    // azul rey bold
+  // Valores de celdas
+  value: '\x1B[37m',       // blanco
+  provider: '\x1B[37m',    // blanco
+  model: '\x1B[37m',       // blanco
+  // Niveles (gris, blanco, blanco bold)
+  lite: '\x1B[90m',        // gris
+  standard: '\x1B[37m',    // blanco
+  reasoning: '\x1B[1;37m', // blanco bold
   total: '\x1B[1;37m',     // blanco bold
-  // Barra de progreso (azul claro, azul rey, blanco)
-  barFilled: '\x1B[1;94m', // azul rey bold
+  // Barra de progreso
+  barFilled: '\x1B[37m',   // blanco
   barEmpty: '\x1B[90m',    // gris
   // Bordes de tabla
   border: '\x1B[90m',      // gris
-  label: '\x1B[37m',       // blanco
+  label: '\x1B[1;34m',     // azul bold (cabeceras)
 };
 
 // ── Bordes Unicode ──────────────────────────────────────────────

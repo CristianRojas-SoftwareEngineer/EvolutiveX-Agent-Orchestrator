@@ -167,37 +167,18 @@ function formatTimeRemaining(resetEpoch?: number): string {
 
 // ── Renderizado de tablas con bordes ────────────────────────────
 
-/** Calcula el ancho total visible de una tabla (sin contar códigos ANSI) */
-function calcTableWidth(headers: string[], rows: string[][]): number {
-  const colCount = headers.length;
-  const widths: number[] = [];
-
-  for (let i = 0; i < colCount; i++) {
-    let maxW = visibleLength(headers[i]);
-    for (const row of rows) {
-      if (i < row.length) {
-        maxW = Math.max(maxW, visibleLength(row[i]));
-      }
-    }
-    widths[i] = maxW;
-  }
-
-  // Ancho total: bordes verticales + espacios + anchos de columnas
-  // │ col1 │ col2 │ │ = 1 + 1 + w1 + 1 + 1 + 1 + w2 + 1 + 1 = 2*cols + sum(widths) + 1
-  return widths.reduce((sum, w) => sum + w, 0) + widths.length * 2 + 1;
-}
-
 /**
  * Renderiza una tabla con bordes Unicode redondeados.
  * @param headers - Array de labels de columnas (texto plano)
  * @param rows - Array de filas, cada una array de celdas (texto con colores ANSI)
  * @param alignments - Alineación por columna: 'left' | 'center' | 'right'
+ * @returns Objeto con el string de la tabla y su ancho total visible
  */
 function renderTable(
   headers: string[],
   rows: string[][],
   alignments: ('left' | 'center' | 'right')[] = [],
-): string {
+): { table: string; width: number } {
   const colCount = headers.length;
   if (alignments.length === 0) {
     alignments = headers.map(() => 'left');
@@ -214,6 +195,9 @@ function renderTable(
     }
     widths[i] = maxW;
   }
+
+  // Ancho total: bordes verticales + espacios + anchos de columnas
+  const totalWidth = widths.reduce((sum, w) => sum + w, 0) + widths.length * 2 + 1;
 
   // Función para alinear celda
   function alignCell(text: string, width: number, align: 'left' | 'center' | 'right'): string {
@@ -268,7 +252,7 @@ function renderTable(
   const botParts = widths.map((w) => B.h.repeat(w + 2));
   lines.push(`${C.border}${B.bl}${botParts.join(B.mb)}${B.br}${C.reset}`);
 
-  return lines.join('\n');
+  return { table: lines.join('\n'), width: totalWidth };
 }
 
 // ── Lógica de resolución ────────────────────────────────────────
@@ -483,7 +467,7 @@ function renderSessionTable(ctx: ClaudeCodeContext): string {
     ? sessionId.slice(0, 33) + '...'
     : sessionId;
 
-  // Definir datos de la tabla para calcular ancho
+  // Definir datos de la tabla
   const headers = ['Proveedor', 'Modelo activo', 'Ventana de Contexto', 'Porcentaje de uso'];
   const rows = [[
     `${C.provider}${providerDisplay}${C.reset}`,
@@ -492,18 +476,16 @@ function renderSessionTable(ctx: ClaudeCodeContext): string {
     barDisplay,
   ]];
 
-  const tableWidth = calcTableWidth(headers, rows);
+  // Renderizar tabla y obtener ancho
+  const { table, width } = renderTable(headers, rows, ['left', 'left', 'center', 'left']);
 
-  const lines: string[] = [];
-  const headerText = `╭─ Sesión actual «${sessionDisplay}»`;
-  const headerVisLen = headerText.length + 2; // +2 para ╭ y ╮
-  const headerPad = Math.max(0, tableWidth - headerVisLen);
-  lines.push(`${C.title}${headerText}${'─'.repeat(headerPad)}╮${C.reset}`);
+  // Calcular padding para centrar el título
+  const titleText = `╭─ Sesión actual «${sessionDisplay}»`;
+  const titleVisLen = titleText.length + 2; // +2 para ╭ y ╮
+  const titlePad = Math.max(0, width - titleVisLen);
+  const title = `${C.title}${titleText}${'─'.repeat(titlePad)}╮${C.reset}`;
 
-  const table = renderTable(headers, rows, ['left', 'left', 'center', 'left']);
-
-  lines.push(table);
-  return lines.join('\n');
+  return `${title}\n${table}`;
 }
 
 function renderTokenTable(metrics: {
@@ -551,22 +533,20 @@ function renderTokenTable(metrics: {
     `${C.total}${formatTokens(totalOutput)}${C.reset}`,
   ]);
 
-  // Definir datos de la tabla para calcular ancho
+  // Definir datos de la tabla
   const headers = ['Nivel', 'Modelo', 'N.º', 'Input', 'Cache In', 'Output'];
   const alignments: Array<'left' | 'center' | 'right'> = ['left', 'left', 'right', 'right', 'right', 'right'];
 
-  const tableWidth = calcTableWidth(headers, rows);
+  // Renderizar tabla y obtener ancho
+  const { table, width } = renderTable(headers, rows, alignments);
 
-  const lines: string[] = [];
-  const headerText = '╭─ Interacciones por nivel de razonamiento';
-  const headerVisLen = headerText.length + 2; // +2 para ╭ y ╮
-  const headerPad = Math.max(0, tableWidth - headerVisLen);
-  lines.push(`${C.title}${headerText}${'─'.repeat(headerPad)}╮${C.reset}`);
+  // Calcular padding para centrar el título
+  const titleText = '╭─ Interacciones por nivel de razonamiento';
+  const titleVisLen = titleText.length + 2; // +2 para ╭ y ╮
+  const titlePad = Math.max(0, width - titleVisLen);
+  const title = `${C.title}${titleText}${'─'.repeat(titlePad)}╮${C.reset}`;
 
-  const table = renderTable(headers, rows, alignments);
-
-  lines.push(table);
-  return lines.join('\n');
+  return `${title}\n${table}`;
 }
 
 function renderRateLimitTable(ctx: ClaudeCodeContext): string | null {
@@ -603,17 +583,20 @@ function renderRateLimitTable(ctx: ClaudeCodeContext): string | null {
     ]);
   }
 
-  const lines: string[] = [];
-  lines.push(`${C.title}╭─ Rate Limits (OAuth) ─╮${C.reset}`);
-
-  const table = renderTable(
+  // Renderizar tabla y obtener ancho
+  const { table, width } = renderTable(
     ['Cuota', 'Uso', 'Reinicio'],
     rows,
     ['left', 'left', 'center'],
   );
 
-  lines.push(table);
-  return lines.join('\n');
+  // Calcular padding para centrar el título
+  const titleText = '╭─ Rate Limits (OAuth)';
+  const titleVisLen = titleText.length + 2; // +2 para ╭ y ╮
+  const titlePad = Math.max(0, width - titleVisLen);
+  const title = `${C.title}${titleText}${'─'.repeat(titlePad)}╮${C.reset}`;
+
+  return `${title}\n${table}`;
 }
 
 // ── Main ────────────────────────────────────────────────────────

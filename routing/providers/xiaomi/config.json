@@ -1,6 +1,6 @@
 {
   "AUTH_METHOD": "bearer",
-  "ANTHROPIC_BASE_URL": "https://api.xiaomimimo.com/anthropic",
+  "ANTHROPIC_BASE_URL": "https://token-plan-sgp.xiaomimimo.com/anthropic",
   "ANTHROPIC_DEFAULT_HAIKU_MODEL": "models/mimo-v2-omni",
   "ANTHROPIC_DEFAULT_SONNET_MODEL": "models/mimo-v2-5",
   "ANTHROPIC_DEFAULT_OPUS_MODEL": "models/mimo-v2-5-pro",
@@ -8,7 +8,7 @@
   "pricing_rules": {
     "schemaVersion": 1,
     "updatedAt": "2026-04-30T00:00:00.000Z",
-    "pricingSourceUrl": "https://api.xiaomimimo.com/anthropic",
+    "pricingSourceUrl": "https://platform.xiaomimimo.com/docs/en-US/tokenplan/subscription",
     "currency": "USD",
     "unit": "per_million_tokens",
     "defaultModifiers": {}

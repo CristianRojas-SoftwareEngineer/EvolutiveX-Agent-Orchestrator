@@ -167,6 +167,26 @@ function formatTimeRemaining(resetEpoch?: number): string {
 
 // ── Renderizado de tablas con bordes ────────────────────────────
 
+/** Calcula el ancho total visible de una tabla (sin contar códigos ANSI) */
+function calcTableWidth(headers: string[], rows: string[][]): number {
+  const colCount = headers.length;
+  const widths: number[] = [];
+
+  for (let i = 0; i < colCount; i++) {
+    let maxW = visibleLength(headers[i]);
+    for (const row of rows) {
+      if (i < row.length) {
+        maxW = Math.max(maxW, visibleLength(row[i]));
+      }
+    }
+    widths[i] = maxW;
+  }
+
+  // Ancho total: bordes verticales + espacios + anchos de columnas
+  // │ col1 │ col2 │ │ = 1 + 1 + w1 + 1 + 1 + 1 + w2 + 1 + 1 = 2*cols + sum(widths) + 1
+  return widths.reduce((sum, w) => sum + w, 0) + widths.length * 2 + 1;
+}
+
 /**
  * Renderiza una tabla con bordes Unicode redondeados.
  * @param headers - Array de labels de columnas (texto plano)
@@ -451,13 +471,10 @@ function renderSessionTable(ctx: ClaudeCodeContext): string {
   // Determinar mostrar del porcentaje de uso
   let barDisplay: string;
   if (usedPct === undefined || usedPct === null) {
-    // Sin datos de contexto
     barDisplay = 'N/A';
   } else if (usedPct === 0 && contextSize && contextSize > 0) {
-    // Valor 0 con tamaño de ventana válido = turno inicial, aún no calculado
     barDisplay = `${C.dim}calculando...${C.reset}`;
   } else {
-    // Valor real (incluyendo 0% explícito cuando no hay ventana definida)
     const pctDisplay = `${usedPct.toFixed(0)}%`;
     barDisplay = `${renderBar(usedPct)} ${pctDisplay}`;
   }
@@ -466,24 +483,24 @@ function renderSessionTable(ctx: ClaudeCodeContext): string {
     ? sessionId.slice(0, 33) + '...'
     : sessionId;
 
-  // Calcular ancho de la tabla para ajustar el header
-  const tableWidth = 11 + 15 + 21 + 19; // anchos de columnas + bordes
+  // Definir datos de la tabla para calcular ancho
+  const headers = ['Proveedor', 'Modelo activo', 'Ventana de Contexto', 'Porcentaje de uso'];
+  const rows = [[
+    `${C.provider}${providerDisplay}${C.reset}`,
+    `${C.model}${modelName}${C.reset}`,
+    `${C.value}${contextDisplay}${C.reset}`,
+    barDisplay,
+  ]];
+
+  const tableWidth = calcTableWidth(headers, rows);
 
   const lines: string[] = [];
   const headerText = `╭─ Sesión actual «${sessionDisplay}»`;
-  const headerPad = Math.max(0, tableWidth - headerText.length - 1); // -1 para el ╮
+  const headerVisLen = headerText.length + 2; // +2 para ╭ y ╮
+  const headerPad = Math.max(0, tableWidth - headerVisLen);
   lines.push(`${C.title}${headerText}${'─'.repeat(headerPad)}╮${C.reset}`);
 
-  const table = renderTable(
-    ['Proveedor', 'Modelo activo', 'Ventana de Contexto', 'Porcentaje de uso'],
-    [[
-      `${C.provider}${providerDisplay}${C.reset}`,
-      `${C.model}${modelName}${C.reset}`,
-      `${C.value}${contextDisplay}${C.reset}`,
-      barDisplay,
-    ]],
-    ['left', 'left', 'center', 'left'],
-  );
+  const table = renderTable(headers, rows, ['left', 'left', 'center', 'left']);
 
   lines.push(table);
   return lines.join('\n');
@@ -534,14 +551,19 @@ function renderTokenTable(metrics: {
     `${C.total}${formatTokens(totalOutput)}${C.reset}`,
   ]);
 
-  const lines: string[] = [];
-  lines.push(`${C.title}╭─ Interacciones por nivel de razonamiento ─╮${C.reset}`);
+  // Definir datos de la tabla para calcular ancho
+  const headers = ['Nivel', 'Modelo', 'N.º', 'Input', 'Cache In', 'Output'];
+  const alignments: Array<'left' | 'center' | 'right'> = ['left', 'left', 'right', 'right', 'right', 'right'];
 
-  const table = renderTable(
-    ['Nivel', 'Modelo', 'N.º', 'Input', 'Cache In', 'Output'],
-    rows,
-    ['left', 'left', 'right', 'right', 'right', 'right'],
-  );
+  const tableWidth = calcTableWidth(headers, rows);
+
+  const lines: string[] = [];
+  const headerText = '╭─ Interacciones por nivel de razonamiento';
+  const headerVisLen = headerText.length + 2; // +2 para ╭ y ╮
+  const headerPad = Math.max(0, tableWidth - headerVisLen);
+  lines.push(`${C.title}${headerText}${'─'.repeat(headerPad)}╮${C.reset}`);
+
+  const table = renderTable(headers, rows, alignments);
 
   lines.push(table);
   return lines.join('\n');

@@ -256,7 +256,7 @@ El sistema previene la saturación en memoria o disco ignorando la escritura si 
 4.  **Modo Desarrollo**: `npm run dev` (Carga `configs/.env` mediante flag nativo de Node v22.9+; **v24 LTS recomendado**).
 5.  **Compilación**: `npm run build` (Genera `/dist` optimizado).
 6.  **Referencia de scripts**: `npm run help` (muestra todos los scripts disponibles con descripciones).
-7.  **Limpieza**: `npm run clean` (Purga `dist/` y `node_modules/`). Para eliminar datos de auditoría acumulados: `npm run clean:sessions`.
+7.  **Limpieza**: `npm run clean` (Purga `dist/` y `node_modules/`). Para purga completa incluyendo auditoría y logs: `npm run clean:all`. Para limpieza selectiva: `npm run clean:sessions` o `npm run clean:logs`.
 
 > Para una guía detallada de onboarding, consultar [docs/how-to-start.md](docs/how-to-start.md).
 

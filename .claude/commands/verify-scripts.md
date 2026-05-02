@@ -39,7 +39,9 @@ node_modules/  ← prerequisito de TODOS los comandos npm
                 │
              clean:sessions, clean:logs  (borran sessions/ y logs/, no afecta nada más)
                 │
-             clean   (borra dist/ + node_modules/ → ÚLTIMA posición)
+             clean:all  (borra dist/ + node_modules/ + sessions/ + logs/ en paralelo)
+                │
+             clean   (borra dist/ + node_modules/)
 ```
 
 **Reglas de orden derivadas del grafo:**
@@ -162,12 +164,19 @@ npm run build
 - **Tipo**: bloqueante
 - **Verificar**: exit code 0. Orquesta: `clean:dist` → (`build:js` ∥ `build:types`). Confirmar que las tres sub-tareas reportan exit 0.
 
+### Paso 11.5 — `test:quick`
+```bash
+npm run test:quick
+```
+- **Tipo**: bloqueante
+- **Verificar**: exit code 0. Orquesta: `lint‖typecheck` → `test:unit` (sin fase de build).
+
 ### Paso 12 — `test`
 ```bash
 npm test
 ```
 - **Tipo**: bloqueante
-- **Verificar**: exit code 0. Orquesta: `lint` → `test:unit` → `build`. Confirmar que las tres fases pasan.
+- **Verificar**: exit code 0. Orquesta: `lint‖typecheck` → `test:unit` → `build` (fases paralelas en etapa 1).
 
 ### Paso 13 — `start`
 ```bash
@@ -212,6 +221,14 @@ npm run clean:logs
 ### Paso 17 — `clean:modules` (SKIPPED)
 - **No ejecutar**. El script `clean` (paso 17) ejecuta `clean:dist` y `clean:modules` en paralelo, por lo que este paso ya queda cubierto.
 - **Registrar**: ⏭️ SKIPPED — cubierto por `clean` en paso 17.
+
+### Paso 17.5 — `clean:all`
+```bash
+npm run clean:all
+```
+- **Tipo**: bloqueante
+- **Verificar**: exit code 0 y que los 4 directorios (`dist/`, `node_modules/`, `sessions/`, `logs/`) han sido eliminados. Ejecuta los 4 clean en paralelo.
+- **ADVERTENCIA**: después de este paso, ningún script npm puede ejecutarse hasta restaurar `node_modules/`.
 
 ### Paso 18 — `clean`
 ```bash
@@ -262,18 +279,20 @@ Al terminar todos los pasos, producir una tabla resumen con el siguiente formato
 | 9  | build:js            | ✅     | 0         | dist/index.js 48 KB ESM                       |
 | 10 | build:types         | ✅     | 0         | 15 archivos .d.ts                             |
 | 11 | build               | ✅     | 0         | 3 sub-tareas exit 0                           |
-| 12 | test                | ✅     | 0         | lint + tests + build OK                       |
+| 11.5| test:quick          | ✅     | 0         | lint‖typecheck + tests OK (sin build)         |
+| 12 | test                | ✅     | 0         | lint‖typecheck → tests → build OK             |
 | 13 | start               | ✅     | —         | Proxy levantado, puerto 8787                  |
 | 14 | dev                 | ✅     | —         | Proxy levantado (tsx), puerto 8787            |
 | 15 | test:watch          | ✅     | —         | Vitest watch mode activo                       |
 | 16 | clean:sessions      | ✅     | 0         | sessions/ limpiado                            |
 | 16.5| clean:logs         | ✅     | 0         | logs/ limpiado                                |
 | 17 | clean:modules       | ⏭️     | —         | Cubierto por clean (paso 18)                  |
+| 17.5| clean:all          | ✅     | 0         | 4 directorios eliminados en paralelo          |
 | 18 | clean               | ✅     | 0         | dist/ y node_modules/ eliminados              |
 | 19 | npm install         | ✅     | 0         | Workspace restaurado                          |
 | 20 | npm run build       | ✅     | 0         | dist/ regenerado                              |
 ```
 
 Incluir al final un resumen de una línea:
-- **Total**: X/20 scripts PASS, Y FAIL, Z SKIPPED.
+- **Total**: X/22 scripts PASS, Y FAIL, Z SKIPPED.
 - **Workspace**: restaurado correctamente / con errores de restauración.

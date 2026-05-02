@@ -174,7 +174,7 @@ Abre tu flujo habitual (proyecto, chat, lo que use la API). Las peticiones pasar
 
 La auditoría en disco es incondicional: el proxy siempre escribe en `./sessions`. La consola muestra tráfico adicional según la configuración de logs.
 
-Para **limpiar** las sesiones acumuladas, ejecuta `npm run clean:sessions`. El próximo arranque con `npm run dev` recreará el directorio vacío automáticamente.
+Para **limpiar** las sesiones acumuladas, ejecuta `npm run clean:sessions`. Para purga completa de todo (build, dependencias, sesiones y logs): `npm run clean:all`. El próximo arranque con `npm run dev` recreará los directorios vacíos automáticamente.
 
 ---
 

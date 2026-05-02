@@ -32,7 +32,12 @@ const scripts: NpmScript[] = [
   { name: 'help', description: 'Muestra este panel de referencia de scripts', category: 'local' },
   {
     name: 'test',
-    description: 'Validación integral (ESLint + TypeScript + Vitest + Compilación)',
+    description: 'Validación integral paralela (Lint‖Typecheck → Tests → Build)',
+    category: 'local',
+  },
+  {
+    name: 'test:quick',
+    description: '[Rápido] Lint + Typecheck + Tests sin build',
     category: 'local',
   },
   { name: 'test:unit', description: 'Ejecuta pruebas unitarias aisladas', category: 'local' },
@@ -78,7 +83,12 @@ const scripts: NpmScript[] = [
   { name: 'clean:logs', description: 'Elimina logs acumulados (./logs)', category: 'recovery' },
   {
     name: 'clean',
-    description: '[Nuclear] Paraleliza borrado de dist y modules',
+    description: '[Nuclear build] Purga dist/ y node_modules/',
+    category: 'recovery',
+  },
+  {
+    name: 'clean:all',
+    description: '[Nuclear total] Purga dist/, modules/, sessions/ y logs/',
     category: 'recovery',
   },
 ];

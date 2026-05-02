@@ -23,7 +23,7 @@
     "clean:dist": "rimraf dist",
     "clean:modules": "rimraf node_modules",
     "clean:sessions": "rimraf sessions",
-    "clean:logs": "rimraf logs",
+    "clean:logs": "rimraf server",
     "configure:provider": "tsx scripting/configure-provider.ts",
     "create:agents-reference": "tsx scripting/create-agents-reference.ts"
   },

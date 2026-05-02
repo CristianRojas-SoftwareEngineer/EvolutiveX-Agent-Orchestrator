@@ -80,10 +80,10 @@ const scripts: NpmScript[] = [
     description: 'Elimina datos de auditoría (./sessions)',
     category: 'recovery',
   },
-  { name: 'clean:logs', description: 'Elimina logs acumulados (./logs)', category: 'recovery' },
+  { name: 'clean:logs', description: 'Elimina logs acumulados (./server)', category: 'recovery' },
   {
     name: 'clean:all',
-    description: '[Nuclear total] Purga dist/, modules/, sessions/ y logs/',
+    description: '[Nuclear total] Purga dist/, modules/, sessions/ y server/',
     category: 'recovery',
   },
 ];

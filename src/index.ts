@@ -15,13 +15,13 @@ import { createProxyDependencies } from './4-api/composition-root.js';
  */
 async function start() {
   // Crear directorio de logs si no existe
-  const logsDir = './logs';
+  const logsDir = './server';
   if (!fs.existsSync(logsDir)) {
     fs.mkdirSync(logsDir, { recursive: true });
   }
 
   // Crear stream de archivo para logs JSON crudos
-  const logFile = fs.createWriteStream('./logs/proxy.log', { flags: 'a' });
+  const logFile = fs.createWriteStream('./server/logs.jsonl', { flags: 'a' });
 
   // Crear logger Pino con dual-transport: terminal (formateada) + archivo (JSON crudo)
   const logger = pino(

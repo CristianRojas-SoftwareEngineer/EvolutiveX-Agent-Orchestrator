@@ -82,11 +82,6 @@ const scripts: NpmScript[] = [
   },
   { name: 'clean:logs', description: 'Elimina logs acumulados (./logs)', category: 'recovery' },
   {
-    name: 'clean',
-    description: '[Nuclear build] Purga dist/ y node_modules/',
-    category: 'recovery',
-  },
-  {
     name: 'clean:all',
     description: '[Nuclear total] Purga dist/, modules/, sessions/ y logs/',
     category: 'recovery',

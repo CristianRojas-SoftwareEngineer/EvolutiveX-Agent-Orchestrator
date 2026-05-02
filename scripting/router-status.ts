@@ -451,10 +451,20 @@ function renderSessionTable(ctx: ClaudeCodeContext): string {
   const usedPct = ctx.context_window?.used_percentage;
 
   const contextDisplay = formatContextSize(contextSize);
-  const pctDisplay = usedPct !== undefined && usedPct !== null ? `${usedPct.toFixed(0)}%` : 'N/A';
-  const barDisplay = usedPct !== undefined && usedPct !== null
-    ? `${renderBar(usedPct)} ${pctDisplay}`
-    : 'N/A';
+
+  // Determinar mostrar del porcentaje de uso
+  let barDisplay: string;
+  if (usedPct === undefined || usedPct === null) {
+    // Sin datos de contexto
+    barDisplay = 'N/A';
+  } else if (usedPct === 0 && contextSize && contextSize > 0) {
+    // Valor 0 con tamaño de ventana válido = turno inicial, aún no calculado
+    barDisplay = `${C.dim}calculando...${C.reset}`;
+  } else {
+    // Valor real (incluyendo 0% explícito cuando no hay ventana definida)
+    const pctDisplay = `${usedPct.toFixed(0)}%`;
+    barDisplay = `${renderBar(usedPct)} ${pctDisplay}`;
+  }
 
   const sessionDisplay = sessionId.length > 36
     ? sessionId.slice(0, 33) + '...'

@@ -266,7 +266,7 @@ El directorio `routing/providers/` contiene la configuración de los diferentes 
 
 ```
 routing/providers/
-├── anthropic/           # API nativa de Anthropic (AUTH_METHOD: api_key)
+├── anthropic/           # AUTH_METHOD: api_key
 │   ├── config.json      # Configuración del proveedor
 │   ├── secrets.json     # API keys (no versionado)
 │   ├── secrets.json.example
@@ -274,26 +274,27 @@ routing/providers/
 │       ├── claude-haiku-4-5/metadata.json
 │       ├── claude-opus-4-6/metadata.json
 │       └── claude-sonnet-4-6/metadata.json
-├── openrouter/          # OpenRouter (multi-proveedor) (AUTH_METHOD: bearer)
-│   ├── config.json
-│   ├── secrets.json
+├── openrouter/          # AUTH_METHOD: bearer
+│   ├── config.json      # Configuración del proveedor
+│   ├── secrets.json     # API keys (no versionado)
 │   ├── secrets.json.example
-│   └── models/
+│   └── models/          # Metadatos por modelo
 │       ├── deepseek-v4-flash/metadata.json
 │       ├── deepseek-v4-pro/metadata.json
 │       └── minimax-m2-5/metadata.json
-├── ollama/              # Ollama (local) (AUTH_METHOD: bearer)
-│   ├── config.json
-│   ├── secrets.json
+├── ollama/              # AUTH_METHOD: bearer
+│   ├── config.json      # Configuración del proveedor
+│   ├── secrets.json     # API keys (no versionado)
 │   ├── secrets.json.example
-│   └── models/
+│   └── models/          # Metadatos por modelo
 │       ├── gemini-3-flash-preview/metadata.json
 │       └── minimax-m2.5/metadata.json
-└── xiaomi/              # Xiaomi (Mimo) (AUTH_METHOD: bearer)
-    ├── config.json
-    └── models/
+└── xiaomi/              # AUTH_METHOD: bearer
+    ├── config.json      # Configuración del proveedor
+    └── models/          # Metadatos por modelo
         └── mimo-v2-5/metadata.json
 ```
+
 
 Cada `config.json` incluye el campo `AUTH_METHOD` que determina qué variable de entorno de autenticación usa Claude Code al comunicarse con ese proveedor:
 

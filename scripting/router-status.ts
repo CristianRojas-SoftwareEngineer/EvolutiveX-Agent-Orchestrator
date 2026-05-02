@@ -436,7 +436,6 @@ function aggregateInteractionMetrics(sessionPath: string): {
 function renderSessionTable(ctx: ClaudeCodeContext): string {
   const provider = resolveActiveProvider();
   const sessionId = ctx.session_id || 'N/A';
-  const modelName = ctx.model?.display_name || 'N/A';
   const contextSize = ctx.context_window?.context_window_size;
   const usedPct = ctx.context_window?.used_percentage;
 
@@ -444,6 +443,10 @@ function renderSessionTable(ctx: ClaudeCodeContext): string {
 
   // Capitalizar nombre del proveedor
   const providerDisplay = provider.providerName.charAt(0).toUpperCase() + provider.providerName.slice(1);
+
+  // Obtener displayName del modelo activo
+  const rawModelName = ctx.model?.display_name || 'N/A';
+  const modelName = loadDisplayName(rawModelName);
 
   // Determinar mostrar del porcentaje de uso
   let barDisplay: string;
@@ -463,8 +466,13 @@ function renderSessionTable(ctx: ClaudeCodeContext): string {
     ? sessionId.slice(0, 33) + '...'
     : sessionId;
 
+  // Calcular ancho de la tabla para ajustar el header
+  const tableWidth = 11 + 15 + 21 + 19; // anchos de columnas + bordes
+
   const lines: string[] = [];
-  lines.push(`${C.title}╭─ Sesión actual «${sessionDisplay}»${'─'.repeat(Math.max(0, 40 - sessionDisplay.length))}╮${C.reset}`);
+  const headerText = `╭─ Sesión actual «${sessionDisplay}»`;
+  const headerPad = Math.max(0, tableWidth - headerText.length - 1); // -1 para el ╮
+  lines.push(`${C.title}${headerText}${'─'.repeat(headerPad)}╮${C.reset}`);
 
   const table = renderTable(
     ['Proveedor', 'Modelo activo', 'Ventana de Contexto', 'Porcentaje de uso'],

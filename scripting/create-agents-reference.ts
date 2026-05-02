@@ -1,7 +1,6 @@
-import { existsSync } from 'node:fs';
+import { existsSync, unlinkSync, linkSync } from 'node:fs';
 import { join } from 'node:path';
 import chalk from 'chalk';
-import { createAgentsReferenceManager } from './utils/create-agents-reference.js';
 
 const cwd = process.cwd();
 const source = join(cwd, 'CLAUDE.md');
@@ -17,8 +16,13 @@ console.log(chalk.cyan(`Origen:    ${source}`));
 console.log(chalk.cyan(`Destino:   ${target}`));
 console.log('');
 
-const manager = createAgentsReferenceManager();
-manager.create(source, target);
+if (existsSync(target)) {
+  unlinkSync(target);
+  console.log(chalk.yellow('  AVISO: existía un archivo AGENTS.md previo. Se sobrescribirá.'));
+}
+
+linkSync(source, target);
+console.log(chalk.green('  OK: hardlink AGENTS.md → CLAUDE.md creado.'));
 
 console.log('');
 console.log(chalk.cyan('Listo. AGENTS.md apunta a CLAUDE.md.'));

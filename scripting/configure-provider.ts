@@ -1,12 +1,271 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { createEnvManager } from './utils/env-manager.js';
-import { loadProviderConfig, getAvailableProviders } from './utils/config-loader.js';
-import { MANAGED_ENV_VARS, type ProviderConfig } from './utils/types.js';
-import { existsSync } from 'node:fs';
+import { execSync } from 'node:child_process';
+import { readFileSync, writeFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { homedir } from 'node:os';
+
+// ── Tipos y constantes ──────────────────────────────────────────
+
+type ModelMetadata = { modelId: string };
+
+interface ProviderConfig {
+  ANTHROPIC_BASE_URL: string;
+  ANTHROPIC_AUTH_TOKEN: string;
+  ANTHROPIC_API_KEY: string;
+  ANTHROPIC_DEFAULT_HAIKU_MODEL: string;
+  ANTHROPIC_DEFAULT_SONNET_MODEL: string;
+  ANTHROPIC_DEFAULT_OPUS_MODEL: string;
+  CLAUDE_CODE_SUBAGENT_MODEL: string;
+  [key: string]: string;
+}
+
+const MANAGED_ENV_VARS = [
+  'ANTHROPIC_API_KEY',
+  'ANTHROPIC_BASE_URL',
+  'ANTHROPIC_AUTH_TOKEN',
+  'ANTHROPIC_DEFAULT_HAIKU_MODEL',
+  'ANTHROPIC_DEFAULT_SONNET_MODEL',
+  'ANTHROPIC_DEFAULT_OPUS_MODEL',
+  'CLAUDE_CODE_SUBAGENT_MODEL',
+] as const;
+
+interface IEnvManager {
+  setEnvVar(name: string, value: string): Promise<void>;
+  removeEnvVar(name: string): Promise<void>;
+  getEnvVar(name: string): string | undefined;
+  getAllManagedVars(): Record<string, string | undefined>;
+}
 
 const PROVIDERS_BASE_PATH = join(process.cwd(), 'routing', 'providers');
+
+// ── Resolución de modelos ───────────────────────────────────────
+
+/**
+ * Resuelve el modelId real desde una ruta relativa como "models/claude-sonnet-4-6".
+ * Lee el metadata.json correspondiente y extrae el campo modelId.
+ */
+function resolveModelId(modelPath: string, providerDir: string): string {
+  if (!modelPath.startsWith('models/')) {
+    throw new Error(`Ruta de modelo inválida: "${modelPath}". Debe comenzar con "models/".`);
+  }
+
+  const metadataPath = join(providerDir, modelPath, 'metadata.json');
+
+  let raw: string;
+  try {
+    raw = readFileSync(metadataPath, 'utf-8');
+  } catch {
+    throw new Error(`No se encontró metadata.json en: ${metadataPath}`);
+  }
+
+  let metadata: ModelMetadata;
+  try {
+    metadata = JSON.parse(raw) as ModelMetadata;
+  } catch {
+    throw new Error(`Error al parsear JSON en: ${metadataPath}`);
+  }
+
+  if (!metadata.modelId) {
+    throw new Error(`metadata.json no contiene campo "modelId": ${metadataPath}`);
+  }
+
+  return metadata.modelId;
+}
+
+// ── Carga de configuración ──────────────────────────────────────
+
+/**
+ * Escanea subdirectorios de routing/providers/ que contengan config.json.
+ */
+function getAvailableProviders(basePath = PROVIDERS_BASE_PATH): string[] {
+  if (!existsSync(basePath)) return [];
+
+  return readdirSync(basePath, { withFileTypes: true })
+    .filter((d) => d.isDirectory() && existsSync(join(basePath, d.name, 'config.json')))
+    .map((d) => d.name);
+}
+
+/**
+ * Carga la configuración completa de un provider: config.json + secrets.json (merge),
+ * resuelve rutas relativas de modelos a modelId reales.
+ */
+function loadProviderConfig(
+  providerName: string,
+  basePath = PROVIDERS_BASE_PATH,
+): ProviderConfig {
+  const providerDir = join(basePath, providerName);
+  const configPath = join(providerDir, 'config.json');
+  const secretsPath = join(providerDir, 'secrets.json');
+
+  if (!existsSync(providerDir)) {
+    const available = getAvailableProviders(basePath);
+    throw new Error(
+      `El provider "${providerName}" no existe en ${basePath}. ` +
+        `Proveedores disponibles: ${available.join(', ')}`,
+    );
+  }
+
+  if (!existsSync(configPath)) {
+    throw new Error(
+      `No se encontró config.json en: ${configPath}\n` +
+        `Cree el archivo con URLs y modelos para el provider "${providerName}".`,
+    );
+  }
+
+  // Leer config.json
+  const configJson = JSON.parse(readFileSync(configPath, 'utf-8')) as Record<string, string>;
+
+  // Resolver rutas relativas de modelos
+  const config: Record<string, string> = {};
+  for (const [key, value] of Object.entries(configJson)) {
+    if (
+      (key.startsWith('ANTHROPIC_DEFAULT_') || key === 'CLAUDE_CODE_SUBAGENT_MODEL') &&
+      typeof value === 'string' &&
+      value.startsWith('models/')
+    ) {
+      config[key] = resolveModelId(value, providerDir);
+    } else {
+      config[key] = value;
+    }
+  }
+
+  // Merge secrets.json si existe
+  if (existsSync(secretsPath)) {
+    try {
+      const secrets = JSON.parse(readFileSync(secretsPath, 'utf-8')) as Record<string, string>;
+      Object.assign(config, secrets);
+    } catch {
+      console.warn(`No se pudo leer ${secretsPath}. Se usarán placeholders para secrets.`);
+    }
+  } else {
+    console.warn(
+      `Archivo de secrets no encontrado: ${secretsPath}. Se usarán placeholders para API keys.`,
+    );
+  }
+
+  // AUTH_TOKEN: si falta o sigue con placeholder, usar placeholder genérico
+  if (!config.ANTHROPIC_AUTH_TOKEN || /^<.*>$/.test(config.ANTHROPIC_AUTH_TOKEN)) {
+    config.ANTHROPIC_AUTH_TOKEN = `<${providerName.toUpperCase()}_API_KEY>`;
+  }
+
+  // Siempre deshabilitar API_KEY para que no compita con AUTH_TOKEN
+  config.ANTHROPIC_API_KEY = '';
+
+  return config as ProviderConfig;
+}
+
+// ── Gestión de variables de entorno ─────────────────────────────
+
+class WindowsEnvManager implements IEnvManager {
+  async setEnvVar(name: string, value: string): Promise<void> {
+    const psValue = value.replace(/'/g, "''");
+    execSync(`[Environment]::SetEnvironmentVariable('${name}', '${psValue}', 'User')`, {
+      shell: 'powershell.exe',
+      stdio: 'pipe',
+    });
+    process.env[name] = value;
+  }
+
+  async removeEnvVar(name: string): Promise<void> {
+    try {
+      execSync(`Remove-ItemProperty -Path 'HKCU:\\Environment' -Name '${name}' -ErrorAction Stop`, {
+        shell: 'powershell.exe',
+        stdio: 'pipe',
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (!/was not found|does not exist|No se encontr/.test(msg)) {
+        throw err;
+      }
+    }
+    delete process.env[name];
+  }
+
+  getEnvVar(name: string): string | undefined {
+    try {
+      const result = execSync(`[Environment]::GetEnvironmentVariable('${name}', 'User')`, {
+        shell: 'powershell.exe',
+        encoding: 'utf-8',
+        stdio: 'pipe',
+      }).trim();
+      return result || undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  getAllManagedVars(): Record<string, string | undefined> {
+    const result: Record<string, string | undefined> = {};
+    for (const name of MANAGED_ENV_VARS) {
+      result[name] = this.getEnvVar(name);
+    }
+    return result;
+  }
+}
+
+function getRcPath(): string {
+  const shell = process.env.SHELL || '';
+  if (shell.includes('zsh')) return join(homedir(), '.zshrc');
+  if (shell.includes('bash')) return join(homedir(), '.bashrc');
+  return join(homedir(), '.profile');
+}
+
+function updateRcFile(rcPath: string, name: string, value: string): void {
+  let content = existsSync(rcPath) ? readFileSync(rcPath, 'utf-8') : '';
+  const exportRegex = new RegExp(`^export\\s+${name}=.*$`, 'm');
+  const exportLine = `export ${name}="${value}"`;
+
+  if (exportRegex.test(content)) {
+    content = content.replace(exportRegex, exportLine);
+  } else {
+    content = content.trimEnd() + '\n' + exportLine + '\n';
+  }
+
+  writeFileSync(rcPath, content, 'utf-8');
+}
+
+function removeRcEntry(rcPath: string, name: string): void {
+  if (!existsSync(rcPath)) return;
+
+  const content = readFileSync(rcPath, 'utf-8');
+  const exportRegex = new RegExp(`^export\\s+${name}=.*$\\n?`, 'm');
+  const updated = content.replace(exportRegex, '');
+  writeFileSync(rcPath, updated, 'utf-8');
+}
+
+class UnixEnvManager implements IEnvManager {
+  async setEnvVar(name: string, value: string): Promise<void> {
+    const rcPath = getRcPath();
+    updateRcFile(rcPath, name, value);
+    process.env[name] = value;
+  }
+
+  async removeEnvVar(name: string): Promise<void> {
+    const rcPath = getRcPath();
+    removeRcEntry(rcPath, name);
+    delete process.env[name];
+  }
+
+  getEnvVar(name: string): string | undefined {
+    return process.env[name] || undefined;
+  }
+
+  getAllManagedVars(): Record<string, string | undefined> {
+    const result: Record<string, string | undefined> = {};
+    for (const name of MANAGED_ENV_VARS) {
+      result[name] = this.getEnvVar(name);
+    }
+    return result;
+  }
+}
+
+function createEnvManager(): IEnvManager {
+  if (process.platform === 'win32') return new WindowsEnvManager();
+  return new UnixEnvManager();
+}
+
+// ── Funciones del CLI ───────────────────────────────────────────
 
 function showCurrentState(env = createEnvManager()): void {
   const vars = env.getAllManagedVars();
@@ -114,7 +373,7 @@ async function verifyApplied(
   }
 }
 
-// ── CLI ──────────────────────────────────────────────────────
+// ── CLI ──────────────────────────────────────────────────────────
 
 const program = new Command();
 

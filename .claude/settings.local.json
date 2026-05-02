@@ -13,7 +13,12 @@
       "Bash(pwsh *)",
       "WebFetch(domain:www.anthropic.com)",
       "WebFetch(domain:claude.com)",
-      "WebFetch(domain:openrouter.ai)"
+      "WebFetch(domain:openrouter.ai)",
+      "Bash(wmic process *)",
+      "Bash(ls -d dist)",
+      "Bash(ls -d node_modules)",
+      "Bash(ls -d sessions)",
+      "Bash(ls -d logs)"
     ]
   }
 }

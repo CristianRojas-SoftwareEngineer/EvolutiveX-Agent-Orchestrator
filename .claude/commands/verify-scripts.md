@@ -67,7 +67,7 @@ node_modules/  ← prerequisito de TODOS los comandos npm
 - `clean:sessions` y `clean:logs` van antes de los clean nucleares.
 - `clean:modules` se ejecuta explícitamente (no se skipea) antes de `clean` y `clean:all`.
 - `clean` y `clean:all` destruyen `node_modules/` y requieren restauración posterior.
-- Tras `clean` y `clean:all`, se restaura el workspace con `npm install` + `npm run build`.
+- Cada script destructivo (`clean:modules`, `clean:all`, `clean`) va seguido de un paso de restauración `npm install` para que los scripts siguientes puedan ejecutarse.
 
 ---
 
@@ -246,38 +246,46 @@ npm run clean:modules
 ```
 - **Tipo**: bloqueante
 - **Verificar**: exit code 0 y que `node_modules/` ha sido eliminado.
-- **ADVERTENCIA**: después de este paso, ejecutar `npm install` antes de continuar con otros scripts npm.
 
-### Paso 22 — `clean:all`
+### Paso 22 — Restaurar dependencias
+```bash
+npm install
+```
+- **Tipo**: bloqueante
+- **Verificar**: exit code 0 y que `node_modules/` existe.
+- **Justificación**: `clean:modules` destruyó `node_modules/`. Los scripts siguientes (`clean:all`, `clean`) dependen de paquetes como `concurrently` que residen en `node_modules/`.
+
+### Paso 23 — `clean:all`
 ```bash
 npm run clean:all
 ```
 - **Tipo**: bloqueante
 - **Verificar**: exit code 0 y que los 4 directorios (`dist/`, `node_modules/`, `sessions/`, `logs/`) han sido eliminados. Ejecuta los 4 clean en paralelo.
-- **ADVERTENCIA**: después de este paso, ningún script npm puede ejecutarse hasta restaurar `node_modules/`.
-
-### Paso 23 — `clean`
-```bash
-npm run clean
-```
-- **Tipo**: bloqueante
-- **Verificar**: exit code 0 y que tanto `dist/` como `node_modules/` han sido eliminados.
-- **ADVERTENCIA**: después de este paso, ningún script npm puede ejecutarse hasta restaurar `node_modules/`.
-
----
-
-## Restauración del workspace
-
-Inmediatamente después del paso 23, restaurar el entorno:
 
 ### Paso 24 — Restaurar dependencias
 ```bash
 npm install
 ```
 - **Tipo**: bloqueante
-- **Verificar**: exit code 0, que `node_modules/` existe, y que no hay vulnerabilidades críticas.
+- **Verificar**: exit code 0 y que `node_modules/` existe.
+- **Justificación**: `clean:all` destruyó `node_modules/`. El paso siguiente (`clean`) requiere `concurrently` para ejecutarse.
 
-### Paso 25 — Restaurar artefactos de compilación
+### Paso 25 — `clean`
+```bash
+npm run clean
+```
+- **Tipo**: bloqueante
+- **Verificar**: exit code 0 y que tanto `dist/` como `node_modules/` han sido eliminados.
+
+### Paso 26 — Restaurar dependencias
+```bash
+npm install
+```
+- **Tipo**: bloqueante
+- **Verificar**: exit code 0 y que `node_modules/` existe.
+- **Justificación**: `clean` destruyó `node_modules/`. El paso siguiente (`npm run build`) requiere `tsup`, `tsc` y `concurrently`.
+
+### Paso 27 — Restaurar artefactos de compilación
 ```bash
 npm run build
 ```
@@ -313,14 +321,16 @@ Al terminar todos los pasos, producir una tabla resumen con el siguiente formato
 | 18 | test:watch              | ✅     | —         | Vitest watch mode activo                  |
 | 19 | clean:sessions          | ✅     | 0         | sessions/ limpiado                        |
 | 20 | clean:logs              | ✅     | 0         | logs/ limpiado                            |
-| 21 | clean:modules           | ✅     | 0         | node_modules/ eliminado                     |
-| 22 | clean:all               | ✅     | 0         | 4 directorios eliminados en paralelo      |
-| 23 | clean                   | ✅     | 0         | dist/ y node_modules/ eliminados          |
-| 24 | npm install             | ✅     | 0         | Workspace restaurado                      |
-| 25 | npm run build           | ✅     | 0         | dist/ regenerado                          |
+| 21 | clean:modules           | ✅     | 0         | node_modules/ eliminado                   |
+| 22 | npm install             | ✅     | 0         | Dependencias restauradas                  |
+| 23 | clean:all               | ✅     | 0         | 4 directorios eliminados en paralelo      |
+| 24 | npm install             | ✅     | 0         | Dependencias restauradas                  |
+| 25 | clean                   | ✅     | 0         | dist/ y node_modules/ eliminados          |
+| 26 | npm install             | ✅     | 0         | Dependencias restauradas                  |
+| 27 | npm run build           | ✅     | 0         | dist/ regenerado                          |
 ```
 
 Incluir al final un resumen de una línea:
-- **Total**: X/25 pasos PASS, Y FAIL.
+- **Total**: X/27 pasos PASS, Y FAIL.
 - **Scripts verificados**: 23/23 de package.json (100% cobertura).
 - **Workspace**: restaurado correctamente / con errores de restauración.

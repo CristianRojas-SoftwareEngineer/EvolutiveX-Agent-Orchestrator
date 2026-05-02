@@ -47,20 +47,6 @@ export async function proxyRoutes(fastify: FastifyInstance, opts: { deps: ProxyD
     // 3. Orquestar la sesión de auditoría y captura de petición
     await proxyController.preHandler(request, reply);
     if (reply.sent) return;
-
-    // 4. Traducción de headers para compatibilidad con Proxies/Gateways (Xiaomi, OpenRouter, etc.)
-    // Si el cliente (Claude Code) envía x-api-key pero el upstream no es Anthropic, traducimos a Bearer.
-    const upstream = deps.config.UPSTREAM_ORIGIN;
-    const apiKey = headers['x-api-key'];
-    if (
-      typeof apiKey === 'string' &&
-      apiKey.length > 0 &&
-      !upstream.includes('anthropic.com') &&
-      !headers['authorization']
-    ) {
-      headers['authorization'] = `Bearer ${apiKey}`;
-      // request.log.debug({ upstream }, 'Traducción de header X-Api-Key a Authorization: Bearer detectada');
-    }
   });
 
   /**

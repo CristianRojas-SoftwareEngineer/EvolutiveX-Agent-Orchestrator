@@ -17,7 +17,6 @@ interface ProviderConfig {
   ANTHROPIC_DEFAULT_SONNET_MODEL: string;
   ANTHROPIC_DEFAULT_OPUS_MODEL: string;
   CLAUDE_CODE_SUBAGENT_MODEL: string;
-  UPSTREAM_ORIGIN: string;
   [key: string]: string;
 }
 
@@ -29,7 +28,6 @@ const MANAGED_ENV_VARS = [
   'ANTHROPIC_DEFAULT_SONNET_MODEL',
   'ANTHROPIC_DEFAULT_OPUS_MODEL',
   'CLAUDE_CODE_SUBAGENT_MODEL',
-  'UPSTREAM_ORIGIN',
 ] as const;
 
 interface IEnvManager {
@@ -149,28 +147,19 @@ function loadProviderConfig(
     );
   }
 
-  // Aplicar lógica de autenticación según el método del proveedor y ruteo via Proxy
-  const localProxyUrl = 'http://localhost:8787';
-
+  // Aplicar lógica de autenticación según el método del proveedor
   if (authMethod === 'api_key') {
     // Acceso directo a la API (ej. Anthropic): usar ANTHROPIC_API_KEY (header X-Api-Key)
-    config.UPSTREAM_ORIGIN = config.ANTHROPIC_BASE_URL || 'https://api.anthropic.com';
-    config.ANTHROPIC_BASE_URL = localProxyUrl;
-
     if (!config.ANTHROPIC_API_KEY || /^<.*>$/.test(config.ANTHROPIC_API_KEY)) {
       config.ANTHROPIC_API_KEY = `<${providerName.toUpperCase()}_API_KEY>`;
     }
     config.ANTHROPIC_AUTH_TOKEN = '';
   } else {
     // Gateway/proxy (ej. OpenRouter, Ollama, Xiaomi): usar ANTHROPIC_AUTH_TOKEN (header Authorization: Bearer)
-    config.UPSTREAM_ORIGIN = config.ANTHROPIC_BASE_URL;
-    config.ANTHROPIC_BASE_URL = localProxyUrl;
-
     if (!config.ANTHROPIC_AUTH_TOKEN || /^<.*>$/.test(config.ANTHROPIC_AUTH_TOKEN)) {
       config.ANTHROPIC_AUTH_TOKEN = `<${providerName.toUpperCase()}_API_KEY>`;
     }
-    // Claude Code solo reconoce ANTHROPIC_API_KEY; el proxy traducirá esto a Bearer
-    config.ANTHROPIC_API_KEY = config.ANTHROPIC_AUTH_TOKEN;
+    config.ANTHROPIC_API_KEY = '';
   }
 
   return config as ProviderConfig;

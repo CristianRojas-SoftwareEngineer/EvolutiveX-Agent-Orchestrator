@@ -65,6 +65,7 @@ interface TokenMetrics {
   cacheReadInputTokens: number;
   outputTokens: number;
   count: number;
+  modelName: string;
 }
 
 // ── Constantes ──────────────────────────────────────────────────
@@ -530,11 +531,12 @@ function aggregateInteractionMetrics(sessionPath: string): {
     cacheReadInputTokens: 0,
     outputTokens: 0,
     count: 0,
+    modelName: '',
   };
   const metrics = {
-    lite: { ...empty },
-    standard: { ...empty },
-    reasoning: { ...empty },
+    lite:      { ...empty, modelName: loadDisplayName(process.env.ANTHROPIC_DEFAULT_HAIKU_MODEL  || '') },
+    standard:  { ...empty, modelName: loadDisplayName(process.env.ANTHROPIC_DEFAULT_SONNET_MODEL || '') },
+    reasoning: { ...empty, modelName: loadDisplayName(process.env.ANTHROPIC_DEFAULT_OPUS_MODEL   || '') },
   };
 
   const interactionsPath = join(sessionPath, 'interactions');
@@ -582,6 +584,7 @@ function aggregateInteractionMetrics(sessionPath: string): {
       const level = classifyModel(modelId);
       const levelMetrics = metrics[level];
 
+      levelMetrics.modelName = loadDisplayName(modelId);
       levelMetrics.count++;
       if (meta.totals) {
         levelMetrics.inputTokens += meta.totals.inputTokens || 0;
@@ -686,22 +689,11 @@ function renderTokenTable(metrics: {
   const levels: Array<{
     key: keyof typeof metrics;
     label: string;
-    modelExample: string;
     color: string;
   }> = [
-    { key: 'lite', label: 'Lite', modelExample: 'MiMo 2 Omni', color: C.value },
-    {
-      key: 'standard',
-      label: 'Standard',
-      modelExample: 'MiMo 2.5',
-      color: C.value,
-    },
-    {
-      key: 'reasoning',
-      label: 'Reasoning',
-      modelExample: 'MiMo 2.5 Pro',
-      color: C.value,
-    },
+    { key: 'lite',      label: 'Lite',      color: C.value },
+    { key: 'standard',  label: 'Standard',  color: C.value },
+    { key: 'reasoning', label: 'Reasoning', color: C.value },
   ];
 
   const rows: string[][] = [];
@@ -720,7 +712,7 @@ function renderTokenTable(metrics: {
 
     rows.push([
       `${level.color}${level.label}${C.reset}`,
-      `${level.color}${level.modelExample}${C.reset}`,
+      `${level.color}${m.modelName || '-'}${C.reset}`,
       `${C.value}${m.count}${C.reset}`,
       `${C.value}${formatTokens(m.inputTokens)}${C.reset}`,
       `${C.value}${formatTokens(m.cacheReadInputTokens)}${C.reset}`,

@@ -588,8 +588,6 @@ function renderSessionTable(ctx: ClaudeCodeContext): {
   let barDisplay: string;
   if (usedPct === undefined || usedPct === null) {
     barDisplay = 'N/A';
-  } else if (usedPct === 0 && contextSize && contextSize > 0) {
-    barDisplay = `${C.dim}calculando...${C.reset}`;
   } else {
     const pctDisplay = `${usedPct.toFixed(0)}%`;
     // Barra (8 chars) + espacio + porcentaje, con espacio inicial para centrado visual

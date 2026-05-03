@@ -41,32 +41,28 @@ Dado que el statusline es un proceso hijo de Claude Code, hereda el entorno comp
 
 ## 3. Layout general
 
-El statusline consta de **dos o tres tablas apiladas verticalmente** según el método de autenticación. La Tabla 1 y la Tabla 2 son comunes a todos los proveedores. La Tabla 3 aparece únicamente para `authMethod === 'oauth'`.
+El statusline consta de **dos o tres tablas** según el método de autenticación. La Tabla 1 y la Tabla 2 se renderizan **side-by-side** (lado a lado). La Tabla 3 aparece debajo, únicamente para `authMethod === 'oauth'`.
 
 ### 3.1 Tabla 1 — Información de sesión y proveedor (común)
 
 ```
-╭─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│                        Sesión actual «9b4510c9-90ca-4439-9dc2-a5d62bf0b308»                                         │
-├────────────────────┬──────────────┬─────────────────────┬────────────────────┬──────────────────────┬──────┬─────────────────────┬─────────────────┤
-│ Proveedor          │ <Nombre>     │ Modelo activo        │ <display_name>     │ Ventana de contexto  │ <N>K │ Porcentaje de uso   │ ████░░░░░ XX%   │
-╰────────────────────┴──────────────┴─────────────────────┴────────────────────┴──────────────────────┴──────┴─────────────────────┴─────────────────╯
+╭─ Sesión actual «9b4510c9-90ca-4439-9dc2-a5d62bf0b308» ─────────────────────────────────────────────────────╮
+│        Proveedor         │     Modelo activo     │ Ventana de contexto │    Porcentaje de uso     │
+├──────────────────────────┼───────────────────────┼─────────────────────┼──────────────────────────┤
+│        Anthropic         │   claude-opus-4-7     │        200K         │  ████████░░░░ 45%        │
+╰──────────────────────────┴───────────────────────┴─────────────────────┴──────────────────────────╯
 ```
 
-**Columnas (8 celdas en pares label–valor):**
+**Columnas (4 columnas planas):**
 
-| Celda | Contenido | Fuente |
-|---|---|---|
-| Proveedor (label) | texto fijo `"Proveedor"` | — |
-| Proveedor (valor) | nombre del proveedor resuelto | cruce `UPSTREAM_ORIGIN` vs `config.json` |
-| Modelo activo (label) | texto fijo `"Modelo activo"` | — |
-| Modelo activo (valor) | `ctx.model.display_name` | stdin |
-| Ventana de contexto (label) | texto fijo `"Ventana de contexto"` | — |
-| Ventana de contexto (valor) | `ctx.context_window.context_window_size` formateado como `NNNk` / `NNNm` | stdin |
-| Porcentaje de uso (label) | texto fijo `"Porcentaje de uso"` | — |
-| Porcentaje de uso (valor) | barra de progreso coloreada + `XX%` | stdin |
+| Columna | Contenido | Fuente | Alineación |
+|---|---|---|---|
+| Proveedor | nombre del proveedor resuelto (capitalizado) | cruce `UPSTREAM_ORIGIN` vs `config.json` | centrada |
+| Modelo activo | display name del modelo activo (`metadata.json → displayName`) | stdin (`ctx.model.display_name`) + resolución en `metadata.json` | centrada |
+| Ventana de contexto | tamaño de ventana formateado como `NNNk` / `NNNm` | stdin (`ctx.context_window.context_window_size`) | centrada |
+| Porcentaje de uso | barra de progreso + porcentaje | stdin (`ctx.context_window.used_percentage`) | centrada |
 
-**Barra de progreso:** 10 bloques, usando `█` (lleno) y `░` (vacío). Color: verde ≤39 %, ámbar 40–69 %, rojo ≥70 %.
+**Barra de progreso:** 8 bloques, usando `█` (lleno) y `░` (vacío). Color: blanco (`\x1B[37m`) para lleno, gris (`\x1B[90m`) para vacío. Sin colores dinámicos por porcentaje.
 
 ---
 
@@ -75,61 +71,56 @@ El statusline consta de **dos o tres tablas apiladas verticalmente** según el m
 Presente siempre, independientemente del método de autenticación. Permite al usuario conocer cuántos tokens consume por nivel de razonamiento en la sesión actual, tanto para providers con facturación por token (bearer) como para suscripciones (OAuth).
 
 ```
-╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│           Interacciones por niveles de razonamiento             │                            Consumo de Tokens                                    │
-├────────────────┬──────────────────────┬──────────────────────┬─────────────────────┬────────────────────────────┬─────────────────────┤
-│ Nivel          │ Modelo               │ N.º Interacciones    │ Tokens de Input     │ Tokens de Input Cacheado   │ Tokens de Output    │
-├────────────────┼──────────────────────┼──────────────────────┼─────────────────────┼────────────────────────────┼─────────────────────┤
-│ Lite           │ <modelo haiku>       │ <n>                  │ <n>                 │ <n>                        │ <n>                 │
-├────────────────┼──────────────────────┼──────────────────────┼─────────────────────┼────────────────────────────┼─────────────────────┤
-│ Standard       │ <modelo sonnet>      │ <n>                  │ <n>                 │ <n>                        │ <n>                 │
-├────────────────┼──────────────────────┼──────────────────────┼─────────────────────┼────────────────────────────┼─────────────────────┤
-│ Reasoning      │ <modelo opus>        │ <n>                  │ <n>                 │ <n>                        │ <n>                 │
-├────────────────┼──────────────────────┼──────────────────────┼─────────────────────┼────────────────────────────┼─────────────────────┤
-│ Sesión actual  │ Total                │ <n>                  │ <n>                 │ <n>                        │ <n>                 │
-╰────────────────┴──────────────────────┴──────────────────────┴─────────────────────┴────────────────────────────┴─────────────────────╯
+╭─ Interacciones por nivel de razonamiento ──────────────────────────────────────────────────────────────────────╮
+│ Nivel      │ Modelo          │ # Interacciones │  Input (tks) │ Cache In (tks) │ Output (tks) │
+├────────────┼─────────────────┼─────────────────┼──────────────┼────────────────┼──────────────┤
+│ Lite       │ MiMo 2 Omni     │              12 │       45,230 │         12,000 │        8,500 │
+│ Standard   │ MiMo 2.5        │              35 │      189,400 │         67,000 │       42,100 │
+│ Reasoning  │ MiMo 2.5 Pro    │               8 │      312,000 │         95,000 │       78,000 │
+├────────────┴─────────────────┼─────────────────┼──────────────┼────────────────┼──────────────┤
+│ Totales de sesión            │              55 │      546,630 │        174,000 │      128,600 │
+╰──────────────────────────────┴─────────────────┴──────────────┴────────────────┴──────────────╯
 ```
 
 **Columnas (6):**
 
-| Columna | Contenido | Fuente |
-|---|---|---|
-| Nivel | `Lite` / `Standard` / `Reasoning` | texto fijo por slot |
-| Modelo | display name del modelo del nivel | `metadata.json → displayName` (o `modelId` como fallback) |
-| N.º Interacciones | cantidad de turnos agénticos del nivel en la sesión | conteo de `meta.json` por modelo |
-| Tokens de Input | suma de `totals.inputTokens` para el nivel | `meta.json → totals.inputTokens` |
-| Tokens de Input Cacheado | suma de `totals.cacheReadInputTokens` para el nivel | `meta.json → totals.cacheReadInputTokens` |
-| Tokens de Output | suma de `totals.outputTokens` para el nivel | `meta.json → totals.outputTokens` |
+| Columna | Contenido | Fuente | Alineación |
+|---|---|---|---|
+| Nivel | `Lite` / `Standard` / `Reasoning` | texto fijo por slot | izquierda |
+| Modelo | display name del modelo del nivel | `metadata.json → displayName` (o `modelId` como fallback) | izquierda |
+| # Interacciones | cantidad de turnos del nivel en la sesión | conteo de `meta.json` por modelo | derecha |
+| Input (tks) | suma de `totals.inputTokens` para el nivel | `meta.json → totals.inputTokens` | derecha |
+| Cache In (tks) | suma de `totals.cacheReadInputTokens` para el nivel | `meta.json → totals.cacheReadInputTokens` | derecha |
+| Output (tks) | suma de `totals.outputTokens` para el nivel | `meta.json → totals.outputTokens` | derecha |
 
-**Fila de totales:** suma de las tres filas de nivel para las columnas numéricas. La celda de modelo muestra `"Total"`.
+**Fila de totales:** celdas fusionadas en columnas 0+1 (texto `"Totales de sesión"`), suma de las tres filas de nivel para las columnas numéricas. Los separadores horizontales usan `┴` en la posición de la columna fusionada.
 
-**Formato de números:** entero con separador de miles (p. ej. `1,234,567`). Si el valor es `0` o `null`, muestra `0`.
+**Formato de números:** entero con separador de miles (p. ej. `1,234,567`). Si el valor es `0`, muestra `-`.
 
-**Header de sección:** la fila superior contiene dos celdas mergeadas: `"Interacciones por niveles de razonamiento"` (columnas 1–3) y `"Consumo de Tokens"` (columnas 4–6).
+**Headers simples:** cada columna tiene su propio header (sin celdas fusionadas en la fila de headers).
 
 ---
 
-### 3.3 Tabla 3 — Límites de cuota de suscripción (solo OAuth)
+### 3.3 Tabla 3 — Rate Limits (solo OAuth)
 
 Se renderiza **únicamente** cuando `authMethod === 'oauth'`. Aplica al proveedor `anthropic` con suscripción PRO/Max.
 
 ```
-╭──────────────────────────────────────────────────────────────────────────────────────────────╮
-│                          Límites de uso por suscripción «Claude PRO»                         │
-├────────────────────────────┬────────────────────────────────┬────────────────────────────────┤
-│ Cuota actual (5h)          │ ████████████░░░░░░░░ 59%        │ ↻ Reinicio en 1h 43m           │
-├────────────────────────────┼────────────────────────────────┼────────────────────────────────┤
-│ Cuota semanal (7d)         │ █████░░░░░░░░░░░░░░░ 28%        │ ↻ Reinicio en 4d 7h            │
-╰────────────────────────────┴────────────────────────────────┴────────────────────────────────╯
+╭─ Rate Limits (OAuth) ───────────────────────────────────────────────────────────────╮
+│ Cuota   │ Uso                                    │ Reinicio    │
+├─────────┼────────────────────────────────────────┼─────────────┤
+│ 5 horas │ ████████████░░░░░░░░ 12/20             │ 1h 43m      │
+│ 7 días  │ █████░░░░░░░░░░░░░░░ 3/10              │ 4d 7h       │
+╰─────────┴────────────────────────────────────────┴─────────────╯
 ```
 
 **Columnas (3):**
 
-| Columna | Contenido | Fuente |
-|---|---|---|
-| Label | `"Cuota actual (5h)"` / `"Cuota semanal (7d)"` | texto fijo |
-| Barra de uso | barra coloreada + porcentaje | `ctx.rate_limits.five_hour.used_percentage` / `ctx.rate_limits.seven_day.used_percentage` |
-| Reinicio | `"↻ Reinicio en Xh Ym"` / `"Xd Yh"` o `"Sin ventana activa"` | `ctx.rate_limits.*.resets_at` (epoch segundos) |
+| Columna | Contenido | Fuente | Alineación |
+|---|---|---|---|
+| Cuota | `"5 horas"` / `"7 días"` | texto fijo | izquierda |
+| Uso | barra de progreso + `usado/total` | `ctx.rate_limits.requests.limit_5h` / `limit_7d` (`used` + `remaining`) | izquierda |
+| Reinicio | `"Xh Ym"` / `"Xd Yh"` | `ctx.rate_limits.requests.limit_5h.reset` / `limit_7d.reset` (epoch segundos) | centrada |
 
 ---
 
@@ -146,10 +137,42 @@ resolveActiveProvider()
         ninguno                       → 'oauth'
 
 renderTablas()
-  ├── Tabla 1: Información de sesión y proveedor     (siempre)
-  ├── Tabla 2: Interacciones y consumo de tokens     (siempre)
-  └── Tabla 3: Límites de cuota de suscripción       (solo authMethod === 'oauth')
+  ├── Tabla 1 + Tabla 2: Side-by-side (siempre)
+  └── Tabla 3: Rate Limits (solo authMethod === 'oauth', debajo)
 ```
+
+---
+
+## 4.1 Colores ANSI
+
+El script usa códigos ANSI raw sin dependencias externas:
+
+| Elemento | Color | Código ANSI |
+|---|---|---|
+| Cabeceras y títulos | Azul `#253ecc` | `\x1B[38;2;37;62;204m` |
+| Valores de celdas | Blanco | `\x1B[37m` |
+| Nivel Lite | Gris | `\x1B[90m` |
+| Nivel Standard | Blanco | `\x1B[37m` |
+| Nivel Reasoning | Blanco bold | `\x1B[1;37m` |
+| Barra de progreso (lleno) | Blanco | `\x1B[37m` |
+| Barra de progreso (vacío) | Gris | `\x1B[90m` |
+| Bordes de tabla | Gris | `\x1B[90m` |
+
+---
+
+## 4.2 Layout side-by-side
+
+La Tabla 1 y la Tabla 2 se renderizan lado a lado usando `renderSideBySide()`, con un gap de 2 espacios entre ellas. Si la Tabla 2 tiene más líneas que la Tabla 1, las líneas sobrantes se renderizan debajo con indentación.
+
+---
+
+## 4.3 Alineaciones por tabla
+
+**Tabla 1 (4 columnas):** todas centradas (`center`).
+
+**Tabla 2 (6 columnas):** izquierda, izquierda, derecha, derecha, derecha, derecha (`left, left, right, right, right, right`).
+
+**Tabla 3 (3 columnas):** izquierda, izquierda, centrada (`left, left, center`).
 
 ---
 
@@ -163,16 +186,21 @@ Los niveles se derivan de las variables de entorno que Claude Code establece al 
 | Standard | `ANTHROPIC_DEFAULT_SONNET_MODEL` | sonnet (uso general) |
 | Reasoning | `ANTHROPIC_DEFAULT_OPUS_MODEL` | opus (razonamiento complejo) |
 
-Para clasificar una interacción en un nivel, el script lee el campo `model` de `request/body.json` de la interacción y lo compara contra los tres valores de `process.env`:
+Para clasificar una interacción en un nivel, el script lee el campo `model` de `request/body.json` y aplica un algoritmo de matching con `includes()` + heurísticas por nombre:
 
 ```
-model en request/body.json === ANTHROPIC_DEFAULT_HAIKU_MODEL  → Lite
-model en request/body.json === ANTHROPIC_DEFAULT_SONNET_MODEL → Standard
-model en request/body.json === ANTHROPIC_DEFAULT_OPUS_MODEL   → Reasoning
-sin match                                                      → ignorar
+1. Matching contra env vars (parcial con includes):
+   modelId.includes(ANTHROPIC_DEFAULT_HAIKU_MODEL)   → Lite
+   modelId.includes(ANTHROPIC_DEFAULT_OPUS_MODEL)     → Reasoning
+   modelId.includes(ANTHROPIC_DEFAULT_SONNET_MODEL)   → Standard
+
+2. Heurísticas por nombre (fallback si no matchea env var):
+   modelo contiene 'haiku', 'flash', 'mini'          → Lite
+   modelo contiene 'opus', 'pro', 'reasoning'        → Reasoning
+   por defecto                                        → Standard
 ```
 
-Solo se cuentan interacciones con `interactionType === 'agentic-turn'` y `totals !== null`.
+Se cuentan interacciones con `interactionType === 'agentic-turn'` o `'side-request'` y `totals !== null`.
 
 ---
 
@@ -215,10 +243,11 @@ El script no contiene lógica específica de plataforma:
 | Leer env vars de auth | `process.env.*` (heredado de Claude Code) | todas |
 | Escanear providers | `fs.readdirSync` | todas |
 | Leer `meta.json` / `request/body.json` | `fs.readFileSync` + `JSON.parse` | todas |
-| Colores y box-drawing | `chalk` | todas |
+| Colores | ANSI crudo con secuencias RGB (`\x1B[38;2;R;G;Bm`) | todas |
+| Bordes de tabla | Caracteres Unicode box-drawing (`╭╮╰╯─│├┤`) | todas |
 | Resolver rutas | `path.join`, `import.meta.dirname` | todas |
 
-No se usa `execSync`, `powershell.exe`, ni archivos rc de shell.
+No se usa `chalk`, `execSync`, `powershell.exe`, ni archivos rc de shell. Los colores se implementan con códigos ANSI raw, incluyendo soporte RGB para el azul `#253ecc` (`\x1B[38;2;37;62;204m`).
 
 ---
 

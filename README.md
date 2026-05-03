@@ -287,11 +287,14 @@ routing/providers/
 │   ├── secrets.json.example
 │   └── models/          # Metadatos por modelo
 │       ├── gemini-3-flash-preview/metadata.json
-│       └── minimax-m2.5/metadata.json
+│       ├── minimax-m2.5/metadata.json
+│       └── minimax-m2.7/metadata.json
 └── xiaomi/              # AUTH_METHOD: bearer
     ├── config.json      # Configuración del proveedor
     └── models/          # Metadatos por modelo
-        └── mimo-v2-5/metadata.json
+        ├── mimo-v2-5/metadata.json
+        ├── mimo-v2-5-pro/metadata.json
+        └── mimo-v2-omni/metadata.json
 ```
 
 

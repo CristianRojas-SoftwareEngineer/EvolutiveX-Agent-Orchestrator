@@ -9,7 +9,13 @@
  * Lee stdin como JSON con el contexto de Claude Code ($ctx).
  */
 
-import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
+import {
+  readFileSync,
+  readdirSync,
+  existsSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 
 // ── Tipos ───────────────────────────────────────────────────────
@@ -67,6 +73,7 @@ const PROJECT_ROOT = join(process.cwd());
 const ROUTING_PATH = join(PROJECT_ROOT, 'routing', 'providers');
 const SESSIONS_PATH = join(PROJECT_ROOT, 'sessions');
 const ENV_PATH = join(PROJECT_ROOT, 'configs', '.env');
+const PCT_CACHE_PATH = join(SESSIONS_PATH, '.last-used-pct');
 
 // ── Colores ANSI ────────────────────────────────────────────────
 
@@ -342,6 +349,25 @@ function renderSideBySide(
   return result.join('\n');
 }
 
+// ── Caché de porcentaje de uso ─────────────────────────────────
+
+function readCachedPct(): number | null {
+  try {
+    if (!existsSync(PCT_CACHE_PATH)) return null;
+    return Number(readFileSync(PCT_CACHE_PATH, 'utf-8').trim());
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedPct(pct: number): void {
+  try {
+    writeFileSync(PCT_CACHE_PATH, String(pct), 'utf-8');
+  } catch {
+    // Ignorar errores de escritura
+  }
+}
+
 // ── Lógica de resolución ────────────────────────────────────────
 
 function readDotEnv(): Record<string, string> {
@@ -593,8 +619,14 @@ function renderSessionTable(ctx: ClaudeCodeContext): {
   const rawModelName = ctx.model?.display_name || 'N/A';
   const modelName = loadDisplayName(rawModelName);
 
-  // Determinar mostrar del porcentaje de uso
-  const pct = usedPct ?? 0;
+  // Porcentaje de uso: persistir valor válido, usar caché como fallback
+  let pct: number;
+  if (usedPct !== undefined && usedPct !== null && usedPct > 0) {
+    pct = usedPct;
+    writeCachedPct(pct);
+  } else {
+    pct = readCachedPct() ?? 0;
+  }
   const pctDisplay = `${pct.toFixed(0)}%`;
   // Barra (8 chars) + espacio + porcentaje, con espacio inicial para centrado visual
   const barDisplay = ` ${renderBar(pct, 8)} ${pctDisplay}`;

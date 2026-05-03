@@ -585,14 +585,10 @@ function renderSessionTable(ctx: ClaudeCodeContext): {
   const modelName = loadDisplayName(rawModelName);
 
   // Determinar mostrar del porcentaje de uso
-  let barDisplay: string;
-  if (usedPct === undefined || usedPct === null) {
-    barDisplay = 'N/A';
-  } else {
-    const pctDisplay = `${usedPct.toFixed(0)}%`;
-    // Barra (8 chars) + espacio + porcentaje, con espacio inicial para centrado visual
-    barDisplay = ` ${renderBar(usedPct, 8)} ${pctDisplay}`;
-  }
+  const pct = usedPct ?? 0;
+  const pctDisplay = `${pct.toFixed(0)}%`;
+  // Barra (8 chars) + espacio + porcentaje, con espacio inicial para centrado visual
+  const barDisplay = ` ${renderBar(pct, 8)} ${pctDisplay}`;
 
   const sessionDisplay =
     sessionId.length > 36 ? sessionId.slice(0, 33) + '...' : sessionId;

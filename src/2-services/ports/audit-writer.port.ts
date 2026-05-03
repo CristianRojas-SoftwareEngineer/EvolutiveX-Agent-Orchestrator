@@ -1,4 +1,4 @@
-import { InteractionState, SseLine, TurnMetadata } from '../../1-domain/types/audit.types.js';
+import { InteractionState, SessionModelMetrics, SseLine, TurnMetadata } from '../../1-domain/types/audit.types.js';
 import { JsonValue } from '../../1-domain/types/json.types.js';
 
 /**
@@ -83,6 +83,11 @@ export interface IAuditWriter {
     headers: Record<string, string | string[] | undefined>,
   ): Promise<void>;
   writeTurnMeta(interactionDir: string, meta: TurnMetadata): Promise<void>;
+  updateSessionMetrics(
+    sessionDir: string,
+    modelId: string,
+    totals: Pick<SessionModelMetrics, 'inputTokens' | 'cacheReadInputTokens' | 'cacheCreationInputTokens' | 'outputTokens'>,
+  ): Promise<void>;
   appendSseLine(interactionDir: string, lineObj: SseLine): void;
   /**
    * Apéndice síncrono del raw dump `sse.txt`. Síncrono para preservar el

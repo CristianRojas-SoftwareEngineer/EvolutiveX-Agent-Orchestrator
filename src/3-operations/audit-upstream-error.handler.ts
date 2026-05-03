@@ -1,3 +1,4 @@
+import * as path from 'node:path';
 import type { IAuditWriter } from '../2-services/ports/audit-writer.port.js';
 import type { ISessionStore } from '../2-services/ports/session-store.port.js';
 import { ProxyEnvironmentConfig } from '../1-domain/types/config.types.js';
@@ -48,6 +49,7 @@ export class AuditUpstreamErrorHandler {
 
     const meta: TurnMetadata = {
       interactionType,
+      ...(turn?.modelId ? { modelId: turn.modelId } : {}),
       turnOutcome: 'upstream-error',
       stepCount: stepsMeta.length,
       startedAt: new Date(startedAt).toISOString(),
@@ -78,6 +80,14 @@ export class AuditUpstreamErrorHandler {
       },
     };
     await this.auditWriter.writeTurnMeta(params.auditInteractionDir, meta);
+
+    if (turn && interactionType !== 'client-preflight' && turn.modelId && totals) {
+      const sessionDir = path.join(this.sessionStore.getBaseDir(), turn.sessionId);
+      await this.auditWriter
+        .updateSessionMetrics(sessionDir, turn.modelId, totals)
+        .catch(() => { /* error no crítico */ });
+    }
+
     await this.auditWriter.removeInteractionState(params.auditInteractionDir);
   }
 }

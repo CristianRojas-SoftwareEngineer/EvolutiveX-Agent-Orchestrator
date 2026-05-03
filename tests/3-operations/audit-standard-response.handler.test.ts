@@ -149,6 +149,7 @@ function makeAuditWriter(overrides: Partial<IAuditWriter> = {}): IAuditWriter {
     removeInteractionState: async () => {},
     writeStepResponseMarkdown: async () => {},
     writeTopLevelMultiStepResponse: async () => ({ written: true }),
+    updateSessionMetrics: async () => {},
     ...overrides,
   };
 }

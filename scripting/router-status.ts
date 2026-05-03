@@ -47,17 +47,14 @@ interface ModelMetadata {
   displayName?: string;
 }
 
-interface InteractionMeta {
-  interactionType?: string;
-  totals?: {
-    inputTokens?: number;
-    cacheReadInputTokens?: number;
-    outputTokens?: number;
-  } | null;
-}
-
-interface InteractionRequest {
-  model?: string;
+interface SessionMetrics {
+  models: Record<string, {
+    count: number;
+    inputTokens: number;
+    cacheReadInputTokens: number;
+    cacheCreationInputTokens: number;
+    outputTokens: number;
+  }>;
 }
 
 interface TokenMetrics {
@@ -539,62 +536,24 @@ function aggregateInteractionMetrics(sessionPath: string): {
     reasoning: { ...empty, modelName: loadDisplayName(process.env.ANTHROPIC_DEFAULT_OPUS_MODEL   || '') },
   };
 
-  const interactionsPath = join(sessionPath, 'interactions');
-  if (!existsSync(interactionsPath)) return metrics;
+  const metricsPath = join(sessionPath, 'session-metrics.json');
+  if (!existsSync(metricsPath)) return metrics;
 
-  const interactions = readdirSync(interactionsPath, {
-    withFileTypes: true,
-  }).filter((d) => d.isDirectory());
+  try {
+    const data = JSON.parse(readFileSync(metricsPath, 'utf-8')) as SessionMetrics;
 
-  for (const interaction of interactions) {
-    const metaPath = join(interactionsPath, interaction.name, 'meta.json');
-    if (!existsSync(metaPath)) continue;
-
-    try {
-      const meta = JSON.parse(
-        readFileSync(metaPath, 'utf-8'),
-      ) as InteractionMeta;
-
-      if (
-        meta.interactionType !== 'agentic-turn' &&
-        meta.interactionType !== 'side-request'
-      )
-        continue;
-
-      const bodyPath = join(
-        interactionsPath,
-        interaction.name,
-        'request',
-        'body.json',
-      );
-      let modelId = '';
-      if (existsSync(bodyPath)) {
-        try {
-          const body = JSON.parse(
-            readFileSync(bodyPath, 'utf-8'),
-          ) as InteractionRequest;
-          modelId = body.model || '';
-        } catch {
-          // Ignorar body corrupto
-        }
-      }
-
-      if (!modelId) continue;
-
+    for (const [modelId, m] of Object.entries(data.models)) {
       const level = classifyModel(modelId);
       const levelMetrics = metrics[level];
 
       levelMetrics.modelName = loadDisplayName(modelId);
-      levelMetrics.count++;
-      if (meta.totals) {
-        levelMetrics.inputTokens += meta.totals.inputTokens || 0;
-        levelMetrics.cacheReadInputTokens +=
-          meta.totals.cacheReadInputTokens || 0;
-        levelMetrics.outputTokens += meta.totals.outputTokens || 0;
-      }
-    } catch {
-      // Ignorar meta.json corrupto
+      levelMetrics.count += m.count;
+      levelMetrics.inputTokens += m.inputTokens;
+      levelMetrics.cacheReadInputTokens += m.cacheReadInputTokens;
+      levelMetrics.outputTokens += m.outputTokens;
     }
+  } catch {
+    // session-metrics.json corrupto — retornar métricas vacías
   }
 
   return metrics;

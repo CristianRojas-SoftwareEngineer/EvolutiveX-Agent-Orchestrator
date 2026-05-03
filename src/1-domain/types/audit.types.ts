@@ -207,6 +207,8 @@ export interface ActiveTurn {
   awaitingContinuation?: boolean;
   /** Timestamp (epoch ms) de cuándo el turno empezó a esperar la continuation. */
   awaitingSince?: number;
+  /** Modelo usado en este turno, extraído del request body al registrar el turno. */
+  modelId?: string;
 }
 
 /**
@@ -215,6 +217,8 @@ export interface ActiveTurn {
  */
 export interface TurnMetadata {
   interactionType: InteractionType;
+  /** Modelo que procesó este turno. Presente en agentic-turn y side-request. */
+  modelId?: string;
   turnOutcome: TurnOutcome;
   stepCount: number;
   startedAt: string;
@@ -255,6 +259,20 @@ export interface TurnMetadata {
    * correlación offline.
    */
   lostPendingBuiltinTools?: PendingBuiltinToolUse[];
+}
+
+/** Métricas agregadas de tokens por modelo dentro de una sesión. */
+export interface SessionModelMetrics {
+  count: number;
+  inputTokens: number;
+  cacheReadInputTokens: number;
+  cacheCreationInputTokens: number;
+  outputTokens: number;
+}
+
+/** Resumen de métricas de sesión escrito en session-metrics.json. */
+export interface SessionMetrics {
+  models: Record<string, SessionModelMetrics>;
 }
 
 /**

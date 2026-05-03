@@ -193,6 +193,7 @@ export class AuditInteractionHandler {
       sessionId: auditSessionId,
       pendingAgentToolUses: [],
       pendingBuiltinToolUses: [],
+      modelId: extractModelFromRequestBody(params.rawBody) ?? undefined,
     });
 
     return {
@@ -291,6 +292,7 @@ export class AuditInteractionHandler {
         pendingAgentToolUses: [],
         pendingBuiltinToolUses: [],
         parentContext,
+        modelId: extractModelFromRequestBody(params.rawBody) ?? undefined,
       });
 
       return {
@@ -398,6 +400,7 @@ export class AuditInteractionHandler {
         pendingAgentToolUses: [],
         pendingBuiltinToolUses: [],
         parentContext,
+        modelId: extractModelFromRequestBody(params.rawBody) ?? undefined,
       });
 
       return {
@@ -529,6 +532,7 @@ export class AuditInteractionHandler {
       sessionId: auditSessionId,
       pendingAgentToolUses: [],
       pendingBuiltinToolUses: [],
+      modelId: extractModelFromRequestBody(params.rawBody) ?? undefined,
     });
 
     return {
@@ -638,6 +642,7 @@ export class AuditInteractionHandler {
       sessionId: auditSessionId,
       pendingAgentToolUses: [],
       pendingBuiltinToolUses: [],
+      modelId: extractModelFromRequestBody(params.rawBody) ?? undefined,
     });
 
     return {
@@ -696,6 +701,7 @@ export class AuditInteractionHandler {
       sessionId: auditSessionId,
       pendingAgentToolUses: [],
       pendingBuiltinToolUses: [],
+      modelId: extractModelFromRequestBody(params.rawBody) ?? undefined,
     });
 
     return {
@@ -813,6 +819,7 @@ export class AuditInteractionHandler {
 
     await this.auditWriter.writeTurnMeta(turn.interactionDir, {
       interactionType: turn.interactionType,
+      ...(turn.modelId ? { modelId: turn.modelId } : {}),
       turnOutcome: 'orphaned',
       stepCount: turn.stepsMeta.length,
       startedAt: new Date(turn.startedAt).toISOString(),
@@ -843,6 +850,13 @@ export class AuditInteractionHandler {
         sseRawWriteError: false,
       },
     });
+
+    if (turn.interactionType !== 'client-preflight' && turn.modelId && totals) {
+      const sessionDir = path.join(this.sessionStore.getBaseDir(), turn.sessionId);
+      await this.auditWriter
+        .updateSessionMetrics(sessionDir, turn.modelId, totals)
+        .catch(() => { /* error no crítico */ });
+    }
 
     await this.auditWriter.removeInteractionState(turn.interactionDir);
   }

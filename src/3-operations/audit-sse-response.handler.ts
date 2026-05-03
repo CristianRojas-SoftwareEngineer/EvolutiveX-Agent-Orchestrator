@@ -447,6 +447,7 @@ export class AuditSseResponseHandler {
 
     const meta: TurnMetadata = {
       interactionType: turn.interactionType,
+      ...(turn.modelId ? { modelId: turn.modelId } : {}),
       turnOutcome,
       stepCount: turn.stepsMeta.length,
       startedAt: new Date(turn.startedAt).toISOString(),
@@ -479,6 +480,14 @@ export class AuditSseResponseHandler {
     };
 
     await this.auditWriter.writeTurnMeta(turn.interactionDir, meta);
+
+    if (turn.interactionType !== 'client-preflight' && turn.modelId && totals) {
+      const sessionDir = path.join(this.sessionStore.getBaseDir(), turn.sessionId);
+      await this.auditWriter
+        .updateSessionMetrics(sessionDir, turn.modelId, totals)
+        .catch((err: unknown) => this.logger?.error({ err }, 'Error actualizando session-metrics'));
+    }
+
     // Eliminar state.json al cerrar turno
     await this.auditWriter.removeInteractionState(turn.interactionDir);
   }

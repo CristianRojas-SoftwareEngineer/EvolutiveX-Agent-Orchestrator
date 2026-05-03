@@ -3,7 +3,7 @@ import * as fs from 'node:fs/promises';
 import * as fsSync from 'node:fs';
 import { RedactService } from '../1-domain/services/redact.service.js';
 import { MarkdownRendererService } from '../1-domain/services/markdown-renderer.service.js';
-import { InteractionState, SseLine, TurnMetadata } from '../1-domain/types/audit.types.js';
+import { InteractionState, SessionMetrics, SessionModelMetrics, SseLine, TurnMetadata } from '../1-domain/types/audit.types.js';
 import { JsonValue } from '../1-domain/types/json.types.js';
 import type { IAuditWriter } from './ports/audit-writer.port.js';
 
@@ -466,5 +466,39 @@ export class AuditWriterService implements IAuditWriter {
     } catch (err: unknown) {
       return { written: false, error: err instanceof Error ? err.message : String(err) };
     }
+  }
+
+  public async updateSessionMetrics(
+    sessionDir: string,
+    modelId: string,
+    totals: Pick<SessionModelMetrics, 'inputTokens' | 'cacheReadInputTokens' | 'cacheCreationInputTokens' | 'outputTokens'>,
+  ): Promise<void> {
+    const filePath = path.join(sessionDir, 'session-metrics.json');
+
+    let data: SessionMetrics = { models: {} };
+    try {
+      const raw = await fs.readFile(filePath, 'utf8');
+      data = JSON.parse(raw) as SessionMetrics;
+    } catch {
+      // ENOENT o parse error → empezar desde cero
+    }
+
+    const existing = data.models[modelId] ?? {
+      count: 0,
+      inputTokens: 0,
+      cacheReadInputTokens: 0,
+      cacheCreationInputTokens: 0,
+      outputTokens: 0,
+    };
+
+    data.models[modelId] = {
+      count: existing.count + 1,
+      inputTokens: existing.inputTokens + totals.inputTokens,
+      cacheReadInputTokens: existing.cacheReadInputTokens + totals.cacheReadInputTokens,
+      cacheCreationInputTokens: existing.cacheCreationInputTokens + totals.cacheCreationInputTokens,
+      outputTokens: existing.outputTokens + totals.outputTokens,
+    };
+
+    await this.writeJsonAtomic(filePath, data as unknown as JsonValue);
   }
 }

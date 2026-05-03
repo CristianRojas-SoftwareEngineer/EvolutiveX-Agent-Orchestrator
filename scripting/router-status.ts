@@ -87,7 +87,9 @@ const C = {
   reasoning: '\x1B[1;37m', // blanco bold
   total: '\x1B[1;37m', // blanco bold
   // Barra de progreso
-  barFilled: '\x1B[37m', // blanco
+  barGreen: '\x1B[38;2;130;220;120m', // verde claro
+  barOrange: '\x1B[38;2;240;170;60m', // naranja
+  barRed: '\x1B[38;2;230;80;80m', // rojo
   barEmpty: '\x1B[90m', // gris
   // Bordes de tabla
   border: '\x1B[90m', // gris
@@ -150,11 +152,18 @@ function formatContextSize(size?: number): string {
   return String(size);
 }
 
+function barColor(percentage: number): string {
+  if (percentage <= 39) return C.barGreen;
+  if (percentage <= 69) return C.barOrange;
+  return C.barRed;
+}
+
 function renderBar(percentage: number, width: number = 10): string {
   const filled = Math.round((percentage / 100) * width);
   const empty = width - filled;
 
-  const filledBar = `${C.barFilled}${'█'.repeat(filled)}${C.reset}`;
+  const color = barColor(percentage);
+  const filledBar = `${color}${'█'.repeat(filled)}${C.reset}`;
   const emptyBar = `${C.barEmpty}${'░'.repeat(empty)}${C.reset}`;
   return `${filledBar}${emptyBar}`;
 }

@@ -953,6 +953,55 @@ describe('AuditInteractionHandler', () => {
     expect(subCalled).toBe(false);
   });
 
+  it('closeOrphanTurn invoca updateSessionMetrics dentro de withSessionLock', async () => {
+    const config = makeConfig();
+    let lockSessionId: string | null = null;
+    let metricsCalled = false;
+
+    const orphanTurn: ActiveTurn = {
+      interactionDir: '/tmp/sessions/test/interactions/000001_orphan',
+      interactionType: 'agentic-turn',
+      stepCount: 1,
+      requestSequence: 1,
+      startedAt: Date.now() - 120_000,
+      requestBodyOmitted: false,
+      requestBodyBytes: 100,
+      stepsMeta: [{ stepIndex: 1, sse: true, statusCode: 200, inputTokens: 10, outputTokens: 5 }],
+      sessionId: 'test-session',
+      pendingAgentToolUses: [],
+      pendingBuiltinToolUses: [],
+      modelId: 'claude-opus-4-5',
+    };
+
+    const store = makeSessionStore({
+      findStaleTurnsAwaitingContinuation: () => [orphanTurn],
+      withSessionLock: async <T>(sessionId: string, fn: () => Promise<T>): Promise<T> => {
+        lockSessionId = sessionId;
+        return fn();
+      },
+    });
+
+    const handler = new AuditInteractionHandler(
+      new SessionResolverService(config),
+      store,
+      makeAuditWriter({
+        updateSessionMetrics: async () => {
+          metricsCalled = true;
+        },
+      }),
+      config,
+    );
+
+    await handler.execute({
+      headers: {},
+      rawBody: FRESH_BODY,
+      requestId: 'req-new',
+    });
+
+    expect(lockSessionId).toBe('test-session');
+    expect(metricsCalled).toBe(true);
+  });
+
   it('fresh turn debe cerrar orphan turns stale de la misma sesión', async () => {
     const config = makeConfig();
     const orphanTurn = {

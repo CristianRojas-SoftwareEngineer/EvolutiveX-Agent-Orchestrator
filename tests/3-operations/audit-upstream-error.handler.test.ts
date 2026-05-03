@@ -202,6 +202,50 @@ describe('AuditUpstreamErrorHandler', () => {
     expect(capturedMeta!.steps).toEqual([]);
   });
 
+  it('debería invocar updateSessionMetrics dentro de withSessionLock al cerrar turno agentic', async () => {
+    const config = makeConfig();
+    let lockSessionId: string | null = null;
+    let metricsCalled = false;
+
+    const activeTurn: ActiveTurn = {
+      interactionDir: '/tmp/sessions/s/interactions/000001_req-1',
+      interactionType: 'agentic-turn',
+      stepCount: 2,
+      requestSequence: 1,
+      startedAt: Date.now() - 200,
+      requestBodyOmitted: false,
+      requestBodyBytes: 100,
+      stepsMeta: [{ stepIndex: 1, sse: true, statusCode: 200, inputTokens: 5, outputTokens: 3 }],
+      sessionId: 's',
+      pendingAgentToolUses: [],
+      pendingBuiltinToolUses: [],
+      modelId: 'claude-opus-4-5',
+    };
+
+    const handler = new AuditUpstreamErrorHandler(
+      makeAuditWriter({
+        updateSessionMetrics: async () => {
+          metricsCalled = true;
+        },
+      }),
+      config,
+      makeSessionStore(activeTurn, {
+        withSessionLock: async <T>(sessionId: string, fn: () => Promise<T>): Promise<T> => {
+          lockSessionId = sessionId;
+          return fn();
+        },
+      }),
+    );
+
+    await handler.execute({
+      ...BASE_PARAMS,
+      error: Object.assign(new Error('ECONNREFUSED'), { code: 'ECONNREFUSED' }),
+    });
+
+    expect(lockSessionId).toBe('s');
+    expect(metricsCalled).toBe(true);
+  });
+
   it('debería propagar parentContext si el turn activo es subagente', async () => {
     const config = makeConfig();
     let capturedMeta: TurnMetadata | null = null;

@@ -83,9 +83,11 @@ export class AuditUpstreamErrorHandler {
 
     if (turn && interactionType !== 'client-preflight' && turn.modelId && totals) {
       const sessionDir = path.join(this.sessionStore.getBaseDir(), turn.sessionId);
-      await this.auditWriter
-        .updateSessionMetrics(sessionDir, turn.modelId, totals)
-        .catch(() => { /* error no crítico */ });
+      await this.sessionStore.withSessionLock(turn.sessionId, async () => {
+        await this.auditWriter
+          .updateSessionMetrics(sessionDir, turn.modelId!, totals)
+          .catch(() => { /* error no crítico */ });
+      });
     }
 
     await this.auditWriter.removeInteractionState(params.auditInteractionDir);

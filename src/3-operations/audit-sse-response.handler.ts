@@ -483,9 +483,11 @@ export class AuditSseResponseHandler {
 
     if (turn.interactionType !== 'client-preflight' && turn.modelId && totals) {
       const sessionDir = path.join(this.sessionStore.getBaseDir(), turn.sessionId);
-      await this.auditWriter
-        .updateSessionMetrics(sessionDir, turn.modelId, totals)
-        .catch((err: unknown) => this.logger?.error({ err }, 'Error actualizando session-metrics'));
+      await this.sessionStore.withSessionLock(turn.sessionId, async () => {
+        await this.auditWriter
+          .updateSessionMetrics(sessionDir, turn.modelId!, totals)
+          .catch((err: unknown) => this.logger?.error({ err }, 'Error actualizando session-metrics'));
+      });
     }
 
     // Eliminar state.json al cerrar turno

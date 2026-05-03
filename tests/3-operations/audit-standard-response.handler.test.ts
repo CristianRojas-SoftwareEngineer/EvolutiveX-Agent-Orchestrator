@@ -313,6 +313,46 @@ describe('AuditStandardResponseHandler', () => {
     expect(stepMetaPushed!.label).toBe('quota-check');
   });
 
+  it('debería invocar updateSessionMetrics dentro de withSessionLock al cerrar turno agentic', async () => {
+    const config = makeConfig();
+    let lockSessionId: string | null = null;
+    let metricsCalled = false;
+
+    const turn = makeActiveTurn({
+      modelId: 'claude-opus-4-5',
+      stepsMeta: [{ stepIndex: 1, sse: false, statusCode: 200, inputTokens: 10, outputTokens: 5 }],
+    });
+
+    const handler = new AuditStandardResponseHandler(
+      makeAuditWriter({
+        finalizeNonSseResponseAudit: async () => ({
+          responseBodyBytesAudited: 10,
+          responseTruncatedByProxyBuffer: false,
+          responseTruncatedByAuditLimit: false,
+        }),
+        updateSessionMetrics: async () => {
+          metricsCalled = true;
+        },
+      }),
+      config,
+      makeSessionStore(turn, {
+        withSessionLock: async <T>(sessionId: string, fn: () => Promise<T>): Promise<T> => {
+          lockSessionId = sessionId;
+          return fn();
+        },
+      }),
+    );
+
+    const stream = new PassThrough();
+    handler.execute(stream, makeContext(), 'application/json');
+    stream.write(Buffer.from('{"id":"msg_1","stop_reason":"end_turn"}'));
+    stream.end();
+
+    await new Promise((r) => setTimeout(r, 100));
+    expect(lockSessionId).toBe('test');
+    expect(metricsCalled).toBe(true);
+  });
+
   it('debería propagar parentContext al meta.json si el turn es subagente', async () => {
     const config = makeConfig();
     let captured: TurnMetadata | null = null;

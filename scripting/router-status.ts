@@ -540,7 +540,7 @@ function classifyModel(modelId: string): 'lite' | 'standard' | 'reasoning' {
   return 'standard';
 }
 
-function aggregateInteractionMetrics(sessionPath: string): {
+function createEmptyMetrics(): {
   lite: TokenMetrics;
   standard: TokenMetrics;
   reasoning: TokenMetrics;
@@ -552,11 +552,19 @@ function aggregateInteractionMetrics(sessionPath: string): {
     count: 0,
     modelName: '',
   };
-  const metrics = {
+  return {
     lite:      { ...empty, modelName: loadDisplayName(process.env.ANTHROPIC_DEFAULT_HAIKU_MODEL  || '') },
     standard:  { ...empty, modelName: loadDisplayName(process.env.ANTHROPIC_DEFAULT_SONNET_MODEL || '') },
     reasoning: { ...empty, modelName: loadDisplayName(process.env.ANTHROPIC_DEFAULT_OPUS_MODEL   || '') },
   };
+}
+
+function aggregateInteractionMetrics(sessionPath: string): {
+  lite: TokenMetrics;
+  standard: TokenMetrics;
+  reasoning: TokenMetrics;
+} {
+  const metrics = createEmptyMetrics();
 
   const metricsPath = join(sessionPath, 'session-metrics.json');
   if (!existsSync(metricsPath)) return metrics;
@@ -907,6 +915,10 @@ function main(): void {
         standard:  { count: metrics.standard.count,  inputTokens: metrics.standard.inputTokens,  cacheReadInputTokens: metrics.standard.cacheReadInputTokens,  outputTokens: metrics.standard.outputTokens },
         reasoning: { count: metrics.reasoning.count,  inputTokens: metrics.reasoning.inputTokens, cacheReadInputTokens: metrics.reasoning.cacheReadInputTokens, outputTokens: metrics.reasoning.outputTokens },
       });
+    } else if (ctx.session_id) {
+      const emptyMetrics = createEmptyMetrics();
+      const table2 = renderTokenTable(emptyMetrics, null);
+      output.push(renderSideBySide(table1, table2, 2));
     } else {
       output.push(table1.lines.join('\n'));
     }

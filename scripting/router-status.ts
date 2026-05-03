@@ -73,7 +73,6 @@ const PROJECT_ROOT = join(process.cwd());
 const ROUTING_PATH = join(PROJECT_ROOT, 'routing', 'providers');
 const SESSIONS_PATH = join(PROJECT_ROOT, 'sessions');
 const ENV_PATH = join(PROJECT_ROOT, 'configs', '.env');
-const PCT_CACHE_PATH = join(SESSIONS_PATH, '.last-used-pct');
 
 // ── Colores ANSI ────────────────────────────────────────────────
 
@@ -94,9 +93,9 @@ const C = {
   reasoning: '\x1B[1;37m', // blanco bold
   total: '\x1B[1;37m', // blanco bold
   // Barra de progreso
-  barGreen: '\x1B[38;2;80;180;80m', // verde
-  barOrange: '\x1B[38;2;240;170;60m', // naranja
-  barRed: '\x1B[38;2;230;80;80m', // rojo
+  barGreen: '\x1B[38;2;46;204;113m', // verde oscuro elegante
+  barOrange: '\x1B[38;2;243;156;18m', // naranja oscuro elegante
+  barRed: '\x1B[38;2;231;76;60m', // rojo oscuro elegante
   barEmpty: '\x1B[90m', // gris
   // Bordes de tabla
   border: '\x1B[90m', // gris
@@ -349,20 +348,21 @@ function renderSideBySide(
   return result.join('\n');
 }
 
-// ── Caché de porcentaje de uso ─────────────────────────────────
+// ── Caché de porcentaje de uso (por sesión) ─────────────────────
 
-function readCachedPct(): number | null {
+function readCachedPct(sessionPath: string): number | null {
   try {
-    if (!existsSync(PCT_CACHE_PATH)) return null;
-    return Number(readFileSync(PCT_CACHE_PATH, 'utf-8').trim());
+    const cacheFile = join(sessionPath, '.last-pct');
+    if (!existsSync(cacheFile)) return null;
+    return Number(readFileSync(cacheFile, 'utf-8').trim());
   } catch {
     return null;
   }
 }
 
-function writeCachedPct(pct: number): void {
+function writeCachedPct(sessionPath: string, pct: number): void {
   try {
-    writeFileSync(PCT_CACHE_PATH, String(pct), 'utf-8');
+    writeFileSync(join(sessionPath, '.last-pct'), String(pct), 'utf-8');
   } catch {
     // Ignorar errores de escritura
   }
@@ -599,7 +599,10 @@ function aggregateInteractionMetrics(sessionPath: string): {
 
 // ── Renderizado de tablas completas ─────────────────────────────
 
-function renderSessionTable(ctx: ClaudeCodeContext): {
+function renderSessionTable(
+  ctx: ClaudeCodeContext,
+  sessionPath?: string | null,
+): {
   lines: string[];
   width: number;
 } {
@@ -621,11 +624,11 @@ function renderSessionTable(ctx: ClaudeCodeContext): {
 
   // Porcentaje de uso: persistir valor válido, usar caché como fallback
   let pct: number;
-  if (usedPct !== undefined && usedPct !== null && usedPct > 0) {
+  if (usedPct !== undefined && usedPct !== null) {
     pct = usedPct;
-    writeCachedPct(pct);
+    if (sessionPath) writeCachedPct(sessionPath, pct);
   } else {
-    pct = readCachedPct() ?? 0;
+    pct = (sessionPath ? readCachedPct(sessionPath) : null) ?? 0;
   }
   const pctDisplay = `${pct.toFixed(0)}%`;
   // Barra (8 chars) + espacio + porcentaje, con espacio inicial para centrado visual
@@ -874,11 +877,13 @@ function main(): void {
 
     const output: string[] = [];
 
+    // Resolver sesión antes de renderizar para caché per-session
+    const sessionPath = resolveSessionPath(ctx.session_id);
+
     // Tabla 1: Sesión y proveedor
-    const table1 = renderSessionTable(ctx);
+    const table1 = renderSessionTable(ctx, sessionPath);
 
     // Tabla 2: Métricas de interacciones
-    const sessionPath = resolveSessionPath(ctx.session_id);
     if (sessionPath) {
       const metrics = aggregateInteractionMetrics(sessionPath);
       const table2 = renderTokenTable(metrics);

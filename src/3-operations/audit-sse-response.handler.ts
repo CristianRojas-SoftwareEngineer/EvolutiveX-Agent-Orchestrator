@@ -164,6 +164,16 @@ export class AuditSseResponseHandler {
               }
               if (evt.type === 'message_delta' && evt.usage) {
                 stepUsage.output_tokens = evt.usage.output_tokens ?? 0;
+                // Fallback: proveedores como Xiaomi envían input tokens solo en message_delta
+                if (!stepUsage.input_tokens && evt.usage.input_tokens) {
+                  stepUsage.input_tokens = evt.usage.input_tokens;
+                }
+                if (!stepUsage.cache_creation_input_tokens && evt.usage.cache_creation_input_tokens) {
+                  stepUsage.cache_creation_input_tokens = evt.usage.cache_creation_input_tokens;
+                }
+                if (!stepUsage.cache_read_input_tokens && evt.usage.cache_read_input_tokens) {
+                  stepUsage.cache_read_input_tokens = evt.usage.cache_read_input_tokens;
+                }
               }
               if (evt.type === 'content_block_start' && evt.content_block?.type === 'tool_use') {
                 toolCalls.push(evt.content_block.name);

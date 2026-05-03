@@ -59,10 +59,38 @@ export class AuditStandardResponseHandler {
           streamErrorMessage: err?.message || String(err),
         });
 
+        // Extraer usage del body en caso de error (best-effort)
+        let errorBodyUsage:
+          | {
+              input_tokens?: number;
+              output_tokens?: number;
+              cache_creation_input_tokens?: number;
+              cache_read_input_tokens?: number;
+            }
+          | undefined;
+        if (buf.length > 0) {
+          try {
+            const errorJson = JSON.parse(buf.toString('utf8'));
+            if (errorJson.usage) {
+              errorBodyUsage = errorJson.usage;
+            }
+          } catch {
+            /* Body no es JSON válido — sin usage */
+          }
+        }
+
         const stepMeta: StepMeta = {
           stepIndex: stepNumber,
           sse: false,
           statusCode: context.responseStatusCode,
+          ...(errorBodyUsage?.input_tokens ? { inputTokens: errorBodyUsage.input_tokens } : {}),
+          ...(errorBodyUsage?.output_tokens ? { outputTokens: errorBodyUsage.output_tokens } : {}),
+          ...(errorBodyUsage?.cache_creation_input_tokens
+            ? { cacheCreationInputTokens: errorBodyUsage.cache_creation_input_tokens }
+            : {}),
+          ...(errorBodyUsage?.cache_read_input_tokens
+            ? { cacheReadInputTokens: errorBodyUsage.cache_read_input_tokens }
+            : {}),
         };
 
         const turn = await this.sessionStore.getTurnByDir(context.auditInteractionDir);
@@ -97,13 +125,24 @@ export class AuditStandardResponseHandler {
       try {
         const buf = Buffer.concat(chunks);
 
-        // Extraer anthropicMessageId del body para correlación con logs de Claude Code
+        // Extraer anthropicMessageId y usage del body para correlación con logs de Claude Code
         let anthropicMessageId: string | undefined;
+        let bodyUsage:
+          | {
+              input_tokens?: number;
+              output_tokens?: number;
+              cache_creation_input_tokens?: number;
+              cache_read_input_tokens?: number;
+            }
+          | undefined;
         try {
           const json = JSON.parse(buf.toString('utf8'));
           anthropicMessageId = json.id;
+          if (json.usage) {
+            bodyUsage = json.usage;
+          }
         } catch {
-          // Body no es JSON válido — sin messageId
+          // Body no es JSON válido — sin messageId ni usage
         }
 
         // Escribir body en el step dir
@@ -128,6 +167,14 @@ export class AuditStandardResponseHandler {
             sse: false,
             statusCode: context.responseStatusCode,
             ...(anthropicMessageId ? { anthropicMessageId } : {}),
+            ...(bodyUsage?.input_tokens ? { inputTokens: bodyUsage.input_tokens } : {}),
+            ...(bodyUsage?.output_tokens ? { outputTokens: bodyUsage.output_tokens } : {}),
+            ...(bodyUsage?.cache_creation_input_tokens
+              ? { cacheCreationInputTokens: bodyUsage.cache_creation_input_tokens }
+              : {}),
+            ...(bodyUsage?.cache_read_input_tokens
+              ? { cacheReadInputTokens: bodyUsage.cache_read_input_tokens }
+              : {}),
           };
           await this.sessionStore.pushStepMetaByDir(context.auditInteractionDir, stepMeta);
 
@@ -149,6 +196,14 @@ export class AuditStandardResponseHandler {
           statusCode: context.responseStatusCode,
           stopReason: terminalStatus === 'non-terminal' ? 'tool_use' : undefined,
           ...(anthropicMessageId ? { anthropicMessageId } : {}),
+          ...(bodyUsage?.input_tokens ? { inputTokens: bodyUsage.input_tokens } : {}),
+          ...(bodyUsage?.output_tokens ? { outputTokens: bodyUsage.output_tokens } : {}),
+          ...(bodyUsage?.cache_creation_input_tokens
+            ? { cacheCreationInputTokens: bodyUsage.cache_creation_input_tokens }
+            : {}),
+          ...(bodyUsage?.cache_read_input_tokens
+            ? { cacheReadInputTokens: bodyUsage.cache_read_input_tokens }
+            : {}),
         };
         await this.sessionStore.pushStepMetaByDir(context.auditInteractionDir, stepMeta);
 

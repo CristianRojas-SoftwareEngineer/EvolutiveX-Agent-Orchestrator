@@ -57,7 +57,12 @@ export function buildSimulatedSseFromText(args: {
       data: {
         type: 'message_delta',
         delta: { stop_reason: 'end_turn', stop_sequence: null },
-        usage: { output_tokens: 0 },
+        usage: {
+          output_tokens: 0,
+          input_tokens: 0,
+          cache_creation_input_tokens: 0,
+          cache_read_input_tokens: 0,
+        },
       },
     },
     {

@@ -133,6 +133,9 @@ export interface AnthropicSseMessageDelta {
   };
   usage: {
     output_tokens: number;
+    input_tokens?: number;
+    cache_creation_input_tokens?: number;
+    cache_read_input_tokens?: number;
   };
 }
 

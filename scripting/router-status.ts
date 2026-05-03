@@ -178,6 +178,7 @@ function renderTable(
   headers: string[],
   rows: string[][],
   alignments: ('left' | 'center' | 'right')[] = [],
+  separatorAfter?: number[],
 ): { table: string; width: number } {
   const colCount = headers.length;
   if (alignments.length === 0) {
@@ -196,8 +197,8 @@ function renderTable(
     widths[i] = maxW;
   }
 
-  // Ancho total: bordes verticales + espacios + anchos de columnas
-  const totalWidth = widths.reduce((sum, w) => sum + w, 0) + widths.length * 2 + 1;
+  // Ancho total: anchos de columnas + padding por columna + bordes + separadores
+  const totalWidth = widths.reduce((sum, w) => sum + w, 0) + widths.length * 3 + 1;
 
   // Función para alinear celda
   function alignCell(text: string, width: number, align: 'left' | 'center' | 'right'): string {
@@ -236,7 +237,8 @@ function renderTable(
   lines.push(`${C.border}${B.ml}${midParts.join(B.mm)}${B.mr}${C.reset}`);
 
   // Filas de datos
-  for (const row of rows) {
+  for (let r = 0; r < rows.length; r++) {
+    const row = rows[r];
     const cells = row.map((cell, i) => {
       const aligned = alignments[i] === 'right'
         ? alignRight(cell, widths[i])
@@ -246,6 +248,12 @@ function renderTable(
       return aligned;
     });
     lines.push(`${C.border}${B.v}${C.reset} ${cells.join(` ${C.border}${B.v}${C.reset} `)} ${C.border}${B.v}${C.reset}`);
+
+    // Separador horizontal opcional después de esta fila
+    if (separatorAfter?.includes(r)) {
+      const sepParts = widths.map((w) => B.h.repeat(w + 2));
+      lines.push(`${C.border}${B.ml}${sepParts.join(B.mm)}${B.mr}${C.reset}`);
+    }
   }
 
   // Línea inferior: ╰───┴───╯
@@ -253,6 +261,30 @@ function renderTable(
   lines.push(`${C.border}${B.bl}${botParts.join(B.mb)}${B.br}${C.reset}`);
 
   return { table: lines.join('\n'), width: totalWidth };
+}
+
+function renderSideBySide(left: { lines: string[]; width: number }, right: { lines: string[]; width: number }, gap: number = 2): string {
+  const minLines = Math.min(left.lines.length, right.lines.length);
+  const result: string[] = [];
+
+  // Renderizar lado a lado las líneas que ambas tablas tienen en común
+  for (let i = 0; i < minLines; i++) {
+    const leftVisLen = visibleLength(left.lines[i]);
+    const leftPad = ' '.repeat(Math.max(0, left.width - leftVisLen));
+    result.push(`${left.lines[i]}${leftPad}${' '.repeat(gap)}${right.lines[i]}`);
+  }
+
+  // Renderizar las líneas sobrantes de la tabla más larga debajo
+  if (right.lines.length > left.lines.length) {
+    // Usar un punto invisible (ZWSP) seguido de espacios para evitar recorte de la terminal
+    const zwsp = '​';
+    const indent = zwsp + ' '.repeat(left.width + gap);
+    for (let i = minLines; i < right.lines.length; i++) {
+      result.push(`${indent}${right.lines[i]}`);
+    }
+  }
+
+  return result.join('\n');
 }
 
 // ── Lógica de resolución ────────────────────────────────────────
@@ -437,7 +469,7 @@ function aggregateInteractionMetrics(sessionPath: string): {
 
 // ── Renderizado de tablas completas ─────────────────────────────
 
-function renderSessionTable(ctx: ClaudeCodeContext): string {
+function renderSessionTable(ctx: ClaudeCodeContext): { lines: string[]; width: number } {
   const provider = resolveActiveProvider();
   const sessionId = ctx.session_id || 'N/A';
   const contextSize = ctx.context_window?.context_window_size;
@@ -479,20 +511,21 @@ function renderSessionTable(ctx: ClaudeCodeContext): string {
   // Renderizar tabla y obtener ancho
   const { table, width } = renderTable(headers, rows, ['left', 'left', 'center', 'left']);
 
-  // Calcular padding para centrar el título
-  const titleText = `╭─ Sesión actual «${sessionDisplay}»`;
-  const titleVisLen = titleText.length + 2; // +2 para ╭ y ╮
-  const titlePad = Math.max(0, width - titleVisLen);
+  // Calcular padding para que el título tenga el mismo ancho que la tabla
+  const titleText = `╭─ Sesión actual «${sessionDisplay}» `;
+  const titleVisLen = visibleLength(titleText);
+  const titlePad = Math.max(0, width - titleVisLen - 1); // -1 para ╮ (╭ ya está en titleVisLen)
   const title = `${C.title}${titleText}${'─'.repeat(titlePad)}╮${C.reset}`;
 
-  return `${title}\n${table}`;
+  const lines = [title, ...table.split('\n')];
+  return { lines, width };
 }
 
 function renderTokenTable(metrics: {
   lite: TokenMetrics;
   standard: TokenMetrics;
   reasoning: TokenMetrics;
-}): string {
+}): { lines: string[]; width: number } {
   const levels: Array<{ key: keyof typeof metrics; label: string; modelExample: string; color: string }> = [
     { key: 'lite', label: 'Lite', modelExample: 'MiMo 2 Omni', color: C.lite },
     { key: 'standard', label: 'Standard', modelExample: 'MiMo 2.5', color: C.standard },
@@ -534,19 +567,20 @@ function renderTokenTable(metrics: {
   ]);
 
   // Definir datos de la tabla
-  const headers = ['Nivel', 'Modelo', 'N.º', 'Input', 'Cache In', 'Output'];
+  const headers = ['Nivel', 'Modelo', 'N.º', 'Input (tks)', 'Cache In (tks)', 'Output (tks)'];
   const alignments: Array<'left' | 'center' | 'right'> = ['left', 'left', 'right', 'right', 'right', 'right'];
 
   // Renderizar tabla y obtener ancho
-  const { table, width } = renderTable(headers, rows, alignments);
+  const { table, width } = renderTable(headers, rows, alignments, [0, 1, 2]);
 
-  // Calcular padding para centrar el título
-  const titleText = '╭─ Interacciones por nivel de razonamiento';
-  const titleVisLen = titleText.length + 2; // +2 para ╭ y ╮
-  const titlePad = Math.max(0, width - titleVisLen);
+  // Calcular padding para que el título tenga el mismo ancho que la tabla
+  const titleText = '╭─ Interacciones por nivel de razonamiento ';
+  const titleVisLen = visibleLength(titleText);
+  const titlePad = Math.max(0, width - titleVisLen - 1); // -1 para ╮ (╭ ya está en titleVisLen)
   const title = `${C.title}${titleText}${'─'.repeat(titlePad)}╮${C.reset}`;
 
-  return `${title}\n${table}`;
+  const lines = [title, ...table.split('\n')];
+  return { lines, width };
 }
 
 function renderRateLimitTable(ctx: ClaudeCodeContext): string | null {
@@ -590,10 +624,10 @@ function renderRateLimitTable(ctx: ClaudeCodeContext): string | null {
     ['left', 'left', 'center'],
   );
 
-  // Calcular padding para centrar el título
+  // Calcular padding para que el título tenga el mismo ancho que la tabla
   const titleText = '╭─ Rate Limits (OAuth)';
-  const titleVisLen = titleText.length + 2; // +2 para ╭ y ╮
-  const titlePad = Math.max(0, width - titleVisLen);
+  const titleVisLen = visibleLength(titleText);
+  const titlePad = Math.max(0, width - titleVisLen - 1); // -1 para ╮ (╭ ya está en titleVisLen)
   const title = `${C.title}${titleText}${'─'.repeat(titlePad)}╮${C.reset}`;
 
   return `${title}\n${table}`;
@@ -619,14 +653,16 @@ function main(): void {
     const output: string[] = [];
 
     // Tabla 1: Sesión y proveedor
-    output.push(renderSessionTable(ctx));
+    const table1 = renderSessionTable(ctx);
 
     // Tabla 2: Métricas de interacciones
     const sessionPath = resolveSessionPath(ctx.session_id);
     if (sessionPath) {
       const metrics = aggregateInteractionMetrics(sessionPath);
-      output.push('');
-      output.push(renderTokenTable(metrics));
+      const table2 = renderTokenTable(metrics);
+      output.push(renderSideBySide(table1, table2, 2));
+    } else {
+      output.push(table1.lines.join('\n'));
     }
 
     // Tabla 3: Rate limits (solo OAuth)

@@ -85,7 +85,7 @@ export class AuditUpstreamErrorHandler {
       const sessionDir = path.join(this.sessionStore.getBaseDir(), turn.sessionId);
       await this.sessionStore.withSessionLock(turn.sessionId, async () => {
         await this.auditWriter
-          .updateSessionMetrics(sessionDir, turn.modelId!, totals)
+          .updateSessionMetrics(sessionDir, turn.modelId!, totals, stepsMeta.length)
           .catch(() => { /* error no crítico */ });
       });
     }

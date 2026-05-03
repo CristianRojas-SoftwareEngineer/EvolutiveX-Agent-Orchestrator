@@ -60,23 +60,23 @@ Adicionalmente, `ActiveTurn` y `TurnMetadata` fueron extendidos con `modelId?: s
 `updateSessionMetrics` implementa read-modify-write atómico:
 
 1. Lee `session-metrics.json` (`ENOENT` o parse error → `{ models: {} }`).
-2. Suma los `totals` del turno al bucket `models[modelId]`.
+2. Suma los `totals` del step al bucket `models[modelId]` e incrementa `count` en `stepCount` (normalmente `1` por invocación per-step; `turn.stepsMeta.length` para turns huérfanos).
 3. Escribe mediante `writeJsonAtomic` (escribe a `.tmp` + `rename`), garantizando que lectores concurrentes nunca ven un archivo parcialmente escrito.
 
-#### Puntos de invocación (4 handlers)
+#### Puntos de invocación (per-step + 2 callers legacy)
 
-La invocación ocurre al cerrar un turno, sujeta a una guarda triple:
+La invocación principal ocurre per-step, justo después de `pushStepMetaByDir`, sujeta a una guarda dual:
 
 ```
-turn.interactionType !== 'client-preflight' && turn.modelId && totals
+currentTurn?.modelId
 ```
 
-| Handler | Archivo |
-|---------|---------|
-| `writeTurnMeta` (SSE) | `src/3-operations/audit-sse-response.handler.ts` |
-| `writeTurnMeta` (non-SSE) | `src/3-operations/audit-standard-response.handler.ts` |
-| `execute` (error upstream) | `src/3-operations/audit-upstream-error.handler.ts` |
-| `closeOrphanTurn` | `src/3-operations/audit-interaction.handler.ts` |
+| Punto de invocación | Archivo | `stepCount` |
+|---------------------|---------|-------------|
+| Después de `pushStepMetaByDir` (SSE) | `src/3-operations/audit-sse-response.handler.ts` | `1` |
+| Después de `pushStepMetaByDir` (non-SSE) | `src/3-operations/audit-standard-response.handler.ts` | `1` |
+| `execute` (error upstream) | `src/3-operations/audit-upstream-error.handler.ts` | `stepsMeta.length` |
+| `closeOrphanTurn` | `src/3-operations/audit-interaction.handler.ts` | `turn.stepsMeta.length` |
 
 Los `client-preflight` están explícitamente excluidos porque no generan tokens de usuario.
 

@@ -297,6 +297,17 @@ export class AuditSseResponseHandler {
         // Agentic turn o side-request
         await this.sessionStore.pushStepMetaByDir(context.auditInteractionDir, stepMeta);
 
+        // Actualizar métricas de sesión per-step
+        if (activeTurn?.modelId) {
+          const sessionDir = path.join(this.sessionStore.getBaseDir(), activeTurn.sessionId);
+          const stepTotals = computeTokenTotals([stepMeta]);
+          await this.sessionStore.withSessionLock(activeTurn.sessionId, async () => {
+            await this.auditWriter
+              .updateSessionMetrics(sessionDir, activeTurn.modelId!, stepTotals, 1)
+              .catch(() => { /* error no crítico */ });
+          });
+        }
+
         // Reconstruir mensaje del step y generar archivos markdown (best-effort)
         try {
           const stepMessage = await this.sseReconstruct.reconstructStepMessage(stepDir);
@@ -480,15 +491,6 @@ export class AuditSseResponseHandler {
     };
 
     await this.auditWriter.writeTurnMeta(turn.interactionDir, meta);
-
-    if (turn.interactionType !== 'client-preflight' && turn.modelId && totals) {
-      const sessionDir = path.join(this.sessionStore.getBaseDir(), turn.sessionId);
-      await this.sessionStore.withSessionLock(turn.sessionId, async () => {
-        await this.auditWriter
-          .updateSessionMetrics(sessionDir, turn.modelId!, totals)
-          .catch((err: unknown) => this.logger?.error({ err }, 'Error actualizando session-metrics'));
-      });
-    }
 
     // Eliminar state.json al cerrar turno
     await this.auditWriter.removeInteractionState(turn.interactionDir);

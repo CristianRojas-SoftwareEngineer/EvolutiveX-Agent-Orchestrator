@@ -13,7 +13,6 @@ import {
   readFileSync,
   readdirSync,
   existsSync,
-  statSync,
   writeFileSync,
 } from 'node:fs';
 import { join } from 'node:path';
@@ -77,7 +76,7 @@ const ENV_PATH = join(PROJECT_ROOT, 'configs', '.env');
 const C = {
   reset: '\x1B[0m',
   bold: '\x1B[1m',
-  dim: '\x1B[2m',
+  dim: '\x1B[90m',
   // Cabeceras y títulos - azul #253ecc (rgb: 37-62-204)
   title: '\x1B[38;2;37;62;204m', // azul #253ecc
   header: '\x1B[38;2;37;62;204m', // azul #253ecc
@@ -352,7 +351,8 @@ function readCachedPct(sessionPath: string): number | null {
   try {
     const cacheFile = join(sessionPath, '.last-pct');
     if (!existsSync(cacheFile)) return null;
-    return Number(readFileSync(cacheFile, 'utf-8').trim());
+    const n = Number(readFileSync(cacheFile, 'utf-8').trim());
+    return Number.isFinite(n) ? n : null;
   } catch {
     return null;
   }
@@ -361,6 +361,39 @@ function readCachedPct(sessionPath: string): number | null {
 function writeCachedPct(sessionPath: string, pct: number): void {
   try {
     writeFileSync(join(sessionPath, '.last-pct'), String(pct), 'utf-8');
+  } catch {
+    // Ignorar errores de escritura
+  }
+}
+
+// ── Caché de métricas previas (para flash de valores) ──────────
+
+interface LevelMetricsSnapshot {
+  count: number;
+  inputTokens: number;
+  cacheReadInputTokens: number;
+  outputTokens: number;
+}
+
+interface MetricsSnapshot {
+  lite: LevelMetricsSnapshot;
+  standard: LevelMetricsSnapshot;
+  reasoning: LevelMetricsSnapshot;
+}
+
+function readLastMetrics(sessionPath: string): MetricsSnapshot | null {
+  try {
+    const cacheFile = join(sessionPath, '.last-metrics.json');
+    if (!existsSync(cacheFile)) return null;
+    return JSON.parse(readFileSync(cacheFile, 'utf-8')) as MetricsSnapshot;
+  } catch {
+    return null;
+  }
+}
+
+function writeLastMetrics(sessionPath: string, snapshot: MetricsSnapshot): void {
+  try {
+    writeFileSync(join(sessionPath, '.last-metrics.json'), JSON.stringify(snapshot), 'utf-8');
   } catch {
     // Ignorar errores de escritura
   }
@@ -438,21 +471,10 @@ function resolveSessionPath(sessionId?: string): string | null {
   );
 
   if (sessions.length === 0) return null;
+  if (!sessionId) return null;
 
-  if (sessionId) {
-    const match = sessions.find((s) => s.name.startsWith(sessionId));
-    if (match) return join(SESSIONS_PATH, match.name);
-  }
-
-  let newest: { name: string; mtime: number } | null = null;
-  for (const s of sessions) {
-    const stat = statSync(join(SESSIONS_PATH, s.name));
-    if (!newest || stat.mtimeMs > newest.mtime) {
-      newest = { name: s.name, mtime: stat.mtimeMs };
-    }
-  }
-
-  return newest ? join(SESSIONS_PATH, newest.name) : null;
+  const match = sessions.find((s) => s.name.startsWith(sessionId));
+  return match ? join(SESSIONS_PATH, match.name) : null;
 }
 
 function loadDisplayName(modelId: string): string {
@@ -559,6 +581,31 @@ function aggregateInteractionMetrics(sessionPath: string): {
   return metrics;
 }
 
+function cellColor(
+  level: 'lite' | 'standard' | 'reasoning',
+  field: keyof LevelMetricsSnapshot,
+  current: number,
+  previous: MetricsSnapshot | null,
+): string {
+  if (!previous) return C.dim;
+  const prev = previous[level]?.[field];
+  if (prev === undefined || current !== prev) return C.value;
+  return C.dim;
+}
+
+function totalColor(
+  field: keyof LevelMetricsSnapshot,
+  values: Record<string, number>,
+  previous: MetricsSnapshot | null,
+): string {
+  if (!previous) return C.dim;
+  for (const level of ['lite', 'standard', 'reasoning'] as const) {
+    const prev = previous[level]?.[field];
+    if (prev === undefined || values[level] !== prev) return C.total;
+  }
+  return C.dim;
+}
+
 // ── Renderizado de tablas completas ─────────────────────────────
 
 function renderSessionTable(
@@ -586,11 +633,12 @@ function renderSessionTable(
 
   // Porcentaje de uso: persistir valor válido, usar caché como fallback
   let pct: number;
-  if (usedPct !== undefined && usedPct !== null) {
+  if (typeof usedPct === 'number' && Number.isFinite(usedPct) && usedPct > 0) {
     pct = usedPct;
     if (sessionPath) writeCachedPct(sessionPath, pct);
   } else {
-    pct = (sessionPath ? readCachedPct(sessionPath) : null) ?? 0;
+    const cached = sessionPath ? readCachedPct(sessionPath) : null;
+    pct = (typeof cached === 'number' && Number.isFinite(cached) && cached >= 0) ? cached : 0;
   }
   const pctDisplay = `${pct.toFixed(0)}%`;
   // Barra (8 chars) + espacio + porcentaje, con espacio inicial para centrado visual
@@ -637,7 +685,7 @@ function renderTokenTable(metrics: {
   lite: TokenMetrics;
   standard: TokenMetrics;
   reasoning: TokenMetrics;
-}): { lines: string[]; width: number } {
+}, previous: MetricsSnapshot | null): { lines: string[]; width: number } {
   // Función local para alinear a la derecha
   function alignRight(text: string, width: number): string {
     const vis = visibleLength(text);
@@ -669,13 +717,16 @@ function renderTokenTable(metrics: {
     totalOutput += m.outputTokens;
     totalCount += m.count;
 
+    const cc = (field: keyof LevelMetricsSnapshot, value: number) =>
+      cellColor(level.key, field, value, previous);
+
     rows.push([
       `${level.color}${level.label}${C.reset}`,
       `${level.color}${m.modelName || '-'}${C.reset}`,
-      `${C.value}${m.count}${C.reset}`,
-      `${C.value}${formatTokens(m.inputTokens)}${C.reset}`,
-      `${C.value}${formatTokens(m.cacheReadInputTokens)}${C.reset}`,
-      `${C.value}${formatTokens(m.outputTokens)}${C.reset}`,
+      `${cc('count', m.count)}${m.count}${C.reset}`,
+      `${cc('inputTokens', m.inputTokens)}${formatTokens(m.inputTokens)}${C.reset}`,
+      `${cc('cacheReadInputTokens', m.cacheReadInputTokens)}${formatTokens(m.cacheReadInputTokens)}${C.reset}`,
+      `${cc('outputTokens', m.outputTokens)}${formatTokens(m.outputTokens)}${C.reset}`,
     ]);
   }
 
@@ -719,7 +770,17 @@ function renderTokenTable(metrics: {
   const mergedContentWidth = w0 + w1 + 3;
   const totalMerged = padRight(totalText, mergedContentWidth);
 
-  const totalRow = `${C.border}${B.v}${C.reset} ${totalMerged} ${C.border}${B.v}${C.reset} ${alignRight(`${C.total}${totalCount}${C.reset}`, w2)} ${C.border}${B.v}${C.reset} ${alignRight(`${C.total}${formatTokens(totalInput)}${C.reset}`, w3)} ${C.border}${B.v}${C.reset} ${alignRight(`${C.total}${formatTokens(totalCache)}${C.reset}`, w4)} ${C.border}${B.v}${C.reset} ${alignRight(`${C.total}${formatTokens(totalOutput)}${C.reset}`, w5)} ${C.border}${B.v}${C.reset}`;
+  const totals = {
+    lite: metrics.lite.count,
+    standard: metrics.standard.count,
+    reasoning: metrics.reasoning.count,
+  };
+  const tcCount = totalColor('count', totals, previous);
+  const tcInput = totalColor('inputTokens', { lite: metrics.lite.inputTokens, standard: metrics.standard.inputTokens, reasoning: metrics.reasoning.inputTokens }, previous);
+  const tcCache = totalColor('cacheReadInputTokens', { lite: metrics.lite.cacheReadInputTokens, standard: metrics.standard.cacheReadInputTokens, reasoning: metrics.reasoning.cacheReadInputTokens }, previous);
+  const tcOutput = totalColor('outputTokens', { lite: metrics.lite.outputTokens, standard: metrics.standard.outputTokens, reasoning: metrics.reasoning.outputTokens }, previous);
+
+  const totalRow = `${C.border}${B.v}${C.reset} ${totalMerged} ${C.border}${B.v}${C.reset} ${alignRight(`${tcCount}${totalCount}${C.reset}`, w2)} ${C.border}${B.v}${C.reset} ${alignRight(`${tcInput}${formatTokens(totalInput)}${C.reset}`, w3)} ${C.border}${B.v}${C.reset} ${alignRight(`${tcCache}${formatTokens(totalCache)}${C.reset}`, w4)} ${C.border}${B.v}${C.reset} ${alignRight(`${tcOutput}${formatTokens(totalOutput)}${C.reset}`, w5)} ${C.border}${B.v}${C.reset}`;
 
   // Borde inferior de la tabla con columna fusionada
   // w0+2 (col0) + 1 (┴) + w1+2 (col1) = w0+w1+5
@@ -837,8 +898,15 @@ function main(): void {
     // Tabla 2: Métricas de interacciones
     if (sessionPath) {
       const metrics = aggregateInteractionMetrics(sessionPath);
-      const table2 = renderTokenTable(metrics);
+      const previous = readLastMetrics(sessionPath);
+      const table2 = renderTokenTable(metrics, previous);
       output.push(renderSideBySide(table1, table2, 2));
+
+      writeLastMetrics(sessionPath, {
+        lite:      { count: metrics.lite.count,      inputTokens: metrics.lite.inputTokens,      cacheReadInputTokens: metrics.lite.cacheReadInputTokens,      outputTokens: metrics.lite.outputTokens },
+        standard:  { count: metrics.standard.count,  inputTokens: metrics.standard.inputTokens,  cacheReadInputTokens: metrics.standard.cacheReadInputTokens,  outputTokens: metrics.standard.outputTokens },
+        reasoning: { count: metrics.reasoning.count,  inputTokens: metrics.reasoning.inputTokens, cacheReadInputTokens: metrics.reasoning.cacheReadInputTokens, outputTokens: metrics.reasoning.outputTokens },
+      });
     } else {
       output.push(table1.lines.join('\n'));
     }

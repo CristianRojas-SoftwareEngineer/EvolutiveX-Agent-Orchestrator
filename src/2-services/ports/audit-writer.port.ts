@@ -87,6 +87,7 @@ export interface IAuditWriter {
     sessionDir: string,
     modelId: string,
     totals: Pick<SessionModelMetrics, 'inputTokens' | 'cacheReadInputTokens' | 'cacheCreationInputTokens' | 'outputTokens'>,
+    stepCount: number,
   ): Promise<void>;
   appendSseLine(interactionDir: string, lineObj: SseLine): void;
   /**

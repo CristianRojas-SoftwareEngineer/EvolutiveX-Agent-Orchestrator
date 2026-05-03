@@ -472,6 +472,7 @@ export class AuditWriterService implements IAuditWriter {
     sessionDir: string,
     modelId: string,
     totals: Pick<SessionModelMetrics, 'inputTokens' | 'cacheReadInputTokens' | 'cacheCreationInputTokens' | 'outputTokens'>,
+    stepCount: number,
   ): Promise<void> {
     const filePath = path.join(sessionDir, 'session-metrics.json');
 
@@ -492,7 +493,7 @@ export class AuditWriterService implements IAuditWriter {
     };
 
     data.models[modelId] = {
-      count: existing.count + 1,
+      count: existing.count + stepCount,
       inputTokens: existing.inputTokens + totals.inputTokens,
       cacheReadInputTokens: existing.cacheReadInputTokens + totals.cacheReadInputTokens,
       cacheCreationInputTokens: existing.cacheCreationInputTokens + totals.cacheCreationInputTokens,

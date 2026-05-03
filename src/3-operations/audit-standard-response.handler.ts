@@ -152,6 +152,18 @@ export class AuditStandardResponseHandler {
         };
         await this.sessionStore.pushStepMetaByDir(context.auditInteractionDir, stepMeta);
 
+        // Actualizar métricas de sesión per-step
+        const currentTurn = this.sessionStore.getTurnByDirSync(context.auditInteractionDir);
+        if (currentTurn?.modelId) {
+          const sessionDir = path.join(this.sessionStore.getBaseDir(), currentTurn.sessionId);
+          const stepTotals = computeTokenTotals([stepMeta]);
+          await this.sessionStore.withSessionLock(currentTurn.sessionId, async () => {
+            await this.auditWriter
+              .updateSessionMetrics(sessionDir, currentTurn.modelId!, stepTotals, 1)
+              .catch(() => { /* error no crítico */ });
+          });
+        }
+
         if (terminalStatus !== 'terminal') {
           // Raro: non-SSE con stop_reason=tool_use — mantener turno abierto
           return;
@@ -236,15 +248,6 @@ export class AuditStandardResponseHandler {
     };
 
     await this.auditWriter.writeTurnMeta(turn.interactionDir, meta);
-
-    if (turn.interactionType !== 'client-preflight' && turn.modelId && totals) {
-      const sessionDir = path.join(this.sessionStore.getBaseDir(), turn.sessionId);
-      await this.sessionStore.withSessionLock(turn.sessionId, async () => {
-        await this.auditWriter
-          .updateSessionMetrics(sessionDir, turn.modelId!, totals)
-          .catch(() => { /* error no crítico */ });
-      });
-    }
 
     // Eliminar state.json al cerrar turno
     await this.auditWriter.removeInteractionState(turn.interactionDir);

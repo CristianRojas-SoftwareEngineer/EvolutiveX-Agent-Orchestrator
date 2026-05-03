@@ -87,7 +87,7 @@ const C = {
   reasoning: '\x1B[1;37m', // blanco bold
   total: '\x1B[1;37m', // blanco bold
   // Barra de progreso
-  barGreen: '\x1B[38;2;130;220;120m', // verde claro
+  barGreen: '\x1B[38;2;80;180;80m', // verde
   barOrange: '\x1B[38;2;240;170;60m', // naranja
   barRed: '\x1B[38;2;230;80;80m', // rojo
   barEmpty: '\x1B[90m', // gris

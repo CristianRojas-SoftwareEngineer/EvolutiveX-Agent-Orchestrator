@@ -11,7 +11,6 @@
 
 import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { homedir } from 'node:os';
 
 // ── Tipos ───────────────────────────────────────────────────────
 
@@ -75,39 +74,48 @@ const C = {
   reset: '\x1B[0m',
   bold: '\x1B[1m',
   dim: '\x1B[2m',
-  // Cabeceras y títulos
-  title: '\x1B[1;34m',     // azul bold
-  header: '\x1B[1;94m',    // azul rey bold
+  // Cabeceras y títulos - azul #253ecc (rgb: 37-62-204)
+  title: '\x1B[38;2;37;62;204m', // azul #253ecc
+  header: '\x1B[38;2;37;62;204m', // azul #253ecc
   // Valores de celdas
-  value: '\x1B[37m',       // blanco
-  provider: '\x1B[37m',    // blanco
-  model: '\x1B[37m',       // blanco
+  value: '\x1B[37m', // blanco
+  provider: '\x1B[37m', // blanco
+  model: '\x1B[37m', // blanco
   // Niveles (gris, blanco, blanco bold)
-  lite: '\x1B[90m',        // gris
-  standard: '\x1B[37m',    // blanco
+  lite: '\x1B[90m', // gris
+  standard: '\x1B[37m', // blanco
   reasoning: '\x1B[1;37m', // blanco bold
-  total: '\x1B[1;37m',     // blanco bold
+  total: '\x1B[1;37m', // blanco bold
   // Barra de progreso
-  barFilled: '\x1B[37m',   // blanco
-  barEmpty: '\x1B[90m',    // gris
+  barFilled: '\x1B[37m', // blanco
+  barEmpty: '\x1B[90m', // gris
   // Bordes de tabla
-  border: '\x1B[90m',      // gris
-  label: '\x1B[1;34m',     // azul bold (cabeceras)
+  border: '\x1B[90m', // gris
+  label: '\x1B[38;2;37;62;204m', // azul #253ecc (cabeceras)
 };
 
 // ── Bordes Unicode ──────────────────────────────────────────────
 
 const B = {
-  tl: '╭', tr: '╮', bl: '╰', br: '╯',
-  h: '─', v: '│',
-  ml: '├', mr: '┤', mt: '┬', mb: '┴', mm: '┼',
+  tl: '╭',
+  tr: '╮',
+  bl: '╰',
+  br: '╯',
+  h: '─',
+  v: '│',
+  ml: '├',
+  mr: '┤',
+  mt: '┬',
+  mb: '┴',
+  mm: '┼',
 };
 
 // ── Helpers de renderizado ──────────────────────────────────────
 
 /** Longitud visible de un string (sin contar códigos ANSI) */
+const ANSI_REGEX = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, 'g');
 function visibleLength(str: string): number {
-  return str.replace(/\x1B\[[0-9;]*m/g, '').length;
+  return str.replace(ANSI_REGEX, '').length;
 }
 
 /** Padding a longitud fija con color */
@@ -179,7 +187,7 @@ function renderTable(
   rows: string[][],
   alignments: ('left' | 'center' | 'right')[] = [],
   separatorAfter?: number[],
-): { table: string; width: number } {
+): { table: string; width: number; columnWidths: number[] } {
   const colCount = headers.length;
   if (alignments.length === 0) {
     alignments = headers.map(() => 'left');
@@ -193,7 +201,8 @@ function renderTable(
     for (const row of rows) {
       if (i < row.length && row[i] !== '' && row[i] !== undefined) {
         // Si la celda siguiente está vacía, esta es una celda fusionada - excluir del cálculo
-        const isMerged = i + 1 < colCount && (row[i + 1] === '' || row[i + 1] === undefined);
+        const isMerged =
+          i + 1 < colCount && (row[i + 1] === '' || row[i + 1] === undefined);
         if (!isMerged) {
           maxW = Math.max(maxW, visibleLength(row[i]));
         }
@@ -203,16 +212,8 @@ function renderTable(
   }
 
   // Ancho total: anchos de columnas + padding por columna + bordes + separadores
-  const totalWidth = widths.reduce((sum, w) => sum + w, 0) + widths.length * 3 + 1;
-
-  // Función para alinear celda
-  function alignCell(text: string, width: number, align: 'left' | 'center' | 'right'): string {
-    switch (align) {
-      case 'right': return padRight(text, width); // padRight ya hace left, invertimos
-      case 'center': return padCenter(text, width);
-      default: return padRight(text, width);
-    }
-  }
+  const totalWidth =
+    widths.reduce((sum, w) => sum + w, 0) + widths.length * 3 + 1;
 
   // Para alineación a la derecha, necesitamos padding manual
   function alignRight(text: string, width: number): string {
@@ -230,12 +231,15 @@ function renderTable(
   // Header: │ Header │ Header │
   const headerCells = headers.map((h, i) => {
     const colored = `${C.label}${h}${C.reset}`;
-    const aligned = alignments[i] === 'right'
-      ? alignRight(colored, widths[i])
-      : padCenter(colored, widths[i]);
+    const aligned =
+      alignments[i] === 'right'
+        ? alignRight(colored, widths[i])
+        : padCenter(colored, widths[i]);
     return aligned;
   });
-  lines.push(`${C.border}${B.v}${C.reset} ${headerCells.join(` ${C.border}${B.v}${C.reset} `)} ${C.border}${B.v}${C.reset}`);
+  lines.push(
+    `${C.border}${B.v}${C.reset} ${headerCells.join(` ${C.border}${B.v}${C.reset} `)} ${C.border}${B.v}${C.reset}`,
+  );
 
   // Separador de header: ├───┼───┤
   const midParts = widths.map((w) => B.h.repeat(w + 2));
@@ -258,20 +262,26 @@ function renderTable(
 
       // Calcular ancho efectivo (incluyendo celdas vacías siguientes)
       let effectiveWidth = widths[i];
-      for (let j = i + 1; j < colCount && (row[j] === '' || row[j] === undefined); j++) {
+      for (
+        let j = i + 1;
+        j < colCount && (row[j] === '' || row[j] === undefined);
+        j++
+      ) {
         effectiveWidth += widths[j] + 3; // +3 para espacio, borde, espacio
       }
 
-      const aligned = alignments[i] === 'right'
-        ? alignRight(cell, effectiveWidth)
-        : alignments[i] === 'center'
-          ? padCenter(cell, effectiveWidth)
-          : padRight(cell, effectiveWidth);
+      const aligned =
+        alignments[i] === 'right'
+          ? alignRight(cell, effectiveWidth)
+          : alignments[i] === 'center'
+            ? padCenter(cell, effectiveWidth)
+            : padRight(cell, effectiveWidth);
 
       rowLine += aligned;
 
       // Agregar separador de columna (excepto si la siguiente celda está vacía)
-      const nextIsEmpty = i + 1 < colCount && (row[i + 1] === '' || row[i + 1] === undefined);
+      const nextIsEmpty =
+        i + 1 < colCount && (row[i + 1] === '' || row[i + 1] === undefined);
       if (i < colCount - 1 && !nextIsEmpty) {
         rowLine += ` ${C.border}${B.v}${C.reset} `;
       }
@@ -293,7 +303,11 @@ function renderTable(
   return { table: lines.join('\n'), width: totalWidth, columnWidths: widths };
 }
 
-function renderSideBySide(left: { lines: string[]; width: number }, right: { lines: string[]; width: number }, gap: number = 2): string {
+function renderSideBySide(
+  left: { lines: string[]; width: number },
+  right: { lines: string[]; width: number },
+  gap: number = 2,
+): string {
   const minLines = Math.min(left.lines.length, right.lines.length);
   const result: string[] = [];
 
@@ -301,7 +315,9 @@ function renderSideBySide(left: { lines: string[]; width: number }, right: { lin
   for (let i = 0; i < minLines; i++) {
     const leftVisLen = visibleLength(left.lines[i]);
     const leftPad = ' '.repeat(Math.max(0, left.width - leftVisLen));
-    result.push(`${left.lines[i]}${leftPad}${' '.repeat(gap)}${right.lines[i]}`);
+    result.push(
+      `${left.lines[i]}${leftPad}${' '.repeat(gap)}${right.lines[i]}`,
+    );
   }
 
   // Renderizar las líneas sobrantes de la tabla más larga debajo
@@ -335,7 +351,10 @@ function readDotEnv(): Record<string, string> {
   return result;
 }
 
-function resolveActiveProvider(): { providerName: string; upstreamOrigin: string } {
+function resolveActiveProvider(): {
+  providerName: string;
+  upstreamOrigin: string;
+} {
   const envVars = readDotEnv();
   const upstreamOrigin = envVars['UPSTREAM_ORIGIN'] || '';
 
@@ -347,13 +366,17 @@ function resolveActiveProvider(): { providerName: string; upstreamOrigin: string
     return { providerName: 'Desconocido', upstreamOrigin };
   }
 
-  const providers = readdirSync(ROUTING_PATH, { withFileTypes: true })
-    .filter((d) => d.isDirectory() && existsSync(join(ROUTING_PATH, d.name, 'config.json')));
+  const providers = readdirSync(ROUTING_PATH, { withFileTypes: true }).filter(
+    (d) =>
+      d.isDirectory() && existsSync(join(ROUTING_PATH, d.name, 'config.json')),
+  );
 
   for (const provider of providers) {
     try {
       const configPath = join(ROUTING_PATH, provider.name, 'config.json');
-      const config = JSON.parse(readFileSync(configPath, 'utf-8')) as ProviderConfig;
+      const config = JSON.parse(
+        readFileSync(configPath, 'utf-8'),
+      ) as ProviderConfig;
       if (config.ANTHROPIC_BASE_URL === upstreamOrigin) {
         return { providerName: provider.name, upstreamOrigin };
       }
@@ -377,8 +400,9 @@ function resolveAuthMethod(): 'api_key' | 'bearer' | 'oauth' {
 function resolveSessionPath(sessionId?: string): string | null {
   if (!existsSync(SESSIONS_PATH)) return null;
 
-  const sessions = readdirSync(SESSIONS_PATH, { withFileTypes: true })
-    .filter((d) => d.isDirectory());
+  const sessions = readdirSync(SESSIONS_PATH, { withFileTypes: true }).filter(
+    (d) => d.isDirectory(),
+  );
 
   if (sessions.length === 0) return null;
 
@@ -401,21 +425,25 @@ function resolveSessionPath(sessionId?: string): string | null {
 function loadDisplayName(modelId: string): string {
   if (!existsSync(ROUTING_PATH)) return modelId;
 
-  const providers = readdirSync(ROUTING_PATH, { withFileTypes: true })
-    .filter((d) => d.isDirectory());
+  const providers = readdirSync(ROUTING_PATH, { withFileTypes: true }).filter(
+    (d) => d.isDirectory(),
+  );
 
   for (const provider of providers) {
     const modelsDir = join(ROUTING_PATH, provider.name, 'models');
     if (!existsSync(modelsDir)) continue;
 
-    const models = readdirSync(modelsDir, { withFileTypes: true })
-      .filter((d) => d.isDirectory());
+    const models = readdirSync(modelsDir, { withFileTypes: true }).filter((d) =>
+      d.isDirectory(),
+    );
 
     for (const model of models) {
       const metadataPath = join(modelsDir, model.name, 'metadata.json');
       if (!existsSync(metadataPath)) continue;
       try {
-        const metadata = JSON.parse(readFileSync(metadataPath, 'utf-8')) as ModelMetadata;
+        const metadata = JSON.parse(
+          readFileSync(metadataPath, 'utf-8'),
+        ) as ModelMetadata;
         if (metadata.modelId === modelId) {
           return metadata.displayName || modelId;
         }
@@ -435,12 +463,25 @@ function classifyModel(modelId: string): 'lite' | 'standard' | 'reasoning' {
 
   const modelBase = modelId.split('/').pop() || modelId;
 
-  if (haiku && (modelId.includes(haiku) || modelBase.includes('haiku'))) return 'lite';
-  if (opus && (modelId.includes(opus) || modelBase.includes('opus'))) return 'reasoning';
-  if (sonnet && (modelId.includes(sonnet) || modelBase.includes('sonnet'))) return 'standard';
+  if (haiku && (modelId.includes(haiku) || modelBase.includes('haiku')))
+    return 'lite';
+  if (opus && (modelId.includes(opus) || modelBase.includes('opus')))
+    return 'reasoning';
+  if (sonnet && (modelId.includes(sonnet) || modelBase.includes('sonnet')))
+    return 'standard';
 
-  if (modelBase.includes('haiku') || modelBase.includes('flash') || modelBase.includes('mini')) return 'lite';
-  if (modelBase.includes('opus') || modelBase.includes('pro') || modelBase.includes('reasoning')) return 'reasoning';
+  if (
+    modelBase.includes('haiku') ||
+    modelBase.includes('flash') ||
+    modelBase.includes('mini')
+  )
+    return 'lite';
+  if (
+    modelBase.includes('opus') ||
+    modelBase.includes('pro') ||
+    modelBase.includes('reasoning')
+  )
+    return 'reasoning';
   return 'standard';
 }
 
@@ -449,29 +490,52 @@ function aggregateInteractionMetrics(sessionPath: string): {
   standard: TokenMetrics;
   reasoning: TokenMetrics;
 } {
-  const empty: TokenMetrics = { inputTokens: 0, cacheReadInputTokens: 0, outputTokens: 0, count: 0 };
-  const metrics = { lite: { ...empty }, standard: { ...empty }, reasoning: { ...empty } };
+  const empty: TokenMetrics = {
+    inputTokens: 0,
+    cacheReadInputTokens: 0,
+    outputTokens: 0,
+    count: 0,
+  };
+  const metrics = {
+    lite: { ...empty },
+    standard: { ...empty },
+    reasoning: { ...empty },
+  };
 
   const interactionsPath = join(sessionPath, 'interactions');
   if (!existsSync(interactionsPath)) return metrics;
 
-  const interactions = readdirSync(interactionsPath, { withFileTypes: true })
-    .filter((d) => d.isDirectory());
+  const interactions = readdirSync(interactionsPath, {
+    withFileTypes: true,
+  }).filter((d) => d.isDirectory());
 
   for (const interaction of interactions) {
     const metaPath = join(interactionsPath, interaction.name, 'meta.json');
     if (!existsSync(metaPath)) continue;
 
     try {
-      const meta = JSON.parse(readFileSync(metaPath, 'utf-8')) as InteractionMeta;
+      const meta = JSON.parse(
+        readFileSync(metaPath, 'utf-8'),
+      ) as InteractionMeta;
 
-      if (meta.interactionType !== 'agentic-turn' && meta.interactionType !== 'side-request') continue;
+      if (
+        meta.interactionType !== 'agentic-turn' &&
+        meta.interactionType !== 'side-request'
+      )
+        continue;
 
-      const bodyPath = join(interactionsPath, interaction.name, 'request', 'body.json');
+      const bodyPath = join(
+        interactionsPath,
+        interaction.name,
+        'request',
+        'body.json',
+      );
       let modelId = '';
       if (existsSync(bodyPath)) {
         try {
-          const body = JSON.parse(readFileSync(bodyPath, 'utf-8')) as InteractionRequest;
+          const body = JSON.parse(
+            readFileSync(bodyPath, 'utf-8'),
+          ) as InteractionRequest;
           modelId = body.model || '';
         } catch {
           // Ignorar body corrupto
@@ -486,7 +550,8 @@ function aggregateInteractionMetrics(sessionPath: string): {
       levelMetrics.count++;
       if (meta.totals) {
         levelMetrics.inputTokens += meta.totals.inputTokens || 0;
-        levelMetrics.cacheReadInputTokens += meta.totals.cacheReadInputTokens || 0;
+        levelMetrics.cacheReadInputTokens +=
+          meta.totals.cacheReadInputTokens || 0;
         levelMetrics.outputTokens += meta.totals.outputTokens || 0;
       }
     } catch {
@@ -499,7 +564,10 @@ function aggregateInteractionMetrics(sessionPath: string): {
 
 // ── Renderizado de tablas completas ─────────────────────────────
 
-function renderSessionTable(ctx: ClaudeCodeContext): { lines: string[]; width: number } {
+function renderSessionTable(ctx: ClaudeCodeContext): {
+  lines: string[];
+  width: number;
+} {
   const provider = resolveActiveProvider();
   const sessionId = ctx.session_id || 'N/A';
   const contextSize = ctx.context_window?.context_window_size;
@@ -508,7 +576,9 @@ function renderSessionTable(ctx: ClaudeCodeContext): { lines: string[]; width: n
   const contextDisplay = formatContextSize(contextSize);
 
   // Capitalizar nombre del proveedor
-  const providerDisplay = provider.providerName.charAt(0).toUpperCase() + provider.providerName.slice(1);
+  const providerDisplay =
+    provider.providerName.charAt(0).toUpperCase() +
+    provider.providerName.slice(1);
 
   // Obtener displayName del modelo activo
   const rawModelName = ctx.model?.display_name || 'N/A';
@@ -522,24 +592,36 @@ function renderSessionTable(ctx: ClaudeCodeContext): { lines: string[]; width: n
     barDisplay = `${C.dim}calculando...${C.reset}`;
   } else {
     const pctDisplay = `${usedPct.toFixed(0)}%`;
-    barDisplay = `${renderBar(usedPct)} ${pctDisplay}`;
+    // Barra (8 chars) + espacio + porcentaje, con espacio inicial para centrado visual
+    barDisplay = ` ${renderBar(usedPct, 8)} ${pctDisplay}`;
   }
 
-  const sessionDisplay = sessionId.length > 36
-    ? sessionId.slice(0, 33) + '...'
-    : sessionId;
+  const sessionDisplay =
+    sessionId.length > 36 ? sessionId.slice(0, 33) + '...' : sessionId;
 
   // Definir datos de la tabla
-  const headers = ['Proveedor', 'Modelo activo', 'Ventana de Contexto', 'Porcentaje de uso'];
-  const rows = [[
-    `${C.provider}${providerDisplay}${C.reset}`,
-    `${C.model}${modelName}${C.reset}`,
-    `${C.value}${contextDisplay}${C.reset}`,
-    barDisplay,
-  ]];
+  const headers = [
+    'Proveedor',
+    'Modelo activo',
+    'Ventana de contexto',
+    'Porcentaje de uso',
+  ];
+  const rows = [
+    [
+      `${C.provider}${providerDisplay}${C.reset}`,
+      `${C.model}${modelName}${C.reset}`,
+      `${C.value}${contextDisplay}${C.reset}`,
+      barDisplay,
+    ],
+  ];
 
   // Renderizar tabla y obtener ancho
-  const { table, width } = renderTable(headers, rows, ['left', 'left', 'center', 'left']);
+  const { table, width } = renderTable(headers, rows, [
+    'center',
+    'center',
+    'center',
+    'center',
+  ]);
 
   // Calcular padding para que el título tenga el mismo ancho que la tabla
   const titleText = `╭─ Sesión actual «${sessionDisplay}» `;
@@ -563,10 +645,25 @@ function renderTokenTable(metrics: {
     return ' '.repeat(pad) + text;
   }
 
-  const levels: Array<{ key: keyof typeof metrics; label: string; modelExample: string; color: string }> = [
-    { key: 'lite', label: 'Lite', modelExample: 'MiMo 2 Omni', color: C.lite },
-    { key: 'standard', label: 'Standard', modelExample: 'MiMo 2.5', color: C.standard },
-    { key: 'reasoning', label: 'Reasoning', modelExample: 'MiMo 2.5 Pro', color: C.reasoning },
+  const levels: Array<{
+    key: keyof typeof metrics;
+    label: string;
+    modelExample: string;
+    color: string;
+  }> = [
+    { key: 'lite', label: 'Lite', modelExample: 'MiMo 2 Omni', color: C.value },
+    {
+      key: 'standard',
+      label: 'Standard',
+      modelExample: 'MiMo 2.5',
+      color: C.value,
+    },
+    {
+      key: 'reasoning',
+      label: 'Reasoning',
+      modelExample: 'MiMo 2.5 Pro',
+      color: C.value,
+    },
   ];
 
   const rows: string[][] = [];
@@ -594,11 +691,30 @@ function renderTokenTable(metrics: {
   }
 
   // Definir datos de la tabla (sin fila de total)
-  const headers = ['Nivel', 'Modelo', 'N.º', 'Input (tks)', 'Cache In (tks)', 'Output (tks)'];
-  const alignments: Array<'left' | 'center' | 'right'> = ['left', 'left', 'right', 'right', 'right', 'right'];
+  const headers = [
+    'Nivel',
+    'Modelo',
+    '# Interacciones',
+    'Input (tks)',
+    'Cache In (tks)',
+    'Output (tks)',
+  ];
+  const alignments: Array<'left' | 'center' | 'right'> = [
+    'left',
+    'left',
+    'right',
+    'right',
+    'right',
+    'right',
+  ];
 
   // Renderizar tabla sin fila de total
-  const { table, width, columnWidths } = renderTable(headers, rows, alignments, [0, 1, 2]);
+  const { table, width, columnWidths } = renderTable(
+    headers,
+    rows,
+    alignments,
+    [0, 1, 2],
+  );
 
   // Renderizar fila de total manualmente con celdas fusionadas
   const w0 = columnWidths[0];
@@ -609,17 +725,24 @@ function renderTokenTable(metrics: {
   const w5 = columnWidths[5];
 
   const totalText = `${C.total}Totales de sesión${C.reset}`;
-  // Ancho visual: "│ " + w0 + " " + " " + w1 + " │" = w0 + w1 + 6
-  const mergedWidth = w0 + w1 + 6;
-  const totalMerged = padRight(totalText, mergedWidth);
+  // Para que los │ de las columnas 3-6 estén alineados con las filas anteriores:
+  // mergedContentWidth = w0 + w1 + 3 produce │ en posiciones coincidentes
+  const mergedContentWidth = w0 + w1 + 3;
+  const totalMerged = padRight(totalText, mergedContentWidth);
 
-  const totalRow = `${C.border}${B.v}${C.reset} ${totalMerged} ${C.border}${B.v}${C.reset} ${padRight(`${C.total}${totalCount}${C.reset}`, w2)} ${C.border}${B.v}${C.reset} ${alignRight(`${C.total}${formatTokens(totalInput)}${C.reset}`, w3)} ${C.border}${B.v}${C.reset} ${alignRight(`${C.total}${formatTokens(totalCache)}${C.reset}`, w4)} ${C.border}${B.v}${C.reset} ${alignRight(`${C.total}${formatTokens(totalOutput)}${C.reset}`, w5)} ${C.border}${B.v}${C.reset}`;
+  const totalRow = `${C.border}${B.v}${C.reset} ${totalMerged} ${C.border}${B.v}${C.reset} ${alignRight(`${C.total}${totalCount}${C.reset}`, w2)} ${C.border}${B.v}${C.reset} ${alignRight(`${C.total}${formatTokens(totalInput)}${C.reset}`, w3)} ${C.border}${B.v}${C.reset} ${alignRight(`${C.total}${formatTokens(totalCache)}${C.reset}`, w4)} ${C.border}${B.v}${C.reset} ${alignRight(`${C.total}${formatTokens(totalOutput)}${C.reset}`, w5)} ${C.border}${B.v}${C.reset}`;
 
   // Borde inferior de la tabla con columna fusionada
   // w0+2 (col0) + 1 (┴) + w1+2 (col1) = w0+w1+5
   const mergedBorderWidth = w0 + w1 + 5;
   const mergedBorder = B.h.repeat(mergedBorderWidth);
-  const botParts = [mergedBorder, B.h.repeat(w2 + 2), B.h.repeat(w3 + 2), B.h.repeat(w4 + 2), B.h.repeat(w5 + 2)];
+  const botParts = [
+    mergedBorder,
+    B.h.repeat(w2 + 2),
+    B.h.repeat(w3 + 2),
+    B.h.repeat(w4 + 2),
+    B.h.repeat(w5 + 2),
+  ];
   const botLine = `${C.border}${B.bl}${botParts.join(B.mb)}${B.br}${C.reset}`;
 
   // Calcular padding para que el título tenga el mismo ancho que la tabla
@@ -631,6 +754,17 @@ function renderTokenTable(metrics: {
   // Eliminar el borde inferior generado por renderTable
   const tableLines = table.split('\n');
   tableLines.pop(); // Eliminar última línea (borde inferior)
+
+  // Cambiar el primer ┼ del separador anterior por ┴ (la columna fusionada termina ahí)
+  const lastSepIdx = tableLines.length - 1;
+  const lastSep = tableLines[lastSepIdx];
+  const firstMmIdx = lastSep.indexOf(B.mm);
+  if (firstMmIdx !== -1) {
+    tableLines[lastSepIdx] =
+      lastSep.substring(0, firstMmIdx) +
+      B.mb +
+      lastSep.substring(firstMmIdx + 1);
+  }
 
   const lines = [title, ...tableLines, totalRow, botLine];
   return { lines, width };
@@ -671,11 +805,11 @@ function renderRateLimitTable(ctx: ClaudeCodeContext): string | null {
   }
 
   // Renderizar tabla y obtener ancho
-  const { table, width } = renderTable(
-    ['Cuota', 'Uso', 'Reinicio'],
-    rows,
-    ['left', 'left', 'center'],
-  );
+  const { table, width } = renderTable(['Cuota', 'Uso', 'Reinicio'], rows, [
+    'left',
+    'left',
+    'center',
+  ]);
 
   // Calcular padding para que el título tenga el mismo ancho que la tabla
   const titleText = '╭─ Rate Limits (OAuth)';

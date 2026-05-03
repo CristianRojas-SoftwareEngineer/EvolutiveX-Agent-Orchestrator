@@ -186,12 +186,17 @@ function renderTable(
   }
 
   // Calcular ancho máximo por columna (basado en contenido visible)
+  // Excluir celdas fusionadas (celda seguida de celda vacía)
   const widths: number[] = [];
   for (let i = 0; i < colCount; i++) {
     let maxW = visibleLength(headers[i]);
     for (const row of rows) {
-      if (i < row.length) {
-        maxW = Math.max(maxW, visibleLength(row[i]));
+      if (i < row.length && row[i] !== '' && row[i] !== undefined) {
+        // Si la celda siguiente está vacía, esta es una celda fusionada - excluir del cálculo
+        const isMerged = i + 1 < colCount && (row[i + 1] === '' || row[i + 1] === undefined);
+        if (!isMerged) {
+          maxW = Math.max(maxW, visibleLength(row[i]));
+        }
       }
     }
     widths[i] = maxW;
@@ -239,15 +244,40 @@ function renderTable(
   // Filas de datos
   for (let r = 0; r < rows.length; r++) {
     const row = rows[r];
-    const cells = row.map((cell, i) => {
+
+    // Verificar si hay celdas vacías (fusión)
+    let rowLine = `${C.border}${B.v}${C.reset} `;
+    for (let i = 0; i < colCount; i++) {
+      const cell = row[i] || '';
+      const isEmpty = cell === '';
+
+      // Si la celda está vacía, extender la celda anterior
+      if (isEmpty && i > 0) {
+        continue;
+      }
+
+      // Calcular ancho efectivo (incluyendo celdas vacías siguientes)
+      let effectiveWidth = widths[i];
+      for (let j = i + 1; j < colCount && (row[j] === '' || row[j] === undefined); j++) {
+        effectiveWidth += widths[j] + 3; // +3 para espacio, borde, espacio
+      }
+
       const aligned = alignments[i] === 'right'
-        ? alignRight(cell, widths[i])
+        ? alignRight(cell, effectiveWidth)
         : alignments[i] === 'center'
-          ? padCenter(cell, widths[i])
-          : padRight(cell, widths[i]);
-      return aligned;
-    });
-    lines.push(`${C.border}${B.v}${C.reset} ${cells.join(` ${C.border}${B.v}${C.reset} `)} ${C.border}${B.v}${C.reset}`);
+          ? padCenter(cell, effectiveWidth)
+          : padRight(cell, effectiveWidth);
+
+      rowLine += aligned;
+
+      // Agregar separador de columna (excepto si la siguiente celda está vacía)
+      const nextIsEmpty = i + 1 < colCount && (row[i + 1] === '' || row[i + 1] === undefined);
+      if (i < colCount - 1 && !nextIsEmpty) {
+        rowLine += ` ${C.border}${B.v}${C.reset} `;
+      }
+    }
+    rowLine += ` ${C.border}${B.v}${C.reset}`;
+    lines.push(rowLine);
 
     // Separador horizontal opcional después de esta fila
     if (separatorAfter?.includes(r)) {
@@ -260,7 +290,7 @@ function renderTable(
   const botParts = widths.map((w) => B.h.repeat(w + 2));
   lines.push(`${C.border}${B.bl}${botParts.join(B.mb)}${B.br}${C.reset}`);
 
-  return { table: lines.join('\n'), width: totalWidth };
+  return { table: lines.join('\n'), width: totalWidth, columnWidths: widths };
 }
 
 function renderSideBySide(left: { lines: string[]; width: number }, right: { lines: string[]; width: number }, gap: number = 2): string {
@@ -526,6 +556,13 @@ function renderTokenTable(metrics: {
   standard: TokenMetrics;
   reasoning: TokenMetrics;
 }): { lines: string[]; width: number } {
+  // Función local para alinear a la derecha
+  function alignRight(text: string, width: number): string {
+    const vis = visibleLength(text);
+    const pad = Math.max(0, width - vis);
+    return ' '.repeat(pad) + text;
+  }
+
   const levels: Array<{ key: keyof typeof metrics; label: string; modelExample: string; color: string }> = [
     { key: 'lite', label: 'Lite', modelExample: 'MiMo 2 Omni', color: C.lite },
     { key: 'standard', label: 'Standard', modelExample: 'MiMo 2.5', color: C.standard },
@@ -556,22 +593,34 @@ function renderTokenTable(metrics: {
     ]);
   }
 
-  // Fila de total
-  rows.push([
-    `${C.total}Sesión actual${C.reset}`,
-    `${C.total}Total${C.reset}`,
-    `${C.total}${totalCount}${C.reset}`,
-    `${C.total}${formatTokens(totalInput)}${C.reset}`,
-    `${C.total}${formatTokens(totalCache)}${C.reset}`,
-    `${C.total}${formatTokens(totalOutput)}${C.reset}`,
-  ]);
-
-  // Definir datos de la tabla
+  // Definir datos de la tabla (sin fila de total)
   const headers = ['Nivel', 'Modelo', 'N.º', 'Input (tks)', 'Cache In (tks)', 'Output (tks)'];
   const alignments: Array<'left' | 'center' | 'right'> = ['left', 'left', 'right', 'right', 'right', 'right'];
 
-  // Renderizar tabla y obtener ancho
-  const { table, width } = renderTable(headers, rows, alignments, [0, 1, 2]);
+  // Renderizar tabla sin fila de total
+  const { table, width, columnWidths } = renderTable(headers, rows, alignments, [0, 1, 2]);
+
+  // Renderizar fila de total manualmente con celdas fusionadas
+  const w0 = columnWidths[0];
+  const w1 = columnWidths[1];
+  const w2 = columnWidths[2];
+  const w3 = columnWidths[3];
+  const w4 = columnWidths[4];
+  const w5 = columnWidths[5];
+
+  const totalText = `${C.total}Totales de sesión${C.reset}`;
+  // Ancho visual: "│ " + w0 + " " + " " + w1 + " │" = w0 + w1 + 6
+  const mergedWidth = w0 + w1 + 6;
+  const totalMerged = padRight(totalText, mergedWidth);
+
+  const totalRow = `${C.border}${B.v}${C.reset} ${totalMerged} ${C.border}${B.v}${C.reset} ${padRight(`${C.total}${totalCount}${C.reset}`, w2)} ${C.border}${B.v}${C.reset} ${alignRight(`${C.total}${formatTokens(totalInput)}${C.reset}`, w3)} ${C.border}${B.v}${C.reset} ${alignRight(`${C.total}${formatTokens(totalCache)}${C.reset}`, w4)} ${C.border}${B.v}${C.reset} ${alignRight(`${C.total}${formatTokens(totalOutput)}${C.reset}`, w5)} ${C.border}${B.v}${C.reset}`;
+
+  // Borde inferior de la tabla con columna fusionada
+  // w0+2 (col0) + 1 (┴) + w1+2 (col1) = w0+w1+5
+  const mergedBorderWidth = w0 + w1 + 5;
+  const mergedBorder = B.h.repeat(mergedBorderWidth);
+  const botParts = [mergedBorder, B.h.repeat(w2 + 2), B.h.repeat(w3 + 2), B.h.repeat(w4 + 2), B.h.repeat(w5 + 2)];
+  const botLine = `${C.border}${B.bl}${botParts.join(B.mb)}${B.br}${C.reset}`;
 
   // Calcular padding para que el título tenga el mismo ancho que la tabla
   const titleText = '╭─ Interacciones por nivel de razonamiento ';
@@ -579,7 +628,11 @@ function renderTokenTable(metrics: {
   const titlePad = Math.max(0, width - titleVisLen - 1); // -1 para ╮ (╭ ya está en titleVisLen)
   const title = `${C.title}${titleText}${'─'.repeat(titlePad)}╮${C.reset}`;
 
-  const lines = [title, ...table.split('\n')];
+  // Eliminar el borde inferior generado por renderTable
+  const tableLines = table.split('\n');
+  tableLines.pop(); // Eliminar última línea (borde inferior)
+
+  const lines = [title, ...tableLines, totalRow, botLine];
   return { lines, width };
 }
 

@@ -1,9 +1,3 @@
-# Problemas activos y diseño de sistemas en evolución
-
-Este documento describe el diseño de sistemas recientemente introducidos y los problemas conocidos que aún no han sido abordados. Su propósito es preservar el razonamiento técnico para facilitar decisiones de diseño futuras.
-
----
-
 ## Sistema de métricas por Slot/Modelo y Sesión (`session-metrics.json`)
 
 ### Motivación
@@ -115,23 +109,5 @@ No existe doble conteo. Sumar todos los turnos da el costo total efectivo de la 
 #### Validez multi-proveedor
 
 El sistema funciona para cualquier proveedor configurado en Smart Code Proxy (Anthropic, OpenRouter, etc.) porque depende únicamente del campo `"model"` del request body JSON, no de APIs ni formatos de respuesta propietarios. `classifyModel` clasifica el `modelId` usando las variables de entorno de configuración de modelos del proxy.
-
----
-
-### Problemas conocidos
-
-#### P1 — Race condition formal entre side-request y agentic-turn (misma sesión) [RESUELTO]
-
-**Escenario:** Un side-request (`count_tokens`, `context-sync`) y el cierre de un agentic-turn ocurren concurrentemente en la misma sesión. Ambos ejecutan `updateSessionMetrics` sobre el mismo `session-metrics.json`.
-
-**Mecanismo de fallo (original):** El ciclo read-modify-write no estaba protegido por ningún lock a nivel de archivo. Si el agentic-turn lee el archivo, luego el side-request lee el mismo estado, luego el agentic-turn escribe, luego el side-request escribe — la escritura del side-request sobreescribe la del agentic-turn. Se pierde una actualización.
-
-**Resolución:** Las llamadas a `updateSessionMetrics` en los 4 handlers de cierre de turno ahora se envuelven en `withSessionLock(sessionId, ...)`. Esto serializa las escrituras a `session-metrics.json` por sesión, garantizando que cada incremento de contador y suma de tokens se aplique correctamente sobre el estado previo.
-
-**Handlers modificados:**
-- `src/3-operations/audit-sse-response.handler.ts` — `writeTurnMeta`
-- `src/3-operations/audit-standard-response.handler.ts` — `writeTurnMeta`
-- `src/3-operations/audit-upstream-error.handler.ts` — `execute`
-- `src/3-operations/audit-interaction.handler.ts` — `closeOrphanTurn`
 
 ---

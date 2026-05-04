@@ -22,7 +22,7 @@ El rediseño reemplaza los tres `.ps1` con un único `scripting/router-status.ts
 |---|---|---|
 | Session ID | stdin (`$ctx`) | `ctx.session_id` |
 | Modelo activo (nombre de display) | stdin (`$ctx`) | `ctx.model.display_name` |
-| Ventana de contexto (tamaño) | stdin (`$ctx`) | `ctx.context_window.context_window_size` |
+| Contexto (tks) (tamaño) | stdin (`$ctx`) | `ctx.context_window.context_window_size` |
 | Porcentaje de uso de contexto | stdin (`$ctx`) | `ctx.context_window.used_percentage` |
 | Rate limits (solo OAuth) | stdin (`$ctx`) | `ctx.rate_limits.five_hour`, `ctx.rate_limits.seven_day` |
 | Provider upstream activo | `configs/.env` | `UPSTREAM_ORIGIN` |
@@ -47,7 +47,7 @@ El statusline consta de **dos o tres tablas** según el método de autenticació
 
 ```
 ╭─ Sesión actual «9b4510c9-90ca-4439-9dc2-a5d62bf0b308» ─────────────────────────────────────────────────────╮
-│        Proveedor         │     Modelo activo     │ Ventana de contexto │    Porcentaje de uso     │
+│        Proveedor         │     Modelo activo     │ Contexto (tks) │    Porcentaje de uso     │
 ├──────────────────────────┼───────────────────────┼─────────────────────┼──────────────────────────┤
 │        Anthropic         │   claude-opus-4-7     │        200K         │  ████████░░░░ 45%        │
 ╰──────────────────────────┴───────────────────────┴─────────────────────┴──────────────────────────╯
@@ -59,7 +59,7 @@ El statusline consta de **dos o tres tablas** según el método de autenticació
 |---|---|---|---|
 | Proveedor | nombre del proveedor resuelto (capitalizado) | cruce `UPSTREAM_ORIGIN` vs `config.json` | centrada |
 | Modelo activo | display name del modelo activo (`metadata.json → displayName`) | stdin (`ctx.model.display_name`) + resolución en `metadata.json` | centrada |
-| Ventana de contexto | tamaño de ventana formateado como `NNNk` / `NNNm` | stdin (`ctx.context_window.context_window_size`) | centrada |
+| Contexto (tks) | tamaño de ventana formateado como `NNNk` / `NNNm` | stdin (`ctx.context_window.context_window_size`) | centrada |
 | Porcentaje de uso | barra de progreso + porcentaje | stdin (`ctx.context_window.used_percentage`) | centrada |
 
 **Barra de progreso:** 8 bloques, usando `█` (lleno) y `░` (vacío). Color dinámico por rango de porcentaje: verde (`#2ecc71`) 0–39%, naranja (`#f39c12`) 40–69%, rojo (`#e74c3c`) 70–100%. Vacío: gris (`\x1B[90m`).

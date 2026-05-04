@@ -194,26 +194,15 @@ function formatTimeRemaining(resetEpoch?: number): string {
  * @param alignments - Alineación por columna: 'left' | 'center' | 'right'
  * @returns Objeto con el string de la tabla y su ancho total visible
  */
-function renderTable(
-  headers: string[],
-  rows: string[][],
-  alignments: ('left' | 'center' | 'right')[] = [],
-  separatorAfter?: number[],
-  noHeader?: boolean,
-): { table: string; width: number; columnWidths: number[] } {
+// Calcular anchos máximos por columna (basado en contenido visible)
+// Excluir celdas fusionadas (celda seguida de celda vacía)
+function computeColumnWidths(headers: string[], rows: string[][]): number[] {
   const colCount = headers.length;
-  if (alignments.length === 0) {
-    alignments = headers.map(() => 'left');
-  }
-
-  // Calcular ancho máximo por columna (basado en contenido visible)
-  // Excluir celdas fusionadas (celda seguida de celda vacía)
   const widths: number[] = [];
   for (let i = 0; i < colCount; i++) {
     let maxW = visibleLength(headers[i]);
     for (const row of rows) {
       if (i < row.length && row[i] !== '' && row[i] !== undefined) {
-        // Si la celda siguiente está vacía, esta es una celda fusionada - excluir del cálculo
         const isMerged =
           i + 1 < colCount && (row[i + 1] === '' || row[i + 1] === undefined);
         if (!isMerged) {
@@ -223,10 +212,39 @@ function renderTable(
     }
     widths[i] = maxW;
   }
+  return widths;
+}
+
+// Calcular ancho total de tabla: anchos de columnas + padding + bordes + separadores
+function computeTableWidth(headers: string[], rows: string[][]): number {
+  const widths = computeColumnWidths(headers, rows);
+  return widths.reduce((sum, w) => sum + w, 0) + widths.length * 3 + 1;
+}
+
+function renderTable(
+  headers: string[],
+  rows: string[][],
+  alignments: ('left' | 'center' | 'right')[] = [],
+  separatorAfter?: number[],
+  noHeader?: boolean,
+  minWidth?: number,
+): { table: string; width: number; columnWidths: number[] } {
+  const colCount = headers.length;
+  if (alignments.length === 0) {
+    alignments = headers.map(() => 'left');
+  }
+
+  const widths = computeColumnWidths(headers, rows);
 
   // Ancho total: anchos de columnas + padding por columna + bordes + separadores
-  const totalWidth =
+  let totalWidth =
     widths.reduce((sum, w) => sum + w, 0) + widths.length * 3 + 1;
+
+  // Si minWidth es mayor que el ancho natural, expandir última columna
+  if (minWidth !== undefined && totalWidth < minWidth) {
+    widths[widths.length - 1] += minWidth - totalWidth;
+    totalWidth = minWidth;
+  }
 
   // Para alineación a la derecha, necesitamos padding manual
   function alignRight(text: string, width: number): string {
@@ -636,13 +654,7 @@ function totalColor(
 
 // ── Renderizado de tablas completas ─────────────────────────────
 
-function renderSessionTable(
-  ctx: ClaudeCodeContext,
-  sessionPath?: string | null,
-): {
-  lines: string[];
-  width: number;
-} {
+function buildSessionTableData(ctx: ClaudeCodeContext, sessionPath?: string | null) {
   const provider = resolveActiveProvider();
   const sessionId = ctx.session_id || 'N/A';
   const contextSize = ctx.context_window?.context_window_size;
@@ -650,16 +662,13 @@ function renderSessionTable(
 
   const contextDisplay = formatContextSize(contextSize);
 
-  // Capitalizar nombre del proveedor
   const providerDisplay =
     provider.providerName.charAt(0).toUpperCase() +
     provider.providerName.slice(1);
 
-  // Obtener displayName del modelo activo
   const rawModelName = ctx.model?.display_name || 'N/A';
   const modelName = loadDisplayName(rawModelName);
 
-  // Porcentaje de uso: persistir valor válido, usar caché como fallback
   let pct: number;
   if (typeof usedPct === 'number' && Number.isFinite(usedPct) && usedPct > 0) {
     pct = usedPct;
@@ -669,17 +678,15 @@ function renderSessionTable(
     pct = (typeof cached === 'number' && Number.isFinite(cached) && cached >= 0) ? cached : 0;
   }
   const pctDisplay = `${pct.toFixed(0)}%`;
-  // Barra (8 chars) + espacio + porcentaje, con espacio inicial para centrado visual
   const barDisplay = ` ${renderBar(pct, 8)} ${pctDisplay}`;
 
   const sessionDisplay =
     sessionId.length > 36 ? sessionId.slice(0, 33) + '...' : sessionId;
 
-  // Definir datos de la tabla
   const headers = [
     'Proveedor',
     'Modelo activo',
-    'Ventana de contexto',
+    'Contexto (tks)',
     'Porcentaje de uso',
   ];
   const rows = [
@@ -690,19 +697,33 @@ function renderSessionTable(
       barDisplay,
     ],
   ];
+  const alignments: Array<'left' | 'center' | 'right'> = [
+    'center', 'center', 'center', 'center',
+  ];
 
-  // Renderizar tabla y obtener ancho
-  const { table, width } = renderTable(headers, rows, [
-    'center',
-    'center',
-    'center',
-    'center',
-  ]);
+  return { headers, rows, alignments, sessionDisplay };
+}
 
-  // Calcular padding para que el título tenga el mismo ancho que la tabla
+function computeSessionTableWidth(ctx: ClaudeCodeContext, sessionPath?: string | null): number {
+  const { headers, rows } = buildSessionTableData(ctx, sessionPath);
+  return computeTableWidth(headers, rows);
+}
+
+function renderSessionTable(
+  ctx: ClaudeCodeContext,
+  sessionPath?: string | null,
+  targetWidth?: number,
+): {
+  lines: string[];
+  width: number;
+} {
+  const { headers, rows, alignments, sessionDisplay } = buildSessionTableData(ctx, sessionPath);
+
+  const { table, width } = renderTable(headers, rows, alignments, undefined, undefined, targetWidth);
+
   const titleText = `╭─ Sesión actual «${sessionDisplay}» `;
   const titleVisLen = visibleLength(titleText);
-  const titlePad = Math.max(0, width - titleVisLen - 1); // -1 para ╮ (╭ ya está en titleVisLen)
+  const titlePad = Math.max(0, width - titleVisLen - 1);
   const title = `${C.title}${titleText}${'─'.repeat(titlePad)}╮${C.reset}`;
 
   const lines = [title, ...table.split('\n')];
@@ -848,7 +869,7 @@ function renderTokenTable(metrics: {
   return { lines, width };
 }
 
-function renderRateLimitTable(ctx: ClaudeCodeContext): { lines: string[]; width: number } | null {
+function buildRateLimitTableData(ctx: ClaudeCodeContext) {
   const { five_hour, seven_day } = ctx.rate_limits ?? {};
   if (!five_hour && !seven_day) return null;
 
@@ -874,19 +895,39 @@ function renderRateLimitTable(ctx: ClaudeCodeContext): { lines: string[]; width:
     ]);
   }
 
-  // Renderizar tabla y obtener ancho
+  const headers = ['', '', '', ''];
+  const alignments: Array<'left' | 'center' | 'right'> = [
+    'left', 'left', 'left', 'right',
+  ];
+
+  return { headers, rows, alignments };
+}
+
+function computeRateLimitTableWidth(ctx: ClaudeCodeContext): number | null {
+  const data = buildRateLimitTableData(ctx);
+  if (!data) return null;
+  return computeTableWidth(data.headers, data.rows);
+}
+
+function renderRateLimitTable(
+  ctx: ClaudeCodeContext,
+  targetWidth?: number,
+): { lines: string[]; width: number } | null {
+  const data = buildRateLimitTableData(ctx);
+  if (!data) return null;
+
   const { table, width } = renderTable(
-    ['', '', '', ''],
-    rows,
-    ['left', 'left', 'left', 'right'],
+    data.headers,
+    data.rows,
+    data.alignments,
     [0],
     true,
+    targetWidth,
   );
 
-  // Calcular padding para que el título tenga el mismo ancho que la tabla
   const titleText = '╭─ Límites de uso por suscripción ';
   const titleVisLen = visibleLength(titleText);
-  const titlePad = Math.max(0, width - titleVisLen - 1); // -1 para ╮ (╭ ya está en titleVisLen)
+  const titlePad = Math.max(0, width - titleVisLen - 1);
   const title = `${C.title}${titleText}${'─'.repeat(titlePad)}╮${C.reset}`;
 
   const lines = [title, ...table.split('\n')];
@@ -915,8 +956,15 @@ function main(): void {
     // Resolver sesión antes de renderizar para caché per-session
     const sessionPath = resolveSessionPath(ctx.session_id);
 
+    // Tabla 3: Rate limits (solo OAuth) — calcular ancho primero para layout simétrico
+    const authMethod = resolveAuthMethod();
+    const rlWidth = authMethod === 'oauth' ? computeRateLimitTableWidth(ctx) : null;
+    const targetWidth = rlWidth !== null
+      ? Math.max(computeSessionTableWidth(ctx, sessionPath), rlWidth)
+      : undefined;
+
     // Tabla 1: Sesión y proveedor
-    const table1 = renderSessionTable(ctx, sessionPath);
+    const table1 = renderSessionTable(ctx, sessionPath, targetWidth);
 
     // Tabla 2: Métricas de interacciones
     let table2: { lines: string[]; width: number };
@@ -934,15 +982,13 @@ function main(): void {
     }
 
     // Tabla 3: Rate limits (solo OAuth)
-    const authMethod = resolveAuthMethod();
-    const table3 = authMethod === 'oauth' ? renderRateLimitTable(ctx) : null;
+    const table3 = rlWidth !== null ? renderRateLimitTable(ctx, targetWidth) : null;
 
     if (table3) {
       // Layout: [Tabla1 + Tabla3] a la izquierda | Tabla2 a la derecha
-      const leftWidth = Math.max(table1.width, table3.width);
       const left = {
         lines: [...table1.lines, ...table3.lines],
-        width: leftWidth,
+        width: targetWidth!,
       };
       // Padding dinámico: igualar alturas para evitar interleaving
       const heightDiff = left.lines.length - table2.lines.length;

@@ -16,6 +16,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { join } from 'node:path';
+import { homedir } from 'node:os';
 
 // ── Tipos ───────────────────────────────────────────────────────
 
@@ -401,6 +402,19 @@ function writeLastMetrics(sessionPath: string, snapshot: MetricsSnapshot): void 
 
 // ── Lógica de resolución ────────────────────────────────────────
 
+function readClaudeEnv(): Record<string, string> {
+  const settingsPath = join(homedir(), '.claude', 'settings.json');
+  if (!existsSync(settingsPath)) return {};
+  try {
+    const settings = JSON.parse(readFileSync(settingsPath, 'utf-8')) as { env?: Record<string, string> };
+    return settings.env ?? {};
+  } catch {
+    return {};
+  }
+}
+
+const claudeEnv = readClaudeEnv();
+
 function readDotEnv(): Record<string, string> {
   const result: Record<string, string> = {};
   if (!existsSync(ENV_PATH)) return result;
@@ -455,8 +469,8 @@ function resolveActiveProvider(): {
 }
 
 function resolveAuthMethod(): 'api_key' | 'bearer' | 'oauth' {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  const authToken = process.env.ANTHROPIC_AUTH_TOKEN;
+  const apiKey = claudeEnv['ANTHROPIC_API_KEY'];
+  const authToken = claudeEnv['ANTHROPIC_AUTH_TOKEN'];
 
   if (apiKey && apiKey.trim() !== '') return 'api_key';
   if (authToken && authToken.trim() !== '') return 'bearer';
@@ -512,9 +526,9 @@ function loadDisplayName(modelId: string): string {
 }
 
 function classifyModel(modelId: string): 'lite' | 'standard' | 'reasoning' {
-  const haiku = process.env.ANTHROPIC_DEFAULT_HAIKU_MODEL || '';
-  const sonnet = process.env.ANTHROPIC_DEFAULT_SONNET_MODEL || '';
-  const opus = process.env.ANTHROPIC_DEFAULT_OPUS_MODEL || '';
+  const haiku = claudeEnv['ANTHROPIC_DEFAULT_HAIKU_MODEL'] ?? '';
+  const sonnet = claudeEnv['ANTHROPIC_DEFAULT_SONNET_MODEL'] ?? '';
+  const opus = claudeEnv['ANTHROPIC_DEFAULT_OPUS_MODEL'] ?? '';
 
   const modelBase = modelId.split('/').pop() || modelId;
 
@@ -553,9 +567,9 @@ function createEmptyMetrics(): {
     modelName: '',
   };
   return {
-    lite:      { ...empty, modelName: loadDisplayName(process.env.ANTHROPIC_DEFAULT_HAIKU_MODEL  || '') },
-    standard:  { ...empty, modelName: loadDisplayName(process.env.ANTHROPIC_DEFAULT_SONNET_MODEL || '') },
-    reasoning: { ...empty, modelName: loadDisplayName(process.env.ANTHROPIC_DEFAULT_OPUS_MODEL   || '') },
+    lite:      { ...empty, modelName: loadDisplayName(claudeEnv['ANTHROPIC_DEFAULT_HAIKU_MODEL']  ?? '') },
+    standard:  { ...empty, modelName: loadDisplayName(claudeEnv['ANTHROPIC_DEFAULT_SONNET_MODEL'] ?? '') },
+    reasoning: { ...empty, modelName: loadDisplayName(claudeEnv['ANTHROPIC_DEFAULT_OPUS_MODEL']   ?? '') },
   };
 }
 

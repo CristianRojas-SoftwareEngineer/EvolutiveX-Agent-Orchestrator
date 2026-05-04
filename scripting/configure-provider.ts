@@ -243,7 +243,6 @@ class ClaudeSettingsEnvManager implements IEnvManager {
     if (!settings.env) settings.env = {};
     settings.env[name] = value;
     writeClaudeSettings(settings);
-    process.env[name] = value;
   }
 
   async removeEnvVar(name: string): Promise<void> {
@@ -255,19 +254,18 @@ class ClaudeSettingsEnvManager implements IEnvManager {
       }
     }
     writeClaudeSettings(settings);
-    delete process.env[name];
   }
 
   getEnvVar(name: string): string | undefined {
     const settings = readClaudeSettings();
-    return settings.env?.[name] ?? process.env[name];
+    return settings.env?.[name];
   }
 
   getAllManagedVars(): Record<string, string | undefined> {
     const settings = readClaudeSettings();
     const result: Record<string, string | undefined> = {};
     for (const name of MANAGED_ENV_VARS) {
-      result[name] = settings.env?.[name] ?? process.env[name];
+      result[name] = settings.env?.[name];
     }
     return result;
   }

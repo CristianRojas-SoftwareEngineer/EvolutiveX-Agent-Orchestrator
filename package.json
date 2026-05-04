@@ -25,6 +25,7 @@
     "clean:sessions": "rimraf sessions",
     "clean:logs": "rimraf server",
     "configure:provider": "tsx scripting/configure-provider.ts",
+    "cleanup:env": "tsx scripting/clean-windows-env.ts",
     "create:agents-reference": "tsx scripting/create-agents-reference.ts"
   },
   "keywords": [],

@@ -889,7 +889,7 @@ function renderRateLimitTable(ctx: ClaudeCodeContext): { lines: string[]; width:
   const titlePad = Math.max(0, width - titleVisLen - 1); // -1 para ╮ (╭ ya está en titleVisLen)
   const title = `${C.title}${titleText}${'─'.repeat(titlePad)}╮${C.reset}`;
 
-  const lines = [title, '', ...table.split('\n')];
+  const lines = [title, ...table.split('\n')];
   return { lines, width };
 }
 
@@ -941,7 +941,7 @@ function main(): void {
       // Layout: [Tabla1 + Tabla3] a la izquierda | Tabla2 a la derecha
       const leftWidth = Math.max(table1.width, table3.width);
       const left = {
-        lines: [...table1.lines, '', ...table3.lines],
+        lines: [...table1.lines, ...table3.lines],
         width: leftWidth,
       };
       // Padding dinámico: igualar alturas para evitar interleaving

@@ -62,7 +62,7 @@ El statusline consta de **dos o tres tablas** según el método de autenticació
 | Ventana de contexto | tamaño de ventana formateado como `NNNk` / `NNNm` | stdin (`ctx.context_window.context_window_size`) | centrada |
 | Porcentaje de uso | barra de progreso + porcentaje | stdin (`ctx.context_window.used_percentage`) | centrada |
 
-**Barra de progreso:** 8 bloques, usando `█` (lleno) y `░` (vacío). Color: blanco (`\x1B[37m`) para lleno, gris (`\x1B[90m`) para vacío. Sin colores dinámicos por porcentaje.
+**Barra de progreso:** 8 bloques, usando `█` (lleno) y `░` (vacío). Color dinámico por rango de porcentaje: verde (`#2ecc71`) 0–39%, naranja (`#f39c12`) 40–69%, rojo (`#e74c3c`) 70–100%. Vacío: gris (`\x1B[90m`).
 
 ---
 
@@ -106,21 +106,22 @@ Presente siempre, independientemente del método de autenticación. Permite al u
 Se renderiza **únicamente** cuando `authMethod === 'oauth'`. Aplica al proveedor `anthropic` con suscripción PRO/Max.
 
 ```
-╭─ Rate Limits (OAuth) ───────────────────────────────────────────────────────────────╮
-│ Cuota   │ Uso                                    │ Reinicio    │
-├─────────┼────────────────────────────────────────┼─────────────┤
-│ 5 horas │ ████████████░░░░░░░░ 12/20             │ 1h 43m      │
-│ 7 días  │ █████░░░░░░░░░░░░░░░ 3/10              │ 4d 7h       │
-╰─────────┴────────────────────────────────────────┴─────────────╯
+╭─ Límites de uso por suscripción ─────────────────────────────────────────────────────╮
+│ Cuota actual (5h)  │ ████████████░░░░░░░░ 60% │ Reinicio en │          1h 43m       │
+│ Cuota semanal (7d) │ █████░░░░░░░░░░░░░░░ 15% │ Reinicio en │          4d 7h        │
+╰────────────────────┴─────────────────────────┴─────────────┴────────────────────────╯
 ```
 
-**Columnas (3):**
+**Columnas (4):**
 
 | Columna | Contenido | Fuente | Alineación |
 |---|---|---|---|
-| Cuota | `"5 horas"` / `"7 días"` | texto fijo | izquierda |
-| Uso | barra de progreso + `usado/total` | `ctx.rate_limits.requests.limit_5h` / `limit_7d` (`used` + `remaining`) | izquierda |
-| Reinicio | `"Xh Ym"` / `"Xd Yh"` | `ctx.rate_limits.requests.limit_5h.reset` / `limit_7d.reset` (epoch segundos) | centrada |
+| Cuota | `"Cuota actual (5h)"` / `"Cuota semanal (7d)"` | texto fijo | izquierda |
+| Barra + % | barra de progreso + porcentaje (`XX%`) | `ctx.rate_limits.five_hour.used_percentage` / `seven_day.used_percentage` | izquierda |
+| Etiqueta reinicio | texto fijo `"Reinicio en"` | — | izquierda |
+| Tiempo restante | `"Xh Ym"` / `"Xd Yh"` | `ctx.rate_limits.five_hour.resets_at` / `seven_day.resets_at` (epoch segundos) | derecha |
+
+**Barra de progreso:** colores dinámicos según porcentaje (verde/naranja/rojo), misma lógica que la Tabla 1.
 
 ---
 
@@ -172,7 +173,7 @@ La Tabla 1 y la Tabla 2 se renderizan lado a lado usando `renderSideBySide()`, c
 
 **Tabla 2 (6 columnas):** izquierda, izquierda, derecha, derecha, derecha, derecha (`left, left, right, right, right, right`).
 
-**Tabla 3 (3 columnas):** izquierda, izquierda, centrada (`left, left, center`).
+**Tabla 3 (4 columnas):** izquierda, izquierda, izquierda, derecha (`left, left, left, right`).
 
 ---
 

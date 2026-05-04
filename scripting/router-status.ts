@@ -30,10 +30,8 @@ interface ClaudeCodeContext {
     used_percentage?: number;
   };
   rate_limits?: {
-    requests?: {
-      limit_5h?: { used?: number; remaining?: number; reset?: number };
-      limit_7d?: { used?: number; remaining?: number; reset?: number };
-    };
+    five_hour?: { used_percentage?: number; resets_at?: number };
+    seven_day?:  { used_percentage?: number; resets_at?: number };
   } | null;
 }
 
@@ -118,10 +116,11 @@ const B = {
 
 // ── Helpers de renderizado ──────────────────────────────────────
 
-/** Longitud visible de un string (sin contar códigos ANSI) */
+/** Longitud visible de un string (sin contar códigos ANSI ni caracteres de ancho cero) */
 const ANSI_REGEX = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, 'g');
+const ZWSP_REGEX = /\u200b/g;
 function visibleLength(str: string): number {
-  return str.replace(ANSI_REGEX, '').length;
+  return str.replace(ANSI_REGEX, '').replace(ZWSP_REGEX, '').length;
 }
 
 /** Padding a longitud fija con color */
@@ -200,6 +199,7 @@ function renderTable(
   rows: string[][],
   alignments: ('left' | 'center' | 'right')[] = [],
   separatorAfter?: number[],
+  noHeader?: boolean,
 ): { table: string; width: number; columnWidths: number[] } {
   const colCount = headers.length;
   if (alignments.length === 0) {
@@ -241,22 +241,24 @@ function renderTable(
   const topParts = widths.map((w) => B.h.repeat(w + 2));
   lines.push(`${C.border}${B.tl}${topParts.join(B.mt)}${B.tr}${C.reset}`);
 
-  // Header: │ Header │ Header │
-  const headerCells = headers.map((h, i) => {
-    const colored = `${C.label}${h}${C.reset}`;
-    const aligned =
-      alignments[i] === 'right'
-        ? alignRight(colored, widths[i])
-        : padCenter(colored, widths[i]);
-    return aligned;
-  });
-  lines.push(
-    `${C.border}${B.v}${C.reset} ${headerCells.join(` ${C.border}${B.v}${C.reset} `)} ${C.border}${B.v}${C.reset}`,
-  );
+  if (!noHeader) {
+    // Header: │ Header │ Header │
+    const headerCells = headers.map((h, i) => {
+      const colored = `${C.label}${h}${C.reset}`;
+      const aligned =
+        alignments[i] === 'right'
+          ? alignRight(colored, widths[i])
+          : padCenter(colored, widths[i]);
+      return aligned;
+    });
+    lines.push(
+      `${C.border}${B.v}${C.reset} ${headerCells.join(` ${C.border}${B.v}${C.reset} `)} ${C.border}${B.v}${C.reset}`,
+    );
 
-  // Separador de header: ├───┼───┤
-  const midParts = widths.map((w) => B.h.repeat(w + 2));
-  lines.push(`${C.border}${B.ml}${midParts.join(B.mm)}${B.mr}${C.reset}`);
+    // Separador de header: ├───┼───┤
+    const midParts = widths.map((w) => B.h.repeat(w + 2));
+    lines.push(`${C.border}${B.ml}${midParts.join(B.mm)}${B.mr}${C.reset}`);
+  }
 
   // Filas de datos
   for (let r = 0; r < rows.length; r++) {
@@ -335,11 +337,15 @@ function renderSideBySide(
 
   // Renderizar las líneas sobrantes de la tabla más larga debajo
   if (right.lines.length > left.lines.length) {
-    // Usar un punto invisible (ZWSP) seguido de espacios para evitar recorte de la terminal
+    // Usar ZWSP (zero-width space) para evitar recorte de espacios trailing por la terminal
     const zwsp = '​';
     const indent = zwsp + ' '.repeat(left.width + gap);
     for (let i = minLines; i < right.lines.length; i++) {
       result.push(`${indent}${right.lines[i]}`);
+    }
+  } else if (left.lines.length > right.lines.length) {
+    for (let i = minLines; i < left.lines.length; i++) {
+      result.push(left.lines[i]);
     }
   }
 
@@ -842,54 +848,49 @@ function renderTokenTable(metrics: {
   return { lines, width };
 }
 
-function renderRateLimitTable(ctx: ClaudeCodeContext): string | null {
-  if (!ctx.rate_limits?.requests) return null;
-
-  const { limit_5h, limit_7d } = ctx.rate_limits.requests;
-  if (!limit_5h && !limit_7d) return null;
+function renderRateLimitTable(ctx: ClaudeCodeContext): { lines: string[]; width: number } | null {
+  const { five_hour, seven_day } = ctx.rate_limits ?? {};
+  if (!five_hour && !seven_day) return null;
 
   const rows: string[][] = [];
 
-  if (limit_5h) {
-    const used = limit_5h.used || 0;
-    const remaining = limit_5h.remaining || 0;
-    const total = used + remaining;
-    const pct = total > 0 ? (used / total) * 100 : 0;
-    const barStr = `${renderBar(pct)} ${formatNumber(used)}/${formatNumber(total)}`;
+  if (five_hour) {
+    const pct = five_hour.used_percentage ?? 0;
     rows.push([
-      `${C.label}5 horas${C.reset}`,
-      barStr,
-      `${C.value}${formatTimeRemaining(limit_5h.reset)}${C.reset}`,
+      `${C.label}Cuota actual (5h)${C.reset}`,
+      `${renderBar(pct)} ${pct.toFixed(0)}%`,
+      `${C.dim}Reinicio en${C.reset}`,
+      `${C.value}${formatTimeRemaining(five_hour.resets_at)}${C.reset}`,
     ]);
   }
 
-  if (limit_7d) {
-    const used = limit_7d.used || 0;
-    const remaining = limit_7d.remaining || 0;
-    const total = used + remaining;
-    const pct = total > 0 ? (used / total) * 100 : 0;
-    const barStr = `${renderBar(pct)} ${formatNumber(used)}/${formatNumber(total)}`;
+  if (seven_day) {
+    const pct = seven_day.used_percentage ?? 0;
     rows.push([
-      `${C.label}7 días${C.reset}`,
-      barStr,
-      `${C.value}${formatTimeRemaining(limit_7d.reset)}${C.reset}`,
+      `${C.label}Cuota semanal (7d)${C.reset}`,
+      `${renderBar(pct)} ${pct.toFixed(0)}%`,
+      `${C.dim}Reinicio en${C.reset}`,
+      `${C.value}${formatTimeRemaining(seven_day.resets_at)}${C.reset}`,
     ]);
   }
 
   // Renderizar tabla y obtener ancho
-  const { table, width } = renderTable(['Cuota', 'Uso', 'Reinicio'], rows, [
-    'left',
-    'left',
-    'center',
-  ]);
+  const { table, width } = renderTable(
+    ['', '', '', ''],
+    rows,
+    ['left', 'left', 'left', 'right'],
+    [0],
+    true,
+  );
 
   // Calcular padding para que el título tenga el mismo ancho que la tabla
-  const titleText = '╭─ Rate Limits (OAuth)';
+  const titleText = '╭─ Límites de uso por suscripción ';
   const titleVisLen = visibleLength(titleText);
   const titlePad = Math.max(0, width - titleVisLen - 1); // -1 para ╮ (╭ ya está en titleVisLen)
   const title = `${C.title}${titleText}${'─'.repeat(titlePad)}╮${C.reset}`;
 
-  return `${title}\n${table}`;
+  const lines = [title, '', ...table.split('\n')];
+  return { lines, width };
 }
 
 // ── Main ────────────────────────────────────────────────────────
@@ -918,33 +919,41 @@ function main(): void {
     const table1 = renderSessionTable(ctx, sessionPath);
 
     // Tabla 2: Métricas de interacciones
+    let table2: { lines: string[]; width: number };
     if (sessionPath) {
       const metrics = aggregateInteractionMetrics(sessionPath);
       const previous = readLastMetrics(sessionPath);
-      const table2 = renderTokenTable(metrics, previous);
-      output.push(renderSideBySide(table1, table2, 2));
-
+      table2 = renderTokenTable(metrics, previous);
       writeLastMetrics(sessionPath, {
         lite:      { count: metrics.lite.count,      inputTokens: metrics.lite.inputTokens,      cacheReadInputTokens: metrics.lite.cacheReadInputTokens,      outputTokens: metrics.lite.outputTokens },
         standard:  { count: metrics.standard.count,  inputTokens: metrics.standard.inputTokens,  cacheReadInputTokens: metrics.standard.cacheReadInputTokens,  outputTokens: metrics.standard.outputTokens },
         reasoning: { count: metrics.reasoning.count,  inputTokens: metrics.reasoning.inputTokens, cacheReadInputTokens: metrics.reasoning.cacheReadInputTokens, outputTokens: metrics.reasoning.outputTokens },
       });
-    } else if (ctx.session_id) {
-      const emptyMetrics = createEmptyMetrics();
-      const table2 = renderTokenTable(emptyMetrics, null);
-      output.push(renderSideBySide(table1, table2, 2));
     } else {
-      output.push(table1.lines.join('\n'));
+      table2 = renderTokenTable(createEmptyMetrics(), null);
     }
 
     // Tabla 3: Rate limits (solo OAuth)
     const authMethod = resolveAuthMethod();
-    if (authMethod === 'oauth') {
-      const rateLimitTable = renderRateLimitTable(ctx);
-      if (rateLimitTable) {
-        output.push('');
-        output.push(rateLimitTable);
-      }
+    const table3 = authMethod === 'oauth' ? renderRateLimitTable(ctx) : null;
+
+    if (table3) {
+      // Layout: [Tabla1 + Tabla3] a la izquierda | Tabla2 a la derecha
+      const leftWidth = Math.max(table1.width, table3.width);
+      const left = {
+        lines: [...table1.lines, '', ...table3.lines],
+        width: leftWidth,
+      };
+      // Padding dinámico: igualar alturas para evitar interleaving
+      const heightDiff = left.lines.length - table2.lines.length;
+      const paddedTable2 = heightDiff > 0
+        ? { lines: [...table2.lines, ...Array(heightDiff).fill('')], width: table2.width }
+        : table2;
+      output.push(renderSideBySide(left, paddedTable2, 2));
+    } else if (ctx.session_id || sessionPath) {
+      output.push(renderSideBySide(table1, table2, 2));
+    } else {
+      output.push(table1.lines.join('\n'));
     }
 
     console.log(output.join('\n'));

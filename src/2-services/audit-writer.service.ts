@@ -3,7 +3,7 @@ import * as fs from 'node:fs/promises';
 import * as fsSync from 'node:fs';
 import { RedactService } from '../1-domain/services/redact.service.js';
 import { MarkdownRendererService } from '../1-domain/services/markdown-renderer.service.js';
-import { InteractionState, SessionMetrics, SessionModelMetrics, SseLine, TurnMetadata } from '../1-domain/types/audit.types.js';
+import { InteractionState, InteractionMetadata, SessionMetrics, SessionModelMetrics, SseLine } from '../1-domain/types/audit.types.js';
 import { JsonValue } from '../1-domain/types/json.types.js';
 import type { IAuditWriter } from './ports/audit-writer.port.js';
 
@@ -338,7 +338,7 @@ export class AuditWriterService implements IAuditWriter {
     );
   }
 
-  public async writeTurnMeta(interactionDir: string, meta: TurnMetadata): Promise<void> {
+  public async writeInteractionMeta(interactionDir: string, meta: InteractionMetadata): Promise<void> {
     await this.writeJsonAtomic(
       path.join(interactionDir, 'meta.json'),
       meta as unknown as JsonValue,

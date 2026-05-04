@@ -38,7 +38,7 @@ sessions/<session-id>/interactions/NNNNNN_<uuid>/
 
 - `NNNNNN` es el orden dentro de la sesión (coherente con el prefijo del directorio y con `interaction-sequence.json` en la raíz de la sesión).
 - Una interacción puede contener **múltiples steps** (llamadas HTTP individuales), agrupados bajo `steps/`. Por ejemplo, un turno agentic con herramientas puede tener 2-3 steps SSE seguidos.
-- `meta.json` es de tipo `TurnMetadata`: describe `interactionType` (`agentic-turn`, `client-preflight` o `side-request`), `steps[]` con metadatos por step, y `totals` con tokens agregados.
+- `meta.json` es de tipo `InteractionMetadata`: describe `interactionType` (`agentic`, `client-preflight` o `side-request`), `steps[]` con metadatos por step, y `totals` con tokens agregados.
 
 Eso es una **interacción de turno** única: una fila en el historial de auditoría, que puede abarcar varias llamadas HTTP.
 
@@ -291,13 +291,13 @@ No se aplica `inferenceGeoUs` porque `inference_geo` es `not_available` en este 
 
 Para localizar `usage` en disco (jerarquía general: `sessions/<session-id>/interactions/NNNNNN_<uuid>/`):
 
-En la nueva estructura, el `usage` de cada step SSE vive en `steps/{N}/response/sse.jsonl`. Si existe reconstrucción top-level, también en `response/body.json`. El `meta.json` del turno incluye `totals` con tokens agregados por turno (solo para `agentic-turn` SSE) y `steps[]` donde cada step puede incluir tokens individuales.
+En la nueva estructura, el `usage` de cada step SSE vive en `steps/{N}/response/sse.jsonl`. Si existe reconstrucción top-level, también en `response/body.json`. El `meta.json` del turno incluye `totals` con tokens agregados por turno (solo para `agentic` SSE) y `steps[]` donde cada step puede incluir tokens individuales.
 
 | Nivel         | Archivo                          | Cuándo                                                                        |
 | ------------- | -------------------------------- | ----------------------------------------------------------------------------- |
 | **Step SSE**  | `steps/NNN/response/sse.jsonl`   | Siempre en turnos SSE; contiene evento `message_delta` con `usage`            |
-| **Top-level** | `response/body.json`             | Siempre en agentic-turn/side-request SSE completados (reconstrucción exitosa) |
-| **meta.json** | campo `totals`                   | Solo `agentic-turn` SSE; agrega tokens de todos los steps                     |
+| **Top-level** | `response/body.json`             | Siempre en agentic/side-request SSE completados (reconstrucción exitosa) |
+| **meta.json** | campo `totals`                   | Solo `agentic` SSE; agrega tokens de todos los steps                     |
 | **meta.json** | campo `steps[].inputTokens` etc. | Tokens por step individual                                                    |
 
 Si **no** hay JSON reconstruido pero sí `steps/NNN/response/sse.jsonl`, el objeto `usage` aparece en el flujo SSE (p. ej. en el evento `message_delta` al finalizar el stream): parsea las líneas JSON del archivo hasta localizar el bloque `usage` asociado al mensaje completado.
@@ -306,7 +306,7 @@ El campo `model` para la §6.4 suele coincidir en petición y respuesta; si solo
 
 Convención detallada de nombres y reglas de presencia: [README del repositorio](../README.md) y referencia de auditoría del proyecto.
 
-Para la **matriz completa** de archivos por interacción, campos de `meta.json` (TurnMetadata) y catálogo de presencia, resulta útil la skill de Claude Code **`smart-code-proxy`** y su `reference.md`. Esta sección solo indica **dónde** suele aparecer `usage` en relación con la estructura de steps.
+Para la **matriz completa** de archivos por interacción, campos de `meta.json` (InteractionMetadata) y catálogo de presencia, resulta útil la skill de Claude Code **`smart-code-proxy`** y su `reference.md`. Esta sección solo indica **dónde** suele aparecer `usage` en relación con la estructura de steps.
 
 ---
 
@@ -318,8 +318,8 @@ Para estimar el coste **total** de una sesión de Claude Code a partir de audito
 
 1. Recorre cada carpeta `interactions/NNNNNN_*/` en orden de secuencia (p. ej. orden numérico del prefijo). Nota: cada interacción puede agrupar múltiples llamadas HTTP; los `usage` individuales están en los steps (`steps/{N}/response/sse.jsonl`).
 2. Clasifica por **ruta sin query** (quita `?beta=true` u otros parámetros antes de comparar). **Orden importa:** el endpoint de conteo contiene el segmento `count_tokens`. Si solo buscas si la URL contiene `/v1/messages`, **ambas** rutas coincidirían (porque `.../messages/count_tokens` también incluye `messages`). Regla segura: si el path contiene `count_tokens` → petición de **conteo**; si no, y el path corresponde a `POST /v1/messages` (sin `count_tokens`) → **generación**. Omite `count_tokens` para el coste de generación (coste **0** con la política actual de conteo gratuito). La ruta por step está en `meta.json → steps[].url` (si aplica) o en los archivos de request del step.
-3. Para cada step de generación con respuesta válida y `usage` disponible, aplica la §8. El `model` suele estar en el cuerpo de respuesta reconstruido o en el último evento SSE del step. Alternativamente, `meta.json → totals` agrega los tokens de todos los steps del turno para `agentic-turn` SSE.
-4. **Suma** los costes por step. Si el proxy registró error de upstream (`turnOutcome: "upstream-error"` en `meta.json`), o si no hay archivos de respuesta utilizables en el step, no hay `usage` fiable para esa llamada.
+3. Para cada step de generación con respuesta válida y `usage` disponible, aplica la §8. El `model` suele estar en el cuerpo de respuesta reconstruido o en el último evento SSE del step. Alternativamente, `meta.json → totals` agrega los tokens de todos los steps del turno para `agentic` SSE.
+4. **Suma** los costes por step. Si el proxy registró error de upstream (`outcome: "upstream-error"` en `meta.json`), o si no hay archivos de respuesta utilizables en el step, no hay `usage` fiable para esa llamada.
 
 ---
 

@@ -84,7 +84,7 @@ describe('Test de Integración - Decompresión Gzip', () => {
   it('debería descomprimir el payload del upstream y quitar headers de compresión hacia el cliente', async () => {
     // Inject ejecuta el handler en memoria saltándose sockets,
     // ideal para tests rápidos con Fastify.
-    // Usamos un body con tools para que se clasifique como agentic-turn (no preflight)
+    // Usamos un body con tools para que se clasifique como agentic (no preflight)
     const requestBody = JSON.stringify({
       model: 'claude-3-5-sonnet',
       messages: [{ role: 'user', content: 'test' }],

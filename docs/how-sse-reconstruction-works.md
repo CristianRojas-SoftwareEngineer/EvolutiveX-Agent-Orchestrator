@@ -81,7 +81,7 @@ const REPLAY_MODEL = 'claude-sse-replay';
 
 La reconstrucción SSE se invoca automáticamente al cerrar un step terminal en:
 
-- `agentic-turn` con `stop_reason` ∈ {`end_turn`, `max_tokens`, `null`/error}.
+- `agentic` con `stop_reason` ∈ {`end_turn`, `max_tokens`, `null`/error}.
 - `side-request` con `stop_reason` terminal.
 
 **No se invoca** para `client-preflight` (son interacciones no conversacionales sin mensaje de asistente que reconstruir).

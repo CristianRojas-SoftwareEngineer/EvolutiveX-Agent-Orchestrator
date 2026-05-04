@@ -3,7 +3,7 @@ import { AuditUpstreamErrorHandler } from '../../src/3-operations/audit-upstream
 import type { IAuditWriter } from '../../src/2-services/ports/audit-writer.port.js';
 import type { ISessionStore } from '../../src/2-services/ports/session-store.port.js';
 import { ProxyEnvironmentConfig } from '../../src/1-domain/types/config.types.js';
-import { ActiveTurn, StepMeta, TurnMetadata } from '../../src/1-domain/types/audit.types.js';
+import { ActiveInteraction, StepMeta, InteractionMetadata } from '../../src/1-domain/types/audit.types.js';
 
 function makeConfig(overrides: Partial<ProxyEnvironmentConfig> = {}): ProxyEnvironmentConfig {
   return {
@@ -30,22 +30,22 @@ function makeConfig(overrides: Partial<ProxyEnvironmentConfig> = {}): ProxyEnvir
 }
 
 function makeSessionStore(
-  turn: ActiveTurn | null = null,
+  interaction: ActiveInteraction | null = null,
   overrides: Partial<ISessionStore> = {},
 ): ISessionStore {
-  const registry = new Map<string, ActiveTurn>();
-  if (turn) registry.set(turn.interactionDir, turn);
+  const registry = new Map<string, ActiveInteraction>();
+  if (interaction) registry.set(interaction.interactionDir, interaction);
   return {
     getBaseDir: () => '/tmp/sessions',
     ensureAuditSessionsRoot: async () => {},
     nextAuditInteractionSequence: async () => 1,
-    registerTurn: (t: ActiveTurn) => {
+    registerInteraction: (t: ActiveInteraction) => {
       registry.set(t.interactionDir, t);
     },
     registerToolUseId: () => {},
-    getTurnByToolUseId: () => null,
-    getTurnByDir: async (dir: string) => registry.get(dir) || null,
-    getTurnByDirSync: (dir: string) => registry.get(dir) || null,
+    getInteractionByToolUseId: () => null,
+    getInteractionByDir: async (dir: string) => registry.get(dir) || null,
+    getInteractionByDirSync: (dir: string) => registry.get(dir) || null,
     incrementStepCountByDir: (dir: string) => {
       const t = registry.get(dir);
       if (t) t.stepCount += 1;
@@ -54,17 +54,17 @@ function makeSessionStore(
     pushStepMetaByDir: async (dir: string, meta: StepMeta) => {
       registry.get(dir)?.stepsMeta.push(meta);
     },
-    closeTurn: (dir: string) => {
+    closeInteraction: (dir: string) => {
       registry.delete(dir);
     },
     registerPendingAgentToolUse: () => {},
-    findTurnWithPendingAgents: () => null,
+    findInteractionWithPendingAgents: () => null,
     consumePendingAgentToolUse: () => {},
     registerPendingBuiltinToolUse: () => {},
-    findTurnWithPendingBuiltinTools: () => null,
+    findInteractionWithPendingBuiltinTools: () => null,
     consumePendingBuiltinToolUse: () => {},
-    findStaleTurnsAwaitingContinuation: () => [],
-    getAllOpenTurns: () => [],
+    findStaleInteractionsAwaitingContinuation: () => [],
+    getAllOpenInteractions: () => [],
     registerContextSyncCache: () => {},
     resolveContextSyncCache: () => null,
     withSessionLock: async <T>(_sessionId: string, fn: () => Promise<T>): Promise<T> => fn(),
@@ -92,7 +92,7 @@ function makeAuditWriter(overrides: Partial<IAuditWriter> = {}): IAuditWriter {
       responseTruncatedByAuditLimit: false,
     }),
     writeResponseHeadersAudit: async () => {},
-    writeTurnMeta: async () => {},
+    writeInteractionMeta: async () => {},
     appendSseLine: () => {},
     appendSseRawChunk: () => {},
     writeInteractionState: async () => {},
@@ -117,16 +117,16 @@ const BASE_PARAMS = {
 };
 
 describe('AuditUpstreamErrorHandler', () => {
-  it('debería escribir TurnMetadata con turnOutcome=upstream-error cuando hay turno activo', async () => {
+  it('debería escribir InteractionMetadata con outcome=upstream-error cuando hay interacción activa', async () => {
     const config = makeConfig();
     let capturedDir: string | null = null;
-    let capturedMeta: TurnMetadata | null = null;
-    let turnCleared = false;
+    let capturedMeta: InteractionMetadata | null = null;
+    let interactionCleared = false;
     let stateRemoved = false;
 
-    const activeTurn: ActiveTurn = {
+    const activeInteraction: ActiveInteraction = {
       interactionDir: '/tmp/sessions/s/interactions/000001_req-1',
-      interactionType: 'agentic-turn',
+      interactionType: 'agentic',
       stepCount: 2,
       requestSequence: 1,
       startedAt: Date.now() - 200,
@@ -140,7 +140,7 @@ describe('AuditUpstreamErrorHandler', () => {
 
     const handler = new AuditUpstreamErrorHandler(
       makeAuditWriter({
-        writeTurnMeta: async (dir, meta) => {
+        writeInteractionMeta: async (dir, meta) => {
           capturedDir = dir;
           capturedMeta = meta;
         },
@@ -149,9 +149,9 @@ describe('AuditUpstreamErrorHandler', () => {
         },
       }),
       config,
-      makeSessionStore(activeTurn, {
-        closeTurn: async () => {
-          turnCleared = true;
+      makeSessionStore(activeInteraction, {
+        closeInteraction: async () => {
+          interactionCleared = true;
         },
       }),
     );
@@ -162,25 +162,25 @@ describe('AuditUpstreamErrorHandler', () => {
     });
 
     expect(capturedDir).toBe('/tmp/sessions/s/interactions/000001_req-1');
-    expect(capturedMeta!.turnOutcome).toBe('upstream-error');
-    expect(capturedMeta!.interactionType).toBe('agentic-turn');
+    expect(capturedMeta!.outcome).toBe('upstream-error');
+    expect(capturedMeta!.interactionType).toBe('agentic');
     expect(capturedMeta!.errorMessage).toContain('ECONNREFUSED');
     expect(capturedMeta!.errorCode).toBe('ECONNREFUSED');
     expect(capturedMeta!.stepCount).toBe(1);
     expect(capturedMeta!.totals).toBeDefined();
     expect(capturedMeta!.totals!.inputTokens).toBe(5);
     expect(capturedMeta!.sse).toBe(true);
-    expect(turnCleared).toBe(true);
+    expect(interactionCleared).toBe(true);
     expect(stateRemoved).toBe(true);
   });
 
-  it('debería escribir TurnMetadata sintético cuando no hay turno activo registrado', async () => {
+  it('debería escribir InteractionMetadata sintético cuando no hay interacción activa registrada', async () => {
     const config = makeConfig();
-    let capturedMeta: TurnMetadata | null = null;
+    let capturedMeta: InteractionMetadata | null = null;
 
     const handler = new AuditUpstreamErrorHandler(
       makeAuditWriter({
-        writeTurnMeta: async (_dir, meta) => {
+        writeInteractionMeta: async (_dir, meta) => {
           capturedMeta = meta;
         },
       }),
@@ -194,22 +194,22 @@ describe('AuditUpstreamErrorHandler', () => {
     });
 
     expect(capturedMeta).not.toBeNull();
-    expect(capturedMeta!.turnOutcome).toBe('upstream-error');
-    expect(capturedMeta!.interactionType).toBe('agentic-turn');
+    expect(capturedMeta!.outcome).toBe('upstream-error');
+    expect(capturedMeta!.interactionType).toBe('agentic');
     expect(capturedMeta!.errorMessage).toContain('socket hang up');
     expect(capturedMeta!.errorCode).toBe('ECONNRESET');
     expect(capturedMeta!.stepCount).toBe(0);
     expect(capturedMeta!.steps).toEqual([]);
   });
 
-  it('debería invocar updateSessionMetrics dentro de withSessionLock al cerrar turno agentic', async () => {
+  it('debería invocar updateSessionMetrics dentro de withSessionLock al cerrar interacción agentic', async () => {
     const config = makeConfig();
     let lockSessionId: string | null = null;
     let metricsCalled = false;
 
-    const activeTurn: ActiveTurn = {
+    const activeInteraction: ActiveInteraction = {
       interactionDir: '/tmp/sessions/s/interactions/000001_req-1',
-      interactionType: 'agentic-turn',
+      interactionType: 'agentic',
       stepCount: 2,
       requestSequence: 1,
       startedAt: Date.now() - 200,
@@ -229,7 +229,7 @@ describe('AuditUpstreamErrorHandler', () => {
         },
       }),
       config,
-      makeSessionStore(activeTurn, {
+      makeSessionStore(activeInteraction, {
         withSessionLock: async <T>(sessionId: string, fn: () => Promise<T>): Promise<T> => {
           lockSessionId = sessionId;
           return fn();
@@ -246,12 +246,12 @@ describe('AuditUpstreamErrorHandler', () => {
     expect(metricsCalled).toBe(true);
   });
 
-  it('debería propagar parentContext si el turn activo es subagente', async () => {
+  it('debería propagar parentContext si el interaction activo es subagente', async () => {
     const config = makeConfig();
-    let capturedMeta: TurnMetadata | null = null;
-    const subTurn: ActiveTurn = {
+    let capturedMeta: InteractionMetadata | null = null;
+    const subInteraction: ActiveInteraction = {
       interactionDir: '/tmp/sessions/s/interactions/000001_req-1',
-      interactionType: 'agentic-turn',
+      interactionType: 'agentic',
       stepCount: 1,
       requestSequence: 1,
       startedAt: Date.now() - 100,
@@ -271,12 +271,12 @@ describe('AuditUpstreamErrorHandler', () => {
 
     const handler = new AuditUpstreamErrorHandler(
       makeAuditWriter({
-        writeTurnMeta: async (_dir, meta) => {
+        writeInteractionMeta: async (_dir, meta) => {
           capturedMeta = meta;
         },
       }),
       config,
-      makeSessionStore(subTurn),
+      makeSessionStore(subInteraction),
     );
 
     await handler.execute({
@@ -284,6 +284,6 @@ describe('AuditUpstreamErrorHandler', () => {
       error: Object.assign(new Error('boom'), { code: 'ECONNREFUSED' }),
     });
 
-    expect(capturedMeta!.parentContext).toEqual(subTurn.parentContext);
+    expect(capturedMeta!.parentContext).toEqual(subInteraction.parentContext);
   });
 });

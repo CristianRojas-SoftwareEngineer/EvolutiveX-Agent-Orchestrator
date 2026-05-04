@@ -78,7 +78,7 @@ export class ProxyController {
       request.auditInteractionDir = result.auditInteractionDir;
       request.requestBodyOmitted = result.requestBodyOmitted;
       request.interactionType = result.interactionType;
-      request.turnClassification = result.turnClassification;
+      request.requestClassification = result.requestClassification;
     }
   }
 
@@ -170,7 +170,7 @@ export class ProxyController {
       auditInteractionDir: request.auditInteractionDir || '',
       responseStatusCode: res.statusCode,
       interactionType: request.interactionType,
-      turnClassification: request.turnClassification,
+      requestClassification: request.requestClassification,
     };
 
     if (isSse) {

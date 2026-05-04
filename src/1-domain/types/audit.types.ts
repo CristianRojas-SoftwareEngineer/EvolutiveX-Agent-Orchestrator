@@ -23,7 +23,7 @@ export interface SseLine {
 /**
  * Clasificación del tipo de request según el contenido del body.
  */
-export type TurnClassification =
+export type RequestClassification =
   | { type: 'preflight-quota' }
   | { type: 'preflight-warmup' }
   | { type: 'fresh' }
@@ -96,17 +96,17 @@ export function computeSseRawBytesTotal(steps: StepMeta[]): number {
 /**
  * Estado en memoria de un turno activo en una sesión.
  */
-export type InteractionType = 'client-preflight' | 'agentic-turn' | 'side-request';
+export type InteractionType = 'client-preflight' | 'agentic' | 'side-request';
 
 /**
- * Resultado posible de un turno de interacción.
- * - completed: Turno completado exitosamente (2xx)
+ * Resultado posible de una interacción.
+ * - completed: Interacción completada exitosamente (2xx)
  * - client-error: Error del cliente (4xx)
  * - upstream-error: Error del servidor upstream (5xx o fallo de conexión)
  * - truncated: Truncado por max_tokens
- * - orphaned: Turno cerrado por cleanup (continuation nunca llegó, graceful shutdown, etc.)
+ * - orphaned: Interacción cerrada por cleanup (continuation nunca llegó, graceful shutdown, etc.)
  */
-export type TurnOutcome =
+export type InteractionOutcome =
   | 'completed'
   | 'client-error'
   | 'upstream-error'
@@ -168,7 +168,7 @@ export interface PendingBuiltinToolUse {
   toolType: 'web_search' | 'web_fetch' | 'text_editor';
 }
 
-export interface ActiveTurn {
+export interface ActiveInteraction {
   interactionDir: string;
   interactionType: InteractionType;
   stepCount: number;
@@ -215,11 +215,11 @@ export interface ActiveTurn {
  * Metadatos del turno completo escritos en meta.json.
  * Refleja la perspectiva de turno lógico del usuario.
  */
-export interface TurnMetadata {
+export interface InteractionMetadata {
   interactionType: InteractionType;
-  /** Modelo que procesó este turno. Presente en agentic-turn y side-request. */
+  /** Modelo que procesó esta interacción. Presente en agentic y side-request. */
   modelId?: string;
-  turnOutcome: TurnOutcome;
+  outcome: InteractionOutcome;
   stepCount: number;
   startedAt: string;
   endedAt: string;
@@ -381,5 +381,5 @@ export interface AuditInteractionContext {
   auditInteractionDir: string;
   responseStatusCode: number | null;
   interactionType?: InteractionType;
-  turnClassification?: TurnClassification;
+  requestClassification?: RequestClassification;
 }

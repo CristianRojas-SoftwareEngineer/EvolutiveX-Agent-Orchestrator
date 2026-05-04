@@ -8,9 +8,9 @@ import type { ISseReconstructor } from '../../src/2-services/ports/sse-reconstru
 import { ProxyEnvironmentConfig } from '../../src/1-domain/types/config.types.js';
 import {
   AuditInteractionContext,
-  ActiveTurn,
+  ActiveInteraction,
   StepMeta,
-  TurnMetadata,
+  InteractionMetadata,
 } from '../../src/1-domain/types/audit.types.js';
 
 function makeConfig(overrides: Partial<ProxyEnvironmentConfig> = {}): ProxyEnvironmentConfig {
@@ -37,10 +37,10 @@ function makeConfig(overrides: Partial<ProxyEnvironmentConfig> = {}): ProxyEnvir
   };
 }
 
-function makeActiveTurn(overrides: Partial<ActiveTurn> = {}): ActiveTurn {
+function makeActiveInteraction(overrides: Partial<ActiveInteraction> = {}): ActiveInteraction {
   return {
     interactionDir: '/tmp/sessions/test/interactions/000001_req-1',
-    interactionType: 'agentic-turn',
+    interactionType: 'agentic',
     stepCount: 1,
     requestSequence: 1,
     startedAt: Date.now(),
@@ -67,35 +67,35 @@ function makeContext(overrides: Partial<AuditInteractionContext> = {}): AuditInt
     requestBodyOmitted: false,
     auditInteractionDir: '/tmp/sessions/test/interactions/000001_req-1',
     responseStatusCode: 200,
-    interactionType: 'agentic-turn',
+    interactionType: 'agentic',
     ...overrides,
   };
 }
 
 function makeSessionStore(
-  turn: ActiveTurn | null = makeActiveTurn(),
+  interaction: ActiveInteraction | null = makeActiveInteraction(),
   overrides: Partial<ISessionStore> = {},
 ): ISessionStore {
-  const registry = new Map<string, ActiveTurn>();
+  const registry = new Map<string, ActiveInteraction>();
   const toolUseIndex = new Map<string, string>();
-  if (turn) registry.set(turn.interactionDir, turn);
+  if (interaction) registry.set(interaction.interactionDir, interaction);
   const pushedMetas: StepMeta[] = [];
   return {
     getBaseDir: () => '/tmp/sessions',
     ensureAuditSessionsRoot: async () => {},
     nextAuditInteractionSequence: async () => 1,
-    registerTurn: (t: ActiveTurn) => {
+    registerInteraction: (t: ActiveInteraction) => {
       registry.set(t.interactionDir, t);
     },
     registerToolUseId: (id: string, dir: string) => {
       toolUseIndex.set(id, dir);
     },
-    getTurnByToolUseId: (id: string) => {
+    getInteractionByToolUseId: (id: string) => {
       const dir = toolUseIndex.get(id);
       return dir ? (registry.get(dir) ?? null) : null;
     },
-    getTurnByDir: async (dir: string) => registry.get(dir) || null,
-    getTurnByDirSync: (dir: string) => registry.get(dir) || null,
+    getInteractionByDir: async (dir: string) => registry.get(dir) || null,
+    getInteractionByDirSync: (dir: string) => registry.get(dir) || null,
     incrementStepCountByDir: (dir: string) => {
       const t = registry.get(dir);
       if (t) t.stepCount += 1;
@@ -106,17 +106,17 @@ function makeSessionStore(
       const t = registry.get(dir);
       if (t) t.stepsMeta.push(meta);
     },
-    closeTurn: (dir: string) => {
+    closeInteraction: (dir: string) => {
       registry.delete(dir);
     },
     registerPendingAgentToolUse: () => {},
-    findTurnWithPendingAgents: () => null,
+    findInteractionWithPendingAgents: () => null,
     consumePendingAgentToolUse: () => {},
     registerPendingBuiltinToolUse: () => {},
-    findTurnWithPendingBuiltinTools: () => null,
+    findInteractionWithPendingBuiltinTools: () => null,
     consumePendingBuiltinToolUse: () => {},
-    findStaleTurnsAwaitingContinuation: () => [],
-    getAllOpenTurns: () => [],
+    findStaleInteractionsAwaitingContinuation: () => [],
+    getAllOpenInteractions: () => [],
     registerContextSyncCache: () => {},
     resolveContextSyncCache: () => null,
     withSessionLock: async <T>(_sessionId: string, fn: () => Promise<T>): Promise<T> => fn(),
@@ -144,7 +144,7 @@ function makeAuditWriter(overrides: Partial<IAuditWriter> = {}): IAuditWriter {
       responseTruncatedByAuditLimit: false,
     }),
     writeResponseHeadersAudit: async () => {},
-    writeTurnMeta: async () => {},
+    writeInteractionMeta: async () => {},
     appendSseLine: () => {},
     appendSseRawChunk: () => {},
     writeInteractionState: async () => {},
@@ -168,10 +168,10 @@ function makeSseReconstructor(overrides: Partial<ISseReconstructor> = {}): ISseR
 }
 
 describe('AuditSseResponseHandler', () => {
-  it('debería capturar líneas SSE en stepDir y escribir turnMeta al finalizar (end_turn)', async () => {
+  it('debería capturar líneas SSE en stepDir y escribir interactionMeta al finalizar (end_turn)', async () => {
     const config = makeConfig();
     const appendedLines: unknown[] = [];
-    let turnMetaWritten = false;
+    let interactionMetaWritten = false;
 
     const sseData = [
       'event: message_start',
@@ -190,8 +190,8 @@ describe('AuditSseResponseHandler', () => {
         appendSseLine: (_dir, line) => {
           appendedLines.push(line);
         },
-        writeTurnMeta: async () => {
-          turnMetaWritten = true;
+        writeInteractionMeta: async () => {
+          interactionMetaWritten = true;
         },
       }),
       makeSseReconstructor(),
@@ -207,12 +207,12 @@ describe('AuditSseResponseHandler', () => {
     await new Promise((r) => setTimeout(r, 100));
 
     expect(appendedLines.length).toBeGreaterThanOrEqual(2);
-    expect(turnMetaWritten).toBe(true);
+    expect(interactionMetaWritten).toBe(true);
   });
 
-  it('debería NO escribir turnMeta si stop_reason=tool_use (turno continúa)', async () => {
+  it('debería NO escribir interactionMeta si stop_reason=tool_use (interacción continúa)', async () => {
     const config = makeConfig();
-    let turnMetaWritten = false;
+    let interactionMetaWritten = false;
 
     const sseData = [
       'event: message_delta',
@@ -222,8 +222,8 @@ describe('AuditSseResponseHandler', () => {
 
     const handler = new AuditSseResponseHandler(
       makeAuditWriter({
-        writeTurnMeta: async () => {
-          turnMetaWritten = true;
+        writeInteractionMeta: async () => {
+          interactionMetaWritten = true;
         },
       }),
       makeSseReconstructor(),
@@ -237,25 +237,25 @@ describe('AuditSseResponseHandler', () => {
     stream.end();
 
     await new Promise((r) => setTimeout(r, 100));
-    expect(turnMetaWritten).toBe(false);
+    expect(interactionMetaWritten).toBe(false);
   });
 
-  it('debería cerrar turno preflight-warmup cuando termina el stream', async () => {
+  it('debería cerrar interacción preflight-warmup cuando termina el stream', async () => {
     const config = makeConfig();
-    let turnCleared = false;
-    let turnMetaWritten = false;
+    let interactionCleared = false;
+    let interactionMetaWritten = false;
 
-    const preflightTurn = makeActiveTurn({ interactionType: 'client-preflight' });
-    const store = makeSessionStore(preflightTurn, {
-      closeTurn: (_dir) => {
-        turnCleared = true;
+    const preflightInteraction = makeActiveInteraction({ interactionType: 'client-preflight' });
+    const store = makeSessionStore(preflightInteraction, {
+      closeInteraction: (_dir) => {
+        interactionCleared = true;
       },
     });
 
     const handler = new AuditSseResponseHandler(
       makeAuditWriter({
-        writeTurnMeta: async () => {
-          turnMetaWritten = true;
+        writeInteractionMeta: async () => {
+          interactionMetaWritten = true;
         },
       }),
       makeSseReconstructor(),
@@ -268,7 +268,7 @@ describe('AuditSseResponseHandler', () => {
       stream,
       makeContext({
         interactionType: 'client-preflight',
-        turnClassification: { type: 'preflight-warmup' },
+        requestClassification: { type: 'preflight-warmup' },
       }),
       {},
     );
@@ -276,18 +276,18 @@ describe('AuditSseResponseHandler', () => {
     stream.end();
 
     await new Promise((r) => setTimeout(r, 100));
-    expect(turnCleared).toBe(true);
-    expect(turnMetaWritten).toBe(true);
+    expect(interactionCleared).toBe(true);
+    expect(interactionMetaWritten).toBe(true);
   });
 
   it('debería registrar sseRawBytesWritten por step en StepMeta', async () => {
     const config = makeConfig();
     let capturedMeta: StepMeta | null = null;
-    const turn = makeActiveTurn();
-    const store = makeSessionStore(turn, {
+    const interaction = makeActiveInteraction();
+    const store = makeSessionStore(interaction, {
       pushStepMetaByDir: async (_dir, meta) => {
         capturedMeta = meta;
-        turn.stepsMeta.push(meta);
+        interaction.stepsMeta.push(meta);
       },
     });
 
@@ -370,23 +370,23 @@ describe('AuditSseResponseHandler', () => {
     expect(headerDirs.some((d) => !/steps[/\\]/.test(d))).toBe(true);
   });
 
-  it('NO debería cerrar turno agentic si llega un warmup durante el turno', async () => {
+  it('NO debería cerrar interacción agentic si llega un warmup durante la interacción', async () => {
     const config = makeConfig();
-    let turnClosed = false;
-    let turnMetaWritten = false;
+    let interactionClosed = false;
+    let interactionMetaWritten = false;
 
-    // Turno subyacente es agentic-turn, no preflight
-    const agenticTurn = makeActiveTurn({ interactionType: 'agentic-turn' });
-    const store = makeSessionStore(agenticTurn, {
-      closeTurn: () => {
-        turnClosed = true;
+    // Interacción subyacente es agentic, no preflight
+    const agenticInteraction = makeActiveInteraction({ interactionType: 'agentic' });
+    const store = makeSessionStore(agenticInteraction, {
+      closeInteraction: () => {
+        interactionClosed = true;
       },
     });
 
     const handler = new AuditSseResponseHandler(
       makeAuditWriter({
-        writeTurnMeta: async () => {
-          turnMetaWritten = true;
+        writeInteractionMeta: async () => {
+          interactionMetaWritten = true;
         },
       }),
       makeSseReconstructor(),
@@ -399,7 +399,7 @@ describe('AuditSseResponseHandler', () => {
       stream,
       makeContext({
         interactionType: 'client-preflight',
-        turnClassification: { type: 'preflight-warmup' },
+        requestClassification: { type: 'preflight-warmup' },
       }),
       {},
     );
@@ -407,11 +407,11 @@ describe('AuditSseResponseHandler', () => {
     stream.end();
 
     await new Promise((r) => setTimeout(r, 100));
-    expect(turnClosed).toBe(false);
-    expect(turnMetaWritten).toBe(false);
+    expect(interactionClosed).toBe(false);
+    expect(interactionMetaWritten).toBe(false);
   });
 
-  it('debería llamar removeInteractionState al cerrar el turno', async () => {
+  it('debería llamar removeInteractionState al cerrar la interacción', async () => {
     const config = makeConfig();
     let removeCalled = false;
     const handler = new AuditSseResponseHandler(
@@ -467,8 +467,8 @@ describe('AuditSseResponseHandler', () => {
   it('debería registrar pendingAgentToolUse al ver content_block_start tool_use name=Agent', async () => {
     const config = makeConfig();
     const calls: Array<{ dir: string; step: number; id: string; type?: string }> = [];
-    const turn = makeActiveTurn();
-    const store = makeSessionStore(turn, {
+    const interaction = makeActiveInteraction();
+    const store = makeSessionStore(interaction, {
       registerPendingAgentToolUse: (dir, step, id, type) => {
         calls.push({ dir, step, id, type });
       },
@@ -505,7 +505,7 @@ describe('AuditSseResponseHandler', () => {
     // Dos llamadas esperadas: una en content_block_start (sin subagent_type)
     // y una al cerrar el bloque (con subagent_type='Explore').
     expect(calls.length).toBeGreaterThanOrEqual(2);
-    expect(calls[0]).toEqual({ dir: turn.interactionDir, step: 1, id: 'toolu_a', type: undefined });
+    expect(calls[0]).toEqual({ dir: interaction.interactionDir, step: 1, id: 'toolu_a', type: undefined });
     const enriched = calls.find((c) => c.type === 'Explore');
     expect(enriched).toBeDefined();
     expect(enriched!.id).toBe('toolu_a');
@@ -514,7 +514,7 @@ describe('AuditSseResponseHandler', () => {
   it('NO debería registrar pendingAgentToolUse para tool_use con name distinto de Agent', async () => {
     const config = makeConfig();
     const calls: unknown[] = [];
-    const store = makeSessionStore(makeActiveTurn(), {
+    const store = makeSessionStore(makeActiveInteraction(), {
       registerPendingAgentToolUse: (...args) => {
         calls.push(args);
       },
@@ -547,7 +547,7 @@ describe('AuditSseResponseHandler', () => {
   it('debería tolerar input_json incompleto / inválido sin lanzar (sin enriquecer subagent_type)', async () => {
     const config = makeConfig();
     const calls: Array<{ id: string; type?: string }> = [];
-    const store = makeSessionStore(makeActiveTurn(), {
+    const store = makeSessionStore(makeActiveInteraction(), {
       registerPendingAgentToolUse: (_dir, _step, id, type) => {
         calls.push({ id, type });
       },
@@ -584,7 +584,7 @@ describe('AuditSseResponseHandler', () => {
 
   it('debería detectar SSE event: error y cerrar con upstream-error + errorMessage/errorCode', async () => {
     const config = makeConfig();
-    let captured: TurnMetadata | null = null;
+    let captured: InteractionMetadata | null = null;
 
     const sseData = [
       'event: message_start',
@@ -600,7 +600,7 @@ describe('AuditSseResponseHandler', () => {
 
     const handler = new AuditSseResponseHandler(
       makeAuditWriter({
-        writeTurnMeta: async (_dir, meta) => {
+        writeInteractionMeta: async (_dir, meta) => {
           captured = meta;
         },
       }),
@@ -616,16 +616,16 @@ describe('AuditSseResponseHandler', () => {
 
     await new Promise((r) => setTimeout(r, 100));
     expect(captured).not.toBeNull();
-    expect(captured!.turnOutcome).toBe('upstream-error');
+    expect(captured!.outcome).toBe('upstream-error');
     expect(captured!.errorMessage).toBe('Overloaded');
     expect(captured!.errorCode).toBe('overloaded_error');
   });
 
   it('debería incluir lostPendingAgents en meta cuando SSE error ocurre con pendings activos', async () => {
     const config = makeConfig();
-    let captured: TurnMetadata | null = null;
+    let captured: InteractionMetadata | null = null;
 
-    const turn = makeActiveTurn({
+    const interaction = makeActiveInteraction({
       pendingAgentToolUses: [
         { stepIndex: 1, toolUseId: 'toolu_agent_1' },
         { stepIndex: 1, toolUseId: 'toolu_agent_2', subagentType: 'Explore' },
@@ -641,13 +641,13 @@ describe('AuditSseResponseHandler', () => {
 
     const handler = new AuditSseResponseHandler(
       makeAuditWriter({
-        writeTurnMeta: async (_dir, meta) => {
+        writeInteractionMeta: async (_dir, meta) => {
           captured = meta;
         },
       }),
       makeSseReconstructor(),
       config,
-      makeSessionStore(turn),
+      makeSessionStore(interaction),
     );
 
     const stream = new PassThrough();
@@ -657,7 +657,7 @@ describe('AuditSseResponseHandler', () => {
 
     await new Promise((r) => setTimeout(r, 100));
     expect(captured).not.toBeNull();
-    expect(captured!.turnOutcome).toBe('upstream-error');
+    expect(captured!.outcome).toBe('upstream-error');
     expect(captured!.lostPendingAgents).toHaveLength(2);
     expect(captured!.lostPendingAgents![0].toolUseId).toBe('toolu_agent_1');
     expect(captured!.lostPendingAgents![1].subagentType).toBe('Explore');
@@ -665,8 +665,8 @@ describe('AuditSseResponseHandler', () => {
 
   it('debería marcar awaitingContinuation=true cuando stop_reason=tool_use', async () => {
     const config = makeConfig();
-    const turn = makeActiveTurn();
-    const store = makeSessionStore(turn);
+    const interaction = makeActiveInteraction();
+    const store = makeSessionStore(interaction);
 
     const sseData = ['data: {"type":"message_delta","delta":{"stop_reason":"tool_use"}}', ''].join(
       '\n',
@@ -684,17 +684,17 @@ describe('AuditSseResponseHandler', () => {
     stream.end();
 
     await new Promise((r) => setTimeout(r, 100));
-    expect(turn.awaitingContinuation).toBe(true);
-    expect(turn.awaitingSince).toBeTypeOf('number');
+    expect(interaction.awaitingContinuation).toBe(true);
+    expect(interaction.awaitingSince).toBeTypeOf('number');
   });
 
   it('NO debería incluir lostPendingAgents cuando no hay pendings activos', async () => {
     const config = makeConfig();
-    let captured: TurnMetadata | null = null;
+    let captured: InteractionMetadata | null = null;
 
     const handler = new AuditSseResponseHandler(
       makeAuditWriter({
-        writeTurnMeta: async (_dir, meta) => {
+        writeInteractionMeta: async (_dir, meta) => {
           captured = meta;
         },
       }),
@@ -715,12 +715,12 @@ describe('AuditSseResponseHandler', () => {
     expect(captured!.lostPendingAgents).toBeUndefined();
   });
 
-  it('debería invocar updateSessionMetrics dentro de withSessionLock al cerrar turno agentic', async () => {
+  it('debería invocar updateSessionMetrics dentro de withSessionLock al cerrar la interacción agentic', async () => {
     const config = makeConfig();
     let lockSessionId: string | null = null;
     let metricsCalled = false;
 
-    const turn = makeActiveTurn({
+    const interaction = makeActiveInteraction({
       modelId: 'claude-opus-4-5',
       stepsMeta: [{ stepIndex: 1, sse: true, statusCode: 200, inputTokens: 10, outputTokens: 5 }],
     });
@@ -736,7 +736,7 @@ describe('AuditSseResponseHandler', () => {
       }),
       makeSseReconstructor(),
       config,
-      makeSessionStore(turn, {
+      makeSessionStore(interaction, {
         withSessionLock: async <T>(sessionId: string, fn: () => Promise<T>): Promise<T> => {
           lockSessionId = sessionId;
           return fn();
@@ -754,10 +754,10 @@ describe('AuditSseResponseHandler', () => {
     expect(metricsCalled).toBe(true);
   });
 
-  it('debería propagar parentContext al meta.json si el turn es subagente', async () => {
+  it('debería propagar parentContext al meta.json si la interacción es subagente', async () => {
     const config = makeConfig();
-    let captured: TurnMetadata | null = null;
-    const subTurn = makeActiveTurn({
+    let captured: InteractionMetadata | null = null;
+    const subInteraction = makeActiveInteraction({
       parentContext: {
         parentInteractionDir: '/tmp/parent',
         parentStepIndex: 1,
@@ -768,13 +768,13 @@ describe('AuditSseResponseHandler', () => {
 
     const handler = new AuditSseResponseHandler(
       makeAuditWriter({
-        writeTurnMeta: async (_dir, meta) => {
+        writeInteractionMeta: async (_dir, meta) => {
           captured = meta;
         },
       }),
       makeSseReconstructor(),
       config,
-      makeSessionStore(subTurn),
+      makeSessionStore(subInteraction),
     );
 
     const sseData = [
@@ -790,6 +790,6 @@ describe('AuditSseResponseHandler', () => {
 
     await new Promise((r) => setTimeout(r, 100));
     expect(captured).not.toBeNull();
-    expect(captured!.parentContext).toEqual(subTurn.parentContext);
+    expect(captured!.parentContext).toEqual(subInteraction.parentContext);
   });
 });

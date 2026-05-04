@@ -4,17 +4,17 @@ import type { ISessionStore } from '../2-services/ports/session-store.port.js';
 import { ProxyEnvironmentConfig } from '../1-domain/types/config.types.js';
 import {
   AuditInteractionContext,
-  ActiveTurn,
+  ActiveInteraction,
   StepMeta,
-  TurnMetadata,
-  TurnOutcome,
+  InteractionMetadata,
+  InteractionOutcome,
   computeTokenTotals,
 } from '../1-domain/types/audit.types.js';
 
 /**
  * Handler para orquestar la auditoría de respuestas estándar (no-SSE).
- * Para agentic-turn: aplica heurística terminal-por-defecto.
- * Para client-preflight: escribe step sin cerrar el turno.
+ * Para agentic: aplica heurística terminal-por-defecto.
+ * Para client-preflight: escribe step sin cerrar la interacción.
  */
 export class AuditStandardResponseHandler {
   constructor(
@@ -33,8 +33,8 @@ export class AuditStandardResponseHandler {
       return;
     }
 
-    const activeTurn = this.sessionStore.getTurnByDirSync(context.auditInteractionDir);
-    const stepNumber = activeTurn?.stepCount ?? 1;
+    const activeInteraction = this.sessionStore.getInteractionByDirSync(context.auditInteractionDir);
+    const stepNumber = activeInteraction?.stepCount ?? 1;
     const stepDir = path.join(
       context.auditInteractionDir,
       'steps',
@@ -93,17 +93,17 @@ export class AuditStandardResponseHandler {
             : {}),
         };
 
-        const turn = await this.sessionStore.getTurnByDir(context.auditInteractionDir);
+        const interaction = await this.sessionStore.getInteractionByDir(context.auditInteractionDir);
         await this.sessionStore.pushStepMetaByDir(context.auditInteractionDir, stepMeta);
 
         if (context.interactionType !== 'client-preflight') {
-          // Cerrar turno con error
-          this.sessionStore.closeTurn(context.auditInteractionDir);
-          if (turn) {
-            await this.writeTurnMeta(
-              turn,
+          // Cerrar interacción con error
+          this.sessionStore.closeInteraction(context.auditInteractionDir);
+          if (interaction) {
+            await this.writeInteractionMeta(
+              interaction,
               context,
-              'upstream-error' as TurnOutcome,
+              'upstream-error' as InteractionOutcome,
               false,
               totalBytes,
             );
@@ -163,7 +163,7 @@ export class AuditStandardResponseHandler {
           const stepMeta: StepMeta = {
             stepIndex: stepNumber,
             label:
-              context.turnClassification?.type === 'preflight-quota' ? 'quota-check' : undefined,
+              context.requestClassification?.type === 'preflight-quota' ? 'quota-check' : undefined,
             sse: false,
             statusCode: context.responseStatusCode,
             ...(anthropicMessageId ? { anthropicMessageId } : {}),
@@ -179,15 +179,15 @@ export class AuditStandardResponseHandler {
           await this.sessionStore.pushStepMetaByDir(context.auditInteractionDir, stepMeta);
 
           // Cerrar preflight inmediatamente
-          const preflightTurn = await this.sessionStore.getTurnByDir(context.auditInteractionDir);
-          this.sessionStore.closeTurn(context.auditInteractionDir);
-          if (preflightTurn) {
-            await this.writeTurnMeta(preflightTurn, context, 'completed', false, totalBytes);
+          const preflightInteraction = await this.sessionStore.getInteractionByDir(context.auditInteractionDir);
+          this.sessionStore.closeInteraction(context.auditInteractionDir);
+          if (preflightInteraction) {
+            await this.writeInteractionMeta(preflightInteraction, context, 'completed', false, totalBytes);
           }
           return;
         }
 
-        // Agentic turn: heurística terminal-por-defecto
+        // Agentic: heurística terminal-por-defecto
         const terminalStatus = checkTerminal(buf);
 
         const stepMeta: StepMeta = {
@@ -208,19 +208,19 @@ export class AuditStandardResponseHandler {
         await this.sessionStore.pushStepMetaByDir(context.auditInteractionDir, stepMeta);
 
         // Actualizar métricas de sesión per-step
-        const currentTurn = this.sessionStore.getTurnByDirSync(context.auditInteractionDir);
-        if (currentTurn?.modelId) {
-          const sessionDir = path.join(this.sessionStore.getBaseDir(), currentTurn.sessionId);
+        const currentInteraction = this.sessionStore.getInteractionByDirSync(context.auditInteractionDir);
+        if (currentInteraction?.modelId) {
+          const sessionDir = path.join(this.sessionStore.getBaseDir(), currentInteraction.sessionId);
           const stepTotals = computeTokenTotals([stepMeta]);
-          await this.sessionStore.withSessionLock(currentTurn.sessionId, async () => {
+          await this.sessionStore.withSessionLock(currentInteraction.sessionId, async () => {
             await this.auditWriter
-              .updateSessionMetrics(sessionDir, currentTurn.modelId!, stepTotals, 1)
+              .updateSessionMetrics(sessionDir, currentInteraction.modelId!, stepTotals, 1)
               .catch(() => { /* error no crítico */ });
           });
         }
 
         if (terminalStatus !== 'terminal') {
-          // Raro: non-SSE con stop_reason=tool_use — mantener turno abierto
+          // Raro: non-SSE con stop_reason=tool_use — mantener interacción abierta
           return;
         }
 
@@ -240,12 +240,12 @@ export class AuditStandardResponseHandler {
           );
         }
 
-        const turn = await this.sessionStore.getTurnByDir(context.auditInteractionDir);
-        this.sessionStore.closeTurn(context.auditInteractionDir);
+        const interaction = await this.sessionStore.getInteractionByDir(context.auditInteractionDir);
+        this.sessionStore.closeInteraction(context.auditInteractionDir);
 
-        if (turn) {
-          const turnOutcome = this.computeTurnOutcome(context.responseStatusCode);
-          await this.writeTurnMeta(turn, context, turnOutcome, false, totalBytes);
+        if (interaction) {
+          const outcome = this.computeInteractionOutcome(context.responseStatusCode);
+          await this.writeInteractionMeta(interaction, context, outcome, false, totalBytes);
         }
       } catch (err) {
         console.error('Error al escribir meta final de respuesta estándar:', err);
@@ -253,29 +253,29 @@ export class AuditStandardResponseHandler {
     });
   }
 
-  private async writeTurnMeta(
-    turn: ActiveTurn,
+  private async writeInteractionMeta(
+    interaction: ActiveInteraction,
     context: AuditInteractionContext,
-    turnOutcome: TurnOutcome,
+    interactionOutcome: InteractionOutcome,
     sse: boolean,
     totalResponseBytes: number,
   ): Promise<void> {
     const endedAt = Date.now();
 
     const totals =
-      turn.interactionType !== 'client-preflight' ? computeTokenTotals(turn.stepsMeta) : null;
+      interaction.interactionType !== 'client-preflight' ? computeTokenTotals(interaction.stepsMeta) : null;
 
-    const meta: TurnMetadata = {
-      interactionType: turn.interactionType,
-      ...(turn.modelId ? { modelId: turn.modelId } : {}),
-      turnOutcome,
-      stepCount: turn.stepsMeta.length,
-      startedAt: new Date(turn.startedAt).toISOString(),
+    const meta: InteractionMetadata = {
+      interactionType: interaction.interactionType,
+      ...(interaction.modelId ? { modelId: interaction.modelId } : {}),
+      outcome: interactionOutcome,
+      stepCount: interaction.stepsMeta.length,
+      startedAt: new Date(interaction.startedAt).toISOString(),
       endedAt: new Date(endedAt).toISOString(),
-      durationMs: endedAt - turn.startedAt,
+      durationMs: endedAt - interaction.startedAt,
       statusCode: context.responseStatusCode,
       sse,
-      steps: turn.stepsMeta,
+      steps: interaction.stepsMeta,
       totals,
       sseResponseBodyAttempted: false,
       sseResponseBodyWritten: false,
@@ -283,10 +283,10 @@ export class AuditStandardResponseHandler {
       sseResponseBodySource: null,
       errorMessage: null,
       errorCode: null,
-      ...(turn.parentContext ? { parentContext: turn.parentContext } : {}),
-      ...(turn.contextSyncFallback ? { contextSyncFallback: true } : {}),
+      ...(interaction.parentContext ? { parentContext: interaction.parentContext } : {}),
+      ...(interaction.contextSyncFallback ? { contextSyncFallback: true } : {}),
       truncation: {
-        requestBodyOmitted: turn.requestBodyOmitted,
+        requestBodyOmitted: interaction.requestBodyOmitted,
         responseBodyBytesTotal: totalResponseBytes,
         responseBodyBytesAudited: Math.min(
           totalResponseBytes,
@@ -302,20 +302,20 @@ export class AuditStandardResponseHandler {
       },
     };
 
-    await this.auditWriter.writeTurnMeta(turn.interactionDir, meta);
+    await this.auditWriter.writeInteractionMeta(interaction.interactionDir, meta);
 
-    // Eliminar state.json al cerrar turno
-    await this.auditWriter.removeInteractionState(turn.interactionDir);
+    // Eliminar state.json al cerrar interacción
+    await this.auditWriter.removeInteractionState(interaction.interactionDir);
   }
 
   /**
-   * Computa el outcome del turno basado en el status code HTTP.
+   * Computa el outcome de la interacción basado en el status code HTTP.
    * - 2xx → completed
    * - 4xx → client-error (error del cliente/request)
    * - 5xx → upstream-error (error del servidor upstream)
    * - null → upstream-error (fallo de conexión)
    */
-  private computeTurnOutcome(statusCode: number | null): TurnOutcome {
+  private computeInteractionOutcome(statusCode: number | null): InteractionOutcome {
     if (!statusCode || statusCode < 400) {
       return 'completed';
     }

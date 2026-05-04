@@ -3,12 +3,12 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { SessionStoreService } from '../../src/2-services/session-store.service.js';
-import { ActiveTurn } from '../../src/1-domain/types/audit.types.js';
+import { ActiveInteraction } from '../../src/1-domain/types/audit.types.js';
 
-function makeTurn(overrides: Partial<ActiveTurn> = {}): ActiveTurn {
+function makeInteraction(overrides: Partial<ActiveInteraction> = {}): ActiveInteraction {
   return {
     interactionDir: '/tmp/sessions/s1/interactions/000001_req-1',
-    interactionType: 'agentic-turn',
+    interactionType: 'agentic',
     stepCount: 1,
     requestSequence: 1,
     startedAt: Date.now(),
@@ -22,7 +22,7 @@ function makeTurn(overrides: Partial<ActiveTurn> = {}): ActiveTurn {
   };
 }
 
-describe('SessionStoreService — turnRegistry', () => {
+describe('SessionStoreService — interactionRegistry', () => {
   let tmpDir: string;
   let store: SessionStoreService;
 
@@ -31,137 +31,137 @@ describe('SessionStoreService — turnRegistry', () => {
     store = new SessionStoreService(tmpDir);
   });
 
-  it('registerTurn registra el turno en el registry por interactionDir', async () => {
-    const turn = makeTurn();
-    store.registerTurn(turn);
+  it('registerInteraction registra el interacción en el registry por interactionDir', async () => {
+    const interaction = makeInteraction();
+    store.registerInteraction(interaction);
 
-    expect(await store.getTurnByDir(turn.interactionDir)).toBe(turn);
+    expect(await store.getInteractionByDir(interaction.interactionDir)).toBe(interaction);
   });
 
-  it('dos llamadas registerTurn coexisten sin interferirse', async () => {
-    const turnA = makeTurn({ interactionDir: '/tmp/a' });
-    const turnB = makeTurn({ interactionDir: '/tmp/b' });
-    store.registerTurn(turnA);
-    store.registerTurn(turnB);
+  it('dos llamadas registerInteraction coexisten sin interferirse', async () => {
+    const interactionA = makeInteraction({ interactionDir: '/tmp/a' });
+    const interactionB = makeInteraction({ interactionDir: '/tmp/b' });
+    store.registerInteraction(interactionA);
+    store.registerInteraction(interactionB);
 
-    expect(store.getTurnByDirSync('/tmp/a')).toBe(turnA);
-    expect(store.getTurnByDirSync('/tmp/b')).toBe(turnB);
+    expect(store.getInteractionByDirSync('/tmp/a')).toBe(interactionA);
+    expect(store.getInteractionByDirSync('/tmp/b')).toBe(interactionB);
   });
 
-  it('closeTurn elimina del turnRegistry', async () => {
-    const turn = makeTurn();
-    store.registerTurn(turn);
+  it('closeInteraction elimina del interactionRegistry', async () => {
+    const interaction = makeInteraction();
+    store.registerInteraction(interaction);
 
-    store.closeTurn(turn.interactionDir);
+    store.closeInteraction(interaction.interactionDir);
 
-    expect(await store.getTurnByDir(turn.interactionDir)).toBeNull();
+    expect(await store.getInteractionByDir(interaction.interactionDir)).toBeNull();
   });
 
-  it('closeTurn no afecta a otros turnos registrados', async () => {
-    const turnA = makeTurn({ interactionDir: '/tmp/dir-a' });
-    const turnB = makeTurn({ interactionDir: '/tmp/dir-b' });
-    store.registerTurn(turnA);
-    store.registerTurn(turnB);
+  it('closeInteraction no afecta a otros interacciones registrados', async () => {
+    const interactionA = makeInteraction({ interactionDir: '/tmp/dir-a' });
+    const interactionB = makeInteraction({ interactionDir: '/tmp/dir-b' });
+    store.registerInteraction(interactionA);
+    store.registerInteraction(interactionB);
 
-    store.closeTurn('/tmp/dir-b');
+    store.closeInteraction('/tmp/dir-b');
 
-    expect(store.getTurnByDirSync('/tmp/dir-a')).toBe(turnA);
-    expect(store.getTurnByDirSync('/tmp/dir-b')).toBeNull();
+    expect(store.getInteractionByDirSync('/tmp/dir-a')).toBe(interactionA);
+    expect(store.getInteractionByDirSync('/tmp/dir-b')).toBeNull();
   });
 
-  it('pushStepMetaByDir acumula en el turno correcto', async () => {
-    const turnA = makeTurn({ interactionDir: '/tmp/a' });
-    const turnB = makeTurn({ interactionDir: '/tmp/b' });
-    store.registerTurn(turnA);
-    store.registerTurn(turnB);
+  it('pushStepMetaByDir acumula en el interacción correcto', async () => {
+    const interactionA = makeInteraction({ interactionDir: '/tmp/a' });
+    const interactionB = makeInteraction({ interactionDir: '/tmp/b' });
+    store.registerInteraction(interactionA);
+    store.registerInteraction(interactionB);
 
     await store.pushStepMetaByDir('/tmp/a', { stepIndex: 1, sse: true, statusCode: 200 });
     await store.pushStepMetaByDir('/tmp/b', { stepIndex: 1, sse: false, statusCode: 200 });
 
-    expect(turnA.stepsMeta).toHaveLength(1);
-    expect(turnA.stepsMeta[0].sse).toBe(true);
-    expect(turnB.stepsMeta).toHaveLength(1);
-    expect(turnB.stepsMeta[0].sse).toBe(false);
+    expect(interactionA.stepsMeta).toHaveLength(1);
+    expect(interactionA.stepsMeta[0].sse).toBe(true);
+    expect(interactionB.stepsMeta).toHaveLength(1);
+    expect(interactionB.stepsMeta[0].sse).toBe(false);
   });
 
-  it('incrementStepCountByDir incrementa y retorna stepCount del turno por dir', async () => {
-    const turn = makeTurn({ interactionDir: '/tmp/inc', stepCount: 1 });
-    store.registerTurn(turn);
+  it('incrementStepCountByDir incrementa y retorna stepCount del interacción por dir', async () => {
+    const interaction = makeInteraction({ interactionDir: '/tmp/inc', stepCount: 1 });
+    store.registerInteraction(interaction);
 
     expect(store.incrementStepCountByDir('/tmp/inc')).toBe(2);
     expect(store.incrementStepCountByDir('/tmp/inc')).toBe(3);
-    expect(turn.stepCount).toBe(3);
+    expect(interaction.stepCount).toBe(3);
   });
 
   it('incrementStepCountByDir retorna 1 si el dir no existe', () => {
     expect(store.incrementStepCountByDir('/tmp/nonexistent')).toBe(1);
   });
 
-  it('registerToolUseId + getTurnByToolUseId correlaciona correctamente', () => {
-    const turn = makeTurn({ interactionDir: '/tmp/t1' });
-    store.registerTurn(turn);
+  it('registerToolUseId + getInteractionByToolUseId correlaciona correctamente', () => {
+    const interaction = makeInteraction({ interactionDir: '/tmp/t1' });
+    store.registerInteraction(interaction);
     store.registerToolUseId('tool-abc', '/tmp/t1');
 
-    expect(store.getTurnByToolUseId('tool-abc')).toBe(turn);
+    expect(store.getInteractionByToolUseId('tool-abc')).toBe(interaction);
   });
 
-  it('getTurnByToolUseId retorna null para ID no registrado', () => {
-    expect(store.getTurnByToolUseId('nonexistent')).toBeNull();
+  it('getInteractionByToolUseId retorna null para ID no registrado', () => {
+    expect(store.getInteractionByToolUseId('nonexistent')).toBeNull();
   });
 
-  it('múltiples tool_use_id apuntando al mismo turno', () => {
-    const turn = makeTurn({ interactionDir: '/tmp/t1' });
-    store.registerTurn(turn);
+  it('múltiples tool_use_id apuntando al mismo interacción', () => {
+    const interaction = makeInteraction({ interactionDir: '/tmp/t1' });
+    store.registerInteraction(interaction);
     store.registerToolUseId('id-1', '/tmp/t1');
     store.registerToolUseId('id-2', '/tmp/t1');
     store.registerToolUseId('id-3', '/tmp/t1');
 
-    expect(store.getTurnByToolUseId('id-1')).toBe(turn);
-    expect(store.getTurnByToolUseId('id-2')).toBe(turn);
-    expect(store.getTurnByToolUseId('id-3')).toBe(turn);
+    expect(store.getInteractionByToolUseId('id-1')).toBe(interaction);
+    expect(store.getInteractionByToolUseId('id-2')).toBe(interaction);
+    expect(store.getInteractionByToolUseId('id-3')).toBe(interaction);
   });
 
-  it('closeTurn limpia los tool_use_id del turno cerrado', () => {
-    const turn = makeTurn({ interactionDir: '/tmp/t1' });
-    store.registerTurn(turn);
+  it('closeInteraction limpia los tool_use_id del interacción cerrado', () => {
+    const interaction = makeInteraction({ interactionDir: '/tmp/t1' });
+    store.registerInteraction(interaction);
     store.registerToolUseId('id-1', '/tmp/t1');
     store.registerToolUseId('id-2', '/tmp/t1');
 
-    store.closeTurn('/tmp/t1');
+    store.closeInteraction('/tmp/t1');
 
-    expect(store.getTurnByToolUseId('id-1')).toBeNull();
-    expect(store.getTurnByToolUseId('id-2')).toBeNull();
+    expect(store.getInteractionByToolUseId('id-1')).toBeNull();
+    expect(store.getInteractionByToolUseId('id-2')).toBeNull();
   });
 
-  it('closeTurn no limpia tool_use_id de otros turnos', () => {
-    const turnA = makeTurn({ interactionDir: '/tmp/a' });
-    const turnB = makeTurn({ interactionDir: '/tmp/b' });
-    store.registerTurn(turnA);
-    store.registerTurn(turnB);
+  it('closeInteraction no limpia tool_use_id de otros interacciones', () => {
+    const interactionA = makeInteraction({ interactionDir: '/tmp/a' });
+    const interactionB = makeInteraction({ interactionDir: '/tmp/b' });
+    store.registerInteraction(interactionA);
+    store.registerInteraction(interactionB);
     store.registerToolUseId('id-a', '/tmp/a');
     store.registerToolUseId('id-b', '/tmp/b');
 
-    store.closeTurn('/tmp/a');
+    store.closeInteraction('/tmp/a');
 
-    expect(store.getTurnByToolUseId('id-a')).toBeNull();
-    expect(store.getTurnByToolUseId('id-b')).toBe(turnB);
+    expect(store.getInteractionByToolUseId('id-a')).toBeNull();
+    expect(store.getInteractionByToolUseId('id-b')).toBe(interactionB);
   });
 
-  it('concurrent side-request no interfiere con turno agentic registrado', () => {
-    const mainTurn = makeTurn({ interactionDir: '/tmp/main' });
-    const sideTurn = makeTurn({ interactionDir: '/tmp/side', interactionType: 'side-request' });
+  it('concurrent side-request no interfiere con interacción agentic registrado', () => {
+    const mainInteraction = makeInteraction({ interactionDir: '/tmp/main' });
+    const sideInteraction = makeInteraction({ interactionDir: '/tmp/side', interactionType: 'side-request' });
 
-    store.registerTurn(mainTurn);
-    store.registerTurn(sideTurn);
+    store.registerInteraction(mainInteraction);
+    store.registerInteraction(sideInteraction);
 
     // Ambos accesibles por dir
-    expect(store.getTurnByDirSync('/tmp/main')).toBe(mainTurn);
-    expect(store.getTurnByDirSync('/tmp/side')).toBe(sideTurn);
+    expect(store.getInteractionByDirSync('/tmp/main')).toBe(mainInteraction);
+    expect(store.getInteractionByDirSync('/tmp/side')).toBe(sideInteraction);
 
-    // Cerrar side-request no afecta al turno principal
-    store.closeTurn('/tmp/side');
-    expect(store.getTurnByDir('/tmp/main')).resolves.toBe(mainTurn);
-    expect(store.getTurnByDir('/tmp/side')).resolves.toBeNull();
+    // Cerrar side-request no afecta al interacción principal
+    store.closeInteraction('/tmp/side');
+    expect(store.getInteractionByDir('/tmp/main')).resolves.toBe(mainInteraction);
+    expect(store.getInteractionByDir('/tmp/side')).resolves.toBeNull();
   });
 });
 
@@ -174,14 +174,14 @@ describe('SessionStoreService — pending Agent tool_uses', () => {
     store = new SessionStoreService(tmpDir);
   });
 
-  it('registerPendingAgentToolUse + findTurnWithPendingAgents (caso unívoco)', () => {
-    const turn = makeTurn({ interactionDir: '/tmp/p1', sessionId: 'sA' });
-    store.registerTurn(turn);
+  it('registerPendingAgentToolUse + findInteractionWithPendingAgents (caso unívoco)', () => {
+    const interaction = makeInteraction({ interactionDir: '/tmp/p1', sessionId: 'sA' });
+    store.registerInteraction(interaction);
     store.registerPendingAgentToolUse('/tmp/p1', 1, 'tool-aaa', 'general-purpose');
 
-    const found = store.findTurnWithPendingAgents('sA');
+    const found = store.findInteractionWithPendingAgents('sA');
     expect(found).not.toBeNull();
-    expect(found!.turn).toBe(turn);
+    expect(found!.interaction).toBe(interaction);
     expect(found!.pendings).toHaveLength(1);
     expect(found!.pendings[0]).toEqual({
       stepIndex: 1,
@@ -190,33 +190,33 @@ describe('SessionStoreService — pending Agent tool_uses', () => {
     });
   });
 
-  it('findTurnWithPendingAgents devuelve null cuando no hay pendings', () => {
-    const turn = makeTurn({ interactionDir: '/tmp/p1', sessionId: 'sA' });
-    store.registerTurn(turn);
-    expect(store.findTurnWithPendingAgents('sA')).toBeNull();
+  it('findInteractionWithPendingAgents devuelve null cuando no hay pendings', () => {
+    const interaction = makeInteraction({ interactionDir: '/tmp/p1', sessionId: 'sA' });
+    store.registerInteraction(interaction);
+    expect(store.findInteractionWithPendingAgents('sA')).toBeNull();
   });
 
-  it('findTurnWithPendingAgents excluye turns con interactionType !== agentic-turn', () => {
-    const sideTurn = makeTurn({
+  it('findInteractionWithPendingAgents excluye interacciones con interactionType !== agentic', () => {
+    const sideInteraction = makeInteraction({
       interactionDir: '/tmp/side',
       sessionId: 'sA',
       interactionType: 'side-request',
     });
-    const preflightTurn = makeTurn({
+    const preflightInteraction = makeInteraction({
       interactionDir: '/tmp/pre',
       sessionId: 'sA',
       interactionType: 'client-preflight',
     });
-    store.registerTurn(sideTurn);
-    store.registerTurn(preflightTurn);
+    store.registerInteraction(sideInteraction);
+    store.registerInteraction(preflightInteraction);
     store.registerPendingAgentToolUse('/tmp/side', 1, 'tool-x');
     store.registerPendingAgentToolUse('/tmp/pre', 1, 'tool-y');
 
-    expect(store.findTurnWithPendingAgents('sA')).toBeNull();
+    expect(store.findInteractionWithPendingAgents('sA')).toBeNull();
   });
 
-  it('findTurnWithPendingAgents excluye turns con parentContext (refuerza profundidad ≤ 2)', () => {
-    const subagentTurn = makeTurn({
+  it('findInteractionWithPendingAgents excluye interacciones con parentContext (refuerza profundidad ≤ 2)', () => {
+    const subagentInteraction = makeInteraction({
       interactionDir: '/tmp/sub',
       sessionId: 'sA',
       parentContext: {
@@ -225,116 +225,116 @@ describe('SessionStoreService — pending Agent tool_uses', () => {
         triggeringToolUseId: 'tool-a',
       },
     });
-    store.registerTurn(subagentTurn);
+    store.registerInteraction(subagentInteraction);
     store.registerPendingAgentToolUse('/tmp/sub', 1, 'nested-agent');
 
     // Aunque el subagente tenga un Agent pendiente, no puede ser padre de nadie.
-    expect(store.findTurnWithPendingAgents('sA')).toBeNull();
+    expect(store.findInteractionWithPendingAgents('sA')).toBeNull();
   });
 
-  it('findTurnWithPendingAgents devuelve copia del array (mutación local no afecta al turn)', () => {
-    const turn = makeTurn({ interactionDir: '/tmp/p1', sessionId: 'sA' });
-    store.registerTurn(turn);
+  it('findInteractionWithPendingAgents devuelve copia del array (mutación local no afecta al interaction)', () => {
+    const interaction = makeInteraction({ interactionDir: '/tmp/p1', sessionId: 'sA' });
+    store.registerInteraction(interaction);
     store.registerPendingAgentToolUse('/tmp/p1', 1, 'tool-1');
     store.registerPendingAgentToolUse('/tmp/p1', 1, 'tool-2');
 
-    const found = store.findTurnWithPendingAgents('sA');
+    const found = store.findInteractionWithPendingAgents('sA');
     expect(found!.pendings).toHaveLength(2);
     found!.pendings.pop();
-    expect(turn.pendingAgentToolUses).toHaveLength(2);
+    expect(interaction.pendingAgentToolUses).toHaveLength(2);
   });
 
   it('registerPendingAgentToolUse es idempotente y enriquece subagentType si llega después', () => {
-    const turn = makeTurn({ interactionDir: '/tmp/p1', sessionId: 'sA' });
-    store.registerTurn(turn);
+    const interaction = makeInteraction({ interactionDir: '/tmp/p1', sessionId: 'sA' });
+    store.registerInteraction(interaction);
     store.registerPendingAgentToolUse('/tmp/p1', 1, 'tool-aaa');
     store.registerPendingAgentToolUse('/tmp/p1', 1, 'tool-aaa', 'Explore');
 
-    expect(turn.pendingAgentToolUses).toHaveLength(1);
-    expect(turn.pendingAgentToolUses[0].subagentType).toBe('Explore');
+    expect(interaction.pendingAgentToolUses).toHaveLength(1);
+    expect(interaction.pendingAgentToolUses[0].subagentType).toBe('Explore');
   });
 
   it('consumePendingAgentToolUse elimina la entrada y deja las demás intactas', () => {
-    const turn = makeTurn({ interactionDir: '/tmp/p1', sessionId: 'sA' });
-    store.registerTurn(turn);
+    const interaction = makeInteraction({ interactionDir: '/tmp/p1', sessionId: 'sA' });
+    store.registerInteraction(interaction);
     store.registerPendingAgentToolUse('/tmp/p1', 1, 'tool-1');
     store.registerPendingAgentToolUse('/tmp/p1', 1, 'tool-2');
 
     store.consumePendingAgentToolUse('/tmp/p1', 'tool-1');
-    expect(turn.pendingAgentToolUses).toHaveLength(1);
-    expect(turn.pendingAgentToolUses[0].toolUseId).toBe('tool-2');
+    expect(interaction.pendingAgentToolUses).toHaveLength(1);
+    expect(interaction.pendingAgentToolUses[0].toolUseId).toBe('tool-2');
   });
 
   it('consumePendingAgentToolUse es idempotente sobre entrada inexistente', () => {
-    const turn = makeTurn({ interactionDir: '/tmp/p1', sessionId: 'sA' });
-    store.registerTurn(turn);
+    const interaction = makeInteraction({ interactionDir: '/tmp/p1', sessionId: 'sA' });
+    store.registerInteraction(interaction);
     store.consumePendingAgentToolUse('/tmp/p1', 'no-existe');
-    expect(turn.pendingAgentToolUses).toHaveLength(0);
+    expect(interaction.pendingAgentToolUses).toHaveLength(0);
   });
 
-  it('closeTurn limpia sessionToActiveTurns y borra la clave si queda vacío', () => {
-    const turn = makeTurn({ interactionDir: '/tmp/p1', sessionId: 'sA' });
-    store.registerTurn(turn);
-    expect(store.findTurnWithPendingAgents('sA')).toBeNull(); // no pendings, pero el set existe
+  it('closeInteraction limpia sessionToActiveInteractions y borra la clave si queda vacío', () => {
+    const interaction = makeInteraction({ interactionDir: '/tmp/p1', sessionId: 'sA' });
+    store.registerInteraction(interaction);
+    expect(store.findInteractionWithPendingAgents('sA')).toBeNull(); // no pendings, pero el set existe
 
-    // Tras cerrar, la sesión queda sin turns activos y find devuelve null
-    store.closeTurn('/tmp/p1');
-    store.registerPendingAgentToolUse('/tmp/p1', 1, 'tool-x'); // no-op (turn ya cerrado)
-    expect(store.findTurnWithPendingAgents('sA')).toBeNull();
+    // Tras cerrar, la sesión queda sin interacciones activas y find devuelve null
+    store.closeInteraction('/tmp/p1');
+    store.registerPendingAgentToolUse('/tmp/p1', 1, 'tool-x'); // no-op (interacción ya cerrada)
+    expect(store.findInteractionWithPendingAgents('sA')).toBeNull();
   });
 
   it('sesiones distintas no interfieren', () => {
-    const turnA = makeTurn({ interactionDir: '/tmp/a', sessionId: 'sA' });
-    const turnB = makeTurn({ interactionDir: '/tmp/b', sessionId: 'sB' });
-    store.registerTurn(turnA);
-    store.registerTurn(turnB);
+    const interactionA = makeInteraction({ interactionDir: '/tmp/a', sessionId: 'sA' });
+    const interactionB = makeInteraction({ interactionDir: '/tmp/b', sessionId: 'sB' });
+    store.registerInteraction(interactionA);
+    store.registerInteraction(interactionB);
     store.registerPendingAgentToolUse('/tmp/a', 1, 'tool-a');
 
-    expect(store.findTurnWithPendingAgents('sA')).not.toBeNull();
-    expect(store.findTurnWithPendingAgents('sB')).toBeNull();
-    expect(store.findTurnWithPendingAgents('sX')).toBeNull();
+    expect(store.findInteractionWithPendingAgents('sA')).not.toBeNull();
+    expect(store.findInteractionWithPendingAgents('sB')).toBeNull();
+    expect(store.findInteractionWithPendingAgents('sX')).toBeNull();
   });
 
-  it('findStaleTurnsAwaitingContinuation retorna turnos stale con awaitingContinuation', async () => {
-    const staleTurn = makeTurn({
+  it('findStaleInteractionsAwaitingContinuation retorna interacciones stale con awaitingContinuation', async () => {
+    const staleInteraction = makeInteraction({
       interactionDir: '/tmp/stale',
       awaitingContinuation: true,
       awaitingSince: Date.now() - 120_000, // 2 min ago
     });
-    const freshTurn = makeTurn({
+    const freshInteraction = makeInteraction({
       interactionDir: '/tmp/fresh',
       awaitingContinuation: true,
       awaitingSince: Date.now() - 5_000, // 5 sec ago
     });
-    const normalTurn = makeTurn({ interactionDir: '/tmp/normal' });
+    const normalInteraction = makeInteraction({ interactionDir: '/tmp/normal' });
 
-    store.registerTurn(staleTurn);
-    store.registerTurn(freshTurn);
-    store.registerTurn(normalTurn);
+    store.registerInteraction(staleInteraction);
+    store.registerInteraction(freshInteraction);
+    store.registerInteraction(normalInteraction);
 
-    const stale = store.findStaleTurnsAwaitingContinuation('s1', 60_000);
+    const stale = store.findStaleInteractionsAwaitingContinuation('s1', 60_000);
     expect(stale).toHaveLength(1);
     expect(stale[0].interactionDir).toBe('/tmp/stale');
   });
 
-  it('findStaleTurnsAwaitingContinuation retorna vacío si no hay stale', async () => {
-    const turn = makeTurn({ awaitingContinuation: false });
-    store.registerTurn(turn);
-    expect(store.findStaleTurnsAwaitingContinuation('s1', 60_000)).toHaveLength(0);
+  it('findStaleInteractionsAwaitingContinuation retorna vacío si no hay stale', async () => {
+    const interaction = makeInteraction({ awaitingContinuation: false });
+    store.registerInteraction(interaction);
+    expect(store.findStaleInteractionsAwaitingContinuation('s1', 60_000)).toHaveLength(0);
   });
 
-  it('getAllOpenTurns retorna todos los turnos en el registry', async () => {
-    const t1 = makeTurn({ interactionDir: '/tmp/t1' });
-    const t2 = makeTurn({ interactionDir: '/tmp/t2', sessionId: 's2' });
-    store.registerTurn(t1);
-    store.registerTurn(t2);
-    const all = store.getAllOpenTurns();
+  it('getAllOpenInteractions retorna todos los interacciones en el registry', async () => {
+    const t1 = makeInteraction({ interactionDir: '/tmp/t1' });
+    const t2 = makeInteraction({ interactionDir: '/tmp/t2', sessionId: 's2' });
+    store.registerInteraction(t1);
+    store.registerInteraction(t2);
+    const all = store.getAllOpenInteractions();
     expect(all).toHaveLength(2);
     expect(all.map((t) => t.interactionDir).sort()).toEqual(['/tmp/t1', '/tmp/t2']);
   });
 
-  it('getAllOpenTurns retorna vacío si no hay turnos', async () => {
-    expect(store.getAllOpenTurns()).toHaveLength(0);
+  it('getAllOpenInteractions retorna vacío si no hay interacciones', async () => {
+    expect(store.getAllOpenInteractions()).toHaveLength(0);
   });
 
   it('withSessionLock serializa ejecuciones concurrentes en la misma sesión', async () => {
@@ -399,11 +399,11 @@ describe('SessionStoreService — contextSyncCache', () => {
     expect(store.resolveContextSyncCache('h1', 'h2')).toBe('new');
   });
 
-  it('closeTurn no limpia el caché de Context Sync', () => {
+  it('closeInteraction no limpia el caché de Context Sync', () => {
     store.registerContextSyncCache('h1', 'h2', 'cached');
-    const turn = makeTurn({ interactionDir: '/tmp/t1' });
-    store.registerTurn(turn);
-    store.closeTurn('/tmp/t1');
+    const interaction = makeInteraction({ interactionDir: '/tmp/t1' });
+    store.registerInteraction(interaction);
+    store.closeInteraction('/tmp/t1');
     expect(store.resolveContextSyncCache('h1', 'h2')).toBe('cached');
   });
 });

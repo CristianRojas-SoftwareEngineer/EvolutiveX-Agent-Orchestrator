@@ -5,7 +5,7 @@ import {
   extractModelFromRequestBody,
   extractToolResultIdsFromRequestBody,
   HARNESS_CONTEXT_SYNC_SUFFIX,
-} from '../../src/1-domain/services/turn-classifier.service.js';
+} from '../../src/1-domain/services/request-classifier.service.js';
 
 describe('classifyRequestBody', () => {
   it('clasifica buffer vacío como preflight-warmup', () => {

@@ -53,7 +53,7 @@ export interface SessionMetrics {
 }
 ```
 
-Adicionalmente, `ActiveTurn` y `TurnMetadata` fueron extendidos con `modelId?: string` para que el modelo quede disponible al momento del cierre de turno y persista en cada `meta.json` individual para inspección offline.
+Adicionalmente, `ActiveInteraction` y `InteractionMetadata` fueron extendidos con `modelId?: string` para que el modelo quede disponible al momento del cierre de turno y persista en cada `meta.json` individual para inspección offline.
 
 #### Escritura atómica (`src/2-services/audit-writer.service.ts`)
 

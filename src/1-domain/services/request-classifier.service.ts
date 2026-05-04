@@ -1,4 +1,4 @@
-import { SideRequestSubType, TurnClassification } from '../types/audit.types.js';
+import { SideRequestSubType, RequestClassification } from '../types/audit.types.js';
 
 /**
  * Sufijo fijo inyectado por el harness en los side-requests de tipo Context Sync
@@ -16,7 +16,7 @@ export const HARNESS_CONTEXT_SYNC_SUFFIX = `Provide a concise response based onl
  * Búsqueda string-based sobre el buffer sin parsear JSON completo.
  * Asume protocolo Claude Code donde los mensajes de usuario incluyen "tools".
  */
-export function classifyRequestBody(bodyBuffer: Buffer): TurnClassification {
+export function classifyRequestBody(bodyBuffer: Buffer): RequestClassification {
   if (!bodyBuffer.length) return { type: 'preflight-warmup' };
   const str = bodyBuffer.toString('utf8');
   if (str.includes('"tool_result"')) return { type: 'continuation' };

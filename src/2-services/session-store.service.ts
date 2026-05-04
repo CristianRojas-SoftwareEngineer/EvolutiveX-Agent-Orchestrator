@@ -2,7 +2,7 @@ import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 
 import {
-  ActiveTurn,
+  ActiveInteraction,
   PendingAgentToolUse,
   PendingBuiltinToolUse,
   StepMeta,
@@ -14,15 +14,15 @@ const INTERACTION_SEQUENCE_FILE = 'interaction-sequence.json';
 
 /**
  * Servicio adaptador para operaciones de filesystem de sesiones.
- * Gestiona secuencias en disco, mutex, directorio raíz de auditoría, y estado de turnos activos.
+ * Gestiona secuencias en disco, mutex, directorio raíz de auditoría, y estado de interacciones activas.
  */
 export class SessionStoreService implements ISessionStore {
   private sessionRequestChains = new Map<string, Promise<void>>();
   private auditBaseDir: string;
-  private turnRegistry = new Map<string, ActiveTurn>();
-  private toolUseIdToTurnDir = new Map<string, string>();
-  /** Índice por sesión: sessionId → set de interactionDir de turns activos. */
-  private sessionToActiveTurns = new Map<string, Set<string>>();
+  private interactionRegistry = new Map<string, ActiveInteraction>();
+  private toolUseIdToInteractionDir = new Map<string, string>();
+  /** Índice por sesión: sessionId → set de interactionDir de interacciones activas. */
+  private sessionToActiveInteractions = new Map<string, Set<string>>();
   /** Caché de Context Sync: (htmlHash:promptHash) → { response, expiresAt }. TTL 5 min. */
   private contextSyncCache = new Map<string, { response: string; expiresAt: number }>();
   private static readonly CONTEXT_SYNC_CACHE_TTL_MS = 5 * 60 * 1000;
@@ -56,14 +56,14 @@ export class SessionStoreService implements ISessionStore {
     );
   }
 
-  public registerTurn(turn: ActiveTurn): void {
-    this.turnRegistry.set(turn.interactionDir, turn);
-    let set = this.sessionToActiveTurns.get(turn.sessionId);
+  public registerInteraction(interaction: ActiveInteraction): void {
+    this.interactionRegistry.set(interaction.interactionDir, interaction);
+    let set = this.sessionToActiveInteractions.get(interaction.sessionId);
     if (!set) {
       set = new Set<string>();
-      this.sessionToActiveTurns.set(turn.sessionId, set);
+      this.sessionToActiveInteractions.set(interaction.sessionId, set);
     }
-    set.add(turn.interactionDir);
+    set.add(interaction.interactionDir);
   }
 
   public registerPendingAgentToolUse(
@@ -72,9 +72,9 @@ export class SessionStoreService implements ISessionStore {
     toolUseId: string,
     subagentType?: string,
   ): void {
-    const turn = this.turnRegistry.get(interactionDir);
-    if (!turn) return;
-    const existing = turn.pendingAgentToolUses.find((p) => p.toolUseId === toolUseId);
+    const interaction = this.interactionRegistry.get(interactionDir);
+    if (!interaction) return;
+    const existing = interaction.pendingAgentToolUses.find((p) => p.toolUseId === toolUseId);
     if (existing) {
       // Idempotente: si ya existe, sólo enriquecer subagentType si llega ahora.
       if (subagentType && !existing.subagentType) {
@@ -84,35 +84,35 @@ export class SessionStoreService implements ISessionStore {
     }
     const entry: PendingAgentToolUse = { stepIndex, toolUseId };
     if (subagentType) entry.subagentType = subagentType;
-    turn.pendingAgentToolUses.push(entry);
+    interaction.pendingAgentToolUses.push(entry);
   }
 
-  public findTurnWithPendingAgents(
+  public findInteractionWithPendingAgents(
     sessionId: string,
-  ): { turn: ActiveTurn; pendings: PendingAgentToolUse[] } | null {
-    const dirs = this.sessionToActiveTurns.get(sessionId);
+  ): { interaction: ActiveInteraction; pendings: PendingAgentToolUse[] } | null {
+    const dirs = this.sessionToActiveInteractions.get(sessionId);
     if (!dirs) return null;
     for (const dir of dirs) {
-      const turn = this.turnRegistry.get(dir);
-      if (!turn) continue;
-      // Filtros: sólo agentic-turn de nivel 1 con pendings activos.
-      // - interactionType !== 'agentic-turn' excluye client-preflight y side-request.
+      const interaction = this.interactionRegistry.get(dir);
+      if (!interaction) continue;
+      // Filtros: sólo agentic de nivel 1 con pendings activos.
+      // - interactionType !== 'agentic' excluye client-preflight y side-request.
       // - parentContext definido excluye subagentes (refuerza profundidad ≤ 2).
       // - pendingAgentToolUses vacío descarta el resto.
-      if (turn.interactionType !== 'agentic-turn') continue;
-      if (turn.parentContext) continue;
-      if (turn.pendingAgentToolUses.length === 0) continue;
-      return { turn, pendings: [...turn.pendingAgentToolUses] };
+      if (interaction.interactionType !== 'agentic') continue;
+      if (interaction.parentContext) continue;
+      if (interaction.pendingAgentToolUses.length === 0) continue;
+      return { interaction, pendings: [...interaction.pendingAgentToolUses] };
     }
     return null;
   }
 
   public consumePendingAgentToolUse(interactionDir: string, toolUseId: string): void {
-    const turn = this.turnRegistry.get(interactionDir);
-    if (!turn) return;
-    const idx = turn.pendingAgentToolUses.findIndex((p) => p.toolUseId === toolUseId);
+    const interaction = this.interactionRegistry.get(interactionDir);
+    if (!interaction) return;
+    const idx = interaction.pendingAgentToolUses.findIndex((p) => p.toolUseId === toolUseId);
     if (idx >= 0) {
-      turn.pendingAgentToolUses.splice(idx, 1);
+      interaction.pendingAgentToolUses.splice(idx, 1);
     }
   }
 
@@ -122,107 +122,107 @@ export class SessionStoreService implements ISessionStore {
     toolUseId: string,
     toolType: 'web_search' | 'web_fetch' | 'text_editor',
   ): void {
-    const turn = this.turnRegistry.get(interactionDir);
-    if (!turn) return;
-    const existing = turn.pendingBuiltinToolUses.find((p) => p.toolUseId === toolUseId);
+    const interaction = this.interactionRegistry.get(interactionDir);
+    if (!interaction) return;
+    const existing = interaction.pendingBuiltinToolUses.find((p) => p.toolUseId === toolUseId);
     if (existing) return; // Idempotente: ya existe, no hacer nada
     const entry: PendingBuiltinToolUse = { stepIndex, toolUseId, toolType };
-    turn.pendingBuiltinToolUses.push(entry);
+    interaction.pendingBuiltinToolUses.push(entry);
   }
 
-  public findTurnWithPendingBuiltinTools(
+  public findInteractionWithPendingBuiltinTools(
     sessionId: string,
-  ): { turn: ActiveTurn; pendings: PendingBuiltinToolUse[] } | null {
-    const dirs = this.sessionToActiveTurns.get(sessionId);
+  ): { interaction: ActiveInteraction; pendings: PendingBuiltinToolUse[] } | null {
+    const dirs = this.sessionToActiveInteractions.get(sessionId);
     if (!dirs) return null;
     for (const dir of dirs) {
-      const turn = this.turnRegistry.get(dir);
-      if (!turn) continue;
-      // A diferencia de findTurnWithPendingAgents, SÍ consideramos turns con
+      const interaction = this.interactionRegistry.get(dir);
+      if (!interaction) continue;
+      // A diferencia de findInteractionWithPendingAgents, SÍ consideramos interacciones con
       // parentContext (subagentes pueden ser padres de builtin tools)
-      if (turn.pendingBuiltinToolUses.length === 0) continue;
-      return { turn, pendings: [...turn.pendingBuiltinToolUses] };
+      if (interaction.pendingBuiltinToolUses.length === 0) continue;
+      return { interaction, pendings: [...interaction.pendingBuiltinToolUses] };
     }
     return null;
   }
 
   public consumePendingBuiltinToolUse(interactionDir: string, toolUseId: string): void {
-    const turn = this.turnRegistry.get(interactionDir);
-    if (!turn) return;
-    const idx = turn.pendingBuiltinToolUses.findIndex((p) => p.toolUseId === toolUseId);
+    const interaction = this.interactionRegistry.get(interactionDir);
+    if (!interaction) return;
+    const idx = interaction.pendingBuiltinToolUses.findIndex((p) => p.toolUseId === toolUseId);
     if (idx >= 0) {
-      turn.pendingBuiltinToolUses.splice(idx, 1);
+      interaction.pendingBuiltinToolUses.splice(idx, 1);
     }
   }
 
   public registerToolUseId(toolUseId: string, interactionDir: string): void {
-    this.toolUseIdToTurnDir.set(toolUseId, interactionDir);
+    this.toolUseIdToInteractionDir.set(toolUseId, interactionDir);
   }
 
-  public getTurnByToolUseId(toolUseId: string): ActiveTurn | null {
-    const dir = this.toolUseIdToTurnDir.get(toolUseId);
+  public getInteractionByToolUseId(toolUseId: string): ActiveInteraction | null {
+    const dir = this.toolUseIdToInteractionDir.get(toolUseId);
     if (!dir) return null;
-    return this.turnRegistry.get(dir) ?? null;
+    return this.interactionRegistry.get(dir) ?? null;
   }
 
-  public getTurnByDir(dir: string): Promise<ActiveTurn | null> {
-    return Promise.resolve(this.turnRegistry.get(dir) || null);
+  public getInteractionByDir(dir: string): Promise<ActiveInteraction | null> {
+    return Promise.resolve(this.interactionRegistry.get(dir) || null);
   }
 
-  public getTurnByDirSync(dir: string): ActiveTurn | null {
-    return this.turnRegistry.get(dir) || null;
+  public getInteractionByDirSync(dir: string): ActiveInteraction | null {
+    return this.interactionRegistry.get(dir) || null;
   }
 
   public incrementStepCountByDir(dir: string): number {
-    const turn = this.turnRegistry.get(dir);
-    if (!turn) return 1;
-    turn.stepCount += 1;
-    return turn.stepCount;
+    const interaction = this.interactionRegistry.get(dir);
+    if (!interaction) return 1;
+    interaction.stepCount += 1;
+    return interaction.stepCount;
   }
 
   public async pushStepMetaByDir(dir: string, meta: StepMeta): Promise<void> {
-    const turn = this.turnRegistry.get(dir);
-    if (turn) turn.stepsMeta.push(meta);
+    const interaction = this.interactionRegistry.get(dir);
+    if (interaction) interaction.stepsMeta.push(meta);
   }
 
-  public closeTurn(dir: string): void {
-    const turn = this.turnRegistry.get(dir);
-    this.turnRegistry.delete(dir);
-    if (turn) {
-      const set = this.sessionToActiveTurns.get(turn.sessionId);
+  public closeInteraction(dir: string): void {
+    const interaction = this.interactionRegistry.get(dir);
+    this.interactionRegistry.delete(dir);
+    if (interaction) {
+      const set = this.sessionToActiveInteractions.get(interaction.sessionId);
       if (set) {
         set.delete(dir);
         if (set.size === 0) {
-          this.sessionToActiveTurns.delete(turn.sessionId);
+          this.sessionToActiveInteractions.delete(interaction.sessionId);
         }
       }
     }
-    for (const [id, d] of this.toolUseIdToTurnDir) {
-      if (d === dir) this.toolUseIdToTurnDir.delete(id);
+    for (const [id, d] of this.toolUseIdToInteractionDir) {
+      if (d === dir) this.toolUseIdToInteractionDir.delete(id);
     }
   }
 
-  public findStaleTurnsAwaitingContinuation(sessionId: string, maxAgeMs: number): ActiveTurn[] {
-    const dirs = this.sessionToActiveTurns.get(sessionId);
+  public findStaleInteractionsAwaitingContinuation(sessionId: string, maxAgeMs: number): ActiveInteraction[] {
+    const dirs = this.sessionToActiveInteractions.get(sessionId);
     if (!dirs) return [];
     const now = Date.now();
-    const stale: ActiveTurn[] = [];
+    const stale: ActiveInteraction[] = [];
     for (const dir of dirs) {
-      const turn = this.turnRegistry.get(dir);
-      if (!turn) continue;
+      const interaction = this.interactionRegistry.get(dir);
+      if (!interaction) continue;
       if (
-        turn.awaitingContinuation === true &&
-        typeof turn.awaitingSince === 'number' &&
-        now - turn.awaitingSince > maxAgeMs
+        interaction.awaitingContinuation === true &&
+        typeof interaction.awaitingSince === 'number' &&
+        now - interaction.awaitingSince > maxAgeMs
       ) {
-        stale.push(turn);
+        stale.push(interaction);
       }
     }
     return stale;
   }
 
-  public getAllOpenTurns(): ActiveTurn[] {
-    return [...this.turnRegistry.values()];
+  public getAllOpenInteractions(): ActiveInteraction[] {
+    return [...this.interactionRegistry.values()];
   }
 
   public withSessionLock<T>(sessionId: string, fn: () => Promise<T>): Promise<T> {

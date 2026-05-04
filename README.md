@@ -18,7 +18,7 @@ El proxy utiliza **Progressive Kernel Architecture (PKA)** — un modelo arquite
 
 | Capa                           | Ubicación                | Responsabilidad                                                                   | Componentes Clave                                                                                                                                                   |
 | ------------------------------ | ------------------------ | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **1 - Dominio**                | `src/1-domain/`          | Tipos puros (entidades) y lógica de dominio sin dependencias externas             | `SessionResolverService`, `TurnClassifierService`, `RedactService`, `MarkdownRendererService`, `SseSimulatorService`, Tipos de auditoría                            |
+| **1 - Dominio**                | `src/1-domain/`          | Tipos puros (entidades) y lógica de dominio sin dependencias externas             | `SessionResolverService`, `RequestClassifierService`, `RedactService`, `MarkdownRendererService`, `SseSimulatorService`, Tipos de auditoría                            |
 | **2 - Servicios (Adapters)**   | `src/2-services/`        | Implementaciones concretas con I/O (filesystem, streams) y **ports** (interfaces) | `SessionStoreService`, `AuditWriterService`, `SseReconstructService`, `StreamTeeService`, Ports: `IAuditWriter`, `ISessionStore`, `ISseReconstructor`, `IStreamTee` |
 | **3 - Operaciones (Handlers)** | `src/3-operations/`      | Orquestación de casos de uso (Command Handlers)                                   | `AuditInteractionHandler`, `AuditSseResponseHandler`, `AuditStandardResponseHandler`, `AuditUpstreamErrorHandler`, `FilterToolsHandler`                             |
 | **4 - API (Composition Root)** | `src/4-api/`             | Wiring de dependencias y configuración                                            | `createProxyDependencies()`, Configuración de entorno                                                                                                               |
@@ -55,7 +55,7 @@ graph TD
     I -->|Si SSE, detecta stop_reason| K[SSEReconstructService\nagrupa steps, reconstruye]
     K -->|Reconstrucción| L[response/body.json]
     I -->|Si no-SSE, heurística terminal| M[steps/NNN/response/body.json]
-    L --> N[meta.json TurnMetadata + Markdown]
+    L --> N[meta.json InteractionMetadata + Markdown]
     M --> N
 ```
 
@@ -79,7 +79,7 @@ El diseño garantiza que nunca se filtren API Keys a los logs de servidor ni a l
 Ideal para depurar comportamientos erráticos en herramientas de CLI (como `claude`):
 
 - Agrupa las peticiones de un turno completo (prompt → respuesta final) bajo una interacción con subdirectorios `steps/`.
-- Tres tipos de interacción: `agentic-turn` (turno del usuario con prompt y respuesta), `client-preflight` (quota check + cache warm-up) y `side-request` (peticiones con `"tools": []`, ej. count_tokens, generación de títulos).
+- Tres tipos de interacción: `agentic` (turno del usuario con prompt y respuesta), `client-preflight` (quota check + cache warm-up) y `side-request` (peticiones con `"tools": []`, ej. count_tokens, generación de títulos).
 - Los `side-request` se auditan en su propia interacción sin desplazar al turno activo principal, evitando corrupción de metadata por race conditions.
 - Los `side-request` de Context Sync WebFetch (`context-sync-webfetch`) implementan **caché inteligente para observabilidad transparente**:
   - **HIT**: Se detecta por heurística, se responde localmente con SSE simulada reutilizando el resumen del subagente, **sin llamar a Anthropic** y **sin crear interacción en disco** (completamente transparente para el observador humano).
@@ -89,7 +89,7 @@ Ideal para depurar comportamientos erráticos en herramientas de CLI (como `clau
 - Las continuaciones (`tool_result`) se rutean al turno padre mediante correlación por `tool_use_id`, eliminando la misatribución de steps.
 - Los preflights (`client-preflight`) se cierran inmediatamente al recibir su respuesta, evitando turnos zombie que bloquean la sesión.
 - Cada step en `meta.json` puede incluir `toolUseIds: string[]` — los IDs de tool_use emitidos en ese step, usados para correlacionar con futuras continuaciones.
-- `meta.json` resume el turno completo: steps individuales, tokens agregados en `totals`, duración y `turnOutcome`.
+- `meta.json` resume el turno completo: steps individuales, tokens agregados en `totals`, duración y `outcome`.
 
 <a name="riesgos-seguridad"></a>
 
@@ -106,14 +106,14 @@ Cada turno genera una estructura jerárquica en `./sessions/<session-id>/interac
 
 ```
 interactions/NNNNNN_<uuid>/
-  meta.json                     # TurnMetadata: resumen del turno (interactionType, turnOutcome, steps[], totals)
+  meta.json                     # InteractionMetadata: resumen del turno (interactionType, outcome, steps[], totals)
   state.json                    # Marcador "in-progress" (solo existe mientras la interacción está abierta)
-  request/                      # Solo agentic-turn y side-request: petición inicial top-level
+  request/                      # Solo agentic y side-request: petición inicial top-level
     headers.json
     body.bin
     body.json
     body.parsed.md
-  response/                     # Solo agentic-turn/side-request SSE completados: respuesta final reconstruida
+  response/                     # Solo agentic/side-request SSE completados: respuesta final reconstruida
     body.json
     body.parsed.md
     headers.json
@@ -127,7 +127,7 @@ interactions/NNNNNN_<uuid>/
     002/ ...
 ```
 
-> **Nota:** Los preflights (`client-preflight`) no escriben `request/` en el nivel raíz de la interacción; sólo tienen `steps/` con sus archivos individuales. Todos los tipos de interacción (`agentic-turn`, `side-request`, `client-preflight`) escriben `steps/001/request/` para mantener simetría estructural.
+> **Nota:** Los preflights (`client-preflight`) no escriben `request/` en el nivel raíz de la interacción; sólo tienen `steps/` con sus archivos individuales. Todos los tipos de interacción (`agentic`, `side-request`, `client-preflight`) escriben `steps/001/request/` para mantener simetría estructural.
 
 > **Subagentes (`Task` / herramienta `Agent`):** Cuando el turno principal emite un `tool_use` con `name: "Agent"`, la siguiente petición fresh de la misma sesión NO se trata como nuevo turno raíz: se anida bajo el step que la disparó como `steps/<NNN>/sub-interactions/<MMM>_<uuid>/` con la misma estructura interna (`request/`, `response/`, `steps/`, `meta.json`, `state.json`). El `meta.json` del subagente incluye un bloque `parentContext: { parentInteractionDir, parentStepIndex, triggeringToolUseId, subagentType }` para reconstruir el árbol padre→hijo. La profundidad está acotada a 2 niveles (un subagente no puede ser padre de otros subagentes).
 
@@ -137,15 +137,15 @@ interactions/NNNNNN_<uuid>/
 
 | `interactionType`  | Origen                                                                 | Cierre                                            |
 | ------------------ | ---------------------------------------------------------------------- | ------------------------------------------------- |
-| `agentic-turn`     | Prompt del usuario con `tools` no vacíos (fresh) + continuations       | `stop_reason` terminal (`end_turn`, `max_tokens`) |
+| `agentic`     | Prompt del usuario con `tools` no vacíos (fresh) + continuations       | `stop_reason` terminal (`end_turn`, `max_tokens`) |
 | `client-preflight` | Quota check (`max_tokens:1`) o cache warm-up sin turno activo          | Al recibir la respuesta (inmediato)               |
 | `side-request`     | Peticiones con `tools: []` (ej. `count_tokens`, generación de títulos) | Respuesta terminal; no desplaza al turno activo   |
 
-### Resultados de Turno (`turnOutcome`)
+### Resultados de Turno (`outcome`)
 
-El campo `turnOutcome` en `meta.json` indica el resultado final del turno:
+El campo `outcome` en `meta.json` indica el resultado final del turno:
 
-| `turnOutcome`    | Significado                                                             | `statusCode` típico |
+| `outcome`    | Significado                                                             | `statusCode` típico |
 | ---------------- | ----------------------------------------------------------------------- | ------------------- |
 | `completed`      | Turno completado exitosamente                                           | 2xx                 |
 | `client-error`   | Error del cliente (request mal formada, autenticación fallida, etc.)    | 4xx                 |
@@ -226,7 +226,7 @@ Personaliza el comportamiento ajustando estas variables en tu entorno o en un ar
 |                  | `CONTEXT_SYNC_MAX_WAIT_MS`      | Tiempo máximo (ms) para esperar el step de WebFetch ya resumido antes de fallback.                                                 | `5000`                                                                                  |
 |   **Filtrado**   | `FILTERED_TOOLS`                | Lista de tool names a excluir del request (coma-separado). Reduce tokens y ruido en auditoría.                                     | `ScheduleWakeup,NotebookEdit,ExitWorktree,EnterWorktree,CronList,CronDelete,CronCreate` |
 
-> **Auditoría por defecto (con excepción explícita).** El proxy escribe en `./sessions` para `agentic-turn`, `client-preflight` y `side-request` normales. Excepción: side-request Context Sync de WebFetch con caché HIT (`context-sync-webfetch`) se responden localmente sin crear interacción en disco. En side-request SSE auditados: (a) `steps/NNN/response/sse.jsonl` es la **fuente de verdad** (escritura síncrona, orden determinista); (b) `steps/NNN/response/sse.txt` es raw dump de depuración acotado por `MAX_AUDIT_SSE_RAW_BYTES`; (c) `response/body.json` top-level se reconstruye desde `sse.jsonl`. Detalle en [`docs/how-sse-reconstruction-works.md`](docs/how-sse-reconstruction-works.md).
+> **Auditoría por defecto (con excepción explícita).** El proxy escribe en `./sessions` para `agentic`, `client-preflight` y `side-request` normales. Excepción: side-request Context Sync de WebFetch con caché HIT (`context-sync-webfetch`) se responden localmente sin crear interacción en disco. En side-request SSE auditados: (a) `steps/NNN/response/sse.jsonl` es la **fuente de verdad** (escritura síncrona, orden determinista); (b) `steps/NNN/response/sse.txt` es raw dump de depuración acotado por `MAX_AUDIT_SSE_RAW_BYTES`; (c) `response/body.json` top-level se reconstruye desde `sse.jsonl`. Detalle en [`docs/how-sse-reconstruction-works.md`](docs/how-sse-reconstruction-works.md).
 
 <a name="correlación-de-sesión-sessionid"></a>
 

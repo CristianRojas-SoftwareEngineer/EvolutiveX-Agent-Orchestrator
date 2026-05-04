@@ -201,7 +201,7 @@ Para clasificar una interacción en un nivel, el script lee el campo `model` de 
    por defecto                                        → Standard
 ```
 
-Se cuentan interacciones con `interactionType === 'agentic-turn'` o `'side-request'` y `totals !== null`.
+Se cuentan interacciones con `interactionType === 'agentic'` o `'side-request'` y `totals !== null`.
 
 ---
 
@@ -274,7 +274,7 @@ No se usa `chalk`, `execSync`, `powershell.exe`, ni archivos rc de shell. Los co
 
 | Limitación | Causa | Mejora propuesta |
 |---|---|---|
-| `model` no está en `meta.json` | El proxy no persiste el modelo en TurnMetadata | Añadir campo `model` a `TurnMetadata` (schema change) |
+| `model` no está en `meta.json` | El proxy no persiste el modelo en InteractionMetadata | Añadir campo `model` a `InteractionMetadata` (schema change) |
 | `displayName` no está en `metadata.json` | Campo no definido en la especificación actual | ✅ Resuelto: añadir `displayName` a `metadata.json` de cada modelo |
 | Resolución de sesión es estática | El proxy no expone mapeo `session_id → carpeta` | ✅ Resuelto: resolución dinámica por `session_id` de `$ctx` |
 | `cacheReadInputTokens` puede ser `null` | Algunos proveedores no implementan prompt caching | Tratar `null` como `0` en la suma |

@@ -1,5 +1,5 @@
 import {
-  ActiveTurn,
+  ActiveInteraction,
   PendingAgentToolUse,
   PendingBuiltinToolUse,
   StepMeta,
@@ -13,16 +13,16 @@ export interface ISessionStore {
   getBaseDir(): string;
   ensureAuditSessionsRoot(): Promise<void>;
   nextAuditInteractionSequence(sessionId: string): Promise<number>;
-  registerTurn(turn: ActiveTurn): void;
+  registerInteraction(interaction: ActiveInteraction): void;
   registerToolUseId(toolUseId: string, interactionDir: string): void;
-  getTurnByToolUseId(toolUseId: string): ActiveTurn | null;
-  getTurnByDir(dir: string): Promise<ActiveTurn | null>;
-  getTurnByDirSync(dir: string): ActiveTurn | null;
+  getInteractionByToolUseId(toolUseId: string): ActiveInteraction | null;
+  getInteractionByDir(dir: string): Promise<ActiveInteraction | null>;
+  getInteractionByDirSync(dir: string): ActiveInteraction | null;
   incrementStepCountByDir(dir: string): number;
   pushStepMetaByDir(dir: string, meta: StepMeta): Promise<void>;
-  closeTurn(dir: string): void;
+  closeInteraction(dir: string): void;
   /**
-   * Registra un tool_use `Agent` emitido por el SSE del turn padre cuyo
+   * Registra un tool_use `Agent` emitido por el SSE de la interacción padre cuyo
    * `tool_result` aún no ha llegado. Si la entrada con el mismo `toolUseId`
    * ya existe, actualiza `subagentType` cuando se aporta y deja el resto
    * intacto (idempotente para dobles llamadas desde el SSE handler).
@@ -34,23 +34,23 @@ export interface ISessionStore {
     subagentType?: string,
   ): void;
   /**
-   * Busca en la sesión el primer turn elegible como padre de subagentes:
-   * `agentic-turn`, sin `parentContext` (refuerza profundidad ≤ 2) y con
+   * Busca en la sesión la primera interacción elegible como padre de subagentes:
+   * `agentic`, sin `parentContext` (refuerza profundidad ≤ 2) y con
    * `pendingAgentToolUses` no vacío. Devuelve copia del array de pendings
-   * para que el caller decida ambigüedad sin mutar el turn por accidente.
+   * para que el caller decida ambigüedad sin mutar la interacción por accidente.
    */
-  findTurnWithPendingAgents(
+  findInteractionWithPendingAgents(
     sessionId: string,
-  ): { turn: ActiveTurn; pendings: PendingAgentToolUse[] } | null;
+  ): { interaction: ActiveInteraction; pendings: PendingAgentToolUse[] } | null;
   /**
    * Consume (elimina) la entrada de `pendingAgentToolUses` cuyo `toolUseId`
-   * coincide en el turn registrado. Idempotente: no-op si el turn o la
+   * coincide en la interacción registrada. Idempotente: no-op si la interacción o la
    * entrada no existen.
    */
   consumePendingAgentToolUse(interactionDir: string, toolUseId: string): void;
   /**
    * Registra un tool_use de built-in tool (web_search, web_fetch, text_editor)
-   * emitido por el SSE del turn cuya ejecución aún no ha llegado.
+   * emitido por el SSE de la interacción cuya ejecución aún no ha llegado.
    * Idempotente: si la entrada ya existe, no hace nada.
    */
   registerPendingBuiltinToolUse(
@@ -60,30 +60,30 @@ export interface ISessionStore {
     toolType: 'web_search' | 'web_fetch' | 'text_editor',
   ): void;
   /**
-   * Busca en la sesión el primer turn con `pendingBuiltinToolUses` no vacío.
-   * A diferencia de `findTurnWithPendingAgents`, este método SÍ considera
-   * turns con `parentContext` (subagentes pueden ser padres de builtin tools).
+   * Busca en la sesión la primera interacción con `pendingBuiltinToolUses` no vacío.
+   * A diferencia de `findInteractionWithPendingAgents`, este método SÍ considera
+   * interacciones con `parentContext` (subagentes pueden ser padres de builtin tools).
    * Devuelve copia del array de pendings.
    */
-  findTurnWithPendingBuiltinTools(
+  findInteractionWithPendingBuiltinTools(
     sessionId: string,
-  ): { turn: ActiveTurn; pendings: PendingBuiltinToolUse[] } | null;
+  ): { interaction: ActiveInteraction; pendings: PendingBuiltinToolUse[] } | null;
   /**
    * Consume (elimina) la entrada de `pendingBuiltinToolUses` cuyo `toolUseId`
-   * coincide en el turn registrado. Idempotente.
+   * coincide en la interacción registrada. Idempotente.
    */
   consumePendingBuiltinToolUse(interactionDir: string, toolUseId: string): void;
   /**
-   * Busca en la sesión turnos con `awaitingContinuation === true` cuyo
-   * `awaitingSince` supera `maxAgeMs` milisegundos. Devuelve los turnos
-   * stale para que el caller los cierre como orphans.
+   * Busca en la sesión interacciones con `awaitingContinuation === true` cuyo
+   * `awaitingSince` supera `maxAgeMs` milisegundos. Devuelve las interacciones
+   * stale para que el caller las cierre como orphans.
    */
-  findStaleTurnsAwaitingContinuation(sessionId: string, maxAgeMs: number): ActiveTurn[];
+  findStaleInteractionsAwaitingContinuation(sessionId: string, maxAgeMs: number): ActiveInteraction[];
   /**
-   * Devuelve todos los turnos actualmente abiertos en el registry.
+   * Devuelve todas las interacciones actualmente abiertas en el registry.
    * Usado para graceful shutdown.
    */
-  getAllOpenTurns(): ActiveTurn[];
+  getAllOpenInteractions(): ActiveInteraction[];
   /**
    * Registra una respuesta de WebFetch en el caché de Context Sync.
    * Key: ${htmlHash}:${promptHash}, TTL: 5 minutos.

@@ -1,5 +1,5 @@
 import 'fastify';
-import { InteractionType, TurnClassification } from '../../1-domain/types/audit.types.js';
+import { InteractionType, RequestClassification } from '../../1-domain/types/audit.types.js';
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -10,6 +10,6 @@ declare module 'fastify' {
     requestBodyOmitted?: boolean;
     rawBodyBytes?: number;
     interactionType?: InteractionType;
-    turnClassification?: TurnClassification;
+    requestClassification?: RequestClassification;
   }
 }

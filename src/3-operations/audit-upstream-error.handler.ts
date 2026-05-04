@@ -3,14 +3,14 @@ import type { IAuditWriter } from '../2-services/ports/audit-writer.port.js';
 import type { ISessionStore } from '../2-services/ports/session-store.port.js';
 import { ProxyEnvironmentConfig } from '../1-domain/types/config.types.js';
 import {
-  TurnMetadata,
+  InteractionMetadata,
   computeTokenTotals,
   computeSseRawBytesTotal,
 } from '../1-domain/types/audit.types.js';
 
 /**
  * Handler para escribir metadata de error cuando falla la conexión upstream.
- * Si hay un turno activo, cierra el turno con turnOutcome: "upstream-error".
+ * Si hay una interacción activa, cierra la interacción con outcome: "upstream-error".
  */
 export class AuditUpstreamErrorHandler {
   constructor(
@@ -31,14 +31,14 @@ export class AuditUpstreamErrorHandler {
     requestBodyOmitted: boolean;
     error: Error & { code?: string };
   }): Promise<void> {
-    const turn = await this.sessionStore.getTurnByDir(params.auditInteractionDir);
-    this.sessionStore.closeTurn(params.auditInteractionDir);
+    const interaction = await this.sessionStore.getInteractionByDir(params.auditInteractionDir);
+    this.sessionStore.closeInteraction(params.auditInteractionDir);
 
     const endedAt = Date.now();
-    const interactionType = turn?.interactionType ?? 'agentic-turn';
-    const startedAt = turn?.startedAt ?? params.requestStartTime;
-    const stepsMeta = turn?.stepsMeta ?? [];
-    const requestBodyOmitted = turn?.requestBodyOmitted ?? params.requestBodyOmitted;
+    const interactionType = interaction?.interactionType ?? 'agentic';
+    const startedAt = interaction?.startedAt ?? params.requestStartTime;
+    const stepsMeta = interaction?.stepsMeta ?? [];
+    const requestBodyOmitted = interaction?.requestBodyOmitted ?? params.requestBodyOmitted;
 
     const totals = interactionType !== 'client-preflight' ? computeTokenTotals(stepsMeta) : null;
     const sseRawBytesTotal = computeSseRawBytesTotal(stepsMeta);
@@ -47,10 +47,10 @@ export class AuditUpstreamErrorHandler {
     const errorMessage = params.error?.message ?? String(params.error);
     const errorCode = params.error?.code ?? null;
 
-    const meta: TurnMetadata = {
+    const meta: InteractionMetadata = {
       interactionType,
-      ...(turn?.modelId ? { modelId: turn.modelId } : {}),
-      turnOutcome: 'upstream-error',
+      ...(interaction?.modelId ? { modelId: interaction.modelId } : {}),
+      outcome: 'upstream-error',
       stepCount: stepsMeta.length,
       startedAt: new Date(startedAt).toISOString(),
       endedAt: new Date(endedAt).toISOString(),
@@ -65,8 +65,8 @@ export class AuditUpstreamErrorHandler {
       sseResponseBodySource: null,
       errorMessage,
       errorCode,
-      ...(turn?.parentContext ? { parentContext: turn.parentContext } : {}),
-      ...(turn?.contextSyncFallback ? { contextSyncFallback: true } : {}),
+      ...(interaction?.parentContext ? { parentContext: interaction.parentContext } : {}),
+      ...(interaction?.contextSyncFallback ? { contextSyncFallback: true } : {}),
       truncation: {
         requestBodyOmitted,
         responseBodyBytesTotal: null,
@@ -79,13 +79,13 @@ export class AuditUpstreamErrorHandler {
         sseRawWriteError: false,
       },
     };
-    await this.auditWriter.writeTurnMeta(params.auditInteractionDir, meta);
+    await this.auditWriter.writeInteractionMeta(params.auditInteractionDir, meta);
 
-    if (turn && interactionType !== 'client-preflight' && turn.modelId && totals) {
-      const sessionDir = path.join(this.sessionStore.getBaseDir(), turn.sessionId);
-      await this.sessionStore.withSessionLock(turn.sessionId, async () => {
+    if (interaction && interactionType !== 'client-preflight' && interaction.modelId && totals) {
+      const sessionDir = path.join(this.sessionStore.getBaseDir(), interaction.sessionId);
+      await this.sessionStore.withSessionLock(interaction.sessionId, async () => {
         await this.auditWriter
-          .updateSessionMetrics(sessionDir, turn.modelId!, totals, stepsMeta.length)
+          .updateSessionMetrics(sessionDir, interaction.modelId!, totals, stepsMeta.length)
           .catch(() => { /* error no crítico */ });
       });
     }

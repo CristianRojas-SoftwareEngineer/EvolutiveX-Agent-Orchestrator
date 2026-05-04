@@ -7,11 +7,11 @@ import { ProxyEnvironmentConfig } from '../1-domain/types/config.types.js';
 import { JsonValue } from '../1-domain/types/json.types.js';
 import {
   AuditInteractionContext,
-  ActiveTurn,
+  ActiveInteraction,
   SseReconstructResult,
   StepMeta,
-  TurnMetadata,
-  TurnOutcome,
+  InteractionMetadata,
+  InteractionOutcome,
   computeTokenTotals,
   computeSseRawBytesTotal,
 } from '../1-domain/types/audit.types.js';
@@ -19,7 +19,7 @@ import type { Logger } from '../1-domain/types/logger.types.js';
 
 /**
  * Handler para orquestar la auditoría de respuestas SSE.
- * Escribe SSE raw en steps/{N}/response/ y reconstruye el body en response/ top-level al cerrar el turno.
+ * Escribe SSE raw en steps/{N}/response/ y reconstruye el body en response/ top-level al cerrar la interacción.
  */
 export class AuditSseResponseHandler {
   constructor(
@@ -54,8 +54,8 @@ export class AuditSseResponseHandler {
       return;
     }
 
-    const activeTurn = this.sessionStore.getTurnByDirSync(context.auditInteractionDir);
-    const stepNumber = activeTurn?.stepCount ?? 1;
+    const activeInteraction = this.sessionStore.getInteractionByDirSync(context.auditInteractionDir);
+    const stepNumber = activeInteraction?.stepCount ?? 1;
     const stepDir = path.join(
       context.auditInteractionDir,
       'steps',
@@ -141,7 +141,7 @@ export class AuditSseResponseHandler {
             line: trimmed,
           });
 
-          // Parsear eventos clave para metadata del turno
+          // Parsear eventos clave para metadata de la interacción
           if (trimmed.startsWith('data: ')) {
             try {
               const evt = JSON.parse(trimmed.slice(6));
@@ -304,16 +304,16 @@ export class AuditSseResponseHandler {
           return;
         }
 
-        // Agentic turn o side-request
+        // Agentic interaction o side-request
         await this.sessionStore.pushStepMetaByDir(context.auditInteractionDir, stepMeta);
 
         // Actualizar métricas de sesión per-step
-        if (activeTurn?.modelId) {
-          const sessionDir = path.join(this.sessionStore.getBaseDir(), activeTurn.sessionId);
+        if (activeInteraction?.modelId) {
+          const sessionDir = path.join(this.sessionStore.getBaseDir(), activeInteraction.sessionId);
           const stepTotals = computeTokenTotals([stepMeta]);
-          await this.sessionStore.withSessionLock(activeTurn.sessionId, async () => {
+          await this.sessionStore.withSessionLock(activeInteraction.sessionId, async () => {
             await this.auditWriter
-              .updateSessionMetrics(sessionDir, activeTurn.modelId!, stepTotals, 1)
+              .updateSessionMetrics(sessionDir, activeInteraction.modelId!, stepTotals, 1)
               .catch(() => { /* error no crítico */ });
           });
         }
@@ -331,19 +331,19 @@ export class AuditSseResponseHandler {
         }
 
         if (stopReason === 'tool_use') {
-          // Turno no terminal — continúa con el próximo step (continuation).
-          // Marcar el turno como awaiting para que el cleanup pueda detectar
+          // Interacción no terminal — continúa con el próximo step (continuation).
+          // Marcar la interacción como awaiting para que el cleanup pueda detectar
           // orphans cuya continuation nunca llegó.
-          const awaitTurn = this.sessionStore.getTurnByDirSync(context.auditInteractionDir);
-          if (awaitTurn) {
-            awaitTurn.awaitingContinuation = true;
-            awaitTurn.awaitingSince = Date.now();
+          const awaitInteraction = this.sessionStore.getInteractionByDirSync(context.auditInteractionDir);
+          if (awaitInteraction) {
+            awaitInteraction.awaitingContinuation = true;
+            awaitInteraction.awaitingSince = Date.now();
           }
           return;
         }
 
         // Terminal: end_turn, max_tokens, null/error
-        const turnOutcome: TurnOutcome =
+        const outcome: InteractionOutcome =
           stopReason === 'end_turn'
             ? 'completed'
             : stopReason === 'max_tokens'
@@ -380,14 +380,14 @@ export class AuditSseResponseHandler {
             .catch((e) => console.error('Error al escribir cabeceras top-level:', e));
         }
 
-        const turn = await this.sessionStore.getTurnByDir(context.auditInteractionDir);
-        this.sessionStore.closeTurn(context.auditInteractionDir);
+        const turn = await this.sessionStore.getInteractionByDir(context.auditInteractionDir);
+        this.sessionStore.closeInteraction(context.auditInteractionDir);
 
         if (turn) {
-          await this.writeTurnMeta(
+          await this.writeInteractionMeta(
             turn,
             context,
-            turnOutcome,
+            outcome,
             true,
             streamError,
             sseReconstructResult,
@@ -406,7 +406,7 @@ export class AuditSseResponseHandler {
     stepMeta: StepMeta,
     streamError: boolean,
   ): Promise<void> {
-    const isWarmup = context.turnClassification?.type === 'preflight-warmup';
+    const isWarmup = context.requestClassification?.type === 'preflight-warmup';
     const meta: StepMeta = {
       ...stepMeta,
       ...(isWarmup ? { label: 'cache-warmup' } : {}),
@@ -417,30 +417,30 @@ export class AuditSseResponseHandler {
     if (!isWarmup) {
       // Preflights no-warmup: cerrar inmediatamente (quota-check no llega por SSE
       // normalmente pero mantenemos simetría con standard handler).
-      const turn = await this.sessionStore.getTurnByDir(context.auditInteractionDir);
-      this.sessionStore.closeTurn(context.auditInteractionDir);
+      const turn = await this.sessionStore.getInteractionByDir(context.auditInteractionDir);
+      this.sessionStore.closeInteraction(context.auditInteractionDir);
       if (turn) {
-        await this.writeTurnMeta(turn, context, 'completed', false, streamError);
+        await this.writeInteractionMeta(turn, context, 'completed', false, streamError);
       }
       return;
     }
 
-    // El warmup solo cierra el turno si éste es realmente un client-preflight.
-    // Si el turno subyacente es agentic (warmup dentro de un turno activo),
+    // El warmup solo cierra la interacción si ésta es realmente un client-preflight.
+    // Si la interacción subyacente es agentic (warmup dentro de una interacción activa),
     // no se cierra aquí: se cerrará por el flujo terminal.
-    const turn = await this.sessionStore.getTurnByDir(context.auditInteractionDir);
+    const turn = await this.sessionStore.getInteractionByDir(context.auditInteractionDir);
     if (turn?.interactionType === 'client-preflight') {
-      this.sessionStore.closeTurn(context.auditInteractionDir);
-      await this.writeTurnMeta(turn, context, 'completed', false, streamError);
+      this.sessionStore.closeInteraction(context.auditInteractionDir);
+      await this.writeInteractionMeta(turn, context, 'completed', false, streamError);
     }
-    // Si el turno es agentic-turn o side-request, sólo registramos el step
-    // (ya hecho arriba) y mantenemos el turno abierto.
+    // Si la interacción es agentic o side-request, sólo registramos el step
+    // (ya hecho arriba) y mantenemos la interacción abierta.
   }
 
-  private async writeTurnMeta(
-    turn: ActiveTurn,
+  private async writeInteractionMeta(
+    turn: ActiveInteraction,
     context: AuditInteractionContext,
-    turnOutcome: TurnOutcome,
+    outcome: InteractionOutcome,
     sse: boolean,
     streamError: boolean,
     sseResult?: SseReconstructResult,
@@ -466,10 +466,10 @@ export class AuditSseResponseHandler {
     const lostBuiltinPendings =
       turn.pendingBuiltinToolUses.length > 0 ? turn.pendingBuiltinToolUses : undefined;
 
-    const meta: TurnMetadata = {
+    const meta: InteractionMetadata = {
       interactionType: turn.interactionType,
       ...(turn.modelId ? { modelId: turn.modelId } : {}),
-      turnOutcome,
+      outcome,
       stepCount: turn.stepsMeta.length,
       startedAt: new Date(turn.startedAt).toISOString(),
       endedAt: new Date(endedAt).toISOString(),
@@ -500,9 +500,9 @@ export class AuditSseResponseHandler {
       },
     };
 
-    await this.auditWriter.writeTurnMeta(turn.interactionDir, meta);
+    await this.auditWriter.writeInteractionMeta(turn.interactionDir, meta);
 
-    // Eliminar state.json al cerrar turno
+    // Eliminar state.json al cerrar la interacción
     await this.auditWriter.removeInteractionState(turn.interactionDir);
   }
 }

@@ -118,7 +118,7 @@ describe('AuditWriterService - writeStepRequest', () => {
   });
 });
 
-describe('AuditWriterService - writeTurnMeta', () => {
+describe('AuditWriterService - writeInteractionMeta', () => {
   let tempDir: string;
   let service: AuditWriterService;
 
@@ -132,13 +132,13 @@ describe('AuditWriterService - writeTurnMeta', () => {
     await fs.rm(tempDir, { recursive: true, force: true });
   });
 
-  it('debería escribir meta.json con TurnMetadata', async () => {
+  it('debería escribir meta.json con InteractionMetadata', async () => {
     const interactionDir = path.join(tempDir, 'interactions', '000001_req');
     await fs.mkdir(interactionDir, { recursive: true });
 
-    await service.writeTurnMeta(interactionDir, {
-      interactionType: 'agentic-turn',
-      turnOutcome: 'completed',
+    await service.writeInteractionMeta(interactionDir, {
+      interactionType: 'agentic',
+      outcome: 'completed',
       stepCount: 2,
       startedAt: '2026-01-01T00:00:00.000Z',
       endedAt: '2026-01-01T00:00:10.000Z',
@@ -175,8 +175,8 @@ describe('AuditWriterService - writeTurnMeta', () => {
     });
 
     const meta = JSON.parse(await fs.readFile(path.join(interactionDir, 'meta.json'), 'utf8'));
-    expect(meta.interactionType).toBe('agentic-turn');
-    expect(meta.turnOutcome).toBe('completed');
+    expect(meta.interactionType).toBe('agentic');
+    expect(meta.outcome).toBe('completed');
     expect(meta.stepCount).toBe(2);
     expect(meta.steps).toHaveLength(2);
     expect(meta.totals.inputTokens).toBe(10);
@@ -202,11 +202,11 @@ describe('AuditWriterService - writeInteractionState / removeInteractionState', 
     await service.writeInteractionState(interactionDir, {
       state: 'in-progress',
       startedAt: '2026-01-01T00:00:00.000Z',
-      interactionType: 'agentic-turn',
+      interactionType: 'agentic',
     });
     const content = JSON.parse(await fs.readFile(path.join(interactionDir, 'state.json'), 'utf8'));
     expect(content.state).toBe('in-progress');
-    expect(content.interactionType).toBe('agentic-turn');
+    expect(content.interactionType).toBe('agentic');
     expect(content.startedAt).toBe('2026-01-01T00:00:00.000Z');
   });
 

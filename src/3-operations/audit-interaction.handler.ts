@@ -9,15 +9,15 @@ import {
   classifySideRequestSubType,
   extractModelFromRequestBody,
   HARNESS_CONTEXT_SYNC_SUFFIX,
-} from '../1-domain/services/turn-classifier.service.js';
+} from '../1-domain/services/request-classifier.service.js';
 import { buildSimulatedSseFromText } from '../1-domain/services/sse-simulator.service.js';
 import {
-  ActiveTurn,
+  ActiveInteraction,
   InteractionType,
   ParentContext,
   PendingAgentToolUse,
   PendingBuiltinToolUse,
-  TurnClassification,
+  RequestClassification,
   computeTokenTotals,
   computeSseRawBytesTotal,
 } from '../1-domain/types/audit.types.js';
@@ -42,7 +42,7 @@ export interface AuditInteractionResult {
   requestSequence: number;
   auditSessionId: string;
   interactionType: InteractionType;
-  turnClassification: TurnClassification;
+  requestClassification: RequestClassification;
   contextSyncCacheHit?: boolean;
   contextSyncSseStream?: NodeJS.ReadableStream;
   webFetchHtmlHash?: string;
@@ -51,10 +51,10 @@ export interface AuditInteractionResult {
 
 /**
  * Handler para orquestar la auditoría de la interacción entrante.
- * Clasifica el request, gestiona turnos activos y escribe la auditoría del request.
+ * Clasifica el request, gestiona interacciones activas y escribe la auditoría del request.
  */
 export class AuditInteractionHandler {
-  /** Umbral de antigüedad (ms) para considerar un turno awaiting como orphan. */
+  /** Umbral de antigüedad (ms) para considerar una interacción awaiting como orphan. */
   static readonly ORPHAN_MAX_AGE_MS = 60_000;
 
   constructor(
@@ -92,15 +92,15 @@ export class AuditInteractionHandler {
     }
 
     if (classification.type === 'fresh') {
-      // Cleanup de turnos orphan: cerrar turnos stale que esperan continuation
+      // Cleanup de interacciones orphan: cerrar interacciones stale que esperan continuation
       // que nunca llegó (tool call malformado, cancelación, etc.).
-      await this.closeOrphanTurns(auditSessionId);
+      await this.closeOrphanInteractions(auditSessionId);
 
-      // Antes de tratar la request como un nuevo turn raíz, comprobar si en la
-      // misma sesión hay un agentic-turn padre con tool_uses `Agent` aún sin
+      // Antes de tratar la request como una nueva interacción raíz, comprobar si en la
+      // misma sesión hay un agentic padre con tool_uses `Agent` aún sin
       // resolver: si lo hay, esta fresh se anida como subagente bajo el step
       // padre correspondiente.
-      const pendingMatch = this.sessionStore.findTurnWithPendingAgents(auditSessionId);
+      const pendingMatch = this.sessionStore.findInteractionWithPendingAgents(auditSessionId);
       if (pendingMatch) {
         return this.handleSubagent(
           params,
@@ -126,8 +126,8 @@ export class AuditInteractionHandler {
     }
 
     if (classification.type === 'builtin-tool-execution') {
-      // Buscar un turno (incluyendo subagentes) con pending builtin tools
-      const builtinPendingMatch = this.sessionStore.findTurnWithPendingBuiltinTools(auditSessionId);
+      // Buscar una interacción (incluyendo subagentes) con pending builtin tools
+      const builtinPendingMatch = this.sessionStore.findInteractionWithPendingBuiltinTools(auditSessionId);
       if (builtinPendingMatch) {
         return this.handleBuiltinToolExecution(
           params,
@@ -149,7 +149,7 @@ export class AuditInteractionHandler {
     params: { rawBody: Buffer; requestId: string },
     headersForAudit: Record<string, string | string[] | undefined>,
     auditSessionId: string,
-    classification: TurnClassification,
+    classification: RequestClassification,
   ): Promise<AuditInteractionResult> {
     const seq = await this.sessionStore.nextAuditInteractionSequence(auditSessionId);
     const folderName = this.sessionResolver.formatAuditInteractionDirName(seq, params.requestId);
@@ -178,12 +178,12 @@ export class AuditInteractionHandler {
     await this.auditWriter.writeInteractionState(wr.dir, {
       state: 'in-progress',
       startedAt: new Date(startedAt).toISOString(),
-      interactionType: 'agentic-turn',
+      interactionType: 'agentic',
     });
 
-    this.sessionStore.registerTurn({
+    this.sessionStore.registerInteraction({
       interactionDir: wr.dir,
-      interactionType: 'agentic-turn',
+      interactionType: 'agentic',
       stepCount: 1,
       requestSequence: seq,
       startedAt,
@@ -201,8 +201,8 @@ export class AuditInteractionHandler {
       requestBodyOmitted: wr.requestBodyOmitted,
       requestSequence: seq,
       auditSessionId,
-      interactionType: 'agentic-turn',
-      turnClassification: classification,
+      interactionType: 'agentic',
+      requestClassification: classification,
     };
   }
 
@@ -215,14 +215,14 @@ export class AuditInteractionHandler {
     params: { rawBody: Buffer; requestId: string },
     headersForAudit: Record<string, string | string[] | undefined>,
     auditSessionId: string,
-    classification: TurnClassification,
+    classification: RequestClassification,
     match: {
-      turn: { interactionDir: string; pendingBuiltinToolUses: PendingBuiltinToolUse[] };
+      interaction: { interactionDir: string; pendingBuiltinToolUses: PendingBuiltinToolUse[] };
       pendings: PendingBuiltinToolUse[];
     },
   ): Promise<AuditInteractionResult> {
     return this.sessionStore.withSessionLock(auditSessionId, async () => {
-      const parentInteractionDir = match.turn.interactionDir;
+      const parentInteractionDir = match.interaction.interactionDir;
       const parentStepIndex = match.pendings.reduce(
         (min, p) => Math.min(min, p.stepIndex),
         match.pendings[0].stepIndex,
@@ -270,7 +270,7 @@ export class AuditInteractionHandler {
       await this.auditWriter.writeInteractionState(wr.dir, {
         state: 'in-progress',
         startedAt: new Date(startedAt).toISOString(),
-        interactionType: 'agentic-turn',
+        interactionType: 'agentic',
         parentContext,
       });
 
@@ -279,9 +279,9 @@ export class AuditInteractionHandler {
         this.sessionStore.consumePendingBuiltinToolUse(parentInteractionDir, triggeringToolUseId);
       }
 
-      this.sessionStore.registerTurn({
+      this.sessionStore.registerInteraction({
         interactionDir: wr.dir,
-        interactionType: 'agentic-turn',
+        interactionType: 'agentic',
         stepCount: 1,
         requestSequence: subSeq,
         startedAt,
@@ -300,8 +300,8 @@ export class AuditInteractionHandler {
         requestBodyOmitted: wr.requestBodyOmitted,
         requestSequence: subSeq,
         auditSessionId,
-        interactionType: 'agentic-turn',
-        turnClassification: classification,
+        interactionType: 'agentic',
+        requestClassification: classification,
       };
     });
   }
@@ -316,14 +316,14 @@ export class AuditInteractionHandler {
     params: { rawBody: Buffer; requestId: string },
     headersForAudit: Record<string, string | string[] | undefined>,
     auditSessionId: string,
-    classification: TurnClassification,
+    classification: RequestClassification,
     match: {
-      turn: { interactionDir: string; pendingAgentToolUses: PendingAgentToolUse[] };
+      interaction: { interactionDir: string; pendingAgentToolUses: PendingAgentToolUse[] };
       pendings: PendingAgentToolUse[];
     },
   ): Promise<AuditInteractionResult> {
     return this.sessionStore.withSessionLock(auditSessionId, async () => {
-      const parentInteractionDir = match.turn.interactionDir;
+      const parentInteractionDir = match.interaction.interactionDir;
       // Si todos los pendings comparten el mismo step padre, lo usamos; si no,
       // tomamos el menor (caso defensivo: en la práctica el SSE registra todos
       // los pendings durante el mismo step antes de ceder el control al cliente).
@@ -378,7 +378,7 @@ export class AuditInteractionHandler {
       await this.auditWriter.writeInteractionState(wr.dir, {
         state: 'in-progress',
         startedAt: new Date(startedAt).toISOString(),
-        interactionType: 'agentic-turn',
+        interactionType: 'agentic',
         parentContext,
       });
 
@@ -387,9 +387,9 @@ export class AuditInteractionHandler {
         this.sessionStore.consumePendingAgentToolUse(parentInteractionDir, triggeringToolUseId);
       }
 
-      this.sessionStore.registerTurn({
+      this.sessionStore.registerInteraction({
         interactionDir: wr.dir,
-        interactionType: 'agentic-turn',
+        interactionType: 'agentic',
         stepCount: 1,
         requestSequence: subSeq,
         startedAt,
@@ -408,8 +408,8 @@ export class AuditInteractionHandler {
         requestBodyOmitted: wr.requestBodyOmitted,
         requestSequence: subSeq,
         auditSessionId,
-        interactionType: 'agentic-turn',
-        turnClassification: classification,
+        interactionType: 'agentic',
+        requestClassification: classification,
       };
     });
   }
@@ -418,13 +418,13 @@ export class AuditInteractionHandler {
     params: { rawBody: Buffer; requestId: string },
     headersForAudit: Record<string, string | string[] | undefined>,
     auditSessionId: string,
-    classification: TurnClassification,
+    classification: RequestClassification,
   ): Promise<AuditInteractionResult> {
     const toolUseIds = this.extractToolUseIdsFromBody(params.rawBody);
-    const parentTurn =
-      toolUseIds.length > 0 ? this.sessionStore.getTurnByToolUseId(toolUseIds[0]) : null;
+    const parentInteraction =
+      toolUseIds.length > 0 ? this.sessionStore.getInteractionByToolUseId(toolUseIds[0]) : null;
 
-    if (!parentTurn) {
+    if (!parentInteraction) {
       console.warn(
         '[audit] No se encontró turno padre para continuation (tool_use_ids:',
         toolUseIds,
@@ -437,19 +437,19 @@ export class AuditInteractionHandler {
       await this.auditWriter.writeInteractionState(result.auditInteractionDir, {
         state: 'in-progress',
         startedAt: new Date().toISOString(),
-        interactionType: 'agentic-turn',
+        interactionType: 'agentic',
         continuationOrphan: true,
       });
-      return { ...result, turnClassification: classification };
+      return { ...result, requestClassification: classification };
     }
 
     // Limpiar flag de espera: la continuation esperada acaba de llegar.
-    parentTurn.awaitingContinuation = false;
-    parentTurn.awaitingSince = undefined;
+    parentInteraction.awaitingContinuation = false;
+    parentInteraction.awaitingSince = undefined;
 
-    const stepCount = this.sessionStore.incrementStepCountByDir(parentTurn.interactionDir);
+    const stepCount = this.sessionStore.incrementStepCountByDir(parentInteraction.interactionDir);
     const stepDir = path.join(
-      parentTurn.interactionDir,
+      parentInteraction.interactionDir,
       'steps',
       String(stepCount).padStart(3, '0'),
     );
@@ -466,22 +466,22 @@ export class AuditInteractionHandler {
     // los consumimos aquí: la llegada del tool_result evidencia que el
     // subagente correspondiente ya completó su ciclo.
     for (const toolUseId of toolUseIds) {
-      this.sessionStore.consumePendingAgentToolUse(parentTurn.interactionDir, toolUseId);
+      this.sessionStore.consumePendingAgentToolUse(parentInteraction.interactionDir, toolUseId);
     }
 
     // También consumir cualquier pending builtin tool que corresponda a los
     // tool_result_ids recibidos (por si la ejecución de builtin tool ya completó).
     for (const toolUseId of toolUseIds) {
-      this.sessionStore.consumePendingBuiltinToolUse(parentTurn.interactionDir, toolUseId);
+      this.sessionStore.consumePendingBuiltinToolUse(parentInteraction.interactionDir, toolUseId);
     }
 
     return {
-      auditInteractionDir: parentTurn.interactionDir,
-      requestBodyOmitted: parentTurn.requestBodyOmitted,
-      requestSequence: parentTurn.requestSequence,
+      auditInteractionDir: parentInteraction.interactionDir,
+      requestBodyOmitted: parentInteraction.requestBodyOmitted,
+      requestSequence: parentInteraction.requestSequence,
       auditSessionId,
-      interactionType: parentTurn.interactionType,
-      turnClassification: classification,
+      interactionType: parentInteraction.interactionType,
+      requestClassification: classification,
     };
   }
 
@@ -489,7 +489,7 @@ export class AuditInteractionHandler {
     params: { rawBody: Buffer; requestId: string },
     headersForAudit: Record<string, string | string[] | undefined>,
     auditSessionId: string,
-    classification: TurnClassification,
+    classification: RequestClassification,
   ): Promise<AuditInteractionResult> {
     const seq = await this.sessionStore.nextAuditInteractionSequence(auditSessionId);
     const folderName = this.sessionResolver.formatAuditInteractionDirName(seq, params.requestId);
@@ -520,7 +520,7 @@ export class AuditInteractionHandler {
       interactionType: 'client-preflight',
     });
 
-    this.sessionStore.registerTurn({
+    this.sessionStore.registerInteraction({
       interactionDir: wr.dir,
       interactionType: 'client-preflight',
       stepCount: 1,
@@ -541,7 +541,7 @@ export class AuditInteractionHandler {
       requestSequence: seq,
       auditSessionId,
       interactionType: 'client-preflight',
-      turnClassification: classification,
+      requestClassification: classification,
     };
   }
 
@@ -549,7 +549,7 @@ export class AuditInteractionHandler {
     params: { rawBody: Buffer; requestId: string },
     headersForAudit: Record<string, string | string[] | undefined>,
     auditSessionId: string,
-    classification: TurnClassification,
+    classification: RequestClassification,
   ): Promise<AuditInteractionResult> {
     const subType = classifySideRequestSubType(params.rawBody);
 
@@ -580,7 +580,7 @@ export class AuditInteractionHandler {
           requestSequence: 0,
           auditSessionId,
           interactionType: 'side-request',
-          turnClassification: classification,
+          requestClassification: classification,
           contextSyncCacheHit: true,
           contextSyncSseStream: Readable.from([ssePayload]),
           webFetchHtmlHash: htmlHash,
@@ -630,7 +630,7 @@ export class AuditInteractionHandler {
     });
 
     // Side-request con interactionType propio (no desplaza a ningún turno agentic)
-    this.sessionStore.registerTurn({
+    this.sessionStore.registerInteraction({
       interactionDir: wr.dir,
       interactionType: 'side-request',
       stepCount: 1,
@@ -651,7 +651,7 @@ export class AuditInteractionHandler {
       requestSequence: seq,
       auditSessionId,
       interactionType: 'side-request',
-      turnClassification: classification,
+      requestClassification: classification,
     };
   }
 
@@ -659,7 +659,7 @@ export class AuditInteractionHandler {
     params: { rawBody: Buffer; requestId: string },
     headersForAudit: Record<string, string | string[] | undefined>,
     auditSessionId: string,
-    classification: TurnClassification,
+    classification: RequestClassification,
   ): Promise<AuditInteractionResult> {
     const seq = await this.sessionStore.nextAuditInteractionSequence(auditSessionId);
     const folderName = this.sessionResolver.formatAuditInteractionDirName(seq, params.requestId);
@@ -689,7 +689,7 @@ export class AuditInteractionHandler {
       interactionType: 'client-preflight',
     });
 
-    this.sessionStore.registerTurn({
+    this.sessionStore.registerInteraction({
       interactionDir: wr.dir,
       interactionType: 'client-preflight',
       stepCount: 1,
@@ -710,7 +710,7 @@ export class AuditInteractionHandler {
       requestSequence: seq,
       auditSessionId,
       interactionType: 'client-preflight',
-      turnClassification: classification,
+      requestClassification: classification,
     };
   }
 
@@ -787,47 +787,47 @@ export class AuditInteractionHandler {
   /**
    * Cierra turnos orphan de la sesión: aquellos marcados como
    * `awaitingContinuation` cuyo tiempo de espera supera el umbral.
-   * Se invoca antes de procesar un nuevo fresh turn.
+   * Se invoca antes de procesar una nueva fresh interaction.
    */
-  private async closeOrphanTurns(sessionId: string): Promise<void> {
-    const stale = this.sessionStore.findStaleTurnsAwaitingContinuation(
+  private async closeOrphanInteractions(sessionId: string): Promise<void> {
+    const stale = this.sessionStore.findStaleInteractionsAwaitingContinuation(
       sessionId,
       AuditInteractionHandler.ORPHAN_MAX_AGE_MS,
     );
-    for (const turn of stale) {
-      await this.closeOrphanTurn(turn);
+    for (const interaction of stale) {
+      await this.closeOrphanInteraction(interaction);
     }
   }
 
   /**
    * Cierra un turno orphan individual, escribiendo meta.json con
-   * `turnOutcome: 'orphaned'` e información forense, y eliminando state.json.
+   * `outcome: 'orphaned'` e información forense, y eliminando state.json.
    */
-  public async closeOrphanTurn(turn: ActiveTurn): Promise<void> {
+  public async closeOrphanInteraction(interaction: ActiveInteraction): Promise<void> {
     const endedAt = Date.now();
     const sseRawBytesLimit = Number.isFinite(this.config.MAX_AUDIT_SSE_RAW_BYTES)
       ? this.config.MAX_AUDIT_SSE_RAW_BYTES
       : null;
-    const sseRawBytesTotal = computeSseRawBytesTotal(turn.stepsMeta);
-    const sseRawTruncatedAny = turn.stepsMeta.some((s) => s.sseRawTruncatedByLimit === true);
+    const sseRawBytesTotal = computeSseRawBytesTotal(interaction.stepsMeta);
+    const sseRawTruncatedAny = interaction.stepsMeta.some((s) => s.sseRawTruncatedByLimit === true);
     const totals =
-      turn.interactionType !== 'client-preflight' ? computeTokenTotals(turn.stepsMeta) : null;
+      interaction.interactionType !== 'client-preflight' ? computeTokenTotals(interaction.stepsMeta) : null;
     const lostPendings =
-      turn.pendingAgentToolUses.length > 0 ? turn.pendingAgentToolUses : undefined;
+      interaction.pendingAgentToolUses.length > 0 ? interaction.pendingAgentToolUses : undefined;
 
-    this.sessionStore.closeTurn(turn.interactionDir);
+    this.sessionStore.closeInteraction(interaction.interactionDir);
 
-    await this.auditWriter.writeTurnMeta(turn.interactionDir, {
-      interactionType: turn.interactionType,
-      ...(turn.modelId ? { modelId: turn.modelId } : {}),
-      turnOutcome: 'orphaned',
-      stepCount: turn.stepsMeta.length,
-      startedAt: new Date(turn.startedAt).toISOString(),
+    await this.auditWriter.writeInteractionMeta(interaction.interactionDir, {
+      interactionType: interaction.interactionType,
+      ...(interaction.modelId ? { modelId: interaction.modelId } : {}),
+      outcome: 'orphaned',
+      stepCount: interaction.stepsMeta.length,
+      startedAt: new Date(interaction.startedAt).toISOString(),
       endedAt: new Date(endedAt).toISOString(),
-      durationMs: endedAt - turn.startedAt,
+      durationMs: endedAt - interaction.startedAt,
       statusCode: null,
-      sse: turn.stepsMeta.some((s) => s.sse),
-      steps: turn.stepsMeta,
+      sse: interaction.stepsMeta.some((s) => s.sse),
+      steps: interaction.stepsMeta,
       totals,
       sseResponseBodyAttempted: false,
       sseResponseBodyWritten: false,
@@ -835,11 +835,11 @@ export class AuditInteractionHandler {
       sseResponseBodySource: null,
       errorMessage: null,
       errorCode: null,
-      ...(turn.parentContext ? { parentContext: turn.parentContext } : {}),
-      ...(turn.contextSyncFallback ? { contextSyncFallback: true } : {}),
+      ...(interaction.parentContext ? { parentContext: interaction.parentContext } : {}),
+      ...(interaction.contextSyncFallback ? { contextSyncFallback: true } : {}),
       ...(lostPendings ? { lostPendingAgents: lostPendings } : {}),
       truncation: {
-        requestBodyOmitted: turn.requestBodyOmitted,
+        requestBodyOmitted: interaction.requestBodyOmitted,
         responseBodyBytesTotal: null,
         responseBodyBytesAudited: null,
         responseTruncatedByProxyBuffer: false,
@@ -851,16 +851,16 @@ export class AuditInteractionHandler {
       },
     });
 
-    if (turn.interactionType !== 'client-preflight' && turn.modelId && totals) {
-      const sessionDir = path.join(this.sessionStore.getBaseDir(), turn.sessionId);
-      await this.sessionStore.withSessionLock(turn.sessionId, async () => {
+    if (interaction.interactionType !== 'client-preflight' && interaction.modelId && totals) {
+      const sessionDir = path.join(this.sessionStore.getBaseDir(), interaction.sessionId);
+      await this.sessionStore.withSessionLock(interaction.sessionId, async () => {
         await this.auditWriter
-          .updateSessionMetrics(sessionDir, turn.modelId!, totals, turn.stepsMeta.length)
+          .updateSessionMetrics(sessionDir, interaction.modelId!, totals, interaction.stepsMeta.length)
           .catch(() => { /* error no crítico */ });
       });
     }
 
-    await this.auditWriter.removeInteractionState(turn.interactionDir);
+    await this.auditWriter.removeInteractionState(interaction.interactionDir);
   }
 
   /**

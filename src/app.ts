@@ -44,19 +44,19 @@ export function buildApp(deps: ProxyDependencies, logger: Logger) {
   // Registrar las rutas principales de orquestación del proxy con deps inyectadas
   app.register(proxyRoutes, { deps });
 
-  // Graceful shutdown: cerrar todos los turnos abiertos como orphans para que
+  // Graceful shutdown: cerrar todas las interacciones abiertas como orphans para que
   // la auditoría en disco quede completa (meta.json + eliminación de state.json).
   app.addHook('onClose', async () => {
-    const openTurns = deps.sessionStore.getAllOpenTurns();
-    for (const turn of openTurns) {
+    const openInteractions = deps.sessionStore.getAllOpenInteractions();
+    for (const interaction of openInteractions) {
       try {
-        await deps.auditInteractionHandler.closeOrphanTurn(turn);
+        await deps.auditInteractionHandler.closeOrphanInteraction(interaction);
       } catch (err) {
-        app.log.error({ err, dir: turn.interactionDir }, 'Error cerrando turno orphan en shutdown');
+        app.log.error({ err, dir: interaction.interactionDir }, 'Error cerrando interacción orphan en shutdown');
       }
     }
-    if (openTurns.length > 0) {
-      app.log.info({ count: openTurns.length }, 'Turnos orphan cerrados en graceful shutdown');
+    if (openInteractions.length > 0) {
+      app.log.info({ count: openInteractions.length }, 'Interacciones orphan cerradas en graceful shutdown');
     }
   });
 

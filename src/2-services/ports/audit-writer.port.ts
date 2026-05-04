@@ -1,4 +1,4 @@
-import { InteractionState, SessionModelMetrics, SseLine, TurnMetadata } from '../../1-domain/types/audit.types.js';
+import { InteractionState, InteractionMetadata, SessionModelMetrics, SseLine } from '../../1-domain/types/audit.types.js';
 import { JsonValue } from '../../1-domain/types/json.types.js';
 
 /**
@@ -82,7 +82,7 @@ export interface IAuditWriter {
     interactionDir: string,
     headers: Record<string, string | string[] | undefined>,
   ): Promise<void>;
-  writeTurnMeta(interactionDir: string, meta: TurnMetadata): Promise<void>;
+  writeInteractionMeta(interactionDir: string, meta: InteractionMetadata): Promise<void>;
   updateSessionMetrics(
     sessionDir: string,
     modelId: string,
@@ -97,8 +97,8 @@ export interface IAuditWriter {
    */
   appendSseRawChunk(interactionDir: string, chunk: Buffer): void;
   /**
-   * Escribe un marcador `state.json` en el directorio de interaccion indicando
-   * que la interaccion esta en curso. Debe eliminarse al cerrar el turno.
+   * Escribe un marcador `state.json` en el directorio de interacción indicando
+   * que la interacción está en curso. Debe eliminarse al cerrar la interacción.
    */
   writeInteractionState(interactionDir: string, state: InteractionState): Promise<void>;
   /**

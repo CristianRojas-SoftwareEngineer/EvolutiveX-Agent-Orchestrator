@@ -104,6 +104,7 @@ export class SseReconstructService implements ISseReconstructor {
       const result = await this.auditWriterService.writeTopLevelMultiStepResponse(
         interactionDir,
         stepCount,
+        opts.context,
       );
       return {
         sseResponseBodyAttempted: true,

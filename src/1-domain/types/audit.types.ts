@@ -328,6 +328,8 @@ export interface SseReconstructOptions {
    * Informativo: NO aborta la reconstrucción (fuente es `sse.jsonl`).
    */
   sseRawWriteError: boolean;
+  /** Contexto posicional para enriquecer el body.parsed.md generado. */
+  context?: MarkdownRenderContext;
 }
 
 /**
@@ -386,4 +388,23 @@ export interface AuditInteractionContext {
   responseStatusCode: number | null;
   interactionType?: InteractionType;
   requestClassification?: RequestClassification;
+}
+
+/**
+ * Contexto posicional que los handlers de Capa 3 proporcionan al MarkdownRendererService
+ * para enriquecer los body.parsed.md generados con información de ubicación en el flujo global.
+ */
+export interface MarkdownRenderContext {
+  /** Tipo de interacción para etiquetas de display */
+  interactionType?: InteractionType;
+  /** Índice del step actual (1-indexado) */
+  stepIndex?: number;
+  /** Total de steps en la interacción */
+  stepCount?: number;
+  /** Tipo de subagente (general-purpose, Explore, Plan, etc.) */
+  subagentType?: string;
+  /** Modelo usado en este step */
+  modelId?: string;
+  /** Path relativo a thought/content.md para referencia cruzada */
+  thoughtContentPath?: string;
 }

@@ -36,7 +36,8 @@ function makeSessionStore(overrides: Partial<ISessionStore> = {}): ISessionStore
   return {
     getBaseDir: () => '/tmp/sessions',
     ensureAuditSessionsRoot: async () => {},
-    nextAuditInteractionSequence: async () => 1,
+    nextMainAgentSequence: async () => 1,
+    nextSideInteractionSequence: async () => 1,
     registerInteraction: (interaction: ActiveInteraction) => {
       registry.set(interaction.interactionDir, interaction);
     },
@@ -458,7 +459,7 @@ describe('AuditInteractionHandler', () => {
     );
     await handler.execute({ headers: {}, rawBody: FRESH_BODY, requestId: 'req-1' });
     expect(stepDirs).toHaveLength(1);
-    expect(stepDirs[0]).toMatch(/steps[/\\]001$/);
+    expect(stepDirs[0]).toMatch(/steps[/\\]01$/);
   });
 
   it('debería clasificar side-request con interactionType side-request', async () => {
@@ -501,7 +502,7 @@ describe('AuditInteractionHandler', () => {
     );
     await handler.execute({ headers: {}, rawBody: SIDE_REQUEST_BODY, requestId: 'req-side' });
     expect(stepDirs).toHaveLength(1);
-    expect(stepDirs[0]).toMatch(/steps[/\\]001$/);
+    expect(stepDirs[0]).toMatch(/steps[/\\]01$/);
   });
 
   it('debería llamar writeInteractionState para fresh/side/preflight-quota (state.json)', async () => {

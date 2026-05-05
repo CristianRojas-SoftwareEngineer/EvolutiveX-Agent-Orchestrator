@@ -14,6 +14,7 @@ import { buildSimulatedSseFromText } from '../1-domain/services/sse-simulator.se
 import {
   ActiveInteraction,
   InteractionType,
+  MarkdownRenderContext,
   ParentContext,
   PendingAgentToolUse,
   PendingBuiltinToolUse,
@@ -175,6 +176,7 @@ export class AuditInteractionHandler {
       headers: headersForAudit,
       bodyBuffer: params.rawBody,
       maxAuditRequestBytes: this.config.MAX_AUDIT_REQUEST_BODY_BYTES,
+      context: { interactionType: 'agentic', stepIndex: 1 },
     });
 
     // Escribir steps/01/request para simetría estructural (todos los steps tienen request/)
@@ -184,6 +186,7 @@ export class AuditInteractionHandler {
       headers: headersForAudit,
       bodyBuffer: params.rawBody,
       maxAuditRequestBytes: this.config.MAX_AUDIT_REQUEST_BODY_BYTES,
+      context: { interactionType: 'agentic', stepIndex: 1 },
     });
 
     const startedAt = Date.now();
@@ -356,6 +359,12 @@ export class AuditInteractionHandler {
       );
       const folderName = `${PREFIX_SUB_AGENT}-${String(subSeq).padStart(PAD_SUB_AGENT, '0')}`;
 
+      const subagentContext: MarkdownRenderContext = {
+        interactionType: 'agentic',
+        subagentType: subagentType ?? match.pendings[0]?.subagentType,
+        stepIndex: 1,
+      };
+
       const wr = await this.auditWriter.writeSubInteractionRequest({
         parentInteractionDir,
         parentStepIndex,
@@ -363,6 +372,7 @@ export class AuditInteractionHandler {
         headers: headersForAudit,
         bodyBuffer: params.rawBody,
         maxAuditRequestBytes: this.config.MAX_AUDIT_REQUEST_BODY_BYTES,
+        context: subagentContext,
       });
 
       // Escribir steps/01/request del subagente para mantener simetría estructural.
@@ -372,6 +382,7 @@ export class AuditInteractionHandler {
         headers: headersForAudit,
         bodyBuffer: params.rawBody,
         maxAuditRequestBytes: this.config.MAX_AUDIT_REQUEST_BODY_BYTES,
+        context: subagentContext,
       });
 
       const startedAt = Date.now();
@@ -466,6 +477,10 @@ export class AuditInteractionHandler {
       headers: headersForAudit,
       bodyBuffer: params.rawBody,
       maxAuditRequestBytes: this.config.MAX_AUDIT_REQUEST_BODY_BYTES,
+      context: {
+        interactionType: parentInteraction.interactionType,
+        stepIndex: stepCount,
+      },
     });
 
     // Si la continuation trae tool_result_ids que correspondan a Agents que
@@ -521,6 +536,7 @@ export class AuditInteractionHandler {
       headers: headersForAudit,
       bodyBuffer: params.rawBody,
       maxAuditRequestBytes: this.config.MAX_AUDIT_REQUEST_BODY_BYTES,
+      context: { interactionType: 'client-preflight', stepIndex: 1 },
     });
 
     const startedAt = Date.now();
@@ -625,6 +641,7 @@ export class AuditInteractionHandler {
       headers: headersForAudit,
       bodyBuffer: params.rawBody,
       maxAuditRequestBytes: this.config.MAX_AUDIT_REQUEST_BODY_BYTES,
+      context: { interactionType: 'side-request', stepIndex: 1 },
     });
 
     // Escribir steps/01/request para simetría estructural
@@ -634,6 +651,7 @@ export class AuditInteractionHandler {
       headers: headersForAudit,
       bodyBuffer: params.rawBody,
       maxAuditRequestBytes: this.config.MAX_AUDIT_REQUEST_BODY_BYTES,
+      context: { interactionType: 'side-request', stepIndex: 1 },
     });
 
     const startedAt = Date.now();
@@ -699,6 +717,7 @@ export class AuditInteractionHandler {
       headers: headersForAudit,
       bodyBuffer: params.rawBody,
       maxAuditRequestBytes: this.config.MAX_AUDIT_REQUEST_BODY_BYTES,
+      context: { interactionType: 'client-preflight', stepIndex: 1 },
     });
 
     const startedAt = Date.now();

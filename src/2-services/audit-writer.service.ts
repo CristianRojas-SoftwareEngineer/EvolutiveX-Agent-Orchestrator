@@ -3,7 +3,7 @@ import * as fs from 'node:fs/promises';
 import * as fsSync from 'node:fs';
 import { RedactService } from '../1-domain/services/redact.service.js';
 import { MarkdownRendererService } from '../1-domain/services/markdown-renderer.service.js';
-import { InteractionState, InteractionMetadata, SessionMetrics, SessionModelMetrics, SseLine } from '../1-domain/types/audit.types.js';
+import { InteractionState, InteractionMetadata, MarkdownRenderContext, SessionMetrics, SessionModelMetrics, SseLine } from '../1-domain/types/audit.types.js';
 import { JsonValue } from '../1-domain/types/json.types.js';
 import type { IAuditWriter } from './ports/audit-writer.port.js';
 import {
@@ -44,13 +44,14 @@ export class AuditWriterService implements IAuditWriter {
     baseName: string,
     parsed: JsonValue,
     type: 'request' | 'response',
+    context?: MarkdownRenderContext,
   ): Promise<void> {
     await this.writeJsonAtomic(path.join(dir, `${baseName}.json`), parsed);
     try {
       const md =
         type === 'request'
-          ? this.markdownRendererService.renderRequestConversationMarkdown(parsed)
-          : this.markdownRendererService.renderResponseConversationMarkdown(parsed);
+          ? this.markdownRendererService.renderRequestConversationMarkdown(parsed, context)
+          : this.markdownRendererService.renderResponseConversationMarkdown(parsed, context);
       await this.writeFileAtomic(
         path.join(dir, `${baseName}.parsed.md`),
         Buffer.from(`${md}\n`, 'utf8'),
@@ -70,6 +71,7 @@ export class AuditWriterService implements IAuditWriter {
     bodyBuffer: Buffer | null;
     maxAuditRequestBytes: number;
     skipTopLevelRequest?: boolean;
+    context?: MarkdownRenderContext;
   }): Promise<{ requestBodyOmitted: boolean }> {
     if (params.skipTopLevelRequest) {
       await fs.mkdir(params.interactionDir, { recursive: true });
@@ -81,6 +83,7 @@ export class AuditWriterService implements IAuditWriter {
       params.headers,
       params.bodyBuffer,
       params.maxAuditRequestBytes,
+      params.context,
     );
     return { requestBodyOmitted };
   }
@@ -92,6 +95,7 @@ export class AuditWriterService implements IAuditWriter {
     headers: Record<string, string | string[] | undefined>;
     bodyBuffer: Buffer | null;
     maxAuditRequestBytes: number;
+    context?: MarkdownRenderContext;
   }): Promise<{ dir: string; requestBodyOmitted: boolean }> {
     const dir = path.join(
       params.parentInteractionDir,
@@ -104,6 +108,7 @@ export class AuditWriterService implements IAuditWriter {
       params.headers,
       params.bodyBuffer,
       params.maxAuditRequestBytes,
+      params.context,
     );
     return { dir, requestBodyOmitted };
   }
@@ -144,6 +149,7 @@ export class AuditWriterService implements IAuditWriter {
     headers: Record<string, string | string[] | undefined>,
     bodyBuffer: Buffer | null,
     maxAuditRequestBytes: number,
+    context?: MarkdownRenderContext,
   ): Promise<boolean> {
     const requestDir = path.join(interactionDir, DIR_INPUT);
     await fs.mkdir(requestDir, { recursive: true });
@@ -161,7 +167,7 @@ export class AuditWriterService implements IAuditWriter {
       await this.writeFileAtomic(path.join(requestDir, 'body.bin'), bodyBuffer);
       const parsed = this.redactService.tryParseJson(bodyBuffer);
       if (parsed !== null) {
-        await this.writeFormattedAndMarkdown(requestDir, 'body', parsed, 'request');
+        await this.writeFormattedAndMarkdown(requestDir, 'body', parsed, 'request', context);
       }
       return false;
     }
@@ -184,6 +190,7 @@ export class AuditWriterService implements IAuditWriter {
     headers: Record<string, string | string[] | undefined>;
     bodyBuffer: Buffer | null;
     maxAuditRequestBytes: number;
+    context?: MarkdownRenderContext;
   }): Promise<void> {
     const requestDir = path.join(params.stepDir, DIR_STEP_REQUEST);
     await fs.mkdir(requestDir, { recursive: true });
@@ -199,7 +206,7 @@ export class AuditWriterService implements IAuditWriter {
       await this.writeFileAtomic(path.join(requestDir, 'body.bin'), params.bodyBuffer);
       const parsed = this.redactService.tryParseJson(params.bodyBuffer);
       if (parsed !== null) {
-        await this.writeFormattedAndMarkdown(requestDir, 'body', parsed, 'request');
+        await this.writeFormattedAndMarkdown(requestDir, 'body', parsed, 'request', params.context);
       }
       return;
     }
@@ -426,13 +433,17 @@ export class AuditWriterService implements IAuditWriter {
    * - body.json (mensaje completo, pretty print)
    * - body.parsed.md (vista markdown semántica)
    */
-  public async writeStepResponseMarkdown(stepDir: string, message: JsonValue): Promise<void> {
+  public async writeStepResponseMarkdown(
+    stepDir: string,
+    message: JsonValue,
+    context?: MarkdownRenderContext,
+  ): Promise<void> {
     const responseDir = path.join(stepDir, DIR_STEP_RESPONSE);
     await fs.mkdir(responseDir, { recursive: true });
 
     await this.writeJsonAtomic(path.join(responseDir, 'body.json'), message);
 
-    const md = this.markdownRendererService.renderResponseConversationMarkdown(message);
+    const md = this.markdownRendererService.renderResponseConversationMarkdown(message, context);
     await this.writeFileAtomic(
       path.join(responseDir, 'body.parsed.md'),
       Buffer.from(`${md}\n`, 'utf8'),
@@ -447,6 +458,7 @@ export class AuditWriterService implements IAuditWriter {
   public async writeTopLevelMultiStepResponse(
     interactionDir: string,
     stepCount: number,
+    context?: MarkdownRenderContext,
   ): Promise<{ written: boolean; error?: string }> {
     const steps: Array<{ stepIndex: number; parsed: JsonValue }> = [];
 
@@ -484,7 +496,7 @@ export class AuditWriterService implements IAuditWriter {
       };
       await this.writeJsonAtomic(path.join(outputDir, 'body.json'), multiStepObj);
 
-      const md = this.markdownRendererService.renderMultiStepResponseMarkdown(steps);
+      const md = this.markdownRendererService.renderMultiStepResponseMarkdown(steps, context);
       await this.writeFileAtomic(
         path.join(outputDir, 'body.parsed.md'),
         Buffer.from(`${md}\n`, 'utf8'),

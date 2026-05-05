@@ -229,6 +229,10 @@ export class AuditStandardResponseHandler {
         const topLevel = await this.auditWriter.writeTopLevelMultiStepResponse(
           context.auditInteractionDir,
           stepNumber,
+          {
+            interactionType: context.interactionType,
+            stepCount: stepNumber,
+          },
         );
         if (!topLevel.written) {
           console.error('Error al escribir top-level multi-step non-SSE:', topLevel.error);

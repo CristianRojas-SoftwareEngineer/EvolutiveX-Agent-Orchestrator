@@ -144,6 +144,8 @@ function makeAuditWriter(overrides: Partial<IAuditWriter> = {}): IAuditWriter {
       responseTruncatedByAuditLimit: false,
     }),
     writeResponseHeadersAudit: async () => {},
+    writeTopLevelResponseHeaders: async () => {},
+    writeStepThought: async () => {},
     writeInteractionMeta: async () => {},
     appendSseLine: () => {},
     appendSseRawChunk: () => {},
@@ -337,7 +339,7 @@ describe('AuditSseResponseHandler', () => {
 
     await new Promise((r) => setTimeout(r, 100));
     // Solo el step dir, nunca el top-level
-    expect(headerDirs.every((d) => /steps[/\\]\d{3}$/.test(d))).toBe(true);
+    expect(headerDirs.every((d) => /steps[/\\]\d{2}$/.test(d))).toBe(true);
   });
 
   it('debería escribir headers top-level cuando la reconstrucción escribió body', async () => {
@@ -346,6 +348,9 @@ describe('AuditSseResponseHandler', () => {
     const handler = new AuditSseResponseHandler(
       makeAuditWriter({
         writeResponseHeadersAudit: async (dir) => {
+          headerDirs.push(dir);
+        },
+        writeTopLevelResponseHeaders: async (dir) => {
           headerDirs.push(dir);
         },
       }),

@@ -202,7 +202,7 @@ describe('MarkdownRendererService', () => {
       expect(md.length).toBeLessThan(longThinking.length + 1000);
     });
 
-    it('debería concatenar múltiples bloques del mismo tipo', () => {
+    it('debería concatenar múltiples bloques del mismo tipo con separador ---', () => {
       const parsed = {
         id: 'msg_123',
         type: 'message',
@@ -218,6 +218,8 @@ describe('MarkdownRendererService', () => {
       const md = renderer.renderResponseConversationMarkdown(parsed);
       expect(md).toContain('> Pensamiento 1');
       expect(md).toContain('> Pensamiento 2');
+      // El separador --- queda dentro del blockquote (cada línea lleva prefijo >)
+      expect(md).toContain('> Pensamiento 1\n> \n> ---\n> \n> Pensamiento 2');
       expect(md).toContain('Texto 1\n\nTexto 2');
     });
 
@@ -248,6 +250,75 @@ describe('MarkdownRendererService', () => {
       expect(md).toContain('"skill": "test"');
       expect(md).toContain('**bash** (id: `toolu_222`)');
       expect(md).toContain('"command": "ls"');
+    });
+
+    it('debería preservar orden temporal de thinking interleaved con text', () => {
+      const parsed = {
+        id: 'msg_123',
+        type: 'message',
+        role: 'assistant',
+        stop_reason: 'end_turn',
+        content: [
+          { type: 'thinking', thinking: 'Pienso que debo leer el archivo...' },
+          { type: 'text', text: 'Voy a revisar el archivo.' },
+          { type: 'thinking', thinking: 'Ahora tengo el contenido, voy a analizarlo...' },
+          { type: 'text', text: 'Aqui esta mi analisis.' },
+        ],
+      };
+      const md = renderer.renderResponseConversationMarkdown(parsed);
+      // Thinking debe aparecer en orden, no todos al principio
+      const idxThinking1 = md.indexOf('Pienso que debo leer');
+      const idxText1 = md.indexOf('Voy a revisar el archivo.');
+      const idxThinking2 = md.indexOf('Ahora tengo el contenido');
+      const idxText2 = md.indexOf('Aqui esta mi analisis');
+      expect(idxThinking1).toBeLessThan(idxText1);
+      expect(idxText1).toBeLessThan(idxThinking2);
+      expect(idxThinking2).toBeLessThan(idxText2);
+      // Debe usar contadores secuenciales
+      expect(md).toContain('## Razonamiento interno');
+      expect(md).toContain('## Razonamiento interno (2)');
+      expect(md).toContain('## Respuesta');
+      expect(md).toContain('## Respuesta (2)');
+    });
+
+    it('debería preservar orden de thinking intercalado con tool_use', () => {
+      const parsed = {
+        id: 'msg_123',
+        type: 'message',
+        role: 'assistant',
+        stop_reason: 'tool_use',
+        content: [
+          { type: 'thinking', thinking: 'Necesito ejecutar un comando' },
+          { type: 'tool_use', id: 'toolu_001', name: 'bash', input: { command: 'ls' } },
+          { type: 'thinking', thinking: 'Ahora voy a leer el resultado' },
+          { type: 'tool_use', id: 'toolu_002', name: 'read_file', input: { path: '/a.ts' } },
+        ],
+      };
+      const md = renderer.renderResponseConversationMarkdown(parsed);
+      const idxThinking1 = md.indexOf('Necesito ejecutar');
+      const idxTool1 = md.indexOf('**bash**');
+      const idxThinking2 = md.indexOf('Ahora voy a leer');
+      const idxTool2 = md.indexOf('**read_file**');
+      expect(idxThinking1).toBeLessThan(idxTool1);
+      expect(idxTool1).toBeLessThan(idxThinking2);
+      expect(idxThinking2).toBeLessThan(idxTool2);
+    });
+
+    it('debería renderizar solo un thinking sin contador', () => {
+      const parsed = {
+        id: 'msg_123',
+        type: 'message',
+        role: 'assistant',
+        content: [
+          { type: 'thinking', thinking: 'Unico pensamiento' },
+          { type: 'text', text: 'Respuesta' },
+        ],
+      };
+      const md = renderer.renderResponseConversationMarkdown(parsed);
+      expect(md).toContain('## Razonamiento interno');
+      expect(md).not.toContain('## Razonamiento interno (2)');
+      expect(md).toContain('## Respuesta');
+      expect(md).not.toContain('## Respuesta (2)');
     });
 
     it('debería hacer fallback a JSON genérico para datos no-objeto', () => {
@@ -290,6 +361,181 @@ describe('MarkdownRendererService', () => {
       expect(md).toContain('  ```json\n  {\n    "command": "ls"\n  }\n  ```');
       // Los dos tool_use deben estar separados por \n\n (el join del array parts)
       expect(md).toContain('  ```\n\n- **bash**');
+    });
+  });
+
+  describe('context headers', () => {
+    it('debería renderizar heading principal para main-agent sin context', () => {
+      const parsed = { stop_reason: 'end_turn', content: [{ type: 'text', text: 'Hola' }] };
+      const md = renderer.renderResponseConversationMarkdown(parsed);
+      expect(md).toMatch(/^# Respuesta del Asistente/);
+    });
+
+    it('debería renderizar heading de subagente con context', () => {
+      const parsed = { stop_reason: 'end_turn', content: [{ type: 'text', text: 'Resultado' }] };
+      const md = renderer.renderResponseConversationMarkdown(parsed, {
+        subagentType: 'general-purpose',
+      });
+      expect(md).toContain('# Respuesta del Subagente (`general-purpose`)');
+      expect(md).toContain('**Tipo:** Subagente (`general-purpose`)');
+    });
+
+    it('debería renderizar heading de side-request con context', () => {
+      const parsed = { stop_reason: 'end_turn', content: [{ type: 'text', text: 'OK' }] };
+      const md = renderer.renderResponseConversationMarkdown(parsed, {
+        interactionType: 'side-request',
+      });
+      expect(md).toContain('# Respuesta del Side-request');
+    });
+
+    it('debería renderizar heading de preflight con context', () => {
+      const parsed = { stop_reason: 'end_turn', content: [{ type: 'text', text: 'OK' }] };
+      const md = renderer.renderResponseConversationMarkdown(parsed, {
+        interactionType: 'client-preflight',
+      });
+      expect(md).toContain('# Respuesta del Preflight');
+    });
+
+    it('debería incluir stepIndex y stepCount en header', () => {
+      const parsed = { stop_reason: 'end_turn', content: [{ type: 'text', text: 'OK' }] };
+      const md = renderer.renderResponseConversationMarkdown(parsed, {
+        interactionType: 'agentic',
+        stepIndex: 2,
+        stepCount: 5,
+        modelId: 'claude-3-5-sonnet-20241022',
+      });
+      expect(md).toContain('**Interacción:** Interacción Principal — Step 2 de 5');
+      expect(md).toContain('**Modelo:** claude-3-5-sonnet-20241022');
+    });
+
+    it('debería incluir stepIndex y stepCount de subagente en header', () => {
+      const parsed = { stop_reason: 'end_turn', content: [{ type: 'text', text: 'OK' }] };
+      const md = renderer.renderResponseConversationMarkdown(parsed, {
+        subagentType: 'Explore',
+        stepIndex: 1,
+        stepCount: 3,
+        modelId: 'mimo-v2.5',
+      });
+      expect(md).toContain('**Interacción:** Subagente (`Explore`) — Step 1 de 3');
+      expect(md).toContain('**Modelo:** mimo-v2.5');
+    });
+
+    it('debería renderizar request con context de subagente', () => {
+      const parsed = {
+        model: 'test',
+        messages: [{ role: 'user', content: 'Hola' }],
+      };
+      const md = renderer.renderRequestConversationMarkdown(parsed, {
+        subagentType: 'Plan',
+      });
+      expect(md).toContain('# Prompt del Subagente (`Plan`)');
+    });
+  });
+
+  describe('TOC multi-step', () => {
+    it('debería generar TOC para multi-step', () => {
+      const steps = [
+        {
+          stepIndex: 1,
+          parsed: {
+            stop_reason: 'tool_use',
+            content: [
+              { type: 'thinking', thinking: 'Pensando...' },
+              { type: 'tool_use', id: 't1', name: 'bash', input: {} },
+            ],
+          },
+        },
+        {
+          stepIndex: 2,
+          parsed: {
+            stop_reason: 'end_turn',
+            content: [{ type: 'text', text: 'Listo' }],
+          },
+        },
+      ];
+      const md = renderer.renderMultiStepResponseMarkdown(steps);
+      expect(md).toContain('## Contenido');
+      expect(md).toContain('- [Step 1 de 2 — tool_use]');
+      expect(md).toContain('- [Step 2 de 2 — end_turn]');
+      expect(md).toContain('  - [Razonamiento interno]');
+      expect(md).toContain('  - [Acciones solicitadas]');
+      expect(md).toContain('  - [Respuesta]');
+    });
+
+    it('no debería generar TOC para single-step', () => {
+      const steps = [
+        {
+          stepIndex: 1,
+          parsed: { stop_reason: 'end_turn', content: [{ type: 'text', text: 'OK' }] },
+        },
+      ];
+      const md = renderer.renderMultiStepResponseMarkdown(steps);
+      expect(md).not.toContain('## Contenido');
+    });
+  });
+
+  describe('referencia thought/content.md', () => {
+    it('debería usar referencia a thought/content.md cuando thoughtContentPath está presente', () => {
+      const longThinking = 'a'.repeat(6000);
+      const parsed = {
+        id: 'msg_123',
+        type: 'message',
+        role: 'assistant',
+        content: [{ type: 'thinking', thinking: longThinking }],
+      };
+      const md = renderer.renderResponseConversationMarkdown(parsed, {
+        thoughtContentPath: 'thought/content.md',
+      });
+      expect(md).toContain('_[Pensamiento truncado — ver `thought/content.md`]');
+      expect(md).not.toContain('_[Pensamiento truncado...]_');
+    });
+
+    it('debería usar indicador genérico sin thoughtContentPath', () => {
+      const longThinking = 'a'.repeat(6000);
+      const parsed = {
+        id: 'msg_123',
+        type: 'message',
+        role: 'assistant',
+        content: [{ type: 'thinking', thinking: longThinking }],
+      };
+      const md = renderer.renderResponseConversationMarkdown(parsed);
+      expect(md).toContain('_[Pensamiento truncado...]_');
+    });
+  });
+
+  describe('diferenciación de contenido Skill', () => {
+    it('debería detectar y renderizar contenido Skill en bloque colapsable', () => {
+      const skillContent = 'Base directory for this skill: /home/user/.claude/skills/test\n\nSkill line 1\nSkill line 2';
+      const parsed = {
+        model: 'test',
+        messages: [{ role: 'user', content: skillContent }],
+      };
+      const md = renderer.renderRequestConversationMarkdown(parsed);
+      expect(md).toContain('### Contenido inyectado por Skill: test');
+      expect(md).toContain('<details>');
+      expect(md).toContain('<summary>Ver contenido de la Skill');
+      expect(md).toContain('</details>');
+    });
+
+    it('debería extraer texto después del Skill si coexiste', () => {
+      const fullPrompt = 'Base directory for this skill: /skills/test\n\nLinea skill\n\n\n\nMi pregunta original';
+      const parsed = {
+        model: 'test',
+        messages: [{ role: 'user', content: fullPrompt }],
+      };
+      const md = renderer.renderRequestConversationMarkdown(parsed);
+      expect(md).toContain('### Contenido inyectado por Skill: test');
+      expect(md).toContain('Mi pregunta original');
+    });
+
+    it('no debería detectar Skill en prompts normales', () => {
+      const parsed = {
+        model: 'test',
+        messages: [{ role: 'user', content: 'Hola, necesito ayuda' }],
+      };
+      const md = renderer.renderRequestConversationMarkdown(parsed);
+      expect(md).not.toContain('<details>');
+      expect(md).not.toContain('Contenido inyectado por Skill');
     });
   });
 });

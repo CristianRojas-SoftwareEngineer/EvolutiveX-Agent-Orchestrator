@@ -84,7 +84,7 @@ describe('SessionResolverService - Resolución de sesión', () => {
 describe('SessionResolverService - Formato de directorio', () => {
   it('debería formatear nombres con secuencia zero-padded', () => {
     const svc = new SessionResolverService(makeConfig());
-    expect(svc.formatAuditInteractionDirName(1, 'abc-123')).toBe('000001_abc-123');
-    expect(svc.formatAuditInteractionDirName(999999, 'xyz')).toBe('999999_xyz');
+    expect(svc.formatAuditInteractionDirName(1)).toBe('01');
+    expect(svc.formatAuditInteractionDirName(999999)).toBe('999999');
   });
 });

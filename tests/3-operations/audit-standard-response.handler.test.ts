@@ -197,7 +197,7 @@ describe('AuditStandardResponseHandler', () => {
 
     // Step dir: finalizeNonSseResponseAudit llamado 1 vez
     expect(finalizedDirs).toHaveLength(1);
-    expect(finalizedDirs[0]).toMatch(/steps[/\\]001/);
+    expect(finalizedDirs[0]).toMatch(/steps[/\\]01/);
     // Top-level: writeTopLevelMultiStepResponse llamado 1 vez
     expect(topLevelCalls).toBe(1);
     expect(interactionMetaWritten).toBe(true);

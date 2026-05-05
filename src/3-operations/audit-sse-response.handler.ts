@@ -361,6 +361,12 @@ export class AuditSseResponseHandler {
           await this.auditWriter.writeStepResponseMarkdown(
             stepDir,
             stepMessage as unknown as JsonValue,
+            {
+              stepIndex: stepNumber,
+              stepCount: activeInteraction?.stepCount,
+              modelId: activeInteraction?.modelId,
+              thoughtContentPath: thinkingBlocks.length > 0 ? 'thought/content.md' : undefined,
+            },
           );
         } catch (reconstructErr) {
           // No fallar el step si la reconstrucción falla; solo loggear
@@ -400,6 +406,13 @@ export class AuditSseResponseHandler {
             sseRawBytesWritten,
             sseRawTruncatedByLimit: sseRawTruncated,
             sseRawWriteError: streamError,
+            context: {
+              interactionType: context.interactionType,
+              stepIndex: stepNumber,
+              stepCount: activeInteraction?.stepCount,
+              modelId: activeInteraction?.modelId,
+              thoughtContentPath: thinkingBlocks.length > 0 ? 'thought/content.md' : undefined,
+            },
           });
         } catch (err) {
           console.error('Error en reconstrucción SSE:', err);

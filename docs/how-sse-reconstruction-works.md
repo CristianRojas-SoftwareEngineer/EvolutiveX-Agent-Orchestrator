@@ -120,13 +120,13 @@ steps/NNN/response/
 
 2. **El servicio `SseReconstructService`** lee `steps/NNN/response/sse.jsonl` y reconstruye el mensaje usando el SDK de Anthropic (mismo mecanismo que el turno completo).
 
-3. **El mensaje reconstruido** se pasa a `IAuditWriter.writeStepResponseMarkdown(stepDir, message)`, que genera:
+3. **El mensaje reconstruido** se pasa a `IAuditWriter.writeStepResponseMarkdown(stepDir, message, context?)`, que genera:
    - `body.json` — mensaje completo en JSON (pretty print)
-   - `body.parsed.md` — vista markdown semántica legible
+   - `body.parsed.md` — vista markdown semántica legible (enriquecida con `MarkdownRenderContext` si se proporciona: encabezados contextuales, blockquote metadata, TOC multi-step, detección de Skill)
 
 ### Reconstrucción del body top-level
 
-`runReconstruction()` delega en `AuditWriterService.writeTopLevelMultiStepResponse(interactionDir, stepCount)` para producir el `response/body.json` top-level. Este método:
+`runReconstruction()` delega en `AuditWriterService.writeTopLevelMultiStepResponse(interactionDir, stepCount, context?)` para producir el `response/body.json` top-level. Este método:
 
 - Copia la reconstrucción del **último step** como body top-level del turno
 - No realiza una reconstrucción independiente del turno completo

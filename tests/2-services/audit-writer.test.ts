@@ -247,20 +247,20 @@ describe('AuditWriterService - nextSubInteractionSequence', () => {
     expect(seq).toBe(1);
   });
 
-  it('retorna max+1 con sub-interacciones de 6 dígitos existentes', async () => {
-    const subDir = path.join(tempDir, 'steps', '001', 'sub-interactions');
-    await fs.mkdir(path.join(subDir, '000001_aaaa-bbbb'), { recursive: true });
-    await fs.mkdir(path.join(subDir, '000003_cccc-dddd'), { recursive: true });
+  it('retorna max+1 con sub-agentes de 2 dígitos existentes', async () => {
+    const stepDir = path.join(tempDir, 'steps', '01');
+    await fs.mkdir(path.join(stepDir, 'sub-agent-01'), { recursive: true });
+    await fs.mkdir(path.join(stepDir, 'sub-agent-03'), { recursive: true });
 
     const seq = await service.nextSubInteractionSequence(tempDir, 1);
     expect(seq).toBe(4);
   });
 
-  it('ignora nombres de directorio malformados (sin prefijo de 6 dígitos)', async () => {
-    const subDir = path.join(tempDir, 'steps', '001', 'sub-interactions');
-    await fs.mkdir(path.join(subDir, 'abc_invalid'), { recursive: true });
-    await fs.mkdir(path.join(subDir, '00_short'), { recursive: true });
-    await fs.mkdir(path.join(subDir, '000002_valid-uuid'), { recursive: true });
+  it('ignora nombres de directorio malformados (sin prefijo sub-agent-NN)', async () => {
+    const stepDir = path.join(tempDir, 'steps', '01');
+    await fs.mkdir(path.join(stepDir, 'abc_invalid'), { recursive: true });
+    await fs.mkdir(path.join(stepDir, 'sub-agent'), { recursive: true });
+    await fs.mkdir(path.join(stepDir, 'sub-agent-02'), { recursive: true });
 
     const seq = await service.nextSubInteractionSequence(tempDir, 1);
     expect(seq).toBe(3);

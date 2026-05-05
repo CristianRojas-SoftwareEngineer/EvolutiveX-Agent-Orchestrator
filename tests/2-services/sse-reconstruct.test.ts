@@ -30,7 +30,7 @@ describe('Test de Integración - SseReconstructService (fuente: sse.jsonl)', () 
   beforeAll(async () => {
     tempSessionsDir = path.join(os.tmpdir(), `scp-sse-${Date.now()}`);
     interactionDir = path.join(tempSessionsDir, 'test-session', 'interactions', 'mock-req');
-    stepDir = path.join(interactionDir, 'steps', '001');
+    stepDir = path.join(interactionDir, 'steps', '01');
     const stepResponseDir = path.join(stepDir, 'response');
     await fs.mkdir(stepResponseDir, { recursive: true });
     await fs.mkdir(path.join(interactionDir, 'response'), { recursive: true });
@@ -97,7 +97,7 @@ describe('Test de Integración - SseReconstructService (fuente: sse.jsonl)', () 
     expect(result.sseResponseBodySource).toBe('file');
 
     const jsonContent = await fs.readFile(
-      path.join(interactionDir, 'response', 'body.json'),
+      path.join(interactionDir, 'output', 'body.json'),
       'utf8',
     );
     const parsed = JSON.parse(jsonContent);
@@ -113,7 +113,7 @@ describe('Test de Integración - SseReconstructService (fuente: sse.jsonl)', () 
     expect(parsed.steps[0].stop_reason).toBe('end_turn');
 
     const mdContent = await fs.readFile(
-      path.join(interactionDir, 'response', 'body.parsed.md'),
+      path.join(interactionDir, 'output', 'body.parsed.md'),
       'utf8',
     );
     expect(mdContent).toContain('_(stop_reason: end_turn)_');
@@ -131,7 +131,7 @@ describe('SseReconstructService - resiliencia frente a sse.txt corrupto', () => 
   beforeAll(async () => {
     tempDir = path.join(os.tmpdir(), `scp-sse-corrupt-${Date.now()}`);
     interactionDir = path.join(tempDir, 'session', 'interactions', 'mock');
-    stepDir = path.join(interactionDir, 'steps', '001');
+    stepDir = path.join(interactionDir, 'steps', '01');
     await fs.mkdir(path.join(stepDir, 'response'), { recursive: true });
     await fs.mkdir(path.join(interactionDir, 'response'), { recursive: true });
 
@@ -209,7 +209,7 @@ describe('SseReconstructService - resiliencia frente a sse.txt corrupto', () => 
     expect(result.sseResponseBodyError).toBeUndefined();
 
     const body = JSON.parse(
-      await fs.readFile(path.join(interactionDir, 'response', 'body.json'), 'utf8'),
+      await fs.readFile(path.join(interactionDir, 'output', 'body.json'), 'utf8'),
     );
     // Formato multi-step-response
     expect(body.type).toBe('multi-step-response');
@@ -241,7 +241,7 @@ describe('SseReconstructService - fixture real (sessions/ histórico)', () => {
   beforeAll(async () => {
     tempDir = path.join(os.tmpdir(), `scp-sse-real-${Date.now()}`);
     interactionDir = path.join(tempDir, 'session', 'interactions', 'real');
-    stepDir = path.join(interactionDir, 'steps', '001');
+    stepDir = path.join(interactionDir, 'steps', '01');
     await fs.mkdir(path.join(stepDir, 'response'), { recursive: true });
     await fs.mkdir(path.join(interactionDir, 'response'), { recursive: true });
 
@@ -291,7 +291,7 @@ describe('SseReconstructService - fixture real (sessions/ histórico)', () => {
     expect(result.sseResponseBodyError).toBeUndefined();
 
     const body = JSON.parse(
-      await fs.readFile(path.join(interactionDir, 'response', 'body.json'), 'utf8'),
+      await fs.readFile(path.join(interactionDir, 'output', 'body.json'), 'utf8'),
     );
     // Formato multi-step-response
     expect(body.type).toBe('multi-step-response');

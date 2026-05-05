@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { PassThrough } from 'node:stream';
 import { AuditStandardResponseHandler } from '../../src/3-operations/audit-standard-response.handler.js';
 import type { IAuditWriter } from '../../src/2-services/ports/audit-writer.port.js';
@@ -42,6 +42,7 @@ function makeActiveInteraction(overrides: Partial<ActiveInteraction> = {}): Acti
     startedAt: Date.now(),
     sessionId: 'test',
     pendingAgentToolUses: [],
+    pendingWebSearchToolUses: [],
     requestBodyOmitted: false,
     requestBodyBytes: 100,
     stepsMeta: [],
@@ -108,6 +109,9 @@ function makeSessionStore(
     registerPendingAgentToolUse: () => {},
     findInteractionWithPendingAgents: () => null,
     consumePendingAgentToolUse: () => {},
+    registerPendingWebSearchToolUse: vi.fn(),
+    findInteractionWithPendingWebSearch: vi.fn().mockReturnValue(null),
+    consumeWebSearchPending: vi.fn().mockReturnValue(null),
     findStaleInteractionsAwaitingContinuation: () => [],
     getAllOpenInteractions: () => [],
     withSessionLock: async <T>(_sessionId: string, fn: () => Promise<T>): Promise<T> => fn(),

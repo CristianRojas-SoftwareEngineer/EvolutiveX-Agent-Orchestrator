@@ -151,6 +151,18 @@ export interface PendingAgentToolUse {
   subagentType?: string;
 }
 
+/**
+ * Entrada que tracquea un tool_use `WebSearch` emitido por el SSE del padre y aún
+ * no correlacionado con la llamada de implementación correspondiente. Cada entrada
+ * se consume al recibir el request fresh de implementación del harness.
+ */
+export interface PendingWebSearchToolUse {
+  /** Step del padre donde se emitió el tool_use. */
+  stepIndex: number;
+  /** Identificador único del tool_use bloque emitido por Anthropic. */
+  toolUseId: string;
+}
+
 export interface ActiveInteraction {
   interactionDir: string;
   interactionType: InteractionType;
@@ -170,6 +182,11 @@ export interface ActiveInteraction {
    * `tool_result`. Vacío en turns que no son padres de subagentes.
    */
   pendingAgentToolUses: PendingAgentToolUse[];
+  /**
+   * Tool_uses `WebSearch` emitidos por el SSE de este turn que aún esperan su
+   * llamada de implementación del harness. Vacío en turns que no usan WebSearch.
+   */
+  pendingWebSearchToolUses: PendingWebSearchToolUse[];
   /** Definido sólo en turns que son subagentes. */
   parentContext?: ParentContext;
   /**
@@ -220,6 +237,11 @@ export interface InteractionMetadata {
    * graceful shutdown). Información forense para correlación offline.
    */
   lostPendingAgents?: PendingAgentToolUse[];
+  /**
+   * Presente cuando el turno se cierra habiendo registrado WebSearch tool_uses
+   * que no se consumieron antes del cierre. Información forense para correlación offline.
+   */
+  lostPendingWebSearch?: PendingWebSearchToolUse[];
 }
 
 /** Métricas agregadas de tokens por modelo dentro de una sesión. */

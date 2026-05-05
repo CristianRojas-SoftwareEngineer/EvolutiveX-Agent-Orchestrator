@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { AuditUpstreamErrorHandler } from '../../src/3-operations/audit-upstream-error.handler.js';
 import type { IAuditWriter } from '../../src/2-services/ports/audit-writer.port.js';
 import type { ISessionStore } from '../../src/2-services/ports/session-store.port.js';
@@ -59,6 +59,9 @@ function makeSessionStore(
     registerPendingAgentToolUse: () => {},
     findInteractionWithPendingAgents: () => null,
     consumePendingAgentToolUse: () => {},
+    registerPendingWebSearchToolUse: vi.fn(),
+    findInteractionWithPendingWebSearch: vi.fn().mockReturnValue(null),
+    consumeWebSearchPending: vi.fn().mockReturnValue(null),
     findStaleInteractionsAwaitingContinuation: () => [],
     getAllOpenInteractions: () => [],
     withSessionLock: async <T>(_sessionId: string, fn: () => Promise<T>): Promise<T> => fn(),
@@ -131,6 +134,7 @@ describe('AuditUpstreamErrorHandler', () => {
       stepsMeta: [{ stepIndex: 1, sse: true, statusCode: 200, inputTokens: 5, outputTokens: 3 }],
       sessionId: 's',
       pendingAgentToolUses: [],
+      pendingWebSearchToolUses: [],
     };
 
     const handler = new AuditUpstreamErrorHandler(
@@ -213,6 +217,7 @@ describe('AuditUpstreamErrorHandler', () => {
       stepsMeta: [{ stepIndex: 1, sse: true, statusCode: 200, inputTokens: 5, outputTokens: 3 }],
       sessionId: 's',
       pendingAgentToolUses: [],
+      pendingWebSearchToolUses: [],
       modelId: 'claude-opus-4-5',
     };
 
@@ -254,6 +259,7 @@ describe('AuditUpstreamErrorHandler', () => {
       stepsMeta: [],
       sessionId: 's',
       pendingAgentToolUses: [],
+      pendingWebSearchToolUses: [],
       parentContext: {
         parentInteractionDir: '/tmp/parent',
         parentStepIndex: 1,

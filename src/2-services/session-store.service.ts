@@ -4,6 +4,7 @@ import * as fs from 'node:fs/promises';
 import {
   ActiveInteraction,
   PendingAgentToolUse,
+  PendingWebSearchToolUse,
   StepMeta,
 } from '../1-domain/types/audit.types.js';
 import type { ISessionStore } from './ports/session-store.port.js';
@@ -126,6 +127,38 @@ export class SessionStoreService implements ISessionStore {
     if (idx >= 0) {
       interaction.pendingAgentToolUses.splice(idx, 1);
     }
+  }
+
+  public registerPendingWebSearchToolUse(
+    interactionDir: string,
+    stepIndex: number,
+    toolUseId: string,
+  ): void {
+    const interaction = this.interactionRegistry.get(interactionDir);
+    if (!interaction) return;
+    // Idempotente: si ya existe el toolUseId, no duplicar.
+    if (interaction.pendingWebSearchToolUses.some((p) => p.toolUseId === toolUseId)) return;
+    interaction.pendingWebSearchToolUses.push({ stepIndex, toolUseId });
+  }
+
+  public findInteractionWithPendingWebSearch(
+    sessionId: string,
+  ): { interaction: ActiveInteraction; pendings: PendingWebSearchToolUse[] } | null {
+    const dirs = this.sessionToActiveInteractions.get(sessionId);
+    if (!dirs) return null;
+    for (const dir of dirs) {
+      const interaction = this.interactionRegistry.get(dir);
+      if (!interaction) continue;
+      if (interaction.pendingWebSearchToolUses.length === 0) continue;
+      return { interaction, pendings: [...interaction.pendingWebSearchToolUses] };
+    }
+    return null;
+  }
+
+  public consumeWebSearchPending(interactionDir: string): PendingWebSearchToolUse | null {
+    const interaction = this.interactionRegistry.get(interactionDir);
+    if (!interaction || interaction.pendingWebSearchToolUses.length === 0) return null;
+    return interaction.pendingWebSearchToolUses.shift()!;
   }
 
   public registerToolUseId(toolUseId: string, interactionDir: string): void {

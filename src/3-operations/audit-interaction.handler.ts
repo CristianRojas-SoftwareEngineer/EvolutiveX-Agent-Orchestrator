@@ -12,6 +12,7 @@ import {
   MarkdownRenderContext,
   ParentContext,
   PendingAgentToolUse,
+  PendingWebSearchToolUse,
   RequestClassification,
   computeTokenTotals,
   computeSseRawBytesTotal,
@@ -83,6 +84,21 @@ export class AuditInteractionHandler {
       // Cleanup de interacciones orphan: cerrar interacciones stale que esperan continuation
       // que nunca llegó (tool call malformado, cancelación, etc.).
       await this.closeOrphanInteractions(auditSessionId);
+
+      // Verificar si es una llamada de implementación de web_search: el harness
+      // ejecuta WebSearch haciendo una llamada interna a la API que el proxy
+      // captura como fresh. Si hay un pending web_search, redirigir como step
+      // adicional del padre en lugar de crear un sub-agente.
+      const webSearchPending = this.sessionStore.findInteractionWithPendingWebSearch(auditSessionId);
+      if (webSearchPending) {
+        return this.handleWebSearchStep(
+          params,
+          headersForAudit,
+          auditSessionId,
+          classification,
+          webSearchPending,
+        );
+      }
 
       // Antes de tratar la request como una nueva interacción raíz, comprobar si en la
       // misma sesión hay un agentic padre con tool_uses `Agent` aún sin
@@ -171,6 +187,7 @@ export class AuditInteractionHandler {
       stepsMeta: [],
       sessionId: auditSessionId,
       pendingAgentToolUses: [],
+      pendingWebSearchToolUses: [],
       modelId: extractModelFromRequestBody(params.rawBody) ?? undefined,
     });
 
@@ -280,6 +297,7 @@ export class AuditInteractionHandler {
         stepsMeta: [],
         sessionId: auditSessionId,
         pendingAgentToolUses: [],
+      pendingWebSearchToolUses: [],
         parentContext,
         modelId: extractModelFromRequestBody(params.rawBody) ?? undefined,
       });
@@ -293,6 +311,54 @@ export class AuditInteractionHandler {
         requestClassification: classification,
       };
     });
+  }
+
+  /**
+   * Registra la llamada de implementación de WebSearch como un step adicional
+   * dentro de la interacción padre que emitió el tool_use `web_search`. No crea
+   * una interacción independiente — el request/response del harness se escriben
+   * en `steps/NN/` del padre, igual que cualquier otro step de ejecución de tool.
+   */
+  private async handleWebSearchStep(
+    params: { rawBody: Buffer; requestId: string },
+    headersForAudit: Record<string, string | string[] | undefined>,
+    auditSessionId: string,
+    classification: RequestClassification,
+    match: {
+      interaction: { interactionDir: string; pendingWebSearchToolUses: PendingWebSearchToolUse[] };
+      pendings: PendingWebSearchToolUse[];
+    },
+  ): Promise<AuditInteractionResult> {
+    const parentInteractionDir = match.interaction.interactionDir;
+    this.sessionStore.consumeWebSearchPending(parentInteractionDir);
+
+    // Determinar el siguiente número de step del padre
+    const stepCount = this.sessionStore.incrementStepCountByDir(parentInteractionDir);
+    const stepDir = path.join(
+      parentInteractionDir,
+      DIR_STEPS,
+      String(stepCount).padStart(PAD_STEP, '0'),
+    );
+
+    await this.auditWriter.writeStepRequest({
+      stepDir,
+      headers: headersForAudit,
+      bodyBuffer: params.rawBody,
+      maxAuditRequestBytes: this.config.MAX_AUDIT_REQUEST_BODY_BYTES,
+      context: {
+        interactionType: 'agentic',
+        stepIndex: stepCount,
+      },
+    });
+
+    return {
+      auditInteractionDir: parentInteractionDir,
+      requestBodyOmitted: false,
+      requestSequence: 0,
+      auditSessionId,
+      interactionType: 'agentic',
+      requestClassification: classification,
+    };
   }
 
   private async handleContinuation(
@@ -415,6 +481,7 @@ export class AuditInteractionHandler {
       stepsMeta: [],
       sessionId: auditSessionId,
       pendingAgentToolUses: [],
+      pendingWebSearchToolUses: [],
       modelId: extractModelFromRequestBody(params.rawBody) ?? undefined,
     });
 
@@ -481,6 +548,7 @@ export class AuditInteractionHandler {
       stepsMeta: [],
       sessionId: auditSessionId,
       pendingAgentToolUses: [],
+      pendingWebSearchToolUses: [],
       modelId: extractModelFromRequestBody(params.rawBody) ?? undefined,
     });
 
@@ -545,6 +613,7 @@ export class AuditInteractionHandler {
       stepsMeta: [],
       sessionId: auditSessionId,
       pendingAgentToolUses: [],
+      pendingWebSearchToolUses: [],
       modelId: extractModelFromRequestBody(params.rawBody) ?? undefined,
     });
 
@@ -658,6 +727,8 @@ export class AuditInteractionHandler {
       interaction.interactionType !== 'client-preflight' ? computeTokenTotals(interaction.stepsMeta) : null;
     const lostPendings =
       interaction.pendingAgentToolUses.length > 0 ? interaction.pendingAgentToolUses : undefined;
+    const lostPendingsWebSearch =
+      interaction.pendingWebSearchToolUses.length > 0 ? interaction.pendingWebSearchToolUses : undefined;
 
     this.sessionStore.closeInteraction(interaction.interactionDir);
 
@@ -681,6 +752,7 @@ export class AuditInteractionHandler {
       errorCode: null,
       ...(interaction.parentContext ? { parentContext: interaction.parentContext } : {}),
       ...(lostPendings ? { lostPendingAgents: lostPendings } : {}),
+      ...(lostPendingsWebSearch ? { lostPendingWebSearch: lostPendingsWebSearch } : {}),
       truncation: {
         requestBodyOmitted: interaction.requestBodyOmitted,
         responseBodyBytesTotal: null,

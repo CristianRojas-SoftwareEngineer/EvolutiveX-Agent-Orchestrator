@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { AuditInteractionHandler } from '../../src/3-operations/audit-interaction.handler.js';
 import { SessionResolverService } from '../../src/1-domain/services/session-resolver.service.js';
 import type { ISessionStore } from '../../src/2-services/ports/session-store.port.js';
@@ -62,6 +62,9 @@ function makeSessionStore(overrides: Partial<ISessionStore> = {}): ISessionStore
     registerPendingAgentToolUse: () => {},
     findInteractionWithPendingAgents: () => null,
     consumePendingAgentToolUse: () => {},
+    registerPendingWebSearchToolUse: vi.fn(),
+    findInteractionWithPendingWebSearch: vi.fn().mockReturnValue(null),
+    consumeWebSearchPending: vi.fn().mockReturnValue(null),
     findStaleInteractionsAwaitingContinuation: () => [],
     getAllOpenInteractions: () => [],
     withSessionLock: async <T>(_sessionId: string, fn: () => Promise<T>): Promise<T> => fn(),
@@ -240,6 +243,7 @@ describe('AuditInteractionHandler', () => {
       stepsMeta: [],
       sessionId: 's',
       pendingAgentToolUses: [],
+      pendingWebSearchToolUses: [],
     };
     const store = makeSessionStore({
       getInteractionByToolUseId: (id: string) => (id === 'tool-x' ? parentInteraction : null),
@@ -443,6 +447,7 @@ describe('AuditInteractionHandler', () => {
       stepsMeta: [],
       sessionId: 's',
       pendingAgentToolUses: [],
+      pendingWebSearchToolUses: [],
     };
     const store = makeSessionStore({
       getInteractionByToolUseId: (id: string) => (id === 'first-id' ? parentInteraction : null),
@@ -617,7 +622,7 @@ describe('AuditInteractionHandler', () => {
       pendingAgentToolUses: [
         { stepIndex: 2, toolUseId: 'toolu_unique', subagentType: 'general-purpose' },
       ],
-
+      pendingWebSearchToolUses: [],
     };
     let consumed: { dir: string; id: string } | null = null;
     let registeredSub: ActiveInteraction | null = null;
@@ -696,7 +701,7 @@ describe('AuditInteractionHandler', () => {
         { stepIndex: 1, toolUseId: 'toolu_a', subagentType: 'Explore' },
         { stepIndex: 1, toolUseId: 'toolu_b', subagentType: 'Plan' },
       ],
-
+      pendingWebSearchToolUses: [],
     };
     let consumeCalls = 0;
     let registeredSub: ActiveInteraction | null = null;
@@ -754,7 +759,7 @@ describe('AuditInteractionHandler', () => {
       stepsMeta: [],
       sessionId: 's',
       pendingAgentToolUses: [{ stepIndex: 1, toolUseId: 'toolu_x' }],
-
+      pendingWebSearchToolUses: [],
     };
     const order: string[] = [];
     const store = makeSessionStore({
@@ -806,7 +811,7 @@ describe('AuditInteractionHandler', () => {
       stepsMeta: [],
       sessionId: 's',
       pendingAgentToolUses: [{ stepIndex: 1, toolUseId: 'tool-x', subagentType: 'Plan' }],
-
+      pendingWebSearchToolUses: [],
     };
     const consumed: Array<{ dir: string; id: string }> = [];
 
@@ -872,7 +877,7 @@ describe('AuditInteractionHandler', () => {
       stepsMeta: [{ stepIndex: 1, sse: true, statusCode: 200, inputTokens: 10, outputTokens: 5 }],
       sessionId: 'test-session',
       pendingAgentToolUses: [],
-
+      pendingWebSearchToolUses: [],
       modelId: 'claude-opus-4-5',
     };
 
@@ -918,7 +923,7 @@ describe('AuditInteractionHandler', () => {
       stepsMeta: [{ stepIndex: 1, sse: true, statusCode: 200, stopReason: 'tool_use' }],
       sessionId: 'test-session',
       pendingAgentToolUses: [{ stepIndex: 1, toolUseId: 'toolu_orphan' }],
-
+      pendingWebSearchToolUses: [],
       awaitingContinuation: true,
       awaitingSince: Date.now() - 120_000,
     };

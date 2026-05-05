@@ -210,6 +210,22 @@ export class AuditSseResponseHandler {
                       jsonAcc: '',
                     });
                   }
+
+                  // Detección de WebSearch: registrar pending para que la
+                  // siguiente fresh request (llamada de implementación del
+                  // harness) se registre como step adicional del padre en
+                  // lugar de crear un sub-agente espurio.
+                  if (
+                    typeof evt.content_block.name === 'string' &&
+                    evt.content_block.name.toLowerCase() === 'web_search' &&
+                    typeof evt.content_block.id === 'string'
+                  ) {
+                    this.sessionStore.registerPendingWebSearchToolUse(
+                      context.auditInteractionDir,
+                      stepNumber,
+                      evt.content_block.id,
+                    );
+                  }
                 }
               }
               if (
@@ -485,6 +501,8 @@ export class AuditSseResponseHandler {
     // Información forense: pending agents no consumidos al cierre
     const lostPendings =
       turn.pendingAgentToolUses.length > 0 ? turn.pendingAgentToolUses : undefined;
+    const lostPendingsWebSearch =
+      turn.pendingWebSearchToolUses.length > 0 ? turn.pendingWebSearchToolUses : undefined;
 
     const meta: InteractionMetadata = {
       interactionType: turn.interactionType,
@@ -506,6 +524,7 @@ export class AuditSseResponseHandler {
       errorCode: sseErrorType ?? null,
       ...(turn.parentContext ? { parentContext: turn.parentContext } : {}),
       ...(lostPendings ? { lostPendingAgents: lostPendings } : {}),
+      ...(lostPendingsWebSearch ? { lostPendingWebSearch: lostPendingsWebSearch } : {}),
       truncation: {
         requestBodyOmitted: turn.requestBodyOmitted,
         responseBodyBytesTotal: null,

@@ -17,6 +17,7 @@ function makeInteraction(overrides: Partial<ActiveInteraction> = {}): ActiveInte
     stepsMeta: [],
     sessionId: 's1',
     pendingAgentToolUses: [],
+    pendingWebSearchToolUses: [],
     ...overrides,
   };
 }

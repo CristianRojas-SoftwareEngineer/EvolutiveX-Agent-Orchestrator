@@ -370,28 +370,7 @@ function renderSideBySide(
   return result.join('\n');
 }
 
-// ── Caché de porcentaje de uso (por sesión) ─────────────────────
-
-function readCachedPct(sessionPath: string): number | null {
-  try {
-    const cacheFile = join(sessionPath, '.last-pct');
-    if (!existsSync(cacheFile)) return null;
-    const n = Number(readFileSync(cacheFile, 'utf-8').trim());
-    return Number.isFinite(n) ? n : null;
-  } catch {
-    return null;
-  }
-}
-
-function writeCachedPct(sessionPath: string, pct: number): void {
-  try {
-    writeFileSync(join(sessionPath, '.last-pct'), String(pct), 'utf-8');
-  } catch {
-    // Ignorar errores de escritura
-  }
-}
-
-// ── Caché de métricas previas (para flash de valores) ──────────
+// ── Caché del statusline (por sesión) ───────────────────────────
 
 interface LevelMetricsSnapshot {
   count: number;
@@ -406,19 +385,28 @@ interface MetricsSnapshot {
   reasoning: LevelMetricsSnapshot;
 }
 
-function readLastMetrics(sessionPath: string): MetricsSnapshot | null {
+interface StatuslineCache {
+  contextUsagePercentage?: number;
+  metricsSnapshot?: MetricsSnapshot;
+}
+
+function readStatuslineCache(sessionPath: string): StatuslineCache {
   try {
-    const cacheFile = join(sessionPath, '.last-metrics.json');
-    if (!existsSync(cacheFile)) return null;
-    return JSON.parse(readFileSync(cacheFile, 'utf-8')) as MetricsSnapshot;
+    const cacheFile = join(sessionPath, '.statusline-state.json');
+    if (!existsSync(cacheFile)) return {};
+    return JSON.parse(readFileSync(cacheFile, 'utf-8')) as StatuslineCache;
   } catch {
-    return null;
+    return {};
   }
 }
 
-function writeLastMetrics(sessionPath: string, snapshot: MetricsSnapshot): void {
+function writeStatuslineCache(sessionPath: string, cache: StatuslineCache): void {
   try {
-    writeFileSync(join(sessionPath, '.last-metrics.json'), JSON.stringify(snapshot), 'utf-8');
+    const cacheFile = join(sessionPath, '.statusline-state.json');
+    // Leer actual para hacer merge si es necesario
+    const current = readStatuslineCache(sessionPath);
+    const updated = { ...current, ...cache };
+    writeFileSync(cacheFile, JSON.stringify(updated), 'utf-8');
   } catch {
     // Ignorar errores de escritura
   }
@@ -658,7 +646,7 @@ function buildSessionTableData(ctx: ClaudeCodeContext, sessionPath?: string | nu
   const provider = resolveActiveProvider();
   const sessionId = ctx.session_id || 'N/A';
   const contextSize = ctx.context_window?.context_window_size;
-  const usedPct = ctx.context_window?.used_percentage;
+  const contextUsedPercentage = ctx.context_window?.used_percentage;
 
   const contextDisplay = formatContextSize(contextSize);
 
@@ -669,16 +657,17 @@ function buildSessionTableData(ctx: ClaudeCodeContext, sessionPath?: string | nu
   const rawModelName = ctx.model?.display_name || 'N/A';
   const modelName = loadDisplayName(rawModelName);
 
-  let pct: number;
-  if (typeof usedPct === 'number' && Number.isFinite(usedPct) && usedPct > 0) {
-    pct = usedPct;
-    if (sessionPath) writeCachedPct(sessionPath, pct);
+  let usagePercentage: number;
+  if (typeof contextUsedPercentage === 'number' && Number.isFinite(contextUsedPercentage) && contextUsedPercentage > 0) {
+    usagePercentage = contextUsedPercentage;
+    if (sessionPath) writeStatuslineCache(sessionPath, { contextUsagePercentage: usagePercentage });
   } else {
-    const cached = sessionPath ? readCachedPct(sessionPath) : null;
-    pct = (typeof cached === 'number' && Number.isFinite(cached) && cached >= 0) ? cached : 0;
+    const cache = sessionPath ? readStatuslineCache(sessionPath) : {};
+    const cached = cache.contextUsagePercentage;
+    usagePercentage = (typeof cached === 'number' && Number.isFinite(cached) && cached >= 0) ? cached : 0;
   }
-  const pctDisplay = `${pct.toFixed(0)}%`;
-  const barDisplay = ` ${renderBar(pct, 8)} ${pctDisplay}`;
+  const percentageDisplay = `${usagePercentage.toFixed(0)}%`;
+  const barDisplay = ` ${renderBar(usagePercentage, 8)} ${percentageDisplay}`;
 
   const sessionDisplay =
     sessionId.length > 36 ? sessionId.slice(0, 33) + '...' : sessionId;
@@ -876,20 +865,20 @@ function buildRateLimitTableData(ctx: ClaudeCodeContext) {
   const rows: string[][] = [];
 
   if (five_hour) {
-    const pct = five_hour.used_percentage ?? 0;
+    const usedPercentage = five_hour.used_percentage ?? 0;
     rows.push([
       `${C.label}Cuota actual (5h)${C.reset}`,
-      `${renderBar(pct)} ${pct.toFixed(0)}%`,
+      `${renderBar(usedPercentage)} ${usedPercentage.toFixed(0)}%`,
       `${C.dim}Reinicio en${C.reset}`,
       `${C.value}${formatTimeRemaining(five_hour.resets_at)}${C.reset}`,
     ]);
   }
 
   if (seven_day) {
-    const pct = seven_day.used_percentage ?? 0;
+    const usedPercentage = seven_day.used_percentage ?? 0;
     rows.push([
       `${C.label}Cuota semanal (7d)${C.reset}`,
-      `${renderBar(pct)} ${pct.toFixed(0)}%`,
+      `${renderBar(usedPercentage)} ${usedPercentage.toFixed(0)}%`,
       `${C.dim}Reinicio en${C.reset}`,
       `${C.value}${formatTimeRemaining(seven_day.resets_at)}${C.reset}`,
     ]);
@@ -970,12 +959,15 @@ function main(): void {
     let table2: { lines: string[]; width: number };
     if (sessionPath) {
       const metrics = aggregateInteractionMetrics(sessionPath);
-      const previous = readLastMetrics(sessionPath);
+      const cache = readStatuslineCache(sessionPath);
+      const previous = cache.metricsSnapshot || null;
       table2 = renderTokenTable(metrics, previous);
-      writeLastMetrics(sessionPath, {
-        lite:      { count: metrics.lite.count,      inputTokens: metrics.lite.inputTokens,      cacheReadInputTokens: metrics.lite.cacheReadInputTokens,      outputTokens: metrics.lite.outputTokens },
-        standard:  { count: metrics.standard.count,  inputTokens: metrics.standard.inputTokens,  cacheReadInputTokens: metrics.standard.cacheReadInputTokens,  outputTokens: metrics.standard.outputTokens },
-        reasoning: { count: metrics.reasoning.count,  inputTokens: metrics.reasoning.inputTokens, cacheReadInputTokens: metrics.reasoning.cacheReadInputTokens, outputTokens: metrics.reasoning.outputTokens },
+      writeStatuslineCache(sessionPath, {
+        metricsSnapshot: {
+          lite:      { count: metrics.lite.count,      inputTokens: metrics.lite.inputTokens,      cacheReadInputTokens: metrics.lite.cacheReadInputTokens,      outputTokens: metrics.lite.outputTokens },
+          standard:  { count: metrics.standard.count,  inputTokens: metrics.standard.inputTokens,  cacheReadInputTokens: metrics.standard.cacheReadInputTokens,  outputTokens: metrics.standard.outputTokens },
+          reasoning: { count: metrics.reasoning.count,  inputTokens: metrics.reasoning.inputTokens, cacheReadInputTokens: metrics.reasoning.cacheReadInputTokens, outputTokens: metrics.reasoning.outputTokens },
+        }
       });
     } else {
       table2 = renderTokenTable(createEmptyMetrics(), null);

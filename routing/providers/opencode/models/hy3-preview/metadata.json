@@ -1,6 +1,6 @@
 {
-  "modelId": "minimax/minimax-m2.5:free",
-  "displayName": "MiniMax M2.5",
+  "modelId": "hy3-preview-free",
+  "displayName": "HY3 Preview",
   "costs": {
     "input": {
       "base": 0.0,

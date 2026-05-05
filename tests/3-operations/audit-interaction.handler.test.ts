@@ -65,6 +65,9 @@ function makeSessionStore(overrides: Partial<ISessionStore> = {}): ISessionStore
     registerPendingWebSearchToolUse: vi.fn(),
     findInteractionWithPendingWebSearch: vi.fn().mockReturnValue(null),
     consumeWebSearchPending: vi.fn().mockReturnValue(null),
+    registerPendingWebFetchToolUse: vi.fn(),
+    findInteractionWithPendingWebFetch: vi.fn().mockReturnValue(null),
+    consumeWebFetchPending: vi.fn().mockReturnValue(null),
     findStaleInteractionsAwaitingContinuation: () => [],
     getAllOpenInteractions: () => [],
     withSessionLock: async <T>(_sessionId: string, fn: () => Promise<T>): Promise<T> => fn(),
@@ -218,8 +221,8 @@ describe('AuditInteractionHandler', () => {
     );
 
     const [r1, r2] = await Promise.all([
-      handler.execute({ headers: {}, rawBody: FRESH_BODY, requestId: 'req-1' }),
-      handler.execute({ headers: {}, rawBody: FRESH_BODY, requestId: 'req-2' }),
+      handler.execute({ headers: { 'x-cc-audit-session': 's' }, rawBody: FRESH_BODY, requestId: 'req-1' }),
+      handler.execute({ headers: { 'x-cc-audit-session': 's' }, rawBody: FRESH_BODY, requestId: 'req-2' }),
     ]);
 
     expect(r1).not.toBeNull();
@@ -244,6 +247,7 @@ describe('AuditInteractionHandler', () => {
       sessionId: 's',
       pendingAgentToolUses: [],
       pendingWebSearchToolUses: [],
+      pendingWebFetchToolUses: [],
     };
     const store = makeSessionStore({
       getInteractionByToolUseId: (id: string) => (id === 'tool-x' ? parentInteraction : null),
@@ -263,7 +267,7 @@ describe('AuditInteractionHandler', () => {
       config,
     );
     const result = await handler.execute({
-      headers: {},
+      headers: { 'x-cc-audit-session': 'test-session' },
       rawBody: CONTINUATION_BODY,
       requestId: 'req-2',
     });
@@ -291,7 +295,7 @@ describe('AuditInteractionHandler', () => {
       config,
     );
     const result = await handler.execute({
-      headers: {},
+      headers: { 'x-cc-audit-session': 'test-session' },
       rawBody: CONTINUATION_BODY,
       requestId: 'req-1',
     });
@@ -324,7 +328,7 @@ describe('AuditInteractionHandler', () => {
       config,
     );
     const result = await handler.execute({
-      headers: {},
+      headers: { 'x-cc-audit-session': 'test-session' },
       rawBody: QUOTA_BODY,
       requestId: 'req-1',
     });
@@ -364,7 +368,7 @@ describe('AuditInteractionHandler', () => {
       }),
       config,
     );
-    await handler.execute({ headers: {}, rawBody: FRESH_BODY, requestId: 'req-1' });
+    await handler.execute({ headers: { 'x-cc-audit-session': 'test' }, rawBody: FRESH_BODY, requestId: 'req-1' });
     expect(stepDirs).toHaveLength(1);
     expect(stepDirs[0]).toMatch(/steps[/\\]01$/);
   });
@@ -384,7 +388,7 @@ describe('AuditInteractionHandler', () => {
       config,
     );
     const result = await handler.execute({
-      headers: {},
+      headers: { 'x-cc-audit-session': 'test' },
       rawBody: SIDE_REQUEST_BODY,
       requestId: 'req-side',
     });
@@ -407,7 +411,7 @@ describe('AuditInteractionHandler', () => {
       }),
       config,
     );
-    await handler.execute({ headers: {}, rawBody: SIDE_REQUEST_BODY, requestId: 'req-side' });
+    await handler.execute({ headers: { 'x-cc-audit-session': 'test' }, rawBody: SIDE_REQUEST_BODY, requestId: 'req-side' });
     expect(stepDirs).toHaveLength(1);
     expect(stepDirs[0]).toMatch(/steps[/\\]01$/);
   });
@@ -426,9 +430,9 @@ describe('AuditInteractionHandler', () => {
       writer,
       config,
     );
-    await handler.execute({ headers: {}, rawBody: FRESH_BODY, requestId: 'r1' });
-    await handler.execute({ headers: {}, rawBody: SIDE_REQUEST_BODY, requestId: 'r2' });
-    await handler.execute({ headers: {}, rawBody: QUOTA_BODY, requestId: 'r3' });
+    await handler.execute({ headers: { 'x-cc-audit-session': 'test' }, rawBody: FRESH_BODY, requestId: 'r1' });
+    await handler.execute({ headers: { 'x-cc-audit-session': 'test' }, rawBody: SIDE_REQUEST_BODY, requestId: 'r2' });
+    await handler.execute({ headers: { 'x-cc-audit-session': 'test' }, rawBody: QUOTA_BODY, requestId: 'r3' });
     expect(stateDirs.some((s) => s.startsWith('agentic:'))).toBe(true);
     expect(stateDirs.some((s) => s.startsWith('side-request:'))).toBe(true);
     expect(stateDirs.some((s) => s.startsWith('client-preflight:'))).toBe(true);
@@ -448,6 +452,7 @@ describe('AuditInteractionHandler', () => {
       sessionId: 's',
       pendingAgentToolUses: [],
       pendingWebSearchToolUses: [],
+      pendingWebFetchToolUses: [],
     };
     const store = makeSessionStore({
       getInteractionByToolUseId: (id: string) => (id === 'first-id' ? parentInteraction : null),
@@ -472,7 +477,7 @@ describe('AuditInteractionHandler', () => {
       makeAuditWriter(),
       config,
     );
-    const result = await handler.execute({ headers: {}, rawBody: body, requestId: 'r' });
+    const result = await handler.execute({ headers: { 'x-cc-audit-session': 's' }, rawBody: body, requestId: 'r' });
     expect(result!.auditInteractionDir).toBe('/tmp/parent');
   });
 
@@ -492,7 +497,7 @@ describe('AuditInteractionHandler', () => {
       config,
     );
     await handler.execute({
-      headers: {},
+      headers: { 'x-cc-audit-session': 's' },
       rawBody: makeContinuationBody('my-tool-id'),
       requestId: 'r',
     });
@@ -517,11 +522,11 @@ describe('AuditInteractionHandler', () => {
       config,
     );
     // No debe lanzar excepción
-    const result = await handler.execute({ headers: {}, rawBody: bodyNoIds, requestId: 'r' });
+    const result = await handler.execute({ headers: { 'x-cc-audit-session': 'test' }, rawBody: bodyNoIds, requestId: 'r' });
     expect(result).not.toBeNull();
   });
 
-  it('debería ignorar health checks de Bun (sin body, sin auth, sin session headers)', async () => {
+  it('debería ignorar TODAS las requests resueltas como _unknown sin importar headers', async () => {
     const config = makeConfig();
     let interactionWritten = false;
     const handler = new AuditInteractionHandler(
@@ -536,21 +541,22 @@ describe('AuditInteractionHandler', () => {
       config,
     );
 
+    // Headers con user-agent claude-cli, authorization, body fresh — pero sin session headers
     const result = await handler.execute({
       headers: {
-        'user-agent': 'Bun/1.3.13',
-        accept: '*/*',
+        'user-agent': 'claude-cli/2.1.113',
+        authorization: 'Bearer <ANTHROPIC_KEY_REDACTED>xxx',
         host: '127.0.0.1:8787',
       },
-      rawBody: Buffer.alloc(0),
-      requestId: 'health-check-1',
+      rawBody: FRESH_BODY,
+      requestId: 'pre-session-1',
     });
 
     expect(result).toBeNull();
     expect(interactionWritten).toBe(false);
   });
 
-  it('debería auditar request de Bun si tiene authorization header (no es health check)', async () => {
+  it('debería ignorar HEAD request sin session header (preflight de Claude Code)', async () => {
     const config = makeConfig();
     let interactionWritten = false;
     const handler = new AuditInteractionHandler(
@@ -565,46 +571,19 @@ describe('AuditInteractionHandler', () => {
       config,
     );
 
+    // HEAD request típica de Claude Code antes de establecer sesión
     const result = await handler.execute({
       headers: {
-        'user-agent': 'Bun/1.3.13',
+        'user-agent': 'claude-cli/2.1.113',
         authorization: 'Bearer <ANTHROPIC_KEY_REDACTED>xxx',
         host: '127.0.0.1:8787',
       },
       rawBody: Buffer.alloc(0),
-      requestId: 'req-1',
+      requestId: 'head-preflight',
     });
 
-    expect(result).not.toBeNull();
-    expect(interactionWritten).toBe(true);
-  });
-
-  it('debería auditar request de Bun si tiene body (no es health check)', async () => {
-    const config = makeConfig();
-    let interactionWritten = false;
-    const handler = new AuditInteractionHandler(
-      new SessionResolverService(config),
-      makeSessionStore(),
-      makeAuditWriter({
-        writeInteractionRequest: async () => {
-          interactionWritten = true;
-          return { dir: '/tmp/test', requestBodyOmitted: false };
-        },
-      }),
-      config,
-    );
-
-    const result = await handler.execute({
-      headers: {
-        'user-agent': 'Bun/1.3.13',
-        host: '127.0.0.1:8787',
-      },
-      rawBody: Buffer.from('{"test":true}'),
-      requestId: 'req-1',
-    });
-
-    expect(result).not.toBeNull();
-    expect(interactionWritten).toBe(true);
+    expect(result).toBeNull();
+    expect(interactionWritten).toBe(false);
   });
 
   it('subagente unívoco: fresh + 1 pending → handleSubagent crea sub-interaction y consume pending', async () => {
@@ -623,6 +602,7 @@ describe('AuditInteractionHandler', () => {
         { stepIndex: 2, toolUseId: 'toolu_unique', subagentType: 'general-purpose' },
       ],
       pendingWebSearchToolUses: [],
+      pendingWebFetchToolUses: [],
     };
     let consumed: { dir: string; id: string } | null = null;
     let registeredSub: ActiveInteraction | null = null;
@@ -702,6 +682,7 @@ describe('AuditInteractionHandler', () => {
         { stepIndex: 1, toolUseId: 'toolu_b', subagentType: 'Plan' },
       ],
       pendingWebSearchToolUses: [],
+      pendingWebFetchToolUses: [],
     };
     let consumeCalls = 0;
     let registeredSub: ActiveInteraction | null = null;
@@ -760,6 +741,7 @@ describe('AuditInteractionHandler', () => {
       sessionId: 's',
       pendingAgentToolUses: [{ stepIndex: 1, toolUseId: 'toolu_x' }],
       pendingWebSearchToolUses: [],
+      pendingWebFetchToolUses: [],
     };
     const order: string[] = [];
     const store = makeSessionStore({
@@ -790,7 +772,7 @@ describe('AuditInteractionHandler', () => {
       config,
     );
 
-    await handler.execute({ headers: {}, rawBody: FRESH_BODY, requestId: 'sub' });
+    await handler.execute({ headers: { 'x-cc-audit-session': 's' }, rawBody: FRESH_BODY, requestId: 'sub' });
     expect(order[0]).toBe('lock-acquire');
     expect(order[order.length - 1]).toBe('lock-release');
     expect(order.indexOf('next-seq')).toBeGreaterThan(order.indexOf('lock-acquire'));
@@ -812,6 +794,7 @@ describe('AuditInteractionHandler', () => {
       sessionId: 's',
       pendingAgentToolUses: [{ stepIndex: 1, toolUseId: 'tool-x', subagentType: 'Plan' }],
       pendingWebSearchToolUses: [],
+      pendingWebFetchToolUses: [],
     };
     const consumed: Array<{ dir: string; id: string }> = [];
 
@@ -829,7 +812,7 @@ describe('AuditInteractionHandler', () => {
     );
 
     const result = await handler.execute({
-      headers: {},
+      headers: { 'x-cc-audit-session': 'test' },
       rawBody: CONTINUATION_BODY, // contiene tool_result con tool_use_id 'tool-x'
       requestId: 'cont-1',
     });
@@ -853,7 +836,7 @@ describe('AuditInteractionHandler', () => {
       config,
     );
     const result = await handler.execute({
-      headers: {},
+      headers: { 'x-cc-audit-session': 's' },
       rawBody: FRESH_BODY,
       requestId: 'r-plain',
     });
@@ -878,6 +861,7 @@ describe('AuditInteractionHandler', () => {
       sessionId: 'test-session',
       pendingAgentToolUses: [],
       pendingWebSearchToolUses: [],
+      pendingWebFetchToolUses: [],
       modelId: 'claude-opus-4-5',
     };
 
@@ -901,7 +885,7 @@ describe('AuditInteractionHandler', () => {
     );
 
     await handler.execute({
-      headers: {},
+      headers: { 'x-cc-audit-session': 's' },
       rawBody: FRESH_BODY,
       requestId: 'req-new',
     });
@@ -924,6 +908,7 @@ describe('AuditInteractionHandler', () => {
       sessionId: 'test-session',
       pendingAgentToolUses: [{ stepIndex: 1, toolUseId: 'toolu_orphan' }],
       pendingWebSearchToolUses: [],
+      pendingWebFetchToolUses: [],
       awaitingContinuation: true,
       awaitingSince: Date.now() - 120_000,
     };
@@ -955,7 +940,7 @@ describe('AuditInteractionHandler', () => {
     );
 
     await handler.execute({
-      headers: {},
+      headers: { 'x-cc-audit-session': 's' },
       rawBody: FRESH_BODY,
       requestId: 'req-new',
     });
@@ -967,32 +952,120 @@ describe('AuditInteractionHandler', () => {
     expect(orphanStateRemoved).toBe(true);
   });
 
-  it('debería auditar request de claude-cli aunque tenga session _unknown', async () => {
+  it('fresh + pending web_fetch → handleWebFetchStep crea step adicional del padre', async () => {
     const config = makeConfig();
-    let interactionWritten = false;
+    const parentInteraction: ActiveInteraction = {
+      interactionDir: '/tmp/sessions/s/interactions/000001_parent',
+      interactionType: 'agentic',
+      stepCount: 2,
+      requestSequence: 1,
+      startedAt: Date.now(),
+      requestBodyOmitted: false,
+      requestBodyBytes: 100,
+      stepsMeta: [],
+      sessionId: 's',
+      pendingAgentToolUses: [],
+      pendingWebSearchToolUses: [],
+      pendingWebFetchToolUses: [
+        { stepIndex: 1, toolUseId: 'toolu_fetch_1' },
+      ],
+    };
+
+    let consumedFetch: string | null = null;
+    let stepDirWritten: string | null = null;
+
+    const store = makeSessionStore({
+      findInteractionWithPendingWebFetch: vi.fn().mockReturnValue({
+        interaction: parentInteraction,
+        pendings: [...parentInteraction.pendingWebFetchToolUses],
+      }),
+      consumeWebFetchPending: vi.fn().mockImplementation((dir: string) => {
+        consumedFetch = dir;
+        return { stepIndex: 1, toolUseId: 'toolu_fetch_1' };
+      }),
+      incrementStepCountByDir: (_dir: string) => {
+        parentInteraction.stepCount = 3;
+        return 3;
+      },
+    });
+
     const handler = new AuditInteractionHandler(
       new SessionResolverService(config),
-      makeSessionStore(),
+      store,
       makeAuditWriter({
-        writeInteractionRequest: async () => {
-          interactionWritten = true;
-          return { dir: '/tmp/test', requestBodyOmitted: false };
+        writeStepRequest: async (p) => {
+          stepDirWritten = p.stepDir;
         },
       }),
       config,
     );
 
     const result = await handler.execute({
-      headers: {
-        'user-agent': 'claude-cli/2.1.113',
-        authorization: 'Bearer <ANTHROPIC_KEY_REDACTED>xxx',
-        host: '127.0.0.1:8787',
-      },
+      headers: { 'x-cc-audit-session': 's' },
       rawBody: FRESH_BODY,
-      requestId: 'req-1',
+      requestId: 'fetch-req',
     });
 
     expect(result).not.toBeNull();
-    expect(interactionWritten).toBe(true);
+    expect(result!.auditInteractionDir).toBe(parentInteraction.interactionDir);
+    expect(result!.requestClassification).toEqual({ type: 'fresh' });
+    expect(consumedFetch).toBe(parentInteraction.interactionDir);
+    expect(stepDirWritten).toContain('steps');
+  });
+
+  it('fresh con pending web_fetch Y pending agent → web_fetch tiene prioridad', async () => {
+    const config = makeConfig();
+    const parentInteraction: ActiveInteraction = {
+      interactionDir: '/tmp/sessions/s/interactions/000001_parent',
+      interactionType: 'agentic',
+      stepCount: 2,
+      requestSequence: 1,
+      startedAt: Date.now(),
+      requestBodyOmitted: false,
+      requestBodyBytes: 100,
+      stepsMeta: [],
+      sessionId: 's',
+      pendingAgentToolUses: [{ stepIndex: 1, toolUseId: 'toolu_agent' }],
+      pendingWebSearchToolUses: [],
+      pendingWebFetchToolUses: [
+        { stepIndex: 1, toolUseId: 'toolu_fetch' },
+      ],
+    };
+
+    const store = makeSessionStore({
+      findInteractionWithPendingWebFetch: vi.fn().mockReturnValue({
+        interaction: parentInteraction,
+        pendings: [...parentInteraction.pendingWebFetchToolUses],
+      }),
+      consumeWebFetchPending: vi.fn().mockReturnValue({ stepIndex: 1, toolUseId: 'toolu_fetch' }),
+      incrementStepCountByDir: (_dir: string) => {
+        parentInteraction.stepCount = 3;
+        return 3;
+      },
+    });
+
+    let subCalled = false;
+    const handler = new AuditInteractionHandler(
+      new SessionResolverService(config),
+      store,
+      makeAuditWriter({
+        writeSubInteractionRequest: async () => {
+          subCalled = true;
+          return { dir: '', requestBodyOmitted: false };
+        },
+      }),
+      config,
+    );
+
+    const result = await handler.execute({
+      headers: { 'x-cc-audit-session': 's' },
+      rawBody: FRESH_BODY,
+      requestId: 'fetch-vs-agent',
+    });
+
+    // WebFetch tiene prioridad: no se crea sub-agente
+    expect(result).not.toBeNull();
+    expect(result!.auditInteractionDir).toBe(parentInteraction.interactionDir);
+    expect(subCalled).toBe(false);
   });
 });

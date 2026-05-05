@@ -11,5 +11,6 @@ declare module 'fastify' {
     rawBodyBytes?: number;
     interactionType?: InteractionType;
     requestClassification?: RequestClassification;
+    isInternalToolStep?: boolean;
   }
 }

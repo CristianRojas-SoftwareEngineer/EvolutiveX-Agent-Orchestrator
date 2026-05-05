@@ -1,5 +1,5 @@
 {
-  "modelId": "minimax-m2.5",
+  "modelId": "minimax-m2.5:cloud",
   "displayName": "MiniMax M2.5",
   "costs": {
     "input": {

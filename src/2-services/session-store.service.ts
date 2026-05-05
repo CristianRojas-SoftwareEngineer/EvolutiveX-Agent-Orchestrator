@@ -4,6 +4,7 @@ import * as fs from 'node:fs/promises';
 import {
   ActiveInteraction,
   PendingAgentToolUse,
+  PendingWebFetchToolUse,
   PendingWebSearchToolUse,
   StepMeta,
 } from '../1-domain/types/audit.types.js';
@@ -54,7 +55,7 @@ export class SessionStoreService implements ISessionStore {
   public nextMainAgentSequence(sessionId: string): Promise<number> {
     return this.withSessionLock(sessionId, () =>
       this.allocateNextSequence(
-        path.join(this.auditBaseDir, sessionId, DIR_MAIN_AGENT, FILE_INTERACTION_SEQUENCE),
+        path.join(this.auditBaseDir, sessionId, DIR_MAIN_AGENT, DIR_INTERACTIONS, FILE_INTERACTION_SEQUENCE),
         path.join(this.auditBaseDir, sessionId, DIR_MAIN_AGENT, DIR_INTERACTIONS),
       ),
     );
@@ -159,6 +160,31 @@ export class SessionStoreService implements ISessionStore {
     const interaction = this.interactionRegistry.get(interactionDir);
     if (!interaction || interaction.pendingWebSearchToolUses.length === 0) return null;
     return interaction.pendingWebSearchToolUses.shift()!;
+  }
+
+  public registerPendingWebFetchToolUse(interactionDir: string, stepIndex: number, toolUseId: string): void {
+    const interaction = this.interactionRegistry.get(interactionDir);
+    if (!interaction) return;
+    if (interaction.pendingWebFetchToolUses.some((p) => p.toolUseId === toolUseId)) return;
+    interaction.pendingWebFetchToolUses.push({ stepIndex, toolUseId });
+  }
+
+  public findInteractionWithPendingWebFetch(sessionId: string) {
+    const dirs = this.sessionToActiveInteractions.get(sessionId);
+    if (!dirs) return null;
+    for (const dir of dirs) {
+      const interaction = this.interactionRegistry.get(dir);
+      if (!interaction) continue;
+      if (interaction.pendingWebFetchToolUses.length === 0) continue;
+      return { interaction, pendings: [...interaction.pendingWebFetchToolUses] };
+    }
+    return null;
+  }
+
+  public consumeWebFetchPending(interactionDir: string): PendingWebFetchToolUse | null {
+    const interaction = this.interactionRegistry.get(interactionDir);
+    if (!interaction || interaction.pendingWebFetchToolUses.length === 0) return null;
+    return interaction.pendingWebFetchToolUses.shift()!;
   }
 
   public registerToolUseId(toolUseId: string, interactionDir: string): void {

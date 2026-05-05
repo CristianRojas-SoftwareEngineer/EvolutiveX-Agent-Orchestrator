@@ -1,6 +1,7 @@
 import {
   ActiveInteraction,
   PendingAgentToolUse,
+  PendingWebFetchToolUse,
   PendingWebSearchToolUse,
   StepMeta,
 } from '../../1-domain/types/audit.types.js';
@@ -71,6 +72,28 @@ export interface ISessionStore {
    * interacción registrada. Devuelve el pending consumido o `null` si no había.
    */
   consumeWebSearchPending(interactionDir: string): PendingWebSearchToolUse | null;
+  /**
+   * Registra un tool_use `WebFetch` emitido por el SSE de la interacción padre
+   * cuya llamada de implementación aún no ha llegado.
+   */
+  registerPendingWebFetchToolUse(
+    interactionDir: string,
+    stepIndex: number,
+    toolUseId: string,
+  ): void;
+  /**
+   * Busca en la sesión la primera interacción con `pendingWebFetchToolUses`
+   * no vacío. A diferencia de `findInteractionWithPendingAgents`, NO excluye
+   * interacciones con `parentContext` (un subagente también puede usar WebFetch).
+   */
+  findInteractionWithPendingWebFetch(
+    sessionId: string,
+  ): { interaction: ActiveInteraction; pendings: PendingWebFetchToolUse[] } | null;
+  /**
+   * Consume (elimina) la primera entrada de `pendingWebFetchToolUses` de la
+   * interacción registrada. Devuelve el pending consumido o `null` si no había.
+   */
+  consumeWebFetchPending(interactionDir: string): PendingWebFetchToolUse | null;
   /**
    * Busca en la sesión interacciones con `awaitingContinuation === true` cuyo
    * `awaitingSince` supera `maxAgeMs` milisegundos. Devuelve las interacciones

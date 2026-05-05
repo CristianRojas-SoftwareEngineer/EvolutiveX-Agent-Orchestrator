@@ -367,6 +367,26 @@ export class MarkdownRendererService {
       }
     }
 
+    // Renderizado de errores del proveedor (si existen en el step)
+    const error = obj.error && typeof obj.error === 'object' && !Array.isArray(obj.error)
+      ? obj.error as Record<string, JsonValue>
+      : undefined;
+
+    if (error) {
+      parts.push(this.heading(headingLevel, 'Error del Proveedor'));
+      const msg = error.message ? String(error.message) : 'Error desconocido';
+      const code = error.code ? ` (código: ${error.code})` : '';
+      parts.push(`**Mensaje:** ${msg}${code}`);
+
+      if (error.metadata && typeof error.metadata === 'object' && !Array.isArray(error.metadata)) {
+        const meta = error.metadata as Record<string, JsonValue>;
+        if (typeof meta.raw === 'string' && meta.raw) {
+          parts.push('**Detalle técnico:**');
+          parts.push(`\`\`\`json\n${meta.raw}\n\`\`\``);
+        }
+      }
+    }
+
     if (stopReason) {
       parts.push('');
       parts.push(`_(stop_reason: ${stopReason})_`);

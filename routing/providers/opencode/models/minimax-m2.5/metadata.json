@@ -1,5 +1,5 @@
 {
-  "modelId": "minimax/minimax-m2.5:free",
+  "modelId": "minimax-m2.5-free",
   "displayName": "MiniMax M2.5",
   "costs": {
     "input": {

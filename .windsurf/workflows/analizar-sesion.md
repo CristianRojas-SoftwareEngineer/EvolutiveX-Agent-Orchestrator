@@ -35,20 +35,21 @@ Durante el análisis, clasifica todo gap en una de dos categorías:
 
 **Diferencias de diseño intencionales (no son bugs):**
 - Smart Code Proxy registra preflights (`client-preflight`) como interacciones separadas (el harness las agrupa en el log)
-- Estructura de directorios en disco vs formato JSONL del harness (diferente representación, mismo contenido lógico)
+- Estructura de directorios jerárquica en disco (`main-agent/interactions/`, `side-interactions/`) vs formato JSONL del harness (diferente representación, mismo contenido lógico)
 
 **Inconsistencias/bugs (requieren investigación/corrección):**
 - Subagentes que el harness registra pero el proxy no captura
 - Tool_use IDs que no correlacionan entre harness y proxy
 - Interacciones huérfanas (state.json sin meta.json correspondiente)
+- Subagentes de nivel 2+ sin `parentContext` correcto
 
 ## Objetivos
 
-1. **Cargar la skill** `smart-code-proxy` para interpretar correctamente la arquitectura PKA y la taxonomía de turnos
+1. **Cargar la skill** `smart-code-proxy` para interpretar correctamente la arquitectura PKA y la taxonomía de interacciones
 2. **Obtener el `session-id`** del usuario para parametrizar todas las rutas de análisis
 3. **Analizar el registro nativo del harness** en `C:\Users\Cristian\.claude\projects\` para establecer la línea base de verdad
 4. **Analizar el audit trail del proxy** en `C:\Users\Cristian\Desktop\Proyectos\Smart Code Proxy\sessions\` para comprender la visión intermediada
-5. **Comparar estructuras** identificando diferencias en: jerarquía de subagentes, clasificación de turnos, correlación de tool uses, y manejo de eventos
+5. **Comparar estructuras** identificando diferencias en: jerarquía de subagentes, clasificación de interacciones, correlación de tool uses, y manejo de eventos
 6. **Detectar gaps** específicos donde el proxy no captura o malinterpreta el comportamiento del harness
 7. **Sintetizar hallazgos** en un informe estructurado que incluya: resumen comparativo, diferencias arquitectónicas identificadas, gaps detectados con prioridad, y recomendaciones para ajustes del proxy
 8. **Documentar lecciones** sobre el comportamiento del harness que deban incorporarse al diseño del proxy
@@ -77,12 +78,13 @@ Archivos relevantes:
 
 Ubicación: `C:\Users\Cristian\Desktop\Proyectos\Smart Code Proxy\sessions\{session-id}`
 
-Estructura a explorar:
-- `C:\Users\Cristian\Desktop\Proyectos\Smart Code Proxy\sessions\{session-id}\meta.json`: Metadatos del turno principal
-- `C:\Users\Cristian\Desktop\Proyectos\Smart Code Proxy\sessions\{session-id}\request\`: Peticiones HTTP interceptadas
-- `C:\Users\Cristian\Desktop\Proyectos\Smart Code Proxy\sessions\{session-id}\response\`: Respuestas HTTP interceptadas
-- `C:\Users\Cristian\Desktop\Proyectos\Smart Code Proxy\sessions\{session-id}\steps\`: Pasos individuales de la interacción
-- `C:\Users\Cristian\Desktop\Proyectos\Smart Code Proxy\sessions\{session-id}\sub-interactions\`: Interacciones anidadas (subagentes)
+Estructura a explorar (dos árboles con contadores independientes):
+- `C:\Users\Cristian\Desktop\Proyectos\Smart Code Proxy\sessions\{session-id}\session-metrics.json`: Métricas agregadas por modelo
+- `C:\Users\Cristian\Desktop\Proyectos\Smart Code Proxy\sessions\{session-id}\main-agent\interactions\`: Interacciones agénticas (`interactionType: "agentic"`)
+  - `NN\meta.json`, `NN\state.json`, `NN\input\`, `NN\output\`, `NN\steps\`
+  - `NN\steps\NN\sub-agent-NN\`: Subagentes anidados (mism estructura interna)
+- `C:\Users\Cristian\Desktop\Proyectos\Smart Code Proxy\sessions\{session-id}\side-interactions\`: Preflights y side-requests
+  - `NN\meta.json`, `NN\state.json`, `NN\input\` (solo side-request), `NN\steps\`
 
 ## Skill de referencia
 
@@ -92,8 +94,8 @@ Para interpretar correctamente la estructura de interacciones, usa la skill:
 
 Esta skill proporciona el conocimiento de dominio necesario sobre:
 - Arquitectura PKA de 6 capas del proxy
-- Clasificación de turnos (agentic, client-preflight, side-request, continuation)
-- Jerarquía de archivos de auditoría (meta.json, state.json, steps/, sub-interactions/)
+- Clasificación de interacciones (agentic, client-preflight, side-request, continuation) — 5 tipos
+- Jerarquía de archivos de auditoría (meta.json, state.json, steps/, sub-agent-NN/)
 - Subagentes anidados y correlación tool_use/tool_result
 - Variables de entorno y comportamiento del proxy
 
@@ -110,18 +112,60 @@ Ejecuta este comando único para obtener la jerarquía completa de directorios y
 tree /F "C:\Users\Cristian\Desktop\Proyectos\Smart Code Proxy\sessions\{session-id}"
 ```
 
-Este comando está disponible en todas las versiones de Windows y proporciona una vista jerárquica clara de toda la estructura de archivos.
+**Salida esperada (formato típico):**
+```
+{session-id}
+├── session-metrics.json
+├── main-agent
+│   ├── interaction-sequence.json
+│   └── interactions
+│       ├── 01
+│       │   ├── meta.json
+│       │   ├── input/
+│       │   │   ├── headers.json
+│       │   │   ├── body.bin
+│       │   │   ├── body.json
+│       │   │   └── body.parsed.md
+│       │   ├── output/
+│       │   │   ├── body.json
+│       │   │   ├── body.parsed.md
+│       │   │   └── headers.json
+│       │   └── steps
+│       │       ├── 01
+│       │       │   ├── request/
+│       │       │   └── response/
+│       │       └── 02
+│       │           ├── request/
+│       │           ├── response/
+│       │           └── sub-agent-01
+│       │               ├── meta.json
+│       │               ├── input/
+│       │               ├── output/
+│       │               └── steps/
+│       └── 02
+│           ├── meta.json
+│           └── steps/
+└── side-interactions
+    ├── interaction-sequence.json
+    ├── 01
+    │   ├── meta.json
+    │   └── steps/
+    └── 02
+        ├── meta.json
+        ├── input/
+        └── steps/
+```
 
 **Este paso es bloqueante y obligatorio.** No procedas al Paso 1 sin haber ejecutado este comando y comprendido la estructura real de archivos presentes en disco.
 
 **¿Por qué este paso es crítico?**
 - El tool `list_dir` frecuentemente reporta "(0 items)" para directorios que contienen archivos anidados profundamente
-- Los sub-interactions a menudo no aparecen en listados superficiales pero sí existen en disco
+- Los subagentes (`sub-agent-NN/`) a menudo no aparecen en listados superficiales pero sí existen en disco
 - Sin este inventario determinístico, es imposible saber con certeza qué interacciones existen antes de intentar leer sus archivos
 
 **Usa el output de este comando para:**
-1. Confirmar el número real de interacciones (directorios `NNNNNN_<uuid>/` bajo `interactions/`)
-2. Identificar la profundidad máxima de anidamiento (sub-interactions dentro de steps/)
+1. Confirmar el número real de interacciones agénticas (`NN/` bajo `main-agent/interactions/`) y side-interactions (`NN/` bajo `side-interactions/`)
+2. Identificar la profundidad máxima de anidamiento (subagentes `sub-agent-NN/` dentro de `steps/NN/`)
 3. Verificar la existencia de archivos clave (`meta.json`, `state.json`, `body.json`) antes de intentar leerlos
 4. Detectar discrepancias entre la secuencia esperada y los directorios realmente presentes
 
@@ -131,9 +175,9 @@ Guarda el output de este comando y refiérete a él durante todo el análisis.
 
 1. Carga la skill `smart-code-proxy` para tener acceso al conocimiento de dominio
 2. **Línea base (harness nativo)**: Lee el archivo `.jsonl` de la sesión en `C:\Users\Cristian\.claude\projects\C--Users-Cristian-Desktop-Proyectos-Smart-Code-Proxy\{session-id}.jsonl`
-3. **Proxy audit trail**: Lee el archivo `meta.json` del turno principal en `C:\Users\Cristian\Desktop\Proyectos\Smart Code Proxy\sessions\{session-id}\meta.json`
-4. Compara: ¿Cuántos turnos/subagentes registra el harness vs. cuántos captura el proxy?
-5. Identifica la clasificación del turno principal en ambos sistemas
+3. **Proxy audit trail**: Lee `main-agent/interactions/01/meta.json` del primer turno agéntico
+4. Compara: ¿Cuántas interacciones/subagentes registra el harness vs. cuántas captura el proxy?
+5. Identifica la clasificación de la primera interacción en ambos sistemas (`interactionType` en `meta.json`)
 
 ### Paso 2: Análisis comparativo de la estructura jerárquica
 
@@ -142,36 +186,36 @@ Guarda el output de este comando y refiérete a él durante todo el análisis.
 2. Identifica el árbol de anidamiento según el formato del harness
 3. Nota cómo el harness correlaciona tool_use con archivos de subagente
 
-**En el proxy:**
-1. **Usa el inventario del Paso 0** — no hagas nuevos listados superficiales
-2. Identifica todos los directorios `NNNNNN_<uuid>/` bajo `interactions/` (interacciones de primer nivel)
-3. Identifica los `sub-interactions/` anidados dentro de `steps/NNN/` (subagentes)
-4. Para cada sub-interacción identificada en el inventario, lee su `meta.json` y compara con el harness
-5. Mapea la relación padre-hijo usando `parentContext` y `toolUseId`
+**En el proxy (usa el inventario del Paso 0 — no hagas nuevos listados superficiales):**
+1. Identifica todas las interacciones agénticas (`NN/` bajo `main-agent/interactions/`)
+2. Identifica todos los subagentes (`sub-agent-NN/` anidados dentro de `steps/NN/`)
+3. Identifica side-interactions (`NN/` bajo `side-interactions/`): preflights y side-requests
+4. Para cada interacción identificada, lee su `meta.json` y compara con el harness
+5. Mapea la relación padre-hijo usando `parentContext` del `meta.json` de cada subagente
 
 **Comparación:**
 6. Verifica: ¿El proxy captura todos los subagentes que registra el harness?
 7. Identifica diferencias en la profundidad máxima de anidamiento reportada
 8. Detecta subagentes "fantasma" o huérfanos en cualquiera de los dos sistemas
 
-**Importante:** Si el Paso 0 mostró que existen `sub-interactions/` pero el `list_dir` posterior reporta "(0 items)", **ignora el list_dir** y usa el resultado del `tree` o `Get-ChildItem -Recurse` del Paso 0 como fuente de verdad.
+**Importante:** Si el Paso 0 mostró que existen `sub-agent-NN/` pero el `list_dir` posterior reporta "(0 items)", **ignora el list_dir** y usa el resultado del `tree` del Paso 0 como fuente de verdad.
 
 ### Paso 3: Análisis comparativo de interacciones individuales
 
-Para cada turno (principal y subagentes), compara ambas fuentes:
+Para cada interacción (principal y subagentes), compara ambas fuentes:
 
-**Clasificación del turno:**
+**Clasificación de la interacción:**
 1. ¿Cómo clasifica el harness esta interacción vs. cómo la clasifica el proxy?
 2. ¿Coinciden las clasificaciones con la taxonomía (agentic, client-preflight, side-request, continuation)?
 
 **Evolución y flujo:**
-3. Revisa los steps en `C:\Users\Cristian\Desktop\Proyectos\Smart Code Proxy\sessions\{session-id}\steps\` del proxy y compáralos con los eventos en el `.jsonl` del harness
+3. Revisa los steps en `main-agent/interactions/NN/steps/` o `side-interactions/NN/steps/` del proxy y compáralos con los eventos en el `.jsonl` del harness
 4. Identifica eventos capturados por el harness que el proxy pudo haber omitido
 
 **Eventos clave (comparativa):**
 5. Mensajes de error o excepciones: ¿Ambos sistemas los registran igual?
 6. Tool uses detectados: ¿El proxy identifica correctamente los `Agent` tool type?
-7. Decisiones de enrutamiento: ¿El proxy enrutó correctamente side-requests vs. agentic-turns?
+7. Decisiones de enrutamiento: ¿El proxy enrutó correctamente side-requests vs. agentic?
 
 **Metadata y métricas:**
 8. Compara latencias, conteos de tokens, y `outcome` entre ambos sistemas
@@ -198,11 +242,12 @@ Con base en el análisis anterior, produce una explicación estructurada que cub
 
    **Diferencias de diseño (comportamiento intencional, no bugs):**
    - Preflights (`client-preflight`) como interacciones separadas en lugar de eventos en log
-   - Metadata adicional en proxy (latencias, tokens por step)
+   - Metadata adicional en proxy (latencias, tokens por step, `anthropicMessageId`)
    - `interactionType` explícito vs inferido del contexto en harness
+   - Subagentes de built-in tools como sub-interacciones anidadas
 
 4. **Comportamiento observado**:
-   - ¿El proxy enrutó correctamente las interacciones según la taxonomía de la skill?
+   - ¿El proxy enrutó correctamente las interacciones según la taxonomía?
    - ¿Detectó correctamente los tool uses de tipo `Agent`?
    - ¿Manejó apropiadamente las continuaciones y side-requests?
 

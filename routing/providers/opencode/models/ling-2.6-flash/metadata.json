@@ -1,6 +1,6 @@
 {
-  "modelId": "minimax/minimax-m2.5:free",
-  "displayName": "MiniMax M2.5",
+  "modelId": "ling-2.6-flash-free",
+  "displayName": "Ling 2.6 Flash",
   "costs": {
     "input": {
       "base": 0.0,

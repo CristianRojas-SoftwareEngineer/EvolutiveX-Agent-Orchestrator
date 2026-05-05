@@ -403,7 +403,7 @@ program
       return;
     }
 
-    const validProviders = ['default', 'anthropic', 'ollama', 'openrouter', 'xiaomi'];
+    const validProviders = ['default', 'anthropic', 'ollama', 'openrouter', 'xiaomi', 'opencode'];
     if (!validProviders.includes(provider)) {
       console.error(
         chalk.red(`Proveedor inválido: "${provider}". Opciones: ${validProviders.join(', ')}`),
@@ -418,7 +418,7 @@ program
       console.log(
         chalk.cyan('\nRestaurando configuración nativa de Anthropic (suscripción PRO/Max) vía Proxy...'),
       );
-      
+
       const proxyPort = getProxyPort();
       const proxyUrl = `http://127.0.0.1:${proxyPort}`;
       const defaultUpstream = 'https://api.anthropic.com';
@@ -437,7 +437,7 @@ program
         console.log(chalk.yellow(`  [SET] ANTHROPIC_BASE_URL = ${proxyUrl}`));
         console.log(chalk.yellow(`  [PROXY] UPSTREAM_ORIGIN configurado a ${defaultUpstream} en configs/.env`));
       }
-      
+
       if (!opts.dryRun) {
         await verifyApplied(provider, null, env);
       }
@@ -460,11 +460,11 @@ program
       }
 
       console.log(chalk.cyan(`\nAplicando configuración de ${provider}...`));
-      
+
       const proxyPort = getProxyPort();
       const proxyUrl = `http://127.0.0.1:${proxyPort}`;
       const originalBaseUrl = config.ANTHROPIC_BASE_URL;
-      
+
       // Sobrescribir el destino para enrutar a través del Proxy local
       config.ANTHROPIC_BASE_URL = proxyUrl;
 

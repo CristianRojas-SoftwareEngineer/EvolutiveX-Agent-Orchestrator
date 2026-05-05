@@ -163,6 +163,18 @@ export interface PendingWebSearchToolUse {
   toolUseId: string;
 }
 
+/**
+ * Entrada que tracquea un tool_use `WebFetch` emitido por el SSE del padre y aún
+ * no correlacionado con la llamada de implementación correspondiente. Cada entrada
+ * se consume al recibir el request fresh de implementación del harness.
+ */
+export interface PendingWebFetchToolUse {
+  /** Step del padre donde se emitió el tool_use. */
+  stepIndex: number;
+  /** Identificador único del tool_use bloque emitido por Anthropic. */
+  toolUseId: string;
+}
+
 export interface ActiveInteraction {
   interactionDir: string;
   interactionType: InteractionType;
@@ -187,6 +199,11 @@ export interface ActiveInteraction {
    * llamada de implementación del harness. Vacío en turns que no usan WebSearch.
    */
   pendingWebSearchToolUses: PendingWebSearchToolUse[];
+  /**
+   * Tool_uses `WebFetch` emitidos por el SSE de este turn que aún esperan su
+   * llamada de implementación del harness. Vacío en turns que no usan WebFetch.
+   */
+  pendingWebFetchToolUses: PendingWebFetchToolUse[];
   /** Definido sólo en turns que son subagentes. */
   parentContext?: ParentContext;
   /**
@@ -242,6 +259,11 @@ export interface InteractionMetadata {
    * que no se consumieron antes del cierre. Información forense para correlación offline.
    */
   lostPendingWebSearch?: PendingWebSearchToolUse[];
+  /**
+   * Presente cuando el turno se cierra habiendo registrado WebFetch tool_uses
+   * que no se consumieron antes del cierre. Información forense para correlación offline.
+   */
+  lostPendingWebFetch?: PendingWebFetchToolUse[];
 }
 
 /** Métricas agregadas de tokens por modelo dentro de una sesión. */
@@ -367,6 +389,7 @@ export interface AuditInteractionContext {
   responseStatusCode: number | null;
   interactionType?: InteractionType;
   requestClassification?: RequestClassification;
+  isInternalToolStep?: boolean;
 }
 
 /**

@@ -12,6 +12,7 @@ import {
   MarkdownRenderContext,
   ParentContext,
   PendingAgentToolUse,
+  PendingWebFetchToolUse,
   PendingWebSearchToolUse,
   RequestClassification,
   computeTokenTotals,
@@ -36,6 +37,7 @@ export interface AuditInteractionResult {
   auditSessionId: string;
   interactionType: InteractionType;
   requestClassification: RequestClassification;
+  isInternalToolStep?: boolean;
 }
 
 /**
@@ -62,8 +64,10 @@ export class AuditInteractionHandler {
     const auditSession = this.sessionResolver.getAuditSessionId(params.headers);
     const auditSessionId = auditSession.sessionId;
 
-    // Detectar y ignorar health checks de Bun que no aportan valor a la observabilidad
-    if (this.isIgnorableHealthCheck(params, auditSessionId)) {
+    // Requests sin sesión identificada están fuera del diseño de observabilidad.
+    // Claude Code envía requests pre-sesión (HEAD /, GET /v1/models) que resuelven
+    // a '_unknown' y no deben crear directorios ni side-interactions.
+    if (auditSessionId === '_unknown') {
       return null;
     }
 
@@ -97,6 +101,21 @@ export class AuditInteractionHandler {
           auditSessionId,
           classification,
           webSearchPending,
+        );
+      }
+
+      // Verificar si es una llamada de implementación de web_fetch: el harness
+      // ejecuta WebFetch haciendo una llamada interna a la API que el proxy
+      // captura como fresh. Si hay un pending web_fetch, redirigir como step
+      // adicional del padre en lugar de crear un sub-agente.
+      const webFetchPending = this.sessionStore.findInteractionWithPendingWebFetch(auditSessionId);
+      if (webFetchPending) {
+        return this.handleWebFetchStep(
+          params,
+          headersForAudit,
+          auditSessionId,
+          classification,
+          webFetchPending,
         );
       }
 
@@ -188,6 +207,7 @@ export class AuditInteractionHandler {
       sessionId: auditSessionId,
       pendingAgentToolUses: [],
       pendingWebSearchToolUses: [],
+      pendingWebFetchToolUses: [],
       modelId: extractModelFromRequestBody(params.rawBody) ?? undefined,
     });
 
@@ -298,6 +318,7 @@ export class AuditInteractionHandler {
         sessionId: auditSessionId,
         pendingAgentToolUses: [],
       pendingWebSearchToolUses: [],
+      pendingWebFetchToolUses: [],
         parentContext,
         modelId: extractModelFromRequestBody(params.rawBody) ?? undefined,
       });
@@ -358,6 +379,56 @@ export class AuditInteractionHandler {
       auditSessionId,
       interactionType: 'agentic',
       requestClassification: classification,
+      isInternalToolStep: true,
+    };
+  }
+
+  /**
+   * Registra la llamada de implementación de WebFetch como un step adicional
+   * dentro de la interacción padre que emitió el tool_use `web_fetch`. No crea
+   * una interacción independiente — el request/response del harness se escriben
+   * en `steps/NN/` del padre, igual que cualquier otro step de ejecución de tool.
+   */
+  private async handleWebFetchStep(
+    params: { rawBody: Buffer; requestId: string },
+    headersForAudit: Record<string, string | string[] | undefined>,
+    auditSessionId: string,
+    classification: RequestClassification,
+    match: {
+      interaction: { interactionDir: string; pendingWebFetchToolUses: PendingWebFetchToolUse[] };
+      pendings: PendingWebFetchToolUse[];
+    },
+  ): Promise<AuditInteractionResult> {
+    const parentInteractionDir = match.interaction.interactionDir;
+    this.sessionStore.consumeWebFetchPending(parentInteractionDir);
+
+    // Determinar el siguiente número de step del padre
+    const stepCount = this.sessionStore.incrementStepCountByDir(parentInteractionDir);
+    const stepDir = path.join(
+      parentInteractionDir,
+      DIR_STEPS,
+      String(stepCount).padStart(PAD_STEP, '0'),
+    );
+
+    await this.auditWriter.writeStepRequest({
+      stepDir,
+      headers: headersForAudit,
+      bodyBuffer: params.rawBody,
+      maxAuditRequestBytes: this.config.MAX_AUDIT_REQUEST_BODY_BYTES,
+      context: {
+        interactionType: 'agentic',
+        stepIndex: stepCount,
+      },
+    });
+
+    return {
+      auditInteractionDir: parentInteractionDir,
+      requestBodyOmitted: false,
+      requestSequence: 0,
+      auditSessionId,
+      interactionType: 'agentic',
+      requestClassification: classification,
+      isInternalToolStep: true,
     };
   }
 
@@ -482,6 +553,7 @@ export class AuditInteractionHandler {
       sessionId: auditSessionId,
       pendingAgentToolUses: [],
       pendingWebSearchToolUses: [],
+      pendingWebFetchToolUses: [],
       modelId: extractModelFromRequestBody(params.rawBody) ?? undefined,
     });
 
@@ -549,6 +621,7 @@ export class AuditInteractionHandler {
       sessionId: auditSessionId,
       pendingAgentToolUses: [],
       pendingWebSearchToolUses: [],
+      pendingWebFetchToolUses: [],
       modelId: extractModelFromRequestBody(params.rawBody) ?? undefined,
     });
 
@@ -614,6 +687,7 @@ export class AuditInteractionHandler {
       sessionId: auditSessionId,
       pendingAgentToolUses: [],
       pendingWebSearchToolUses: [],
+      pendingWebFetchToolUses: [],
       modelId: extractModelFromRequestBody(params.rawBody) ?? undefined,
     });
 
@@ -653,51 +727,6 @@ export class AuditInteractionHandler {
   }
 
   /**
-   * Detecta health checks de Bun/Claude Code que no aportan valor a la observabilidad.
-   * Criterios (todos deben cumplirse):
-   * - User-Agent contiene "Bun" (no "claude-cli")
-   * - Body vacío (rawBody.length === 0)
-   * - Sin header de autorización
-   * - Sin headers de sesión (x-claude-code-session-id ni x-cc-audit-session)
-   * - Sesión resuelta a '_unknown' (fallback final)
-   */
-  private isIgnorableHealthCheck(
-    params: { headers: Record<string, string | string[] | undefined>; rawBody: Buffer },
-    auditSessionId: string,
-  ): boolean {
-    // Solo si fallback a _unknown
-    if (auditSessionId !== '_unknown') {
-      return false;
-    }
-
-    // Body debe estar vacío
-    if (params.rawBody.length > 0) {
-      return false;
-    }
-
-    // User-Agent debe ser Bun (no claude-cli)
-    const userAgent = this.getHeaderValue(params.headers, 'user-agent') || '';
-    if (!userAgent.includes('Bun') || userAgent.includes('claude-cli')) {
-      return false;
-    }
-
-    // Sin header de autorización
-    const auth = this.getHeaderValue(params.headers, 'authorization');
-    if (auth) {
-      return false;
-    }
-
-    // Sin headers de sesión específicos de Claude Code
-    const sessionId = this.getHeaderValue(params.headers, 'x-claude-code-session-id');
-    const auditSession = this.getHeaderValue(params.headers, 'x-cc-audit-session');
-    if (sessionId || auditSession) {
-      return false;
-    }
-
-    return true;
-  }
-
-  /**
    * Cierra turnos orphan de la sesión: aquellos marcados como
    * `awaitingContinuation` cuyo tiempo de espera supera el umbral.
    * Se invoca antes de procesar una nueva fresh interaction.
@@ -729,6 +758,8 @@ export class AuditInteractionHandler {
       interaction.pendingAgentToolUses.length > 0 ? interaction.pendingAgentToolUses : undefined;
     const lostPendingsWebSearch =
       interaction.pendingWebSearchToolUses.length > 0 ? interaction.pendingWebSearchToolUses : undefined;
+    const lostPendingsWebFetch =
+      interaction.pendingWebFetchToolUses.length > 0 ? interaction.pendingWebFetchToolUses : undefined;
 
     this.sessionStore.closeInteraction(interaction.interactionDir);
 
@@ -753,6 +784,7 @@ export class AuditInteractionHandler {
       ...(interaction.parentContext ? { parentContext: interaction.parentContext } : {}),
       ...(lostPendings ? { lostPendingAgents: lostPendings } : {}),
       ...(lostPendingsWebSearch ? { lostPendingWebSearch: lostPendingsWebSearch } : {}),
+      ...(lostPendingsWebFetch ? { lostPendingWebFetch: lostPendingsWebFetch } : {}),
       truncation: {
         requestBodyOmitted: interaction.requestBodyOmitted,
         responseBodyBytesTotal: null,
@@ -778,20 +810,4 @@ export class AuditInteractionHandler {
     await this.auditWriter.removeInteractionState(interaction.interactionDir);
   }
 
-  /**
-   * Helper para obtener un valor de header de forma case-insensitive.
-   */
-  private getHeaderValue(
-    headers: Record<string, string | string[] | undefined>,
-    name: string,
-  ): string | undefined {
-    const lower = name.toLowerCase();
-    for (const key of Object.keys(headers)) {
-      if (key.toLowerCase() === lower) {
-        const value = headers[key];
-        return Array.isArray(value) ? value[0] : value;
-      }
-    }
-    return undefined;
-  }
 }

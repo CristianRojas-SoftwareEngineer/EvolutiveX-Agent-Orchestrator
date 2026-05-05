@@ -18,6 +18,7 @@ function makeInteraction(overrides: Partial<ActiveInteraction> = {}): ActiveInte
     sessionId: 's1',
     pendingAgentToolUses: [],
     pendingWebSearchToolUses: [],
+    pendingWebFetchToolUses: [],
     ...overrides,
   };
 }
@@ -355,5 +356,99 @@ describe('SessionStoreService — pending Agent tool_uses', () => {
     expect(b).toBe('B');
     // Si está serializado, B sólo arranca tras end:A.
     expect(observed).toEqual(['start:A', 'end:A', 'start:B', 'end:B']);
+  });
+});
+
+describe('SessionStoreService — pending WebFetch tool_uses', () => {
+  let tmpDir: string;
+  let store: SessionStoreService;
+
+  beforeEach(async () => {
+    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'sstore-webfetch-'));
+    store = new SessionStoreService(tmpDir);
+  });
+
+  it('registerPendingWebFetchToolUse + findInteractionWithPendingWebFetch', () => {
+    const interaction = makeInteraction({ interactionDir: '/tmp/p1', sessionId: 'sA' });
+    store.registerInteraction(interaction);
+    store.registerPendingWebFetchToolUse('/tmp/p1', 1, 'tool-fetch-1');
+
+    const found = store.findInteractionWithPendingWebFetch('sA');
+    expect(found).not.toBeNull();
+    expect(found!.interaction).toBe(interaction);
+    expect(found!.pendings).toHaveLength(1);
+    expect(found!.pendings[0]).toEqual({ stepIndex: 1, toolUseId: 'tool-fetch-1' });
+  });
+
+  it('findInteractionWithPendingWebFetch devuelve null cuando no hay pendings', () => {
+    const interaction = makeInteraction({ interactionDir: '/tmp/p1', sessionId: 'sA' });
+    store.registerInteraction(interaction);
+    expect(store.findInteractionWithPendingWebFetch('sA')).toBeNull();
+  });
+
+  it('findInteractionWithPendingWebFetch NO excluye interacciones con parentContext (subagente puede usar WebFetch)', () => {
+    const subagentInteraction = makeInteraction({
+      interactionDir: '/tmp/sub',
+      sessionId: 'sA',
+      parentContext: {
+        parentInteractionDir: '/tmp/parent',
+        parentStepIndex: 1,
+        triggeringToolUseId: 'tool-a',
+      },
+    });
+    store.registerInteraction(subagentInteraction);
+    store.registerPendingWebFetchToolUse('/tmp/sub', 1, 'fetch-sub');
+
+    const found = store.findInteractionWithPendingWebFetch('sA');
+    expect(found).not.toBeNull();
+    expect(found!.pendings[0].toolUseId).toBe('fetch-sub');
+  });
+
+  it('consumeWebFetchPending elimina la primera entrada y la devuelve', () => {
+    const interaction = makeInteraction({ interactionDir: '/tmp/p1', sessionId: 'sA' });
+    store.registerInteraction(interaction);
+    store.registerPendingWebFetchToolUse('/tmp/p1', 1, 'fetch-1');
+    store.registerPendingWebFetchToolUse('/tmp/p1', 2, 'fetch-2');
+
+    const consumed = store.consumeWebFetchPending('/tmp/p1');
+    expect(consumed).toEqual({ stepIndex: 1, toolUseId: 'fetch-1' });
+    expect(interaction.pendingWebFetchToolUses).toHaveLength(1);
+    expect(interaction.pendingWebFetchToolUses[0].toolUseId).toBe('fetch-2');
+  });
+
+  it('consumeWebFetchPending retorna null si no hay pendings', () => {
+    const interaction = makeInteraction({ interactionDir: '/tmp/p1', sessionId: 'sA' });
+    store.registerInteraction(interaction);
+    expect(store.consumeWebFetchPending('/tmp/p1')).toBeNull();
+  });
+
+  it('registerPendingWebFetchToolUse es idempotente (no duplica toolUseId)', () => {
+    const interaction = makeInteraction({ interactionDir: '/tmp/p1', sessionId: 'sA' });
+    store.registerInteraction(interaction);
+    store.registerPendingWebFetchToolUse('/tmp/p1', 1, 'fetch-1');
+    store.registerPendingWebFetchToolUse('/tmp/p1', 1, 'fetch-1');
+
+    expect(interaction.pendingWebFetchToolUses).toHaveLength(1);
+  });
+
+  it('closeInteraction limpia pendings de WebFetch', () => {
+    const interaction = makeInteraction({ interactionDir: '/tmp/p1', sessionId: 'sA' });
+    store.registerInteraction(interaction);
+    store.registerPendingWebFetchToolUse('/tmp/p1', 1, 'fetch-1');
+
+    store.closeInteraction('/tmp/p1');
+    store.registerPendingWebFetchToolUse('/tmp/p1', 2, 'fetch-2'); // no-op (interacción cerrada)
+    expect(store.findInteractionWithPendingWebFetch('sA')).toBeNull();
+  });
+
+  it('sesiones distintas no interfieren', () => {
+    const interactionA = makeInteraction({ interactionDir: '/tmp/a', sessionId: 'sA' });
+    const interactionB = makeInteraction({ interactionDir: '/tmp/b', sessionId: 'sB' });
+    store.registerInteraction(interactionA);
+    store.registerInteraction(interactionB);
+    store.registerPendingWebFetchToolUse('/tmp/a', 1, 'fetch-a');
+
+    expect(store.findInteractionWithPendingWebFetch('sA')).not.toBeNull();
+    expect(store.findInteractionWithPendingWebFetch('sB')).toBeNull();
   });
 });

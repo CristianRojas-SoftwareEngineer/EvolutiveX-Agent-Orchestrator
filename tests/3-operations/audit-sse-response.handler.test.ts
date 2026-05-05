@@ -45,6 +45,7 @@ function makeActiveInteraction(overrides: Partial<ActiveInteraction> = {}): Acti
     sessionId: 'test',
     pendingAgentToolUses: [],
     pendingWebSearchToolUses: [],
+    pendingWebFetchToolUses: [],
     requestBodyOmitted: false,
     requestBodyBytes: 100,
     stepsMeta: [],
@@ -114,6 +115,9 @@ function makeSessionStore(
     registerPendingWebSearchToolUse: vi.fn(),
     findInteractionWithPendingWebSearch: vi.fn().mockReturnValue(null),
     consumeWebSearchPending: vi.fn().mockReturnValue(null),
+    registerPendingWebFetchToolUse: vi.fn(),
+    findInteractionWithPendingWebFetch: vi.fn().mockReturnValue(null),
+    consumeWebFetchPending: vi.fn().mockReturnValue(null),
     findStaleInteractionsAwaitingContinuation: () => [],
     getAllOpenInteractions: () => [],
     withSessionLock: async <T>(_sessionId: string, fn: () => Promise<T>): Promise<T> => fn(),
@@ -792,5 +796,81 @@ describe('AuditSseResponseHandler', () => {
     await new Promise((r) => setTimeout(r, 100));
     expect(captured).not.toBeNull();
     expect(captured!.parentContext).toEqual(subInteraction.parentContext);
+  });
+
+  it('debería registrar pendingWebFetchToolUse al ver content_block_start name=WebFetch', async () => {
+    const config = makeConfig();
+    const calls: Array<{ dir: string; step: number; id: string }> = [];
+    const interaction = makeActiveInteraction();
+    const store = makeSessionStore(interaction, {
+      registerPendingWebFetchToolUse: (dir, step, id) => {
+        calls.push({ dir, step, id });
+      },
+    });
+    const handler = new AuditSseResponseHandler(
+      makeAuditWriter(),
+      makeSseReconstructor(),
+      config,
+      store,
+    );
+
+    const sse = [
+      'data: {"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"toolu_fetch_1","name":"Web_Fetch"}}',
+      '',
+      'data: {"type":"content_block_stop","index":0}',
+      '',
+      'data: {"type":"message_delta","delta":{"stop_reason":"tool_use"}}',
+      '',
+    ].join('\n');
+
+    const stream = new PassThrough();
+    handler.execute(stream, makeContext(), {});
+    stream.write(sse);
+    stream.end();
+
+    await new Promise((r) => setTimeout(r, 100));
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toEqual({ dir: interaction.interactionDir, step: 1, id: 'toolu_fetch_1' });
+  });
+
+  it('debería incluir lostPendingWebFetch en meta cuando hay pendings activos al cierre', async () => {
+    const config = makeConfig();
+    let captured: InteractionMetadata | null = null;
+
+    const interaction = makeActiveInteraction({
+      pendingWebFetchToolUses: [
+        { stepIndex: 1, toolUseId: 'toolu_fetch_lost_1' },
+        { stepIndex: 2, toolUseId: 'toolu_fetch_lost_2' },
+      ],
+    });
+
+    const sseData = [
+      'event: error',
+      'data: {"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}',
+      '',
+    ].join('\n');
+
+    const handler = new AuditSseResponseHandler(
+      makeAuditWriter({
+        writeInteractionMeta: async (_dir, meta) => {
+          captured = meta;
+        },
+      }),
+      makeSseReconstructor(),
+      config,
+      makeSessionStore(interaction),
+    );
+
+    const stream = new PassThrough();
+    handler.execute(stream, makeContext(), {});
+    stream.write(sseData);
+    stream.end();
+
+    await new Promise((r) => setTimeout(r, 100));
+    expect(captured).not.toBeNull();
+    expect(captured!.outcome).toBe('upstream-error');
+    expect(captured!.lostPendingWebFetch).toHaveLength(2);
+    expect(captured!.lostPendingWebFetch![0].toolUseId).toBe('toolu_fetch_lost_1');
+    expect(captured!.lostPendingWebFetch![1].toolUseId).toBe('toolu_fetch_lost_2');
   });
 });

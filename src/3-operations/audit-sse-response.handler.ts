@@ -191,13 +191,14 @@ export class AuditSseResponseHandler {
                     context.auditInteractionDir,
                   );
 
+                  const toolName = typeof evt.content_block.name === 'string'
+                    ? evt.content_block.name.toLowerCase()
+                    : '';
+
                   // Detección de Agent: registrar pending para que la siguiente
                   // fresh request en la misma sesión se clasifique como subagente.
-                  // El subagent_type llegará después vía input_json_delta y se
-                  // enriquecerá al cierre del bloque.
                   if (
-                    typeof evt.content_block.name === 'string' &&
-                    evt.content_block.name.toLowerCase() === 'agent' &&
+                    toolName === 'agent' &&
                     typeof evt.index === 'number'
                   ) {
                     this.sessionStore.registerPendingAgentToolUse(
@@ -211,16 +212,26 @@ export class AuditSseResponseHandler {
                     });
                   }
 
-                  // Detección de WebSearch: registrar pending para que la
-                  // siguiente fresh request (llamada de implementación del
-                  // harness) se registre como step adicional del padre en
-                  // lugar de crear un sub-agente espurio.
+                  // Detección de WebSearch: Claude Code usa 'WebSearch' (websearch),
+                  // otros proveedores pueden usar 'web_search'.
                   if (
-                    typeof evt.content_block.name === 'string' &&
-                    evt.content_block.name.toLowerCase() === 'web_search' &&
+                    (toolName === 'websearch' || toolName === 'web_search') &&
                     typeof evt.content_block.id === 'string'
                   ) {
                     this.sessionStore.registerPendingWebSearchToolUse(
+                      context.auditInteractionDir,
+                      stepNumber,
+                      evt.content_block.id,
+                    );
+                  }
+
+                  // Detección de WebFetch: Claude Code usa 'WebFetch' (webfetch),
+                  // otros proveedores pueden usar 'web_fetch'.
+                  if (
+                    (toolName === 'webfetch' || toolName === 'web_fetch') &&
+                    typeof evt.content_block.id === 'string'
+                  ) {
+                    this.sessionStore.registerPendingWebFetchToolUse(
                       context.auditInteractionDir,
                       stepNumber,
                       evt.content_block.id,
@@ -419,6 +430,17 @@ export class AuditSseResponseHandler {
             .catch((e) => console.error('Error al escribir cabeceras top-level:', e));
         }
 
+        if (context.isInternalToolStep) {
+          // Es un step interno (WebSearch/WebFetch). No cerrar la interacción padre.
+          // Marcarla como awaitingContinuation para que la próxima continuation no la considere huérfana.
+          const awaitInteraction = this.sessionStore.getInteractionByDirSync(context.auditInteractionDir);
+          if (awaitInteraction) {
+            awaitInteraction.awaitingContinuation = true;
+            awaitInteraction.awaitingSince = Date.now();
+          }
+          return;
+        }
+
         const turn = await this.sessionStore.getInteractionByDir(context.auditInteractionDir);
         this.sessionStore.closeInteraction(context.auditInteractionDir);
 
@@ -503,6 +525,8 @@ export class AuditSseResponseHandler {
       turn.pendingAgentToolUses.length > 0 ? turn.pendingAgentToolUses : undefined;
     const lostPendingsWebSearch =
       turn.pendingWebSearchToolUses.length > 0 ? turn.pendingWebSearchToolUses : undefined;
+    const lostPendingsWebFetch =
+      turn.pendingWebFetchToolUses.length > 0 ? turn.pendingWebFetchToolUses : undefined;
 
     const meta: InteractionMetadata = {
       interactionType: turn.interactionType,
@@ -525,6 +549,7 @@ export class AuditSseResponseHandler {
       ...(turn.parentContext ? { parentContext: turn.parentContext } : {}),
       ...(lostPendings ? { lostPendingAgents: lostPendings } : {}),
       ...(lostPendingsWebSearch ? { lostPendingWebSearch: lostPendingsWebSearch } : {}),
+      ...(lostPendingsWebFetch ? { lostPendingWebFetch: lostPendingsWebFetch } : {}),
       truncation: {
         requestBodyOmitted: turn.requestBodyOmitted,
         responseBodyBytesTotal: null,

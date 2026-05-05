@@ -104,8 +104,8 @@ La sesión se divide en dos árboles independientes bajo `./sessions/<session-id
 sessions/<session-id>/
   session-metrics.json          # Métricas agregadas de tokens por modelo (O(1) para el statusline)
   main-agent/                   # Turnos agénticos del usuario (fresh + continuations)
-    interaction-sequence.json   # Contador de secuencia exclusivo de este árbol
     interactions/
+      interaction-sequence.json # Contador de secuencia exclusivo de este árbol
       NN/                       # Secuencia de 2 dígitos (01, 02, …)
         meta.json               # InteractionMetadata: resumen del turno
         state.json              # Marcador "in-progress" (solo existe mientras está abierto)

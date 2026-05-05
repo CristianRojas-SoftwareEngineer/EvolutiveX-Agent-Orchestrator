@@ -1,6 +1,6 @@
 {
-  "modelId": "minimax/minimax-m2.5:free",
-  "displayName": "MiniMax M2.5",
+  "modelId": "inclusionai/ling-2.6-1t:free",
+  "displayName": "Ling 2.6",
   "costs": {
     "input": {
       "base": 0.0,

@@ -1,0 +1,16 @@
+{
+    "AUTH_METHOD": "bearer",
+    "ANTHROPIC_BASE_URL": "https://opencode.ai/zen/v1/messages",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "models/hy3-preview",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "models/ling-2.6-flash",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "models/minimax-m2.5",
+    "CLAUDE_CODE_SUBAGENT_MODEL": "models/ling-2.6-flash",
+    "pricing_rules": {
+        "schemaVersion": 1,
+        "updatedAt": "2026-05-05T00:00:00.000Z",
+        "pricingSourceUrl": "https://openrouter.ai/api/v1/models",
+        "currency": "USD",
+        "unit": "per_million_tokens",
+        "defaultModifiers": {}
+    }
+}

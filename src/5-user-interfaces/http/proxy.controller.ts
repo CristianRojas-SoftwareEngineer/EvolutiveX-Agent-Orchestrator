@@ -55,6 +55,7 @@ export class ProxyController {
       request.requestBodyOmitted = result.requestBodyOmitted;
       request.interactionType = result.interactionType;
       request.requestClassification = result.requestClassification;
+      request.isInternalToolStep = result.isInternalToolStep;
     }
   }
 
@@ -147,6 +148,7 @@ export class ProxyController {
       responseStatusCode: res.statusCode,
       interactionType: request.interactionType,
       requestClassification: request.requestClassification,
+      isInternalToolStep: request.isInternalToolStep,
     };
 
     if (isSse) {

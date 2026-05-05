@@ -28,13 +28,7 @@ export type RequestClassification =
   | { type: 'preflight-warmup' }
   | { type: 'fresh' }
   | { type: 'continuation' }
-  | { type: 'side-request' }
-  | { type: 'builtin-tool-execution' };
-
-/**
- * Subclasificación de side-requests.
- */
-export type SideRequestSubType = 'context-sync-webfetch' | 'harness-auxiliary';
+  | { type: 'side-request' };
 
 /**
  * Metadatos de un step individual dentro de un turno.
@@ -157,21 +151,6 @@ export interface PendingAgentToolUse {
   subagentType?: string;
 }
 
-/**
- * Entrada que tracquea un tool_use de built-in tool (web_search, web_fetch,
- * text_editor) emitido por el SSE y aún no correlacionado con la ejecución
- * correspondiente. Cada entrada se consume al crear la sub-interacción de
- * ejecución de la herramienta built-in.
- */
-export interface PendingBuiltinToolUse {
-  /** Step donde se emitió el tool_use. */
-  stepIndex: number;
-  /** Identificador único del tool_use bloque emitido por Anthropic. */
-  toolUseId: string;
-  /** Tipo de built-in tool: web_search, web_fetch, o text_editor. */
-  toolType: 'web_search' | 'web_fetch' | 'text_editor';
-}
-
 export interface ActiveInteraction {
   interactionDir: string;
   interactionType: InteractionType;
@@ -191,19 +170,8 @@ export interface ActiveInteraction {
    * `tool_result`. Vacío en turns que no son padres de subagentes.
    */
   pendingAgentToolUses: PendingAgentToolUse[];
-  /**
-   * Tool_uses de built-in tools (web_search, web_fetch, text_editor) emitidos
-   * por el SSE de este turn que aún no han sido correlacionados con sus
-   * ejecuciones. Vacío en turns que no emiten built-in tool uses.
-   */
-  pendingBuiltinToolUses: PendingBuiltinToolUse[];
   /** Definido sólo en turns que son subagentes. */
   parentContext?: ParentContext;
-  /**
-   * Presente en side-requests de Context Sync cuando hubo cache MISS y se
-   * degradó a forward+auditoría normal.
-   */
-  contextSyncFallback?: boolean;
   /**
    * True cuando el SSE handler procesó un step con `stop_reason: "tool_use"`
    * y retornó early esperando una continuation que aún no ha llegado.
@@ -247,22 +215,11 @@ export interface InteractionMetadata {
   /** Presente sólo en interacciones de subagentes anidadas bajo el step padre. */
   parentContext?: ParentContext;
   /**
-   * Presente en side-request de Context Sync cuando no hubo HIT de caché y se
-   * hizo fallback a upstream con auditoría normal.
-   */
-  contextSyncFallback?: boolean;
-  /**
    * Presente cuando el turno se cierra habiendo registrado Agent tool_uses
    * que no se consumieron antes del cierre (error upstream, orphan timeout,
    * graceful shutdown). Información forense para correlación offline.
    */
   lostPendingAgents?: PendingAgentToolUse[];
-  /**
-   * Presente cuando el turno se cierra habiendo registrado built-in tool_uses
-   * que no se consumieron antes del cierre. Información forense para
-   * correlación offline.
-   */
-  lostPendingBuiltinTools?: PendingBuiltinToolUse[];
 }
 
 /** Métricas agregadas de tokens por modelo dentro de una sesión. */

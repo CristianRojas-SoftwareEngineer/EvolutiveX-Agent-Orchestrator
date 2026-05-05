@@ -187,8 +187,6 @@ No hace falta leer la tabla entera del README el primer día:
 | `PORT`                       | Puerto donde escucha el proxy en tu máquina (por defecto `8787`).                                |
 | `UPSTREAM_ORIGIN`            | URL base del API al que el proxy reenvía (por defecto Anthropic).                                |
 | `FILTERED_TOOLS`             | Lista de tool names a excluir del request (coma-separado). Para desactivar: `FILTERED_TOOLS=""`. |
-| `CONTEXT_SYNC_CACHE_ENABLED` | Habilita caché inteligente para side-request Context Sync WebFetch (por defecto `true`).         |
-| `CONTEXT_SYNC_MAX_WAIT_MS`   | Timeout en ms para esperar step de WebFetch antes de fallback (por defecto `5000`).              |
 | `PROXY_UNREDACT_THINKING`    | Remueve flag de redacción de thinking para capturar contenido legible (por defecto `false`).     |
 
 La carpeta de salida es siempre `./sessions`, relativa al directorio desde donde ejecutas el proxy.

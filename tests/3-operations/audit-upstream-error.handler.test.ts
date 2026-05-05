@@ -22,8 +22,6 @@ function makeConfig(overrides: Partial<ProxyEnvironmentConfig> = {}): ProxyEnvir
     CONSOLE_REDACT: true,
     LOG_SSE: false,
     MAX_BODY_LOG_BYTES: 2048,
-    CONTEXT_SYNC_CACHE_ENABLED: true,
-    CONTEXT_SYNC_MAX_WAIT_MS: 5000,
     FILTERED_TOOLS: [],
     ...overrides,
   };
@@ -38,7 +36,8 @@ function makeSessionStore(
   return {
     getBaseDir: () => '/tmp/sessions',
     ensureAuditSessionsRoot: async () => {},
-    nextAuditInteractionSequence: async () => 1,
+    nextMainAgentSequence: async () => 1,
+    nextSideInteractionSequence: async () => 1,
     registerInteraction: (t: ActiveInteraction) => {
       registry.set(t.interactionDir, t);
     },
@@ -60,13 +59,8 @@ function makeSessionStore(
     registerPendingAgentToolUse: () => {},
     findInteractionWithPendingAgents: () => null,
     consumePendingAgentToolUse: () => {},
-    registerPendingBuiltinToolUse: () => {},
-    findInteractionWithPendingBuiltinTools: () => null,
-    consumePendingBuiltinToolUse: () => {},
     findStaleInteractionsAwaitingContinuation: () => [],
     getAllOpenInteractions: () => [],
-    registerContextSyncCache: () => {},
-    resolveContextSyncCache: () => null,
     withSessionLock: async <T>(_sessionId: string, fn: () => Promise<T>): Promise<T> => fn(),
     ...overrides,
   };
@@ -92,12 +86,14 @@ function makeAuditWriter(overrides: Partial<IAuditWriter> = {}): IAuditWriter {
       responseTruncatedByAuditLimit: false,
     }),
     writeResponseHeadersAudit: async () => {},
+    writeTopLevelResponseHeaders: async () => {},
     writeInteractionMeta: async () => {},
     appendSseLine: () => {},
     appendSseRawChunk: () => {},
     writeInteractionState: async () => {},
     removeInteractionState: async () => {},
     writeStepResponseMarkdown: async () => {},
+    writeStepThought: async () => {},
     writeTopLevelMultiStepResponse: async () => ({ written: true }),
     updateSessionMetrics: async () => {},
     ...overrides,
@@ -135,7 +131,6 @@ describe('AuditUpstreamErrorHandler', () => {
       stepsMeta: [{ stepIndex: 1, sse: true, statusCode: 200, inputTokens: 5, outputTokens: 3 }],
       sessionId: 's',
       pendingAgentToolUses: [],
-      pendingBuiltinToolUses: [],
     };
 
     const handler = new AuditUpstreamErrorHandler(
@@ -218,7 +213,6 @@ describe('AuditUpstreamErrorHandler', () => {
       stepsMeta: [{ stepIndex: 1, sse: true, statusCode: 200, inputTokens: 5, outputTokens: 3 }],
       sessionId: 's',
       pendingAgentToolUses: [],
-      pendingBuiltinToolUses: [],
       modelId: 'claude-opus-4-5',
     };
 
@@ -260,7 +254,6 @@ describe('AuditUpstreamErrorHandler', () => {
       stepsMeta: [],
       sessionId: 's',
       pendingAgentToolUses: [],
-      pendingBuiltinToolUses: [],
       parentContext: {
         parentInteractionDir: '/tmp/parent',
         parentStepIndex: 1,

@@ -1,10 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   classifyRequestBody,
-  classifySideRequestSubType,
   extractModelFromRequestBody,
   extractToolResultIdsFromRequestBody,
-  HARNESS_CONTEXT_SYNC_SUFFIX,
 } from '../../src/1-domain/services/request-classifier.service.js';
 
 describe('classifyRequestBody', () => {
@@ -99,69 +97,6 @@ describe('classifyRequestBody', () => {
       }),
     );
     expect(classifyRequestBody(body)).toEqual({ type: 'continuation' });
-  });
-});
-
-describe('classifySideRequestSubType — detección por sufijo del harness', () => {
-  it('detecta context-sync-webfetch por HARNESS_CONTEXT_SYNC_SUFFIX', () => {
-    const html = '<html><body>contenido</body></html>';
-    const content = `Web page content:\n---\n${html}\n---\n${HARNESS_CONTEXT_SYNC_SUFFIX}`;
-    const body = Buffer.from(
-      JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        tools: [],
-        messages: [{ role: 'user', content }],
-      }),
-    );
-
-    expect(classifySideRequestSubType(body)).toEqual({
-      subType: 'context-sync-webfetch',
-    });
-  });
-
-  it('retorna harness-auxiliary si no contiene HARNESS_CONTEXT_SYNC_SUFFIX', () => {
-    const body = Buffer.from(
-      JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        tools: [],
-        messages: [
-          { role: 'user', content: 'Web page content:\n---\n<html>ok</html>\n---\nResume' },
-        ],
-      }),
-    );
-
-    expect(classifySideRequestSubType(body)).toEqual({ subType: 'harness-auxiliary' });
-  });
-
-  it('retorna harness-auxiliary si no hay patrón Web page content', () => {
-    const body = Buffer.from(
-      JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        tools: [],
-        messages: [{ role: 'user', content: 'count tokens' }],
-      }),
-    );
-
-    expect(classifySideRequestSubType(body)).toEqual({ subType: 'harness-auxiliary' });
-  });
-
-  it('retorna harness-auxiliary si tools no es array vacío', () => {
-    const content = `Web page content:\n---\n<html></html>\n---\n${HARNESS_CONTEXT_SYNC_SUFFIX}`;
-    const body = Buffer.from(
-      JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        tools: [{ name: 'Read' }],
-        messages: [{ role: 'user', content }],
-      }),
-    );
-
-    expect(classifySideRequestSubType(body)).toEqual({ subType: 'harness-auxiliary' });
-  });
-
-  it('HARNESS_CONTEXT_SYNC_SUFFIX está exportado y es un string no vacío', () => {
-    expect(typeof HARNESS_CONTEXT_SYNC_SUFFIX).toBe('string');
-    expect(HARNESS_CONTEXT_SYNC_SUFFIX.length).toBeGreaterThan(10);
-    expect(HARNESS_CONTEXT_SYNC_SUFFIX).toContain('125-character');
   });
 });
 

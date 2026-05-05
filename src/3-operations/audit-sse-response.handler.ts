@@ -31,21 +31,6 @@ export class AuditSseResponseHandler {
     private logger?: Logger,
   ) {}
 
-  /**
-   * Detecta si un tool_use es de tipo built-in (web_search, web_fetch, text_editor)
-   * y retorna el tipo correspondiente, o null si no es built-in.
-   */
-  private detectBuiltinToolType(
-    toolName: string | undefined,
-  ): 'web_search' | 'web_fetch' | 'text_editor' | null {
-    if (!toolName) return null;
-    const name = toolName.toLowerCase();
-    if (name === 'web_search' || name === 'websearch') return 'web_search';
-    if (name === 'web_fetch' || name === 'webfetch') return 'web_fetch';
-    if (name === 'text_editor' || name === 'texteditor') return 'text_editor';
-    return null;
-  }
-
   public execute(
     stream: NodeJS.ReadableStream,
     context: AuditInteractionContext,
@@ -224,18 +209,6 @@ export class AuditSseResponseHandler {
                       toolUseId: evt.content_block.id,
                       jsonAcc: '',
                     });
-                  }
-
-                  // Detección de built-in tools: registrar pending para que la
-                  // siguiente builtin-tool-execution request se anide correctamente.
-                  const builtinToolType = this.detectBuiltinToolType(evt.content_block.name);
-                  if (builtinToolType) {
-                    this.sessionStore.registerPendingBuiltinToolUse(
-                      context.auditInteractionDir,
-                      stepNumber,
-                      evt.content_block.id,
-                      builtinToolType,
-                    );
                   }
                 }
               }
@@ -512,9 +485,6 @@ export class AuditSseResponseHandler {
     // Información forense: pending agents no consumidos al cierre
     const lostPendings =
       turn.pendingAgentToolUses.length > 0 ? turn.pendingAgentToolUses : undefined;
-    // Información forense: pending builtin tools no consumidos al cierre
-    const lostBuiltinPendings =
-      turn.pendingBuiltinToolUses.length > 0 ? turn.pendingBuiltinToolUses : undefined;
 
     const meta: InteractionMetadata = {
       interactionType: turn.interactionType,
@@ -536,7 +506,6 @@ export class AuditSseResponseHandler {
       errorCode: sseErrorType ?? null,
       ...(turn.parentContext ? { parentContext: turn.parentContext } : {}),
       ...(lostPendings ? { lostPendingAgents: lostPendings } : {}),
-      ...(lostBuiltinPendings ? { lostPendingBuiltinTools: lostBuiltinPendings } : {}),
       truncation: {
         requestBodyOmitted: turn.requestBodyOmitted,
         responseBodyBytesTotal: null,

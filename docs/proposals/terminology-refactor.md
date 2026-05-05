@@ -44,7 +44,6 @@ Es la interacción principal: el proxy recibió un prompt del usuario, lo forwar
 **Condiciones de clasificación:**
 - `fresh`: body con `"tools"` (array no vacío) → nueva interacción raíz o subagente
 - `continuation`: body con `"tool_result"` → step adicional de una interacción existente
-- `builtin-tool-execution`: body con tools de tipo `web_search_*`, `web_fetch_*`, `text_editor_*` → sub-interacción anidada
 
 **Estructura en disco:**
 ```
@@ -65,7 +64,7 @@ main-agent/interactions/NN/
         body.json, body.parsed.md, headers.json
       thought/                  # Solo si el step contiene extended thinking
         content.md              # Texto completo del thinking (sin truncar)
-      sub-agent-01/             # Solo si este step emitió tool_use Agent o builtin
+      sub-agent-01/             # Solo si este step emitió tool_use Agent
         meta.json               # InteractionMetadata con parentContext
         state.json
         input/, output/, steps/
@@ -102,10 +101,6 @@ side-interactions/NN/
 ### 3. `side-request` — Petición lateral del harness
 
 Peticiones con `"tools": []` (array vacío) que el harness envía en paralelo a la interacción agéntica activa. El caso más frecuente es `/v1/messages/count_tokens`. **No reemplazan ni interrumpen la interacción activa.**
-
-**Sub-tipos:**
-- `context-sync-webfetch`: reinyección de HTML que Claude Code hace para sincronizar contexto de WebFetch a subagentes. Si hay cache HIT, el proxy responde con SSE simulada localmente y **no escribe nada en disco** (transparente para el observador).
-- `harness-auxiliary`: cualquier otro side-request; se audita siempre.
 
 **Estructura en disco** (cuando se persiste):
 ```
@@ -264,17 +259,13 @@ Cada una de estas requests HTTP es un **step** en el proxy. La primera request e
 El modelo solo describe el camino feliz de un `agentic`. No modela:
 
 - **`client-preflight`**: no tiene Input ni Output propios; existe para inicialización del harness.
-- **`side-request`**: corre en paralelo a la interacción activa sin interferir con ella; el caso especial de Context Sync puede no dejar rastro en disco.
+- **`side-request`**: corre en paralelo a la interacción activa sin interferir con ella.
 
 ### 3. Subagentes paralelos
 
 El modelo muestra delegación 1-a-1. En la práctica, un step puede delegar a múltiples subagentes simultáneamente. El proxy gestiona esto con una lista de `PendingAgentToolUse` y los correlaciona a medida que llegan los `tool_result`.
 
-### 4. Built-in tools como sub-interacciones
-
-El modelo solo modela la delegación a subagentes (`Agent`). El proxy también anida como sub-interacciones las ejecuciones de built-in tools (`web_search_*`, `web_fetch_*`, `text_editor_*`), lo que permite trazar qué URLs fetchió cada subagente.
-
-### 5. Extended thinking
+### 4. Extended thinking
 
 Cuando la respuesta de un step incluye bloques de extended thinking (`type: "thinking"`), el proxy los captura y escribe el texto completo en `steps/NN/thought/content.md` (sin truncar). Si hay múltiples bloques de thinking en el mismo step, se concatenan con separadores `---`. Esta información también se refleja en `StepMeta` como `hasThinking: true` y `thinkingBlockCount`.
 

@@ -13,7 +13,7 @@ Smart Code Proxy es un intermediario en desarrollo activo que se construye media
 
 Smart Code Proxy busca **observabilidad inteligente para análisis humano**, no granularidad técnica por sí misma. El objetivo es presentar los flujos lógicos que el usuario orquesta (secuenciales y/o paralelos con subagentes) de forma natural y trazable, siguiendo el concepto de "Screaming Architecture".
 
-**No todo lo que se puede registrar debe registrarse.** Las ejecuciones internas de built-in tools (WebFetch/WebSearch) por subagentes sí son relevantes y deben registrarse como sub-interacciones, pero las reinyecciones de Context Sync deben ser transparentes (HIT sin registro) o, en caso de MISS, registrarse solo como side-request de primer nivel con `contextSyncFallback: true`.
+**No todo lo que se puede registrar debe registrarse.** Las ejecuciones internas de built-in tools (WebFetch/WebSearch) por subagentes sí son relevantes y deben registrarse como sub-interacciones.
 
 ## Motivación
 
@@ -34,12 +34,10 @@ Realizar un análisis comparativo sistemático entre la sesión registrada nativ
 Durante el análisis, clasifica todo gap en una de dos categorías:
 
 **Diferencias de diseño intencionales (no son bugs):**
-- Smart Code Proxy registra ejecuciones de built-in tools (WebFetch/WebSearch) como sub-interacciones anidadas (más detalle que el harness nativo)
 - Smart Code Proxy registra preflights (`client-preflight`) como interacciones separadas (el harness las agrupa en el log)
 - Estructura de directorios en disco vs formato JSONL del harness (diferente representación, mismo contenido lógico)
 
 **Inconsistencias/bugs (requieren investigación/corrección):**
-- Context Sync que debería ser HIT aparece como MISS (`contextSyncFallback: true` cuando el subagente ya completó)
 - Subagentes que el harness registra pero el proxy no captura
 - Tool_use IDs que no correlacionan entre harness y proxy
 - Interacciones huérfanas (state.json sin meta.json correspondiente)
@@ -94,7 +92,7 @@ Para interpretar correctamente la estructura de interacciones, usa la skill:
 
 Esta skill proporciona el conocimiento de dominio necesario sobre:
 - Arquitectura PKA de 6 capas del proxy
-- Clasificación de turnos (agentic-turn, client-preflight, side-request, continuation, builtin-tool-execution)
+- Clasificación de turnos (agentic, client-preflight, side-request, continuation)
 - Jerarquía de archivos de auditoría (meta.json, state.json, steps/, sub-interactions/)
 - Subagentes anidados y correlación tool_use/tool_result
 - Variables de entorno y comportamiento del proxy
@@ -164,7 +162,7 @@ Para cada turno (principal y subagentes), compara ambas fuentes:
 
 **Clasificación del turno:**
 1. ¿Cómo clasifica el harness esta interacción vs. cómo la clasifica el proxy?
-2. ¿Coinciden las clasificaciones con la taxonomía (agentic-turn, client-preflight, side-request, continuation, builtin-tool-execution)?
+2. ¿Coinciden las clasificaciones con la taxonomía (agentic, client-preflight, side-request, continuation)?
 
 **Evolución y flujo:**
 3. Revisa los steps en `C:\Users\Cristian\Desktop\Proyectos\Smart Code Proxy\sessions\{session-id}\steps\` del proxy y compáralos con los eventos en el `.jsonl` del harness
@@ -175,20 +173,9 @@ Para cada turno (principal y subagentes), compara ambas fuentes:
 6. Tool uses detectados: ¿El proxy identifica correctamente los `Agent` tool type?
 7. Decisiones de enrutamiento: ¿El proxy enrutó correctamente side-requests vs. agentic-turns?
 
-**Context Sync (verificación crítica):**
-8. Busca interacciones con `"contextSyncFallback": true` en el proxy
-9. Si existen: verificar si deberían haber sido HIT (¿el subagente que hizo WebFetch completó su step antes de la reinyección?)
-10. Verificar timestamps: ¿El side-request de Context Sync llegó antes de que el subagente registrara su step? (race condition)
-11. Evaluar: Cada `contextSyncFallback: true` cuando el subagente completó previamente es un **inconsistencia potencial** (caché no funcionó como esperado)
-
-**Built-in tools de subagentes:**
-12. Verificar que ejecuciones WebFetch/WebSearch de subagentes aparezcan como sub-interacciones (nivel 2)
-13. Confirmar que tengan `parentContext` apuntando al subagente padre
-14. Esto es comportamiento **correcto por diseño**, no un gap
-
 **Metadata y métricas:**
-15. Compara latencias, conteos de tokens, y `outcome` entre ambos sistemas
-16. Identifica discrepancias numéricas significativas
+8. Compara latencias, conteos de tokens, y `outcome` entre ambos sistemas
+9. Identifica discrepancias numéricas significativas
 
 ### Paso 4: Síntesis comparativa y detección de gaps
 
@@ -204,16 +191,14 @@ Con base en el análisis anterior, produce una explicación estructurada que cub
 3. **Gaps identificados** (clasificados por tipo):
 
    **Inconsistencias (requieren investigación/corrección):**
-   - Context Sync MISS cuando debería ser HIT (`contextSyncFallback: true` con subagente completado previamente)
    - Subagentes del harness sin correspondiente en proxy
    - Tool_use IDs descorrelacionados entre harness y proxy
    - Interacciones huérfanas (state.json sin meta.json)
    - Subagentes de nivel 2+ sin `parentContext` correcto
 
    **Diferencias de diseño (comportamiento intencional, no bugs):**
-   - Mayor profundidad de anidamiento en proxy (built-in tools como sub-interacciones de subagentes)
    - Preflights (`client-preflight`) como interacciones separadas en lugar de eventos en log
-   - Metadata adicional en proxy (latencias, tokens por step, cache metrics)
+   - Metadata adicional en proxy (latencias, tokens por step)
    - `interactionType` explícito vs inferido del contexto en harness
 
 4. **Comportamiento observado**:
@@ -246,6 +231,5 @@ Antes de entregar el análisis, verifica:
 5. ¿El análisis refleja comprensión de las diferencias de diseño entre el formato nativo de Claude Code y la arquitectura PKA del proxy?
 6. ¿Las recomendaciones para la siguiente iteración son accionables y específicas?
 7. ¿Se clasificaron correctamente los gaps como "inconsistencias" (bugs) vs "diferencias de diseño" (intencional)?
-8. ¿Se identificaron Context Sync MISS (`contextSyncFallback: true`) que deberían haber sido HIT?
 
 Solo entrega el análisis cuando estas verificaciones hayan pasado.

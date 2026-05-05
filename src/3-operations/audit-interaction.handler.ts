@@ -1,23 +1,17 @@
 import * as path from 'node:path';
-import { createHash } from 'node:crypto';
-import { Readable } from 'node:stream';
 import { SessionResolverService } from '../1-domain/services/session-resolver.service.js';
 import type { ISessionStore } from '../2-services/ports/session-store.port.js';
 import type { IAuditWriter } from '../2-services/ports/audit-writer.port.js';
 import {
   classifyRequestBody,
-  classifySideRequestSubType,
   extractModelFromRequestBody,
-  HARNESS_CONTEXT_SYNC_SUFFIX,
 } from '../1-domain/services/request-classifier.service.js';
-import { buildSimulatedSseFromText } from '../1-domain/services/sse-simulator.service.js';
 import {
   ActiveInteraction,
   InteractionType,
   MarkdownRenderContext,
   ParentContext,
   PendingAgentToolUse,
-  PendingBuiltinToolUse,
   RequestClassification,
   computeTokenTotals,
   computeSseRawBytesTotal,
@@ -34,18 +28,6 @@ import {
   PAD_SUB_AGENT,
 } from '../1-domain/constants/audit-paths.js';
 
-/**
- * Extrae el contenido HTML entre los primeros dos fences `---` de un mensaje
- * de Context Sync. El HTML es el contenido reinyectado por el harness.
- */
-function extractHtmlBetweenFences(bodyStr: string): string {
-  const firstFence = bodyStr.indexOf('---');
-  if (firstFence < 0) return '';
-  const secondFence = bodyStr.indexOf('---', firstFence + 3);
-  if (secondFence < 0) return '';
-  return bodyStr.slice(firstFence + 3, secondFence);
-}
-
 export interface AuditInteractionResult {
   auditInteractionDir: string;
   requestBodyOmitted: boolean;
@@ -53,10 +35,6 @@ export interface AuditInteractionResult {
   auditSessionId: string;
   interactionType: InteractionType;
   requestClassification: RequestClassification;
-  contextSyncCacheHit?: boolean;
-  contextSyncSseStream?: NodeJS.ReadableStream;
-  webFetchHtmlHash?: string;
-  webFetchPromptHash?: string;
 }
 
 /**
@@ -135,22 +113,6 @@ export class AuditInteractionHandler {
       return this.handlePreflightWarmup(params, headersForAudit, auditSessionId, classification);
     }
 
-    if (classification.type === 'builtin-tool-execution') {
-      // Buscar una interacción (incluyendo subagentes) con pending builtin tools
-      const builtinPendingMatch = this.sessionStore.findInteractionWithPendingBuiltinTools(auditSessionId);
-      if (builtinPendingMatch) {
-        return this.handleBuiltinToolExecution(
-          params,
-          headersForAudit,
-          auditSessionId,
-          classification,
-          builtinPendingMatch,
-        );
-      }
-      // Si no hay match, tratar como fresh (degradación graceful)
-      return this.handleFresh(params, headersForAudit, auditSessionId, { type: 'fresh' });
-    }
-
     // Fallback inalcanzable
     return this.handleFresh(params, headersForAudit, auditSessionId, { type: 'fresh' });
   }
@@ -209,7 +171,6 @@ export class AuditInteractionHandler {
       stepsMeta: [],
       sessionId: auditSessionId,
       pendingAgentToolUses: [],
-      pendingBuiltinToolUses: [],
       modelId: extractModelFromRequestBody(params.rawBody) ?? undefined,
     });
 
@@ -221,103 +182,6 @@ export class AuditInteractionHandler {
       interactionType: 'agentic',
       requestClassification: classification,
     };
-  }
-
-  /**
-   * Crea una interacción de ejecución de built-in tool anidada bajo el step del
-   * subagente que emitió el tool_use. Similar a handleSubagent, pero para
-   * web_search/web_fetch/text_editor en lugar de Agent.
-   */
-  private async handleBuiltinToolExecution(
-    params: { rawBody: Buffer; requestId: string },
-    headersForAudit: Record<string, string | string[] | undefined>,
-    auditSessionId: string,
-    classification: RequestClassification,
-    match: {
-      interaction: { interactionDir: string; pendingBuiltinToolUses: PendingBuiltinToolUse[] };
-      pendings: PendingBuiltinToolUse[];
-    },
-  ): Promise<AuditInteractionResult> {
-    return this.sessionStore.withSessionLock(auditSessionId, async () => {
-      const parentInteractionDir = match.interaction.interactionDir;
-      const parentStepIndex = match.pendings.reduce(
-        (min, p) => Math.min(min, p.stepIndex),
-        match.pendings[0].stepIndex,
-      );
-
-      // Correlación tool_use ↔ ejecución builtin:
-      // - 1 pending → unívoco, lo consumimos ya.
-      // - >1 pending → ambiguo; dejamos null.
-      const triggeringToolUseId = match.pendings.length === 1 ? match.pendings[0].toolUseId : null;
-
-      const subSeq = await this.auditWriter.nextSubInteractionSequence(
-        parentInteractionDir,
-        parentStepIndex,
-      );
-      const folderName = `${PREFIX_SUB_AGENT}-${String(subSeq).padStart(PAD_SUB_AGENT, '0')}`;
-
-      const wr = await this.auditWriter.writeSubInteractionRequest({
-        parentInteractionDir,
-        parentStepIndex,
-        folderName,
-        headers: headersForAudit,
-        bodyBuffer: params.rawBody,
-        maxAuditRequestBytes: this.config.MAX_AUDIT_REQUEST_BODY_BYTES,
-      });
-
-      // Escribir steps/01/request para simetría estructural
-      const stepDir = path.join(wr.dir, DIR_STEPS, String(1).padStart(PAD_STEP, '0'));
-      await this.auditWriter.writeStepRequest({
-        stepDir,
-        headers: headersForAudit,
-        bodyBuffer: params.rawBody,
-        maxAuditRequestBytes: this.config.MAX_AUDIT_REQUEST_BODY_BYTES,
-      });
-
-      const startedAt = Date.now();
-      const parentContext: ParentContext = {
-        parentInteractionDir,
-        parentStepIndex,
-        triggeringToolUseId,
-      };
-
-      await this.auditWriter.writeInteractionState(wr.dir, {
-        state: 'in-progress',
-        startedAt: new Date(startedAt).toISOString(),
-        interactionType: 'agentic',
-        parentContext,
-      });
-
-      // Si la correlación fue unívoca, consumimos el pending en este momento.
-      if (triggeringToolUseId) {
-        this.sessionStore.consumePendingBuiltinToolUse(parentInteractionDir, triggeringToolUseId);
-      }
-
-      this.sessionStore.registerInteraction({
-        interactionDir: wr.dir,
-        interactionType: 'agentic',
-        stepCount: 1,
-        requestSequence: subSeq,
-        startedAt,
-        requestBodyOmitted: wr.requestBodyOmitted,
-        requestBodyBytes: params.rawBody.length,
-        stepsMeta: [],
-        sessionId: auditSessionId,
-        pendingAgentToolUses: [],
-        pendingBuiltinToolUses: [],
-        parentContext,
-        modelId: extractModelFromRequestBody(params.rawBody) ?? undefined,
-      });
-
-      return {
-        auditInteractionDir: wr.dir,
-        requestBodyOmitted: wr.requestBodyOmitted,
-        requestSequence: subSeq,
-        auditSessionId,
-        interactionType: 'agentic',
-        requestClassification: classification,
-      };
-    });
   }
 
   /**
@@ -416,7 +280,6 @@ export class AuditInteractionHandler {
         stepsMeta: [],
         sessionId: auditSessionId,
         pendingAgentToolUses: [],
-        pendingBuiltinToolUses: [],
         parentContext,
         modelId: extractModelFromRequestBody(params.rawBody) ?? undefined,
       });
@@ -491,12 +354,6 @@ export class AuditInteractionHandler {
       this.sessionStore.consumePendingAgentToolUse(parentInteraction.interactionDir, toolUseId);
     }
 
-    // También consumir cualquier pending builtin tool que corresponda a los
-    // tool_result_ids recibidos (por si la ejecución de builtin tool ya completó).
-    for (const toolUseId of toolUseIds) {
-      this.sessionStore.consumePendingBuiltinToolUse(parentInteraction.interactionDir, toolUseId);
-    }
-
     return {
       auditInteractionDir: parentInteraction.interactionDir,
       requestBodyOmitted: parentInteraction.requestBodyOmitted,
@@ -558,7 +415,6 @@ export class AuditInteractionHandler {
       stepsMeta: [],
       sessionId: auditSessionId,
       pendingAgentToolUses: [],
-      pendingBuiltinToolUses: [],
       modelId: extractModelFromRequestBody(params.rawBody) ?? undefined,
     });
 
@@ -578,55 +434,6 @@ export class AuditInteractionHandler {
     auditSessionId: string,
     classification: RequestClassification,
   ): Promise<AuditInteractionResult> {
-    const subType = classifySideRequestSubType(params.rawBody);
-
-    if (subType.subType === 'context-sync-webfetch') {
-      // Extraer HTML entre los fences para calcular hashes
-      const bodyStr = params.rawBody.toString('utf8');
-      const htmlHash = createHash('sha256').update(extractHtmlBetweenFences(bodyStr)).digest('hex');
-      const promptHash = createHash('sha256').update(HARNESS_CONTEXT_SYNC_SUFFIX).digest('hex');
-
-      const cachedResponse = this.sessionStore.resolveContextSyncCache(htmlHash, promptHash);
-      if (cachedResponse) {
-        this.logger?.info(
-          {
-            event: 'audit_side_request_cache_hit',
-            sessionId: auditSessionId,
-            requestId: params.requestId,
-            htmlHash,
-            promptHash,
-          },
-          'Side-request: HIT desde caché (transparente)',
-        );
-
-        const model = extractModelFromRequestBody(params.rawBody) || 'unknown';
-        const ssePayload = buildSimulatedSseFromText({ text: cachedResponse, model });
-        return {
-          auditInteractionDir: '',
-          requestBodyOmitted: false,
-          requestSequence: 0,
-          auditSessionId,
-          interactionType: 'side-request',
-          requestClassification: classification,
-          contextSyncCacheHit: true,
-          contextSyncSseStream: Readable.from([ssePayload]),
-          webFetchHtmlHash: htmlHash,
-          webFetchPromptHash: promptHash,
-        };
-      }
-
-      this.logger?.debug(
-        {
-          event: 'audit_side_request_cache_miss',
-          sessionId: auditSessionId,
-          requestId: params.requestId,
-          htmlHash,
-          promptHash,
-        },
-        'Side-request: MISS, se auditará como side-request normal',
-      );
-    }
-
     const seq = await this.sessionStore.nextSideInteractionSequence(auditSessionId);
     const folderName = this.sessionResolver.formatAuditInteractionDirName(seq);
     const interactionDir = path.join(
@@ -674,7 +481,6 @@ export class AuditInteractionHandler {
       stepsMeta: [],
       sessionId: auditSessionId,
       pendingAgentToolUses: [],
-      pendingBuiltinToolUses: [],
       modelId: extractModelFromRequestBody(params.rawBody) ?? undefined,
     });
 
@@ -739,7 +545,6 @@ export class AuditInteractionHandler {
       stepsMeta: [],
       sessionId: auditSessionId,
       pendingAgentToolUses: [],
-      pendingBuiltinToolUses: [],
       modelId: extractModelFromRequestBody(params.rawBody) ?? undefined,
     });
 
@@ -875,7 +680,6 @@ export class AuditInteractionHandler {
       errorMessage: null,
       errorCode: null,
       ...(interaction.parentContext ? { parentContext: interaction.parentContext } : {}),
-      ...(interaction.contextSyncFallback ? { contextSyncFallback: true } : {}),
       ...(lostPendings ? { lostPendingAgents: lostPendings } : {}),
       truncation: {
         requestBodyOmitted: interaction.requestBodyOmitted,

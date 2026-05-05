@@ -23,8 +23,6 @@ function makeConfig(overrides: Partial<ProxyEnvironmentConfig> = {}): ProxyEnvir
     CONSOLE_REDACT: true,
     LOG_SSE: false,
     MAX_BODY_LOG_BYTES: 2048,
-    CONTEXT_SYNC_CACHE_ENABLED: true,
-    CONTEXT_SYNC_MAX_WAIT_MS: 5000,
     FILTERED_TOOLS: [],
     ...overrides,
   };
@@ -64,13 +62,8 @@ function makeSessionStore(overrides: Partial<ISessionStore> = {}): ISessionStore
     registerPendingAgentToolUse: () => {},
     findInteractionWithPendingAgents: () => null,
     consumePendingAgentToolUse: () => {},
-    registerPendingBuiltinToolUse: () => {},
-    findInteractionWithPendingBuiltinTools: () => null,
-    consumePendingBuiltinToolUse: () => {},
     findStaleInteractionsAwaitingContinuation: () => [],
     getAllOpenInteractions: () => [],
-    registerContextSyncCache: () => {},
-    resolveContextSyncCache: () => null,
     withSessionLock: async <T>(_sessionId: string, fn: () => Promise<T>): Promise<T> => fn(),
     ...overrides,
   };
@@ -102,12 +95,14 @@ function makeAuditWriter(overrides: Partial<IAuditWriter> = {}): IAuditWriter {
       responseTruncatedByAuditLimit: false,
     }),
     writeResponseHeadersAudit: async () => {},
+    writeTopLevelResponseHeaders: async () => {},
     writeInteractionMeta: async () => {},
     appendSseLine: () => {},
     appendSseRawChunk: () => {},
     writeInteractionState: async () => {},
     removeInteractionState: async () => {},
     writeStepResponseMarkdown: async () => {},
+    writeStepThought: async () => {},
     writeTopLevelMultiStepResponse: async () => ({ written: true }),
     updateSessionMetrics: async () => {},
     ...overrides,
@@ -165,97 +160,6 @@ function makeContinuationBody(toolUseId: string): Buffer {
 }
 
 describe('AuditInteractionHandler', () => {
-  it('side-request context-sync HIT no audita y retorna stream SSE simulado', async () => {
-    const config = makeConfig({ CONTEXT_SYNC_CACHE_ENABLED: true });
-    const HARNESS_CONTEXT_SYNC_SUFFIX = `Provide a concise response based only on the content above. In your response:
-    - Enforce a strict 125-character maximum for quotes from any source document. Open Source Software is ok as long as we respect the license.
-    - Use quotation marks for exact language from articles; any language outside of the quotation should never be word-for-word the same.
-    - You are not a lawyer and never comment on the legality of your own prompts and responses.
-    - Never produce or reproduce exact song lyrics.`;
-    const html = '<html><body>contenido</body></html>';
-    const content = `Web page content:\n---\n${html}\n---\n${HARNESS_CONTEXT_SYNC_SUFFIX}`;
-
-    const store = makeSessionStore({
-      resolveContextSyncCache: (_h: string, _p: string) => 'cached response',
-    });
-    let writeInteractionRequestCalled = false;
-
-    const handler = new AuditInteractionHandler(
-      new SessionResolverService(config),
-      store,
-      makeAuditWriter({
-        writeInteractionRequest: async () => {
-          writeInteractionRequestCalled = true;
-          return { dir: '/tmp/should-not-be-used', requestBodyOmitted: false };
-        },
-      }),
-      config,
-    );
-
-    const ctxBody = Buffer.from(
-      JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        tools: [],
-        messages: [{ role: 'user', content }],
-      }),
-    );
-
-    const result = await handler.execute({
-      headers: {},
-      rawBody: ctxBody,
-      requestId: 'req-side-cache',
-    });
-
-    expect(result).not.toBeNull();
-    expect(result!.contextSyncCacheHit).toBe(true);
-    expect(result!.contextSyncSseStream).toBeDefined();
-    expect(writeInteractionRequestCalled).toBe(false);
-  });
-
-  it('side-request context-sync MISS audita como side-request normal', async () => {
-    const config = makeConfig({ CONTEXT_SYNC_CACHE_ENABLED: true });
-    const HARNESS_CONTEXT_SYNC_SUFFIX = `Provide a concise response based only on the content above. In your response:
-    - Enforce a strict 125-character maximum for quotes from any source document. Open Source Software is ok as long as we respect the license.
-    - Use quotation marks for exact language from articles; any language outside of the quotation should never be word-for-word the same.
-    - You are not a lawyer and never comment on the legality of your own prompts and responses.
-    - Never produce or reproduce exact song lyrics.`;
-    const html = '<html><body>contenido</body></html>';
-    const content = `Web page content:\n---\n${html}\n---\n${HARNESS_CONTEXT_SYNC_SUFFIX}`;
-
-    let writeInteractionRequestCalled = false;
-    const handler = new AuditInteractionHandler(
-      new SessionResolverService(config),
-      makeSessionStore({
-        resolveContextSyncCache: () => null,
-      }),
-      makeAuditWriter({
-        writeInteractionRequest: async () => {
-          writeInteractionRequestCalled = true;
-          return { dir: '/tmp/sessions/s/interactions/000001_req-side', requestBodyOmitted: false };
-        },
-      }),
-      config,
-    );
-
-    const ctxBody = Buffer.from(
-      JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        tools: [],
-        messages: [{ role: 'user', content }],
-      }),
-    );
-
-    const result = await handler.execute({
-      headers: {},
-      rawBody: ctxBody,
-      requestId: 'req-side-cache-miss',
-    });
-    expect(result).not.toBeNull();
-    expect(result!.contextSyncCacheHit).toBeUndefined();
-    expect(result!.interactionType).toBe('side-request');
-    expect(writeInteractionRequestCalled).toBe(true);
-  });
-
   it('debería clasificar fresh: crear interacción y registrar interacción', async () => {
     const config = makeConfig();
     let registeredInteraction: ActiveInteraction | null = null;
@@ -288,7 +192,7 @@ describe('AuditInteractionHandler', () => {
     const registeredInteractions: ActiveInteraction[] = [];
     let seq = 0;
     const store = makeSessionStore({
-      nextAuditInteractionSequence: async () => {
+      nextSideInteractionSequence: async () => {
         seq += 1;
         return seq;
       },
@@ -336,7 +240,6 @@ describe('AuditInteractionHandler', () => {
       stepsMeta: [],
       sessionId: 's',
       pendingAgentToolUses: [],
-      pendingBuiltinToolUses: [],
     };
     const store = makeSessionStore({
       getInteractionByToolUseId: (id: string) => (id === 'tool-x' ? parentInteraction : null),
@@ -540,7 +443,6 @@ describe('AuditInteractionHandler', () => {
       stepsMeta: [],
       sessionId: 's',
       pendingAgentToolUses: [],
-      pendingBuiltinToolUses: [],
     };
     const store = makeSessionStore({
       getInteractionByToolUseId: (id: string) => (id === 'first-id' ? parentInteraction : null),
@@ -715,7 +617,7 @@ describe('AuditInteractionHandler', () => {
       pendingAgentToolUses: [
         { stepIndex: 2, toolUseId: 'toolu_unique', subagentType: 'general-purpose' },
       ],
-      pendingBuiltinToolUses: [],
+
     };
     let consumed: { dir: string; id: string } | null = null;
     let registeredSub: ActiveInteraction | null = null;
@@ -794,7 +696,7 @@ describe('AuditInteractionHandler', () => {
         { stepIndex: 1, toolUseId: 'toolu_a', subagentType: 'Explore' },
         { stepIndex: 1, toolUseId: 'toolu_b', subagentType: 'Plan' },
       ],
-      pendingBuiltinToolUses: [],
+
     };
     let consumeCalls = 0;
     let registeredSub: ActiveInteraction | null = null;
@@ -852,7 +754,7 @@ describe('AuditInteractionHandler', () => {
       stepsMeta: [],
       sessionId: 's',
       pendingAgentToolUses: [{ stepIndex: 1, toolUseId: 'toolu_x' }],
-      pendingBuiltinToolUses: [],
+
     };
     const order: string[] = [];
     const store = makeSessionStore({
@@ -904,7 +806,7 @@ describe('AuditInteractionHandler', () => {
       stepsMeta: [],
       sessionId: 's',
       pendingAgentToolUses: [{ stepIndex: 1, toolUseId: 'tool-x', subagentType: 'Plan' }],
-      pendingBuiltinToolUses: [],
+
     };
     const consumed: Array<{ dir: string; id: string }> = [];
 
@@ -970,7 +872,7 @@ describe('AuditInteractionHandler', () => {
       stepsMeta: [{ stepIndex: 1, sse: true, statusCode: 200, inputTokens: 10, outputTokens: 5 }],
       sessionId: 'test-session',
       pendingAgentToolUses: [],
-      pendingBuiltinToolUses: [],
+
       modelId: 'claude-opus-4-5',
     };
 
@@ -1016,7 +918,7 @@ describe('AuditInteractionHandler', () => {
       stepsMeta: [{ stepIndex: 1, sse: true, statusCode: 200, stopReason: 'tool_use' }],
       sessionId: 'test-session',
       pendingAgentToolUses: [{ stepIndex: 1, toolUseId: 'toolu_orphan' }],
-      pendingBuiltinToolUses: [],
+
       awaitingContinuation: true,
       awaitingSince: Date.now() - 120_000,
     };

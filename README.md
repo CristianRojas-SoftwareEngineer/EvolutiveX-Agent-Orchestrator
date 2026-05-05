@@ -81,10 +81,6 @@ Ideal para depurar comportamientos erráticos en herramientas de CLI (como `clau
 - Agrupa las peticiones de un turno completo (prompt → respuesta final) bajo una interacción con subdirectorios `steps/`.
 - Tres tipos de interacción: `agentic` (turno del usuario con prompt y respuesta), `client-preflight` (quota check + cache warm-up) y `side-request` (peticiones con `"tools": []`, ej. count_tokens, generación de títulos).
 - Los `side-request` se auditan en su propia interacción sin desplazar al turno activo principal, evitando corrupción de metadata por race conditions.
-- Los `side-request` de Context Sync WebFetch (`context-sync-webfetch`) implementan **caché inteligente para observabilidad transparente**:
-  - **HIT**: Se detecta por heurística, se responde localmente con SSE simulada reutilizando el resumen del subagente, **sin llamar a Anthropic** y **sin crear interacción en disco** (completamente transparente para el observador humano).
-  - **MISS**: El step resuelto no aparece dentro de `CONTEXT_SYNC_MAX_WAIT_MS`. Se degrada a side-request normal de primer nivel con `contextSyncFallback: true` en `meta.json`. Esto es un indicador de **potencial inconsistencia** si el subagente ya había completado (el caché debería haber resuelto el HIT). Ver diagnóstico en [`docs/issues/context-sync-cache.md`](docs/issues/context-sync-cache.md).
-- **Principio de observabilidad**: Las ejecuciones internas de built-in tools (WebFetch/WebSearch) por subagentes sí se registran como sub-interacciones (aportan valor al entender qué información consumió cada subagente). Las reinyecciones de Context Sync deben ser transparentes (HIT sin registro) para no duplicar la información ni crear ambigüedad.
 - Los turnos se indexan por `interactionDir` (único por request) permitiendo múltiples turnos concurrentes en la misma sesión (parallel subagents).
 - Las continuaciones (`tool_result`) se rutean al turno padre mediante correlación por `tool_use_id`, eliminando la misatribución de steps.
 - Los preflights (`client-preflight`) se cierran inmediatamente al recibir su respuesta, evitando turnos zombie que bloquean la sesión.
@@ -241,11 +237,9 @@ Personaliza el comportamiento ajustando estas variables en tu entorno o en un ar
 |                  |                                 | Logs dual-transport: terminal formateada + `server/logs.jsonl` (JSON crudo).                                                          | —                                                                                       |
 |                  | `MAX_BODY_LOG_BYTES`            | Límite restrictivo para visualizar cuerpos crudos por log.                                                                         | `2048`                                                                                  |
 |   **Thinking**   | `PROXY_UNREDACT_THINKING`       | Remueve el flag `redact-thinking-2026-02-12` del header `anthropic-beta` para capturar contenido thinking legible.                 | `false` (desactivado)                                                                   |
-| **Context Sync** | `CONTEXT_SYNC_CACHE_ENABLED`    | Habilita caché inteligente para side-request `context-sync-webfetch`. Si está en `0/false`, siempre hace forward+auditoría normal. | `true`                                                                                  |
-|                  | `CONTEXT_SYNC_MAX_WAIT_MS`      | Tiempo máximo (ms) para esperar el step de WebFetch ya resumido antes de fallback.                                                 | `5000`                                                                                  |
 |   **Filtrado**   | `FILTERED_TOOLS`                | Lista de tool names a excluir del request (coma-separado). Reduce tokens y ruido en auditoría.                                     | `ScheduleWakeup,NotebookEdit,ExitWorktree,EnterWorktree,CronList,CronDelete,CronCreate` |
 
-> **Auditoría por defecto (con excepción explícita).** El proxy escribe en `./sessions` para `agentic`, `client-preflight` y `side-request` normales. Excepción: side-request Context Sync de WebFetch con caché HIT (`context-sync-webfetch`) se responden localmente sin crear interacción en disco. En side-request SSE auditados: (a) `steps/NNN/response/sse.jsonl` es la **fuente de verdad** (escritura síncrona, orden determinista); (b) `steps/NNN/response/sse.txt` es raw dump de depuración acotado por `MAX_AUDIT_SSE_RAW_BYTES`; (c) `response/body.json` top-level se reconstruye desde `sse.jsonl`. Detalle en [`docs/how-sse-reconstruction-works.md`](docs/how-sse-reconstruction-works.md).
+> **Auditoría por defecto.** El proxy escribe en `./sessions` para `agentic`, `client-preflight` y `side-request`. En side-request SSE auditados: (a) `steps/NNN/response/sse.jsonl` es la **fuente de verdad** (escritura síncrona, orden determinista); (b) `steps/NNN/response/sse.txt` es raw dump de depuración acotado por `MAX_AUDIT_SSE_RAW_BYTES`; (c) `response/body.json` top-level se reconstruye desde `sse.jsonl`. Detalle en [`docs/how-sse-reconstruction-works.md`](docs/how-sse-reconstruction-works.md).
 
 <a name="correlación-de-sesión-sessionid"></a>
 
@@ -373,6 +367,5 @@ Tras cada turno, se genera una estructura bajo `./sessions/<session-id>/main-age
 
 El proxy intercepta métricas de uso de tokens que pueden ser cuantificadas. Consulta estas guías adicionales para configurar precios y estimar costos según el tráfico auditado:
 
-- [Caché inteligente de Context Sync WebFetch (HIT/MISS y reglas de auditoría)](./docs/issues/context-sync-cache.md)
 - [Coste por interacción: Claude Code y la API de Anthropic](./docs/how-to-calculate-anthropic-api-costs.md)
 - [Coste por generación: OpenRouter y la API Chat Completions](./docs/how-to-calculate-openrouter-api-costs.md)

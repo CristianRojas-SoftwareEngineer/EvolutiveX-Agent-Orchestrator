@@ -9,7 +9,7 @@ import { AuditInteractionContext } from '../../1-domain/types/audit.types.js';
 export class ProxyController {
   constructor(private deps: ProxyDependencies) {}
 
-  public async preHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+  public async preHandler(request: FastifyRequest, _reply: FastifyReply): Promise<void> {
     let rawBody: Buffer;
 
     if (
@@ -40,36 +40,12 @@ export class ProxyController {
     }
 
     request.rawBodyBytes = filteredBody.length;
-    const preHandlerStart = Date.now();
 
     const result = await this.deps.auditInteractionHandler.execute({
       headers: request.headers,
       rawBody: filteredBody,
       requestId: request.id,
     });
-
-    if (result?.contextSyncCacheHit && result.contextSyncSseStream) {
-      const orgHeader = request.headers['anthropic-organization-id'];
-      reply
-        .header('content-type', 'text/event-stream')
-        .header('cache-control', 'no-cache')
-        .header('connection', 'keep-alive');
-      if (typeof orgHeader === 'string' && orgHeader.length > 0) {
-        reply.header('anthropic-organization-id', orgHeader);
-      }
-      request.log.info(
-        {
-          event: 'context-sync.hit',
-          sessionId: result.auditSessionId,
-          htmlHash: result.webFetchHtmlHash,
-          promptHash: result.webFetchPromptHash,
-          latencyMs: Date.now() - preHandlerStart,
-        },
-        'Context Sync side-request servido desde caché local',
-      );
-      reply.send(result.contextSyncSseStream);
-      return;
-    }
 
     if (result) {
       request.auditSessionId = result.auditSessionId;

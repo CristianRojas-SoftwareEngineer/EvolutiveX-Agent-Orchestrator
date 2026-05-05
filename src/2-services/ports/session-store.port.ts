@@ -1,7 +1,6 @@
 import {
   ActiveInteraction,
   PendingAgentToolUse,
-  PendingBuiltinToolUse,
   StepMeta,
 } from '../../1-domain/types/audit.types.js';
 
@@ -50,31 +49,6 @@ export interface ISessionStore {
    */
   consumePendingAgentToolUse(interactionDir: string, toolUseId: string): void;
   /**
-   * Registra un tool_use de built-in tool (web_search, web_fetch, text_editor)
-   * emitido por el SSE de la interacción cuya ejecución aún no ha llegado.
-   * Idempotente: si la entrada ya existe, no hace nada.
-   */
-  registerPendingBuiltinToolUse(
-    interactionDir: string,
-    stepIndex: number,
-    toolUseId: string,
-    toolType: 'web_search' | 'web_fetch' | 'text_editor',
-  ): void;
-  /**
-   * Busca en la sesión la primera interacción con `pendingBuiltinToolUses` no vacío.
-   * A diferencia de `findInteractionWithPendingAgents`, este método SÍ considera
-   * interacciones con `parentContext` (subagentes pueden ser padres de builtin tools).
-   * Devuelve copia del array de pendings.
-   */
-  findInteractionWithPendingBuiltinTools(
-    sessionId: string,
-  ): { interaction: ActiveInteraction; pendings: PendingBuiltinToolUse[] } | null;
-  /**
-   * Consume (elimina) la entrada de `pendingBuiltinToolUses` cuyo `toolUseId`
-   * coincide en la interacción registrada. Idempotente.
-   */
-  consumePendingBuiltinToolUse(interactionDir: string, toolUseId: string): void;
-  /**
    * Busca en la sesión interacciones con `awaitingContinuation === true` cuyo
    * `awaitingSince` supera `maxAgeMs` milisegundos. Devuelve las interacciones
    * stale para que el caller las cierre como orphans.
@@ -85,16 +59,6 @@ export interface ISessionStore {
    * Usado para graceful shutdown.
    */
   getAllOpenInteractions(): ActiveInteraction[];
-  /**
-   * Registra una respuesta de WebFetch en el caché de Context Sync.
-   * Key: ${htmlHash}:${promptHash}, TTL: 5 minutos.
-   */
-  registerContextSyncCache(htmlHash: string, promptHash: string, response: string): void;
-  /**
-   * Busca una respuesta cacheada de Context Sync por hashes.
-   * Retorna null si no existe o si expiró.
-   */
-  resolveContextSyncCache(htmlHash: string, promptHash: string): string | null;
   /**
    * Ejecuta `fn` serializado por sesión. Garantiza que dos llamadas
    * concurrentes con el mismo `sessionId` se ejecuten en orden, lo cual

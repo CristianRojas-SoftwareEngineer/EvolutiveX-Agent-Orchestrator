@@ -13,18 +13,6 @@ function parseBytesLimit(envVal: string | undefined, defaultVal: number): number
   return n;
 }
 
-function parsePositiveInt(envVal: string | undefined, defaultVal: number): number {
-  if (envVal === undefined || envVal === '') return defaultVal;
-  const n = parseInt(envVal, 10);
-  if (Number.isNaN(n) || n <= 0) return defaultVal;
-  return n;
-}
-
-function parseBooleanEnabled(envVal: string | undefined, defaultVal: boolean): boolean {
-  if (envVal === undefined || envVal === '') return defaultVal;
-  return envVal === '1' || envVal.toLowerCase() === 'true';
-}
-
 /**
  * Objeto de configuración global para el Proxy.
  * Resuelve los ajustes desde variables de entorno con valores seguros por defecto.
@@ -64,10 +52,6 @@ export const config: ProxyEnvironmentConfig = {
 
   // Unredact thinking content (opt-in, desactivado por defecto)
   PROXY_UNREDACT_THINKING: process.env.PROXY_UNREDACT_THINKING === 'true',
-
-  // Context Sync cache (WebFetch side-request artificial)
-  CONTEXT_SYNC_CACHE_ENABLED: parseBooleanEnabled(process.env.CONTEXT_SYNC_CACHE_ENABLED, true),
-  CONTEXT_SYNC_MAX_WAIT_MS: parsePositiveInt(process.env.CONTEXT_SYNC_MAX_WAIT_MS, 5000),
 
   // Filtrado de tools: lista de tool names a excluir del request
   FILTERED_TOOLS: process.env.FILTERED_TOOLS

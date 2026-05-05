@@ -4,7 +4,6 @@ import * as fs from 'node:fs/promises';
 import {
   ActiveInteraction,
   PendingAgentToolUse,
-  PendingBuiltinToolUse,
   StepMeta,
 } from '../1-domain/types/audit.types.js';
 import type { ISessionStore } from './ports/session-store.port.js';
@@ -27,9 +26,6 @@ export class SessionStoreService implements ISessionStore {
   private toolUseIdToInteractionDir = new Map<string, string>();
   /** Índice por sesión: sessionId → set de interactionDir de interacciones activas. */
   private sessionToActiveInteractions = new Map<string, Set<string>>();
-  /** Caché de Context Sync: (htmlHash:promptHash) → { response, expiresAt }. TTL 5 min. */
-  private contextSyncCache = new Map<string, { response: string; expiresAt: number }>();
-  private static readonly CONTEXT_SYNC_CACHE_TTL_MS = 5 * 60 * 1000;
 
   constructor(
     auditBaseDir: string,
@@ -132,45 +128,6 @@ export class SessionStoreService implements ISessionStore {
     }
   }
 
-  public registerPendingBuiltinToolUse(
-    interactionDir: string,
-    stepIndex: number,
-    toolUseId: string,
-    toolType: 'web_search' | 'web_fetch' | 'text_editor',
-  ): void {
-    const interaction = this.interactionRegistry.get(interactionDir);
-    if (!interaction) return;
-    const existing = interaction.pendingBuiltinToolUses.find((p) => p.toolUseId === toolUseId);
-    if (existing) return; // Idempotente: ya existe, no hacer nada
-    const entry: PendingBuiltinToolUse = { stepIndex, toolUseId, toolType };
-    interaction.pendingBuiltinToolUses.push(entry);
-  }
-
-  public findInteractionWithPendingBuiltinTools(
-    sessionId: string,
-  ): { interaction: ActiveInteraction; pendings: PendingBuiltinToolUse[] } | null {
-    const dirs = this.sessionToActiveInteractions.get(sessionId);
-    if (!dirs) return null;
-    for (const dir of dirs) {
-      const interaction = this.interactionRegistry.get(dir);
-      if (!interaction) continue;
-      // A diferencia de findInteractionWithPendingAgents, SÍ consideramos interacciones con
-      // parentContext (subagentes pueden ser padres de builtin tools)
-      if (interaction.pendingBuiltinToolUses.length === 0) continue;
-      return { interaction, pendings: [...interaction.pendingBuiltinToolUses] };
-    }
-    return null;
-  }
-
-  public consumePendingBuiltinToolUse(interactionDir: string, toolUseId: string): void {
-    const interaction = this.interactionRegistry.get(interactionDir);
-    if (!interaction) return;
-    const idx = interaction.pendingBuiltinToolUses.findIndex((p) => p.toolUseId === toolUseId);
-    if (idx >= 0) {
-      interaction.pendingBuiltinToolUses.splice(idx, 1);
-    }
-  }
-
   public registerToolUseId(toolUseId: string, interactionDir: string): void {
     this.toolUseIdToInteractionDir.set(toolUseId, interactionDir);
   }
@@ -247,36 +204,6 @@ export class SessionStoreService implements ISessionStore {
     const result = prev.then(() => fn());
     this.sessionRequestChains.set(key, result.catch(() => {}) as unknown as Promise<void>);
     return result;
-  }
-
-  public registerContextSyncCache(htmlHash: string, promptHash: string, response: string): void {
-    this.cleanExpiredContextSyncCache();
-    const key = `${htmlHash}:${promptHash}`;
-    this.contextSyncCache.set(key, {
-      response,
-      expiresAt: Date.now() + SessionStoreService.CONTEXT_SYNC_CACHE_TTL_MS,
-    });
-  }
-
-  public resolveContextSyncCache(htmlHash: string, promptHash: string): string | null {
-    this.cleanExpiredContextSyncCache();
-    const key = `${htmlHash}:${promptHash}`;
-    const entry = this.contextSyncCache.get(key);
-    if (!entry) return null;
-    if (Date.now() > entry.expiresAt) {
-      this.contextSyncCache.delete(key);
-      return null;
-    }
-    return entry.response;
-  }
-
-  private cleanExpiredContextSyncCache(): void {
-    const now = Date.now();
-    for (const [key, entry] of this.contextSyncCache) {
-      if (now > entry.expiresAt) {
-        this.contextSyncCache.delete(key);
-      }
-    }
   }
 
   private async allocateNextSequence(sequenceFilePath: string, scanDir: string): Promise<number> {

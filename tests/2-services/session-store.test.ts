@@ -17,7 +17,6 @@ function makeInteraction(overrides: Partial<ActiveInteraction> = {}): ActiveInte
     stepsMeta: [],
     sessionId: 's1',
     pendingAgentToolUses: [],
-    pendingBuiltinToolUses: [],
     ...overrides,
   };
 }
@@ -355,55 +354,5 @@ describe('SessionStoreService — pending Agent tool_uses', () => {
     expect(b).toBe('B');
     // Si está serializado, B sólo arranca tras end:A.
     expect(observed).toEqual(['start:A', 'end:A', 'start:B', 'end:B']);
-  });
-});
-
-describe('SessionStoreService — contextSyncCache', () => {
-  let tmpDir: string;
-  let store: SessionStoreService;
-
-  beforeEach(async () => {
-    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'sstore-cache-'));
-    store = new SessionStoreService(tmpDir);
-  });
-
-  it('registerContextSyncCache + resolveContextSyncCache funciona por clave (htmlHash:promptHash)', () => {
-    store.registerContextSyncCache('hash1', 'hash2', 'response text');
-    const found = store.resolveContextSyncCache('hash1', 'hash2');
-    expect(found).toBe('response text');
-  });
-
-  it('resolveContextSyncCache retorna null si no existe entrada', () => {
-    expect(store.resolveContextSyncCache('no', 'existe')).toBeNull();
-  });
-
-  it('resolveContextSyncCache retorna null después de expirar el TTL', async () => {
-    // Usar Date.now() mock para simular expiración
-    const originalNow = Date.now;
-    let mockNow = 1000;
-    Date.now = () => mockNow;
-
-    store.registerContextSyncCache('h1', 'h2', 'cached');
-    expect(store.resolveContextSyncCache('h1', 'h2')).toBe('cached');
-
-    // Avanzar más allá del TTL (5 min = 300_000 ms)
-    mockNow = 1000 + 300_001;
-    expect(store.resolveContextSyncCache('h1', 'h2')).toBeNull();
-
-    Date.now = originalNow;
-  });
-
-  it('registerContextSyncCache sobrescribe entrada existente', () => {
-    store.registerContextSyncCache('h1', 'h2', 'old');
-    store.registerContextSyncCache('h1', 'h2', 'new');
-    expect(store.resolveContextSyncCache('h1', 'h2')).toBe('new');
-  });
-
-  it('closeInteraction no limpia el caché de Context Sync', () => {
-    store.registerContextSyncCache('h1', 'h2', 'cached');
-    const interaction = makeInteraction({ interactionDir: '/tmp/t1' });
-    store.registerInteraction(interaction);
-    store.closeInteraction('/tmp/t1');
-    expect(store.resolveContextSyncCache('h1', 'h2')).toBe('cached');
   });
 });

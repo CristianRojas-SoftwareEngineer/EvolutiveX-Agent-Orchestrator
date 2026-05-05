@@ -10,6 +10,7 @@ import {
   InteractionOutcome,
   computeTokenTotals,
 } from '../1-domain/types/audit.types.js';
+import { PAD_STEP } from '../1-domain/constants/audit-paths.js';
 
 /**
  * Handler para orquestar la auditoría de respuestas estándar (no-SSE).
@@ -38,7 +39,7 @@ export class AuditStandardResponseHandler {
     const stepDir = path.join(
       context.auditInteractionDir,
       'steps',
-      String(stepNumber).padStart(3, '0'),
+      String(stepNumber).padStart(PAD_STEP, '0'),
     );
 
     const chunks: Buffer[] = [];
@@ -234,7 +235,7 @@ export class AuditStandardResponseHandler {
         }
 
         if (responseHeaders) {
-          await this.auditWriter.writeResponseHeadersAudit(
+          await this.auditWriter.writeTopLevelResponseHeaders(
             context.auditInteractionDir,
             responseHeaders,
           );

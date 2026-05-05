@@ -12,7 +12,8 @@ import {
 export interface ISessionStore {
   getBaseDir(): string;
   ensureAuditSessionsRoot(): Promise<void>;
-  nextAuditInteractionSequence(sessionId: string): Promise<number>;
+  nextMainAgentSequence(sessionId: string): Promise<number>;
+  nextSideInteractionSequence(sessionId: string): Promise<number>;
   registerInteraction(interaction: ActiveInteraction): void;
   registerToolUseId(toolUseId: string, interactionDir: string): void;
   getInteractionByToolUseId(toolUseId: string): ActiveInteraction | null;

@@ -51,10 +51,10 @@ graph TD
     F -->|Response Stream| G{ProxyController: Interceptor}
     G -->|Clonación de Stream| H[Transmisión al Cliente]
     G -->|Clonación de Stream| I[Handler de Auditoría]
-    I -->|Si SSE| J[steps/NNN/response/sse.jsonl]
+    I -->|Si SSE| J[steps/NN/response/sse.jsonl]
     I -->|Si SSE, detecta stop_reason| K[SSEReconstructService\nagrupa steps, reconstruye]
-    K -->|Reconstrucción| L[response/body.json]
-    I -->|Si no-SSE, heurística terminal| M[steps/NNN/response/body.json]
+    K -->|Reconstrucción| L[output/body.json]
+    I -->|Si no-SSE, heurística terminal| M[steps/NN/response/body.json]
     L --> N[meta.json InteractionMetadata + Markdown]
     M --> N
 ```
@@ -67,8 +67,8 @@ graph TD
 
 A diferencia de un proxy genérico, este sistema "entiende" los flujos binarios de Anthropic.
 
-- Extrae cada línea de datos y la convierte en una entrada con _timestamp_ en `response/sse.jsonl` (escrito **síncronamente**: fuente de verdad ordenada para la reconstrucción).
-- Mantiene un volcado binario crudo (`response/sse.txt`) para depuración de paridad de protocolos. **No** es la fuente de la reconstrucción y puede truncarse por `MAX_AUDIT_SSE_RAW_BYTES` sin afectar al mensaje final reconstruido.
+- Extrae cada línea de datos y la convierte en una entrada con _timestamp_ en `steps/NN/response/sse.jsonl` (escrito **síncronamente**: fuente de verdad ordenada para la reconstrucción).
+- Mantiene un volcado binario crudo (`steps/NN/response/sse.txt`) para depuración de paridad de protocolos. **No** es la fuente de la reconstrucción y puede truncarse por `MAX_AUDIT_SSE_RAW_BYTES` sin afectar al mensaje final reconstruido.
 
 ### 🛡️ Privacidad Avanzada
 
@@ -102,34 +102,53 @@ Ideal para depurar comportamientos erráticos en herramientas de CLI (como `clau
 
 ## 📂 Referencia de Archivos de Auditoría
 
-Cada turno genera una estructura jerárquica en `./sessions/<session-id>/interactions/<seq>_<uuid>/`:
+La sesión se divide en dos árboles independientes bajo `./sessions/<session-id>/`:
 
 ```
-interactions/NNNNNN_<uuid>/
-  meta.json                     # InteractionMetadata: resumen del turno (interactionType, outcome, steps[], totals)
-  state.json                    # Marcador "in-progress" (solo existe mientras la interacción está abierta)
-  request/                      # Solo agentic y side-request: petición inicial top-level
-    headers.json
-    body.bin
-    body.json
-    body.parsed.md
-  response/                     # Solo agentic/side-request SSE completados: respuesta final reconstruida
-    body.json
-    body.parsed.md
-    headers.json
-  steps/
-    001/                        # Cada step es una llamada HTTP individual; siempre contiene request/ para todos los tipos
-      request/                  # Petición del step (auto-contenida; desde step 001 en adelante)
+sessions/<session-id>/
+  session-metrics.json          # Métricas agregadas de tokens por modelo (O(1) para el statusline)
+  main-agent/                   # Turnos agénticos del usuario (fresh + continuations)
+    interaction-sequence.json   # Contador de secuencia exclusivo de este árbol
+    interactions/
+      NN/                       # Secuencia de 2 dígitos (01, 02, …)
+        meta.json               # InteractionMetadata: resumen del turno
+        state.json              # Marcador "in-progress" (solo existe mientras está abierto)
+        input/                  # Petición inicial top-level (agentic y side-request)
+          headers.json, body.bin, body.json, body.parsed.md
+        output/                 # Respuesta final reconstruida (SSE completados)
+          body.json, body.parsed.md, headers.json
+        steps/
+          NN/                   # Cada step es una llamada HTTP individual (01, 02, …)
+            request/            # Petición del step (auto-contenida)
+              headers.json, body.bin, body.json, body.parsed.md
+            response/           # SSE: sse.jsonl (fuente de verdad) + reconstruidos; No-SSE: body.json
+              sse.jsonl, sse.txt, headers.json
+              body.json, body.parsed.md
+            thought/            # Solo si el step contiene extended thinking
+              content.md
+            sub-agent-NN/       # Solo si el step emitió tool_use Agent (subagente anidado)
+              meta.json, state.json
+              input/, output/, steps/
+  side-interactions/            # Preflights y side-requests (contadores independientes)
+    interaction-sequence.json
+    NN/                         # Secuencia de 2 dígitos (01, 02, …)
+      meta.json
+      state.json
+      input/                    # Solo en side-request (no en client-preflight)
         headers.json, body.bin, body.json, body.parsed.md
-      response/                 # SSE: sse.jsonl (fuente de verdad) + archivos reconstruidos; No-SSE: body.json
-        sse.jsonl, sse.txt, headers.json                    (SSE crudo)
-        body.json, body.parsed.md                           (SSE reconstruido ✅)
-    002/ ...
+      steps/
+        NN/
+          request/
+            headers.json, body.bin, body.json, body.parsed.md
+          response/
+            sse.jsonl / body.json / headers.json
 ```
 
-> **Nota:** Los preflights (`client-preflight`) no escriben `request/` en el nivel raíz de la interacción; sólo tienen `steps/` con sus archivos individuales. Todos los tipos de interacción (`agentic`, `side-request`, `client-preflight`) escriben `steps/001/request/` para mantener simetría estructural.
+> **Preflights (`client-preflight`):** No escriben `input/` ni `output/` en el nivel raíz; solo tienen `steps/` con sus archivos individuales. Se alojan en `side-interactions/`.
 
-> **Subagentes (`Task` / herramienta `Agent`):** Cuando el turno principal emite un `tool_use` con `name: "Agent"`, la siguiente petición fresh de la misma sesión NO se trata como nuevo turno raíz: se anida bajo el step que la disparó como `steps/<NNN>/sub-interactions/<MMM>_<uuid>/` con la misma estructura interna (`request/`, `response/`, `steps/`, `meta.json`, `state.json`). El `meta.json` del subagente incluye un bloque `parentContext: { parentInteractionDir, parentStepIndex, triggeringToolUseId, subagentType }` para reconstruir el árbol padre→hijo. La profundidad está acotada a 2 niveles (un subagente no puede ser padre de otros subagentes).
+> **Side-requests:** Peticiones con `tools: []` (ej. `count_tokens`). Escriben `input/` top-level y se alojan en `side-interactions/`.
+
+> **Subagentes (`Task` / herramienta `Agent`):** Se anidan directamente bajo `steps/NN/sub-agent-NN/` con la misma estructura interna (`input/`, `output/`, `steps/`, `meta.json`, `state.json`). El `meta.json` del subagente incluye `parentContext: { parentInteractionDir, parentStepIndex, triggeringToolUseId, subagentType }`. La profundidad está acotada a 2 niveles.
 
 > **state.json:** Archivo marcador escrito al iniciar la interacción con `{ state: "in-progress", startedAt, interactionType, parentContext? }`. Se elimina al cerrar el turno (cuando se escribe `meta.json`). Su presencia indica una interacción huérfana por crash del proceso.
 
@@ -343,7 +362,7 @@ Para más detalles y comandos alternativos, consulta `docs/dockerization.md`.
 
 ### Interpretación de Auditoría
 
-Tras cada turno, se genera una estructura en `./sessions/<session-id>/interactions/<seq>_<uuid>/` con los archivos documentados en la [§ Referencia de Archivos de Auditoría](#archivos-auditoria).
+Tras cada turno, se genera una estructura bajo `./sessions/<session-id>/main-agent/interactions/NN/` (agentic) o `./sessions/<session-id>/side-interactions/NN/` (preflights y side-requests), documentada en la [§ Referencia de Archivos de Auditoría](#archivos-auditoria).
 
 ---
 

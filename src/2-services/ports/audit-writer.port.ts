@@ -15,19 +15,17 @@ export interface IAuditWriter {
     type: 'request' | 'response',
   ): Promise<void>;
   writeInteractionRequest(params: {
-    baseDir: string;
-    sessionId: string;
-    folderName: string;
+    interactionDir: string;
     headers: Record<string, string | string[] | undefined>;
     bodyBuffer: Buffer | null;
     maxAuditRequestBytes: number;
     skipTopLevelRequest?: boolean;
-  }): Promise<{ dir: string; requestBodyOmitted: boolean }>;
+  }): Promise<{ requestBodyOmitted: boolean }>;
   /**
    * Inicializa el directorio de un subagente bajo
-   * `<parentInteractionDir>/steps/<NNN>/sub-interactions/<MMM>_<requestId>/`
-   * y guarda el request top-level con la misma estructura que
-   * `writeInteractionRequest`. No usa `sessions/<id>/interactions/` porque la
+   * `<parentInteractionDir>/steps/<NN>/<folderName>/`
+   * y guarda el request top-level (input/) con la misma estructura que
+   * `writeInteractionRequest`. No usa sessions/id/main-agent/ porque la
    * sub-interacción es hija lógica del step padre.
    */
   writeSubInteractionRequest(params: {
@@ -39,9 +37,9 @@ export interface IAuditWriter {
     maxAuditRequestBytes: number;
   }): Promise<{ dir: string; requestBodyOmitted: boolean }>;
   /**
-   * Devuelve la siguiente secuencia local para sub-interacciones bajo el step
-   * indicado. Examina los directorios existentes con prefijo numérico de 3
-   * dígitos y devuelve `max + 1` (1-indexado). Idempotente y stateless.
+   * Devuelve la siguiente secuencia local para sub-agentes bajo el step
+   * indicado. Escanea directorios con patrón `sub-agent-NN` bajo
+   * `steps/<NN>/` y devuelve `max + 1` (1-indexado). Idempotente y stateless.
    */
   nextSubInteractionSequence(
     parentInteractionDir: string,
@@ -78,10 +76,25 @@ export interface IAuditWriter {
     responseTruncatedByProxyBuffer: boolean;
     responseTruncatedByAuditLimit: boolean;
   }>;
-  writeResponseHeadersAudit(
+  /**
+   * Escribe `output/headers.json` en el directorio de interacción (top-level).
+   */
+  writeTopLevelResponseHeaders(
     interactionDir: string,
     headers: Record<string, string | string[] | undefined>,
   ): Promise<void>;
+  /**
+   * Escribe `response/headers.json` en el directorio de un step.
+   */
+  writeResponseHeadersAudit(
+    stepDir: string,
+    headers: Record<string, string | string[] | undefined>,
+  ): Promise<void>;
+  /**
+   * Escribe el contenido de extended thinking en `thought/content.md`.
+   * No-op si `thinkingBlocks` está vacío.
+   */
+  writeStepThought(stepDir: string, thinkingBlocks: string[]): Promise<void>;
   writeInteractionMeta(interactionDir: string, meta: InteractionMetadata): Promise<void>;
   updateSessionMetrics(
     sessionDir: string,

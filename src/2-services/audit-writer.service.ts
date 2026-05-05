@@ -6,6 +6,17 @@ import { MarkdownRendererService } from '../1-domain/services/markdown-renderer.
 import { InteractionState, InteractionMetadata, SessionMetrics, SessionModelMetrics, SseLine } from '../1-domain/types/audit.types.js';
 import { JsonValue } from '../1-domain/types/json.types.js';
 import type { IAuditWriter } from './ports/audit-writer.port.js';
+import {
+  DIR_INPUT,
+  DIR_OUTPUT,
+  DIR_STEPS,
+  DIR_STEP_REQUEST,
+  DIR_STEP_RESPONSE,
+  DIR_STEP_THOUGHT,
+  PREFIX_SUB_AGENT,
+  PAD_STEP,
+  PAD_SUB_AGENT,
+} from '../1-domain/constants/audit-paths.js';
 
 /**
  * Servicio encargado de la persistencia física de los logs de auditoría.
@@ -54,28 +65,24 @@ export class AuditWriterService implements IAuditWriter {
    * Con skipTopLevelRequest=true solo crea el directorio base (para preflights).
    */
   public async writeInteractionRequest(params: {
-    baseDir: string;
-    sessionId: string;
-    folderName: string;
+    interactionDir: string;
     headers: Record<string, string | string[] | undefined>;
     bodyBuffer: Buffer | null;
     maxAuditRequestBytes: number;
     skipTopLevelRequest?: boolean;
-  }): Promise<{ dir: string; requestBodyOmitted: boolean }> {
-    const dir = path.join(params.baseDir, params.sessionId, 'interactions', params.folderName);
-
+  }): Promise<{ requestBodyOmitted: boolean }> {
     if (params.skipTopLevelRequest) {
-      await fs.mkdir(dir, { recursive: true });
-      return { dir, requestBodyOmitted: false };
+      await fs.mkdir(params.interactionDir, { recursive: true });
+      return { requestBodyOmitted: false };
     }
 
     const requestBodyOmitted = await this.writeRequestPayload(
-      dir,
+      params.interactionDir,
       params.headers,
       params.bodyBuffer,
       params.maxAuditRequestBytes,
     );
-    return { dir, requestBodyOmitted };
+    return { requestBodyOmitted };
   }
 
   public async writeSubInteractionRequest(params: {
@@ -88,9 +95,8 @@ export class AuditWriterService implements IAuditWriter {
   }): Promise<{ dir: string; requestBodyOmitted: boolean }> {
     const dir = path.join(
       params.parentInteractionDir,
-      'steps',
-      String(params.parentStepIndex).padStart(3, '0'),
-      'sub-interactions',
+      DIR_STEPS,
+      String(params.parentStepIndex).padStart(PAD_STEP, '0'),
       params.folderName,
     );
     const requestBodyOmitted = await this.writeRequestPayload(
@@ -106,18 +112,17 @@ export class AuditWriterService implements IAuditWriter {
     parentInteractionDir: string,
     parentStepIndex: number,
   ): Promise<number> {
-    const subDir = path.join(
+    const stepDir = path.join(
       parentInteractionDir,
-      'steps',
-      String(parentStepIndex).padStart(3, '0'),
-      'sub-interactions',
+      DIR_STEPS,
+      String(parentStepIndex).padStart(PAD_STEP, '0'),
     );
     let max = 0;
     try {
-      const entries = await fs.readdir(subDir, { withFileTypes: true });
+      const entries = await fs.readdir(stepDir, { withFileTypes: true });
       for (const e of entries) {
         if (!e.isDirectory()) continue;
-        const m = /^(\d{6})_/.exec(e.name);
+        const m = new RegExp(`^${PREFIX_SUB_AGENT}-(\\d{${PAD_SUB_AGENT}})$`).exec(e.name);
         if (m) {
           const n = parseInt(m[1], 10);
           if (!Number.isNaN(n)) max = Math.max(max, n);
@@ -140,7 +145,7 @@ export class AuditWriterService implements IAuditWriter {
     bodyBuffer: Buffer | null,
     maxAuditRequestBytes: number,
   ): Promise<boolean> {
-    const requestDir = path.join(interactionDir, 'request');
+    const requestDir = path.join(interactionDir, DIR_INPUT);
     await fs.mkdir(requestDir, { recursive: true });
     await this.writeJsonAtomic(
       path.join(requestDir, 'headers.json'),
@@ -180,7 +185,7 @@ export class AuditWriterService implements IAuditWriter {
     bodyBuffer: Buffer | null;
     maxAuditRequestBytes: number;
   }): Promise<void> {
-    const requestDir = path.join(params.stepDir, 'request');
+    const requestDir = path.join(params.stepDir, DIR_STEP_REQUEST);
     await fs.mkdir(requestDir, { recursive: true });
     await this.writeJsonAtomic(
       path.join(requestDir, 'headers.json'),
@@ -220,7 +225,7 @@ export class AuditWriterService implements IAuditWriter {
     responseTruncatedByProxyBuffer: boolean;
     responseTruncatedByAuditLimit: boolean;
   }> {
-    const responseDir = path.join(params.interactionDir, 'response');
+    const responseDir = path.join(params.interactionDir, DIR_STEP_RESPONSE);
     await fs.mkdir(responseDir, { recursive: true });
 
     const slice = params.bodyBuffer.subarray(0, params.maxAuditResponseBytes);
@@ -280,7 +285,7 @@ export class AuditWriterService implements IAuditWriter {
     responseTruncatedByProxyBuffer: boolean;
     responseTruncatedByAuditLimit: boolean;
   }> {
-    const responseDir = path.join(params.interactionDir, 'response');
+    const responseDir = path.join(params.interactionDir, DIR_STEP_RESPONSE);
     await fs.mkdir(responseDir, { recursive: true });
 
     const slice = params.bodyBuffer.subarray(0, params.maxAuditResponseBytes);
@@ -326,15 +331,38 @@ export class AuditWriterService implements IAuditWriter {
     };
   }
 
-  public async writeResponseHeadersAudit(
+  public async writeTopLevelResponseHeaders(
     interactionDir: string,
     headers: Record<string, string | string[] | undefined>,
   ): Promise<void> {
-    const responseDir = path.join(interactionDir, 'response');
+    const outputDir = path.join(interactionDir, DIR_OUTPUT);
+    await fs.mkdir(outputDir, { recursive: true });
+    await this.writeJsonAtomic(
+      path.join(outputDir, 'headers.json'),
+      headers as unknown as JsonValue,
+    );
+  }
+
+  public async writeResponseHeadersAudit(
+    stepDir: string,
+    headers: Record<string, string | string[] | undefined>,
+  ): Promise<void> {
+    const responseDir = path.join(stepDir, DIR_STEP_RESPONSE);
     await fs.mkdir(responseDir, { recursive: true });
     await this.writeJsonAtomic(
       path.join(responseDir, 'headers.json'),
       headers as unknown as JsonValue,
+    );
+  }
+
+  public async writeStepThought(stepDir: string, thinkingBlocks: string[]): Promise<void> {
+    if (thinkingBlocks.length === 0) return;
+    const thoughtDir = path.join(stepDir, DIR_STEP_THOUGHT);
+    await fs.mkdir(thoughtDir, { recursive: true });
+    const content = thinkingBlocks.join('\n\n---\n\n');
+    await this.writeFileAtomic(
+      path.join(thoughtDir, 'content.md'),
+      Buffer.from(`${content}\n`, 'utf8'),
     );
   }
 
@@ -345,8 +373,8 @@ export class AuditWriterService implements IAuditWriter {
     );
   }
 
-  public appendSseLine(interactionDir: string, lineObj: SseLine): void {
-    const responseDir = path.join(interactionDir, 'response');
+  public appendSseLine(stepDir: string, lineObj: SseLine): void {
+    const responseDir = path.join(stepDir, DIR_STEP_RESPONSE);
     fsSync.mkdirSync(responseDir, { recursive: true });
     const p = path.join(responseDir, 'sse.jsonl');
     const line = `${JSON.stringify(lineObj)}\n`;
@@ -363,8 +391,8 @@ export class AuditWriterService implements IAuditWriter {
    * es solo un raw dump de depuración; aun así se mantiene ordenado para
    * paridad de protocolo (ver `docs/how-sse-reconstruction-works.md`).
    */
-  public appendSseRawChunk(interactionDir: string, chunk: Buffer): void {
-    const responseDir = path.join(interactionDir, 'response');
+  public appendSseRawChunk(stepDir: string, chunk: Buffer): void {
+    const responseDir = path.join(stepDir, DIR_STEP_RESPONSE);
     fsSync.mkdirSync(responseDir, { recursive: true });
     const p = path.join(responseDir, 'sse.txt');
     fsSync.appendFileSync(p, chunk);
@@ -399,7 +427,7 @@ export class AuditWriterService implements IAuditWriter {
    * - body.parsed.md (vista markdown semántica)
    */
   public async writeStepResponseMarkdown(stepDir: string, message: JsonValue): Promise<void> {
-    const responseDir = path.join(stepDir, 'response');
+    const responseDir = path.join(stepDir, DIR_STEP_RESPONSE);
     await fs.mkdir(responseDir, { recursive: true });
 
     await this.writeJsonAtomic(path.join(responseDir, 'body.json'), message);
@@ -425,9 +453,9 @@ export class AuditWriterService implements IAuditWriter {
     for (let i = 1; i <= stepCount; i++) {
       const stepBodyPath = path.join(
         interactionDir,
-        'steps',
-        String(i).padStart(3, '0'),
-        'response',
+        DIR_STEPS,
+        String(i).padStart(PAD_STEP, '0'),
+        DIR_STEP_RESPONSE,
         'body.json',
       );
       try {
@@ -442,8 +470,8 @@ export class AuditWriterService implements IAuditWriter {
       return { written: false, error: 'no step bodies found' };
     }
 
-    const responseDir = path.join(interactionDir, 'response');
-    await fs.mkdir(responseDir, { recursive: true });
+    const outputDir = path.join(interactionDir, DIR_OUTPUT);
+    await fs.mkdir(outputDir, { recursive: true });
 
     try {
       const multiStepObj: JsonValue = {
@@ -454,11 +482,11 @@ export class AuditWriterService implements IAuditWriter {
           ...(s.parsed as Record<string, JsonValue>),
         })),
       };
-      await this.writeJsonAtomic(path.join(responseDir, 'body.json'), multiStepObj);
+      await this.writeJsonAtomic(path.join(outputDir, 'body.json'), multiStepObj);
 
       const md = this.markdownRendererService.renderMultiStepResponseMarkdown(steps);
       await this.writeFileAtomic(
-        path.join(responseDir, 'body.parsed.md'),
+        path.join(outputDir, 'body.parsed.md'),
         Buffer.from(`${md}\n`, 'utf8'),
       );
 

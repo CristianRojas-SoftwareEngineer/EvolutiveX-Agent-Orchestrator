@@ -23,6 +23,15 @@ import {
 } from '../1-domain/types/audit.types.js';
 import { ProxyEnvironmentConfig } from '../1-domain/types/config.types.js';
 import type { Logger } from '../1-domain/types/logger.types.js';
+import {
+  DIR_MAIN_AGENT,
+  DIR_INTERACTIONS,
+  DIR_SIDE_INTERACTIONS,
+  DIR_STEPS,
+  PREFIX_SUB_AGENT,
+  PAD_STEP,
+  PAD_SUB_AGENT,
+} from '../1-domain/constants/audit-paths.js';
 
 /**
  * Extrae el contenido HTML entre los primeros dos fences `---` de un mensaje
@@ -151,20 +160,25 @@ export class AuditInteractionHandler {
     auditSessionId: string,
     classification: RequestClassification,
   ): Promise<AuditInteractionResult> {
-    const seq = await this.sessionStore.nextAuditInteractionSequence(auditSessionId);
-    const folderName = this.sessionResolver.formatAuditInteractionDirName(seq, params.requestId);
+    const seq = await this.sessionStore.nextMainAgentSequence(auditSessionId);
+    const folderName = this.sessionResolver.formatAuditInteractionDirName(seq);
+    const interactionDir = path.join(
+      this.sessionStore.getBaseDir(),
+      auditSessionId,
+      DIR_MAIN_AGENT,
+      DIR_INTERACTIONS,
+      folderName,
+    );
 
     const wr = await this.auditWriter.writeInteractionRequest({
-      baseDir: this.sessionStore.getBaseDir(),
-      sessionId: auditSessionId,
-      folderName,
+      interactionDir,
       headers: headersForAudit,
       bodyBuffer: params.rawBody,
       maxAuditRequestBytes: this.config.MAX_AUDIT_REQUEST_BODY_BYTES,
     });
 
-    // Escribir steps/001/request para simetría estructural (todos los steps tienen request/)
-    const stepDir = path.join(wr.dir, 'steps', '001');
+    // Escribir steps/01/request para simetría estructural (todos los steps tienen request/)
+    const stepDir = path.join(interactionDir, DIR_STEPS, String(1).padStart(PAD_STEP, '0'));
     await this.auditWriter.writeStepRequest({
       stepDir,
       headers: headersForAudit,
@@ -175,14 +189,14 @@ export class AuditInteractionHandler {
     const startedAt = Date.now();
 
     // Marcar interacción como en progreso (state.json)
-    await this.auditWriter.writeInteractionState(wr.dir, {
+    await this.auditWriter.writeInteractionState(interactionDir, {
       state: 'in-progress',
       startedAt: new Date(startedAt).toISOString(),
       interactionType: 'agentic',
     });
 
     this.sessionStore.registerInteraction({
-      interactionDir: wr.dir,
+      interactionDir,
       interactionType: 'agentic',
       stepCount: 1,
       requestSequence: seq,
@@ -197,7 +211,7 @@ export class AuditInteractionHandler {
     });
 
     return {
-      auditInteractionDir: wr.dir,
+      auditInteractionDir: interactionDir,
       requestBodyOmitted: wr.requestBodyOmitted,
       requestSequence: seq,
       auditSessionId,
@@ -237,10 +251,7 @@ export class AuditInteractionHandler {
         parentInteractionDir,
         parentStepIndex,
       );
-      const folderName = this.sessionResolver.formatAuditInteractionDirName(
-        subSeq,
-        params.requestId,
-      );
+      const folderName = `${PREFIX_SUB_AGENT}-${String(subSeq).padStart(PAD_SUB_AGENT, '0')}`;
 
       const wr = await this.auditWriter.writeSubInteractionRequest({
         parentInteractionDir,
@@ -251,8 +262,8 @@ export class AuditInteractionHandler {
         maxAuditRequestBytes: this.config.MAX_AUDIT_REQUEST_BODY_BYTES,
       });
 
-      // Escribir steps/001/request para simetría estructural
-      const stepDir = path.join(wr.dir, 'steps', '001');
+      // Escribir steps/01/request para simetría estructural
+      const stepDir = path.join(wr.dir, DIR_STEPS, String(1).padStart(PAD_STEP, '0'));
       await this.auditWriter.writeStepRequest({
         stepDir,
         headers: headersForAudit,
@@ -343,10 +354,7 @@ export class AuditInteractionHandler {
         parentInteractionDir,
         parentStepIndex,
       );
-      const folderName = this.sessionResolver.formatAuditInteractionDirName(
-        subSeq,
-        params.requestId,
-      );
+      const folderName = `${PREFIX_SUB_AGENT}-${String(subSeq).padStart(PAD_SUB_AGENT, '0')}`;
 
       const wr = await this.auditWriter.writeSubInteractionRequest({
         parentInteractionDir,
@@ -357,9 +365,8 @@ export class AuditInteractionHandler {
         maxAuditRequestBytes: this.config.MAX_AUDIT_REQUEST_BODY_BYTES,
       });
 
-      // Escribir steps/001/request del subagente para mantener simetría
-      // estructural con el resto de turns.
-      const stepDir = path.join(wr.dir, 'steps', '001');
+      // Escribir steps/01/request del subagente para mantener simetría estructural.
+      const stepDir = path.join(wr.dir, DIR_STEPS, String(1).padStart(PAD_STEP, '0'));
       await this.auditWriter.writeStepRequest({
         stepDir,
         headers: headersForAudit,
@@ -450,8 +457,8 @@ export class AuditInteractionHandler {
     const stepCount = this.sessionStore.incrementStepCountByDir(parentInteraction.interactionDir);
     const stepDir = path.join(
       parentInteraction.interactionDir,
-      'steps',
-      String(stepCount).padStart(3, '0'),
+      DIR_STEPS,
+      String(stepCount).padStart(PAD_STEP, '0'),
     );
 
     await this.auditWriter.writeStepRequest({
@@ -491,20 +498,24 @@ export class AuditInteractionHandler {
     auditSessionId: string,
     classification: RequestClassification,
   ): Promise<AuditInteractionResult> {
-    const seq = await this.sessionStore.nextAuditInteractionSequence(auditSessionId);
-    const folderName = this.sessionResolver.formatAuditInteractionDirName(seq, params.requestId);
-
-    const wr = await this.auditWriter.writeInteractionRequest({
-      baseDir: this.sessionStore.getBaseDir(),
-      sessionId: auditSessionId,
+    const seq = await this.sessionStore.nextSideInteractionSequence(auditSessionId);
+    const folderName = this.sessionResolver.formatAuditInteractionDirName(seq);
+    const interactionDir = path.join(
+      this.sessionStore.getBaseDir(),
+      auditSessionId,
+      DIR_SIDE_INTERACTIONS,
       folderName,
+    );
+
+    await this.auditWriter.writeInteractionRequest({
+      interactionDir,
       headers: headersForAudit,
       bodyBuffer: params.rawBody,
       maxAuditRequestBytes: this.config.MAX_AUDIT_REQUEST_BODY_BYTES,
       skipTopLevelRequest: true,
     });
 
-    const stepDir = path.join(wr.dir, 'steps', '001');
+    const stepDir = path.join(interactionDir, DIR_STEPS, String(1).padStart(PAD_STEP, '0'));
     await this.auditWriter.writeStepRequest({
       stepDir,
       headers: headersForAudit,
@@ -514,14 +525,14 @@ export class AuditInteractionHandler {
 
     const startedAt = Date.now();
 
-    await this.auditWriter.writeInteractionState(wr.dir, {
+    await this.auditWriter.writeInteractionState(interactionDir, {
       state: 'in-progress',
       startedAt: new Date(startedAt).toISOString(),
       interactionType: 'client-preflight',
     });
 
     this.sessionStore.registerInteraction({
-      interactionDir: wr.dir,
+      interactionDir,
       interactionType: 'client-preflight',
       stepCount: 1,
       requestSequence: seq,
@@ -536,7 +547,7 @@ export class AuditInteractionHandler {
     });
 
     return {
-      auditInteractionDir: wr.dir,
+      auditInteractionDir: interactionDir,
       requestBodyOmitted: false,
       requestSequence: seq,
       auditSessionId,
@@ -600,20 +611,24 @@ export class AuditInteractionHandler {
       );
     }
 
-    const seq = await this.sessionStore.nextAuditInteractionSequence(auditSessionId);
-    const folderName = this.sessionResolver.formatAuditInteractionDirName(seq, params.requestId);
+    const seq = await this.sessionStore.nextSideInteractionSequence(auditSessionId);
+    const folderName = this.sessionResolver.formatAuditInteractionDirName(seq);
+    const interactionDir = path.join(
+      this.sessionStore.getBaseDir(),
+      auditSessionId,
+      DIR_SIDE_INTERACTIONS,
+      folderName,
+    );
 
     const wr = await this.auditWriter.writeInteractionRequest({
-      baseDir: this.sessionStore.getBaseDir(),
-      sessionId: auditSessionId,
-      folderName,
+      interactionDir,
       headers: headersForAudit,
       bodyBuffer: params.rawBody,
       maxAuditRequestBytes: this.config.MAX_AUDIT_REQUEST_BODY_BYTES,
     });
 
-    // Escribir steps/001/request para simetría estructural
-    const stepDir = path.join(wr.dir, 'steps', '001');
+    // Escribir steps/01/request para simetría estructural
+    const stepDir = path.join(interactionDir, DIR_STEPS, String(1).padStart(PAD_STEP, '0'));
     await this.auditWriter.writeStepRequest({
       stepDir,
       headers: headersForAudit,
@@ -623,7 +638,7 @@ export class AuditInteractionHandler {
 
     const startedAt = Date.now();
 
-    await this.auditWriter.writeInteractionState(wr.dir, {
+    await this.auditWriter.writeInteractionState(interactionDir, {
       state: 'in-progress',
       startedAt: new Date(startedAt).toISOString(),
       interactionType: 'side-request',
@@ -631,7 +646,7 @@ export class AuditInteractionHandler {
 
     // Side-request con interactionType propio (no desplaza a ningún turno agentic)
     this.sessionStore.registerInteraction({
-      interactionDir: wr.dir,
+      interactionDir,
       interactionType: 'side-request',
       stepCount: 1,
       requestSequence: seq,
@@ -646,7 +661,7 @@ export class AuditInteractionHandler {
     });
 
     return {
-      auditInteractionDir: wr.dir,
+      auditInteractionDir: interactionDir,
       requestBodyOmitted: wr.requestBodyOmitted,
       requestSequence: seq,
       auditSessionId,
@@ -661,19 +676,24 @@ export class AuditInteractionHandler {
     auditSessionId: string,
     classification: RequestClassification,
   ): Promise<AuditInteractionResult> {
-    const seq = await this.sessionStore.nextAuditInteractionSequence(auditSessionId);
-    const folderName = this.sessionResolver.formatAuditInteractionDirName(seq, params.requestId);
-
-    const wr = await this.auditWriter.writeInteractionRequest({
-      baseDir: this.sessionStore.getBaseDir(),
-      sessionId: auditSessionId,
+    const seq = await this.sessionStore.nextSideInteractionSequence(auditSessionId);
+    const folderName = this.sessionResolver.formatAuditInteractionDirName(seq);
+    const interactionDir = path.join(
+      this.sessionStore.getBaseDir(),
+      auditSessionId,
+      DIR_SIDE_INTERACTIONS,
       folderName,
+    );
+
+    await this.auditWriter.writeInteractionRequest({
+      interactionDir,
       headers: headersForAudit,
       bodyBuffer: params.rawBody,
       maxAuditRequestBytes: this.config.MAX_AUDIT_REQUEST_BODY_BYTES,
+      skipTopLevelRequest: true,
     });
 
-    const stepDir = path.join(wr.dir, 'steps', '001');
+    const stepDir = path.join(interactionDir, DIR_STEPS, String(1).padStart(PAD_STEP, '0'));
     await this.auditWriter.writeStepRequest({
       stepDir,
       headers: headersForAudit,
@@ -683,19 +703,19 @@ export class AuditInteractionHandler {
 
     const startedAt = Date.now();
 
-    await this.auditWriter.writeInteractionState(wr.dir, {
+    await this.auditWriter.writeInteractionState(interactionDir, {
       state: 'in-progress',
       startedAt: new Date(startedAt).toISOString(),
       interactionType: 'client-preflight',
     });
 
     this.sessionStore.registerInteraction({
-      interactionDir: wr.dir,
+      interactionDir,
       interactionType: 'client-preflight',
       stepCount: 1,
       requestSequence: seq,
       startedAt,
-      requestBodyOmitted: wr.requestBodyOmitted,
+      requestBodyOmitted: false,
       requestBodyBytes: params.rawBody.length,
       stepsMeta: [],
       sessionId: auditSessionId,
@@ -705,8 +725,8 @@ export class AuditInteractionHandler {
     });
 
     return {
-      auditInteractionDir: wr.dir,
-      requestBodyOmitted: wr.requestBodyOmitted,
+      auditInteractionDir: interactionDir,
+      requestBodyOmitted: false,
       requestSequence: seq,
       auditSessionId,
       interactionType: 'client-preflight',

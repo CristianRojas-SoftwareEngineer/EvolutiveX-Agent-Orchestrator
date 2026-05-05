@@ -9,8 +9,12 @@ import {
 } from '../1-domain/types/audit.types.js';
 import type { ISessionStore } from './ports/session-store.port.js';
 import type { Logger } from '../1-domain/types/logger.types.js';
-
-const INTERACTION_SEQUENCE_FILE = 'interaction-sequence.json';
+import {
+  DIR_MAIN_AGENT,
+  DIR_INTERACTIONS,
+  DIR_SIDE_INTERACTIONS,
+  FILE_INTERACTION_SEQUENCE,
+} from '../1-domain/constants/audit-paths.js';
 
 /**
  * Servicio adaptador para operaciones de filesystem de sesiones.
@@ -50,9 +54,21 @@ export class SessionStoreService implements ISessionStore {
     }
   }
 
-  public nextAuditInteractionSequence(sessionId: string): Promise<number> {
+  public nextMainAgentSequence(sessionId: string): Promise<number> {
     return this.withSessionLock(sessionId, () =>
-      this.allocateNextAuditInteractionSequence(sessionId),
+      this.allocateNextSequence(
+        path.join(this.auditBaseDir, sessionId, DIR_MAIN_AGENT, FILE_INTERACTION_SEQUENCE),
+        path.join(this.auditBaseDir, sessionId, DIR_MAIN_AGENT, DIR_INTERACTIONS),
+      ),
+    );
+  }
+
+  public nextSideInteractionSequence(sessionId: string): Promise<number> {
+    return this.withSessionLock(sessionId, () =>
+      this.allocateNextSequence(
+        path.join(this.auditBaseDir, sessionId, DIR_SIDE_INTERACTIONS, FILE_INTERACTION_SEQUENCE),
+        path.join(this.auditBaseDir, sessionId, DIR_SIDE_INTERACTIONS),
+      ),
     );
   }
 
@@ -263,17 +279,16 @@ export class SessionStoreService implements ISessionStore {
     }
   }
 
-  private async allocateNextAuditInteractionSequence(sessionId: string): Promise<number> {
-    const fromFile = await this.readLastSequenceFromFile(sessionId);
-    const fromDirs = await this.maxSequenceFromExistingInteractionDirs(sessionId);
+  private async allocateNextSequence(sequenceFilePath: string, scanDir: string): Promise<number> {
+    const fromFile = await this.readLastSequenceFromFile(sequenceFilePath);
+    const fromDirs = await this.maxSequenceFromExistingDirs(scanDir);
     const lastSeen = Math.max(fromFile ?? 0, fromDirs);
     const next = lastSeen + 1;
-    await this.writeLastSequenceAtomic(sessionId, next);
+    await this.writeLastSequenceAtomic(sequenceFilePath, next);
     return next;
   }
 
-  private async readLastSequenceFromFile(sessionId: string): Promise<number | null> {
-    const filePath = path.join(this.auditBaseDir, sessionId, INTERACTION_SEQUENCE_FILE);
+  private async readLastSequenceFromFile(filePath: string): Promise<number | null> {
     try {
       const raw = await fs.readFile(filePath, 'utf8');
       const j = JSON.parse(raw);
@@ -286,29 +301,26 @@ export class SessionStoreService implements ISessionStore {
     return null;
   }
 
-  private async maxSequenceFromExistingInteractionDirs(sessionId: string): Promise<number> {
-    const reqDir = path.join(this.auditBaseDir, sessionId, 'interactions');
+  private async maxSequenceFromExistingDirs(scanDir: string): Promise<number> {
     let max = 0;
     try {
-      const entries = await fs.readdir(reqDir, { withFileTypes: true });
+      const entries = await fs.readdir(scanDir, { withFileTypes: true });
       for (const e of entries) {
         if (!e.isDirectory()) continue;
-        const m = /^(\d{6})_/.exec(e.name);
+        const m = /^(\d{2})$/.exec(e.name);
         if (m) {
           const n = parseInt(m[1], 10);
           if (!Number.isNaN(n)) max = Math.max(max, n);
         }
       }
     } catch {
-      /* no existe el directorio de peticiones */
+      /* directorio inexistente */
     }
     return max;
   }
 
-  private async writeLastSequenceAtomic(sessionId: string, last: number): Promise<void> {
-    const sessionDir = path.join(this.auditBaseDir, sessionId);
-    await fs.mkdir(sessionDir, { recursive: true });
-    const filePath = path.join(sessionDir, INTERACTION_SEQUENCE_FILE);
+  private async writeLastSequenceAtomic(filePath: string, last: number): Promise<void> {
+    await fs.mkdir(path.dirname(filePath), { recursive: true });
     const tmp = `${filePath}.${process.pid}.${Date.now()}.tmp`;
     const body = `${JSON.stringify({ last }, null, 2)}\n`;
     await fs.writeFile(tmp, body, 'utf8');

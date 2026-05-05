@@ -63,6 +63,10 @@ export interface StepMeta {
    * @example "msg_01SweCL7ReWWANWSRsPc8mfn"
    */
   anthropicMessageId?: string;
+  /** True si el step contiene al menos un bloque de extended thinking. */
+  hasThinking?: boolean;
+  /** Número de bloques de thinking detectados en el step. */
+  thinkingBlockCount?: number;
 }
 
 /**

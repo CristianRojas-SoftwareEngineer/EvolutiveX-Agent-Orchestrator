@@ -16,6 +16,7 @@ import {
   computeSseRawBytesTotal,
 } from '../1-domain/types/audit.types.js';
 import type { Logger } from '../1-domain/types/logger.types.js';
+import { PAD_STEP } from '../1-domain/constants/audit-paths.js';
 
 /**
  * Handler para orquestar la auditoría de respuestas SSE.
@@ -59,7 +60,7 @@ export class AuditSseResponseHandler {
     const stepDir = path.join(
       context.auditInteractionDir,
       'steps',
-      String(stepNumber).padStart(3, '0'),
+      String(stepNumber).padStart(PAD_STEP, '0'),
     );
 
     this.auditWriter.writeResponseHeadersAudit(stepDir, responseHeaders).catch((e) => {
@@ -86,6 +87,9 @@ export class AuditSseResponseHandler {
      * `subagent_type` para enriquecer la entrada en `pendingAgentToolUses`.
      */
     const agentBlockTracker = new Map<number, { toolUseId: string; jsonAcc: string }>();
+    /** Tracker de bloques thinking. Indexado por `index` del content_block. */
+    const thinkingBlockTracker = new Map<number, { textAcc: string }>();
+    const thinkingBlocks: string[] = [];
     const stepUsage = {
       input_tokens: 0,
       output_tokens: 0,
@@ -175,6 +179,24 @@ export class AuditSseResponseHandler {
                   stepUsage.cache_read_input_tokens = evt.usage.cache_read_input_tokens;
                 }
               }
+              if (
+                evt.type === 'content_block_start' &&
+                evt.content_block?.type === 'thinking' &&
+                typeof evt.index === 'number'
+              ) {
+                thinkingBlockTracker.set(evt.index, { textAcc: '' });
+              }
+              if (
+                evt.type === 'content_block_delta' &&
+                evt.delta?.type === 'thinking_delta' &&
+                typeof evt.index === 'number' &&
+                typeof evt.delta.thinking === 'string'
+              ) {
+                const thinkingTracked = thinkingBlockTracker.get(evt.index);
+                if (thinkingTracked) {
+                  thinkingTracked.textAcc += evt.delta.thinking;
+                }
+              }
               if (evt.type === 'content_block_start' && evt.content_block?.type === 'tool_use') {
                 toolCalls.push(evt.content_block.name);
                 if (typeof evt.content_block.id === 'string') {
@@ -255,6 +277,13 @@ export class AuditSseResponseHandler {
                   }
                   agentBlockTracker.delete(evt.index);
                 }
+                const thinkingTracked = thinkingBlockTracker.get(evt.index);
+                if (thinkingTracked) {
+                  if (thinkingTracked.textAcc) {
+                    thinkingBlocks.push(thinkingTracked.textAcc);
+                  }
+                  thinkingBlockTracker.delete(evt.index);
+                }
               }
             } catch {
               /* línea no JSON, ignorar */
@@ -274,6 +303,13 @@ export class AuditSseResponseHandler {
             i: sseLineIndex,
             ts: new Date().toISOString(),
             line: finalTrimmed,
+          });
+        }
+
+        // Escribir extended thinking si se detectaron bloques
+        if (thinkingBlocks.length > 0) {
+          this.auditWriter.writeStepThought(stepDir, thinkingBlocks).catch((e) => {
+            console.error('Error al escribir thought del step:', e);
           });
         }
 
@@ -297,6 +333,7 @@ export class AuditSseResponseHandler {
           ...(sseRawBytesWritten > 0 ? { sseRawBytesWritten } : {}),
           ...(sseRawTruncated ? { sseRawTruncatedByLimit: true } : {}),
           ...(anthropicMessageId ? { anthropicMessageId } : {}),
+          ...(thinkingBlocks.length > 0 ? { hasThinking: true, thinkingBlockCount: thinkingBlocks.length } : {}),
         };
 
         if (context.interactionType === 'client-preflight') {
@@ -376,7 +413,7 @@ export class AuditSseResponseHandler {
         // Escribir headers top-level solo si la reconstrucción produjo body
         if (sseReconstructResult?.sseResponseBodyWritten === true) {
           this.auditWriter
-            .writeResponseHeadersAudit(context.auditInteractionDir, responseHeaders)
+            .writeTopLevelResponseHeaders(context.auditInteractionDir, responseHeaders)
             .catch((e) => console.error('Error al escribir cabeceras top-level:', e));
         }
 

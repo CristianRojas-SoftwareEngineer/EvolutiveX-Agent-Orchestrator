@@ -365,6 +365,12 @@ Tras cada turno, se genera una estructura bajo `./sessions/<session-id>/main-age
 
 El proxy incluye validaciones defensivas para prevenir errores de reconstrucción SSE causados por colisiones de concurrencia en requests internas (WebSearch/WebFetch):
 
+- **Contrato inmutable de stepIndex**: Cada step auditado tiene un `assignedStepIndex` asignado durante el request audit que se transporta inmutablemente hasta el response audit. Esto garantiza que el handler de response use el índice correcto del step, incluso si `activeInteraction.stepCount` ha avanzado debido a otras requests concurrentes.
+  - Fresh agentic y side-request: `assignedStepIndex = 1`
+  - Client-preflight: `assignedStepIndex = 1`
+  - Continuation no-coalesced: `assignedStepIndex = stepCount` incrementado
+  - WebSearch/WebFetch internos: `assignedStepIndex = stepCount` asignado dentro de `withSessionLock`
+  - Coalesced Agent continuation: `assignedStepIndex = coalescedAgentContinuation.targetStepIndex`
 - **Asignación atómica de steps internos**: Los handlers de WebSearch y WebFetch usan `withSessionLock` para serializar la asignación de `stepCount` y escritura de step requests, evitando que dos requests concurrentes escriban en el mismo directorio de step.
 - **Unicidad de metadata**: `pushStepMetaByDir` rechaza duplicados no-coalesced con el mismo `stepIndex`, lanzando un error diagnóstico si se detecta una colisión. Para steps coalesced, permite enriquecer la metadata existente en lugar de crear duplicados.
 - **Validación de SSE completo**: `reconstructSseJsonlFile` valida que el archivo `sse.jsonl` contenga exactamente un mensaje completo (un `message_start` y un `message_stop`). Si detecta múltiples mensajes o un stream incompleto, lanza un error diagnóstico antes de pasar al SDK de Anthropic.

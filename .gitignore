@@ -18,8 +18,8 @@ coverage/
 *.swp
 *.sqlite
 
-# sessions/
-# server/
+sessions/
+server/
 
 # Secrets de providers (API keys)
 routing/providers/*/secrets.json

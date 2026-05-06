@@ -1274,4 +1274,127 @@ describe('AuditInteractionHandler', () => {
     // Verificar que se consumieron ambos pendings
     expect(parentInteraction.pendingWebFetchToolUses).toHaveLength(0);
   });
+
+  it('assignedStepIndex se asigna correctamente en handleWebSearchStep', async () => {
+    const config = makeConfig();
+    const parentInteraction: ActiveInteraction = {
+      interactionDir: '/tmp/sessions/s/interactions/000001_parent',
+      interactionType: 'agentic',
+      stepCount: 2,
+      requestSequence: 1,
+      startedAt: Date.now(),
+      requestBodyOmitted: false,
+      requestBodyBytes: 100,
+      stepsMeta: [],
+      sessionId: 's',
+      pendingAgentToolUses: [],
+      pendingWebSearchToolUses: [
+        { stepIndex: 1, toolUseId: 'toolu_search_1' },
+      ],
+      pendingWebFetchToolUses: [],
+    };
+
+    const store = makeSessionStore({
+      findInteractionWithPendingWebSearch: vi.fn().mockReturnValue({
+        interaction: parentInteraction,
+        pendings: [...parentInteraction.pendingWebSearchToolUses],
+      }),
+      consumeWebSearchPending: vi.fn().mockImplementation((_dir: string) => {
+        return { stepIndex: 1, toolUseId: 'toolu_search_1' };
+      }),
+      incrementStepCountByDir: (_dir: string) => {
+        parentInteraction.stepCount = 3;
+        return 3;
+      },
+    });
+
+    const handler = new AuditInteractionHandler(
+      new SessionResolverService(config),
+      store,
+      makeAuditWriter({}),
+      config,
+    );
+
+    const result = await handler.execute({
+      headers: { 'x-cc-audit-session': 's' },
+      rawBody: FRESH_BODY,
+      requestId: 'search-req',
+    });
+
+    expect(result).not.toBeNull();
+    expect(result!.assignedStepIndex).toBe(3);
+    expect(result!.isInternalToolStep).toBe(true);
+  });
+
+  it('assignedStepIndex se asigna correctamente en handleWebFetchStep', async () => {
+    const config = makeConfig();
+    const parentInteraction: ActiveInteraction = {
+      interactionDir: '/tmp/sessions/s/interactions/000001_parent',
+      interactionType: 'agentic',
+      stepCount: 2,
+      requestSequence: 1,
+      startedAt: Date.now(),
+      requestBodyOmitted: false,
+      requestBodyBytes: 100,
+      stepsMeta: [],
+      sessionId: 's',
+      pendingAgentToolUses: [],
+      pendingWebSearchToolUses: [],
+      pendingWebFetchToolUses: [
+        { stepIndex: 1, toolUseId: 'toolu_fetch_1' },
+      ],
+    };
+
+    const store = makeSessionStore({
+      findInteractionWithPendingWebFetch: vi.fn().mockReturnValue({
+        interaction: parentInteraction,
+        pendings: [...parentInteraction.pendingWebFetchToolUses],
+      }),
+      consumeWebFetchPending: vi.fn().mockImplementation((_dir: string) => {
+        return { stepIndex: 1, toolUseId: 'toolu_fetch_1' };
+      }),
+      incrementStepCountByDir: (_dir: string) => {
+        parentInteraction.stepCount = 4;
+        return 4;
+      },
+    });
+
+    const handler = new AuditInteractionHandler(
+      new SessionResolverService(config),
+      store,
+      makeAuditWriter({}),
+      config,
+    );
+
+    const result = await handler.execute({
+      headers: { 'x-cc-audit-session': 's' },
+      rawBody: FRESH_BODY,
+      requestId: 'fetch-req',
+    });
+
+    expect(result).not.toBeNull();
+    expect(result!.assignedStepIndex).toBe(4);
+    expect(result!.isInternalToolStep).toBe(true);
+  });
+
+  it('assignedStepIndex es 1 para fresh agentic', async () => {
+    const config = makeConfig();
+    const store = makeSessionStore({});
+
+    const handler = new AuditInteractionHandler(
+      new SessionResolverService(config),
+      store,
+      makeAuditWriter({}),
+      config,
+    );
+
+    const result = await handler.execute({
+      headers: { 'x-cc-audit-session': 's' },
+      rawBody: FRESH_BODY,
+      requestId: 'fresh-req',
+    });
+
+    expect(result).not.toBeNull();
+    expect(result!.assignedStepIndex).toBe(1);
+  });
 });

@@ -65,6 +65,7 @@ function makeContext(overrides: Partial<AuditInteractionContext> = {}): AuditInt
     auditInteractionDir: '/tmp/sessions/test/interactions/000001_req-1',
     responseStatusCode: 200,
     interactionType: 'agentic',
+    assignedStepIndex: 1,
     ...overrides,
   };
 }

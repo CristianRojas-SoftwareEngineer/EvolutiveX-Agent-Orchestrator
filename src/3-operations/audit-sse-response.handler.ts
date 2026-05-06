@@ -43,7 +43,7 @@ export class AuditSseResponseHandler {
 
     const activeInteraction = this.sessionStore.getInteractionByDirSync(context.auditInteractionDir);
     const coalescedAgentContinuation = context.coalescedAgentContinuation;
-    const stepNumber = coalescedAgentContinuation?.targetStepIndex ?? activeInteraction?.stepCount ?? 1;
+    const stepNumber = coalescedAgentContinuation?.targetStepIndex ?? context.assignedStepIndex;
     const isCoalescedAgentContinuation = coalescedAgentContinuation !== undefined;
     const stepDir = path.join(
       context.auditInteractionDir,

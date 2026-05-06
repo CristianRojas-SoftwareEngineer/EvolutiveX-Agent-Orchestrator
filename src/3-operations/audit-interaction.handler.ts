@@ -38,6 +38,8 @@ export interface AuditInteractionResult {
   auditSessionId: string;
   interactionType: InteractionType;
   requestClassification: RequestClassification;
+  /** Índice del step asignado durante request audit, inmutable hasta response audit. */
+  assignedStepIndex: number;
   isInternalToolStep?: boolean;
   coalescedAgentContinuation?: {
     targetStepIndex: number;
@@ -223,6 +225,7 @@ export class AuditInteractionHandler {
       auditSessionId,
       interactionType: 'agentic',
       requestClassification: classification,
+      assignedStepIndex: 1,
     };
   }
 
@@ -335,6 +338,7 @@ export class AuditInteractionHandler {
         auditSessionId,
         interactionType: 'agentic',
         requestClassification: classification,
+        assignedStepIndex: 1,
       };
     });
   }
@@ -381,6 +385,7 @@ export class AuditInteractionHandler {
         auditSessionId: params.auditSessionId,
         interactionType: 'agentic',
         requestClassification: params.classification,
+        assignedStepIndex: stepCount,
         isInternalToolStep: true,
       };
     });
@@ -508,6 +513,7 @@ export class AuditInteractionHandler {
         auditSessionId,
         interactionType: parentInteraction.interactionType,
         requestClassification: classification,
+        assignedStepIndex: agentContinuationTarget.targetStepIndex,
         coalescedAgentContinuation: agentContinuationTarget,
       };
     }
@@ -545,6 +551,7 @@ export class AuditInteractionHandler {
       auditSessionId,
       interactionType: parentInteraction.interactionType,
       requestClassification: classification,
+      assignedStepIndex: stepCount,
     };
   }
 
@@ -637,6 +644,7 @@ export class AuditInteractionHandler {
       auditSessionId,
       interactionType: 'client-preflight',
       requestClassification: classification,
+      assignedStepIndex: 1,
     };
   }
 
@@ -705,6 +713,7 @@ export class AuditInteractionHandler {
       auditSessionId,
       interactionType: 'side-request',
       requestClassification: classification,
+      assignedStepIndex: 1,
     };
   }
 
@@ -771,6 +780,7 @@ export class AuditInteractionHandler {
       auditSessionId,
       interactionType: 'client-preflight',
       requestClassification: classification,
+      assignedStepIndex: 1,
     };
   }
 

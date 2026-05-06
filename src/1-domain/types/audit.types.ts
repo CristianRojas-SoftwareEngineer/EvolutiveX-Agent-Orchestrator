@@ -511,6 +511,8 @@ export interface AuditInteractionContext {
   responseStatusCode: number | null;
   interactionType?: InteractionType;
   requestClassification?: RequestClassification;
+  /** Índice del step asignado durante request audit, inmutable hasta response audit. */
+  assignedStepIndex: number;
   isInternalToolStep?: boolean;
   coalescedAgentContinuation?: {
     targetStepIndex: number;

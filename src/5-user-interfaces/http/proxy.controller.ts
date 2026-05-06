@@ -55,6 +55,7 @@ export class ProxyController {
       request.requestBodyOmitted = result.requestBodyOmitted;
       request.interactionType = result.interactionType;
       request.requestClassification = result.requestClassification;
+      request.auditStepIndex = result.assignedStepIndex;
       request.isInternalToolStep = result.isInternalToolStep;
       request.coalescedAgentContinuation = result.coalescedAgentContinuation;
     }
@@ -149,6 +150,7 @@ export class ProxyController {
       responseStatusCode: res.statusCode,
       interactionType: request.interactionType,
       requestClassification: request.requestClassification,
+      assignedStepIndex: request.auditStepIndex ?? 1,
       isInternalToolStep: request.isInternalToolStep,
       coalescedAgentContinuation: request.coalescedAgentContinuation,
     };

@@ -232,8 +232,11 @@ export class SessionStoreService implements ISessionStore {
       if (meta.outputTokens) existing.outputTokens = meta.outputTokens;
     } else {
       // Caso no-coalesced: rechazar duplicado
+      const existingIsCoalesced = existing.coalescedAgentContinuation !== undefined;
       throw new Error(
-        `duplicate stepIndex ${meta.stepIndex} for interaction ${dir}`,
+        `duplicate stepIndex ${meta.stepIndex} for interaction ${dir}: ` +
+          `existing step is ${existingIsCoalesced ? 'coalesced' : 'normal'}, ` +
+          `new step is normal (no coalescedAgentContinuation)`,
       );
     }
   }

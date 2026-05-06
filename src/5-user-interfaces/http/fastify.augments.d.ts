@@ -11,6 +11,8 @@ declare module 'fastify' {
     rawBodyBytes?: number;
     interactionType?: InteractionType;
     requestClassification?: RequestClassification;
+    /** Índice del step asignado durante request audit, inmutable hasta response audit. */
+    auditStepIndex?: number;
     isInternalToolStep?: boolean;
     coalescedAgentContinuation?: {
       targetStepIndex: number;

@@ -34,8 +34,8 @@ export class AuditStandardResponseHandler {
       return;
     }
 
-    const activeInteraction = this.sessionStore.getInteractionByDirSync(context.auditInteractionDir);
-    const stepNumber = activeInteraction?.stepCount ?? 1;
+    const _activeInteraction = this.sessionStore.getInteractionByDirSync(context.auditInteractionDir);
+    const stepNumber = context.assignedStepIndex;
     const stepDir = path.join(
       context.auditInteractionDir,
       'steps',

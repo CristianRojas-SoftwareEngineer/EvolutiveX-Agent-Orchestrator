@@ -150,6 +150,7 @@ function makeAuditWriter(overrides: Partial<IAuditWriter> = {}): IAuditWriter {
     writeResponseHeadersAudit: async () => {},
     writeTopLevelResponseHeaders: async () => {},
     writeInteractionMeta: async () => {},
+    writeWorkflowIndex: async () => {},
     appendSseLine: () => {},
     appendSseRawChunk: () => {},
     writeInteractionState: async () => {},

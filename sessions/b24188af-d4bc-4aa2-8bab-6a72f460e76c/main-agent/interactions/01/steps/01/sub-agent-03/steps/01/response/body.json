@@ -1,0 +1,45 @@
+{
+  "id": "gen-1778093846-lZpq7tqWOGeXgZiY2tiX",
+  "type": "message",
+  "role": "assistant",
+  "container": null,
+  "content": [
+    {
+      "type": "text",
+      "text": "I'll search for the Anthropic API changelog, then fetch the 2 most relevant official pages.",
+      "citations": []
+    },
+    {
+      "type": "tool_use",
+      "id": "fc-00a6e77e-ef01-4de9-a07a-d57fcd19f642",
+      "caller": {
+        "type": "direct"
+      },
+      "name": "WebSearch",
+      "input": {
+        "query": "Anthropic API changelog",
+        "allowed_domains": [
+          "anthropic.com",
+          "docs.anthropic.com"
+        ]
+      }
+    }
+  ],
+  "model": "inclusionai/ling-2.6-1t-20260423:free",
+  "stop_reason": "tool_use",
+  "stop_details": null,
+  "stop_sequence": null,
+  "usage": {
+    "input_tokens": 11138,
+    "output_tokens": 65,
+    "cache_creation_input_tokens": null,
+    "cache_read_input_tokens": 0,
+    "cache_creation": null,
+    "inference_geo": null,
+    "server_tool_use": null,
+    "service_tier": null,
+    "speed": "standard"
+  },
+  "provider": "Novita",
+  "parsed_output": null
+}

@@ -3,7 +3,7 @@ import * as fs from 'node:fs/promises';
 import * as fsSync from 'node:fs';
 import { RedactService } from '../1-domain/services/redact.service.js';
 import { MarkdownRendererService } from '../1-domain/services/markdown-renderer.service.js';
-import { InteractionState, InteractionMetadata, MarkdownRenderContext, SessionMetrics, SessionModelMetrics, SseLine, SubagentSummary, SubagentsSummary } from '../1-domain/types/audit.types.js';
+import { InteractionState, InteractionMetadata, MarkdownRenderContext, SessionMetrics, SessionModelMetrics, SseLine, SubagentSummary, SubagentsSummary, WorkflowIndex } from '../1-domain/types/audit.types.js';
 import { JsonValue } from '../1-domain/types/json.types.js';
 import type { IAuditWriter } from './ports/audit-writer.port.js';
 import {
@@ -758,5 +758,57 @@ export class AuditWriterService implements IAuditWriter {
     };
 
     await this.writeJsonAtomic(filePath, data as unknown as JsonValue);
+  }
+
+  public async writeWorkflowIndex(interactionDir: string, meta: InteractionMetadata): Promise<void> {
+    // Solo generar índice para interacciones agentic
+    if (meta.interactionType !== 'agentic') {
+      return;
+    }
+
+    try {
+      // Extraer sessionId del path de interacción
+      const sessionId = interactionDir.split(path.sep).slice(-3)[0];
+
+      // Construir resumen de steps
+      const steps = meta.steps.map((step) => ({
+        stepIndex: step.stepIndex,
+        sse: step.sse,
+        stopReason: step.stopReason,
+        toolCalls: step.toolCalls,
+        inputTokens: step.inputTokens,
+        outputTokens: step.outputTokens,
+        isCoalesced: step.coalescedAgentContinuation !== undefined,
+      }));
+
+      // Construir resumen de anomalías
+      const anomalies = {
+        lostPendingAgents: meta.lostPendingAgents,
+        lostPendingWebSearch: meta.lostPendingWebSearch,
+        lostPendingWebFetch: meta.lostPendingWebFetch,
+      };
+
+      // Construir índice de workflow
+      const workflowIndex: WorkflowIndex = {
+        interactionType: meta.interactionType,
+        sessionId,
+        modelId: meta.modelId,
+        outcome: meta.outcome,
+        durationMs: meta.durationMs,
+        stepCount: meta.stepCount,
+        steps,
+        resolvedInternalTools: meta.resolvedInternalTools,
+        anomalies,
+      };
+
+      // Escribir workflow.json
+      await this.writeJsonAtomic(path.join(interactionDir, 'workflow.json'), workflowIndex as unknown as JsonValue);
+
+      // Generar workflow.md
+      const workflowMd = this.markdownRendererService.renderWorkflowIndexMarkdown(workflowIndex);
+      await this.writeFileAtomic(path.join(interactionDir, 'workflow.md'), Buffer.from(`${workflowMd}\n`, 'utf8'));
+    } catch {
+      // Best-effort: si falla la generación del índice, no romper el flujo principal
+    }
   }
 }

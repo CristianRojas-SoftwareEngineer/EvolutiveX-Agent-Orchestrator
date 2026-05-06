@@ -370,6 +370,11 @@ export interface ActiveInteraction {
 }
 
 /**
+ * Subtipo de side-request para diferenciar requests de naming de sesión.
+ */
+export type SideRequestKind = 'session-naming' | 'generic';
+
+/**
  * Metadatos del turno completo escritos en meta.json.
  * Refleja la perspectiva de turno lógico del usuario.
  */
@@ -377,6 +382,8 @@ export interface InteractionMetadata {
   interactionType: InteractionType;
   /** Modelo que procesó esta interacción. Presente en agentic y side-request. */
   modelId?: string;
+  /** Subtipo de side-request (solo para interactionType='side-request'). */
+  sideRequestKind?: SideRequestKind;
   outcome: InteractionOutcome;
   stepCount: number;
   startedAt: string;
@@ -450,6 +457,81 @@ export interface InteractionState {
   continuationOrphan?: boolean;
   /** Presente sólo en interacciones de subagentes anidadas bajo el step padre. */
   parentContext?: ParentContext;
+}
+
+/**
+ * Índice de workflow por interacción que resume el árbol agéntico.
+ * Generado al cierre de interacciones agentic para facilitar auditoría humana y machine-readable.
+ */
+export interface WorkflowIndex {
+  /** Tipo de interacción (agentic, side-request, client-preflight) */
+  interactionType: InteractionType;
+  /** Identificador de la sesión */
+  sessionId: string;
+  /** Modelo que procesó esta interacción */
+  modelId?: string;
+  /** Resultado de la interacción */
+  outcome: InteractionOutcome;
+  /** Duración total en milisegundos */
+  durationMs: number;
+  /** Número de steps */
+  stepCount: number;
+  /** Resumen de steps */
+  steps: WorkflowStepSummary[];
+  /** Resumen de subagentes (solo para interacciones agentic que invocan subagentes) */
+  subagents?: WorkflowSubagentSummary[];
+  /** Resumen de herramientas internas resueltas */
+  resolvedInternalTools?: ResolvedInternalTool[];
+  /** Anomalías detectadas (pendings perdidos) */
+  anomalies: {
+    lostPendingAgents?: PendingAgentToolUse[];
+    lostPendingWebSearch?: PendingWebSearchToolUse[];
+    lostPendingWebFetch?: PendingWebFetchToolUse[];
+  };
+}
+
+/** Resumen de un step en el índice de workflow */
+export interface WorkflowStepSummary {
+  /** Índice del step */
+  stepIndex: number;
+  /** Si el step es SSE */
+  sse: boolean;
+  /** Stop reason del step */
+  stopReason?: string;
+  /** Herramientas usadas en este step */
+  toolCalls?: string[];
+  /** Tokens de entrada */
+  inputTokens?: number;
+  /** Tokens de salida */
+  outputTokens?: number;
+  /** Si este step es coalesced (invocó subagentes) */
+  isCoalesced?: boolean;
+  /** Subagentes invocados en este step (si aplica) */
+  subagents?: WorkflowSubagentSummary[];
+}
+
+/** Resumen de un subagente en el índice de workflow */
+export interface WorkflowSubagentSummary {
+  /** Índice del subagente */
+  index: number;
+  /** Nombre del directorio del subagente */
+  dirName: string;
+  /** ID del tool_use Agent que originó este subagente */
+  toolUseId: string | null;
+  /** Tipo de subagente */
+  subagentType: string | null;
+  /** Resultado del subagente */
+  outcome: InteractionOutcome | 'unknown';
+  /** Duración en milisegundos */
+  durationMs: number;
+  /** Número de steps del subagente */
+  stepCount: number;
+  /** Herramientas usadas por el subagente */
+  toolCalls: string[];
+  /** Tokens de entrada */
+  inputTokens: number;
+  /** Tokens de salida */
+  outputTokens: number;
 }
 
 /**

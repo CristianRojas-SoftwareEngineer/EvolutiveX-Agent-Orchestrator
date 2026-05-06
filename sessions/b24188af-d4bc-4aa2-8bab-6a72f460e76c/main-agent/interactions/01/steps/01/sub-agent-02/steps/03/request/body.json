@@ -1,0 +1,48 @@
+{
+  "model": "inclusionai/ling-2.6-1t:free",
+  "messages": [
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "text",
+          "text": "Perform a web search for the query: Anthropic API changelog"
+        }
+      ]
+    }
+  ],
+  "system": [
+    {
+      "type": "text",
+      "text": "x-anthropic-billing-header: cc_version=2.1.128.8cc; cc_entrypoint=cli; cch=04c9c;"
+    },
+    {
+      "type": "text",
+      "text": "You are Claude Code, Anthropic's official CLI for Claude."
+    },
+    {
+      "type": "text",
+      "text": "You are an assistant for performing a web search tool use"
+    }
+  ],
+  "tools": [
+    {
+      "type": "web_search_20250305",
+      "name": "web_search",
+      "allowed_domains": [
+        "anthropic.com",
+        "docs.anthropic.com"
+      ],
+      "max_uses": 8
+    }
+  ],
+  "metadata": {
+    "user_id": "{\"device_id\":\"9229d90970d02c0ebfb6e8a811bdca6bbc56b3ea15e4950b38a7dd3048163276\",\"account_uuid\":\"\",\"session_id\":\"b24188af-d4bc-4aa2-8bab-6a72f460e76c\"}"
+  },
+  "max_tokens": 32000,
+  "temperature": 1,
+  "output_config": {
+    "effort": "medium"
+  },
+  "stream": true
+}

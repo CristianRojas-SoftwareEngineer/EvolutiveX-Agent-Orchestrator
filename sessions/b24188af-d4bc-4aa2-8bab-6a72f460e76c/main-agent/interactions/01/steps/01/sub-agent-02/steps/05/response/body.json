@@ -1,0 +1,30 @@
+{
+  "id": "gen-1778093863-Zmv9sMy7r8ZAej3OG4Mw",
+  "type": "message",
+  "role": "assistant",
+  "container": null,
+  "content": [
+    {
+      "type": "text",
+      "text": "Aquí están los 3 primeros resultados sobre la documentación de subagentes de Claude Code:\n\n1. **[Claude Code Documentation - Subagents Overview](https://docs.anthropic.com/en/docs/claude-code/subagents)**  \n   Documentación oficial que explica qué son los subagentes, cómo funcionan y cómo crearlos.\n\n2. **[Claude Code Agent Configuration and Subagent Management](https://docs.anthropic.com/en/docs/claude-code/agents)**  \n   Guía detallada sobre configuración de agentes, opciones de subagentes, permisos y herramientas disponibles.\n\n3. **[Using Custom Subagents in Claude Code](https://docs.anthropic.com/en/docs/claude-code/custom-agents)**  \n   Tutorial paso a paso para crear subagentes personalizados mediante Markdown, CLI o programáticamente.",
+      "citations": []
+    }
+  ],
+  "model": "inclusionai/ling-2.6-1t-20260423:free",
+  "stop_reason": "end_turn",
+  "stop_details": null,
+  "stop_sequence": null,
+  "usage": {
+    "input_tokens": 13040,
+    "output_tokens": 196,
+    "cache_creation_input_tokens": null,
+    "cache_read_input_tokens": 0,
+    "cache_creation": null,
+    "inference_geo": null,
+    "server_tool_use": null,
+    "service_tier": null,
+    "speed": "standard"
+  },
+  "provider": "Novita",
+  "parsed_output": null
+}

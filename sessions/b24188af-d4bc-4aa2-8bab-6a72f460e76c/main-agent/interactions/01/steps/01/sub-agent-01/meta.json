@@ -1,0 +1,80 @@
+{
+  "interactionType": "agentic",
+  "modelId": "inclusionai/ling-2.6-1t:free",
+  "outcome": "completed",
+  "stepCount": 3,
+  "startedAt": "2026-05-06T18:57:27.367Z",
+  "endedAt": "2026-05-06T18:57:34.941Z",
+  "durationMs": 7574,
+  "statusCode": 200,
+  "sse": true,
+  "steps": [
+    {
+      "stepIndex": 1,
+      "sse": true,
+      "statusCode": 200,
+      "sseLineCount": 32,
+      "stopReason": "tool_use",
+      "toolCalls": [
+        "WebFetch"
+      ],
+      "toolUseIds": [
+        "fc-b8f4c963-8138-4ae5-b134-1080b6ff68e4"
+      ],
+      "inputTokens": 11112,
+      "outputTokens": 64,
+      "sseRawBytesWritten": 2857,
+      "anthropicMessageId": "gen-1778093846-ReRrlRY9SO1LZPGJpfKl"
+    },
+    {
+      "stepIndex": 2,
+      "sse": true,
+      "statusCode": 200,
+      "sseLineCount": 32,
+      "stopReason": "end_turn",
+      "inputTokens": 263,
+      "outputTokens": 26,
+      "sseRawBytesWritten": 2573,
+      "anthropicMessageId": "gen-1778093849-t5pHYzI1Hj8QOcHOuaTl"
+    },
+    {
+      "stepIndex": 3,
+      "sse": true,
+      "statusCode": 200,
+      "sseLineCount": 66,
+      "stopReason": "end_turn",
+      "inputTokens": 12455,
+      "outputTokens": 65,
+      "sseRawBytesWritten": 4684,
+      "anthropicMessageId": "gen-1778093850-BTJHUDtnbInayoOyyzyo"
+    }
+  ],
+  "totals": {
+    "cacheCreationInputTokens": 0,
+    "cacheReadInputTokens": 0,
+    "inputTokens": 23830,
+    "outputTokens": 155
+  },
+  "sseResponseBodyAttempted": true,
+  "sseResponseBodyWritten": true,
+  "sseResponseBodyError": null,
+  "sseResponseBodySource": "file",
+  "errorMessage": null,
+  "errorCode": null,
+  "parentContext": {
+    "parentInteractionDir": "C:\\Users\\Cristian\\Desktop\\Proyectos\\Smart Code Proxy\\sessions\\b24188af-d4bc-4aa2-8bab-6a72f460e76c\\main-agent\\interactions\\01",
+    "parentStepIndex": 1,
+    "triggeringToolUseId": null
+  },
+  "truncation": {
+    "requestBodyOmitted": false,
+    "responseBodyBytesTotal": null,
+    "responseBodyBytesAudited": null,
+    "responseTruncatedByProxyBuffer": false,
+    "responseTruncatedByAuditLimit": false,
+    "sseRawBytesAudited": 10114,
+    "sseRawBytesLimit": 52428800,
+    "sseRawTruncatedByLimit": false,
+    "sseRawWriteError": false
+  }
+}

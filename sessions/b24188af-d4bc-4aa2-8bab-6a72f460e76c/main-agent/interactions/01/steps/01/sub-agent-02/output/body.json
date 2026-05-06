@@ -1,0 +1,196 @@
+{
+  "type": "multi-step-response",
+  "stepCount": 5,
+  "steps": [
+    {
+      "stepIndex": 1,
+      "id": "gen-1778093845-RB04dFFddqdBiIWcyOfk",
+      "type": "message",
+      "role": "assistant",
+      "container": null,
+      "content": [
+        {
+          "type": "tool_use",
+          "id": "fc-5dc73cc2-0a7a-4c9e-b0b8-53a534b25711",
+          "caller": {
+            "type": "direct"
+          },
+          "name": "WebSearch",
+          "input": {
+            "query": "Claude Code subagents documentation",
+            "allowed_domains": [
+              "anthropic.com",
+              "claude.ai"
+            ],
+            "head_limit": 250
+          }
+        }
+      ],
+      "model": "inclusionai/ling-2.6-1t-20260423:free",
+      "stop_reason": "tool_use",
+      "stop_details": null,
+      "stop_sequence": null,
+      "usage": {
+        "input_tokens": 11107,
+        "output_tokens": 50,
+        "cache_creation_input_tokens": null,
+        "cache_read_input_tokens": 0,
+        "cache_creation": null,
+        "inference_geo": null,
+        "server_tool_use": null,
+        "service_tier": null,
+        "speed": "standard"
+      },
+      "provider": "Novita",
+      "parsed_output": null
+    },
+    {
+      "stepIndex": 2,
+      "id": "gen-1778093848-usiI55Jy17eOIoc4w9dF",
+      "type": "message",
+      "role": "assistant",
+      "container": null,
+      "content": [
+        {
+          "type": "tool_use",
+          "id": "fc-a6e9044a-c1d5-4cc9-aeb8-4206bb2c3765",
+          "caller": {
+            "type": "direct"
+          },
+          "name": "WebSearch",
+          "input": {
+            "query": "Claude Code subagents documentation",
+            "allowed_domains": [
+              "anthropic.com",
+              "claude.ai"
+            ]
+          }
+        }
+      ],
+      "model": "inclusionai/ling-2.6-1t-20260423:free",
+      "stop_reason": "tool_use",
+      "stop_details": null,
+      "stop_sequence": null,
+      "usage": {
+        "input_tokens": 12440,
+        "output_tokens": 42,
+        "cache_creation_input_tokens": null,
+        "cache_read_input_tokens": 0,
+        "cache_creation": null,
+        "inference_geo": null,
+        "server_tool_use": null,
+        "service_tier": null,
+        "speed": "standard"
+      },
+      "provider": "Novita",
+      "parsed_output": null
+    },
+    {
+      "stepIndex": 3,
+      "id": "gen-1778093848-fH8TbkjWqwNmK8hycYG5",
+      "type": "message",
+      "role": "assistant",
+      "container": null,
+      "content": [
+        {
+          "type": "server_tool_use",
+          "id": "fc-738945aa-4061-49da-89b4-3a07edb681c4",
+          "name": "web_search",
+          "input": {
+            "query": "Anthropic API changelog"
+          }
+        },
+        {
+          "type": "text",
+          "text": "I found the Anthropic API changelog! The search returned several relevant results. Here are the key findings:\n\n## Primary Result: **Claude Platform Release Notes** \nThe main API changelog is available at: **https://docs.anthropic.com/en/release-notes/overview**\n\nThis comprehensive changelog covers updates to the Claude Platform, including the Claude API, client SDKs, and Claude Console. Here are some of the most recent highlights:\n\n### Recent Major Updates (2026):\n\n**April 2026:**\n- **Claude Opus 4.7** launched (most capable model for complex reasoning and agentic coding)\n- **Multiagent sessions and Outcomes** now in public beta\n- **Claude in Amazon Bedrock** now open to all customers\n- **Rate Limits API** released (programmatically query rate limits)\n- **Claude Haiku 3** retired (recommend upgrading to Haiku 4.5)\n\n**March 2026:**\n- **1M token context window** now generally available for Opus 4.6 and Sonnet 4.6\n- **Media limit increased** from 100 to 600 images/PDF pages per request\n- **Model capability fields** added to Models API\n\n**February 2026:**\n- **Claude Sonnet 4.6** launched\n- **Web search and programmatic tool calling** now generally available\n- **Automatic caching** launched for Messages API\n\n### Additional Resources:\n- **API Versioning**: https://docs.anthropic.com/en/api/versioning\n- **Claude Code Changelog**: https://docs.anthropic.com/en/docs/claude-code/changelog\n\nThe changelog shows Anthropic's rapid development pace, with frequent model releases, new features like managed agents, memory tools, and expanded context windows.",
+          "citations": []
+        }
+      ],
+      "model": "unknown",
+      "stop_reason": "end_turn",
+      "stop_details": null,
+      "stop_sequence": null,
+      "usage": {
+        "input_tokens": 13270,
+        "output_tokens": 434,
+        "cache_creation_input_tokens": null,
+        "cache_read_input_tokens": null,
+        "cache_creation": null,
+        "inference_geo": null,
+        "server_tool_use": null,
+        "service_tier": null,
+        "speed": "standard"
+      },
+      "parsed_output": null
+    },
+    {
+      "stepIndex": 4,
+      "id": "gen-1778093851-bRfH3yIXSgsHYJhBcjZL",
+      "type": "message",
+      "role": "assistant",
+      "container": null,
+      "content": [
+        {
+          "type": "server_tool_use",
+          "id": "fc-e0b4d852-23a2-4a83-830f-00e9ad9fa4ba",
+          "name": "web_search",
+          "input": {
+            "query": "Claude Code subagents documentation"
+          }
+        },
+        {
+          "type": "text",
+          "text": "I've successfully found comprehensive documentation about Claude Code subagents. Here's a summary of the key information:\n\n## Overview of Claude Code Subagents\n\nSubagents are specialized AI assistants that handle specific types of tasks in isolated context windows, keeping your main conversation clean and focused.\n\n## Built-in Subagents\n\n1. **Explore** - Fast, read-only agent (Haiku model) for codebase exploration\n2. **Plan** - Research agent for planning mode (read-only tools)\n3. **General-purpose** - Capable agent for complex multi-step tasks\n4. **Helper agents** - Statusline setup, Claude Code guide, etc.\n\n## Creating Custom Subagents\n\n### Methods:\n- **Interactive**: Use `/agents` command in Claude Code\n- **Manual**: Create Markdown files with YAML frontmatter\n- **CLI**: Use `--agents` flag with JSON configuration\n- **Programmatic**: Via Agent SDK\n\n### Configuration Options:\n- `name` and `description` (required)\n- `tools` / `disallowedTools` - Tool access control\n- `model` - Sonnet, Opus, Haiku, or inherit\n- `permissionMode` - Default, acceptEdits, auto, etc.\n- `memory` - User, project, or local persistence\n- `maxTurns` - Turn limit\n- `skills` - Preload specific skills\n- `isolation` - Set to \"worktree\" for isolated repository copy\n\n## Scope and Priority\n\nWhen multiple subagents share the same name, priority is:\n1. Managed settings (highest)\n2. CLI flag (current session)\n3. Project (`.claude/agents/`)\n4. User (`~/.claude/agents/`)\n5. Plugin agents (lowest)\n\n## Subagents vs Agent Teams\n\n- **Subagents**: Run within your session, return summaries to main context\n- **Agent Teams**: Independent Claude Code sessions that communicate peer-to-peer\n\n## SDK Support\n\nThe Claude Agent SDK (Python/TypeScript) also supports subagents through the `agents` parameter in `ClaudeAgentOptions`, using `AgentDefinition` to specify custom agents with their own prompts, tools, and configurations.\n\nThis allows for building sophisticated multi-agent workflows where specialized agents handle different aspects of complex tasks while maintaining context isolation.",
+          "citations": []
+        }
+      ],
+      "model": "unknown",
+      "stop_reason": "end_turn",
+      "stop_details": null,
+      "stop_sequence": null,
+      "usage": {
+        "input_tokens": 19291,
+        "output_tokens": 532,
+        "cache_creation_input_tokens": null,
+        "cache_read_input_tokens": null,
+        "cache_creation": null,
+        "inference_geo": null,
+        "server_tool_use": null,
+        "service_tier": null,
+        "speed": "standard"
+      },
+      "parsed_output": null
+    },
+    {
+      "stepIndex": 5,
+      "id": "gen-1778093863-Zmv9sMy7r8ZAej3OG4Mw",
+      "type": "message",
+      "role": "assistant",
+      "container": null,
+      "content": [
+        {
+          "type": "text",
+          "text": "Aquí están los 3 primeros resultados sobre la documentación de subagentes de Claude Code:\n\n1. **[Claude Code Documentation - Subagents Overview](https://docs.anthropic.com/en/docs/claude-code/subagents)**  \n   Documentación oficial que explica qué son los subagentes, cómo funcionan y cómo crearlos.\n\n2. **[Claude Code Agent Configuration and Subagent Management](https://docs.anthropic.com/en/docs/claude-code/agents)**  \n   Guía detallada sobre configuración de agentes, opciones de subagentes, permisos y herramientas disponibles.\n\n3. **[Using Custom Subagents in Claude Code](https://docs.anthropic.com/en/docs/claude-code/custom-agents)**  \n   Tutorial paso a paso para crear subagentes personalizados mediante Markdown, CLI o programáticamente.",
+          "citations": []
+        }
+      ],
+      "model": "inclusionai/ling-2.6-1t-20260423:free",
+      "stop_reason": "end_turn",
+      "stop_details": null,
+      "stop_sequence": null,
+      "usage": {
+        "input_tokens": 13040,
+        "output_tokens": 196,
+        "cache_creation_input_tokens": null,
+        "cache_read_input_tokens": 0,
+        "cache_creation": null,
+        "inference_geo": null,
+        "server_tool_use": null,
+        "service_tier": null,
+        "speed": "standard"
+      },
+      "provider": "Novita",
+      "parsed_output": null
+    }
+  ]
+}

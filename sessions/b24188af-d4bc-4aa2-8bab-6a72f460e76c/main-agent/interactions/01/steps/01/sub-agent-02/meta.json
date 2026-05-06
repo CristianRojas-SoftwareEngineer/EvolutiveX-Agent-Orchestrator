@@ -1,0 +1,108 @@
+{
+  "interactionType": "agentic",
+  "modelId": "inclusionai/ling-2.6-1t:free",
+  "outcome": "completed",
+  "stepCount": 5,
+  "startedAt": "2026-05-06T18:57:27.383Z",
+  "endedAt": "2026-05-06T18:57:52.186Z",
+  "durationMs": 24803,
+  "statusCode": 200,
+  "sse": true,
+  "steps": [
+    {
+      "stepIndex": 1,
+      "sse": true,
+      "statusCode": 200,
+      "sseLineCount": 42,
+      "stopReason": "tool_use",
+      "toolCalls": [
+        "WebSearch"
+      ],
+      "toolUseIds": [
+        "fc-5dc73cc2-0a7a-4c9e-b0b8-53a534b25711"
+      ],
+      "inputTokens": 11107,
+      "outputTokens": 50,
+      "sseRawBytesWritten": 3440,
+      "anthropicMessageId": "gen-1778093845-RB04dFFddqdBiIWcyOfk"
+    },
+    {
+      "stepIndex": 2,
+      "sse": true,
+      "statusCode": 200,
+      "sseLineCount": 32,
+      "stopReason": "tool_use",
+      "toolCalls": [
+        "WebSearch"
+      ],
+      "toolUseIds": [
+        "fc-a6e9044a-c1d5-4cc9-aeb8-4206bb2c3765"
+      ],
+      "inputTokens": 12440,
+      "outputTokens": 42,
+      "sseRawBytesWritten": 2774,
+      "anthropicMessageId": "gen-1778093848-usiI55Jy17eOIoc4w9dF"
+    },
+    {
+      "stepIndex": 3,
+      "sse": true,
+      "statusCode": 200,
+      "sseLineCount": 342,
+      "stopReason": "end_turn",
+      "inputTokens": 13270,
+      "outputTokens": 434,
+      "sseRawBytesWritten": 21830,
+      "anthropicMessageId": "gen-1778093848-fH8TbkjWqwNmK8hycYG5"
+    },
+    {
+      "stepIndex": 4,
+      "sse": true,
+      "statusCode": 200,
+      "sseLineCount": 440,
+      "stopReason": "end_turn",
+      "inputTokens": 19291,
+      "outputTokens": 532,
+      "sseRawBytesWritten": 28005,
+      "anthropicMessageId": "gen-1778093851-bRfH3yIXSgsHYJhBcjZL"
+    },
+    {
+      "stepIndex": 5,
+      "sse": true,
+      "statusCode": 200,
+      "sseLineCount": 162,
+      "stopReason": "end_turn",
+      "inputTokens": 13040,
+      "outputTokens": 196,
+      "sseRawBytesWritten": 10687,
+      "anthropicMessageId": "gen-1778093863-Zmv9sMy7r8ZAej3OG4Mw"
+    }
+  ],
+  "totals": {
+    "cacheCreationInputTokens": 0,
+    "cacheReadInputTokens": 0,
+    "inputTokens": 69148,
+    "outputTokens": 1254
+  },
+  "sseResponseBodyAttempted": true,
+  "sseResponseBodyWritten": true,
+  "sseResponseBodyError": null,
+  "sseResponseBodySource": "file",
+  "errorMessage": null,
+  "errorCode": null,
+  "parentContext": {
+    "parentInteractionDir": "C:\\Users\\Cristian\\Desktop\\Proyectos\\Smart Code Proxy\\sessions\\b24188af-d4bc-4aa2-8bab-6a72f460e76c\\main-agent\\interactions\\01",
+    "parentStepIndex": 1,
+    "triggeringToolUseId": null
+  },
+  "truncation": {
+    "requestBodyOmitted": false,
+    "responseBodyBytesTotal": null,
+    "responseBodyBytesAudited": null,
+    "responseTruncatedByProxyBuffer": false,
+    "responseTruncatedByAuditLimit": false,
+    "sseRawBytesAudited": 66736,
+    "sseRawBytesLimit": 52428800,
+    "sseRawTruncatedByLimit": false,
+    "sseRawWriteError": false
+  }
+}

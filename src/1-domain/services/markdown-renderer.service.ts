@@ -1,5 +1,5 @@
 import { JsonValue } from '../types/json.types.js';
-import { MarkdownRenderContext, SubagentsSummary } from '../types/audit.types.js';
+import { MarkdownRenderContext, SubagentsSummary, WorkflowIndex } from '../types/audit.types.js';
 
 /**
  * Servicio para renderizar cuerpos JSON de petición/respuesta como Markdown semántico legible.
@@ -701,5 +701,76 @@ export class MarkdownRendererService {
 
     const remaining = lines.slice(skillEnd).join('\n').trim();
     return remaining || undefined;
+  }
+
+  public renderWorkflowIndexMarkdown(workflow: WorkflowIndex): string {
+    const parts: string[] = [this.heading(1, '📊 Índice de Workflow')];
+
+    // Información general
+    parts.push(this.heading(2, 'Información General'));
+    parts.push(`**Tipo:** ${workflow.interactionType}`);
+    parts.push(`**Sesión:** \`${workflow.sessionId}\``);
+    if (workflow.modelId) parts.push(`**Modelo:** ${workflow.modelId}`);
+    parts.push(`**Resultado:** ${workflow.outcome}`);
+    parts.push(`**Duración:** ${this.formatDuration(workflow.durationMs)}`);
+    parts.push(`**Steps:** ${workflow.stepCount}`);
+
+    // Resumen de steps
+    parts.push(this.heading(2, 'Steps'));
+    for (const step of workflow.steps) {
+      parts.push(this.heading(3, `Step ${step.stepIndex}`));
+      parts.push(`**SSE:** ${step.sse ? 'Sí' : 'No'}`);
+      if (step.stopReason) parts.push(`**Stop Reason:** ${step.stopReason}`);
+      if (step.toolCalls && step.toolCalls.length > 0) parts.push(`**Herramientas:** ${step.toolCalls.join(', ')}`);
+      if (step.inputTokens !== undefined || step.outputTokens !== undefined) {
+        parts.push(`**Tokens:** ${step.inputTokens ?? 0} input, ${step.outputTokens ?? 0} output`);
+      }
+      if (step.isCoalesced) parts.push(`**Coalesced:** Sí (invocó subagentes)`);
+    }
+
+    // Resumen de subagentes
+    if (workflow.subagents && workflow.subagents.length > 0) {
+      parts.push(this.heading(2, 'Subagentes'));
+      for (const subagent of workflow.subagents) {
+        parts.push(this.heading(3, `Subagente ${subagent.index}`));
+        parts.push(`**Directorio:** \`${subagent.dirName}\``);
+        if (subagent.toolUseId) parts.push(`**Tool Use ID:** \`${subagent.toolUseId}\``);
+        if (subagent.subagentType) parts.push(`**Tipo:** ${subagent.subagentType}`);
+        parts.push(`**Resultado:** ${subagent.outcome}`);
+        parts.push(`**Duración:** ${this.formatDuration(subagent.durationMs)}`);
+        parts.push(`**Steps:** ${subagent.stepCount}`);
+        if (subagent.toolCalls && subagent.toolCalls.length > 0) parts.push(`**Herramientas:** ${subagent.toolCalls.join(', ')}`);
+        parts.push(`**Tokens:** ${subagent.inputTokens} input, ${subagent.outputTokens} output`);
+      }
+    }
+
+    // Resumen de herramientas internas resueltas
+    if (workflow.resolvedInternalTools && workflow.resolvedInternalTools.length > 0) {
+      parts.push(this.heading(2, 'Herramientas Internas Resueltas'));
+      for (const tool of workflow.resolvedInternalTools) {
+        parts.push(`- **${tool.toolName}** (ID: \`${tool.toolUseId}\`): Step ${tool.originalStepIndex} → ${tool.resolutionMode}${tool.resolvedInStepIndex ? ` (resuelto en step ${tool.resolvedInStepIndex})` : ''}`);
+      }
+    }
+
+    // Anomalías
+    const hasAnomalies =
+      (workflow.anomalies.lostPendingAgents && workflow.anomalies.lostPendingAgents.length > 0) ||
+      (workflow.anomalies.lostPendingWebSearch && workflow.anomalies.lostPendingWebSearch.length > 0) ||
+      (workflow.anomalies.lostPendingWebFetch && workflow.anomalies.lostPendingWebFetch.length > 0);
+
+    if (hasAnomalies) {
+      parts.push(this.heading(2, '⚠️ Anomalías'));
+      if (workflow.anomalies.lostPendingAgents && workflow.anomalies.lostPendingAgents.length > 0) {
+        parts.push(`**Agent tool_uses perdidos:** ${workflow.anomalies.lostPendingAgents.map((p) => p.toolUseId).join(', ')}`);
+      }
+      if (workflow.anomalies.lostPendingWebSearch && workflow.anomalies.lostPendingWebSearch.length > 0) {
+        parts.push(`**WebSearch tool_uses perdidos:** ${workflow.anomalies.lostPendingWebSearch.map((p) => p.toolUseId).join(', ')}`);
+      }
+      if (workflow.anomalies.lostPendingWebFetch && workflow.anomalies.lostPendingWebFetch.length > 0) {
+        parts.push(`**WebFetch tool_uses perdidos:** ${workflow.anomalies.lostPendingWebFetch.map((p) => p.toolUseId).join(', ')}`);
+      }
+    }
+
+    return parts.join('\n\n');
   }
 }

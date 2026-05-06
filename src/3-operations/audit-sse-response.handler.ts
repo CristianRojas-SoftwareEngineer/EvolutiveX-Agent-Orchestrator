@@ -137,7 +137,7 @@ export class AuditSseResponseHandler {
             i: sseLineIndex,
             ts: new Date().toISOString(),
             line: trimmed,
-            phase: isCoalescedAgentContinuation ? currentPhase : undefined,
+            phase: isCoalescedAgentContinuation ? currentPhase : 'delegation',
           });
 
           // Parsear eventos clave para metadata de la interacción
@@ -399,8 +399,10 @@ export class AuditSseResponseHandler {
 
           let sseReconstructResult: SseReconstructResult | undefined;
           try {
-            const initialMessage = await this.sseReconstruct.reconstructStepMessage(stepDir);
-            const finalMessage = await this.sseReconstruct.reconstructSseJsonlFile(sseJsonlPath);
+            // Para steps coalesced, reconstruir initialMessage desde la fase "delegation"
+            const initialMessage = await this.sseReconstruct.reconstructSseJsonlFile(sseJsonlPath, undefined, 'delegation');
+            // Reconstruir finalMessage desde la fase "continuation"
+            const finalMessage = await this.sseReconstruct.reconstructSseJsonlFile(sseJsonlPath, undefined, 'continuation');
             // La request de continuation viene del contexto en memoria, no de archivos
             const continuationRequest = coalescedAgentContinuation?.continuationRequest ?? null;
             const continuationHeaders = coalescedAgentContinuation?.continuationHeaders;

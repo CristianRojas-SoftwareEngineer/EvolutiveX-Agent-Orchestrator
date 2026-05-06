@@ -873,13 +873,14 @@ export class AuditInteractionHandler {
   }
 
   /**
-   * Detector conservador de side-request de naming de sesión.
+   * Detector de side-request de naming de sesión.
    * Un side-request se clasifica como 'session-naming' si:
    * - Es el primer side-request de la sesión
    * - No hay turnos agentic previos en la sesión
    * - No es una implementación WebFetch interna (ya filtrado antes)
+   * - El output_config requiere un campo "title" mediante JSON schema (patrón 1)
    */
-  private async detectSessionNamingSideRequest(auditSessionId: string, _rawBody: Buffer): Promise<boolean> {
+  private async detectSessionNamingSideRequest(auditSessionId: string, rawBody: Buffer): Promise<boolean> {
     try {
       // Verificar si hay turnos agentic previos en la sesión
       const mainAgentDir = path.join(this.sessionStore.getBaseDir(), auditSessionId, DIR_MAIN_AGENT);
@@ -899,11 +900,31 @@ export class AuditInteractionHandler {
         const entries = await fs.readdir(sideInteractionsDir, { withFileTypes: true });
         const existingSideInteractions = entries.filter((e) => e.isDirectory()).length;
         // Si ya hay side-requests previos, este no es el primero → no es naming
-        return existingSideInteractions === 0;
+        if (existingSideInteractions > 0) {
+          return false;
+        }
       } catch {
         // No hay directorio de side-interactions aún → es el primero
-        return true;
       }
+
+      // Patrón 1: Analizar output_config para detectar JSON schema con campo "title"
+      try {
+        const bodyText = rawBody.toString('utf8');
+        const body = JSON.parse(bodyText);
+
+        // Verificar si output_config tiene formato JSON schema con propiedad "title"
+        if (
+          body.output_config?.format?.type === 'json_schema' &&
+          body.output_config.format.schema?.properties?.title
+        ) {
+          return true;
+        }
+      } catch {
+        // Si falla el parsing del body, ser conservador → no clasificar como naming
+      }
+
+      // Si no se detecta el patrón de output_config, clasificar como generic
+      return false;
     } catch {
       // En caso de error, ser conservador → clasificar como generic
       return false;

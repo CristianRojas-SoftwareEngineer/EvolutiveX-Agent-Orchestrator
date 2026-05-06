@@ -303,3 +303,130 @@ describe('SseReconstructService - fixture real (sessions/ histórico)', () => {
     expect(body.steps[0].content[0].text).toContain('Explain Smart Code Proxy project');
   });
 });
+
+describe('SseReconstructService - reconstrucción por fase (coalesced)', () => {
+  let tempDir: string;
+  let jsonlPath: string;
+  let service: SseReconstructService;
+
+  beforeAll(async () => {
+    tempDir = path.join(os.tmpdir(), `scp-sse-phase-${Date.now()}`);
+    await fs.mkdir(tempDir, { recursive: true });
+    jsonlPath = path.join(tempDir, 'sse.jsonl');
+
+    const redactService = new RedactService();
+    const markdownRenderer = new MarkdownRendererService();
+    const writer = new AuditWriterService(redactService, markdownRenderer);
+    service = new SseReconstructService(writer);
+  });
+
+  afterAll(async () => {
+    await fs.rm(tempDir, { recursive: true, force: true });
+  });
+
+  it('reconstruye fase delegation con tool_use Agent y sin message_stop', async () => {
+    const delegationLines = [
+      'event: message_start',
+      'data: {"type":"message_start","message":{"id":"msg_01","type":"message","role":"assistant","content":[],"model":"claude-3-5-sonnet","stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":10,"output_tokens":0}}}',
+      'event: content_block_start',
+      'data: {"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"toolu_01","name":"Agent","input":{}}}',
+      'event: content_block_delta',
+      'data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{\\"description\\":\\"Test\\""}}',
+      'event: content_block_delta',
+      'data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":",\\"prompt\\":\\"Do it\\"}"}}',
+      'event: content_block_stop',
+      'data: {"type":"content_block_stop","index":0}',
+      'event: message_delta',
+      'data: {"type":"message_delta","delta":{"stop_reason":"tool_use"}}',
+    ];
+
+    const jsonlContent = delegationLines
+      .map((line, i) => JSON.stringify({ i: i + 1, ts: '2026-01-01T00:00:00Z', line, phase: 'delegation' as const }))
+      .join('\n') + '\n';
+    await fs.writeFile(jsonlPath, jsonlContent, 'utf8');
+
+    const message = await service.reconstructSseJsonlPhaseMessage(jsonlPath, 'delegation');
+
+    expect(message.id).toBe('msg_01');
+    expect(message.model).toBe('claude-3-5-sonnet');
+    expect(message.stop_reason).toBe('tool_use');
+    expect(message.content).toHaveLength(1);
+    expect(message.content[0].type).toBe('tool_use');
+    if (message.content[0].type === 'tool_use') {
+      expect(message.content[0].id).toBe('toolu_01');
+      expect(message.content[0].name).toBe('Agent');
+      // Verificar que el input se reconstruyó desde los deltas
+      expect(message.content[0].input).toEqual({ description: 'Test', prompt: 'Do it' });
+    }
+  });
+
+  it('reconstruye fase continuation con texto final y message_stop', async () => {
+    const continuationLines = [
+      'event: message_start',
+      'data: {"type":"message_start","message":{"id":"msg_02","type":"message","role":"assistant","content":[],"model":"claude-3-5-sonnet","stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":5,"output_tokens":0}}}',
+      'event: content_block_start',
+      'data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}',
+      'event: content_block_delta',
+      'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Final "}}',
+      'event: content_block_delta',
+      'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"answer"}}',
+      'event: content_block_stop',
+      'data: {"type":"content_block_stop","index":0}',
+      'event: message_delta',
+      'data: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":10}}',
+      'event: message_stop',
+      'data: {"type":"message_stop"}',
+    ];
+
+    const jsonlContent = continuationLines
+      .map((line, i) => JSON.stringify({ i: i + 1, ts: '2026-01-01T00:00:00Z', line, phase: 'continuation' as const }))
+      .join('\n') + '\n';
+    await fs.writeFile(jsonlPath, jsonlContent, 'utf8');
+
+    const message = await service.reconstructSseJsonlPhaseMessage(jsonlPath, 'continuation');
+
+    expect(message.id).toBe('msg_02');
+    expect(message.model).toBe('claude-3-5-sonnet');
+    expect(message.stop_reason).toBe('end_turn');
+    expect(message.content).toHaveLength(1);
+    expect(message.content[0].type).toBe('text');
+    if (message.content[0].type === 'text') {
+      expect(message.content[0].text).toBe('Final answer');
+    }
+  });
+
+  it('filtra correctamente por fase y ignora eventos de otras fases', async () => {
+    const mixedLines = [
+      'event: message_start',
+      'data: {"type":"message_start","message":{"id":"msg_01","model":"claude"}}',
+      'event: content_block_start',
+      'data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}',
+      'event: content_block_delta',
+      'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"delegation text"}}',
+      'event: content_block_stop',
+      'data: {"type":"content_block_stop","index":0}',
+      'event: message_start',
+      'data: {"type":"message_start","message":{"id":"msg_02","model":"claude"}}',
+      'event: content_block_start',
+      'data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}',
+      'event: content_block_delta',
+      'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"continuation text"}}',
+      'event: content_block_stop',
+      'data: {"type":"content_block_stop","index":0}',
+    ];
+
+    const jsonlContent = mixedLines
+      .map((line, i) => {
+        const phase = i < 5 ? 'delegation' : 'continuation';
+        return JSON.stringify({ i: i + 1, ts: '2026-01-01T00:00:00Z', line, phase });
+      })
+      .join('\n') + '\n';
+    await fs.writeFile(jsonlPath, jsonlContent, 'utf8');
+
+    const delegationMessage = await service.reconstructSseJsonlPhaseMessage(jsonlPath, 'delegation');
+    expect(delegationMessage.id).toBe('msg_01');
+
+    const continuationMessage = await service.reconstructSseJsonlPhaseMessage(jsonlPath, 'continuation');
+    expect(continuationMessage.id).toBe('msg_02');
+  });
+});

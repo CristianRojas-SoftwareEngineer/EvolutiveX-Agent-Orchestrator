@@ -154,3 +154,47 @@ El servicio implementa detección de modo beta como **safeguard** para futura co
 - Por defecto es `false` (modo estable)
 
 Esto garantiza que si Anthropic/Claude Code activan beta features en el futuro, la reconstrucción por step funcionará sin modificaciones de código.
+
+## Reconstrucción por Fase (Steps Coalesced)
+
+Para steps coalesced de Agent (que tienen múltiples fases: `delegation` y `continuation`), el proxy usa un mecanismo especial de reconstrucción por fase.
+
+### El Problema
+
+Cuando un step coalesced se filtra por fase en `sse.jsonl`, el stream resultante es **incompleto** (no termina con `message_stop`). El SDK de Anthropic requiere streams completos para parsear correctamente, lo que causaba el error:
+
+```
+AnthropicError: Unexpected event order, got message_start before receiving "message_stop"
+```
+
+### La Solución: Reconstrucción por Eventos Directos
+
+En lugar de usar el SDK de Anthropic para streams parciales, el proxy implementa un parser de eventos SSE directo que:
+
+1. **Lee `sse.jsonl` y filtra por fase** (`delegation` o `continuation`)
+2. **Parsea eventos `data:` directamente** como JSON Anthropic
+3. **Construye un mensaje `Message` mínimo** acumulando deltas por índice:
+   - `text`: concatena `text_delta`
+   - `thinking`: concatena `thinking_delta` si aplica
+   - `tool_use`: reconstruye `input` acumulando `input_json_delta`
+   - `stop_reason`: deriva de `message_delta.delta.stop_reason`
+   - `usage`: combina `message_start.message.usage` y `message_delta.usage`
+4. **No requiere `message_stop`** para fases parciales
+
+### Contrato Público
+
+El port `ISseReconstructor` ahora tiene dos métodos de reconstrucción:
+
+- `reconstructSseJsonlFile(jsonlPath, headersPath?)` — Para streams completos (no coalesced o coalesced completo). Usa el SDK de Anthropic.
+- `reconstructSseJsonlPhaseMessage(jsonlPath, phase)` — Para fases parciales de steps coalesced. Parsea eventos directamente sin SDK.
+
+### Flujo en Steps Coalesced
+
+En `AuditSseResponseHandler`, cuando se detecta un step coalesced:
+
+```ts
+const initialMessage = await this.sseReconstruct.reconstructSseJsonlPhaseMessage(sseJsonlPath, 'delegation');
+const finalMessage = await this.sseReconstruct.reconstructSseJsonlPhaseMessage(sseJsonlPath, 'continuation');
+```
+
+Esto permite reconstruir la delegación inicial (con `tool_use Agent` y `stop_reason = tool_use`) y la respuesta final (con texto y `message_stop`) sin falsificar eventos ni usar el SDK con streams incompletos.

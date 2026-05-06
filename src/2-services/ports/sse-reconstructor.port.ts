@@ -13,11 +13,27 @@ export interface ISseReconstructor {
   reconstructStepMessage(
     stepDir: string,
   ): Promise<Anthropic.Message | Anthropic.Beta.Messages.BetaMessage>;
+
+  /**
+   * Reconstruye un mensaje Anthropic desde un archivo sse.jsonl.
+   * Usa el SDK oficial para parsear eventos SSE y ensamblar el mensaje.
+   * Para streams completos (no coalesced o coalesced completo).
+   */
   reconstructSseJsonlFile(
     jsonlPath: string,
     headersPath?: string,
-    phase?: SsePhase,
   ): Promise<Anthropic.Message | Anthropic.Beta.Messages.BetaMessage>;
+
+  /**
+   * Reconstruye un mensaje Anthropic desde una fase específica de un sse.jsonl coalesced.
+   * Parsea eventos SSE directamente desde el archivo sin usar el SDK,
+   * permitiendo reconstruir fases parciales (delegation/continuation) que no
+   * necesariamente contienen message_stop.
+   */
+  reconstructSseJsonlPhaseMessage(
+    jsonlPath: string,
+    phase: SsePhase,
+  ): Promise<Anthropic.Message>;
 
   /**
    * Reconstruye mensaje del turno completo.

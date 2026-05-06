@@ -42,7 +42,6 @@ export class SseReconstructService implements ISseReconstructor {
   public async reconstructSseJsonlFile(
     jsonlPath: string,
     headersPath?: string,
-    phase?: SsePhase,
   ): Promise<Anthropic.Message | Anthropic.Beta.Messages.BetaMessage> {
     let jsonlBuffer: Buffer;
     try {
@@ -57,7 +56,7 @@ export class SseReconstructService implements ISseReconstructor {
 
     let sseBuffer: Buffer;
     try {
-      sseBuffer = this.reassembleSseBytesFromJsonl(jsonlBuffer, phase);
+      sseBuffer = this.reassembleSseBytesFromJsonl(jsonlBuffer);
     } catch (cause: unknown) {
       const errMsg = cause instanceof Error ? cause.message : String(cause);
       throw new Error(`failed to reassemble SSE bytes from jsonl: ${errMsg}`, { cause });
@@ -79,6 +78,24 @@ export class SseReconstructService implements ISseReconstructor {
     }
 
     return this.reconstructMessageFromSseBytes(sseBuffer, useBeta);
+  }
+
+  public async reconstructSseJsonlPhaseMessage(
+    jsonlPath: string,
+    phase: SsePhase,
+  ): Promise<Anthropic.Message> {
+    let jsonlBuffer: Buffer;
+    try {
+      jsonlBuffer = await fs.readFile(jsonlPath);
+    } catch {
+      throw new Error('response/sse.jsonl missing or unreadable');
+    }
+
+    if (!jsonlBuffer.length) {
+      throw new Error('sse.jsonl empty');
+    }
+
+    return this.reconstructMessageFromSseJsonlPhase(jsonlBuffer, phase);
   }
 
   /**
@@ -148,7 +165,7 @@ export class SseReconstructService implements ISseReconstructor {
    * Esta heurística es equivalente al stream real emitido por upstream, y es
    * la que el SDK de Anthropic parsea sin quejas.
    */
-  private reassembleSseBytesFromJsonl(jsonlBuffer: Buffer, phase?: SsePhase): Buffer {
+  private reassembleSseBytesFromJsonl(jsonlBuffer: Buffer): Buffer {
     const text = jsonlBuffer.toString('utf8');
     const rawLines = text.split('\n');
     const events: string[] = [];
@@ -166,11 +183,6 @@ export class SseReconstructService implements ISseReconstructor {
       try {
         parsed = JSON.parse(raw) as { line?: unknown; phase?: SsePhase };
       } catch {
-        continue;
-      }
-
-      // Filtrar por fase si se especificó
-      if (phase && parsed.phase !== undefined && parsed.phase !== phase) {
         continue;
       }
 
@@ -202,6 +214,158 @@ export class SseReconstructService implements ISseReconstructor {
     // Unir eventos con línea en blanco y terminar con '\n\n' final.
     const wire = `${events.join('\n\n')}\n\n`;
     return Buffer.from(wire, 'utf8');
+  }
+
+  private reconstructMessageFromSseJsonlPhase(jsonlBuffer: Buffer, phase: SsePhase): Anthropic.Message {
+    const text = jsonlBuffer.toString('utf8');
+    const rawLines = text.split('\n');
+    const events: unknown[] = [];
+
+    for (const raw of rawLines) {
+      if (raw.trim() === '') continue;
+      let parsed: { line?: unknown; phase?: SsePhase };
+      try {
+        parsed = JSON.parse(raw) as { line?: unknown; phase?: SsePhase };
+      } catch {
+        continue;
+      }
+
+      // Filtrar por fase
+      if (parsed.phase !== undefined && parsed.phase !== phase) {
+        continue;
+      }
+
+      // Parsear solo líneas data: como eventos
+      const line = typeof parsed.line === 'string' ? parsed.line : '';
+      if (!line.startsWith('data: ')) continue;
+
+      try {
+        const evt = JSON.parse(line.slice(6)) as unknown;
+        events.push(evt);
+      } catch {
+        // Ignorar líneas data: que no son JSON válido
+      }
+    }
+
+    return this.buildMessageFromEvents(events);
+  }
+
+  private buildMessageFromEvents(events: unknown[]): Anthropic.Message {
+    const message: Partial<Anthropic.Message> = {
+      id: 'unknown',
+      type: 'message',
+      role: 'assistant',
+      content: [],
+      model: 'unknown',
+      stop_reason: null,
+      stop_sequence: null,
+      usage: {
+        input_tokens: 0,
+        output_tokens: 0,
+        cache_creation_input_tokens: 0,
+        cache_read_input_tokens: 0,
+      } as Anthropic.Usage,
+    };
+
+    // Mapas para acumular contenido por índice
+    const contentBlocks = new Map<number, Anthropic.ContentBlock>();
+    const textAccumulators = new Map<number, string>();
+    const thinkingAccumulators = new Map<number, string>();
+    const toolInputAccumulators = new Map<number, string>();
+
+    for (const evt of events) {
+      if (typeof evt !== 'object' || evt === null) continue;
+      const event = evt as Record<string, unknown>;
+
+      if (event.type === 'message_start' && event.message) {
+        const msg = event.message as Record<string, unknown>;
+        if (typeof msg.id === 'string') message.id = msg.id;
+        if (typeof msg.model === 'string') message.model = msg.model;
+        if (msg.usage && message.usage) {
+          const usage = msg.usage as Record<string, unknown>;
+          if (typeof usage.input_tokens === 'number') message.usage.input_tokens = usage.input_tokens;
+          if (typeof usage.output_tokens === 'number') message.usage.output_tokens = usage.output_tokens;
+        }
+      }
+
+      if (event.type === 'content_block_start' && typeof event.index === 'number') {
+        const block = event.content_block as Record<string, unknown>;
+        if (block.type === 'text') {
+          contentBlocks.set(event.index, { type: 'text', text: '', citations: [] });
+          textAccumulators.set(event.index, '');
+        } else if (block.type === 'thinking') {
+          contentBlocks.set(event.index, { type: 'thinking', thinking: '', signature: '' });
+          thinkingAccumulators.set(event.index, '');
+        } else if (block.type === 'tool_use' && typeof block.id === 'string' && typeof block.name === 'string') {
+          contentBlocks.set(event.index, {
+            type: 'tool_use',
+            id: block.id,
+            name: block.name,
+            input: {},
+          } as Anthropic.ContentBlock);
+          toolInputAccumulators.set(event.index, '');
+        }
+      }
+
+      if (event.type === 'content_block_delta' && typeof event.index === 'number') {
+        const delta = event.delta as Record<string, unknown>;
+        if (delta.type === 'text_delta' && typeof delta.text === 'string') {
+          const acc = textAccumulators.get(event.index);
+          if (acc !== undefined) textAccumulators.set(event.index, acc + delta.text);
+        } else if (delta.type === 'thinking_delta' && typeof delta.thinking === 'string') {
+          const acc = thinkingAccumulators.get(event.index);
+          if (acc !== undefined) thinkingAccumulators.set(event.index, acc + delta.thinking);
+        } else if (delta.type === 'input_json_delta' && typeof delta.partial_json === 'string') {
+          const acc = toolInputAccumulators.get(event.index);
+          if (acc !== undefined) toolInputAccumulators.set(event.index, acc + delta.partial_json);
+        }
+      }
+
+      if (event.type === 'content_block_stop' && typeof event.index === 'number') {
+        // Consolidar bloque
+        const block = contentBlocks.get(event.index);
+        if (!block) continue;
+
+        if (block.type === 'text') {
+          const acc = textAccumulators.get(event.index) || '';
+          block.text = acc;
+        } else if (block.type === 'thinking') {
+          const acc = thinkingAccumulators.get(event.index) || '';
+          block.thinking = acc;
+        } else if (block.type === 'tool_use') {
+          const acc = toolInputAccumulators.get(event.index) || '';
+          // El JSON acumulado debe ser parseado solo si es válido
+          try {
+            const parsed = JSON.parse(acc) as Record<string, unknown>;
+            block.input = parsed;
+          } catch {
+            // Si el JSON no es válido, dejar input como el string acumulado o vacío
+            block.input = acc.length > 0 ? acc : {};
+          }
+        }
+      }
+
+      if (event.type === 'message_delta') {
+        if (event.delta) {
+          const delta = event.delta as Record<string, unknown>;
+          if (delta.stop_reason) {
+            message.stop_reason = delta.stop_reason as Anthropic.Message['stop_reason'];
+          }
+        }
+        if (event.usage && message.usage) {
+          const usage = event.usage as Record<string, unknown>;
+          if (typeof usage.output_tokens === 'number') message.usage.output_tokens = usage.output_tokens;
+        }
+      }
+    }
+
+    // Convertir Map a array de content blocks
+    message.content = Array.from(contentBlocks.values()).sort((_a, _b) => {
+      // Ordenar por índice de aparición (no tenemos índice explícito, usamos el orden del Map)
+      return 0;
+    });
+
+    return message as Anthropic.Message;
   }
 
   private computeUseBeta(

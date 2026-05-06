@@ -400,9 +400,9 @@ export class AuditSseResponseHandler {
           let sseReconstructResult: SseReconstructResult | undefined;
           try {
             // Para steps coalesced, reconstruir initialMessage desde la fase "delegation"
-            const initialMessage = await this.sseReconstruct.reconstructSseJsonlFile(sseJsonlPath, undefined, 'delegation');
+            const initialMessage = await this.sseReconstruct.reconstructSseJsonlPhaseMessage(sseJsonlPath, 'delegation');
             // Reconstruir finalMessage desde la fase "continuation"
-            const finalMessage = await this.sseReconstruct.reconstructSseJsonlFile(sseJsonlPath, undefined, 'continuation');
+            const finalMessage = await this.sseReconstruct.reconstructSseJsonlPhaseMessage(sseJsonlPath, 'continuation');
             // La request de continuation viene del contexto en memoria, no de archivos
             const continuationRequest = coalescedAgentContinuation?.continuationRequest ?? null;
             const continuationHeaders = coalescedAgentContinuation?.continuationHeaders;

@@ -164,6 +164,7 @@ function makeSseReconstructor(overrides: Partial<ISseReconstructor> = {}): ISseR
   return {
     reconstructStepMessage: async () => ({}) as unknown as Anthropic.Message,
     reconstructSseJsonlFile: async () => ({}) as unknown as Anthropic.Message,
+    reconstructSseJsonlPhaseMessage: async () => ({}) as unknown as Anthropic.Message,
     runReconstruction: async () => ({
       sseResponseBodyAttempted: false,
       sseResponseBodyWritten: false,

@@ -237,6 +237,7 @@ export class AuditInteractionHandler {
       pendingAgentToolUses: [],
       pendingWebSearchToolUses: [],
       pendingWebFetchToolUses: [],
+      resolvedInternalTools: [],
       modelId: extractModelFromRequestBody(params.rawBody) ?? undefined,
     });
 
@@ -349,6 +350,7 @@ export class AuditInteractionHandler {
         pendingAgentToolUses: [],
       pendingWebSearchToolUses: [],
       pendingWebFetchToolUses: [],
+      resolvedInternalTools: [],
         parentContext,
         modelId: extractModelFromRequestBody(params.rawBody) ?? undefined,
       });
@@ -378,9 +380,10 @@ export class AuditInteractionHandler {
     classification: RequestClassification;
     parentInteractionDir: string;
     consumePending: (interactionDir: string) => unknown;
+    registerResolution?: (parentInteractionDir: string, stepCount: number) => void;
   }): Promise<AuditInteractionResult> {
     return this.sessionStore.withSessionLock(params.auditSessionId, async () => {
-      params.consumePending(params.parentInteractionDir);
+      const pending = params.consumePending(params.parentInteractionDir);
 
       const stepCount = this.sessionStore.incrementStepCountByDir(params.parentInteractionDir);
       const stepDir = path.join(
@@ -399,6 +402,11 @@ export class AuditInteractionHandler {
           stepIndex: stepCount,
         },
       });
+
+      // Registrar la resolución si se proporcionó un callback
+      if (params.registerResolution && pending) {
+        params.registerResolution(params.parentInteractionDir, stepCount);
+      }
 
       return {
         auditInteractionDir: params.parentInteractionDir,
@@ -426,6 +434,7 @@ export class AuditInteractionHandler {
     classification: RequestClassification;
     parentInteractionDir: string;
     consumePending: (interactionDir: string) => unknown;
+    registerResolution?: (parentInteractionDir: string, stepCount: number) => void;
   }): Promise<AuditInteractionResult | null> {
     return this.sessionStore.withSessionLock(params.auditSessionId, async () => {
       const pending = params.consumePending(params.parentInteractionDir);
@@ -451,6 +460,11 @@ export class AuditInteractionHandler {
           stepIndex: stepCount,
         },
       });
+
+      // Registrar la resolución si se proporcionó un callback
+      if (params.registerResolution) {
+        params.registerResolution(params.parentInteractionDir, stepCount);
+      }
 
       return {
         auditInteractionDir: params.parentInteractionDir,
@@ -489,6 +503,17 @@ export class AuditInteractionHandler {
       classification,
       parentInteractionDir,
       consumePending: (dir: string) => this.sessionStore.consumeWebSearchPending(dir),
+      registerResolution: (dir: string, stepCount: number) => {
+        const pending = match.pendings[0]; // FIFO
+        if (pending) {
+          this.sessionStore.registerResolvedInternalTool(dir, {
+            toolUseId: pending.toolUseId,
+            toolName: 'WebSearch',
+            originalStepIndex: pending.stepIndex,
+            resolutionMode: 'internal_request',
+          });
+        }
+      },
     });
   }
 
@@ -516,6 +541,17 @@ export class AuditInteractionHandler {
       classification,
       parentInteractionDir,
       consumePending: (dir: string) => this.sessionStore.consumeWebFetchPending(dir),
+      registerResolution: (dir: string, stepCount: number) => {
+        const pending = match.pendings[0]; // FIFO
+        if (pending) {
+          this.sessionStore.registerResolvedInternalTool(dir, {
+            toolUseId: pending.toolUseId,
+            toolName: 'WebFetch',
+            originalStepIndex: pending.stepIndex,
+            resolutionMode: 'internal_request',
+          });
+        }
+      },
     });
     return result;
   }
@@ -619,6 +655,39 @@ export class AuditInteractionHandler {
       this.sessionStore.consumePendingAgentToolUse(parentInteraction.interactionDir, toolUseId);
     }
 
+    // Reconciliar pendings WebSearch/WebFetch resueltos por tool_result en continuation.
+    // Si un tool_result corresponde a un pending de built-in tool, consumirlo y
+    // registrar la resolución como 'tool_result_in_continuation'.
+    for (const toolUseId of toolUseIds) {
+      const webSearchPending = this.sessionStore.consumeWebSearchPendingByToolUseId(
+        parentInteraction.interactionDir,
+        toolUseId,
+      );
+      if (webSearchPending) {
+        this.sessionStore.registerResolvedInternalTool(parentInteraction.interactionDir, {
+          toolUseId,
+          toolName: 'WebSearch',
+          originalStepIndex: webSearchPending.stepIndex,
+          resolutionMode: 'tool_result_in_continuation',
+          resolvedInStepIndex: stepCount,
+        });
+      }
+
+      const webFetchPending = this.sessionStore.consumeWebFetchPendingByToolUseId(
+        parentInteraction.interactionDir,
+        toolUseId,
+      );
+      if (webFetchPending) {
+        this.sessionStore.registerResolvedInternalTool(parentInteraction.interactionDir, {
+          toolUseId,
+          toolName: 'WebFetch',
+          originalStepIndex: webFetchPending.stepIndex,
+          resolutionMode: 'tool_result_in_continuation',
+          resolvedInStepIndex: stepCount,
+        });
+      }
+    }
+
     return {
       auditInteractionDir: parentInteraction.interactionDir,
       requestBodyOmitted: parentInteraction.requestBodyOmitted,
@@ -709,6 +778,7 @@ export class AuditInteractionHandler {
       pendingAgentToolUses: [],
       pendingWebSearchToolUses: [],
       pendingWebFetchToolUses: [],
+      resolvedInternalTools: [],
       modelId: extractModelFromRequestBody(params.rawBody) ?? undefined,
     });
 
@@ -778,6 +848,7 @@ export class AuditInteractionHandler {
       pendingAgentToolUses: [],
       pendingWebSearchToolUses: [],
       pendingWebFetchToolUses: [],
+      resolvedInternalTools: [],
       modelId: extractModelFromRequestBody(params.rawBody) ?? undefined,
     });
 
@@ -845,6 +916,7 @@ export class AuditInteractionHandler {
       pendingAgentToolUses: [],
       pendingWebSearchToolUses: [],
       pendingWebFetchToolUses: [],
+      resolvedInternalTools: [],
       modelId: extractModelFromRequestBody(params.rawBody) ?? undefined,
     });
 

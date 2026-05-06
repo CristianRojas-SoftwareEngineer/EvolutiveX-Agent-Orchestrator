@@ -682,6 +682,7 @@ export class AuditSseResponseHandler {
       ...(lostPendings ? { lostPendingAgents: lostPendings } : {}),
       ...(lostPendingsWebSearch ? { lostPendingWebSearch: lostPendingsWebSearch } : {}),
       ...(lostPendingsWebFetch ? { lostPendingWebFetch: lostPendingsWebFetch } : {}),
+      ...(turn.resolvedInternalTools.length > 0 ? { resolvedInternalTools: turn.resolvedInternalTools } : {}),
       truncation: {
         requestBodyOmitted: turn.requestBodyOmitted,
         responseBodyBytesTotal: null,

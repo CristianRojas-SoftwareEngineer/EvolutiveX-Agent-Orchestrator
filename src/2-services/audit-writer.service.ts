@@ -503,7 +503,7 @@ export class AuditWriterService implements IAuditWriter {
         const dirName = subAgentDirs[i].name;
         const subAgentDir = path.join(stepResponseDir, dirName);
         const metaPath = path.join(subAgentDir, 'meta.json');
-        const outputPath = path.join(dirName, 'output', 'body.parsed.md');
+        const outputPath = path.join('response', dirName, 'output', 'body.parsed.md');
 
         // Leer meta.json del subagente
         let meta: InteractionMetadata | null = null;

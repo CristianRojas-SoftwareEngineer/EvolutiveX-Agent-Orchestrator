@@ -202,7 +202,7 @@ export class MarkdownRendererService {
             obj.initial,
             obj.continuationRequest ?? null,
             obj.final,
-            undefined, // subagentsSummary
+            obj.subagents as unknown as SubagentsSummary, // subagentsSummary
             context,
           );
         }

@@ -65,6 +65,9 @@ function makeSessionStore(
     registerPendingWebFetchToolUse: vi.fn(),
     findInteractionWithPendingWebFetch: vi.fn().mockReturnValue(null),
     consumeWebFetchPending: vi.fn().mockReturnValue(null),
+    consumeWebSearchPendingByToolUseId: vi.fn().mockReturnValue(null),
+    consumeWebFetchPendingByToolUseId: vi.fn().mockReturnValue(null),
+    registerResolvedInternalTool: vi.fn(),
     findStaleInteractionsAwaitingContinuation: () => [],
     getAllOpenInteractions: () => [],
     withSessionLock: async <T>(_sessionId: string, fn: () => Promise<T>): Promise<T> => fn(),
@@ -140,6 +143,7 @@ describe('AuditUpstreamErrorHandler', () => {
       pendingAgentToolUses: [],
       pendingWebSearchToolUses: [],
       pendingWebFetchToolUses: [],
+      resolvedInternalTools: [],
     };
 
     const handler = new AuditUpstreamErrorHandler(
@@ -224,6 +228,7 @@ describe('AuditUpstreamErrorHandler', () => {
       pendingAgentToolUses: [],
       pendingWebSearchToolUses: [],
       pendingWebFetchToolUses: [],
+      resolvedInternalTools: [],
       modelId: 'claude-opus-4-5',
     };
 
@@ -267,6 +272,7 @@ describe('AuditUpstreamErrorHandler', () => {
       pendingAgentToolUses: [],
       pendingWebSearchToolUses: [],
       pendingWebFetchToolUses: [],
+      resolvedInternalTools: [],
       parentContext: {
         parentInteractionDir: '/tmp/parent',
         parentStepIndex: 1,

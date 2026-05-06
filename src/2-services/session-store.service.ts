@@ -1,21 +1,22 @@
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 
+import type { Logger } from '../1-domain/types/logger.types.js';
 import {
   ActiveInteraction,
   PendingAgentToolUse,
   PendingWebFetchToolUse,
   PendingWebSearchToolUse,
+  ResolvedInternalTool,
   StepMeta,
 } from '../1-domain/types/audit.types.js';
-import type { ISessionStore } from './ports/session-store.port.js';
-import type { Logger } from '../1-domain/types/logger.types.js';
 import {
-  DIR_MAIN_AGENT,
   DIR_INTERACTIONS,
+  DIR_MAIN_AGENT,
   DIR_SIDE_INTERACTIONS,
   FILE_INTERACTION_SEQUENCE,
 } from '../1-domain/constants/audit-paths.js';
+import type { ISessionStore } from './ports/session-store.port.js';
 
 /**
  * Servicio adaptador para operaciones de filesystem de sesiones.
@@ -185,6 +186,50 @@ export class SessionStoreService implements ISessionStore {
     const interaction = this.interactionRegistry.get(interactionDir);
     if (!interaction || interaction.pendingWebFetchToolUses.length === 0) return null;
     return interaction.pendingWebFetchToolUses.shift()!;
+  }
+
+  public consumeWebSearchPendingByToolUseId(
+    interactionDir: string,
+    toolUseId: string,
+  ): PendingWebSearchToolUse | null {
+    const interaction = this.interactionRegistry.get(interactionDir);
+    if (!interaction) return null;
+    const idx = interaction.pendingWebSearchToolUses.findIndex((p) => p.toolUseId === toolUseId);
+    if (idx >= 0) {
+      const pending = interaction.pendingWebSearchToolUses[idx];
+      interaction.pendingWebSearchToolUses.splice(idx, 1);
+      return pending;
+    }
+    return null;
+  }
+
+  public consumeWebFetchPendingByToolUseId(
+    interactionDir: string,
+    toolUseId: string,
+  ): PendingWebFetchToolUse | null {
+    const interaction = this.interactionRegistry.get(interactionDir);
+    if (!interaction) return null;
+    const idx = interaction.pendingWebFetchToolUses.findIndex((p) => p.toolUseId === toolUseId);
+    if (idx >= 0) {
+      const pending = interaction.pendingWebFetchToolUses[idx];
+      interaction.pendingWebFetchToolUses.splice(idx, 1);
+      return pending;
+    }
+    return null;
+  }
+
+  public registerResolvedInternalTool(interactionDir: string, resolution: ResolvedInternalTool): void {
+    const interaction = this.interactionRegistry.get(interactionDir);
+    if (!interaction) return;
+    // Idempotente: si ya existe una resolución para este toolUseId, actualizarla
+    const existingIdx = interaction.resolvedInternalTools.findIndex(
+      (r) => r.toolUseId === resolution.toolUseId,
+    );
+    if (existingIdx >= 0) {
+      interaction.resolvedInternalTools[existingIdx] = resolution;
+    } else {
+      interaction.resolvedInternalTools.push(resolution);
+    }
   }
 
   public registerToolUseId(toolUseId: string, interactionDir: string): void {

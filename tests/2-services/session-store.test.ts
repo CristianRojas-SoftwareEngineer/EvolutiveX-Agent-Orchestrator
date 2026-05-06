@@ -19,6 +19,7 @@ function makeInteraction(overrides: Partial<ActiveInteraction> = {}): ActiveInte
     pendingAgentToolUses: [],
     pendingWebSearchToolUses: [],
     pendingWebFetchToolUses: [],
+    resolvedInternalTools: [],
     ...overrides,
   };
 }

@@ -3,6 +3,7 @@ import {
   PendingAgentToolUse,
   PendingWebFetchToolUse,
   PendingWebSearchToolUse,
+  ResolvedInternalTool,
   StepMeta,
 } from '../../1-domain/types/audit.types.js';
 
@@ -100,6 +101,22 @@ export interface ISessionStore {
    * interacción registrada. Devuelve el pending consumido o `null` si no había.
    */
   consumeWebFetchPending(interactionDir: string): PendingWebFetchToolUse | null;
+  /**
+   * Consume (elimina) la entrada de `pendingWebSearchToolUses` cuyo `toolUseId`
+   * coincide en la interacción registrada. Devuelve el pending consumido o
+   * `null` si no existía. Idempotente: no-op si no hay coincidencia.
+   */
+  consumeWebSearchPendingByToolUseId(interactionDir: string, toolUseId: string): PendingWebSearchToolUse | null;
+  /**
+   * Consume (elimina) la entrada de `pendingWebFetchToolUses` cuyo `toolUseId`
+   * coincide en la interacción registrada. Devuelve el pending consumido o
+   * `null` si no existía. Idempotente: no-op si no hay coincidencia.
+   */
+  consumeWebFetchPendingByToolUseId(interactionDir: string, toolUseId: string): PendingWebFetchToolUse | null;
+  /**
+   * Registra una resolución observada de WebSearch/WebFetch.
+   */
+  registerResolvedInternalTool(interactionDir: string, resolution: ResolvedInternalTool): void;
   /**
    * Busca en la sesión interacciones con `awaitingContinuation === true` cuyo
    * `awaitingSince` supera `maxAgeMs` milisegundos. Devuelve las interacciones

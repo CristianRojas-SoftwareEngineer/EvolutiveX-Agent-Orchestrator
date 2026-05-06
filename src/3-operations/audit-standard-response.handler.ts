@@ -289,6 +289,7 @@ export class AuditStandardResponseHandler {
       errorMessage: null,
       errorCode: null,
       ...(interaction.parentContext ? { parentContext: interaction.parentContext } : {}),
+      ...(interaction.resolvedInternalTools.length > 0 ? { resolvedInternalTools: interaction.resolvedInternalTools } : {}),
       truncation: {
         requestBodyOmitted: interaction.requestBodyOmitted,
         responseBodyBytesTotal: totalResponseBytes,

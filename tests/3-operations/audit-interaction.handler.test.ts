@@ -68,6 +68,9 @@ function makeSessionStore(overrides: Partial<ISessionStore> = {}): ISessionStore
     registerPendingWebFetchToolUse: vi.fn(),
     findInteractionWithPendingWebFetch: vi.fn().mockReturnValue(null),
     consumeWebFetchPending: vi.fn().mockReturnValue(null),
+    consumeWebSearchPendingByToolUseId: vi.fn().mockReturnValue(null),
+    consumeWebFetchPendingByToolUseId: vi.fn().mockReturnValue(null),
+    registerResolvedInternalTool: vi.fn(),
     findStaleInteractionsAwaitingContinuation: () => [],
     getAllOpenInteractions: () => [],
     withSessionLock: async <T>(_sessionId: string, fn: () => Promise<T>): Promise<T> => fn(),
@@ -249,6 +252,7 @@ describe('AuditInteractionHandler', () => {
       pendingAgentToolUses: [],
       pendingWebSearchToolUses: [],
       pendingWebFetchToolUses: [],
+      resolvedInternalTools: [],
     };
     const store = makeSessionStore({
       getInteractionByToolUseId: (id: string) => (id === 'tool-x' ? parentInteraction : null),
@@ -454,6 +458,7 @@ describe('AuditInteractionHandler', () => {
       pendingAgentToolUses: [],
       pendingWebSearchToolUses: [],
       pendingWebFetchToolUses: [],
+      resolvedInternalTools: [],
     };
     const store = makeSessionStore({
       getInteractionByToolUseId: (id: string) => (id === 'first-id' ? parentInteraction : null),
@@ -604,6 +609,7 @@ describe('AuditInteractionHandler', () => {
       ],
       pendingWebSearchToolUses: [],
       pendingWebFetchToolUses: [],
+      resolvedInternalTools: [],
     };
     let consumed: { dir: string; id: string } | null = null;
     let registeredSub: ActiveInteraction | null = null;
@@ -684,6 +690,7 @@ describe('AuditInteractionHandler', () => {
       ],
       pendingWebSearchToolUses: [],
       pendingWebFetchToolUses: [],
+      resolvedInternalTools: [],
     };
     let consumeCalls = 0;
     let registeredSub: ActiveInteraction | null = null;
@@ -743,6 +750,7 @@ describe('AuditInteractionHandler', () => {
       pendingAgentToolUses: [{ stepIndex: 1, toolUseId: 'toolu_x' }],
       pendingWebSearchToolUses: [],
       pendingWebFetchToolUses: [],
+      resolvedInternalTools: [],
     };
     const order: string[] = [];
     const store = makeSessionStore({
@@ -796,6 +804,7 @@ describe('AuditInteractionHandler', () => {
       pendingAgentToolUses: [{ stepIndex: 1, toolUseId: 'tool-x', subagentType: 'Plan' }],
       pendingWebSearchToolUses: [],
       pendingWebFetchToolUses: [],
+      resolvedInternalTools: [],
     };
     const consumed: Array<{ dir: string; id: string }> = [];
 
@@ -837,6 +846,7 @@ describe('AuditInteractionHandler', () => {
       pendingAgentToolUses: [{ stepIndex: 1, toolUseId: 'tool-x', subagentType: 'Plan' }],
       pendingWebSearchToolUses: [],
       pendingWebFetchToolUses: [],
+      resolvedInternalTools: [],
     };
     let incrementCalled = false;
 
@@ -910,7 +920,8 @@ describe('AuditInteractionHandler', () => {
       pendingAgentToolUses: [],
       pendingWebSearchToolUses: [],
       pendingWebFetchToolUses: [],
-      modelId: 'claude-opus-4-5',
+      resolvedInternalTools: [],
+      modelId: 'model-1',
     };
 
     const store = makeSessionStore({
@@ -957,6 +968,7 @@ describe('AuditInteractionHandler', () => {
       pendingAgentToolUses: [{ stepIndex: 1, toolUseId: 'toolu_orphan' }],
       pendingWebSearchToolUses: [],
       pendingWebFetchToolUses: [],
+      resolvedInternalTools: [],
       awaitingContinuation: true,
       awaitingSince: Date.now() - 120_000,
     };
@@ -1017,6 +1029,7 @@ describe('AuditInteractionHandler', () => {
       pendingWebFetchToolUses: [
         { stepIndex: 1, toolUseId: 'toolu_fetch_1' },
       ],
+      resolvedInternalTools: [],
     };
 
     let consumedFetch: string | null = null;
@@ -1078,6 +1091,7 @@ describe('AuditInteractionHandler', () => {
       pendingWebFetchToolUses: [
         { stepIndex: 1, toolUseId: 'toolu_fetch' },
       ],
+      resolvedInternalTools: [],
     };
 
     const store = makeSessionStore({
@@ -1135,6 +1149,7 @@ describe('AuditInteractionHandler', () => {
         { stepIndex: 1, toolUseId: 'websearch-2' },
       ],
       pendingWebFetchToolUses: [],
+      resolvedInternalTools: [],
     };
 
     const stepDirs: string[] = [];
@@ -1214,6 +1229,7 @@ describe('AuditInteractionHandler', () => {
         { stepIndex: 1, toolUseId: 'webfetch-1' },
         { stepIndex: 1, toolUseId: 'webfetch-2' },
       ],
+      resolvedInternalTools: [],
     };
 
     const stepDirs: string[] = [];
@@ -1292,6 +1308,7 @@ describe('AuditInteractionHandler', () => {
         { stepIndex: 1, toolUseId: 'toolu_search_1' },
       ],
       pendingWebFetchToolUses: [],
+      resolvedInternalTools: [],
     };
 
     const store = makeSessionStore({
@@ -1343,6 +1360,7 @@ describe('AuditInteractionHandler', () => {
       pendingWebFetchToolUses: [
         { stepIndex: 1, toolUseId: 'toolu_fetch_1' },
       ],
+      resolvedInternalTools: [],
     };
 
     const store = makeSessionStore({
@@ -1413,6 +1431,7 @@ describe('AuditInteractionHandler', () => {
       pendingAgentToolUses: [],
       pendingWebSearchToolUses: [],
       pendingWebFetchToolUses: [{ stepIndex: 1, toolUseId: 'toolu_fetch_1' }],
+      resolvedInternalTools: [],
     };
 
     const webFetchBody = Buffer.from(

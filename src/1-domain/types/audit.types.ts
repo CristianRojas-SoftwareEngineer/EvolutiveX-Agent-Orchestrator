@@ -284,6 +284,31 @@ export interface PendingWebFetchToolUse {
   toolUseId: string;
 }
 
+/**
+ * Resolución de una herramienta interna (WebSearch/WebFetch) que fue observada
+ * en la auditoría. Distingue entre resoluciones por request interna del harness
+ * y resoluciones por tool_result en continuation.
+ */
+export interface ResolvedInternalTool {
+  /** Identificador único del tool_use. */
+  toolUseId: string;
+  /** Nombre de la herramienta. */
+  toolName: 'WebSearch' | 'WebFetch';
+  /** Step donde se emitió el tool_use original. */
+  originalStepIndex: number;
+  /**
+   * Modo de resolución observado.
+   * - 'internal_request': Se observó una request de implementación del harness.
+   * - 'tool_result_in_continuation': El resultado llegó como tool_result en una continuation.
+   */
+  resolutionMode: 'internal_request' | 'tool_result_in_continuation';
+  /**
+   * Step donde se observó la resolución (para tool_result_in_continuation).
+   * Nulo para internal_request porque la resolución es un step separado.
+   */
+  resolvedInStepIndex?: number;
+}
+
 export interface ActiveInteraction {
   interactionDir: string;
   interactionType: InteractionType;
@@ -313,6 +338,11 @@ export interface ActiveInteraction {
    * llamada de implementación del harness. Vacío en turns que no usan WebFetch.
    */
   pendingWebFetchToolUses: PendingWebFetchToolUse[];
+  /**
+   * Resoluciones observadas de WebSearch/WebFetch. Se llena cuando se consumen
+   * pendings, ya sea por request interna o por tool_result en continuation.
+   */
+  resolvedInternalTools: ResolvedInternalTool[];
   /** Definido sólo en turns que son subagentes. */
   parentContext?: ParentContext;
   /**
@@ -386,6 +416,11 @@ export interface InteractionMetadata {
    * que no se consumieron antes del cierre. Información forense para correlación offline.
    */
   lostPendingWebFetch?: PendingWebFetchToolUse[];
+  /**
+   * Resoluciones observadas de WebSearch/WebFetch. Información forense para
+   * trazabilidad de cómo se resolvieron las herramientas internas.
+   */
+  resolvedInternalTools?: ResolvedInternalTool[];
 }
 
 /** Métricas agregadas de tokens por modelo dentro de una sesión. */

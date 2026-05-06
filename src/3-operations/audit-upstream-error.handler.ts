@@ -66,6 +66,7 @@ export class AuditUpstreamErrorHandler {
       errorMessage,
       errorCode,
       ...(interaction?.parentContext ? { parentContext: interaction.parentContext } : {}),
+      ...(interaction?.resolvedInternalTools && interaction.resolvedInternalTools.length > 0 ? { resolvedInternalTools: interaction.resolvedInternalTools } : {}),
       truncation: {
         requestBodyOmitted,
         responseBodyBytesTotal: null,

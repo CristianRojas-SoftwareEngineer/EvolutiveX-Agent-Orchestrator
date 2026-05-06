@@ -1397,4 +1397,183 @@ describe('AuditInteractionHandler', () => {
     expect(result).not.toBeNull();
     expect(result!.assignedStepIndex).toBe(1);
   });
+
+  it('tools: [] con Web page content: y pending WebFetch se correlaciona como step interno', async () => {
+    const config = makeConfig();
+    const parentInteraction: ActiveInteraction = {
+      interactionDir: '/tmp/sessions/s/main-agent/interactions/01',
+      interactionType: 'agentic',
+      stepCount: 1,
+      requestSequence: 1,
+      startedAt: Date.now(),
+      requestBodyOmitted: false,
+      requestBodyBytes: 100,
+      stepsMeta: [],
+      sessionId: 's',
+      pendingAgentToolUses: [],
+      pendingWebSearchToolUses: [],
+      pendingWebFetchToolUses: [{ stepIndex: 1, toolUseId: 'toolu_fetch_1' }],
+    };
+
+    const webFetchBody = Buffer.from(
+      JSON.stringify({
+        model: 'claude-3-5-sonnet',
+        messages: [
+          {
+            role: 'user',
+            content: [{ type: 'text', text: 'Web page content:\n---\nExample Domain\n\nThis domain is for use in documentation examples.' }],
+          },
+        ],
+        tools: [],
+        max_tokens: 4096,
+      }),
+    );
+
+    let stepDirWritten: string | null = null;
+    let sideInteractionWritten = false;
+    let consumeCalled = false;
+
+    const store = makeSessionStore({
+      findInteractionWithPendingWebFetch: vi.fn().mockReturnValue({
+        interaction: parentInteraction,
+        pendings: [...parentInteraction.pendingWebFetchToolUses],
+      }),
+      consumeWebFetchPending: vi.fn().mockImplementation(() => {
+        consumeCalled = true;
+        return { stepIndex: 1, toolUseId: 'toolu_fetch_1' };
+      }),
+      incrementStepCountByDir: () => {
+        parentInteraction.stepCount = 2;
+        return 2;
+      },
+      withSessionLock: async <T>(_: string, fn: () => Promise<T>): Promise<T> => fn(),
+    });
+
+    const handler = new AuditInteractionHandler(
+      new SessionResolverService(config),
+      store,
+      makeAuditWriter({
+        writeStepRequest: async (p) => {
+          stepDirWritten = p.stepDir;
+        },
+        writeInteractionRequest: async () => {
+          sideInteractionWritten = true;
+          return { dir: '', requestBodyOmitted: false };
+        },
+      }),
+      config,
+    );
+
+    const result = await handler.execute({
+      headers: { 'x-cc-audit-session': 's' },
+      rawBody: webFetchBody,
+      requestId: 'fetch-req',
+    });
+
+    expect(result).not.toBeNull();
+    expect(result!.isInternalToolStep).toBe(true);
+    expect(result!.assignedStepIndex).toBe(2);
+    expect(consumeCalled).toBe(true);
+    expect(stepDirWritten).toContain('steps');
+    expect(sideInteractionWritten).toBe(false);
+  });
+
+  it('tools: [] side-request normal sin Web page content: crea side-interaction', async () => {
+    const config = makeConfig();
+    const sideRequestBody = Buffer.from(
+      JSON.stringify({
+        model: 'claude-3-5-sonnet',
+        messages: [{ role: 'user', content: 'count tokens' }],
+        tools: [],
+        max_tokens: 4096,
+      }),
+    );
+
+    let sideInteractionWritten = false;
+    let stepDirWritten: string | null = null;
+
+    const store = makeSessionStore({
+      findInteractionWithPendingWebFetch: vi.fn().mockReturnValue(null),
+      withSessionLock: async <T>(_: string, fn: () => Promise<T>): Promise<T> => fn(),
+    });
+
+    const handler = new AuditInteractionHandler(
+      new SessionResolverService(config),
+      store,
+      makeAuditWriter({
+        writeInteractionRequest: async () => {
+          sideInteractionWritten = true;
+          return { dir: '', requestBodyOmitted: false };
+        },
+        writeStepRequest: async (p) => {
+          stepDirWritten = p.stepDir;
+        },
+      }),
+      config,
+    );
+
+    const result = await handler.execute({
+      headers: { 'x-cc-audit-session': 's' },
+      rawBody: sideRequestBody,
+      requestId: 'side-req',
+    });
+
+    expect(result).not.toBeNull();
+    expect(result!.interactionType).toBe('side-request');
+    expect(sideInteractionWritten).toBe(true);
+    expect(stepDirWritten).not.toBeNull(); // side-requests también escriben steps
+    expect(result!.isInternalToolStep).toBeUndefined(); // no es step interno de herramienta
+  });
+
+  it('Web page content: sin pending WebFetch cae a side-request normal', async () => {
+    const config = makeConfig();
+    const webFetchBody = Buffer.from(
+      JSON.stringify({
+        model: 'claude-3-5-sonnet',
+        messages: [
+          {
+            role: 'user',
+            content: [{ type: 'text', text: 'Web page content:\n---\nExample Domain' }],
+          },
+        ],
+        tools: [],
+        max_tokens: 4096,
+      }),
+    );
+
+    let sideInteractionWritten = false;
+    let stepDirWritten: string | null = null;
+
+    const store = makeSessionStore({
+      findInteractionWithPendingWebFetch: vi.fn().mockReturnValue(null),
+      withSessionLock: async <T>(_: string, fn: () => Promise<T>): Promise<T> => fn(),
+    });
+
+    const handler = new AuditInteractionHandler(
+      new SessionResolverService(config),
+      store,
+      makeAuditWriter({
+        writeInteractionRequest: async () => {
+          sideInteractionWritten = true;
+          return { dir: '', requestBodyOmitted: false };
+        },
+        writeStepRequest: async (p) => {
+          stepDirWritten = p.stepDir;
+        },
+      }),
+      config,
+    );
+
+    const result = await handler.execute({
+      headers: { 'x-cc-audit-session': 's' },
+      rawBody: webFetchBody,
+      requestId: 'fetch-no-pending',
+    });
+
+    expect(result).not.toBeNull();
+    expect(result!.interactionType).toBe('side-request');
+    expect(sideInteractionWritten).toBe(true);
+    expect(stepDirWritten).not.toBeNull(); // side-requests también escriben steps
+    expect(result!.isInternalToolStep).toBeUndefined(); // no es step interno de herramienta
+  });
 });

@@ -41,6 +41,42 @@ export function extractModelFromRequestBody(bodyBuffer: Buffer): string | null {
   return typeof parsed.model === 'string' ? parsed.model : null;
 }
 
+/**
+ * Detecta si un request es una llamada de implementación WebFetch interna.
+ * Las implementaciones WebFetch reales llegan como requests con "tools": [] y
+ * el primer mensaje contiene contenido de página ("Web page content:").
+ * Esta función permite distinguir WebFetch interno de side-request genérico.
+ */
+export function isWebFetchImplementationRequestBody(rawBody: Buffer): boolean {
+  const parsed = safeParse(rawBody);
+  if (!parsed) return false;
+
+  // Verificar que tools sea un array vacío
+  const tools = parsed.tools;
+  if (!Array.isArray(tools) || tools.length !== 0) return false;
+
+  // Verificar que el primer mensaje contenga "Web page content:"
+  const messages = parsed.messages;
+  if (!Array.isArray(messages) || messages.length === 0) return false;
+  const firstMsg = messages[0];
+  if (!firstMsg || typeof firstMsg !== 'object') return false;
+
+  const content = (firstMsg as Record<string, unknown>).content;
+  if (!Array.isArray(content)) return false;
+
+  for (const item of content) {
+    if (!item || typeof item !== 'object') continue;
+    const block = item as Record<string, unknown>;
+    if (block.type === 'text' && typeof block.text === 'string') {
+      if (block.text.includes('Web page content:')) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 function safeParse(bodyBuffer: Buffer): Record<string, unknown> | null {
   try {
     const parsed = JSON.parse(bodyBuffer.toString('utf8')) as unknown;

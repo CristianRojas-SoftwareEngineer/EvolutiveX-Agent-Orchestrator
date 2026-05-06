@@ -5,6 +5,7 @@ import type { IAuditWriter } from '../2-services/ports/audit-writer.port.js';
 import {
   classifyRequestBody,
   extractModelFromRequestBody,
+  isWebFetchImplementationRequestBody,
 } from '../1-domain/services/request-classifier.service.js';
 import {
   ActiveInteraction,
@@ -86,6 +87,27 @@ export class AuditInteractionHandler {
     }
 
     const classification = classifyRequestBody(params.rawBody);
+
+    // Verificar si es una llamada de implementación WebFetch interna antes de side-request.
+    // Las implementaciones WebFetch reales llegan como tools: [] con contenido de página.
+    // Si hay un pending WebFetch, correlacionar como step interno del padre.
+    if (isWebFetchImplementationRequestBody(params.rawBody)) {
+      const webFetchPending = this.sessionStore.findInteractionWithPendingWebFetch(auditSessionId);
+      if (webFetchPending) {
+        const result = await this.handleWebFetchStep(
+          params,
+          headersForAudit,
+          auditSessionId,
+          classification,
+          webFetchPending,
+        );
+        if (result) {
+          return result;
+        }
+        // Si handleWebFetchStep retorna null, el pending se consumió por otro thread; continuar flujo normal
+      }
+      // Si no hay pending o fue consumido, continuar al flujo normal side-request
+    }
 
     if (classification.type === 'side-request') {
       return this.handleSideRequest(params, headersForAudit, auditSessionId, classification);
@@ -392,6 +414,58 @@ export class AuditInteractionHandler {
   }
 
   /**
+   * Helper seguro para intentar registrar llamadas de implementación de tools internos.
+   * A diferencia de handleInternalToolStep, este verifica si consumePending devuelve null
+   * dentro del lock (indicando que ya no hay pending disponible al entrar a la sección crítica).
+   * Si no hay pending, retorna null para que el caller pueda continuar con el flujo normal.
+   */
+  private async tryHandleInternalToolStep(params: {
+    rawBody: Buffer;
+    headersForAudit: Record<string, string | string[] | undefined>;
+    auditSessionId: string;
+    classification: RequestClassification;
+    parentInteractionDir: string;
+    consumePending: (interactionDir: string) => unknown;
+  }): Promise<AuditInteractionResult | null> {
+    return this.sessionStore.withSessionLock(params.auditSessionId, async () => {
+      const pending = params.consumePending(params.parentInteractionDir);
+      if (pending === null || pending === undefined) {
+        // No hay pending disponible al entrar al lock; retornar null para continuar flujo normal
+        return null;
+      }
+
+      const stepCount = this.sessionStore.incrementStepCountByDir(params.parentInteractionDir);
+      const stepDir = path.join(
+        params.parentInteractionDir,
+        DIR_STEPS,
+        String(stepCount).padStart(PAD_STEP, '0'),
+      );
+
+      await this.auditWriter.writeStepRequest({
+        stepDir,
+        headers: params.headersForAudit,
+        bodyBuffer: params.rawBody,
+        maxAuditRequestBytes: this.config.MAX_AUDIT_REQUEST_BODY_BYTES,
+        context: {
+          interactionType: 'agentic',
+          stepIndex: stepCount,
+        },
+      });
+
+      return {
+        auditInteractionDir: params.parentInteractionDir,
+        requestBodyOmitted: false,
+        requestSequence: 0,
+        auditSessionId: params.auditSessionId,
+        interactionType: 'agentic',
+        requestClassification: params.classification,
+        assignedStepIndex: stepCount,
+        isInternalToolStep: true,
+      };
+    });
+  }
+
+  /**
    * Registra la llamada de implementación de WebSearch como un step adicional
    * dentro de la interacción padre que emitió el tool_use `web_search`. No crea
    * una interacción independiente — el request/response del harness se escriben
@@ -433,9 +507,9 @@ export class AuditInteractionHandler {
       interaction: { interactionDir: string; pendingWebFetchToolUses: PendingWebFetchToolUse[] };
       pendings: PendingWebFetchToolUse[];
     },
-  ): Promise<AuditInteractionResult> {
+  ): Promise<AuditInteractionResult | null> {
     const parentInteractionDir = match.interaction.interactionDir;
-    return this.handleInternalToolStep({
+    const result = await this.tryHandleInternalToolStep({
       rawBody: params.rawBody,
       headersForAudit,
       auditSessionId,
@@ -443,6 +517,7 @@ export class AuditInteractionHandler {
       parentInteractionDir,
       consumePending: (dir: string) => this.sessionStore.consumeWebFetchPending(dir),
     });
+    return result;
   }
 
   private async handleContinuation(

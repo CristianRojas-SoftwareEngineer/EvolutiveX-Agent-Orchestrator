@@ -3,6 +3,7 @@ import {
   classifyRequestBody,
   extractModelFromRequestBody,
   extractToolResultIdsFromRequestBody,
+  isWebFetchImplementationRequestBody,
 } from '../../src/1-domain/services/request-classifier.service.js';
 
 describe('classifyRequestBody', () => {
@@ -126,5 +127,107 @@ describe('extractModelFromRequestBody', () => {
       'claude-sonnet-4-6',
     );
     expect(extractModelFromRequestBody(Buffer.from('{"messages":[]}'))).toBeNull();
+  });
+});
+
+describe('isWebFetchImplementationRequestBody', () => {
+  it('retorna true para tools: [] con Web page content:', () => {
+    const body = Buffer.from(
+      JSON.stringify({
+        model: 'claude-3-5-sonnet',
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: 'Web page content:\n---\nExample Domain\n\nThis domain is for use in documentation examples.' },
+            ],
+          },
+        ],
+        tools: [],
+        max_tokens: 4096,
+      }),
+    );
+    expect(isWebFetchImplementationRequestBody(body)).toBe(true);
+  });
+
+  it('retorna false para tools: [] side-request normal sin Web page content:', () => {
+    const body = Buffer.from(
+      JSON.stringify({
+        model: 'claude-3-5-sonnet',
+        messages: [{ role: 'user', content: 'count tokens' }],
+        tools: [],
+        max_tokens: 4096,
+      }),
+    );
+    expect(isWebFetchImplementationRequestBody(body)).toBe(false);
+  });
+
+  it('retorna false para fresh con tools no vacías', () => {
+    const body = Buffer.from(
+      JSON.stringify({
+        model: 'claude-3-5-sonnet',
+        messages: [{ role: 'user', content: 'hola' }],
+        tools: [
+          {
+            name: 'Read',
+            description: 'lee un archivo',
+            input_schema: { type: 'object', properties: {} },
+          },
+        ],
+        max_tokens: 4096,
+      }),
+    );
+    expect(isWebFetchImplementationRequestBody(body)).toBe(false);
+  });
+
+  it('retorna false para JSON inválido', () => {
+    const body = Buffer.from('invalid json');
+    expect(isWebFetchImplementationRequestBody(body)).toBe(false);
+  });
+
+  it('retorna false si tools no es array vacío', () => {
+    const body = Buffer.from(
+      JSON.stringify({
+        model: 'claude-3-5-sonnet',
+        messages: [
+          {
+            role: 'user',
+            content: [{ type: 'text', text: 'Web page content:\n---\nExample Domain' }],
+          },
+        ],
+        tools: [{ name: 'Read' }],
+        max_tokens: 4096,
+      }),
+    );
+    expect(isWebFetchImplementationRequestBody(body)).toBe(false);
+  });
+
+  it('retorna false si no hay mensajes', () => {
+    const body = Buffer.from(
+      JSON.stringify({
+        model: 'claude-3-5-sonnet',
+        messages: [],
+        tools: [],
+        max_tokens: 4096,
+      }),
+    );
+    expect(isWebFetchImplementationRequestBody(body)).toBe(false);
+  });
+
+  it('retorna false si el primer mensaje no tiene contenido de texto con Web page content:', () => {
+    const body = Buffer.from(
+      JSON.stringify({
+        model: 'claude-3-5-sonnet',
+        messages: [
+          {
+            role: 'user',
+            content: [{ type: 'text', text: 'some other content' }],
+          },
+        ],
+        tools: [],
+        max_tokens: 4096,
+      }),
+    );
+    expect(isWebFetchImplementationRequestBody(body)).toBe(false);
   });
 });

@@ -1,4 +1,0 @@
-{"level":30,"time":1778103174282,"pid":17588,"hostname":"Cristian","msg":"Server listening at http://127.0.0.1:8787"}
-{"level":30,"time":1778103174285,"pid":17588,"hostname":"Cristian","msg":"Server listening at http://100.83.32.47:8787"}
-{"level":30,"time":1778103174285,"pid":17588,"hostname":"Cristian","msg":"Server listening at http://192.168.1.84:8787"}
-{"level":30,"time":1778103174286,"pid":17588,"hostname":"Cristian","event":"listening","port":8787,"upstream":"https://openrouter.ai/api","upstreamAcceptEncoding":"identity","maxResponseBufferBytes":104857600,"maxAuditRequestBodyBytes":52428800,"maxAuditResponseBodyBytes":52428800,"maxAuditSseRawBytes":52428800,"stripAuditSessionHeader":true,"auditSessionHashSuffix":false,"msg":"Proxy levantado correctamente"}

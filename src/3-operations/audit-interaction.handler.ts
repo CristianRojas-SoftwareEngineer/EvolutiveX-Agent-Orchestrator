@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import * as fs from 'node:fs/promises';
 import { SessionResolverService } from '../1-domain/services/session-resolver.service.js';
 import type { ISessionStore } from '../2-services/ports/session-store.port.js';
 import type { IAuditWriter } from '../2-services/ports/audit-writer.port.js';
@@ -828,6 +829,13 @@ export class AuditInteractionHandler {
 
     const startedAt = Date.now();
 
+    // Detector conservador de side-request de naming:
+    // - tools: [] (ya clasificado como side-request)
+    // - No es implementación WebFetch interna (ya filtrado antes de este handler)
+    // - Proximidad con el primer turno agentic: si es el primer side-request de la sesión
+    //   y no hay turnos agentic previos, es probablemente naming
+    const isSessionNaming = await this.detectSessionNamingSideRequest(auditSessionId, params.rawBody);
+
     await this.auditWriter.writeInteractionState(interactionDir, {
       state: 'in-progress',
       startedAt: new Date(startedAt).toISOString(),
@@ -850,6 +858,7 @@ export class AuditInteractionHandler {
       pendingWebFetchToolUses: [],
       resolvedInternalTools: [],
       modelId: extractModelFromRequestBody(params.rawBody) ?? undefined,
+      sideRequestKind: isSessionNaming ? 'session-naming' : 'generic',
     });
 
     return {
@@ -861,6 +870,44 @@ export class AuditInteractionHandler {
       requestClassification: classification,
       assignedStepIndex: 1,
     };
+  }
+
+  /**
+   * Detector conservador de side-request de naming de sesión.
+   * Un side-request se clasifica como 'session-naming' si:
+   * - Es el primer side-request de la sesión
+   * - No hay turnos agentic previos en la sesión
+   * - No es una implementación WebFetch interna (ya filtrado antes)
+   */
+  private async detectSessionNamingSideRequest(auditSessionId: string, _rawBody: Buffer): Promise<boolean> {
+    try {
+      // Verificar si hay turnos agentic previos en la sesión
+      const mainAgentDir = path.join(this.sessionStore.getBaseDir(), auditSessionId, DIR_MAIN_AGENT);
+      const interactionsDir = path.join(mainAgentDir, DIR_INTERACTIONS);
+
+      try {
+        await fs.access(interactionsDir);
+        // Si el directorio existe, hay turnos agentic previos → no es naming
+        return false;
+      } catch {
+        // El directorio no existe, no hay turnos agentic previos
+      }
+
+      // Verificar si es el primer side-request de la sesión
+      const sideInteractionsDir = path.join(this.sessionStore.getBaseDir(), auditSessionId, DIR_SIDE_INTERACTIONS);
+      try {
+        const entries = await fs.readdir(sideInteractionsDir, { withFileTypes: true });
+        const existingSideInteractions = entries.filter((e) => e.isDirectory()).length;
+        // Si ya hay side-requests previos, este no es el primero → no es naming
+        return existingSideInteractions === 0;
+      } catch {
+        // No hay directorio de side-interactions aún → es el primero
+        return true;
+      }
+    } catch {
+      // En caso de error, ser conservador → clasificar como generic
+      return false;
+    }
   }
 
   private async handlePreflightWarmup(

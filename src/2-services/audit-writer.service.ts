@@ -3,10 +3,12 @@ import * as fs from 'node:fs/promises';
 import * as fsSync from 'node:fs';
 import { RedactService } from '../1-domain/services/redact.service.js';
 import { MarkdownRendererService } from '../1-domain/services/markdown-renderer.service.js';
-import { InteractionState, InteractionMetadata, MarkdownRenderContext, SessionMetrics, SessionModelMetrics, SseLine, SubagentSummary, SubagentsSummary, WorkflowIndex } from '../1-domain/types/audit.types.js';
+import { InteractionState, InteractionMetadata, InteractionOutcome, MarkdownRenderContext, SessionMetrics, SessionModelMetrics, SseLine, SubagentSummary, SubagentsSummary, WorkflowIndex, WorkflowSubagentSummary, WorkflowResolvedInternalTool, PendingAgentToolUse, PendingWebSearchToolUse, PendingWebFetchToolUse } from '../1-domain/types/audit.types.js';
 import { JsonValue } from '../1-domain/types/json.types.js';
 import type { IAuditWriter } from './ports/audit-writer.port.js';
 import {
+  DIR_MAIN_AGENT,
+  DIR_SIDE_INTERACTIONS,
   DIR_INPUT,
   DIR_OUTPUT,
   DIR_STEPS,
@@ -458,9 +460,8 @@ export class AuditWriterService implements IAuditWriter {
    */
   private async extractSubagentsSummary(stepDir: string, initialMessage: JsonValue, _toolUseIds: string[]): Promise<SubagentsSummary | null> {
     try {
-      // Listar directorios sub-agent-NN
-      const stepResponseDir = path.join(stepDir, DIR_STEP_RESPONSE);
-      const entries = await fs.readdir(stepResponseDir, { withFileTypes: true });
+      // Listar directorios sub-agent-NN directamente desde stepDir
+      const entries = await fs.readdir(stepDir, { withFileTypes: true });
       const subAgentDirs = entries
         .filter((e) => e.isDirectory() && e.name.startsWith(PREFIX_SUB_AGENT))
         .sort((a, b) => a.name.localeCompare(b.name));
@@ -501,9 +502,9 @@ export class AuditWriterService implements IAuditWriter {
 
       for (let i = 0; i < subAgentDirs.length; i++) {
         const dirName = subAgentDirs[i].name;
-        const subAgentDir = path.join(stepResponseDir, dirName);
+        const subAgentDir = path.join(stepDir, dirName);
         const metaPath = path.join(subAgentDir, 'meta.json');
-        const outputPath = path.join('response', dirName, 'output', 'body.parsed.md');
+        const outputPath = path.join(dirName, 'output', 'body.parsed.md');
 
         // Leer meta.json del subagente
         let meta: InteractionMetadata | null = null;
@@ -768,24 +769,178 @@ export class AuditWriterService implements IAuditWriter {
 
     try {
       // Extraer sessionId del path de interacción
-      const sessionId = interactionDir.split(path.sep).slice(-3)[0];
+      // Path esperado: sessions/<session-id>/main-agent/interactions/NN o sessions/<session-id>/side-interactions/NN
+      const parts = interactionDir.split(path.sep);
+      const mainAgentIndex = parts.indexOf(DIR_MAIN_AGENT);
+      const sideInteractionsIndex = parts.indexOf(DIR_SIDE_INTERACTIONS);
+      const treeIndex = mainAgentIndex !== -1 ? mainAgentIndex : sideInteractionsIndex;
+      const sessionId = treeIndex !== -1 && treeIndex > 0 ? parts[treeIndex - 1] : parts[parts.length - 4] || 'unknown';
 
-      // Construir resumen de steps
-      const steps = meta.steps.map((step) => ({
-        stepIndex: step.stepIndex,
-        sse: step.sse,
-        stopReason: step.stopReason,
-        toolCalls: step.toolCalls,
-        inputTokens: step.inputTokens,
-        outputTokens: step.outputTokens,
-        isCoalesced: step.coalescedAgentContinuation !== undefined,
-      }));
+      // Construir resumen de steps con subagents desde body.json
+      const steps = await Promise.all(
+        meta.steps.map(async (step) => {
+          const stepDir = path.join(interactionDir, DIR_STEPS, String(step.stepIndex).padStart(PAD_STEP, '0'));
+          const stepPath = path.join(DIR_STEPS, String(step.stepIndex).padStart(PAD_STEP, '0'));
+          const responsePath = path.join(stepPath, DIR_STEP_RESPONSE, 'body.json');
+          let stepSubagents: WorkflowSubagentSummary[] | undefined;
+
+          // Leer body.json del step si existe
+          try {
+            const bodyPath = path.join(stepDir, DIR_STEP_RESPONSE, 'body.json');
+            const bodyRaw = await fs.readFile(bodyPath, 'utf8');
+            const body = JSON.parse(bodyRaw) as JsonValue;
+
+            if (body && typeof body === 'object' && !Array.isArray(body)) {
+              const bodyObj = body as Record<string, JsonValue>;
+              // Si es coalesced-agent-step-response, extraer subagents
+              if (bodyObj.type === 'coalesced-agent-step-response' && bodyObj.subagents) {
+                const subagentsData = bodyObj.subagents as Record<string, JsonValue>;
+                if (subagentsData.items && Array.isArray(subagentsData.items)) {
+                  const items = subagentsData.items as Record<string, JsonValue>[];
+                  stepSubagents = items.map((item) => ({
+                    index: typeof item.index === 'number' ? item.index : 0,
+                    dirName: typeof item.dirName === 'string' ? item.dirName : '',
+                    toolUseId: typeof item.toolUseId === 'string' ? item.toolUseId : null,
+                    subagentType: typeof item.subagentType === 'string' ? item.subagentType : null,
+                    outcome: (typeof item.outcome === 'string' ? item.outcome : 'unknown') as InteractionOutcome | 'unknown',
+                    durationMs: typeof item.durationMs === 'number' ? item.durationMs : 0,
+                    stepCount: typeof item.stepCount === 'number' ? item.stepCount : 0,
+                    toolCalls: Array.isArray(item.toolCalls) ? item.toolCalls.map(String) : [],
+                    inputTokens: typeof item.inputTokens === 'number' ? item.inputTokens : 0,
+                    outputTokens: typeof item.outputTokens === 'number' ? item.outputTokens : 0,
+                    subagentPath: typeof item.dirName === 'string' ? path.join(stepPath, item.dirName) : undefined,
+                    metaPath: typeof item.dirName === 'string' ? path.join(stepPath, item.dirName, 'meta.json') : undefined,
+                    outputPath: typeof item.dirName === 'string' ? path.join(stepPath, item.dirName, 'output', 'body.parsed.md') : undefined,
+                  }));
+                }
+              }
+            }
+          } catch {
+            // Si falla la lectura, intentar fallback desde directorios
+            try {
+              const entries = await fs.readdir(stepDir, { withFileTypes: true });
+              const subAgentDirs = entries
+                .filter((e) => e.isDirectory() && e.name.startsWith(PREFIX_SUB_AGENT))
+                .sort((a, b) => a.name.localeCompare(b.name));
+
+              if (subAgentDirs.length > 0) {
+                stepSubagents = await Promise.all(
+                  subAgentDirs.map(async (subAgentDirEntry, i) => {
+                    const dirName = subAgentDirEntry.name;
+                    const subAgentDir = path.join(stepDir, dirName);
+                    const metaPath = path.join(subAgentDir, 'meta.json');
+                    let meta: InteractionMetadata | null = null;
+                    try {
+                      const raw = await fs.readFile(metaPath, 'utf8');
+                      meta = JSON.parse(raw) as InteractionMetadata;
+                    } catch {
+                      // Si falla, usar valores por defecto
+                    }
+                    return {
+                      index: i + 1,
+                      dirName,
+                      toolUseId: meta?.parentContext?.triggeringToolUseId || null,
+                      subagentType: meta?.parentContext?.subagentType || null,
+                      outcome: (meta?.outcome || 'unknown') as InteractionOutcome | 'unknown',
+                      durationMs: meta?.durationMs || 0,
+                      stepCount: meta?.stepCount || 0,
+                      toolCalls: meta?.steps?.flatMap((s) => s.toolCalls || []) || [],
+                      inputTokens: meta?.totals?.inputTokens || 0,
+                      outputTokens: meta?.totals?.outputTokens || 0,
+                      subagentPath: path.join(stepPath, dirName),
+                      metaPath: path.join(stepPath, dirName, 'meta.json'),
+                      outputPath: path.join(stepPath, dirName, 'output', 'body.parsed.md'),
+                    };
+                  }),
+                );
+              }
+            } catch {
+              // Si falla el fallback, no incluir subagents
+            }
+          }
+
+          return {
+            stepIndex: step.stepIndex,
+            sse: step.sse,
+            stopReason: step.stopReason,
+            toolCalls: step.toolCalls,
+            inputTokens: step.inputTokens,
+            outputTokens: step.outputTokens,
+            isCoalesced: step.coalescedAgentContinuation !== undefined,
+            subagents: stepSubagents,
+            stepPath,
+            responsePath: step.sse ? responsePath : undefined,
+          };
+        }),
+      );
+
+      // Agregar herramientas internas y anomalías de subagentes al workflow principal
+      const resolvedInternalTools: WorkflowResolvedInternalTool[] = [];
+      const lostPendingAgents: PendingAgentToolUse[] = meta.lostPendingAgents || [];
+      const lostPendingWebSearch: PendingWebSearchToolUse[] = meta.lostPendingWebSearch || [];
+      const lostPendingWebFetch: PendingWebFetchToolUse[] = meta.lostPendingWebFetch || [];
+
+      // Iterar sobre steps para encontrar subagentes y extraer sus herramientas internas
+      for (const step of meta.steps) {
+        const stepDir = path.join(interactionDir, DIR_STEPS, String(step.stepIndex).padStart(PAD_STEP, '0'));
+        const stepPath = path.join(DIR_STEPS, String(step.stepIndex).padStart(PAD_STEP, '0'));
+
+        try {
+          const entries = await fs.readdir(stepDir, { withFileTypes: true });
+          const subAgentDirs = entries.filter((e) => e.isDirectory() && e.name.startsWith(PREFIX_SUB_AGENT));
+
+          for (const subAgentDirEntry of subAgentDirs) {
+            const dirName = subAgentDirEntry.name;
+            const subAgentDir = path.join(stepDir, dirName);
+            const metaPath = path.join(subAgentDir, 'meta.json');
+            const scopePath = path.join(stepPath, dirName);
+
+            try {
+              const raw = await fs.readFile(metaPath, 'utf8');
+              const subMeta = JSON.parse(raw) as InteractionMetadata;
+
+              // Agregar herramientas internas del subagente con scope
+              if (subMeta.resolvedInternalTools) {
+                for (const tool of subMeta.resolvedInternalTools) {
+                  resolvedInternalTools.push({
+                    ...tool,
+                    scopePath,
+                    subagentDirName: dirName,
+                  });
+                }
+              }
+
+              // Agregar anomalías del subagente
+              if (subMeta.lostPendingAgents) {
+                lostPendingAgents.push(...subMeta.lostPendingAgents);
+              }
+              if (subMeta.lostPendingWebSearch) {
+                lostPendingWebSearch.push(...subMeta.lostPendingWebSearch);
+              }
+              if (subMeta.lostPendingWebFetch) {
+                lostPendingWebFetch.push(...subMeta.lostPendingWebFetch);
+              }
+            } catch {
+              // Si falla la lectura, continuar con el siguiente subagente
+            }
+          }
+        } catch {
+          // Si falla la lectura del step, continuar con el siguiente
+        }
+      }
+
+      // Agregar herramientas internas del turno principal sin scope
+      if (meta.resolvedInternalTools) {
+        for (const tool of meta.resolvedInternalTools) {
+          resolvedInternalTools.push(tool);
+        }
+      }
 
       // Construir resumen de anomalías
       const anomalies = {
-        lostPendingAgents: meta.lostPendingAgents,
-        lostPendingWebSearch: meta.lostPendingWebSearch,
-        lostPendingWebFetch: meta.lostPendingWebFetch,
+        lostPendingAgents,
+        lostPendingWebSearch,
+        lostPendingWebFetch,
       };
 
       // Construir índice de workflow
@@ -797,7 +952,7 @@ export class AuditWriterService implements IAuditWriter {
         durationMs: meta.durationMs,
         stepCount: meta.stepCount,
         steps,
-        resolvedInternalTools: meta.resolvedInternalTools,
+        resolvedInternalTools,
         anomalies,
       };
 

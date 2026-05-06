@@ -679,6 +679,7 @@ export class AuditSseResponseHandler {
       errorMessage: sseErrorMessage ?? null,
       errorCode: sseErrorType ?? null,
       ...(turn.parentContext ? { parentContext: turn.parentContext } : {}),
+      ...(turn.sideRequestKind ? { sideRequestKind: turn.sideRequestKind } : {}),
       ...(lostPendings ? { lostPendingAgents: lostPendings } : {}),
       ...(lostPendingsWebSearch ? { lostPendingWebSearch: lostPendingsWebSearch } : {}),
       ...(lostPendingsWebFetch ? { lostPendingWebFetch: lostPendingsWebFetch } : {}),

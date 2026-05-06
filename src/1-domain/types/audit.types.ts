@@ -309,6 +309,16 @@ export interface ResolvedInternalTool {
   resolvedInStepIndex?: number;
 }
 
+/**
+ * Herramienta interna resuelta en el índice de workflow con información de scope.
+ */
+export interface WorkflowResolvedInternalTool extends ResolvedInternalTool {
+  /** Ruta relativa al scope donde se resolvió (ej: 'steps/01/sub-agent-01'). */
+  scopePath?: string;
+  /** Nombre del directorio del subagente si aplica. */
+  subagentDirName?: string;
+}
+
 export interface ActiveInteraction {
   interactionDir: string;
   interactionType: InteractionType;
@@ -343,6 +353,8 @@ export interface ActiveInteraction {
    * pendings, ya sea por request interna o por tool_result en continuation.
    */
   resolvedInternalTools: ResolvedInternalTool[];
+  /** Subtipo de side-request (solo para interactionType='side-request'). */
+  sideRequestKind?: SideRequestKind;
   /** Definido sólo en turns que son subagentes. */
   parentContext?: ParentContext;
   /**
@@ -480,8 +492,8 @@ export interface WorkflowIndex {
   steps: WorkflowStepSummary[];
   /** Resumen de subagentes (solo para interacciones agentic que invocan subagentes) */
   subagents?: WorkflowSubagentSummary[];
-  /** Resumen de herramientas internas resueltas */
-  resolvedInternalTools?: ResolvedInternalTool[];
+  /** Resumen de herramientas internas resueltas (con información de scope) */
+  resolvedInternalTools?: WorkflowResolvedInternalTool[];
   /** Anomalías detectadas (pendings perdidos) */
   anomalies: {
     lostPendingAgents?: PendingAgentToolUse[];
@@ -508,6 +520,10 @@ export interface WorkflowStepSummary {
   isCoalesced?: boolean;
   /** Subagentes invocados en este step (si aplica) */
   subagents?: WorkflowSubagentSummary[];
+  /** Ruta relativa al directorio del step desde la interacción */
+  stepPath?: string;
+  /** Ruta relativa al body.json de respuesta del step */
+  responsePath?: string;
 }
 
 /** Resumen de un subagente en el índice de workflow */
@@ -532,6 +548,12 @@ export interface WorkflowSubagentSummary {
   inputTokens: number;
   /** Tokens de salida */
   outputTokens: number;
+  /** Ruta relativa al directorio del subagente desde el step padre */
+  subagentPath?: string;
+  /** Ruta relativa al meta.json del subagente desde el step padre */
+  metaPath?: string;
+  /** Ruta relativa al body.parsed.md de respuesta del subagente desde el step padre */
+  outputPath?: string;
 }
 
 /**
@@ -663,4 +685,6 @@ export interface MarkdownRenderContext {
   modelId?: string;
   /** Path relativo a thought/content.md para referencia cruzada */
   thoughtContentPath?: string;
+  /** Subtipo de side-request (solo para interactionType='side-request') */
+  sideRequestKind?: SideRequestKind;
 }

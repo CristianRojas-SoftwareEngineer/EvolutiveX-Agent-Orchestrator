@@ -506,16 +506,23 @@ export class MarkdownRendererService {
   private buildRootHeading(type: 'request' | 'response', context?: MarkdownRenderContext): string {
     const interactionType = context?.interactionType;
     const subagentType = context?.subagentType;
+    const sideRequestKind = context?.sideRequestKind;
 
     if (type === 'request') {
-      if (interactionType === 'side-request') return this.heading(1, 'Prompt del Side-request');
+      if (interactionType === 'side-request') {
+        if (sideRequestKind === 'session-naming') return this.heading(1, 'Prompt del Side-request — session-naming');
+        return this.heading(1, 'Prompt del Side-request');
+      }
       if (interactionType === 'client-preflight') return this.heading(1, 'Prompt del Preflight');
       if (subagentType) return this.heading(1, `Prompt del Subagente (\`${subagentType}\`)`);
       return this.heading(1, 'Prompt del Usuario');
     }
 
     // response
-    if (interactionType === 'side-request') return this.heading(1, 'Respuesta del Side-request');
+    if (interactionType === 'side-request') {
+      if (sideRequestKind === 'session-naming') return this.heading(1, 'Respuesta del Side-request — session-naming');
+      return this.heading(1, 'Respuesta del Side-request');
+    }
     if (interactionType === 'client-preflight') return this.heading(1, 'Respuesta del Preflight');
     if (subagentType) return this.heading(1, `Respuesta del Subagente (\`${subagentType}\`)`);
     return this.heading(1, 'Respuesta del Asistente');
@@ -531,7 +538,9 @@ export class MarkdownRendererService {
 
     if (context.stepIndex !== undefined && context.stepCount !== undefined) {
       const interactionLabel = context.interactionType === 'side-request'
-        ? 'Side-request'
+        ? context.sideRequestKind === 'session-naming'
+          ? 'Side-request — session-naming'
+          : 'Side-request'
         : context.interactionType === 'client-preflight'
           ? 'Preflight'
           : context.subagentType
@@ -719,6 +728,7 @@ export class MarkdownRendererService {
     parts.push(this.heading(2, 'Steps'));
     for (const step of workflow.steps) {
       parts.push(this.heading(3, `Step ${step.stepIndex}`));
+      if (step.stepPath) parts.push(`**Ruta:** \`${step.stepPath}\``);
       parts.push(`**SSE:** ${step.sse ? 'Sí' : 'No'}`);
       if (step.stopReason) parts.push(`**Stop Reason:** ${step.stopReason}`);
       if (step.toolCalls && step.toolCalls.length > 0) parts.push(`**Herramientas:** ${step.toolCalls.join(', ')}`);
@@ -728,27 +738,34 @@ export class MarkdownRendererService {
       if (step.isCoalesced) parts.push(`**Coalesced:** Sí (invocó subagentes)`);
     }
 
-    // Resumen de subagentes
-    if (workflow.subagents && workflow.subagents.length > 0) {
-      parts.push(this.heading(2, 'Subagentes'));
-      for (const subagent of workflow.subagents) {
-        parts.push(this.heading(3, `Subagente ${subagent.index}`));
-        parts.push(`**Directorio:** \`${subagent.dirName}\``);
-        if (subagent.toolUseId) parts.push(`**Tool Use ID:** \`${subagent.toolUseId}\``);
-        if (subagent.subagentType) parts.push(`**Tipo:** ${subagent.subagentType}`);
-        parts.push(`**Resultado:** ${subagent.outcome}`);
-        parts.push(`**Duración:** ${this.formatDuration(subagent.durationMs)}`);
-        parts.push(`**Steps:** ${subagent.stepCount}`);
-        if (subagent.toolCalls && subagent.toolCalls.length > 0) parts.push(`**Herramientas:** ${subagent.toolCalls.join(', ')}`);
-        parts.push(`**Tokens:** ${subagent.inputTokens} input, ${subagent.outputTokens} output`);
+    // Resumen de subagentes (ahora dentro de cada step)
+    for (const step of workflow.steps) {
+      if (step.subagents && step.subagents.length > 0) {
+        parts.push(this.heading(2, `Subagentes del Step ${step.stepIndex}`));
+        for (const subagent of step.subagents) {
+          parts.push(this.heading(3, `Subagente ${subagent.index}`));
+          parts.push(`**Directorio:** \`${subagent.dirName}\``);
+          if (subagent.subagentPath) parts.push(`**Ruta:** \`${subagent.subagentPath}\``);
+          if (subagent.toolUseId) parts.push(`**Tool Use ID:** \`${subagent.toolUseId}\``);
+          if (subagent.subagentType) parts.push(`**Tipo:** ${subagent.subagentType}`);
+          parts.push(`**Resultado:** ${subagent.outcome}`);
+          parts.push(`**Duración:** ${this.formatDuration(subagent.durationMs)}`);
+          parts.push(`**Steps:** ${subagent.stepCount}`);
+          if (subagent.toolCalls && subagent.toolCalls.length > 0) parts.push(`**Herramientas:** ${subagent.toolCalls.join(', ')}`);
+          parts.push(`**Tokens:** ${subagent.inputTokens} input, ${subagent.outputTokens} output`);
+        }
       }
     }
 
-    // Resumen de herramientas internas resueltas
+    // Resumen de herramientas internas resueltas (con información de scope)
     if (workflow.resolvedInternalTools && workflow.resolvedInternalTools.length > 0) {
       parts.push(this.heading(2, 'Herramientas Internas Resueltas'));
       for (const tool of workflow.resolvedInternalTools) {
-        parts.push(`- **${tool.toolName}** (ID: \`${tool.toolUseId}\`): Step ${tool.originalStepIndex} → ${tool.resolutionMode}${tool.resolvedInStepIndex ? ` (resuelto en step ${tool.resolvedInStepIndex})` : ''}`);
+        let toolInfo = `- **${tool.toolName}** (ID: \`${tool.toolUseId}\`): Step ${tool.originalStepIndex} → ${tool.resolutionMode}`;
+        if (tool.resolvedInStepIndex) toolInfo += ` (resuelto en step ${tool.resolvedInStepIndex})`;
+        if (tool.scopePath) toolInfo += ` [Scope: \`${tool.scopePath}\`]`;
+        if (tool.subagentDirName) toolInfo += ` [Subagente: \`${tool.subagentDirName}\`]`;
+        parts.push(toolInfo);
       }
     }
 

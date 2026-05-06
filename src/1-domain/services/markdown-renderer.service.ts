@@ -1,5 +1,5 @@
 import { JsonValue } from '../types/json.types.js';
-import type { MarkdownRenderContext } from '../types/audit.types.js';
+import { MarkdownRenderContext, SubagentsSummary } from '../types/audit.types.js';
 
 /**
  * Servicio para renderizar cuerpos JSON de petición/respuesta como Markdown semántico legible.
@@ -202,6 +202,7 @@ export class MarkdownRendererService {
             obj.initial,
             obj.continuationRequest ?? null,
             obj.final,
+            undefined, // subagentsSummary
             context,
           );
         }
@@ -222,6 +223,7 @@ export class MarkdownRendererService {
    * Renderiza una cadena completa de steps como Markdown.
    * Si hay un solo step, el formato es idéntico al de renderResponseConversationMarkdown.
    * Si hay múltiples steps, genera TOC y cada uno lleva encabezado `## Step N de M — <stop_reason>`.
+   * Si los stepIndex no son contiguos, muestra solo `## Step N — <stop_reason>` sin el total.
    */
   public renderMultiStepResponseMarkdown(
     steps: Array<{ stepIndex: number; parsed: JsonValue }>,
@@ -231,7 +233,11 @@ export class MarkdownRendererService {
       return this.renderResponseConversationMarkdown(steps[0].parsed, context);
     }
 
-    const total = steps.length;
+    // Detectar si los stepIndex son contiguos
+    const sortedIndices = steps.map((s) => s.stepIndex).sort((a, b) => a - b);
+    const isContiguous = sortedIndices.every((idx, i) => i === 0 || idx === sortedIndices[i - 1] + 1);
+    const total = isContiguous ? steps.length : Math.max(...steps.map((s) => s.stepIndex));
+
     const rootHeading = this.buildRootHeading('response', context);
     const parts: string[] = [rootHeading];
 
@@ -250,7 +256,9 @@ export class MarkdownRendererService {
           : '';
       const stepHeader = this.heading(
         2,
-        `Step ${stepIndex} de ${total}${stopReason ? ` — ${stopReason}` : ''}`,
+        isContiguous
+          ? `Step ${stepIndex} de ${total}${stopReason ? ` — ${stopReason}` : ''}`
+          : `Step ${stepIndex}${stopReason ? ` — ${stopReason}` : ''}`,
       );
       parts.push(stepHeader);
       parts.push(...this.renderStepSections(parsed, 3, context));
@@ -266,6 +274,7 @@ export class MarkdownRendererService {
     initialMessage: JsonValue,
     continuationRequest: JsonValue | null,
     finalMessage: JsonValue,
+    subagentsSummary?: SubagentsSummary,
     context?: MarkdownRenderContext,
   ): string {
     const rootHeading = this.buildRootHeading('response', context);
@@ -279,15 +288,34 @@ export class MarkdownRendererService {
     parts.push('El agente principal invocó subagentes mediante tool_use `Agent`.');
     parts.push(...this.renderStepSections(initialMessage, 3, context));
 
-    // Fase 2: Continuación con resultados de subagentes (stream terminal)
-    if (continuationRequest !== null) {
+    // Fase 2: Ejecución de subagentes
+    if (subagentsSummary && subagentsSummary.items.length > 0) {
       parts.push('---');
-      parts.push(this.heading(2, '🔀 Fase 2: Continuación con resultados'));
-      parts.push('El agente principal procesó los resultados retornados por los subagentes.');
-      const renderedRequest = this.renderRequestConversationMarkdown(continuationRequest, context);
-      const [, ...requestBody] = renderedRequest.split('\n');
-      const requestContent = requestBody.join('\n').trim();
-      parts.push(requestContent || this.fencedJson(continuationRequest));
+      parts.push(this.heading(2, '🔀 Fase 2: Ejecución de subagentes'));
+      parts.push(`Se ejecutaron ${subagentsSummary.count} subagente${subagentsSummary.count === 1 ? '' : 's'} en paralelo durante esta fase.`);
+      parts.push(`**Completados:** ${subagentsSummary.completedCount} | **Fallidos:** ${subagentsSummary.failedCount} | **Huérfanos:** ${subagentsSummary.orphanedCount}`);
+      parts.push(`**Duración total:** ${this.formatDuration(subagentsSummary.totalDurationMs)} | **Tokens:** ${subagentsSummary.totalInputTokens} input, ${subagentsSummary.totalOutputTokens} output`);
+      parts.push('');
+
+      for (const subagent of subagentsSummary.items) {
+        parts.push(this.heading(3, `Subagente ${subagent.index}: ${subagent.description}`));
+        parts.push(`**ID tool_use:** \`${subagent.toolUseId || 'no correlacionado'}\`${subagent.inferredByOrder ? ' (inferido por orden)' : ''}`);
+        parts.push(`**Tipo:** ${subagent.subagentType || 'general-purpose'}`);
+        parts.push(`**Estado:** ${this.formatOutcome(subagent.outcome)}`);
+        parts.push(`**Duración:** ${this.formatDuration(subagent.durationMs)} | **Steps:** ${subagent.stepCount} | **Tokens:** ${subagent.inputTokens}/${subagent.outputTokens}`);
+        if (subagent.toolCalls.length > 0) {
+          parts.push(`**Herramientas:** ${subagent.toolCalls.join(', ')}`);
+        }
+        if (subagent.finalResponsePreview) {
+          parts.push(`**Respuesta preview:** ${subagent.finalResponsePreview}`);
+        }
+        parts.push(`**Output completo:** \`${subagent.outputPath}\``);
+        parts.push('');
+      }
+    } else {
+      parts.push('---');
+      parts.push(this.heading(2, '🔀 Fase 2: Ejecución de subagentes'));
+      parts.push('No se encontraron subagentes anidados para esta fase.');
     }
 
     // Fase 3: Respuesta final coalesced
@@ -297,6 +325,21 @@ export class MarkdownRendererService {
     parts.push(...this.renderStepSections(finalMessage, 3, context));
 
     return parts.join('\n\n');
+  }
+
+  private formatDuration(ms: number): string {
+    if (ms < 1000) return `${ms}ms`;
+    return `${(ms / 1000).toFixed(1)}s`;
+  }
+
+  private formatOutcome(outcome: string): string {
+    const map: Record<string, string> = {
+      completed: '✅ Completado',
+      'client-error': '❌ Error',
+      orphaned: '⚠️ Huérfano',
+      unknown: '❓ Desconocido',
+    };
+    return map[outcome] || outcome;
   }
 
   /**

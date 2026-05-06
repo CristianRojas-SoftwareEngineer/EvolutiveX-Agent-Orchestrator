@@ -139,6 +139,7 @@ export interface IAuditWriter {
     continuationHeaders?: Record<string, string | string[] | undefined>;
     finalMessage: JsonValue;
     toolUseIds: string[];
+    subagentsSummary?: JsonValue;
     context?: MarkdownRenderContext;
   }): Promise<void>;
   /**

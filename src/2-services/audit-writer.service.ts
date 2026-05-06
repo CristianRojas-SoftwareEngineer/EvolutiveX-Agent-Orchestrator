@@ -3,7 +3,7 @@ import * as fs from 'node:fs/promises';
 import * as fsSync from 'node:fs';
 import { RedactService } from '../1-domain/services/redact.service.js';
 import { MarkdownRendererService } from '../1-domain/services/markdown-renderer.service.js';
-import { InteractionState, InteractionMetadata, MarkdownRenderContext, SessionMetrics, SessionModelMetrics, SseLine } from '../1-domain/types/audit.types.js';
+import { InteractionState, InteractionMetadata, MarkdownRenderContext, SessionMetrics, SessionModelMetrics, SseLine, SubagentSummary, SubagentsSummary } from '../1-domain/types/audit.types.js';
 import { JsonValue } from '../1-domain/types/json.types.js';
 import type { IAuditWriter } from './ports/audit-writer.port.js';
 import {
@@ -452,6 +452,158 @@ export class AuditWriterService implements IAuditWriter {
     );
   }
 
+  /**
+   * Extrae resúmenes de subagentes desde los directorios sub-agent-NN bajo el step padre.
+   * Correlaciona subagentes con tool_use Agent por orden cuando triggeringToolUseId es null.
+   */
+  private async extractSubagentsSummary(stepDir: string, initialMessage: JsonValue, _toolUseIds: string[]): Promise<SubagentsSummary | null> {
+    try {
+      // Listar directorios sub-agent-NN
+      const stepResponseDir = path.join(stepDir, DIR_STEP_RESPONSE);
+      const entries = await fs.readdir(stepResponseDir, { withFileTypes: true });
+      const subAgentDirs = entries
+        .filter((e) => e.isDirectory() && e.name.startsWith(PREFIX_SUB_AGENT))
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+      if (subAgentDirs.length === 0) {
+        return null;
+      }
+
+      // Extraer tool_use Agent del mensaje de delegación
+      const agentToolUses: Array<{ id: string; description: string; prompt: string; subagentType: string | null }> = [];
+      if (initialMessage && typeof initialMessage === 'object' && !Array.isArray(initialMessage)) {
+        const msg = initialMessage as Record<string, JsonValue>;
+        if (msg.content && Array.isArray(msg.content)) {
+          for (const block of msg.content) {
+            if (block && typeof block === 'object' && !Array.isArray(block)) {
+              const contentBlock = block as Record<string, JsonValue>;
+              if (contentBlock.type === 'tool_use' && contentBlock.name === 'Agent' && contentBlock.input) {
+                const input = contentBlock.input as Record<string, JsonValue>;
+                agentToolUses.push({
+                  id: String(contentBlock.id || ''),
+                  description: String(input.description || ''),
+                  prompt: String(input.prompt || ''),
+                  subagentType: input.subagent_type ? String(input.subagent_type) : null,
+                });
+              }
+            }
+          }
+        }
+      }
+
+      const subagents: SubagentSummary[] = [];
+      let completedCount = 0;
+      let failedCount = 0;
+      let orphanedCount = 0;
+      let totalDurationMs = 0;
+      let totalInputTokens = 0;
+      let totalOutputTokens = 0;
+
+      for (let i = 0; i < subAgentDirs.length; i++) {
+        const dirName = subAgentDirs[i].name;
+        const subAgentDir = path.join(stepResponseDir, dirName);
+        const metaPath = path.join(subAgentDir, 'meta.json');
+        const outputPath = path.join(dirName, 'output', 'body.parsed.md');
+
+        // Leer meta.json del subagente
+        let meta: InteractionMetadata | null = null;
+        try {
+          const raw = await fs.readFile(metaPath, 'utf8');
+          meta = JSON.parse(raw) as InteractionMetadata;
+        } catch {
+          // Si falla la lectura, marcar como unknown
+        }
+
+        // Determinar outcome
+        let outcome: SubagentSummary['outcome'] = 'unknown';
+        if (meta) {
+          if (meta.outcome === 'completed') outcome = 'completed';
+          else if (meta.outcome === 'client-error' || meta.outcome === 'upstream-error' || meta.outcome === 'truncated') outcome = 'client-error';
+          else if (meta.outcome === 'orphaned') outcome = 'orphaned';
+        }
+
+        // Correlacionar con tool_use Agent
+        let toolUseId: string | null = null;
+        let inferredByOrder = false;
+        if (meta?.parentContext?.triggeringToolUseId) {
+          toolUseId = meta.parentContext.triggeringToolUseId;
+        } else if (i < agentToolUses.length) {
+          // Correlación por orden cuando triggeringToolUseId es null
+          toolUseId = agentToolUses[i].id;
+          inferredByOrder = true;
+        }
+
+        // Obtener datos del tool_use Agent
+        const agentToolUse = toolUseId
+          ? agentToolUses.find((t) => t.id === toolUseId) || (i < agentToolUses.length ? agentToolUses[i] : null)
+          : null;
+
+        // Extraer métricas
+        const durationMs = meta?.durationMs || 0;
+        const stepCount = meta?.stepCount || 0;
+        const toolCalls = meta?.steps?.flatMap((s) => s.toolCalls || []) || [];
+        const inputTokens = meta?.totals?.inputTokens || 0;
+        const outputTokens = meta?.totals?.outputTokens || 0;
+        const finalStopReason = meta?.steps?.[meta.steps.length - 1]?.stopReason || null;
+
+        // Extraer preview de respuesta final
+        let finalResponsePreview: string | null = null;
+        if (meta?.outcome === 'completed') {
+          try {
+            const outputParsedPath = path.join(subAgentDir, 'output', 'body.parsed.md');
+            const outputRaw = await fs.readFile(outputParsedPath, 'utf8');
+            // Tomar primeras 200 caracteres como preview
+            finalResponsePreview = outputRaw.slice(0, 200).trim();
+            if (outputRaw.length > 200) finalResponsePreview += '...';
+          } catch {
+            finalResponsePreview = null;
+          }
+        }
+
+        // Acumular totales
+        if (outcome === 'completed') completedCount++;
+        else if (outcome === 'client-error') failedCount++;
+        else if (outcome === 'orphaned') orphanedCount++;
+        totalDurationMs += durationMs;
+        totalInputTokens += inputTokens;
+        totalOutputTokens += outputTokens;
+
+        subagents.push({
+          index: i + 1,
+          dirName,
+          toolUseId,
+          inferredByOrder,
+          description: agentToolUse?.description || '',
+          prompt: agentToolUse?.prompt || '',
+          subagentType: agentToolUse?.subagentType || null,
+          outcome,
+          durationMs,
+          stepCount,
+          toolCalls,
+          inputTokens,
+          outputTokens,
+          finalStopReason,
+          finalResponsePreview,
+          outputPath,
+        });
+      }
+
+      return {
+        items: subagents,
+        count: subagents.length,
+        completedCount,
+        failedCount,
+        orphanedCount,
+        totalDurationMs,
+        totalInputTokens,
+        totalOutputTokens,
+      };
+    } catch {
+      // Best-effort: si falla la extracción, retornar null en vez de romper la reconstrucción
+      return null;
+    }
+  }
+
   public async writeCoalescedAgentStepResponse(params: {
     stepDir: string;
     initialMessage: JsonValue;
@@ -459,10 +611,28 @@ export class AuditWriterService implements IAuditWriter {
     continuationHeaders?: Record<string, string | string[] | undefined>;
     finalMessage: JsonValue;
     toolUseIds: string[];
+    subagentsSummary?: JsonValue;
     context?: MarkdownRenderContext;
   }): Promise<void> {
     const responseDir = path.join(params.stepDir, DIR_STEP_RESPONSE);
     await fs.mkdir(responseDir, { recursive: true });
+
+    // Eliminar sse.txt si existe para steps coalesced (solo sse.jsonl es canónico)
+    const sseTxtPath = path.join(responseDir, 'sse.txt');
+    try {
+      await fs.unlink(sseTxtPath);
+    } catch {
+      // El archivo puede no existir, ignorar error
+    }
+
+    // Extraer resumen de subagentes si no se proporcionó explícitamente
+    const subagentsSummary: SubagentsSummary | null = params.subagentsSummary
+      ? (params.subagentsSummary as unknown as SubagentsSummary)
+      : await this.extractSubagentsSummary(
+          params.stepDir,
+          params.initialMessage,
+          params.toolUseIds,
+        );
 
     const body: JsonValue = {
       type: 'coalesced-agent-step-response',
@@ -479,6 +649,7 @@ export class AuditWriterService implements IAuditWriter {
         },
       },
       toolUseIds: params.toolUseIds,
+      ...(subagentsSummary ? { subagents: subagentsSummary as unknown as JsonValue } : {}),
     };
 
     await this.writeJsonAtomic(path.join(responseDir, 'body.json'), body);
@@ -487,6 +658,7 @@ export class AuditWriterService implements IAuditWriter {
       params.initialMessage,
       params.continuationRequest,
       params.finalMessage,
+      subagentsSummary || undefined,
       params.context,
     );
     await this.writeFileAtomic(

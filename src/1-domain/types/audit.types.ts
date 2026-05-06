@@ -18,6 +18,66 @@ export interface AuditSession {
 export type SsePhase = 'delegation' | 'continuation';
 
 /**
+ * Resumen de un subagente ejecutado durante la Fase 2 de un step coalesced.
+ */
+export interface SubagentSummary {
+  /** Índice del subagente (sub-agent-01, sub-agent-02, etc.) */
+  index: number;
+  /** Nombre del directorio del subagente relativo al step padre */
+  dirName: string;
+  /** ID del tool_use Agent que originó este subagente, si puede correlacionarse */
+  toolUseId: string | null;
+  /** Indica si la correlación con toolUseId fue inferida por orden, no explícita */
+  inferredByOrder: boolean;
+  /** Descripción del subagente extraída del tool_use Agent */
+  description: string;
+  /** Prompt del subagente extraído del tool_use Agent */
+  prompt: string;
+  /** Tipo de subagente (general-purpose, Explore, Plan, etc.) */
+  subagentType: string | null;
+  /** Estado final del subagente */
+  outcome: InteractionOutcome | 'unknown';
+  /** Duración total en milisegundos */
+  durationMs: number;
+  /** Número de steps ejecutados por el subagente */
+  stepCount: number;
+  /** Herramientas usadas por el subagente (WebFetch, WebSearch, etc.) */
+  toolCalls: string[];
+  /** Tokens de entrada totales del subagente */
+  inputTokens: number;
+  /** Tokens de salida totales del subagente */
+  outputTokens: number;
+  /** stop_reason del último step del subagente */
+  finalStopReason: string | null;
+  /** Preview acotado de la respuesta final del subagente para legibilidad */
+  finalResponsePreview: string | null;
+  /** Ruta relativa desde el step padre hacia el output completo del subagente */
+  outputPath: string;
+}
+
+/**
+ * Bloque de resumen de subagentes para un step coalesced.
+ */
+export interface SubagentsSummary {
+  /** Lista de subagentes ejecutados */
+  items: SubagentSummary[];
+  /** Total de subagentes */
+  count: number;
+  /** Total de subagentes completados exitosamente */
+  completedCount: number;
+  /** Total de subagentes fallidos */
+  failedCount: number;
+  /** Total de subagentes huérfanos */
+  orphanedCount: number;
+  /** Duración total acumulada de todos los subagentes */
+  totalDurationMs: number;
+  /** Tokens de entrada totales de todos los subagentes */
+  totalInputTokens: number;
+  /** Tokens de salida totales de todos los subagentes */
+  totalOutputTokens: number;
+}
+
+/**
  * Representa una única línea capturada en un stream de Server-Sent Events (SSE).
  */
 export interface SseLine {

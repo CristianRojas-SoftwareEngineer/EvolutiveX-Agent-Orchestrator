@@ -82,9 +82,6 @@ export class AuditUpstreamErrorHandler {
     };
     await this.auditWriter.writeInteractionMeta(params.auditInteractionDir, meta);
 
-    // Generar índice de workflow para interacciones agentic
-    await this.auditWriter.writeWorkflowIndex(params.auditInteractionDir, meta);
-
     if (interaction && interactionType !== 'client-preflight' && interaction.modelId && totals) {
       const sessionDir = path.join(this.sessionStore.getBaseDir(), interaction.sessionId);
       await this.sessionStore.withSessionLock(interaction.sessionId, async () => {

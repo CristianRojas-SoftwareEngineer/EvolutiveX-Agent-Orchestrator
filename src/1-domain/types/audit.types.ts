@@ -335,15 +335,6 @@ export interface ResolvedInternalTool {
   resolvedInStepIndex?: number;
 }
 
-/**
- * Herramienta interna resuelta en el índice de workflow con información de scope.
- */
-export interface WorkflowResolvedInternalTool extends ResolvedInternalTool {
-  /** Ruta relativa al scope donde se resolvió (ej: 'steps/01/sub-agent-01'). */
-  scopePath?: string;
-  /** Nombre del directorio del subagente si aplica. */
-  subagentDirName?: string;
-}
 
 export interface ActiveInteraction {
   interactionDir: string;
@@ -497,90 +488,6 @@ export interface InteractionState {
   parentContext?: ParentContext;
 }
 
-/**
- * Índice de workflow por interacción que resume el árbol agéntico.
- * Generado al cierre de interacciones agentic para facilitar auditoría humana y machine-readable.
- */
-export interface WorkflowIndex {
-  /** Tipo de interacción (agentic, side-request, client-preflight) */
-  interactionType: InteractionType;
-  /** Identificador de la sesión */
-  sessionId: string;
-  /** Modelo que procesó esta interacción */
-  modelId?: string;
-  /** Resultado de la interacción */
-  outcome: InteractionOutcome;
-  /** Duración total en milisegundos */
-  durationMs: number;
-  /** Número de steps */
-  stepCount: number;
-  /** Resumen de steps */
-  steps: WorkflowStepSummary[];
-  /** Resumen de subagentes (solo para interacciones agentic que invocan subagentes) */
-  subagents?: WorkflowSubagentSummary[];
-  /** Resumen de herramientas internas resueltas (con información de scope) */
-  resolvedInternalTools?: WorkflowResolvedInternalTool[];
-  /** Anomalías detectadas (pendings perdidos) */
-  anomalies: {
-    lostPendingAgents?: PendingAgentToolUse[];
-    lostPendingWebSearch?: PendingWebSearchToolUse[];
-    lostPendingWebFetch?: PendingWebFetchToolUse[];
-  };
-}
-
-/** Resumen de un step en el índice de workflow */
-export interface WorkflowStepSummary {
-  /** Índice del step */
-  stepIndex: number;
-  /** Si el step es SSE */
-  sse: boolean;
-  /** Stop reason del step */
-  stopReason?: string;
-  /** Herramientas usadas en este step */
-  toolCalls?: string[];
-  /** Tokens de entrada */
-  inputTokens?: number;
-  /** Tokens de salida */
-  outputTokens?: number;
-  /** Si este step es coalesced (invocó subagentes) */
-  isCoalesced?: boolean;
-  /** Subagentes invocados en este step (si aplica) */
-  subagents?: WorkflowSubagentSummary[];
-  /** Ruta relativa al directorio del step desde la interacción */
-  stepPath?: string;
-  /** Ruta relativa al body.json de respuesta del step */
-  responsePath?: string;
-}
-
-/** Resumen de un subagente en el índice de workflow */
-export interface WorkflowSubagentSummary {
-  /** Índice del subagente */
-  index: number;
-  /** Nombre del directorio del subagente */
-  dirName: string;
-  /** ID del tool_use Agent que originó este subagente */
-  toolUseId: string | null;
-  /** Tipo de subagente */
-  subagentType: string | null;
-  /** Resultado del subagente */
-  outcome: InteractionOutcome | 'unknown';
-  /** Duración en milisegundos */
-  durationMs: number;
-  /** Número de steps del subagente */
-  stepCount: number;
-  /** Herramientas usadas por el subagente */
-  toolCalls: string[];
-  /** Tokens de entrada */
-  inputTokens: number;
-  /** Tokens de salida */
-  outputTokens: number;
-  /** Ruta relativa al directorio del subagente desde el step padre */
-  subagentPath?: string;
-  /** Ruta relativa al meta.json del subagente desde el step padre */
-  metaPath?: string;
-  /** Ruta relativa al body.parsed.md de respuesta del subagente desde el step padre */
-  outputPath?: string;
-}
 
 /**
  * Opciones para la reconstrucción del cuerpo de respuesta desde bytes SSE.

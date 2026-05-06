@@ -1147,43 +1147,6 @@ export class AuditInteractionHandler {
       },
     });
 
-    // Generar índice de workflow para interacciones agentic
-    await this.auditWriter.writeWorkflowIndex(interaction.interactionDir, {
-      interactionType: interaction.interactionType,
-      ...(interaction.modelId ? { modelId: interaction.modelId } : {}),
-      outcome: 'orphaned',
-      stepCount: interaction.stepsMeta.length,
-      startedAt: new Date(interaction.startedAt).toISOString(),
-      endedAt: new Date(endedAt).toISOString(),
-      durationMs: endedAt - interaction.startedAt,
-      statusCode: null,
-      sse: interaction.stepsMeta.some((s) => s.sse),
-      steps: interaction.stepsMeta,
-      totals,
-      sseResponseBodyAttempted: false,
-      sseResponseBodyWritten: false,
-      sseResponseBodyError: null,
-      sseResponseBodySource: null,
-      errorMessage: null,
-      errorCode: null,
-      ...(interaction.parentContext ? { parentContext: interaction.parentContext } : {}),
-      ...(lostPendings ? { lostPendingAgents: lostPendings } : {}),
-      ...(lostPendingsWebSearch ? { lostPendingWebSearch: lostPendingsWebSearch } : {}),
-      ...(lostPendingsWebFetch ? { lostPendingWebFetch: lostPendingsWebFetch } : {}),
-      ...(interaction.resolvedInternalTools ? { resolvedInternalTools: interaction.resolvedInternalTools } : {}),
-      truncation: {
-        requestBodyOmitted: interaction.requestBodyOmitted,
-        responseBodyBytesTotal: null,
-        responseBodyBytesAudited: null,
-        responseTruncatedByProxyBuffer: false,
-        responseTruncatedByAuditLimit: false,
-        sseRawBytesAudited: sseRawBytesTotal || null,
-        sseRawBytesLimit,
-        sseRawTruncatedByLimit: sseRawTruncatedAny,
-        sseRawWriteError: false,
-      },
-    });
-
     if (interaction.interactionType !== 'client-preflight' && interaction.modelId && totals) {
       const sessionDir = path.join(this.sessionStore.getBaseDir(), interaction.sessionId);
       await this.sessionStore.withSessionLock(interaction.sessionId, async () => {

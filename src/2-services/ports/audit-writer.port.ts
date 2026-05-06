@@ -151,9 +151,4 @@ export interface IAuditWriter {
     stepCount: number,
     context?: MarkdownRenderContext,
   ): Promise<{ written: boolean; error?: string }>;
-  /**
-   * Genera workflow.json y workflow.md al cierre de interacciones agentic.
-   * Resume el árbol agéntico con steps, subagentes, herramientas internas y anomalías.
-   */
-  writeWorkflowIndex(interactionDir: string, meta: InteractionMetadata): Promise<void>;
 }

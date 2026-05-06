@@ -707,9 +707,6 @@ export class AuditSseResponseHandler {
 
     await this.auditWriter.writeInteractionMeta(turn.interactionDir, meta);
 
-    // Generar índice de workflow para interacciones agentic
-    await this.auditWriter.writeWorkflowIndex(turn.interactionDir, meta);
-
     // Eliminar state.json al cerrar la interacción
     await this.auditWriter.removeInteractionState(turn.interactionDir);
   }

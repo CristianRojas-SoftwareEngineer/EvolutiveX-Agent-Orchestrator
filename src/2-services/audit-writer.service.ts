@@ -459,7 +459,7 @@ export class AuditWriterService implements IAuditWriter {
    * Soporta mensajes normales, multi-step-response y coalesced-agent-step-response.
    * Retorna null si no se puede extraer texto significativo.
    */
-  private extractFinalTextFromJson(parsed: JsonValue): string | null {
+  public extractFinalTextFromJson(parsed: JsonValue): string | null {
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
       return null;
     }

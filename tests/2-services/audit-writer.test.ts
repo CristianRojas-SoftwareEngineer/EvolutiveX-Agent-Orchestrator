@@ -329,7 +329,7 @@ describe('AuditWriterService - extractFinalTextFromJson', () => {
         { type: 'text', text: 'Texto final' },
       ],
     };
-    const text = (service as any).extractFinalTextFromJson(parsed);
+    const text = service.extractFinalTextFromJson(parsed);
     expect(text).toBe('Texto final');
   });
 
@@ -341,7 +341,7 @@ describe('AuditWriterService - extractFinalTextFromJson', () => {
         { content: [{ type: 'text', text: 'Step 2 final' }] },
       ],
     };
-    const text = (service as any).extractFinalTextFromJson(parsed);
+    const text = service.extractFinalTextFromJson(parsed);
     expect(text).toBe('Step 2 final');
   });
 
@@ -357,19 +357,19 @@ describe('AuditWriterService - extractFinalTextFromJson', () => {
       },
       toolUseIds: [],
     };
-    const text = (service as any).extractFinalTextFromJson(parsed);
+    const text = service.extractFinalTextFromJson(parsed);
     expect(text).toBe('Respuesta final coalesced');
   });
 
   it('debería retornar null si no hay texto', () => {
     const parsed = { content: [{ type: 'tool_use', id: 't1', name: 'bash', input: {} }] };
-    const text = (service as any).extractFinalTextFromJson(parsed);
+    const text = service.extractFinalTextFromJson(parsed);
     expect(text).toBeNull();
   });
 
   it('debería retornar null para inputs no válidos', () => {
-    expect((service as any).extractFinalTextFromJson(null)).toBeNull();
-    expect((service as any).extractFinalTextFromJson('texto')).toBeNull();
-    expect((service as any).extractFinalTextFromJson([])).toBeNull();
+    expect(service.extractFinalTextFromJson(null)).toBeNull();
+    expect(service.extractFinalTextFromJson('texto')).toBeNull();
+    expect(service.extractFinalTextFromJson([])).toBeNull();
   });
 });

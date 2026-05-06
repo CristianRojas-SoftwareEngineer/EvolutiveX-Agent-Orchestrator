@@ -201,11 +201,13 @@ El prefijo `NN` (2 dígitos, 1-based) es el número de secuencia dentro del árb
 
 **Mecanismo de detección (SSE → disco):**
 1. El SSE handler detecta `content_block_start` con `name: "Agent"`.
-2. Acumula el JSON del bloque `input` vía `input_json_delta` (para extraer `subagent_type`).
-3. Registra `PendingAgentToolUse { stepIndex, toolUseId, subagentType }` en el `ActiveInteraction`.
-4. Al llegar la siguiente request `fresh` de la misma sesión, `AuditInteractionHandler` la identifica como subagente y la anida bajo `steps/NN/sub-agent-NN/`.
+2. Acumula el JSON del bloque `input` vía `input_json_delta` (para extraer `subagent_type`, `description` y `prompt`).
+3. Registra `PendingAgentToolUse { stepIndex, toolUseId, subagentType, description, prompt }` en el `ActiveInteraction`.
+4. Al llegar la siguiente request `fresh` de la misma sesión, `AuditInteractionHandler` extrae el prompt del request del subagente y lo compara con los pendings para correlación determinística.
+5. Si hay match exacto por prompt, se asigna el `triggeringToolUseId` correspondiente y se marca `correlationStatus: 'resolved'`.
+6. Si no hay match determinístico, se anida el subagente con `triggeringToolId: null` y `correlationStatus: 'unresolved'`.
 
-**Delegación paralela:** un solo step puede emitir múltiples `Agent` tool_uses simultáneos (Claude lanza varios subagentes en paralelo). En ese caso, `triggeringToolUseId` puede quedar `null` hasta que llegue el `tool_result` que permita la correlación definitiva.
+**Delegación paralela:** un solo step puede emitir múltiples `Agent` tool_uses simultáneos (Claude lanza varios subagentes en paralelo). La correlación se resuelve por match exacto del prompt del request con el `prompt` del tool_use Agent, eliminando la necesidad de inferir por orden.
 
 ---
 
@@ -232,6 +234,8 @@ El prefijo `NN` (2 dígitos, 1-based) es el número de secuencia dentro del árb
     "parentInteractionDir": "<ruta absoluta de la interacción padre>",
     "parentStepIndex": 2,
     "triggeringToolUseId": "toolu_01ABC...",
+    "correlationStatus": "resolved",
+    "correlationMethod": "prompt",
     "subagentType": "general-purpose"
   }
 }

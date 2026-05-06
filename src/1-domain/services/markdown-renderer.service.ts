@@ -316,7 +316,7 @@ export class MarkdownRendererService {
 
       for (const subagent of coalesced.subagents.items) {
         parts.push(this.heading(headingLevel + 1, `Subagente ${subagent.index}: ${subagent.description}`));
-        parts.push(`**ID tool_use:** \`${subagent.toolUseId || 'no correlacionado'}\`${subagent.inferredByOrder ? ' (inferido por orden)' : ''}`);
+        parts.push(`**ID tool_use:** \`${subagent.toolUseId || 'no correlacionado'}\`${subagent.inferredByOrder ? ' (inferido por orden - legacy)' : ''}`);
         parts.push(`**Tipo:** ${subagent.subagentType || 'general-purpose'}`);
         parts.push(`**Estado:** ${this.formatOutcome(subagent.outcome)}`);
         parts.push(`**Duración:** ${this.formatDuration(subagent.durationMs)} | **Steps:** ${subagent.stepCount} | **Tokens:** ${subagent.inputTokens}/${subagent.outputTokens}`);

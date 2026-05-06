@@ -666,6 +666,8 @@ describe('AuditInteractionHandler', () => {
       parentStepIndex: 2,
       triggeringToolUseId: 'toolu_unique',
       subagentType: 'general-purpose',
+      correlationStatus: 'resolved',
+      correlationMethod: 'unique-pending',
     });
     const subState = stateWrites.find(
       (s) => (s.state as Record<string, unknown>).parentContext !== undefined,
@@ -733,6 +735,8 @@ describe('AuditInteractionHandler', () => {
       parentInteractionDir: parentInteraction.interactionDir,
       parentStepIndex: 1,
       triggeringToolUseId: null,
+      correlationStatus: 'unresolved',
+      correlationMethod: 'none',
     });
   });
 

@@ -481,11 +481,11 @@ describe('AuditSseResponseHandler', () => {
 
   it('debería registrar pendingAgentToolUse al ver content_block_start tool_use name=Agent', async () => {
     const config = makeConfig();
-    const calls: Array<{ dir: string; step: number; id: string; type?: string }> = [];
+    const calls: Array<{ dir: string; step: number; id: string; metadata?: { subagentType?: string } | undefined }> = [];
     const interaction = makeActiveInteraction();
     const store = makeSessionStore(interaction, {
-      registerPendingAgentToolUse: (dir, step, id, type) => {
-        calls.push({ dir, step, id, type });
+      registerPendingAgentToolUse: (dir, step, id, metadata) => {
+        calls.push({ dir, step, id, metadata });
       },
     });
     const handler = new AuditSseResponseHandler(
@@ -517,11 +517,11 @@ describe('AuditSseResponseHandler', () => {
 
     await new Promise((r) => setTimeout(r, 100));
 
-    // Dos llamadas esperadas: una en content_block_start (sin subagent_type)
-    // y una al cerrar el bloque (con subagent_type='Explore').
+    // Dos llamadas esperadas: una en content_block_start (sin metadata)
+    // y una al cerrar el bloque (con metadata.subagentType='Explore').
     expect(calls.length).toBeGreaterThanOrEqual(2);
-    expect(calls[0]).toEqual({ dir: interaction.interactionDir, step: 1, id: 'toolu_a', type: undefined });
-    const enriched = calls.find((c) => c.type === 'Explore');
+    expect(calls[0]).toEqual({ dir: interaction.interactionDir, step: 1, id: 'toolu_a', metadata: undefined });
+    const enriched = calls.find((c) => c.metadata?.subagentType === 'Explore');
     expect(enriched).toBeDefined();
     expect(enriched!.id).toBe('toolu_a');
   });
@@ -561,10 +561,10 @@ describe('AuditSseResponseHandler', () => {
 
   it('debería tolerar input_json incompleto / inválido sin lanzar (sin enriquecer subagent_type)', async () => {
     const config = makeConfig();
-    const calls: Array<{ id: string; type?: string }> = [];
+    const calls: Array<{ id: string; metadata?: { subagentType?: string } }> = [];
     const store = makeSessionStore(makeActiveInteraction(), {
-      registerPendingAgentToolUse: (_dir, _step, id, type) => {
-        calls.push({ id, type });
+      registerPendingAgentToolUse: (_dir, _step, id, metadata) => {
+        calls.push({ id, metadata });
       },
     });
     const handler = new AuditSseResponseHandler(

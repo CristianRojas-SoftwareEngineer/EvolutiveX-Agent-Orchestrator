@@ -231,12 +231,19 @@ export interface ParentContext {
   parentStepIndex: number;
   /**
    * `tool_use_id` específico que originó este subagente.
-   * `null` cuando hubo varios tool_use `Agent` paralelos en el mismo step y la
-   * correlación no fue unívoca al crear el subagente; el id correcto se
-   * conocerá al llegar el `tool_result` correspondiente en la continuation
-   * del padre.
+   * `null` cuando la correlación no pudo determinarse.
    */
   triggeringToolUseId: string | null;
+  /**
+   * Estado de correlación del subagente con su tool_use padre.
+   * `resolved` cuando se determinó el `toolUseId` con certeza (por prompt o pending único).
+   * `unresolved` cuando no se pudo correlacionar determinísticamente.
+   */
+  correlationStatus?: CorrelationStatus;
+  /**
+   * Método usado para resolver la correlación, cuando `correlationStatus` es `resolved`.
+   */
+  correlationMethod?: CorrelationMethod;
   /**
    * Tipo de subagente declarado por el cliente en `tool_use.input.subagent_type`
    * (`general-purpose`, `Explore`, `Plan`, `claude-code-guide`, `statusline-setup`, ...).
@@ -246,9 +253,24 @@ export interface ParentContext {
 }
 
 /**
+ * Estado de correlación del `triggeringToolUseId` en el parentContext.
+ * - 'resolved': El tool_use_id se determinó con certeza (por prompt único o pending único).
+ * - 'unresolved': No se pudo correlacionar determinísticamente (sin match o múltiples matches).
+ */
+export type CorrelationStatus = 'resolved' | 'unresolved';
+
+/**
+ * Método usado para resolver la correlación del subagente con su tool_use padre.
+ * - 'prompt': Correlación por match exacto del prompt del request con el pending Agent.
+ * - 'unique-pending': Correlación por ser el único pending disponible.
+ * - 'none': No se pudo resolver la correlación.
+ */
+export type CorrelationMethod = 'prompt' | 'unique-pending' | 'none';
+
+/**
  * Entrada que tracquea un tool_use `Agent` emitido por el SSE del padre y aún
  * no correlacionado con el subagente correspondiente. Cada entrada se consume
- * o bien al crear el subagente (caso unívoco) o bien al recibir la
+ * o bien al crear el subagente (caso resuelto) o bien al recibir la
  * continuation con el `tool_result` (caso paralelo).
  */
 export interface PendingAgentToolUse {
@@ -256,6 +278,10 @@ export interface PendingAgentToolUse {
   stepIndex: number;
   /** Identificador único del tool_use bloque emitido por Anthropic. */
   toolUseId: string;
+  /** `description` del input del tool_use, capturado vía input_json_delta. */
+  description?: string;
+  /** `prompt` del input del tool_use, capturado vía input_json_delta. */
+  prompt?: string;
   /** `subagent_type` del input del tool_use, capturado vía input_json_delta. */
   subagentType?: string;
 }

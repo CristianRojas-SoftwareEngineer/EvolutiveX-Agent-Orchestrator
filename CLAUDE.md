@@ -101,3 +101,12 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 - All commits must include a message describing the purpose, objectives, and functionality of the implemented changes.
 - Messages generated for `git commit` MUST be in Spanish.
+
+---
+
+## 6. Tool Usage Warnings
+
+**The `list_dir` tool is unreliable.**
+
+- It frequently reports directories as empty when they actually contain files.
+- Use `find_by_name` instead to list directory contents (use `Pattern: "*"` to list all files).

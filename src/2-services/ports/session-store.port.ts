@@ -33,14 +33,19 @@ export interface ISessionStore {
   /**
    * Registra un tool_use `Agent` emitido por el SSE de la interacción padre cuyo
    * `tool_result` aún no ha llegado. Si la entrada con el mismo `toolUseId`
-   * ya existe, actualiza `subagentType` cuando se aporta y deja el resto
-   * intacto (idempotente para dobles llamadas desde el SSE handler).
+   * ya existe, actualiza los campos provistos (`subagentType`, `description`, `prompt`)
+   * cuando se aportan y deja el resto intacto (idempotente para dobles llamadas
+   * desde el SSE handler).
    */
   registerPendingAgentToolUse(
     interactionDir: string,
     stepIndex: number,
     toolUseId: string,
-    subagentType?: string,
+    metadata?: {
+      subagentType?: string;
+      description?: string;
+      prompt?: string;
+    },
   ): void;
   /**
    * Busca en la sesión la primera interacción elegible como padre de subagentes:

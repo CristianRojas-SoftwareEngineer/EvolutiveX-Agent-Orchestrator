@@ -253,6 +253,69 @@ export class AuditInteractionHandler {
   }
 
   /**
+   * Extrae el prompt principal del request de un subagente desde el rawBody.
+   * Parsea el request JSON y busca el último bloque `text` de usuario que
+   * corresponde al prompt del agente. Normaliza espacios/saltos de línea
+   * de forma determinista para matching exacto.
+   */
+  private extractSubagentPrompt(rawBody: Buffer): string | null {
+    try {
+      const body = JSON.parse(rawBody.toString('utf8')) as Record<string, unknown>;
+      if (!Array.isArray(body.messages)) return null;
+
+      // Buscar el último mensaje de tipo 'user'
+      for (let i = body.messages.length - 1; i >= 0; i--) {
+        const msg = body.messages[i] as Record<string, unknown>;
+        if (msg.role === 'user' && Array.isArray(msg.content)) {
+          // Buscar el último bloque de texto en el contenido
+          for (let j = msg.content.length - 1; j >= 0; j--) {
+            const block = msg.content[j] as Record<string, unknown>;
+            if (block.type === 'text' && typeof block.text === 'string') {
+              // Normalizar: trim y normalizar espacios múltiples
+              return block.text.trim().replace(/\s+/g, ' ');
+            }
+          }
+        }
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Resuelve el pending Agent correspondiente al request del subagente
+   * comparando el prompt del request con los prompts de los pendings.
+   * Devuelve el pending resuelto o null si no hay match determinístico.
+   */
+  private resolvePendingByPrompt(
+    pendings: PendingAgentToolUse[],
+    subagentPrompt: string | null,
+  ): { pending: PendingAgentToolUse; method: 'prompt' | 'unique-pending' } | null {
+    if (pendings.length === 0) return null;
+
+    // Si hay un solo pending y el subagente no tiene prompt, usar pending único
+    if (pendings.length === 1 && !subagentPrompt) {
+      return { pending: pendings[0], method: 'unique-pending' };
+    }
+
+    // Si el subagente tiene prompt, buscar match exacto en pendings
+    if (subagentPrompt) {
+      const matches = pendings.filter((p) => p.prompt === subagentPrompt);
+      if (matches.length === 1) {
+        return { pending: matches[0], method: 'prompt' };
+      }
+    }
+
+    // Si hay un solo pending, usarlo como fallback
+    if (pendings.length === 1) {
+      return { pending: pendings[0], method: 'unique-pending' };
+    }
+
+    return null;
+  }
+
+  /**
    * Crea una interacción de subagente anidada bajo el step padre que emitió
    * el tool_use `Agent`. La asignación de la secuencia local del subagente y
    * la escritura del request van serializadas dentro de `withSessionLock`
@@ -278,12 +341,27 @@ export class AuditInteractionHandler {
         match.pendings[0].stepIndex,
       );
 
-      // Correlación tool_use ↔ subagente:
-      // - 1 pending → unívoco, lo consumimos ya.
-      // - >1 pending → ambiguo; dejamos null y el id correcto se conocerá al
-      //   recibir el tool_result en la continuation del padre.
-      const triggeringToolUseId = match.pendings.length === 1 ? match.pendings[0].toolUseId : null;
-      const subagentType = match.pendings.length === 1 ? match.pendings[0].subagentType : undefined;
+      // Correlación tool_use ↔ subagente por contenido determinístico.
+      // Extraer el prompt del request del subagente y buscar match en pendings.
+      const subagentPrompt = this.extractSubagentPrompt(params.rawBody);
+      const resolution = this.resolvePendingByPrompt(match.pendings, subagentPrompt);
+
+      let triggeringToolUseId: string | null;
+      let subagentType: string | undefined;
+      let correlationStatus: 'resolved' | 'unresolved';
+      let correlationMethod: 'prompt' | 'unique-pending' | 'none' | undefined;
+
+      if (resolution) {
+        triggeringToolUseId = resolution.pending.toolUseId;
+        subagentType = resolution.pending.subagentType;
+        correlationStatus = 'resolved';
+        correlationMethod = resolution.method;
+      } else {
+        triggeringToolUseId = null;
+        subagentType = undefined;
+        correlationStatus = 'unresolved';
+        correlationMethod = 'none';
+      }
 
       const subSeq = await this.auditWriter.nextSubInteractionSequence(
         parentInteractionDir,
@@ -293,7 +371,7 @@ export class AuditInteractionHandler {
 
       const subagentContext: MarkdownRenderContext = {
         interactionType: 'agentic',
-        subagentType: subagentType ?? match.pendings[0]?.subagentType,
+        subagentType,
         stepIndex: 1,
       };
 
@@ -322,6 +400,8 @@ export class AuditInteractionHandler {
         parentInteractionDir,
         parentStepIndex,
         triggeringToolUseId,
+        correlationStatus,
+        correlationMethod,
         ...(subagentType ? { subagentType } : {}),
       };
 

@@ -269,20 +269,28 @@ export class AuditSseResponseHandler {
                 const tracked = agentBlockTracker.get(evt.index);
                 if (tracked) {
                   let subagentType: string | undefined;
+                  let description: string | undefined;
+                  let prompt: string | undefined;
                   try {
                     const inputObj = JSON.parse(tracked.jsonAcc) as Record<string, unknown>;
                     if (typeof inputObj.subagent_type === 'string') {
                       subagentType = inputObj.subagent_type;
                     }
+                    if (typeof inputObj.description === 'string') {
+                      description = inputObj.description;
+                    }
+                    if (typeof inputObj.prompt === 'string') {
+                      prompt = inputObj.prompt;
+                    }
                   } catch {
-                    /* JSON parcial inválido — sin subagent_type */
+                    /* JSON parcial inválido — sin metadata */
                   }
-                  if (subagentType) {
+                  if (subagentType || description || prompt) {
                     this.sessionStore.registerPendingAgentToolUse(
                       context.auditInteractionDir,
                       stepNumber,
                       tracked.toolUseId,
-                      subagentType,
+                      { subagentType, description, prompt },
                     );
                   }
                   agentBlockTracker.delete(evt.index);

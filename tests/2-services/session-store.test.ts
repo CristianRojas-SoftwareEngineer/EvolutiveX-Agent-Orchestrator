@@ -179,7 +179,7 @@ describe('SessionStoreService — pending Agent tool_uses', () => {
   it('registerPendingAgentToolUse + findInteractionWithPendingAgents (caso unívoco)', () => {
     const interaction = makeInteraction({ interactionDir: '/tmp/p1', sessionId: 'sA' });
     store.registerInteraction(interaction);
-    store.registerPendingAgentToolUse('/tmp/p1', 1, 'tool-aaa', 'general-purpose');
+    store.registerPendingAgentToolUse('/tmp/p1', 1, 'tool-aaa', { subagentType: 'general-purpose' });
 
     const found = store.findInteractionWithPendingAgents('sA');
     expect(found).not.toBeNull();
@@ -250,7 +250,7 @@ describe('SessionStoreService — pending Agent tool_uses', () => {
     const interaction = makeInteraction({ interactionDir: '/tmp/p1', sessionId: 'sA' });
     store.registerInteraction(interaction);
     store.registerPendingAgentToolUse('/tmp/p1', 1, 'tool-aaa');
-    store.registerPendingAgentToolUse('/tmp/p1', 1, 'tool-aaa', 'Explore');
+    store.registerPendingAgentToolUse('/tmp/p1', 1, 'tool-aaa', { subagentType: 'Explore' });
 
     expect(interaction.pendingAgentToolUses).toHaveLength(1);
     expect(interaction.pendingAgentToolUses[0].subagentType).toBe('Explore');

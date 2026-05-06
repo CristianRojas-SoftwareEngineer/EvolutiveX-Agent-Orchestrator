@@ -498,7 +498,8 @@ export class AuditWriterService implements IAuditWriter {
 
   /**
    * Extrae resúmenes de subagentes desde los directorios sub-agent-NN bajo el step padre.
-   * Correlaciona subagentes con tool_use Agent por orden cuando triggeringToolUseId es null.
+   * Usa `parentContext.correlationStatus` para determinar si la correlación está resuelta.
+   * Si `correlationStatus` es 'unresolved', no infiere por orden y deja toolUseId null.
    */
   private async extractSubagentsSummary(stepDir: string, initialMessage: JsonValue, _toolUseIds: string[]): Promise<SubagentsSummary | null> {
     try {
@@ -565,13 +566,19 @@ export class AuditWriterService implements IAuditWriter {
           else if (meta.outcome === 'orphaned') outcome = 'orphaned';
         }
 
-        // Correlacionar con tool_use Agent
+        // Correlacionar con tool_use Agent usando correlationStatus
         let toolUseId: string | null = null;
         let inferredByOrder = false;
         if (meta?.parentContext?.triggeringToolUseId) {
           toolUseId = meta.parentContext.triggeringToolUseId;
+          // No marcar inferredByOrder cuando correlationStatus es 'resolved'
+          inferredByOrder = false;
+        } else if (meta?.parentContext?.correlationStatus === 'unresolved') {
+          // No inferir por orden cuando la correlación está explícitamente no resuelta
+          toolUseId = null;
+          inferredByOrder = false;
         } else if (i < agentToolUses.length) {
-          // Correlación por orden cuando triggeringToolUseId es null
+          // Correlación por orden solo para legacy sin correlationStatus
           toolUseId = agentToolUses[i].id;
           inferredByOrder = true;
         }

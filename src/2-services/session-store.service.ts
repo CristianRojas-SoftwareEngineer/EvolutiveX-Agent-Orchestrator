@@ -85,20 +85,32 @@ export class SessionStoreService implements ISessionStore {
     interactionDir: string,
     stepIndex: number,
     toolUseId: string,
-    subagentType?: string,
+    metadata?: {
+      subagentType?: string;
+      description?: string;
+      prompt?: string;
+    },
   ): void {
     const interaction = this.interactionRegistry.get(interactionDir);
     if (!interaction) return;
     const existing = interaction.pendingAgentToolUses.find((p) => p.toolUseId === toolUseId);
     if (existing) {
-      // Idempotente: si ya existe, sólo enriquecer subagentType si llega ahora.
-      if (subagentType && !existing.subagentType) {
-        existing.subagentType = subagentType;
+      // Idempotente: si ya existe, enriquecer campos provistos si aún no existen.
+      if (metadata?.subagentType && !existing.subagentType) {
+        existing.subagentType = metadata.subagentType;
+      }
+      if (metadata?.description && !existing.description) {
+        existing.description = metadata.description;
+      }
+      if (metadata?.prompt && !existing.prompt) {
+        existing.prompt = metadata.prompt;
       }
       return;
     }
     const entry: PendingAgentToolUse = { stepIndex, toolUseId };
-    if (subagentType) entry.subagentType = subagentType;
+    if (metadata?.subagentType) entry.subagentType = metadata.subagentType;
+    if (metadata?.description) entry.description = metadata.description;
+    if (metadata?.prompt) entry.prompt = metadata.prompt;
     interaction.pendingAgentToolUses.push(entry);
   }
 

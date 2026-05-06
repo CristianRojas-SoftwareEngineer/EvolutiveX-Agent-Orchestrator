@@ -1,5 +1,4 @@
 import * as path from 'node:path';
-import * as fs from 'node:fs/promises';
 import { SessionResolverService } from '../1-domain/services/session-resolver.service.js';
 import type { ISessionStore } from '../2-services/ports/session-store.port.js';
 import type { IAuditWriter } from '../2-services/ports/audit-writer.port.js';
@@ -875,58 +874,31 @@ export class AuditInteractionHandler {
   /**
    * Detector de side-request de naming de sesión.
    * Un side-request se clasifica como 'session-naming' si:
-   * - Es el primer side-request de la sesión
-   * - No hay turnos agentic previos en la sesión
-   * - No es una implementación WebFetch interna (ya filtrado antes)
    * - El output_config requiere un campo "title" mediante JSON schema (patrón 1)
+   *
+   * Nota: El detector no depende del orden de las interacciones (primer side-request,
+   * sin turnos agentic previos) porque la side-interaction de naming puede ocurrir
+   * en cualquier momento de la sesión. El patrón de output_config es suficientemente
+   * distintivo para identificar side-requests de naming.
    */
-  private async detectSessionNamingSideRequest(auditSessionId: string, rawBody: Buffer): Promise<boolean> {
+  private async detectSessionNamingSideRequest(_auditSessionId: string, rawBody: Buffer): Promise<boolean> {
     try {
-      // Verificar si hay turnos agentic previos en la sesión
-      const mainAgentDir = path.join(this.sessionStore.getBaseDir(), auditSessionId, DIR_MAIN_AGENT);
-      const interactionsDir = path.join(mainAgentDir, DIR_INTERACTIONS);
-
-      try {
-        await fs.access(interactionsDir);
-        // Si el directorio existe, hay turnos agentic previos → no es naming
-        return false;
-      } catch {
-        // El directorio no existe, no hay turnos agentic previos
-      }
-
-      // Verificar si es el primer side-request de la sesión
-      const sideInteractionsDir = path.join(this.sessionStore.getBaseDir(), auditSessionId, DIR_SIDE_INTERACTIONS);
-      try {
-        const entries = await fs.readdir(sideInteractionsDir, { withFileTypes: true });
-        const existingSideInteractions = entries.filter((e) => e.isDirectory()).length;
-        // Si ya hay side-requests previos, este no es el primero → no es naming
-        if (existingSideInteractions > 0) {
-          return false;
-        }
-      } catch {
-        // No hay directorio de side-interactions aún → es el primero
-      }
-
       // Patrón 1: Analizar output_config para detectar JSON schema con campo "title"
-      try {
-        const bodyText = rawBody.toString('utf8');
-        const body = JSON.parse(bodyText);
+      const bodyText = rawBody.toString('utf8');
+      const body = JSON.parse(bodyText);
 
-        // Verificar si output_config tiene formato JSON schema con propiedad "title"
-        if (
-          body.output_config?.format?.type === 'json_schema' &&
-          body.output_config.format.schema?.properties?.title
-        ) {
-          return true;
-        }
-      } catch {
-        // Si falla el parsing del body, ser conservador → no clasificar como naming
+      // Verificar si output_config tiene formato JSON schema con propiedad "title"
+      if (
+        body.output_config?.format?.type === 'json_schema' &&
+        body.output_config.format.schema?.properties?.title
+      ) {
+        return true;
       }
 
       // Si no se detecta el patrón de output_config, clasificar como generic
       return false;
     } catch {
-      // En caso de error, ser conservador → clasificar como generic
+      // Si falla el parsing del body, ser conservador → clasificar como generic
       return false;
     }
   }

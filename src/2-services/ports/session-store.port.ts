@@ -21,6 +21,12 @@ export interface ISessionStore {
   getInteractionByDir(dir: string): Promise<ActiveInteraction | null>;
   getInteractionByDirSync(dir: string): ActiveInteraction | null;
   incrementStepCountByDir(dir: string): number;
+  /**
+   * Agrega metadata de step a la interacción. Append estricto para steps normales;
+   * no permite duplicados no-coalesced con el mismo stepIndex. Para steps coalesced,
+   * si meta.coalescedAgentContinuation está definido, enriquece el step existente
+   * en lugar de crear uno nuevo.
+   */
   pushStepMetaByDir(dir: string, meta: StepMeta): Promise<void>;
   closeInteraction(dir: string): void;
   /**

@@ -340,6 +340,53 @@ export class AuditInteractionHandler {
   }
 
   /**
+   * Helper común para registrar llamadas de implementación de tools internos
+   * (WebSearch/WebFetch) como steps adicionales del padre. Ejecuta la sección
+   * crítica (consumir pending, incrementar stepCount, escribir request) dentro
+   * de withSessionLock para evitar colisiones en concurrencia.
+   */
+  private async handleInternalToolStep(params: {
+    rawBody: Buffer;
+    headersForAudit: Record<string, string | string[] | undefined>;
+    auditSessionId: string;
+    classification: RequestClassification;
+    parentInteractionDir: string;
+    consumePending: (interactionDir: string) => unknown;
+  }): Promise<AuditInteractionResult> {
+    return this.sessionStore.withSessionLock(params.auditSessionId, async () => {
+      params.consumePending(params.parentInteractionDir);
+
+      const stepCount = this.sessionStore.incrementStepCountByDir(params.parentInteractionDir);
+      const stepDir = path.join(
+        params.parentInteractionDir,
+        DIR_STEPS,
+        String(stepCount).padStart(PAD_STEP, '0'),
+      );
+
+      await this.auditWriter.writeStepRequest({
+        stepDir,
+        headers: params.headersForAudit,
+        bodyBuffer: params.rawBody,
+        maxAuditRequestBytes: this.config.MAX_AUDIT_REQUEST_BODY_BYTES,
+        context: {
+          interactionType: 'agentic',
+          stepIndex: stepCount,
+        },
+      });
+
+      return {
+        auditInteractionDir: params.parentInteractionDir,
+        requestBodyOmitted: false,
+        requestSequence: 0,
+        auditSessionId: params.auditSessionId,
+        interactionType: 'agentic',
+        requestClassification: params.classification,
+        isInternalToolStep: true,
+      };
+    });
+  }
+
+  /**
    * Registra la llamada de implementación de WebSearch como un step adicional
    * dentro de la interacción padre que emitió el tool_use `web_search`. No crea
    * una interacción independiente — el request/response del harness se escriben
@@ -356,36 +403,14 @@ export class AuditInteractionHandler {
     },
   ): Promise<AuditInteractionResult> {
     const parentInteractionDir = match.interaction.interactionDir;
-    this.sessionStore.consumeWebSearchPending(parentInteractionDir);
-
-    // Determinar el siguiente número de step del padre
-    const stepCount = this.sessionStore.incrementStepCountByDir(parentInteractionDir);
-    const stepDir = path.join(
-      parentInteractionDir,
-      DIR_STEPS,
-      String(stepCount).padStart(PAD_STEP, '0'),
-    );
-
-    await this.auditWriter.writeStepRequest({
-      stepDir,
-      headers: headersForAudit,
-      bodyBuffer: params.rawBody,
-      maxAuditRequestBytes: this.config.MAX_AUDIT_REQUEST_BODY_BYTES,
-      context: {
-        interactionType: 'agentic',
-        stepIndex: stepCount,
-      },
-    });
-
-    return {
-      auditInteractionDir: parentInteractionDir,
-      requestBodyOmitted: false,
-      requestSequence: 0,
+    return this.handleInternalToolStep({
+      rawBody: params.rawBody,
+      headersForAudit,
       auditSessionId,
-      interactionType: 'agentic',
-      requestClassification: classification,
-      isInternalToolStep: true,
-    };
+      classification,
+      parentInteractionDir,
+      consumePending: (dir: string) => this.sessionStore.consumeWebSearchPending(dir),
+    });
   }
 
   /**
@@ -405,36 +430,14 @@ export class AuditInteractionHandler {
     },
   ): Promise<AuditInteractionResult> {
     const parentInteractionDir = match.interaction.interactionDir;
-    this.sessionStore.consumeWebFetchPending(parentInteractionDir);
-
-    // Determinar el siguiente número de step del padre
-    const stepCount = this.sessionStore.incrementStepCountByDir(parentInteractionDir);
-    const stepDir = path.join(
-      parentInteractionDir,
-      DIR_STEPS,
-      String(stepCount).padStart(PAD_STEP, '0'),
-    );
-
-    await this.auditWriter.writeStepRequest({
-      stepDir,
-      headers: headersForAudit,
-      bodyBuffer: params.rawBody,
-      maxAuditRequestBytes: this.config.MAX_AUDIT_REQUEST_BODY_BYTES,
-      context: {
-        interactionType: 'agentic',
-        stepIndex: stepCount,
-      },
-    });
-
-    return {
-      auditInteractionDir: parentInteractionDir,
-      requestBodyOmitted: false,
-      requestSequence: 0,
+    return this.handleInternalToolStep({
+      rawBody: params.rawBody,
+      headersForAudit,
       auditSessionId,
-      interactionType: 'agentic',
-      requestClassification: classification,
-      isInternalToolStep: true,
-    };
+      classification,
+      parentInteractionDir,
+      consumePending: (dir: string) => this.sessionStore.consumeWebFetchPending(dir),
+    });
   }
 
   private async handleContinuation(

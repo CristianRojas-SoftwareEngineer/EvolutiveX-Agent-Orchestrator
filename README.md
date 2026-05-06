@@ -361,6 +361,15 @@ Para más detalles y comandos alternativos, consulta `docs/dockerization.md`.
 
 Tras cada turno, se genera una estructura bajo `./sessions/<session-id>/main-agent/interactions/NN/` (agentic) o `./sessions/<session-id>/side-interactions/NN/` (preflights y side-requests), documentada en la [§ Referencia de Archivos de Auditoría](#archivos-auditoria).
 
+### Fix de Colisión de Steps y Reconstrucción SSE
+
+El proxy incluye validaciones defensivas para prevenir errores de reconstrucción SSE causados por colisiones de concurrencia en requests internas (WebSearch/WebFetch):
+
+- **Asignación atómica de steps internos**: Los handlers de WebSearch y WebFetch usan `withSessionLock` para serializar la asignación de `stepCount` y escritura de step requests, evitando que dos requests concurrentes escriban en el mismo directorio de step.
+- **Unicidad de metadata**: `pushStepMetaByDir` rechaza duplicados no-coalesced con el mismo `stepIndex`, lanzando un error diagnóstico si se detecta una colisión. Para steps coalesced, permite enriquecer la metadata existente en lugar de crear duplicados.
+- **Validación de SSE completo**: `reconstructSseJsonlFile` valida que el archivo `sse.jsonl` contenga exactamente un mensaje completo (un `message_start` y un `message_stop`). Si detecta múltiples mensajes o un stream incompleto, lanza un error diagnóstico antes de pasar al SDK de Anthropic.
+- **Reconstrucción por fase**: Los steps coalesced de Agent usan `reconstructSseJsonlPhaseMessage` (que no requiere `message_stop`) para reconstruir fases parciales (delegation/continuation), manteniendo separados los caminos de reconstrucción para streams completos versus fases coalesced.
+
 ---
 
 > [!NOTE]

@@ -876,4 +876,45 @@ describe('AuditSseResponseHandler', () => {
     expect(captured!.lostPendingWebFetch![0].toolUseId).toBe('toolu_fetch_lost_1');
     expect(captured!.lostPendingWebFetch![1].toolUseId).toBe('toolu_fetch_lost_2');
   });
+
+  it('debería manejar error de reconstrucción SSE best-effort (no rompe flujo)', async () => {
+    const config = makeConfig();
+    let capturedMeta: InteractionMetadata | null = null;
+
+    const sseData = [
+      'event: message_delta',
+      'data: {"type":"message_delta","delta":{"stop_reason":"end_turn"}}',
+      '',
+    ].join('\n');
+
+    const handler = new AuditSseResponseHandler(
+      makeAuditWriter({
+        writeInteractionMeta: async (_dir, meta) => {
+          capturedMeta = meta;
+        },
+      }),
+      makeSseReconstructor({
+        runReconstruction: async () => ({
+          sseResponseBodyAttempted: true,
+          sseResponseBodyWritten: false,
+          sseResponseBodyError: 'sse.jsonl contiene múltiples mensajes completos (múltiples message_start)',
+        }),
+      }),
+      config,
+      makeSessionStore(),
+    );
+
+    const stream = new PassThrough();
+    handler.execute(stream, makeContext(), {});
+    stream.write(sseData);
+    stream.end();
+
+    await new Promise((r) => setTimeout(r, 100));
+
+    // El handler debe cerrar la interacción normalmente aunque la reconstrucción falló
+    expect(capturedMeta).not.toBeNull();
+    expect(capturedMeta!.outcome).toBe('completed');
+    // El error de reconstrucción se registra en sseResponseBodyError del step meta
+    // pero el flujo no se rompe
+  });
 });

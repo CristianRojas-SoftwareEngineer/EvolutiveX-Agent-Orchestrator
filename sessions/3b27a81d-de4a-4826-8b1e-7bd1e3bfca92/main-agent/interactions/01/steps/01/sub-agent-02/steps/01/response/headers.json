@@ -1,0 +1,14 @@
+{
+  "date": "Wed, 06 May 2026 17:48:28 GMT",
+  "content-type": "text/event-stream",
+  "connection": "keep-alive",
+  "access-control-allow-origin": "*",
+  "cache-control": "no-cache",
+  "x-generation-id": "gen-1778089706-fWhXlcmv78OrWGo5qpoY",
+  "access-control-expose-headers": "X-Generation-Id,cf-ray",
+  "permissions-policy": "payment=(self \"https://checkout.stripe.com\" \"https://connect-js.stripe.com\" \"https://js.stripe.com\" \"https://*.js.stripe.com\" \"https://hooks.stripe.com\")",
+  "referrer-policy": "no-referrer, strict-origin-when-cross-origin",
+  "x-content-type-options": "nosniff",
+  "server": "cloudflare",
+  "cf-ray": "9f79d0da2b0de798-SCL"
+}

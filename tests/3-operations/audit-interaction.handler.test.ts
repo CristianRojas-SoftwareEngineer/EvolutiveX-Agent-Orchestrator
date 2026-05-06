@@ -1116,4 +1116,162 @@ describe('AuditInteractionHandler', () => {
     expect(result!.auditInteractionDir).toBe(parentInteraction.interactionDir);
     expect(subCalled).toBe(false);
   });
+
+  it('fresh concurrentes con pendings WebSearch asignan steps únicos del padre', async () => {
+    const config = makeConfig();
+    const parentInteraction: ActiveInteraction = {
+      interactionDir: '/tmp/sessions/s/main-agent/interactions/01',
+      interactionType: 'agentic',
+      stepCount: 3,
+      requestSequence: 1,
+      startedAt: Date.now(),
+      requestBodyOmitted: false,
+      requestBodyBytes: 100,
+      stepsMeta: [],
+      sessionId: 's',
+      pendingAgentToolUses: [],
+      pendingWebSearchToolUses: [
+        { stepIndex: 1, toolUseId: 'websearch-1' },
+        { stepIndex: 1, toolUseId: 'websearch-2' },
+      ],
+      pendingWebFetchToolUses: [],
+    };
+
+    const stepDirs: string[] = [];
+    const lockCalls: string[] = [];
+
+    const store = makeSessionStore({
+      findInteractionWithPendingWebSearch: vi.fn().mockImplementation(() => {
+        if (parentInteraction.pendingWebSearchToolUses.length > 0) {
+          return {
+            interaction: parentInteraction,
+            pendings: [...parentInteraction.pendingWebSearchToolUses],
+          };
+        }
+        return null;
+      }),
+      consumeWebSearchPending: vi.fn().mockImplementation((_dir: string) => {
+        const pending = parentInteraction.pendingWebSearchToolUses.shift();
+        return pending ?? null;
+      }),
+      incrementStepCountByDir: (dir: string) => {
+        if (dir === parentInteraction.interactionDir) {
+          parentInteraction.stepCount += 1;
+          return parentInteraction.stepCount;
+        }
+        return 1;
+      },
+      withSessionLock: async <T>(sessionId: string, fn: () => Promise<T>): Promise<T> => {
+        lockCalls.push(sessionId);
+        return fn();
+      },
+    });
+
+    const handler = new AuditInteractionHandler(
+      new SessionResolverService(config),
+      store,
+      makeAuditWriter({
+        writeStepRequest: async (p) => {
+          stepDirs.push(p.stepDir);
+        },
+      }),
+      config,
+    );
+
+    await Promise.all([
+      handler.execute({ headers: { 'x-cc-audit-session': 's' }, rawBody: FRESH_BODY, requestId: 'req-web-1' }),
+      handler.execute({ headers: { 'x-cc-audit-session': 's' }, rawBody: FRESH_BODY, requestId: 'req-web-2' }),
+    ]);
+
+    // Verificar que se llamó al lock para la sesión
+    expect(lockCalls).toHaveLength(2);
+    expect(lockCalls.every((s) => s === 's')).toBe(true);
+
+    // Verificar que los stepDirs son únicos y diferentes
+    expect(new Set(stepDirs).size).toBe(2);
+    expect(stepDirs[0]).not.toBe(stepDirs[1]);
+    expect(stepDirs.every((d) => d.includes('steps'))).toBe(true);
+
+    // Verificar que se consumieron ambos pendings
+    expect(parentInteraction.pendingWebSearchToolUses).toHaveLength(0);
+  });
+
+  it('fresh concurrentes con pendings WebFetch asignan steps únicos del padre', async () => {
+    const config = makeConfig();
+    const parentInteraction: ActiveInteraction = {
+      interactionDir: '/tmp/sessions/s/main-agent/interactions/01',
+      interactionType: 'agentic',
+      stepCount: 3,
+      requestSequence: 1,
+      startedAt: Date.now(),
+      requestBodyOmitted: false,
+      requestBodyBytes: 100,
+      stepsMeta: [],
+      sessionId: 's',
+      pendingAgentToolUses: [],
+      pendingWebSearchToolUses: [],
+      pendingWebFetchToolUses: [
+        { stepIndex: 1, toolUseId: 'webfetch-1' },
+        { stepIndex: 1, toolUseId: 'webfetch-2' },
+      ],
+    };
+
+    const stepDirs: string[] = [];
+    const lockCalls: string[] = [];
+
+    const store = makeSessionStore({
+      findInteractionWithPendingWebFetch: vi.fn().mockImplementation(() => {
+        if (parentInteraction.pendingWebFetchToolUses.length > 0) {
+          return {
+            interaction: parentInteraction,
+            pendings: [...parentInteraction.pendingWebFetchToolUses],
+          };
+        }
+        return null;
+      }),
+      consumeWebFetchPending: vi.fn().mockImplementation((_dir: string) => {
+        const pending = parentInteraction.pendingWebFetchToolUses.shift();
+        return pending ?? null;
+      }),
+      incrementStepCountByDir: (dir: string) => {
+        if (dir === parentInteraction.interactionDir) {
+          parentInteraction.stepCount += 1;
+          return parentInteraction.stepCount;
+        }
+        return 1;
+      },
+      withSessionLock: async <T>(sessionId: string, fn: () => Promise<T>): Promise<T> => {
+        lockCalls.push(sessionId);
+        return fn();
+      },
+    });
+
+    const handler = new AuditInteractionHandler(
+      new SessionResolverService(config),
+      store,
+      makeAuditWriter({
+        writeStepRequest: async (p) => {
+          stepDirs.push(p.stepDir);
+        },
+      }),
+      config,
+    );
+
+    await Promise.all([
+      handler.execute({ headers: { 'x-cc-audit-session': 's' }, rawBody: FRESH_BODY, requestId: 'req-fetch-1' }),
+      handler.execute({ headers: { 'x-cc-audit-session': 's' }, rawBody: FRESH_BODY, requestId: 'req-fetch-2' }),
+    ]);
+
+    // Verificar que se llamó al lock para la sesión
+    expect(lockCalls).toHaveLength(2);
+    expect(lockCalls.every((s) => s === 's')).toBe(true);
+
+    // Verificar que los stepDirs son únicos y diferentes
+    expect(new Set(stepDirs).size).toBe(2);
+    expect(stepDirs[0]).not.toBe(stepDirs[1]);
+    expect(stepDirs.every((d) => d.includes('steps'))).toBe(true);
+
+    // Verificar que se consumieron ambos pendings
+    expect(parentInteraction.pendingWebFetchToolUses).toHaveLength(0);
+  });
 });

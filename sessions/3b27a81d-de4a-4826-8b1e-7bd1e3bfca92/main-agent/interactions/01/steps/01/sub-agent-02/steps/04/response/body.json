@@ -1,0 +1,37 @@
+{
+  "id": "gen-1778089710-H6Mzpb7ThDT1Hkudz4Tu",
+  "type": "message",
+  "role": "assistant",
+  "container": null,
+  "content": [
+    {
+      "type": "server_tool_use",
+      "id": "fc-77b3fbd5-7b1b-42c9-ac18-018f5f55065a",
+      "name": "web_search",
+      "input": {
+        "query": "Anthropic API changelog"
+      }
+    },
+    {
+      "type": "text",
+      "text": "I've successfully found the Anthropic API changelog information. Here are the key results:\n\n## Anthropic API Changelog Summary\n\nThe main API changelog is available at **https://docs.anthropic.com/en/release-notes/overview** and contains comprehensive updates to the Claude Platform, including the Claude API, client SDKs, and Claude Console.\n\n### Recent Major Updates (2026):\n\n**April 2026:**\n- **Claude Opus 4.7** launched (April 16) - most capable model for complex reasoning\n- **Claude Managed Agents** in public beta (April 8) - fully managed agent harness\n- **Rate Limits API** released (April 24) - programmatically query rate limits\n- **Claude Haiku 3 retired** (April 20) - recommend upgrading to Haiku 4.5\n\n**February 2026:**\n- **Claude Sonnet 4.6** launched - balanced speed and intelligence\n- **Web search tools** now generally available (no beta header required)\n- **Automatic caching** for Messages API launched\n- **Programmatic tool calling** now GA\n\n**January 2026:**\n- **Structured outputs** now generally available\n- **Claude Opus 3 retired** - recommend upgrading to Opus 4.5\n\n### Version History:\nThe API uses version headers (`anthropic-version: 2023-06-01`). Current versions preserve:\n- Existing input/output parameters\n- May add optional inputs or new error types\n- Generally backward compatible when used as documented\n\nFor the complete detailed changelog, you can visit:\n- Main API Changelog: https://docs.anthropic.com/en/release-notes/overview\n- Versioning docs: https://docs.anthropic.com/en/api/versioning\n- Claude Code changelog: https://docs.anthropic.com/en/docs/claude-code/changelog",
+      "citations": []
+    }
+  ],
+  "model": "unknown",
+  "stop_reason": "end_turn",
+  "stop_details": null,
+  "stop_sequence": null,
+  "usage": {
+    "input_tokens": 14090,
+    "output_tokens": 455,
+    "cache_creation_input_tokens": null,
+    "cache_read_input_tokens": null,
+    "cache_creation": null,
+    "inference_geo": null,
+    "server_tool_use": null,
+    "service_tier": null,
+    "speed": "standard"
+  },
+  "parsed_output": null
+}

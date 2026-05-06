@@ -452,3 +452,68 @@ describe('SessionStoreService — pending WebFetch tool_uses', () => {
     expect(store.findInteractionWithPendingWebFetch('sB')).toBeNull();
   });
 });
+
+describe('SessionStoreService — unicidad de stepsMeta', () => {
+  let tmpDir: string;
+  let store: SessionStoreService;
+
+  beforeEach(async () => {
+    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'sstore-stepsmeta-'));
+    store = new SessionStoreService(tmpDir);
+  });
+
+  it('pushStepMetaByDir rechaza duplicado no-coalesced con el mismo stepIndex', async () => {
+    const interaction = makeInteraction({ interactionDir: '/tmp/p1' });
+    store.registerInteraction(interaction);
+
+    await store.pushStepMetaByDir('/tmp/p1', { stepIndex: 1, sse: true, statusCode: 200 });
+
+    await expect(
+      store.pushStepMetaByDir('/tmp/p1', { stepIndex: 1, sse: true, statusCode: 200 }),
+    ).rejects.toThrow('duplicate stepIndex 1 for interaction /tmp/p1');
+  });
+
+  it('pushStepMetaByDir permite enriquecer coalescedAgentContinuation sobre step existente', async () => {
+    const interaction = makeInteraction({ interactionDir: '/tmp/p1' });
+    store.registerInteraction(interaction);
+
+    await store.pushStepMetaByDir('/tmp/p1', {
+      stepIndex: 1,
+      sse: true,
+      statusCode: 200,
+      inputTokens: 100,
+    });
+
+    await store.pushStepMetaByDir('/tmp/p1', {
+      stepIndex: 1,
+      sse: true,
+      statusCode: 200,
+      coalescedAgentContinuation: {
+        toolUseIds: ['tool-1'],
+        sseLineCount: 100,
+        statusCode: 200,
+      },
+      outputTokens: 50,
+    });
+
+    expect(interaction.stepsMeta).toHaveLength(1);
+    expect(interaction.stepsMeta[0].coalescedAgentContinuation).toEqual({
+      toolUseIds: ['tool-1'],
+      sseLineCount: 100,
+      statusCode: 200,
+    });
+    expect(interaction.stepsMeta[0].inputTokens).toBe(100);
+    expect(interaction.stepsMeta[0].outputTokens).toBe(50);
+  });
+
+  it('pushStepMetaByDir permite diferentes stepIndex sin restricción', async () => {
+    const interaction = makeInteraction({ interactionDir: '/tmp/p1' });
+    store.registerInteraction(interaction);
+
+    await store.pushStepMetaByDir('/tmp/p1', { stepIndex: 1, sse: true, statusCode: 200 });
+    await store.pushStepMetaByDir('/tmp/p1', { stepIndex: 2, sse: true, statusCode: 200 });
+    await store.pushStepMetaByDir('/tmp/p1', { stepIndex: 3, sse: true, statusCode: 200 });
+
+    expect(interaction.stepsMeta).toHaveLength(3);
+  });
+});

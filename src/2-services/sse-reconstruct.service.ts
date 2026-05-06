@@ -54,6 +54,9 @@ export class SseReconstructService implements ISseReconstructor {
       throw new Error('sse.jsonl empty');
     }
 
+    // Validar que el archivo contenga exactamente un mensaje completo
+    this.validateCompleteSseJsonl(jsonlBuffer);
+
     let sseBuffer: Buffer;
     try {
       sseBuffer = this.reassembleSseBytesFromJsonl(jsonlBuffer);
@@ -148,14 +151,65 @@ export class SseReconstructService implements ISseReconstructor {
   }
 
   /**
+   * Valida que el archivo sse.jsonl contenga exactamente un mensaje completo
+   * (un message_start y un message_stop). Lanza error si detecta múltiples
+   * mensajes o un stream incompleto. Esta validación previene que el SDK de
+   * Anthropic reciba streams multi-mensaje concatenados por colisiones de
+   * concurrencia en steps internos (WebSearch/WebFetch).
+   */
+  private validateCompleteSseJsonl(jsonlBuffer: Buffer): void {
+    const text = jsonlBuffer.toString('utf8');
+    const rawLines = text.split('\n');
+    let messageStartCount = 0;
+    let messageStopCount = 0;
+
+    for (const raw of rawLines) {
+      if (raw.trim() === '') continue;
+      let parsed: { line?: unknown };
+      try {
+        parsed = JSON.parse(raw) as { line?: unknown };
+      } catch {
+        continue;
+      }
+
+      const line = typeof parsed.line === 'string' ? parsed.line : '';
+      if (!line.startsWith('data: ')) continue;
+
+      try {
+        const evt = JSON.parse(line.slice(6)) as Record<string, unknown>;
+        if (evt.type === 'message_start') {
+          messageStartCount += 1;
+        } else if (evt.type === 'message_stop') {
+          messageStopCount += 1;
+        }
+      } catch {
+        // Ignorar líneas data: que no son JSON válido
+      }
+    }
+
+    if (messageStartCount > 1) {
+      throw new Error('sse.jsonl contiene múltiples mensajes completos (múltiples message_start)');
+    }
+
+    if (messageStartCount === 0) {
+      throw new Error('sse.jsonl no contiene message_start');
+    }
+
+    if (messageStopCount === 0) {
+      throw new Error('sse.jsonl incompleto: falta message_stop');
+    }
+  }
+
+  /**
    * Reensambla el wire-format SSE a partir de las líneas capturadas en
    * `sse.jsonl`. Cada entrada `{i, ts, line, phase?}` aporta una línea SSE ya trimada
    * (sin `\r` final, sin trailing newline). El SDK de Anthropic exige que los
    * eventos estén delimitados por línea en blanco (`\n\n`).
    *
-   * Cuando se especifica `phase`, filtra las líneas para incluir solo las de esa fase,
-   * permitiendo reconstruir separadamente la delegación inicial y la respuesta final
-   * en steps coalesced de Agent.
+   * Este método solo se usa para streams completos (no filtrados por fase).
+   * Para reconstrucción por fase (delegation/continuation en steps coalesced),
+   * se usa `reconstructMessageFromSseJsonlPhase` que parsea eventos directamente
+   * sin pasar por el SDK de Anthropic.
    *
    * Regla: cada línea se emite con `\n` final; además, cuando la siguiente
    * línea arranca un evento nuevo (`event:` o `data:` de un evento standalone

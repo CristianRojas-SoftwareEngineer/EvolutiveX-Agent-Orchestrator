@@ -1,0 +1,47 @@
+{
+  "interactionType": "side-request",
+  "modelId": "inclusionai/ling-2.6-1t:free",
+  "outcome": "completed",
+  "stepCount": 1,
+  "startedAt": "2026-05-06T17:48:20.107Z",
+  "endedAt": "2026-05-06T17:48:22.395Z",
+  "durationMs": 2288,
+  "statusCode": 200,
+  "sse": true,
+  "steps": [
+    {
+      "stepIndex": 1,
+      "sse": true,
+      "statusCode": 200,
+      "sseLineCount": 32,
+      "stopReason": "end_turn",
+      "inputTokens": 472,
+      "outputTokens": 21,
+      "sseRawBytesWritten": 2511,
+      "anthropicMessageId": "gen-1778089698-W8i7K67LLKzMEFF2aLPT"
+    }
+  ],
+  "totals": {
+    "cacheCreationInputTokens": 0,
+    "cacheReadInputTokens": 0,
+    "inputTokens": 472,
+    "outputTokens": 21
+  },
+  "sseResponseBodyAttempted": true,
+  "sseResponseBodyWritten": true,
+  "sseResponseBodyError": null,
+  "sseResponseBodySource": "file",
+  "errorMessage": null,
+  "errorCode": null,
+  "truncation": {
+    "requestBodyOmitted": false,
+    "responseBodyBytesTotal": null,
+    "responseBodyBytesAudited": null,
+    "responseTruncatedByProxyBuffer": false,
+    "responseTruncatedByAuditLimit": false,
+    "sseRawBytesAudited": 2511,
+    "sseRawBytesLimit": 52428800,
+    "sseRawTruncatedByLimit": false,
+    "sseRawWriteError": false
+  }
+}

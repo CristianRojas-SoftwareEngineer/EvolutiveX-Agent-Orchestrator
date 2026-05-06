@@ -430,3 +430,115 @@ describe('SseReconstructService - reconstrucción por fase (coalesced)', () => {
     expect(continuationMessage.id).toBe('msg_02');
   });
 });
+
+describe('SseReconstructService - validación de SSE completo', () => {
+  let tempDir: string;
+  let jsonlPath: string;
+  let service: SseReconstructService;
+
+  beforeAll(async () => {
+    tempDir = path.join(os.tmpdir(), `scp-sse-validate-${Date.now()}`);
+    await fs.mkdir(tempDir, { recursive: true });
+    jsonlPath = path.join(tempDir, 'sse.jsonl');
+
+    const redactService = new RedactService();
+    const markdownRenderer = new MarkdownRendererService();
+    const writer = new AuditWriterService(redactService, markdownRenderer);
+    service = new SseReconstructService(writer);
+  });
+
+  afterAll(async () => {
+    await fs.rm(tempDir, { recursive: true, force: true });
+  });
+
+  it('validateCompleteSseJsonl detecta múltiples message_start y lanza error', async () => {
+    const multiMessageLines = [
+      'event: message_start',
+      'data: {"type":"message_start","message":{"id":"msg_01","model":"claude"}}',
+      'event: content_block_start',
+      'data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}',
+      'event: content_block_delta',
+      'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"text 1"}}',
+      'event: content_block_stop',
+      'data: {"type":"content_block_stop","index":0}',
+      'event: message_stop',
+      'data: {"type":"message_stop"}',
+      'event: message_start',
+      'data: {"type":"message_start","message":{"id":"msg_02","model":"claude"}}',
+      'event: content_block_start',
+      'data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}',
+      'event: content_block_delta',
+      'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"text 2"}}',
+      'event: content_block_stop',
+      'data: {"type":"content_block_stop","index":0}',
+      'event: message_stop',
+      'data: {"type":"message_stop"}',
+    ];
+
+    await fs.writeFile(jsonlPath, toJsonl(multiMessageLines), 'utf8');
+
+    await expect(service.reconstructSseJsonlFile(jsonlPath)).rejects.toThrow(
+      'sse.jsonl contiene múltiples mensajes completos (múltiples message_start)',
+    );
+  });
+
+  it('validateCompleteSseJsonl detecta stream incompleto (sin message_stop) y lanza error', async () => {
+    const incompleteLines = [
+      'event: message_start',
+      'data: {"type":"message_start","message":{"id":"msg_01","model":"claude"}}',
+      'event: content_block_start',
+      'data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}',
+      'event: content_block_delta',
+      'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"text"}}',
+      'event: content_block_stop',
+      'data: {"type":"content_block_stop","index":0}',
+    ];
+
+    await fs.writeFile(jsonlPath, toJsonl(incompleteLines), 'utf8');
+
+    await expect(service.reconstructSseJsonlFile(jsonlPath)).rejects.toThrow(
+      'sse.jsonl incompleto: falta message_stop',
+    );
+  });
+
+  it('validateCompleteSseJsonl no lanza error para stream válido (1 message_start, 1 message_stop)', async () => {
+    const validLines = [
+      'event: message_start',
+      'data: {"type":"message_start","message":{"id":"msg_01","type":"message","role":"assistant","content":[],"model":"claude-3-5-sonnet","stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":10,"output_tokens":1}}}',
+      'event: content_block_start',
+      'data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}',
+      'event: content_block_delta',
+      'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hola"}}',
+      'event: content_block_stop',
+      'data: {"type":"content_block_stop","index":0}',
+      'event: message_delta',
+      'data: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null},"usage":{"output_tokens":12}}',
+      'event: message_stop',
+      'data: {"type":"message_stop"}',
+    ];
+
+    await fs.writeFile(jsonlPath, toJsonl(validLines), 'utf8');
+
+    const message = await service.reconstructSseJsonlFile(jsonlPath);
+    expect(message.id).toBe('msg_01');
+  });
+
+  it('validateCompleteSseJsonl lanza error si no hay message_start', async () => {
+    const noStartLines = [
+      'event: content_block_start',
+      'data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}',
+      'event: content_block_delta',
+      'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"text"}}',
+      'event: content_block_stop',
+      'data: {"type":"content_block_stop","index":0}',
+      'event: message_stop',
+      'data: {"type":"message_stop"}',
+    ];
+
+    await fs.writeFile(jsonlPath, toJsonl(noStartLines), 'utf8');
+
+    await expect(service.reconstructSseJsonlFile(jsonlPath)).rejects.toThrow(
+      'sse.jsonl no contiene message_start',
+    );
+  });
+});

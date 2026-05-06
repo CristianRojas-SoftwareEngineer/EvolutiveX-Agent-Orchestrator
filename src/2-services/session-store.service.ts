@@ -214,7 +214,28 @@ export class SessionStoreService implements ISessionStore {
 
   public async pushStepMetaByDir(dir: string, meta: StepMeta): Promise<void> {
     const interaction = this.interactionRegistry.get(dir);
-    if (interaction) interaction.stepsMeta.push(meta);
+    if (!interaction) return;
+
+    const existing = interaction.stepsMeta.find((m) => m.stepIndex === meta.stepIndex);
+    if (!existing) {
+      interaction.stepsMeta.push(meta);
+      return;
+    }
+
+    // Si ya existe un StepMeta con el mismo stepIndex
+    if (meta.coalescedAgentContinuation) {
+      // Caso coalesced: enriquecer el existente con continuation
+      existing.coalescedAgentContinuation = meta.coalescedAgentContinuation;
+      if (meta.stopReason) existing.stopReason = meta.stopReason;
+      if (meta.statusCode) existing.statusCode = meta.statusCode;
+      if (meta.inputTokens) existing.inputTokens = meta.inputTokens;
+      if (meta.outputTokens) existing.outputTokens = meta.outputTokens;
+    } else {
+      // Caso no-coalesced: rechazar duplicado
+      throw new Error(
+        `duplicate stepIndex ${meta.stepIndex} for interaction ${dir}`,
+      );
+    }
   }
 
   public closeInteraction(dir: string): void {

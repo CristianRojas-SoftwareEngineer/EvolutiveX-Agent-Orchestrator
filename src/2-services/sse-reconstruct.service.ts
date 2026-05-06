@@ -35,7 +35,14 @@ export class SseReconstructService implements ISseReconstructor {
     stepDir: string,
   ): Promise<Anthropic.Message | Anthropic.Beta.Messages.BetaMessage> {
     const jsonlPath = path.join(stepDir, 'response', 'sse.jsonl');
+    const headersPath = path.join(stepDir, 'response', 'headers.json');
+    return this.reconstructSseJsonlFile(jsonlPath, headersPath);
+  }
 
+  public async reconstructSseJsonlFile(
+    jsonlPath: string,
+    headersPath?: string,
+  ): Promise<Anthropic.Message | Anthropic.Beta.Messages.BetaMessage> {
     let jsonlBuffer: Buffer;
     try {
       jsonlBuffer = await fs.readFile(jsonlPath);
@@ -59,15 +66,15 @@ export class SseReconstructService implements ISseReconstructor {
       throw new Error('no SSE bytes to reconstruct');
     }
 
-    // Detectar beta mode desde headers del step
-    const headersPath = path.join(stepDir, 'response', 'headers.json');
     let useBeta = false;
-    try {
-      const headersRaw = await fs.readFile(headersPath, 'utf8');
-      const headers = JSON.parse(headersRaw) as Record<string, unknown>;
-      useBeta = headers['anthropic-beta'] !== undefined;
-    } catch {
-      // default false
+    if (headersPath) {
+      try {
+        const headersRaw = await fs.readFile(headersPath, 'utf8');
+        const headers = JSON.parse(headersRaw) as Record<string, unknown>;
+        useBeta = headers['anthropic-beta'] !== undefined;
+      } catch {
+        // default false
+      }
     }
 
     return this.reconstructMessageFromSseBytes(sseBuffer, useBeta);

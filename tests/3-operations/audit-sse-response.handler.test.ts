@@ -134,6 +134,7 @@ function makeAuditWriter(overrides: Partial<IAuditWriter> = {}): IAuditWriter {
     writeSubInteractionRequest: async () => ({ dir: '', requestBodyOmitted: false }),
     nextSubInteractionSequence: async () => 1,
     writeStepRequest: async () => {},
+    writeCoalescedAgentContinuationRequest: async () => {},
     finalizeNonSseResponseAudit: async () => ({
       responseBodyBytesAudited: 0,
       responseTruncatedByProxyBuffer: false,
@@ -153,6 +154,7 @@ function makeAuditWriter(overrides: Partial<IAuditWriter> = {}): IAuditWriter {
     writeInteractionState: async () => {},
     removeInteractionState: async () => {},
     writeStepResponseMarkdown: async () => {},
+    writeCoalescedAgentStepResponse: async () => {},
     writeTopLevelMultiStepResponse: async () => ({ written: true }),
     updateSessionMetrics: async () => {},
     ...overrides,
@@ -162,6 +164,7 @@ function makeAuditWriter(overrides: Partial<IAuditWriter> = {}): IAuditWriter {
 function makeSseReconstructor(overrides: Partial<ISseReconstructor> = {}): ISseReconstructor {
   return {
     reconstructStepMessage: async () => ({}) as unknown as Anthropic.Message,
+    reconstructSseJsonlFile: async () => ({}) as unknown as Anthropic.Message,
     runReconstruction: async () => ({
       sseResponseBodyAttempted: false,
       sseResponseBodyWritten: false,

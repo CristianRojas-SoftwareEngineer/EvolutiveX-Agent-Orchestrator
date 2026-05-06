@@ -56,6 +56,7 @@ export class ProxyController {
       request.interactionType = result.interactionType;
       request.requestClassification = result.requestClassification;
       request.isInternalToolStep = result.isInternalToolStep;
+      request.coalescedAgentContinuation = result.coalescedAgentContinuation;
     }
   }
 
@@ -149,6 +150,7 @@ export class ProxyController {
       interactionType: request.interactionType,
       requestClassification: request.requestClassification,
       isInternalToolStep: request.isInternalToolStep,
+      coalescedAgentContinuation: request.coalescedAgentContinuation,
     };
 
     if (isSse) {

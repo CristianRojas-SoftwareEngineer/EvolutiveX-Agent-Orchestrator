@@ -12,5 +12,9 @@ declare module 'fastify' {
     interactionType?: InteractionType;
     requestClassification?: RequestClassification;
     isInternalToolStep?: boolean;
+    coalescedAgentContinuation?: {
+      targetStepIndex: number;
+      toolUseIds: string[];
+    };
   }
 }

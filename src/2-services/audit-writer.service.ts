@@ -113,6 +113,54 @@ export class AuditWriterService implements IAuditWriter {
     return { dir, requestBodyOmitted };
   }
 
+  public async writeCoalescedAgentContinuationRequest(params: {
+    stepDir: string;
+    headers: Record<string, string | string[] | undefined>;
+    bodyBuffer: Buffer | null;
+    maxAuditRequestBytes: number;
+    context?: MarkdownRenderContext;
+  }): Promise<void> {
+    const responseDir = path.join(params.stepDir, DIR_STEP_RESPONSE);
+    await fs.mkdir(responseDir, { recursive: true });
+    await this.writeJsonAtomic(
+      path.join(responseDir, 'continuation.request.headers.json'),
+      params.headers as unknown as JsonValue,
+    );
+
+    const body = params.bodyBuffer ?? Buffer.alloc(0);
+    await this.writeFileAtomic(
+      path.join(responseDir, 'continuation.request.body.bin'),
+      body.subarray(0, params.maxAuditRequestBytes),
+    );
+
+    if (body.length > params.maxAuditRequestBytes) {
+      await this.writeFileAtomic(
+        path.join(responseDir, 'continuation.request.body.omitted.txt'),
+        Buffer.from(
+          `Request body omitted after ${params.maxAuditRequestBytes} bytes. Original bytes: ${body.length}.`,
+          'utf8',
+        ),
+      );
+      return;
+    }
+
+    try {
+      const parsed = body.length ? JSON.parse(body.toString('utf8')) as JsonValue : null;
+      await this.writeFormattedAndMarkdown(
+        responseDir,
+        'continuation.request.body',
+        parsed,
+        'request',
+        params.context,
+      );
+    } catch {
+      await this.writeFileAtomic(
+        path.join(responseDir, 'continuation.request.body.raw.txt'),
+        body,
+      );
+    }
+  }
+
   public async nextSubInteractionSequence(
     parentInteractionDir: string,
     parentStepIndex: number,
@@ -381,9 +429,10 @@ export class AuditWriterService implements IAuditWriter {
   }
 
   public appendSseLine(stepDir: string, lineObj: SseLine): void {
-    const responseDir = path.join(stepDir, DIR_STEP_RESPONSE);
-    fsSync.mkdirSync(responseDir, { recursive: true });
-    const p = path.join(responseDir, 'sse.jsonl');
+    const p = stepDir.endsWith('.jsonl')
+      ? stepDir
+      : path.join(stepDir, DIR_STEP_RESPONSE, 'sse.jsonl');
+    fsSync.mkdirSync(path.dirname(p), { recursive: true });
     const line = `${JSON.stringify(lineObj)}\n`;
     fsSync.appendFileSync(p, line, 'utf8');
   }
@@ -399,9 +448,10 @@ export class AuditWriterService implements IAuditWriter {
    * paridad de protocolo (ver `docs/how-sse-reconstruction-works.md`).
    */
   public appendSseRawChunk(stepDir: string, chunk: Buffer): void {
-    const responseDir = path.join(stepDir, DIR_STEP_RESPONSE);
-    fsSync.mkdirSync(responseDir, { recursive: true });
-    const p = path.join(responseDir, 'sse.txt');
+    const p = stepDir.endsWith('.txt')
+      ? stepDir
+      : path.join(stepDir, DIR_STEP_RESPONSE, 'sse.txt');
+    fsSync.mkdirSync(path.dirname(p), { recursive: true });
     fsSync.appendFileSync(p, chunk);
   }
 
@@ -444,6 +494,37 @@ export class AuditWriterService implements IAuditWriter {
     await this.writeJsonAtomic(path.join(responseDir, 'body.json'), message);
 
     const md = this.markdownRendererService.renderResponseConversationMarkdown(message, context);
+    await this.writeFileAtomic(
+      path.join(responseDir, 'body.parsed.md'),
+      Buffer.from(`${md}\n`, 'utf8'),
+    );
+  }
+
+  public async writeCoalescedAgentStepResponse(params: {
+    stepDir: string;
+    initialMessage: JsonValue;
+    continuationRequest: JsonValue | null;
+    finalMessage: JsonValue;
+    context?: MarkdownRenderContext;
+  }): Promise<void> {
+    const responseDir = path.join(params.stepDir, DIR_STEP_RESPONSE);
+    await fs.mkdir(responseDir, { recursive: true });
+
+    const body: JsonValue = {
+      type: 'coalesced-agent-step-response',
+      initial: params.initialMessage,
+      continuationRequest: params.continuationRequest,
+      final: params.finalMessage,
+    };
+
+    await this.writeJsonAtomic(path.join(responseDir, 'body.json'), body);
+
+    const md = this.markdownRendererService.renderCoalescedAgentStepResponseMarkdown(
+      params.initialMessage,
+      params.continuationRequest,
+      params.finalMessage,
+      params.context,
+    );
     await this.writeFileAtomic(
       path.join(responseDir, 'body.parsed.md'),
       Buffer.from(`${md}\n`, 'utf8'),

@@ -61,6 +61,19 @@ export interface StepMeta {
   hasThinking?: boolean;
   /** Número de bloques de thinking detectados en el step. */
   thinkingBlockCount?: number;
+  coalescedAgentContinuation?: {
+    toolUseIds: string[];
+    sseLineCount?: number;
+    stopReason?: string;
+    statusCode: number | null;
+    inputTokens?: number;
+    outputTokens?: number;
+    cacheCreationInputTokens?: number;
+    cacheReadInputTokens?: number;
+    sseRawBytesWritten?: number;
+    sseRawTruncatedByLimit?: boolean;
+    anthropicMessageId?: string;
+  };
 }
 
 /**
@@ -74,12 +87,27 @@ export function computeTokenTotals(steps: StepMeta[]): {
   outputTokens: number;
 } {
   return steps.reduce(
-    (acc, s) => ({
-      cacheCreationInputTokens: acc.cacheCreationInputTokens + (s.cacheCreationInputTokens ?? 0),
-      cacheReadInputTokens: acc.cacheReadInputTokens + (s.cacheReadInputTokens ?? 0),
-      inputTokens: acc.inputTokens + (s.inputTokens ?? 0),
-      outputTokens: acc.outputTokens + (s.outputTokens ?? 0),
-    }),
+    (acc, s) => {
+      const continuation = s.coalescedAgentContinuation;
+      return {
+        cacheCreationInputTokens:
+          acc.cacheCreationInputTokens +
+          (s.cacheCreationInputTokens ?? 0) +
+          (continuation?.cacheCreationInputTokens ?? 0),
+        cacheReadInputTokens:
+          acc.cacheReadInputTokens +
+          (s.cacheReadInputTokens ?? 0) +
+          (continuation?.cacheReadInputTokens ?? 0),
+        inputTokens:
+          acc.inputTokens +
+          (s.inputTokens ?? 0) +
+          (continuation?.inputTokens ?? 0),
+        outputTokens:
+          acc.outputTokens +
+          (s.outputTokens ?? 0) +
+          (continuation?.outputTokens ?? 0),
+      };
+    },
     { cacheCreationInputTokens: 0, cacheReadInputTokens: 0, inputTokens: 0, outputTokens: 0 },
   );
 }
@@ -88,7 +116,13 @@ export function computeTokenTotals(steps: StepMeta[]): {
  * Computa la suma de bytes crudos SSE escritos a lo largo de todos los steps.
  */
 export function computeSseRawBytesTotal(steps: StepMeta[]): number {
-  return steps.reduce((acc, s) => acc + (s.sseRawBytesWritten ?? 0), 0);
+  return steps.reduce(
+    (acc, s) =>
+      acc +
+      (s.sseRawBytesWritten ?? 0) +
+      (s.coalescedAgentContinuation?.sseRawBytesWritten ?? 0),
+    0,
+  );
 }
 
 /**
@@ -215,6 +249,10 @@ export interface ActiveInteraction {
   awaitingSince?: number;
   /** Modelo usado en este turno, extraído del request body al registrar el turno. */
   modelId?: string;
+  coalescedAgentContinuation?: {
+    targetStepIndex: number;
+    toolUseIds: string[];
+  };
 }
 
 /**
@@ -390,6 +428,10 @@ export interface AuditInteractionContext {
   interactionType?: InteractionType;
   requestClassification?: RequestClassification;
   isInternalToolStep?: boolean;
+  coalescedAgentContinuation?: {
+    targetStepIndex: number;
+    toolUseIds: string[];
+  };
 }
 
 /**

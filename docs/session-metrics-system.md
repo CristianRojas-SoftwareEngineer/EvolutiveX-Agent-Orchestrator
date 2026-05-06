@@ -99,9 +99,9 @@ El resultado es agregación correcta del costo real de API de la sesión:
 ```
 step1 padre (fresh)          → inputTokens: X
 step1 subagente              → inputTokens: Y   (llamada HTTP independiente)
-step2 padre (continuation)   → inputTokens: Z
+step1 padre (Agent continuation coalesced) → inputTokens: Z
 ─────────────────────────────────────────────
-session-metrics.json total   → X + Y + Z
+session-metrics.json total                  → X + Y + Z
 ```
 
 No existe doble conteo. Sumar todos los turnos da el costo total efectivo de la sesión.

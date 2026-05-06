@@ -55,6 +55,13 @@ export interface IAuditWriter {
     maxAuditRequestBytes: number;
     context?: MarkdownRenderContext;
   }): Promise<void>;
+  writeCoalescedAgentContinuationRequest(params: {
+    stepDir: string;
+    headers: Record<string, string | string[] | undefined>;
+    bodyBuffer: Buffer | null;
+    maxAuditRequestBytes: number;
+    context?: MarkdownRenderContext;
+  }): Promise<void>;
   finalizeNonSseResponseAudit(params: {
     interactionDir: string;
     bodyBuffer: Buffer;
@@ -132,6 +139,13 @@ export interface IAuditWriter {
     message: JsonValue,
     context?: MarkdownRenderContext,
   ): Promise<void>;
+  writeCoalescedAgentStepResponse(params: {
+    stepDir: string;
+    initialMessage: JsonValue;
+    continuationRequest: JsonValue | null;
+    finalMessage: JsonValue;
+    context?: MarkdownRenderContext;
+  }): Promise<void>;
   /**
    * Combina los body.json de todos los steps y escribe response/body.json
    * (formato multi-step) y response/body.parsed.md en el top-level de la interacción.

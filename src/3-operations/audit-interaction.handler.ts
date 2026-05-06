@@ -38,6 +38,10 @@ export interface AuditInteractionResult {
   interactionType: InteractionType;
   requestClassification: RequestClassification;
   isInternalToolStep?: boolean;
+  coalescedAgentContinuation?: {
+    targetStepIndex: number;
+    toolUseIds: string[];
+  };
 }
 
 /**
@@ -465,6 +469,43 @@ export class AuditInteractionHandler {
     parentInteraction.awaitingContinuation = false;
     parentInteraction.awaitingSince = undefined;
 
+    const agentContinuationTarget = this.resolveAgentContinuationTarget(parentInteraction, toolUseIds);
+    if (agentContinuationTarget) {
+      const stepDir = path.join(
+        parentInteraction.interactionDir,
+        DIR_STEPS,
+        String(agentContinuationTarget.targetStepIndex).padStart(PAD_STEP, '0'),
+      );
+
+      await this.auditWriter.writeCoalescedAgentContinuationRequest({
+        stepDir,
+        headers: headersForAudit,
+        bodyBuffer: params.rawBody,
+        maxAuditRequestBytes: this.config.MAX_AUDIT_REQUEST_BODY_BYTES,
+        context: {
+          interactionType: parentInteraction.interactionType,
+          stepIndex: agentContinuationTarget.targetStepIndex,
+          stepCount: parentInteraction.stepCount,
+        },
+      });
+
+      parentInteraction.coalescedAgentContinuation = agentContinuationTarget;
+
+      for (const toolUseId of toolUseIds) {
+        this.sessionStore.consumePendingAgentToolUse(parentInteraction.interactionDir, toolUseId);
+      }
+
+      return {
+        auditInteractionDir: parentInteraction.interactionDir,
+        requestBodyOmitted: parentInteraction.requestBodyOmitted,
+        requestSequence: parentInteraction.requestSequence,
+        auditSessionId,
+        interactionType: parentInteraction.interactionType,
+        requestClassification: classification,
+        coalescedAgentContinuation: agentContinuationTarget,
+      };
+    }
+
     const stepCount = this.sessionStore.incrementStepCountByDir(parentInteraction.interactionDir);
     const stepDir = path.join(
       parentInteraction.interactionDir,
@@ -498,6 +539,32 @@ export class AuditInteractionHandler {
       auditSessionId,
       interactionType: parentInteraction.interactionType,
       requestClassification: classification,
+    };
+  }
+
+  private resolveAgentContinuationTarget(
+    parentInteraction: ActiveInteraction,
+    toolUseIds: string[],
+  ): { targetStepIndex: number; toolUseIds: string[] } | null {
+    if (toolUseIds.length === 0 || parentInteraction.pendingAgentToolUses.length === 0) {
+      return null;
+    }
+
+    const matchingPendings = parentInteraction.pendingAgentToolUses.filter((pending) =>
+      toolUseIds.includes(pending.toolUseId),
+    );
+    if (matchingPendings.length === 0) {
+      return null;
+    }
+
+    const targetStepIndex = matchingPendings.reduce(
+      (min, pending) => Math.min(min, pending.stepIndex),
+      matchingPendings[0].stepIndex,
+    );
+
+    return {
+      targetStepIndex,
+      toolUseIds: matchingPendings.map((pending) => pending.toolUseId),
     };
   }
 

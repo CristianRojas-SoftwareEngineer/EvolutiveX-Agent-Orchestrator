@@ -90,6 +90,7 @@ function makeAuditWriter(overrides: Partial<IAuditWriter> = {}): IAuditWriter {
     }),
     nextSubInteractionSequence: async () => 1,
     writeStepRequest: async () => {},
+    writeCoalescedAgentContinuationRequest: async () => {},
     finalizeNonSseResponseAudit: async () => ({
       responseBodyBytesAudited: 0,
       responseTruncatedByProxyBuffer: false,
@@ -108,6 +109,7 @@ function makeAuditWriter(overrides: Partial<IAuditWriter> = {}): IAuditWriter {
     writeInteractionState: async () => {},
     removeInteractionState: async () => {},
     writeStepResponseMarkdown: async () => {},
+    writeCoalescedAgentStepResponse: async () => {},
     writeStepThought: async () => {},
     writeTopLevelMultiStepResponse: async () => ({ written: true }),
     updateSessionMetrics: async () => {},
@@ -819,6 +821,59 @@ describe('AuditInteractionHandler', () => {
 
     expect(result).not.toBeNull();
     expect(consumed).toEqual([{ dir: parentInteraction.interactionDir, id: 'tool-x' }]);
+  });
+
+  it('continuation de Agent se coalesce en el step padre sin incrementar stepCount', async () => {
+    const config = makeConfig();
+    const parentInteraction: ActiveInteraction = {
+      interactionDir: '/tmp/sessions/s/interactions/000001_parent',
+      interactionType: 'agentic',
+      stepCount: 1,
+      requestSequence: 1,
+      startedAt: Date.now(),
+      requestBodyOmitted: false,
+      requestBodyBytes: 100,
+      stepsMeta: [],
+      sessionId: 's',
+      pendingAgentToolUses: [{ stepIndex: 1, toolUseId: 'tool-x', subagentType: 'Plan' }],
+      pendingWebSearchToolUses: [],
+      pendingWebFetchToolUses: [],
+    };
+    let incrementCalled = false;
+    let coalescedRequestStepDir: string | null = null;
+
+    const store = makeSessionStore({
+      getInteractionByToolUseId: (id: string) => (id === 'tool-x' ? parentInteraction : null),
+      incrementStepCountByDir: () => {
+        incrementCalled = true;
+        return 2;
+      },
+    });
+    const handler = new AuditInteractionHandler(
+      new SessionResolverService(config),
+      store,
+      makeAuditWriter({
+        writeCoalescedAgentContinuationRequest: async (params) => {
+          coalescedRequestStepDir = params.stepDir;
+        },
+      }),
+      config,
+    );
+
+    const result = await handler.execute({
+      headers: { 'x-cc-audit-session': 'test' },
+      rawBody: CONTINUATION_BODY,
+      requestId: 'cont-1',
+    });
+
+    expect(result).not.toBeNull();
+    expect(incrementCalled).toBe(false);
+    expect(parentInteraction.stepCount).toBe(1);
+    expect(result!.coalescedAgentContinuation).toEqual({
+      targetStepIndex: 1,
+      toolUseIds: ['tool-x'],
+    });
+    expect(coalescedRequestStepDir).toMatch(/steps[/\\]01$/);
   });
 
   it('fresh sin pendings agent → handleFresh (no se invoca writeSubInteractionRequest)', async () => {

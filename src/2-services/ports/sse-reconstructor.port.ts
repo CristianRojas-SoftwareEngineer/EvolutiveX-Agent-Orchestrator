@@ -13,6 +13,10 @@ export interface ISseReconstructor {
   reconstructStepMessage(
     stepDir: string,
   ): Promise<Anthropic.Message | Anthropic.Beta.Messages.BetaMessage>;
+  reconstructSseJsonlFile(
+    jsonlPath: string,
+    headersPath?: string,
+  ): Promise<Anthropic.Message | Anthropic.Beta.Messages.BetaMessage>;
 
   /**
    * Reconstruye mensaje del turno completo.

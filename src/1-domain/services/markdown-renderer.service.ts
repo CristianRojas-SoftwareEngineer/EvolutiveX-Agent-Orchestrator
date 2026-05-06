@@ -188,6 +188,15 @@ export class MarkdownRendererService {
   ): string {
     try {
       if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        const obj = parsed as Record<string, JsonValue>;
+        if (obj.type === 'coalesced-agent-step-response') {
+          return this.renderCoalescedAgentStepResponseMarkdown(
+            obj.initial,
+            obj.continuationRequest ?? null,
+            obj.final,
+            context,
+          );
+        }
         const rootHeading = this.buildRootHeading('response', context);
         const parts: string[] = [rootHeading];
         const contextHeader = this.renderContextHeader(context);
@@ -241,6 +250,37 @@ export class MarkdownRendererService {
         parts.push('---');
       }
     }
+
+    return parts.join('\n\n');
+  }
+
+  public renderCoalescedAgentStepResponseMarkdown(
+    initialMessage: JsonValue,
+    continuationRequest: JsonValue | null,
+    finalMessage: JsonValue,
+    context?: MarkdownRenderContext,
+  ): string {
+    const rootHeading = this.buildRootHeading('response', context);
+    const parts: string[] = [rootHeading];
+
+    const contextHeader = this.renderContextHeader(context);
+    if (contextHeader) parts.push(contextHeader);
+
+    parts.push(this.heading(2, 'Delegación a subagentes'));
+    parts.push(...this.renderStepSections(initialMessage, 3, context));
+
+    if (continuationRequest !== null) {
+      parts.push('---');
+      parts.push(this.heading(2, 'Resultados recibidos de subagentes'));
+      const renderedRequest = this.renderRequestConversationMarkdown(continuationRequest, context);
+      const [, ...requestBody] = renderedRequest.split('\n');
+      const requestContent = requestBody.join('\n').trim();
+      parts.push(requestContent || this.fencedJson(continuationRequest));
+    }
+
+    parts.push('---');
+    parts.push(this.heading(2, 'Respuesta final combinada'));
+    parts.push(...this.renderStepSections(finalMessage, 3, context));
 
     return parts.join('\n\n');
   }

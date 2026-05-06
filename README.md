@@ -82,7 +82,7 @@ Ideal para depurar comportamientos erráticos en herramientas de CLI (como `clau
 - Tres tipos de interacción: `agentic` (turno del usuario con prompt y respuesta), `client-preflight` (quota check + cache warm-up) y `side-request` (peticiones con `"tools": []`, ej. count_tokens, generación de títulos).
 - Los `side-request` se auditan en su propia interacción sin desplazar al turno activo principal, evitando corrupción de metadata por race conditions.
 - Los turnos se indexan por `interactionDir` (único por request) permitiendo múltiples turnos concurrentes en la misma sesión (parallel subagents).
-- Las continuaciones (`tool_result`) se rutean al turno padre mediante correlación por `tool_use_id`, eliminando la misatribución de steps.
+- Las continuaciones (`tool_result`) se rutean al turno padre mediante correlación por `tool_use_id`, eliminando la misatribución de steps. Las continuaciones de `Agent`/subagentes se coalescen en el `response` del step que emitió los subagentes; las demás tools conservan steps separados.
 - Los preflights (`client-preflight`) se cierran inmediatamente al recibir su respuesta, evitando turnos zombie que bloquean la sesión.
 - Cada step en `meta.json` puede incluir `toolUseIds: string[]` — los IDs de tool_use emitidos en ese step, usados para correlacionar con futuras continuaciones.
 - `meta.json` resume el turno completo: steps individuales, tokens agregados en `totals`, duración y `outcome`.
@@ -114,12 +114,14 @@ sessions/<session-id>/
         output/                 # Respuesta final reconstruida (SSE completados)
           body.json, body.parsed.md, headers.json
         steps/
-          NN/                   # Cada step es una llamada HTTP individual (01, 02, …)
+          NN/                   # Step lógico observable (01, 02, …)
             request/            # Petición del step (auto-contenida)
               headers.json, body.bin, body.json, body.parsed.md
             response/           # SSE: sse.jsonl (fuente de verdad) + reconstruidos; No-SSE: body.json
               sse.jsonl, sse.txt, headers.json
               body.json, body.parsed.md
+              continuation.request.body.json   # Solo continuations de Agent coalesced
+              continuation.response.sse.jsonl  # SSE terminal de la continuation de Agent
             thought/            # Solo si el step contiene extended thinking
               content.md
             sub-agent-NN/       # Solo si el step emitió tool_use Agent (subagente anidado)
@@ -144,7 +146,7 @@ sessions/<session-id>/
 
 > **Side-requests:** Peticiones con `tools: []` (ej. `count_tokens`). Escriben `input/` top-level y se alojan en `side-interactions/`.
 
-> **Subagentes (`Task` / herramienta `Agent`):** Se anidan directamente bajo `steps/NN/sub-agent-NN/` con la misma estructura interna (`input/`, `output/`, `steps/`, `meta.json`, `state.json`). El `meta.json` del subagente incluye `parentContext: { parentInteractionDir, parentStepIndex, triggeringToolUseId, subagentType }`. La profundidad está acotada a 2 niveles.
+> **Subagentes (`Task` / herramienta `Agent`):** Se anidan directamente bajo `steps/NN/sub-agent-NN/` con la misma estructura interna (`input/`, `output/`, `steps/`, `meta.json`, `state.json`). El `meta.json` del subagente incluye `parentContext: { parentInteractionDir, parentStepIndex, triggeringToolUseId, subagentType }`. La continuation que trae los `tool_result` de esos subagentes se coalesce en `steps/NN/response/body.*` del step padre, de modo que la delegación y la respuesta final combinada quedan en el mismo step lógico. La profundidad está acotada a 2 niveles.
 
 > **state.json:** Archivo marcador escrito al iniciar la interacción con `{ state: "in-progress", startedAt, interactionType, parentContext? }`. Se elimina al cerrar el turno (cuando se escribe `meta.json`). Su presencia indica una interacción huérfana por crash del proceso.
 

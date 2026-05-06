@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import * as fs from 'node:fs/promises';
 import { StringDecoder } from 'node:string_decoder';
 import type { IAuditWriter } from '../2-services/ports/audit-writer.port.js';
 import type { ISseReconstructor } from '../2-services/ports/sse-reconstructor.port.js';
@@ -41,11 +42,22 @@ export class AuditSseResponseHandler {
     }
 
     const activeInteraction = this.sessionStore.getInteractionByDirSync(context.auditInteractionDir);
-    const stepNumber = activeInteraction?.stepCount ?? 1;
+    const coalescedAgentContinuation = context.coalescedAgentContinuation;
+    const stepNumber = coalescedAgentContinuation?.targetStepIndex ?? activeInteraction?.stepCount ?? 1;
+    const isCoalescedAgentContinuation = coalescedAgentContinuation !== undefined;
     const stepDir = path.join(
       context.auditInteractionDir,
       'steps',
       String(stepNumber).padStart(PAD_STEP, '0'),
+    );
+    const responseDir = path.join(stepDir, 'response');
+    const sseJsonlPath = path.join(
+      responseDir,
+      isCoalescedAgentContinuation ? 'continuation.response.sse.jsonl' : 'sse.jsonl',
+    );
+    const sseRawPath = path.join(
+      responseDir,
+      isCoalescedAgentContinuation ? 'continuation.response.sse.txt' : 'sse.txt',
     );
 
     this.auditWriter.writeResponseHeadersAudit(stepDir, responseHeaders).catch((e) => {
@@ -95,7 +107,7 @@ export class AuditSseResponseHandler {
       if (!sseRawTruncated) {
         if (sseRawBytesWritten + chunk.length <= maxSseRaw) {
           try {
-            this.auditWriter.appendSseRawChunk(stepDir, chunk);
+            this.auditWriter.appendSseRawChunk(sseRawPath, chunk);
             sseRawBytesWritten += chunk.length;
           } catch (e) {
             console.error('Error al escribir SSE crudo:', e);
@@ -104,7 +116,7 @@ export class AuditSseResponseHandler {
           const remaining = maxSseRaw - sseRawBytesWritten;
           if (remaining > 0 && Number.isFinite(remaining)) {
             try {
-              this.auditWriter.appendSseRawChunk(stepDir, chunk.subarray(0, remaining));
+              this.auditWriter.appendSseRawChunk(sseRawPath, chunk.subarray(0, remaining));
               sseRawBytesWritten += remaining;
             } catch (e) {
               console.error('Error al escribir fragmento final de SSE crudo:', e);
@@ -124,7 +136,7 @@ export class AuditSseResponseHandler {
 
         if (trimmed !== '') {
           sseLineIndex++;
-          this.auditWriter.appendSseLine(stepDir, {
+          this.auditWriter.appendSseLine(sseJsonlPath, {
             i: sseLineIndex,
             ts: new Date().toISOString(),
             line: trimmed,
@@ -299,7 +311,7 @@ export class AuditSseResponseHandler {
         const finalTrimmed = lineBuffer.replace(/\r$/, '').trim();
         if (finalTrimmed !== '') {
           sseLineIndex++;
-          this.auditWriter.appendSseLine(stepDir, {
+          this.auditWriter.appendSseLine(sseJsonlPath, {
             i: sseLineIndex,
             ts: new Date().toISOString(),
             line: finalTrimmed,
@@ -338,6 +350,128 @@ export class AuditSseResponseHandler {
 
         if (context.interactionType === 'client-preflight') {
           await this.handlePreflightStepEnd(context, stepMeta, streamError);
+          return;
+        }
+
+        if (isCoalescedAgentContinuation) {
+          const turn = await this.sessionStore.getInteractionByDir(context.auditInteractionDir);
+          if (!turn) return;
+
+          const targetMeta = turn.stepsMeta.find((s) => s.stepIndex === stepNumber);
+          const continuationMeta = {
+            toolUseIds: coalescedAgentContinuation.toolUseIds,
+            sseLineCount: sseLineIndex,
+            stopReason: stopReason ?? undefined,
+            statusCode: context.responseStatusCode,
+            ...(stepUsage.input_tokens ? { inputTokens: stepUsage.input_tokens } : {}),
+            ...(stepUsage.output_tokens ? { outputTokens: stepUsage.output_tokens } : {}),
+            ...(stepUsage.cache_creation_input_tokens
+              ? { cacheCreationInputTokens: stepUsage.cache_creation_input_tokens }
+              : {}),
+            ...(stepUsage.cache_read_input_tokens
+              ? { cacheReadInputTokens: stepUsage.cache_read_input_tokens }
+              : {}),
+            ...(sseRawBytesWritten > 0 ? { sseRawBytesWritten } : {}),
+            ...(sseRawTruncated ? { sseRawTruncatedByLimit: true } : {}),
+            ...(anthropicMessageId ? { anthropicMessageId } : {}),
+          };
+
+          if (targetMeta) {
+            targetMeta.coalescedAgentContinuation = continuationMeta;
+            targetMeta.stopReason = stopReason ?? targetMeta.stopReason;
+          } else {
+            await this.sessionStore.pushStepMetaByDir(context.auditInteractionDir, {
+              stepIndex: stepNumber,
+              sse: true,
+              statusCode: context.responseStatusCode,
+              stopReason: stopReason ?? undefined,
+              coalescedAgentContinuation: continuationMeta,
+            });
+          }
+
+          if (activeInteraction?.modelId) {
+            const sessionDir = path.join(this.sessionStore.getBaseDir(), activeInteraction.sessionId);
+            const stepTotals = computeTokenTotals([{ stepIndex: stepNumber, sse: true, statusCode: context.responseStatusCode, coalescedAgentContinuation: continuationMeta }]);
+            await this.sessionStore.withSessionLock(activeInteraction.sessionId, async () => {
+              await this.auditWriter
+                .updateSessionMetrics(sessionDir, activeInteraction.modelId!, stepTotals, 1)
+                .catch(() => { /* error no crítico */ });
+            });
+          }
+
+          let sseReconstructResult: SseReconstructResult | undefined;
+          try {
+            const initialMessage = await this.sseReconstruct.reconstructStepMessage(stepDir);
+            const finalMessage = await this.sseReconstruct.reconstructSseJsonlFile(sseJsonlPath);
+            let continuationRequest: JsonValue | null = null;
+            try {
+              const raw = await fs.readFile(path.join(responseDir, 'continuation.request.body.json'), 'utf8');
+              continuationRequest = JSON.parse(raw) as JsonValue;
+            } catch {
+              continuationRequest = null;
+            }
+            await this.auditWriter.writeCoalescedAgentStepResponse({
+              stepDir,
+              initialMessage: initialMessage as unknown as JsonValue,
+              continuationRequest,
+              finalMessage: finalMessage as unknown as JsonValue,
+              context: {
+                interactionType: context.interactionType,
+                stepIndex: stepNumber,
+                stepCount: activeInteraction?.stepCount,
+                modelId: activeInteraction?.modelId,
+              },
+            });
+            sseReconstructResult = await this.sseReconstruct.runReconstruction({
+              stepDir,
+              interactionDir: context.auditInteractionDir,
+              stepCount: activeInteraction?.stepCount ?? stepNumber,
+              originalUrl: context.url,
+              headers: {},
+              sseRawBytesWritten,
+              sseRawTruncatedByLimit: sseRawTruncated,
+              sseRawWriteError: streamError,
+              context: {
+                interactionType: context.interactionType,
+                stepIndex: stepNumber,
+                stepCount: activeInteraction?.stepCount,
+                modelId: activeInteraction?.modelId,
+              },
+            });
+          } catch (err) {
+            console.error('Error en reconstrucción SSE coalesced:', err);
+            sseReconstructResult = {
+              sseResponseBodyAttempted: true,
+              sseResponseBodyWritten: false,
+              sseResponseBodyError: err instanceof Error ? err.message : String(err),
+            };
+          }
+
+          if (sseReconstructResult?.sseResponseBodyWritten === true) {
+            this.auditWriter
+              .writeTopLevelResponseHeaders(context.auditInteractionDir, responseHeaders)
+              .catch((e) => console.error('Error al escribir cabeceras top-level:', e));
+          }
+
+          const outcome: InteractionOutcome =
+            stopReason === 'max_tokens'
+              ? 'truncated'
+              : streamError
+                ? 'upstream-error'
+                : 'completed';
+
+          turn.coalescedAgentContinuation = undefined;
+          this.sessionStore.closeInteraction(context.auditInteractionDir);
+          await this.writeInteractionMeta(
+            turn,
+            context,
+            outcome,
+            true,
+            streamError,
+            sseReconstructResult,
+            sseErrorMessage,
+            sseErrorType,
+          );
           return;
         }
 

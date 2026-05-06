@@ -118,10 +118,9 @@ sessions/<session-id>/
             request/            # Petición del step (auto-contenida)
               headers.json, body.bin, body.json, body.parsed.md
             response/           # SSE: sse.jsonl (fuente de verdad) + reconstruidos; No-SSE: body.json
-              sse.jsonl, sse.txt, headers.json
+              sse.jsonl, headers.json
               body.json, body.parsed.md
-              continuation.request.body.json   # Solo continuations de Agent coalesced
-              continuation.response.sse.jsonl  # SSE terminal de la continuation de Agent
+              # sse.txt solo para steps no-coalesced (raw dump debug)
             thought/            # Solo si el step contiene extended thinking
               content.md
             sub-agent-NN/       # Solo si el step emitió tool_use Agent (subagente anidado)
@@ -147,6 +146,8 @@ sessions/<session-id>/
 > **Side-requests:** Peticiones con `tools: []` (ej. `count_tokens`). Escriben `input/` top-level y se alojan en `side-interactions/`.
 
 > **Subagentes (`Task` / herramienta `Agent`):** Se anidan directamente bajo `steps/NN/sub-agent-NN/` con la misma estructura interna (`input/`, `output/`, `steps/`, `meta.json`, `state.json`). El `meta.json` del subagente incluye `parentContext: { parentInteractionDir, parentStepIndex, triggeringToolUseId, subagentType }`. La continuation que trae los `tool_result` de esos subagentes se coalesce en `steps/NN/response/body.*` del step padre, de modo que la delegación y la respuesta final combinada quedan en el mismo step lógico. La profundidad está acotada a 2 niveles.
+
+> **Steps coalesced de Agent:** Para steps que invocan subagentes, el `response/sse.jsonl` es **multi-fase** — cada línea incluye `phase: "delegation"` (stream inicial) o `phase: "continuation"` (stream terminal con tool_result). El `response/body.json` tiene estructura consolidada con `delegation.message`, `continuation.request.body`, `continuation.request.headers`, `continuation.response.message` y `toolUseIds`. Los archivos `continuation.*` temporales ya no se crean; la request de continuation se almacena en memoria y se escribe directamente en `body.json`.
 
 > **state.json:** Archivo marcador escrito al iniciar la interacción con `{ state: "in-progress", startedAt, interactionType, parentContext? }`. Se elimina al cerrar el turno (cuando se escribe `meta.json`). Su presencia indica una interacción huérfana por crash del proceso.
 

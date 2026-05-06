@@ -1,4 +1,4 @@
-import { SseReconstructOptions, SseReconstructResult } from '../../1-domain/types/audit.types.js';
+import { SseReconstructOptions, SseReconstructResult, SsePhase } from '../../1-domain/types/audit.types.js';
 import type Anthropic from '@anthropic-ai/sdk';
 
 /**
@@ -16,6 +16,7 @@ export interface ISseReconstructor {
   reconstructSseJsonlFile(
     jsonlPath: string,
     headersPath?: string,
+    phase?: SsePhase,
   ): Promise<Anthropic.Message | Anthropic.Beta.Messages.BetaMessage>;
 
   /**

@@ -140,12 +140,14 @@ export class MarkdownRendererService {
       }
     }
 
-    // Buscar el último mensaje user (de atrás hacia adelante)
+    // Buscar el último mensaje user con texto real (de atrás hacia adelante)
+    // Continuaciones pueden tener mensajes user solo con tool_results, sin texto
     for (let i = messages.length - 1; i >= 0; i--) {
       const msg = messages[i];
       if (msg && typeof msg === 'object' && !Array.isArray(msg)) {
         const m = msg as Record<string, JsonValue>;
         if (m.role === 'user') {
+          let hasText = false;
           // Extraer contenido del mensaje
           if (Array.isArray(m.content)) {
             for (const block of m.content) {
@@ -153,6 +155,7 @@ export class MarkdownRendererService {
                 const b = block as Record<string, JsonValue>;
                 if (b.type === 'text' && typeof b.text === 'string') {
                   promptText = b.text;
+                  hasText = true;
                 } else if (b.type === 'tool_result') {
                   const toolId = b.tool_use_id ? String(b.tool_use_id) : '';
                   const toolName = toolNameMap.get(toolId) || 'tool';
@@ -169,8 +172,13 @@ export class MarkdownRendererService {
             }
           } else if (typeof m.content === 'string') {
             promptText = m.content;
+            hasText = true;
           }
-          break; // Solo el último mensaje user
+
+          // Solo detenerse si encontramos un mensaje user con texto real
+          if (hasText) {
+            break;
+          }
         }
       }
     }
@@ -266,20 +274,26 @@ export class MarkdownRendererService {
     const contextHeader = this.renderContextHeader(context);
     if (contextHeader) parts.push(contextHeader);
 
-    parts.push(this.heading(2, 'Delegación a subagentes'));
+    // Fase 1: Delegación inicial (stream que emitió tool_use Agent)
+    parts.push(this.heading(2, '🔀 Fase 1: Delegación inicial'));
+    parts.push('El agente principal invocó subagentes mediante tool_use `Agent`.');
     parts.push(...this.renderStepSections(initialMessage, 3, context));
 
+    // Fase 2: Continuación con resultados de subagentes (stream terminal)
     if (continuationRequest !== null) {
       parts.push('---');
-      parts.push(this.heading(2, 'Resultados recibidos de subagentes'));
+      parts.push(this.heading(2, '🔀 Fase 2: Continuación con resultados'));
+      parts.push('El agente principal procesó los resultados retornados por los subagentes.');
       const renderedRequest = this.renderRequestConversationMarkdown(continuationRequest, context);
       const [, ...requestBody] = renderedRequest.split('\n');
       const requestContent = requestBody.join('\n').trim();
       parts.push(requestContent || this.fencedJson(continuationRequest));
     }
 
+    // Fase 3: Respuesta final coalesced
     parts.push('---');
-    parts.push(this.heading(2, 'Respuesta final combinada'));
+    parts.push(this.heading(2, '🔀 Fase 3: Respuesta final coalesced'));
+    parts.push('Mensaje final del agente principal tras procesar todos los resultados.');
     parts.push(...this.renderStepSections(finalMessage, 3, context));
 
     return parts.join('\n\n');

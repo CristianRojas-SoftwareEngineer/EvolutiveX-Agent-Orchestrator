@@ -18,6 +18,7 @@ import {
   computeTokenTotals,
   computeSseRawBytesTotal,
 } from '../1-domain/types/audit.types.js';
+import type { JsonValue } from '../1-domain/types/json.types.js';
 import { ProxyEnvironmentConfig } from '../1-domain/types/config.types.js';
 import type { Logger } from '../1-domain/types/logger.types.js';
 import {
@@ -471,25 +472,27 @@ export class AuditInteractionHandler {
 
     const agentContinuationTarget = this.resolveAgentContinuationTarget(parentInteraction, toolUseIds);
     if (agentContinuationTarget) {
-      const stepDir = path.join(
-        parentInteraction.interactionDir,
-        DIR_STEPS,
-        String(agentContinuationTarget.targetStepIndex).padStart(PAD_STEP, '0'),
-      );
+      // Parsear la request de continuation en memoria para evitar crear archivos temporales
+      const continuationHeaders = headersForAudit;
+      const body = params.rawBody ?? Buffer.alloc(0);
+      let continuationRequest: JsonValue | null;
 
-      await this.auditWriter.writeCoalescedAgentContinuationRequest({
-        stepDir,
-        headers: headersForAudit,
-        bodyBuffer: params.rawBody,
-        maxAuditRequestBytes: this.config.MAX_AUDIT_REQUEST_BODY_BYTES,
-        context: {
-          interactionType: parentInteraction.interactionType,
-          stepIndex: agentContinuationTarget.targetStepIndex,
-          stepCount: parentInteraction.stepCount,
-        },
-      });
+      if (body.length > this.config.MAX_AUDIT_REQUEST_BODY_BYTES) {
+        continuationRequest = null; // Body omitido por tamaño
+      } else {
+        try {
+          continuationRequest = body.length ? JSON.parse(body.toString('utf8')) as JsonValue : null;
+        } catch {
+          continuationRequest = null; // Body inválido
+        }
+      }
 
-      parentInteraction.coalescedAgentContinuation = agentContinuationTarget;
+      // Adjuntar la request de continuation al contexto coalesced
+      parentInteraction.coalescedAgentContinuation = {
+        ...agentContinuationTarget,
+        continuationRequest,
+        continuationHeaders,
+      };
 
       for (const toolUseId of toolUseIds) {
         this.sessionStore.consumePendingAgentToolUse(parentInteraction.interactionDir, toolUseId);

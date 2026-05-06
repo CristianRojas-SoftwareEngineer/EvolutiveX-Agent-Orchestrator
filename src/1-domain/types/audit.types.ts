@@ -1,3 +1,5 @@
+import type { JsonValue } from './json.types.js';
+
 /**
  * Representa una sesión de auditoría resuelta.
  */
@@ -9,6 +11,13 @@ export interface AuditSession {
 }
 
 /**
+ * Fase de un step coalesced de Agent.
+ * - delegation: Stream inicial que emitió tool_use Agent
+ * - continuation: Stream terminal que procesó los tool_result de los subagentes
+ */
+export type SsePhase = 'delegation' | 'continuation';
+
+/**
  * Representa una única línea capturada en un stream de Server-Sent Events (SSE).
  */
 export interface SseLine {
@@ -18,6 +27,12 @@ export interface SseLine {
   ts: string;
   /** El payload crudo de la línea SSE (después del trim). */
   line: string;
+  /**
+   * Fase del step coalesced. Presente solo en steps que invocan subagentes Agent.
+   * Permite reconstruir separadamente la delegación inicial y la respuesta final
+   * desde un único sse.jsonl multi-fase.
+   */
+  phase?: SsePhase;
 }
 
 /**
@@ -252,6 +267,15 @@ export interface ActiveInteraction {
   coalescedAgentContinuation?: {
     targetStepIndex: number;
     toolUseIds: string[];
+    /**
+     * Request de continuation parseado (body JSON completo).
+     * Almacenado en memoria para evitar crear archivos continuation.request.* temporales.
+     */
+    continuationRequest?: JsonValue;
+    /**
+     * Headers de la request de continuation.
+     */
+    continuationHeaders?: Record<string, string | string[] | undefined>;
   };
 }
 
@@ -431,6 +455,15 @@ export interface AuditInteractionContext {
   coalescedAgentContinuation?: {
     targetStepIndex: number;
     toolUseIds: string[];
+    /**
+     * Request de continuation parseado (body JSON completo).
+     * Almacenado en memoria para evitar crear archivos continuation.request.* temporales.
+     */
+    continuationRequest?: JsonValue;
+    /**
+     * Headers de la request de continuation.
+     */
+    continuationHeaders?: Record<string, string | string[] | undefined>;
   };
 }
 

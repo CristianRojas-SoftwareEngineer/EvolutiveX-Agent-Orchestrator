@@ -134,7 +134,6 @@ function makeAuditWriter(overrides: Partial<IAuditWriter> = {}): IAuditWriter {
     writeSubInteractionRequest: async () => ({ dir: '', requestBodyOmitted: false }),
     nextSubInteractionSequence: async () => 1,
     writeStepRequest: async () => {},
-    writeCoalescedAgentContinuationRequest: async () => {},
     finalizeNonSseResponseAudit: async () => ({
       responseBodyBytesAudited: 0,
       responseTruncatedByProxyBuffer: false,

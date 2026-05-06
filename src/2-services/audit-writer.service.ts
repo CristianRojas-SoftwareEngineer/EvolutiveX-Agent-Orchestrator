@@ -113,54 +113,6 @@ export class AuditWriterService implements IAuditWriter {
     return { dir, requestBodyOmitted };
   }
 
-  public async writeCoalescedAgentContinuationRequest(params: {
-    stepDir: string;
-    headers: Record<string, string | string[] | undefined>;
-    bodyBuffer: Buffer | null;
-    maxAuditRequestBytes: number;
-    context?: MarkdownRenderContext;
-  }): Promise<void> {
-    const responseDir = path.join(params.stepDir, DIR_STEP_RESPONSE);
-    await fs.mkdir(responseDir, { recursive: true });
-    await this.writeJsonAtomic(
-      path.join(responseDir, 'continuation.request.headers.json'),
-      params.headers as unknown as JsonValue,
-    );
-
-    const body = params.bodyBuffer ?? Buffer.alloc(0);
-    await this.writeFileAtomic(
-      path.join(responseDir, 'continuation.request.body.bin'),
-      body.subarray(0, params.maxAuditRequestBytes),
-    );
-
-    if (body.length > params.maxAuditRequestBytes) {
-      await this.writeFileAtomic(
-        path.join(responseDir, 'continuation.request.body.omitted.txt'),
-        Buffer.from(
-          `Request body omitted after ${params.maxAuditRequestBytes} bytes. Original bytes: ${body.length}.`,
-          'utf8',
-        ),
-      );
-      return;
-    }
-
-    try {
-      const parsed = body.length ? JSON.parse(body.toString('utf8')) as JsonValue : null;
-      await this.writeFormattedAndMarkdown(
-        responseDir,
-        'continuation.request.body',
-        parsed,
-        'request',
-        params.context,
-      );
-    } catch {
-      await this.writeFileAtomic(
-        path.join(responseDir, 'continuation.request.body.raw.txt'),
-        body,
-      );
-    }
-  }
-
   public async nextSubInteractionSequence(
     parentInteractionDir: string,
     parentStepIndex: number,
@@ -504,7 +456,9 @@ export class AuditWriterService implements IAuditWriter {
     stepDir: string;
     initialMessage: JsonValue;
     continuationRequest: JsonValue | null;
+    continuationHeaders?: Record<string, string | string[] | undefined>;
     finalMessage: JsonValue;
+    toolUseIds: string[];
     context?: MarkdownRenderContext;
   }): Promise<void> {
     const responseDir = path.join(params.stepDir, DIR_STEP_RESPONSE);
@@ -512,9 +466,19 @@ export class AuditWriterService implements IAuditWriter {
 
     const body: JsonValue = {
       type: 'coalesced-agent-step-response',
-      initial: params.initialMessage,
-      continuationRequest: params.continuationRequest,
-      final: params.finalMessage,
+      delegation: {
+        message: params.initialMessage,
+      },
+      continuation: {
+        request: {
+          body: params.continuationRequest,
+          ...(params.continuationHeaders ? { headers: params.continuationHeaders } : {}),
+        },
+        response: {
+          message: params.finalMessage,
+        },
+      },
+      toolUseIds: params.toolUseIds,
     };
 
     await this.writeJsonAtomic(path.join(responseDir, 'body.json'), body);

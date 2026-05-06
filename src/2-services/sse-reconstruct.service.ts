@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import { AuditWriterService } from './audit-writer.service.js';
-import { SseReconstructOptions, SseReconstructResult } from '../1-domain/types/audit.types.js';
+import { SseReconstructOptions, SseReconstructResult, SsePhase } from '../1-domain/types/audit.types.js';
 import type Anthropic from '@anthropic-ai/sdk';
 import type { ISseReconstructor } from './ports/sse-reconstructor.port.js';
 
@@ -42,6 +42,7 @@ export class SseReconstructService implements ISseReconstructor {
   public async reconstructSseJsonlFile(
     jsonlPath: string,
     headersPath?: string,
+    phase?: SsePhase,
   ): Promise<Anthropic.Message | Anthropic.Beta.Messages.BetaMessage> {
     let jsonlBuffer: Buffer;
     try {
@@ -56,7 +57,7 @@ export class SseReconstructService implements ISseReconstructor {
 
     let sseBuffer: Buffer;
     try {
-      sseBuffer = this.reassembleSseBytesFromJsonl(jsonlBuffer);
+      sseBuffer = this.reassembleSseBytesFromJsonl(jsonlBuffer, phase);
     } catch (cause: unknown) {
       const errMsg = cause instanceof Error ? cause.message : String(cause);
       throw new Error(`failed to reassemble SSE bytes from jsonl: ${errMsg}`, { cause });
@@ -131,9 +132,13 @@ export class SseReconstructService implements ISseReconstructor {
 
   /**
    * Reensambla el wire-format SSE a partir de las líneas capturadas en
-   * `sse.jsonl`. Cada entrada `{i, ts, line}` aporta una línea SSE ya trimada
+   * `sse.jsonl`. Cada entrada `{i, ts, line, phase?}` aporta una línea SSE ya trimada
    * (sin `\r` final, sin trailing newline). El SDK de Anthropic exige que los
    * eventos estén delimitados por línea en blanco (`\n\n`).
+   *
+   * Cuando se especifica `phase`, filtra las líneas para incluir solo las de esa fase,
+   * permitiendo reconstruir separadamente la delegación inicial y la respuesta final
+   * en steps coalesced de Agent.
    *
    * Regla: cada línea se emite con `\n` final; además, cuando la siguiente
    * línea arranca un evento nuevo (`event:` o `data:` de un evento standalone
@@ -143,7 +148,7 @@ export class SseReconstructService implements ISseReconstructor {
    * Esta heurística es equivalente al stream real emitido por upstream, y es
    * la que el SDK de Anthropic parsea sin quejas.
    */
-  private reassembleSseBytesFromJsonl(jsonlBuffer: Buffer): Buffer {
+  private reassembleSseBytesFromJsonl(jsonlBuffer: Buffer, phase?: SsePhase): Buffer {
     const text = jsonlBuffer.toString('utf8');
     const rawLines = text.split('\n');
     const events: string[] = [];
@@ -157,12 +162,18 @@ export class SseReconstructService implements ISseReconstructor {
 
     for (const raw of rawLines) {
       if (raw.trim() === '') continue;
-      let parsed: { line?: unknown };
+      let parsed: { line?: unknown; phase?: SsePhase };
       try {
-        parsed = JSON.parse(raw) as { line?: unknown };
+        parsed = JSON.parse(raw) as { line?: unknown; phase?: SsePhase };
       } catch {
         continue;
       }
+
+      // Filtrar por fase si se especificó
+      if (phase && parsed.phase !== undefined && parsed.phase !== phase) {
+        continue;
+      }
+
       const line = typeof parsed.line === 'string' ? parsed.line : '';
       if (!line) continue;
 

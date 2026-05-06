@@ -90,7 +90,6 @@ function makeAuditWriter(overrides: Partial<IAuditWriter> = {}): IAuditWriter {
     }),
     nextSubInteractionSequence: async () => 1,
     writeStepRequest: async () => {},
-    writeCoalescedAgentContinuationRequest: async () => {},
     finalizeNonSseResponseAudit: async () => ({
       responseBodyBytesAudited: 0,
       responseTruncatedByProxyBuffer: false,
@@ -840,7 +839,6 @@ describe('AuditInteractionHandler', () => {
       pendingWebFetchToolUses: [],
     };
     let incrementCalled = false;
-    let coalescedRequestStepDir: string | null = null;
 
     const store = makeSessionStore({
       getInteractionByToolUseId: (id: string) => (id === 'tool-x' ? parentInteraction : null),
@@ -852,11 +850,7 @@ describe('AuditInteractionHandler', () => {
     const handler = new AuditInteractionHandler(
       new SessionResolverService(config),
       store,
-      makeAuditWriter({
-        writeCoalescedAgentContinuationRequest: async (params) => {
-          coalescedRequestStepDir = params.stepDir;
-        },
-      }),
+      makeAuditWriter({}),
       config,
     );
 
@@ -873,7 +867,6 @@ describe('AuditInteractionHandler', () => {
       targetStepIndex: 1,
       toolUseIds: ['tool-x'],
     });
-    expect(coalescedRequestStepDir).toMatch(/steps[/\\]01$/);
   });
 
   it('fresh sin pendings agent → handleFresh (no se invoca writeSubInteractionRequest)', async () => {

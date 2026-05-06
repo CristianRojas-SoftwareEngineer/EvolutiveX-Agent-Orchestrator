@@ -55,13 +55,6 @@ export interface IAuditWriter {
     maxAuditRequestBytes: number;
     context?: MarkdownRenderContext;
   }): Promise<void>;
-  writeCoalescedAgentContinuationRequest(params: {
-    stepDir: string;
-    headers: Record<string, string | string[] | undefined>;
-    bodyBuffer: Buffer | null;
-    maxAuditRequestBytes: number;
-    context?: MarkdownRenderContext;
-  }): Promise<void>;
   finalizeNonSseResponseAudit(params: {
     interactionDir: string;
     bodyBuffer: Buffer;
@@ -143,7 +136,9 @@ export interface IAuditWriter {
     stepDir: string;
     initialMessage: JsonValue;
     continuationRequest: JsonValue | null;
+    continuationHeaders?: Record<string, string | string[] | undefined>;
     finalMessage: JsonValue;
+    toolUseIds: string[];
     context?: MarkdownRenderContext;
   }): Promise<void>;
   /**

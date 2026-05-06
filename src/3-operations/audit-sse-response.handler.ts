@@ -1,5 +1,4 @@
 import * as path from 'node:path';
-import * as fs from 'node:fs/promises';
 import { StringDecoder } from 'node:string_decoder';
 import type { IAuditWriter } from '../2-services/ports/audit-writer.port.js';
 import type { ISseReconstructor } from '../2-services/ports/sse-reconstructor.port.js';
@@ -15,6 +14,7 @@ import {
   InteractionOutcome,
   computeTokenTotals,
   computeSseRawBytesTotal,
+  SsePhase,
 } from '../1-domain/types/audit.types.js';
 import type { Logger } from '../1-domain/types/logger.types.js';
 import { PAD_STEP } from '../1-domain/constants/audit-paths.js';
@@ -51,14 +51,11 @@ export class AuditSseResponseHandler {
       String(stepNumber).padStart(PAD_STEP, '0'),
     );
     const responseDir = path.join(stepDir, 'response');
-    const sseJsonlPath = path.join(
-      responseDir,
-      isCoalescedAgentContinuation ? 'continuation.response.sse.jsonl' : 'sse.jsonl',
-    );
-    const sseRawPath = path.join(
-      responseDir,
-      isCoalescedAgentContinuation ? 'continuation.response.sse.txt' : 'sse.txt',
-    );
+    // Para steps coalesced de Agent, usamos un único sse.jsonl multi-fase
+    const sseJsonlPath = path.join(responseDir, 'sse.jsonl');
+    // Eliminamos sse.txt para steps coalesced (solo body.json y sse.jsonl son canónicos)
+    const sseRawPath = isCoalescedAgentContinuation ? null : path.join(responseDir, 'sse.txt');
+    const currentPhase: SsePhase = isCoalescedAgentContinuation ? 'continuation' : 'delegation';
 
     this.auditWriter.writeResponseHeadersAudit(stepDir, responseHeaders).catch((e) => {
       console.error('Error al escribir cabeceras de step SSE:', e);
@@ -104,7 +101,7 @@ export class AuditSseResponseHandler {
       // Síncrona (ver AuditWriterService.appendSseRawChunk) para preservar
       // el orden de los chunks. Raw dump puro: la reconstrucción se basa en
       // sse.jsonl, no en sse.txt.
-      if (!sseRawTruncated) {
+      if (!sseRawTruncated && sseRawPath !== null) {
         if (sseRawBytesWritten + chunk.length <= maxSseRaw) {
           try {
             this.auditWriter.appendSseRawChunk(sseRawPath, chunk);
@@ -140,6 +137,7 @@ export class AuditSseResponseHandler {
             i: sseLineIndex,
             ts: new Date().toISOString(),
             line: trimmed,
+            phase: isCoalescedAgentContinuation ? currentPhase : undefined,
           });
 
           // Parsear eventos clave para metadata de la interacción
@@ -403,18 +401,16 @@ export class AuditSseResponseHandler {
           try {
             const initialMessage = await this.sseReconstruct.reconstructStepMessage(stepDir);
             const finalMessage = await this.sseReconstruct.reconstructSseJsonlFile(sseJsonlPath);
-            let continuationRequest: JsonValue | null = null;
-            try {
-              const raw = await fs.readFile(path.join(responseDir, 'continuation.request.body.json'), 'utf8');
-              continuationRequest = JSON.parse(raw) as JsonValue;
-            } catch {
-              continuationRequest = null;
-            }
+            // La request de continuation viene del contexto en memoria, no de archivos
+            const continuationRequest = coalescedAgentContinuation?.continuationRequest ?? null;
+            const continuationHeaders = coalescedAgentContinuation?.continuationHeaders;
             await this.auditWriter.writeCoalescedAgentStepResponse({
               stepDir,
               initialMessage: initialMessage as unknown as JsonValue,
               continuationRequest,
+              continuationHeaders,
               finalMessage: finalMessage as unknown as JsonValue,
+              toolUseIds: coalescedAgentContinuation.toolUseIds,
               context: {
                 interactionType: context.interactionType,
                 stepIndex: stepNumber,

@@ -828,11 +828,10 @@ export class AuditInteractionHandler {
 
     const startedAt = Date.now();
 
-    // Detector conservador de side-request de naming:
+    // Detector de side-request de naming:
     // - tools: [] (ya clasificado como side-request)
     // - No es implementación WebFetch interna (ya filtrado antes de este handler)
-    // - Proximidad con el primer turno agentic: si es el primer side-request de la sesión
-    //   y no hay turnos agentic previos, es probablemente naming
+    // - output_config con JSON schema que requiere campo "title" (detectado por el método)
     const isSessionNaming = await this.detectSessionNamingSideRequest(auditSessionId, params.rawBody);
 
     await this.auditWriter.writeInteractionState(interactionDir, {

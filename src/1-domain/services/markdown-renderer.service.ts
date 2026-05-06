@@ -1,5 +1,5 @@
-import { JsonValue } from '../types/json.types.js';
-import { MarkdownRenderContext, SubagentsSummary, WorkflowIndex } from '../types/audit.types.js';
+import type { JsonValue } from '../types/json.types.js';
+import type { MarkdownRenderContext, SubagentsSummary, CoalescedAgentStepResponse, WorkflowIndex } from '../types/audit.types.js';
 
 /**
  * Servicio para renderizar cuerpos JSON de petición/respuesta como Markdown semántico legible.
@@ -198,11 +198,12 @@ export class MarkdownRendererService {
       if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
         const obj = parsed as Record<string, JsonValue>;
         if (obj.type === 'coalesced-agent-step-response') {
+          const coalesced = obj as unknown as CoalescedAgentStepResponse;
           return this.renderCoalescedAgentStepResponseMarkdown(
-            obj.initial,
-            obj.continuationRequest ?? null,
-            obj.final,
-            obj.subagents as unknown as SubagentsSummary, // subagentsSummary
+            coalesced.delegation.message,
+            coalesced.continuation.request.body,
+            coalesced.continuation.response.message,
+            coalesced.subagents,
             context,
           );
         }
@@ -245,15 +246,25 @@ export class MarkdownRendererService {
     if (contextHeader) parts.push(contextHeader);
 
     // Generar TOC para multi-step
-    const toc = this.buildMultiStepToc(steps);
+    const toc = this.buildMultiStepToc(steps, isContiguous, total);
     if (toc) parts.push(toc);
 
     for (let i = 0; i < steps.length; i++) {
       const { stepIndex, parsed } = steps[i];
-      const stopReason =
-        parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-          ? String((parsed as Record<string, JsonValue>).stop_reason ?? '')
-          : '';
+      const isCoalesced = parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+        && (parsed as Record<string, JsonValue>).type === 'coalesced-agent-step-response';
+
+      let stopReason = '';
+      if (isCoalesced) {
+        const coalesced = parsed as unknown as CoalescedAgentStepResponse;
+        const finalMsg = coalesced.continuation.response.message;
+        if (finalMsg && typeof finalMsg === 'object' && !Array.isArray(finalMsg)) {
+          stopReason = String((finalMsg as Record<string, JsonValue>).stop_reason ?? '');
+        }
+      } else if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        stopReason = String((parsed as Record<string, JsonValue>).stop_reason ?? '');
+      }
+
       const stepHeader = this.heading(
         2,
         isContiguous
@@ -261,7 +272,15 @@ export class MarkdownRendererService {
           : `Step ${stepIndex}${stopReason ? ` — ${stopReason}` : ''}`,
       );
       parts.push(stepHeader);
-      parts.push(...this.renderStepSections(parsed, 3, context));
+
+      // Renderizar según el tipo de step
+      if (isCoalesced) {
+        const coalesced = parsed as unknown as CoalescedAgentStepResponse;
+        parts.push(...this.renderCoalescedAgentStepResponseSections(coalesced, 3, context));
+      } else {
+        parts.push(...this.renderStepSections(parsed, 3, context));
+      }
+
       if (i < steps.length - 1) {
         parts.push('---');
       }
@@ -270,35 +289,33 @@ export class MarkdownRendererService {
     return parts.join('\n\n');
   }
 
-  public renderCoalescedAgentStepResponseMarkdown(
-    initialMessage: JsonValue,
-    continuationRequest: JsonValue | null,
-    finalMessage: JsonValue,
-    subagentsSummary?: SubagentsSummary,
+  /**
+   * Renderiza las secciones de un step coalesced sin el heading root.
+   * Reutilizado por renderMultiStepResponseMarkdown para incrustar coalesced steps.
+   */
+  private renderCoalescedAgentStepResponseSections(
+    coalesced: CoalescedAgentStepResponse,
+    headingLevel: number,
     context?: MarkdownRenderContext,
-  ): string {
-    const rootHeading = this.buildRootHeading('response', context);
-    const parts: string[] = [rootHeading];
+  ): string[] {
+    const parts: string[] = [];
 
-    const contextHeader = this.renderContextHeader(context);
-    if (contextHeader) parts.push(contextHeader);
-
-    // Fase 1: Delegación inicial (stream que emitió tool_use Agent)
-    parts.push(this.heading(2, '🔀 Fase 1: Delegación inicial'));
+    // Fase 1: Delegación inicial
+    parts.push(this.heading(headingLevel, '🔀 Fase 1: Delegación inicial'));
     parts.push('El agente principal invocó subagentes mediante tool_use `Agent`.');
-    parts.push(...this.renderStepSections(initialMessage, 3, context));
+    parts.push(...this.renderStepSections(coalesced.delegation.message, headingLevel + 1, context));
 
     // Fase 2: Ejecución de subagentes
-    if (subagentsSummary && subagentsSummary.items.length > 0) {
+    if (coalesced.subagents && coalesced.subagents.items.length > 0) {
       parts.push('---');
-      parts.push(this.heading(2, '🔀 Fase 2: Ejecución de subagentes'));
-      parts.push(`Se ejecutaron ${subagentsSummary.count} subagente${subagentsSummary.count === 1 ? '' : 's'} en paralelo durante esta fase.`);
-      parts.push(`**Completados:** ${subagentsSummary.completedCount} | **Fallidos:** ${subagentsSummary.failedCount} | **Huérfanos:** ${subagentsSummary.orphanedCount}`);
-      parts.push(`**Duración total:** ${this.formatDuration(subagentsSummary.totalDurationMs)} | **Tokens:** ${subagentsSummary.totalInputTokens} input, ${subagentsSummary.totalOutputTokens} output`);
+      parts.push(this.heading(headingLevel, '🔀 Fase 2: Ejecución de subagentes'));
+      parts.push(`Se ejecutaron ${coalesced.subagents.count} subagente${coalesced.subagents.count === 1 ? '' : 's'} en paralelo durante esta fase.`);
+      parts.push(`**Completados:** ${coalesced.subagents.completedCount} | **Fallidos:** ${coalesced.subagents.failedCount} | **Huérfanos:** ${coalesced.subagents.orphanedCount}`);
+      parts.push(`**Duración total:** ${this.formatDuration(coalesced.subagents.totalDurationMs)} | **Tokens:** ${coalesced.subagents.totalInputTokens} input, ${coalesced.subagents.totalOutputTokens} output`);
       parts.push('');
 
-      for (const subagent of subagentsSummary.items) {
-        parts.push(this.heading(3, `Subagente ${subagent.index}: ${subagent.description}`));
+      for (const subagent of coalesced.subagents.items) {
+        parts.push(this.heading(headingLevel + 1, `Subagente ${subagent.index}: ${subagent.description}`));
         parts.push(`**ID tool_use:** \`${subagent.toolUseId || 'no correlacionado'}\`${subagent.inferredByOrder ? ' (inferido por orden)' : ''}`);
         parts.push(`**Tipo:** ${subagent.subagentType || 'general-purpose'}`);
         parts.push(`**Estado:** ${this.formatOutcome(subagent.outcome)}`);
@@ -314,16 +331,45 @@ export class MarkdownRendererService {
       }
     } else {
       parts.push('---');
-      parts.push(this.heading(2, '🔀 Fase 2: Ejecución de subagentes'));
+      parts.push(this.heading(headingLevel, '🔀 Fase 2: Ejecución de subagentes'));
       parts.push('No se encontraron subagentes anidados para esta fase.');
     }
 
     // Fase 3: Respuesta final coalesced
     parts.push('---');
-    parts.push(this.heading(2, '🔀 Fase 3: Respuesta final coalesced'));
+    parts.push(this.heading(headingLevel, '🔀 Fase 3: Respuesta final coalesced'));
     parts.push('Mensaje final del agente principal tras procesar todos los resultados.');
-    parts.push(...this.renderStepSections(finalMessage, 3, context));
+    parts.push(...this.renderStepSections(coalesced.continuation.response.message, headingLevel + 1, context));
 
+    return parts;
+  }
+
+  public renderCoalescedAgentStepResponseMarkdown(
+    initialMessage: JsonValue,
+    continuationRequest: JsonValue | null,
+    finalMessage: JsonValue,
+    subagentsSummary?: SubagentsSummary,
+    context?: MarkdownRenderContext,
+  ): string {
+    const rootHeading = this.buildRootHeading('response', context);
+    const parts: string[] = [rootHeading];
+
+    const contextHeader = this.renderContextHeader(context);
+    if (contextHeader) parts.push(contextHeader);
+
+    // Construir objeto coalesced temporal para reutilizar renderCoalescedAgentStepResponseSections
+    const tempCoalesced: CoalescedAgentStepResponse = {
+      type: 'coalesced-agent-step-response',
+      delegation: { message: initialMessage },
+      continuation: {
+        request: { body: continuationRequest },
+        response: { message: finalMessage },
+      },
+      toolUseIds: [],
+      subagents: subagentsSummary,
+    };
+
+    parts.push(...this.renderCoalescedAgentStepResponseSections(tempCoalesced, 2, context));
     return parts.join('\n\n');
   }
 
@@ -566,20 +612,45 @@ export class MarkdownRendererService {
    */
   private buildMultiStepToc(
     steps: Array<{ stepIndex: number; parsed: JsonValue }>,
+    isContiguous?: boolean,
+    total?: number,
   ): string | undefined {
     if (steps.length <= 1) return undefined;
 
-    const total = steps.length;
+    const stepTotal = total ?? steps.length;
     const tocLines: string[] = ['## Contenido', ''];
 
     for (const { stepIndex, parsed } of steps) {
-      const stopReason =
-        parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-          ? String((parsed as Record<string, JsonValue>).stop_reason ?? '')
-          : '';
-      const stepLabel = `Step ${stepIndex} de ${total}${stopReason ? ` — ${stopReason}` : ''}`;
+      const isCoalesced = parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+        && (parsed as Record<string, JsonValue>).type === 'coalesced-agent-step-response';
+
+      let stopReason = '';
+      if (isCoalesced) {
+        const coalesced = parsed as unknown as CoalescedAgentStepResponse;
+        const finalMsg = coalesced.continuation.response.message;
+        if (finalMsg && typeof finalMsg === 'object' && !Array.isArray(finalMsg)) {
+          stopReason = String((finalMsg as Record<string, JsonValue>).stop_reason ?? '');
+        }
+      } else if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        stopReason = String((parsed as Record<string, JsonValue>).stop_reason ?? '');
+      }
+
+      const stepLabel = isContiguous
+        ? `Step ${stepIndex} de ${stepTotal}${stopReason ? ` — ${stopReason}` : ''}`
+        : `Step ${stepIndex}${stopReason ? ` — ${stopReason}` : ''}`;
       const stepAnchor = this.githubAnchor(stepLabel);
       tocLines.push(`- [${stepLabel}](#${stepAnchor})`);
+
+      // Para steps coalesced, agregar entradas específicas
+      if (isCoalesced) {
+        const coalesced = parsed as unknown as CoalescedAgentStepResponse;
+        if (coalesced.subagents && coalesced.subagents.items.length > 0) {
+          tocLines.push(`  - [Delegación inicial](#${this.githubAnchor(stepLabel + ' ' + '🔀 Fase 1: Delegación inicial')})`);
+          tocLines.push(`  - [Ejecución de subagentes](#${this.githubAnchor(stepLabel + ' ' + '🔀 Fase 2: Ejecución de subagentes')})`);
+          tocLines.push(`  - [Respuesta final coalesced](#${this.githubAnchor(stepLabel + ' ' + '🔀 Fase 3: Respuesta final coalesced')})`);
+        }
+        continue;
+      }
 
       // Detectar si hay thinking en este step para agregar sub-entries
       const content =

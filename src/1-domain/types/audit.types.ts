@@ -688,3 +688,38 @@ export interface MarkdownRenderContext {
   /** Subtipo de side-request (solo para interactionType='side-request') */
   sideRequestKind?: SideRequestKind;
 }
+
+/**
+ * Contrato canónico para la respuesta de un step que invocó subagentes Agent.
+ * Este es el formato persistido en steps/NN/response/body.json para steps coalesced.
+ */
+export interface CoalescedAgentStepResponse {
+  type: 'coalesced-agent-step-response';
+  delegation: {
+    message: JsonValue;
+  };
+  continuation: {
+    request: {
+      body: JsonValue | null;
+      headers?: Record<string, string | string[] | undefined>;
+    };
+    response: {
+      message: JsonValue;
+    };
+  };
+  toolUseIds: string[];
+  subagents?: SubagentsSummary;
+}
+
+/**
+ * Contrato canónico para el output top-level de una interacción con múltiples steps.
+ * Este es el formato persistido en output/body.json para interacciones multi-step.
+ */
+export interface MultiStepResponse {
+  type: 'multi-step-response';
+  stepCount: number;
+  steps: Array<{
+    stepIndex: number;
+    [key: string]: JsonValue;
+  }>;
+}

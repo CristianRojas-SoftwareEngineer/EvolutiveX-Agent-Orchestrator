@@ -313,3 +313,63 @@ describe('AuditWriterService - writeFormattedAndMarkdown semántico', () => {
     expect(md).toContain('<!-- model: claude-3-5-sonnet-20241022, max_tokens: 1024 -->');
   });
 });
+
+describe('AuditWriterService - extractFinalTextFromJson', () => {
+  let service: AuditWriterService;
+
+  beforeEach(() => {
+    service = new AuditWriterService(new RedactService(), new MarkdownRendererService());
+  });
+
+  it('debería extraer el último bloque text de un mensaje normal', () => {
+    const parsed = {
+      content: [
+        { type: 'text', text: 'Texto 1' },
+        { type: 'tool_use', id: 't1', name: 'bash', input: {} },
+        { type: 'text', text: 'Texto final' },
+      ],
+    };
+    const text = (service as any).extractFinalTextFromJson(parsed);
+    expect(text).toBe('Texto final');
+  });
+
+  it('debería extraer texto desde multi-step-response', () => {
+    const parsed = {
+      type: 'multi-step-response',
+      steps: [
+        { content: [{ type: 'text', text: 'Step 1' }] },
+        { content: [{ type: 'text', text: 'Step 2 final' }] },
+      ],
+    };
+    const text = (service as any).extractFinalTextFromJson(parsed);
+    expect(text).toBe('Step 2 final');
+  });
+
+  it('debería extraer texto desde coalesced-agent-step-response (continuation)', () => {
+    const parsed = {
+      type: 'coalesced-agent-step-response',
+      delegation: { message: { content: [{ type: 'text', text: 'Delegación' }] } },
+      continuation: {
+        request: { body: null },
+        response: {
+          message: { content: [{ type: 'text', text: 'Respuesta final coalesced' }] },
+        },
+      },
+      toolUseIds: [],
+    };
+    const text = (service as any).extractFinalTextFromJson(parsed);
+    expect(text).toBe('Respuesta final coalesced');
+  });
+
+  it('debería retornar null si no hay texto', () => {
+    const parsed = { content: [{ type: 'tool_use', id: 't1', name: 'bash', input: {} }] };
+    const text = (service as any).extractFinalTextFromJson(parsed);
+    expect(text).toBeNull();
+  });
+
+  it('debería retornar null para inputs no válidos', () => {
+    expect((service as any).extractFinalTextFromJson(null)).toBeNull();
+    expect((service as any).extractFinalTextFromJson('texto')).toBeNull();
+    expect((service as any).extractFinalTextFromJson([])).toBeNull();
+  });
+});

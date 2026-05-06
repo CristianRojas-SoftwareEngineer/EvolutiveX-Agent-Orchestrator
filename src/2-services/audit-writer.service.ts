@@ -3,7 +3,7 @@ import * as fs from 'node:fs/promises';
 import * as fsSync from 'node:fs';
 import { RedactService } from '../1-domain/services/redact.service.js';
 import { MarkdownRendererService } from '../1-domain/services/markdown-renderer.service.js';
-import { InteractionState, InteractionMetadata, InteractionOutcome, MarkdownRenderContext, SessionMetrics, SessionModelMetrics, SseLine, SubagentSummary, SubagentsSummary, WorkflowIndex, WorkflowSubagentSummary, WorkflowResolvedInternalTool, PendingAgentToolUse, PendingWebSearchToolUse, PendingWebFetchToolUse } from '../1-domain/types/audit.types.js';
+import { InteractionState, InteractionMetadata, InteractionOutcome, MarkdownRenderContext, SessionMetrics, SessionModelMetrics, SseLine, SubagentSummary, SubagentsSummary, WorkflowIndex, WorkflowSubagentSummary, WorkflowResolvedInternalTool, PendingAgentToolUse, PendingWebSearchToolUse, PendingWebFetchToolUse, CoalescedAgentStepResponse } from '../1-domain/types/audit.types.js';
 import { JsonValue } from '../1-domain/types/json.types.js';
 import type { IAuditWriter } from './ports/audit-writer.port.js';
 import {
@@ -455,6 +455,48 @@ export class AuditWriterService implements IAuditWriter {
   }
 
   /**
+   * Extrae el texto final de un mensaje Anthropic desde JSON semántico.
+   * Soporta mensajes normales, multi-step-response y coalesced-agent-step-response.
+   * Retorna null si no se puede extraer texto significativo.
+   */
+  private extractFinalTextFromJson(parsed: JsonValue): string | null {
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return null;
+    }
+
+    const obj = parsed as Record<string, JsonValue>;
+
+    // Caso 1: coalesced-agent-step-response - extraer de continuation.response.message
+    if (obj.type === 'coalesced-agent-step-response') {
+      const coalesced = obj as unknown as CoalescedAgentStepResponse;
+      return this.extractFinalTextFromJson(coalesced.continuation.response.message);
+    }
+
+    // Caso 2: multi-step-response - extraer del último step
+    if (obj.type === 'multi-step-response' && Array.isArray(obj.steps) && obj.steps.length > 0) {
+      const lastStep = obj.steps[obj.steps.length - 1];
+      return this.extractFinalTextFromJson(lastStep);
+    }
+
+    // Caso 3: mensaje normal Anthropic - extraer el último bloque text
+    if (Array.isArray(obj.content)) {
+      const content = obj.content;
+      let lastText = '';
+      for (const block of content) {
+        if (block && typeof block === 'object' && !Array.isArray(block)) {
+          const b = block as Record<string, JsonValue>;
+          if (b.type === 'text' && typeof b.text === 'string') {
+            lastText = b.text;
+          }
+        }
+      }
+      return lastText || null;
+    }
+
+    return null;
+  }
+
+  /**
    * Extrae resúmenes de subagentes desde los directorios sub-agent-NN bajo el step padre.
    * Correlaciona subagentes con tool_use Agent por orden cuando triggeringToolUseId es null.
    */
@@ -547,17 +589,29 @@ export class AuditWriterService implements IAuditWriter {
         const outputTokens = meta?.totals?.outputTokens || 0;
         const finalStopReason = meta?.steps?.[meta.steps.length - 1]?.stopReason || null;
 
-        // Extraer preview de respuesta final
+        // Extraer preview de respuesta final desde JSON semántico
         let finalResponsePreview: string | null = null;
         if (meta?.outcome === 'completed') {
           try {
-            const outputParsedPath = path.join(subAgentDir, 'output', 'body.parsed.md');
-            const outputRaw = await fs.readFile(outputParsedPath, 'utf8');
-            // Tomar primeras 200 caracteres como preview
-            finalResponsePreview = outputRaw.slice(0, 200).trim();
-            if (outputRaw.length > 200) finalResponsePreview += '...';
+            const outputJsonPath = path.join(subAgentDir, 'output', 'body.json');
+            const outputRaw = await fs.readFile(outputJsonPath, 'utf8');
+            const outputParsed = JSON.parse(outputRaw) as JsonValue;
+            const finalText = this.extractFinalTextFromJson(outputParsed);
+            if (finalText) {
+              // Tomar primeras 200 caracteres del texto final real
+              finalResponsePreview = finalText.slice(0, 200).trim();
+              if (finalText.length > 200) finalResponsePreview += '...';
+            }
           } catch {
-            finalResponsePreview = null;
+            // Fallback a body.parsed.md si JSON no está disponible
+            try {
+              const outputParsedPath = path.join(subAgentDir, 'output', 'body.parsed.md');
+              const outputRaw = await fs.readFile(outputParsedPath, 'utf8');
+              finalResponsePreview = outputRaw.slice(0, 200).trim();
+              if (outputRaw.length > 200) finalResponsePreview += '...';
+            } catch {
+              finalResponsePreview = null;
+            }
           }
         }
 

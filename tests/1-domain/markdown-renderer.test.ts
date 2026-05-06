@@ -474,6 +474,202 @@ describe('MarkdownRendererService', () => {
     });
   });
 
+  describe('coalesced-agent-step-response', () => {
+    it('debería renderizar coalesced-agent-step-response con contrato canónico', () => {
+      const coalesced = {
+        type: 'coalesced-agent-step-response',
+        delegation: {
+          message: {
+            content: [
+              { type: 'text', text: 'Voy a invocar subagentes para analizar el código.' },
+              { type: 'tool_use', id: 'toolu_001', name: 'Agent', input: { description: 'Análisis de código' } },
+            ],
+          },
+        },
+        continuation: {
+          request: {
+            body: {
+              messages: [{ role: 'user', content: [{ type: 'tool_result', tool_use_id: 'toolu_001', content: 'Resultado' }] }],
+            },
+          },
+          response: {
+            message: {
+              content: [
+                { type: 'thinking', thinking: 'Procesando resultados de subagentes...' },
+                { type: 'text', text: 'Basado en el análisis, el código está bien estructurado.' },
+              ],
+              stop_reason: 'end_turn',
+            },
+          },
+        },
+        toolUseIds: ['toolu_001'],
+      };
+      const md = renderer.renderResponseConversationMarkdown(coalesced);
+      expect(md).toContain('## 🔀 Fase 1: Delegación inicial');
+      expect(md).toContain('Voy a invocar subagentes para analizar el código.');
+      expect(md).toContain('## 🔀 Fase 2: Ejecución de subagentes');
+      expect(md).toContain('No se encontraron subagentes anidados para esta fase.');
+      expect(md).toContain('## 🔀 Fase 3: Respuesta final coalesced');
+      expect(md).toContain('Basado en el análisis, el código está bien estructurado.');
+      expect(md).toContain('_(stop_reason: end_turn)_');
+    });
+
+    it('debería renderizar coalesced-agent-step-response con subagents', () => {
+      const coalesced = {
+        type: 'coalesced-agent-step-response',
+        delegation: {
+          message: {
+            content: [
+              { type: 'tool_use', id: 'toolu_001', name: 'Agent', input: { description: 'Analizar' } },
+            ],
+          },
+        },
+        continuation: {
+          request: { body: null },
+          response: {
+            message: {
+              content: [{ type: 'text', text: 'Análisis completado.' }],
+              stop_reason: 'end_turn',
+            },
+          },
+        },
+        toolUseIds: ['toolu_001'],
+        subagents: {
+          items: [
+            {
+              index: 1,
+              dirName: 'sub-agent-01',
+              toolUseId: 'toolu_001',
+              inferredByOrder: false,
+              description: 'Analizar código',
+              prompt: 'Analiza el código del proyecto',
+              subagentType: 'Explore',
+              outcome: 'completed',
+              durationMs: 1500,
+              stepCount: 2,
+              toolCalls: ['read_file'],
+              inputTokens: 1000,
+              outputTokens: 500,
+              finalStopReason: 'end_turn',
+              finalResponsePreview: 'El código está bien estructurado...',
+              outputPath: 'sub-agent-01/output/body.parsed.md',
+            },
+          ],
+          count: 1,
+          completedCount: 1,
+          failedCount: 0,
+          orphanedCount: 0,
+          totalDurationMs: 1500,
+          totalInputTokens: 1000,
+          totalOutputTokens: 500,
+        },
+      };
+      const md = renderer.renderResponseConversationMarkdown(coalesced);
+      expect(md).toContain('## 🔀 Fase 1: Delegación inicial');
+      expect(md).toContain('## 🔀 Fase 2: Ejecución de subagentes');
+      expect(md).toContain('Se ejecutaron 1 subagente en paralelo durante esta fase.');
+      expect(md).toContain('**Completados:** 1');
+      expect(md).toContain('Subagente 1: Analizar código');
+      expect(md).toContain('**Tipo:** Explore');
+      expect(md).toContain('**Estado:** ✅ Completado');
+      expect(md).toContain('**Respuesta preview:** El código está bien estructurado...');
+      expect(md).toContain('## 🔀 Fase 3: Respuesta final coalesced');
+      expect(md).toContain('Análisis completado.');
+    });
+
+    it('debería renderizar multi-step con único step coalesced', () => {
+      const steps = [
+        {
+          stepIndex: 1,
+          parsed: {
+            type: 'coalesced-agent-step-response',
+            delegation: {
+              message: {
+                content: [{ type: 'tool_use', id: 'toolu_001', name: 'Agent', input: { description: 'Análisis' } }],
+              },
+            },
+            continuation: {
+              request: { body: null },
+              response: {
+                message: {
+                  content: [{ type: 'text', text: 'Resultado consolidado.' }],
+                  stop_reason: 'end_turn',
+                },
+              },
+            },
+            toolUseIds: ['toolu_001'],
+          },
+        },
+      ];
+      const md = renderer.renderMultiStepResponseMarkdown(steps);
+      expect(md).toContain('# Respuesta del Asistente');
+      expect(md).toContain('## 🔀 Fase 1: Delegación inicial');
+      expect(md).toContain('## 🔀 Fase 2: Ejecución de subagentes');
+      expect(md).toContain('## 🔀 Fase 3: Respuesta final coalesced');
+      expect(md).toContain('Resultado consolidado.');
+    });
+
+    it('debería generar TOC con entradas específicas para steps coalesced', () => {
+      const steps = [
+        {
+          stepIndex: 1,
+          parsed: {
+            type: 'coalesced-agent-step-response',
+            delegation: { message: { content: [] } },
+            continuation: {
+              request: { body: null },
+              response: { message: { content: [], stop_reason: 'end_turn' } },
+            },
+            toolUseIds: [],
+            subagents: {
+              items: [
+                {
+                  index: 1,
+                  dirName: 'sub-agent-01',
+                  toolUseId: 'toolu_001',
+                  inferredByOrder: false,
+                  description: 'Test',
+                  prompt: 'Test',
+                  subagentType: null,
+                  outcome: 'completed',
+                  durationMs: 100,
+                  stepCount: 1,
+                  toolCalls: [],
+                  inputTokens: 10,
+                  outputTokens: 5,
+                  finalStopReason: 'end_turn',
+                  finalResponsePreview: 'Preview...',
+                  outputPath: 'sub-agent-01/output/body.parsed.md',
+                },
+              ],
+              count: 1,
+              completedCount: 1,
+              failedCount: 0,
+              orphanedCount: 0,
+              totalDurationMs: 100,
+              totalInputTokens: 10,
+              totalOutputTokens: 5,
+            },
+          },
+        },
+        {
+          stepIndex: 2,
+          parsed: {
+            stop_reason: 'end_turn',
+            content: [{ type: 'text', text: 'Segundo step normal' }],
+          },
+        },
+      ];
+      const md = renderer.renderMultiStepResponseMarkdown(steps);
+      expect(md).toContain('## Contenido');
+      expect(md).toContain('- [Step 1 de 2 — end_turn]');
+      expect(md).toContain('  - [Delegación inicial]');
+      expect(md).toContain('  - [Ejecución de subagentes]');
+      expect(md).toContain('  - [Respuesta final coalesced]');
+      expect(md).toContain('- [Step 2 de 2 — end_turn]');
+    });
+  });
+
   describe('referencia thought/content.md', () => {
     it('debería usar referencia a thought/content.md cuando thoughtContentPath está presente', () => {
       const longThinking = 'a'.repeat(6000);

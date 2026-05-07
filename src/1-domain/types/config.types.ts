@@ -39,15 +39,6 @@ export interface ProxyEnvironmentConfig {
   /** Control de compresión (gzip, identity) al comunicarse con el upstream. */
   UPSTREAM_ACCEPT_ENCODING: string;
 
-  /** Si es true, redacta datos sensibles en la salida de consola. */
-  CONSOLE_REDACT: boolean;
-
-  /** Si es true, loguea eventos SSE individuales a la consola. */
-  LOG_SSE: boolean;
-
-  /** Límite de bytes para loguear cuerpos en consola. */
-  MAX_BODY_LOG_BYTES: number;
-
   /** Si es true, remueve el flag redact-thinking-2026-02-12 del header anthropic-beta para capturar thinking legible. */
   PROXY_UNREDACT_THINKING?: boolean;
 

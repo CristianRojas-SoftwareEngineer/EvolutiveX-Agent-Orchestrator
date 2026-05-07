@@ -20,9 +20,6 @@ function makeConfig(overrides: Partial<ProxyEnvironmentConfig> = {}): ProxyEnvir
     STRIP_AUDIT_SESSION_HEADER: true,
     AUDIT_SESSION_HASH_SUFFIX: false,
     UPSTREAM_ACCEPT_ENCODING: 'identity',
-    CONSOLE_REDACT: true,
-    LOG_SSE: false,
-    MAX_BODY_LOG_BYTES: 2048,
     FILTERED_TOOLS: [],
     ...overrides,
   };

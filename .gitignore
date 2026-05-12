@@ -23,3 +23,7 @@ server/
 
 # Secrets de providers (API keys)
 routing/providers/*/secrets.json
+
+# Claude/Windsurf config
+.windsurf/
+.claude/

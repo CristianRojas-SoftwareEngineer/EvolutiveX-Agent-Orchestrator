@@ -173,14 +173,8 @@ export function computeTokenTotals(steps: StepMeta[]): {
           acc.cacheReadInputTokens +
           (s.cacheReadInputTokens ?? 0) +
           (continuation?.cacheReadInputTokens ?? 0),
-        inputTokens:
-          acc.inputTokens +
-          (s.inputTokens ?? 0) +
-          (continuation?.inputTokens ?? 0),
-        outputTokens:
-          acc.outputTokens +
-          (s.outputTokens ?? 0) +
-          (continuation?.outputTokens ?? 0),
+        inputTokens: acc.inputTokens + (s.inputTokens ?? 0) + (continuation?.inputTokens ?? 0),
+        outputTokens: acc.outputTokens + (s.outputTokens ?? 0) + (continuation?.outputTokens ?? 0),
       };
     },
     { cacheCreationInputTokens: 0, cacheReadInputTokens: 0, inputTokens: 0, outputTokens: 0 },
@@ -193,9 +187,7 @@ export function computeTokenTotals(steps: StepMeta[]): {
 export function computeSseRawBytesTotal(steps: StepMeta[]): number {
   return steps.reduce(
     (acc, s) =>
-      acc +
-      (s.sseRawBytesWritten ?? 0) +
-      (s.coalescedAgentContinuation?.sseRawBytesWritten ?? 0),
+      acc + (s.sseRawBytesWritten ?? 0) + (s.coalescedAgentContinuation?.sseRawBytesWritten ?? 0),
     0,
   );
 }
@@ -334,7 +326,6 @@ export interface ResolvedInternalTool {
    */
   resolvedInStepIndex?: number;
 }
-
 
 export interface ActiveInteraction {
   interactionDir: string;
@@ -487,7 +478,6 @@ export interface InteractionState {
   /** Presente sólo en interacciones de subagentes anidadas bajo el step padre. */
   parentContext?: ParentContext;
 }
-
 
 /**
  * Opciones para la reconstrucción del cuerpo de respuesta desde bytes SSE.

@@ -1,5 +1,9 @@
 import type { JsonValue } from '../types/json.types.js';
-import type { MarkdownRenderContext, SubagentsSummary, CoalescedAgentStepResponse } from '../types/audit.types.js';
+import type {
+  MarkdownRenderContext,
+  SubagentsSummary,
+  CoalescedAgentStepResponse,
+} from '../types/audit.types.js';
 
 /**
  * Servicio para renderizar cuerpos JSON de petición/respuesta como Markdown semántico legible.
@@ -236,7 +240,9 @@ export class MarkdownRendererService {
 
     // Detectar si los stepIndex son contiguos
     const sortedIndices = steps.map((s) => s.stepIndex).sort((a, b) => a - b);
-    const isContiguous = sortedIndices.every((idx, i) => i === 0 || idx === sortedIndices[i - 1] + 1);
+    const isContiguous = sortedIndices.every(
+      (idx, i) => i === 0 || idx === sortedIndices[i - 1] + 1,
+    );
     const total = isContiguous ? steps.length : Math.max(...steps.map((s) => s.stepIndex));
 
     const rootHeading = this.buildRootHeading('response', context);
@@ -251,8 +257,11 @@ export class MarkdownRendererService {
 
     for (let i = 0; i < steps.length; i++) {
       const { stepIndex, parsed } = steps[i];
-      const isCoalesced = parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-        && (parsed as Record<string, JsonValue>).type === 'coalesced-agent-step-response';
+      const isCoalesced =
+        parsed &&
+        typeof parsed === 'object' &&
+        !Array.isArray(parsed) &&
+        (parsed as Record<string, JsonValue>).type === 'coalesced-agent-step-response';
 
       let stopReason = '';
       if (isCoalesced) {
@@ -309,17 +318,29 @@ export class MarkdownRendererService {
     if (coalesced.subagents && coalesced.subagents.items.length > 0) {
       parts.push('---');
       parts.push(this.heading(headingLevel, '🔀 Fase 2: Ejecución de subagentes'));
-      parts.push(`Se ejecutaron ${coalesced.subagents.count} subagente${coalesced.subagents.count === 1 ? '' : 's'} en paralelo durante esta fase.`);
-      parts.push(`**Completados:** ${coalesced.subagents.completedCount} | **Fallidos:** ${coalesced.subagents.failedCount} | **Huérfanos:** ${coalesced.subagents.orphanedCount}`);
-      parts.push(`**Duración total:** ${this.formatDuration(coalesced.subagents.totalDurationMs)} | **Tokens:** ${coalesced.subagents.totalInputTokens} input, ${coalesced.subagents.totalOutputTokens} output`);
+      parts.push(
+        `Se ejecutaron ${coalesced.subagents.count} subagente${coalesced.subagents.count === 1 ? '' : 's'} en paralelo durante esta fase.`,
+      );
+      parts.push(
+        `**Completados:** ${coalesced.subagents.completedCount} | **Fallidos:** ${coalesced.subagents.failedCount} | **Huérfanos:** ${coalesced.subagents.orphanedCount}`,
+      );
+      parts.push(
+        `**Duración total:** ${this.formatDuration(coalesced.subagents.totalDurationMs)} | **Tokens:** ${coalesced.subagents.totalInputTokens} input, ${coalesced.subagents.totalOutputTokens} output`,
+      );
       parts.push('');
 
       for (const subagent of coalesced.subagents.items) {
-        parts.push(this.heading(headingLevel + 1, `Subagente ${subagent.index}: ${subagent.description}`));
-        parts.push(`**ID tool_use:** \`${subagent.toolUseId || 'no correlacionado'}\`${subagent.inferredByOrder ? ' (inferido por orden - legacy)' : ''}`);
+        parts.push(
+          this.heading(headingLevel + 1, `Subagente ${subagent.index}: ${subagent.description}`),
+        );
+        parts.push(
+          `**ID tool_use:** \`${subagent.toolUseId || 'no correlacionado'}\`${subagent.inferredByOrder ? ' (inferido por orden - legacy)' : ''}`,
+        );
         parts.push(`**Tipo:** ${subagent.subagentType || 'general-purpose'}`);
         parts.push(`**Estado:** ${this.formatOutcome(subagent.outcome)}`);
-        parts.push(`**Duración:** ${this.formatDuration(subagent.durationMs)} | **Steps:** ${subagent.stepCount} | **Tokens:** ${subagent.inputTokens}/${subagent.outputTokens}`);
+        parts.push(
+          `**Duración:** ${this.formatDuration(subagent.durationMs)} | **Steps:** ${subagent.stepCount} | **Tokens:** ${subagent.inputTokens}/${subagent.outputTokens}`,
+        );
         if (subagent.toolCalls.length > 0) {
           parts.push(`**Herramientas:** ${subagent.toolCalls.join(', ')}`);
         }
@@ -339,7 +360,13 @@ export class MarkdownRendererService {
     parts.push('---');
     parts.push(this.heading(headingLevel, '🔀 Fase 3: Respuesta final coalesced'));
     parts.push('Mensaje final del agente principal tras procesar todos los resultados.');
-    parts.push(...this.renderStepSections(coalesced.continuation.response.message, headingLevel + 1, context));
+    parts.push(
+      ...this.renderStepSections(
+        coalesced.continuation.response.message,
+        headingLevel + 1,
+        context,
+      ),
+    );
 
     return parts;
   }
@@ -458,9 +485,7 @@ export class MarkdownRendererService {
         case 'thinking': {
           typeCounters.thinking = (typeCounters.thinking ?? 0) + 1;
           const counter = typeCounters.thinking;
-          const title = counter > 1
-            ? `Razonamiento interno (${counter})`
-            : 'Razonamiento interno';
+          const title = counter > 1 ? `Razonamiento interno (${counter})` : 'Razonamiento interno';
           const fullThinking = seg.blocks.join('\n\n---\n\n');
           const truncated = this.truncateWithIndicator(
             fullThinking,
@@ -488,9 +513,7 @@ export class MarkdownRendererService {
         case 'toolUse': {
           typeCounters.toolUse = (typeCounters.toolUse ?? 0) + 1;
           const counter = typeCounters.toolUse;
-          const title = counter > 1
-            ? `Acciones solicitadas (${counter})`
-            : 'Acciones solicitadas';
+          const title = counter > 1 ? `Acciones solicitadas (${counter})` : 'Acciones solicitadas';
           parts.push(this.heading(headingLevel, title));
           for (const entry of seg.entries) {
             const idStr = entry.id ? `(id: \`${entry.id}\`)` : '';
@@ -511,9 +534,10 @@ export class MarkdownRendererService {
     }
 
     // Renderizado de errores del proveedor (si existen en el step)
-    const error = obj.error && typeof obj.error === 'object' && !Array.isArray(obj.error)
-      ? obj.error as Record<string, JsonValue>
-      : undefined;
+    const error =
+      obj.error && typeof obj.error === 'object' && !Array.isArray(obj.error)
+        ? (obj.error as Record<string, JsonValue>)
+        : undefined;
 
     if (error) {
       parts.push(this.heading(headingLevel, 'Error del Proveedor'));
@@ -556,7 +580,8 @@ export class MarkdownRendererService {
 
     if (type === 'request') {
       if (interactionType === 'side-request') {
-        if (sideRequestKind === 'session-naming') return this.heading(1, 'Prompt del Side-request — session-naming');
+        if (sideRequestKind === 'session-naming')
+          return this.heading(1, 'Prompt del Side-request — session-naming');
         return this.heading(1, 'Prompt del Side-request');
       }
       if (interactionType === 'client-preflight') return this.heading(1, 'Prompt del Preflight');
@@ -566,7 +591,8 @@ export class MarkdownRendererService {
 
     // response
     if (interactionType === 'side-request') {
-      if (sideRequestKind === 'session-naming') return this.heading(1, 'Respuesta del Side-request — session-naming');
+      if (sideRequestKind === 'session-naming')
+        return this.heading(1, 'Respuesta del Side-request — session-naming');
       return this.heading(1, 'Respuesta del Side-request');
     }
     if (interactionType === 'client-preflight') return this.heading(1, 'Respuesta del Preflight');
@@ -583,16 +609,19 @@ export class MarkdownRendererService {
     const lines: string[] = [];
 
     if (context.stepIndex !== undefined && context.stepCount !== undefined) {
-      const interactionLabel = context.interactionType === 'side-request'
-        ? context.sideRequestKind === 'session-naming'
-          ? 'Side-request — session-naming'
-          : 'Side-request'
-        : context.interactionType === 'client-preflight'
-          ? 'Preflight'
-          : context.subagentType
-            ? `Subagente (\`${context.subagentType}\`)`
-            : 'Interacción Principal';
-      lines.push(`**Interacción:** ${interactionLabel} — Step ${context.stepIndex} de ${context.stepCount}`);
+      const interactionLabel =
+        context.interactionType === 'side-request'
+          ? context.sideRequestKind === 'session-naming'
+            ? 'Side-request — session-naming'
+            : 'Side-request'
+          : context.interactionType === 'client-preflight'
+            ? 'Preflight'
+            : context.subagentType
+              ? `Subagente (\`${context.subagentType}\`)`
+              : 'Interacción Principal';
+      lines.push(
+        `**Interacción:** ${interactionLabel} — Step ${context.stepIndex} de ${context.stepCount}`,
+      );
     } else if (context.subagentType) {
       lines.push(`**Tipo:** Subagente (\`${context.subagentType}\`)`);
     }
@@ -621,8 +650,11 @@ export class MarkdownRendererService {
     const tocLines: string[] = ['## Contenido', ''];
 
     for (const { stepIndex, parsed } of steps) {
-      const isCoalesced = parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-        && (parsed as Record<string, JsonValue>).type === 'coalesced-agent-step-response';
+      const isCoalesced =
+        parsed &&
+        typeof parsed === 'object' &&
+        !Array.isArray(parsed) &&
+        (parsed as Record<string, JsonValue>).type === 'coalesced-agent-step-response';
 
       let stopReason = '';
       if (isCoalesced) {
@@ -645,9 +677,15 @@ export class MarkdownRendererService {
       if (isCoalesced) {
         const coalesced = parsed as unknown as CoalescedAgentStepResponse;
         if (coalesced.subagents && coalesced.subagents.items.length > 0) {
-          tocLines.push(`  - [Delegación inicial](#${this.githubAnchor(stepLabel + ' ' + '🔀 Fase 1: Delegación inicial')})`);
-          tocLines.push(`  - [Ejecución de subagentes](#${this.githubAnchor(stepLabel + ' ' + '🔀 Fase 2: Ejecución de subagentes')})`);
-          tocLines.push(`  - [Respuesta final coalesced](#${this.githubAnchor(stepLabel + ' ' + '🔀 Fase 3: Respuesta final coalesced')})`);
+          tocLines.push(
+            `  - [Delegación inicial](#${this.githubAnchor(stepLabel + ' ' + '🔀 Fase 1: Delegación inicial')})`,
+          );
+          tocLines.push(
+            `  - [Ejecución de subagentes](#${this.githubAnchor(stepLabel + ' ' + '🔀 Fase 2: Ejecución de subagentes')})`,
+          );
+          tocLines.push(
+            `  - [Respuesta final coalesced](#${this.githubAnchor(stepLabel + ' ' + '🔀 Fase 3: Respuesta final coalesced')})`,
+          );
         }
         continue;
       }
@@ -660,13 +698,25 @@ export class MarkdownRendererService {
             : []
           : [];
       const hasThinking = content.some(
-        (b) => b && typeof b === 'object' && !Array.isArray(b) && (b as Record<string, JsonValue>).type === 'thinking',
+        (b) =>
+          b &&
+          typeof b === 'object' &&
+          !Array.isArray(b) &&
+          (b as Record<string, JsonValue>).type === 'thinking',
       );
       const hasToolUse = content.some(
-        (b) => b && typeof b === 'object' && !Array.isArray(b) && (b as Record<string, JsonValue>).type === 'tool_use',
+        (b) =>
+          b &&
+          typeof b === 'object' &&
+          !Array.isArray(b) &&
+          (b as Record<string, JsonValue>).type === 'tool_use',
       );
       const hasText = content.some(
-        (b) => b && typeof b === 'object' && !Array.isArray(b) && (b as Record<string, JsonValue>).type === 'text',
+        (b) =>
+          b &&
+          typeof b === 'object' &&
+          !Array.isArray(b) &&
+          (b as Record<string, JsonValue>).type === 'text',
       );
 
       if (hasThinking) {
@@ -715,7 +765,7 @@ export class MarkdownRendererService {
 
     // Extraer nombre de la skill del primer bloque
     const skillNameMatch = firstLine.match(/Base directory for this skill:\s*(.+)/);
-    const skillName = skillNameMatch ? skillNameMatch[1].split('/').pop() ?? 'skill' : 'skill';
+    const skillName = skillNameMatch ? (skillNameMatch[1].split('/').pop() ?? 'skill') : 'skill';
 
     // Buscar el final del contenido Skill (doble salto de línea o cambio de bloque)
     // El contenido Skill termina cuando encontramos una línea vacía seguida de contenido no-Skill

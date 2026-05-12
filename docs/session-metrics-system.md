@@ -71,12 +71,12 @@ La invocación principal ocurre per-step, justo después de `pushStepMetaByDir`,
 currentTurn?.modelId
 ```
 
-| Punto de invocación | Archivo | `stepCount` |
-|---------------------|---------|-------------|
-| Después de `pushStepMetaByDir` (SSE) | `src/3-operations/audit-sse-response.handler.ts` | `1` |
-| Después de `pushStepMetaByDir` (non-SSE) | `src/3-operations/audit-standard-response.handler.ts` | `1` |
-| `execute` (error upstream) | `src/3-operations/audit-upstream-error.handler.ts` | `stepsMeta.length` |
-| `closeOrphanTurn` | `src/3-operations/audit-interaction.handler.ts` | `turn.stepsMeta.length` |
+| Punto de invocación                      | Archivo                                               | `stepCount`             |
+| ---------------------------------------- | ----------------------------------------------------- | ----------------------- |
+| Después de `pushStepMetaByDir` (SSE)     | `src/3-operations/audit-sse-response.handler.ts`      | `1`                     |
+| Después de `pushStepMetaByDir` (non-SSE) | `src/3-operations/audit-standard-response.handler.ts` | `1`                     |
+| `execute` (error upstream)               | `src/3-operations/audit-upstream-error.handler.ts`    | `stepsMeta.length`      |
+| `closeOrphanTurn`                        | `src/3-operations/audit-interaction.handler.ts`       | `turn.stepsMeta.length` |
 
 Los `client-preflight` están explícitamente excluidos porque no generan tokens de usuario.
 

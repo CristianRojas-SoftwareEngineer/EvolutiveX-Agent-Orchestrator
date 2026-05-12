@@ -193,8 +193,14 @@ El port `ISseReconstructor` ahora tiene dos métodos de reconstrucción:
 En `AuditSseResponseHandler`, cuando se detecta un step coalesced:
 
 ```ts
-const initialMessage = await this.sseReconstruct.reconstructSseJsonlPhaseMessage(sseJsonlPath, 'delegation');
-const finalMessage = await this.sseReconstruct.reconstructSseJsonlPhaseMessage(sseJsonlPath, 'continuation');
+const initialMessage = await this.sseReconstruct.reconstructSseJsonlPhaseMessage(
+  sseJsonlPath,
+  'delegation',
+);
+const finalMessage = await this.sseReconstruct.reconstructSseJsonlPhaseMessage(
+  sseJsonlPath,
+  'continuation',
+);
 ```
 
 Esto permite reconstruir la delegación inicial (con `tool_use Agent` y `stop_reason = tool_use`) y la respuesta final (con texto y `message_stop`) sin falsificar eventos ni usar el SDK con streams incompletos.

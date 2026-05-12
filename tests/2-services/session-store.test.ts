@@ -151,7 +151,10 @@ describe('SessionStoreService — interactionRegistry', () => {
 
   it('concurrent side-request no interfiere con interacción agentic registrado', () => {
     const mainInteraction = makeInteraction({ interactionDir: '/tmp/main' });
-    const sideInteraction = makeInteraction({ interactionDir: '/tmp/side', interactionType: 'side-request' });
+    const sideInteraction = makeInteraction({
+      interactionDir: '/tmp/side',
+      interactionType: 'side-request',
+    });
 
     store.registerInteraction(mainInteraction);
     store.registerInteraction(sideInteraction);
@@ -179,7 +182,9 @@ describe('SessionStoreService — pending Agent tool_uses', () => {
   it('registerPendingAgentToolUse + findInteractionWithPendingAgents (caso unívoco)', () => {
     const interaction = makeInteraction({ interactionDir: '/tmp/p1', sessionId: 'sA' });
     store.registerInteraction(interaction);
-    store.registerPendingAgentToolUse('/tmp/p1', 1, 'tool-aaa', { subagentType: 'general-purpose' });
+    store.registerPendingAgentToolUse('/tmp/p1', 1, 'tool-aaa', {
+      subagentType: 'general-purpose',
+    });
 
     const found = store.findInteractionWithPendingAgents('sA');
     expect(found).not.toBeNull();

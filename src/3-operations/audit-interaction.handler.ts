@@ -122,7 +122,8 @@ export class AuditInteractionHandler {
       // ejecuta WebSearch haciendo una llamada interna a la API que el proxy
       // captura como fresh. Si hay un pending web_search, redirigir como step
       // adicional del padre en lugar de crear un sub-agente.
-      const webSearchPending = this.sessionStore.findInteractionWithPendingWebSearch(auditSessionId);
+      const webSearchPending =
+        this.sessionStore.findInteractionWithPendingWebSearch(auditSessionId);
       if (webSearchPending) {
         return this.handleWebSearchStep(
           params,
@@ -428,9 +429,9 @@ export class AuditInteractionHandler {
         stepsMeta: [],
         sessionId: auditSessionId,
         pendingAgentToolUses: [],
-      pendingWebSearchToolUses: [],
-      pendingWebFetchToolUses: [],
-      resolvedInternalTools: [],
+        pendingWebSearchToolUses: [],
+        pendingWebFetchToolUses: [],
+        resolvedInternalTools: [],
         parentContext,
         modelId: extractModelFromRequestBody(params.rawBody) ?? undefined,
       });
@@ -669,7 +670,10 @@ export class AuditInteractionHandler {
     parentInteraction.awaitingContinuation = false;
     parentInteraction.awaitingSince = undefined;
 
-    const agentContinuationTarget = this.resolveAgentContinuationTarget(parentInteraction, toolUseIds);
+    const agentContinuationTarget = this.resolveAgentContinuationTarget(
+      parentInteraction,
+      toolUseIds,
+    );
     if (agentContinuationTarget) {
       // Parsear la request de continuation en memoria para evitar crear archivos temporales
       const continuationHeaders = headersForAudit;
@@ -680,7 +684,9 @@ export class AuditInteractionHandler {
         continuationRequest = null; // Body omitido por tamaño
       } else {
         try {
-          continuationRequest = body.length ? JSON.parse(body.toString('utf8')) as JsonValue : null;
+          continuationRequest = body.length
+            ? (JSON.parse(body.toString('utf8')) as JsonValue)
+            : null;
         } catch {
           continuationRequest = null; // Body inválido
         }
@@ -912,7 +918,10 @@ export class AuditInteractionHandler {
     // - tools: [] (ya clasificado como side-request)
     // - No es implementación WebFetch interna (ya filtrado antes de este handler)
     // - output_config con JSON schema que requiere campo "title" (detectado por el método)
-    const isSessionNaming = await this.detectSessionNamingSideRequest(auditSessionId, params.rawBody);
+    const isSessionNaming = await this.detectSessionNamingSideRequest(
+      auditSessionId,
+      params.rawBody,
+    );
 
     await this.auditWriter.writeInteractionState(interactionDir, {
       state: 'in-progress',
@@ -960,7 +969,10 @@ export class AuditInteractionHandler {
    * en cualquier momento de la sesión. El patrón de output_config es suficientemente
    * distintivo para identificar side-requests de naming.
    */
-  private async detectSessionNamingSideRequest(_auditSessionId: string, rawBody: Buffer): Promise<boolean> {
+  private async detectSessionNamingSideRequest(
+    _auditSessionId: string,
+    rawBody: Buffer,
+  ): Promise<boolean> {
     try {
       // Patrón 1: Analizar output_config para detectar JSON schema con campo "title"
       const bodyText = rawBody.toString('utf8');
@@ -1102,13 +1114,19 @@ export class AuditInteractionHandler {
     const sseRawBytesTotal = computeSseRawBytesTotal(interaction.stepsMeta);
     const sseRawTruncatedAny = interaction.stepsMeta.some((s) => s.sseRawTruncatedByLimit === true);
     const totals =
-      interaction.interactionType !== 'client-preflight' ? computeTokenTotals(interaction.stepsMeta) : null;
+      interaction.interactionType !== 'client-preflight'
+        ? computeTokenTotals(interaction.stepsMeta)
+        : null;
     const lostPendings =
       interaction.pendingAgentToolUses.length > 0 ? interaction.pendingAgentToolUses : undefined;
     const lostPendingsWebSearch =
-      interaction.pendingWebSearchToolUses.length > 0 ? interaction.pendingWebSearchToolUses : undefined;
+      interaction.pendingWebSearchToolUses.length > 0
+        ? interaction.pendingWebSearchToolUses
+        : undefined;
     const lostPendingsWebFetch =
-      interaction.pendingWebFetchToolUses.length > 0 ? interaction.pendingWebFetchToolUses : undefined;
+      interaction.pendingWebFetchToolUses.length > 0
+        ? interaction.pendingWebFetchToolUses
+        : undefined;
 
     this.sessionStore.closeInteraction(interaction.interactionDir);
 
@@ -1151,12 +1169,18 @@ export class AuditInteractionHandler {
       const sessionDir = path.join(this.sessionStore.getBaseDir(), interaction.sessionId);
       await this.sessionStore.withSessionLock(interaction.sessionId, async () => {
         await this.auditWriter
-          .updateSessionMetrics(sessionDir, interaction.modelId!, totals, interaction.stepsMeta.length)
-          .catch(() => { /* error no crítico */ });
+          .updateSessionMetrics(
+            sessionDir,
+            interaction.modelId!,
+            totals,
+            interaction.stepsMeta.length,
+          )
+          .catch(() => {
+            /* error no crítico */
+          });
       });
     }
 
     await this.auditWriter.removeInteractionState(interaction.interactionDir);
   }
-
 }

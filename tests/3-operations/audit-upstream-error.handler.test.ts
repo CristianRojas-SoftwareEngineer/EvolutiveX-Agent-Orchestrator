@@ -3,7 +3,11 @@ import { AuditUpstreamErrorHandler } from '../../src/3-operations/audit-upstream
 import type { IAuditWriter } from '../../src/2-services/ports/audit-writer.port.js';
 import type { ISessionStore } from '../../src/2-services/ports/session-store.port.js';
 import { ProxyEnvironmentConfig } from '../../src/1-domain/types/config.types.js';
-import { ActiveInteraction, StepMeta, InteractionMetadata } from '../../src/1-domain/types/audit.types.js';
+import {
+  ActiveInteraction,
+  StepMeta,
+  InteractionMetadata,
+} from '../../src/1-domain/types/audit.types.js';
 
 function makeConfig(overrides: Partial<ProxyEnvironmentConfig> = {}): ProxyEnvironmentConfig {
   return {

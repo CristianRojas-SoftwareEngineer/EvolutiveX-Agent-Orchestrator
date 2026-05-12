@@ -96,10 +96,7 @@ describe('Test de Integración - SseReconstructService (fuente: sse.jsonl)', () 
     expect(result.sseResponseBodyWritten).toBe(true);
     expect(result.sseResponseBodySource).toBe('file');
 
-    const jsonContent = await fs.readFile(
-      path.join(interactionDir, 'output', 'body.json'),
-      'utf8',
-    );
+    const jsonContent = await fs.readFile(path.join(interactionDir, 'output', 'body.json'), 'utf8');
     const parsed = JSON.parse(jsonContent);
 
     // Formato multi-step-response
@@ -340,9 +337,17 @@ describe('SseReconstructService - reconstrucción por fase (coalesced)', () => {
       'data: {"type":"message_delta","delta":{"stop_reason":"tool_use"}}',
     ];
 
-    const jsonlContent = delegationLines
-      .map((line, i) => JSON.stringify({ i: i + 1, ts: '2026-01-01T00:00:00Z', line, phase: 'delegation' as const }))
-      .join('\n') + '\n';
+    const jsonlContent =
+      delegationLines
+        .map((line, i) =>
+          JSON.stringify({
+            i: i + 1,
+            ts: '2026-01-01T00:00:00Z',
+            line,
+            phase: 'delegation' as const,
+          }),
+        )
+        .join('\n') + '\n';
     await fs.writeFile(jsonlPath, jsonlContent, 'utf8');
 
     const message = await service.reconstructSseJsonlPhaseMessage(jsonlPath, 'delegation');
@@ -378,9 +383,17 @@ describe('SseReconstructService - reconstrucción por fase (coalesced)', () => {
       'data: {"type":"message_stop"}',
     ];
 
-    const jsonlContent = continuationLines
-      .map((line, i) => JSON.stringify({ i: i + 1, ts: '2026-01-01T00:00:00Z', line, phase: 'continuation' as const }))
-      .join('\n') + '\n';
+    const jsonlContent =
+      continuationLines
+        .map((line, i) =>
+          JSON.stringify({
+            i: i + 1,
+            ts: '2026-01-01T00:00:00Z',
+            line,
+            phase: 'continuation' as const,
+          }),
+        )
+        .join('\n') + '\n';
     await fs.writeFile(jsonlPath, jsonlContent, 'utf8');
 
     const message = await service.reconstructSseJsonlPhaseMessage(jsonlPath, 'continuation');
@@ -415,18 +428,25 @@ describe('SseReconstructService - reconstrucción por fase (coalesced)', () => {
       'data: {"type":"content_block_stop","index":0}',
     ];
 
-    const jsonlContent = mixedLines
-      .map((line, i) => {
-        const phase = i < 5 ? 'delegation' : 'continuation';
-        return JSON.stringify({ i: i + 1, ts: '2026-01-01T00:00:00Z', line, phase });
-      })
-      .join('\n') + '\n';
+    const jsonlContent =
+      mixedLines
+        .map((line, i) => {
+          const phase = i < 5 ? 'delegation' : 'continuation';
+          return JSON.stringify({ i: i + 1, ts: '2026-01-01T00:00:00Z', line, phase });
+        })
+        .join('\n') + '\n';
     await fs.writeFile(jsonlPath, jsonlContent, 'utf8');
 
-    const delegationMessage = await service.reconstructSseJsonlPhaseMessage(jsonlPath, 'delegation');
+    const delegationMessage = await service.reconstructSseJsonlPhaseMessage(
+      jsonlPath,
+      'delegation',
+    );
     expect(delegationMessage.id).toBe('msg_01');
 
-    const continuationMessage = await service.reconstructSseJsonlPhaseMessage(jsonlPath, 'continuation');
+    const continuationMessage = await service.reconstructSseJsonlPhaseMessage(
+      jsonlPath,
+      'continuation',
+    );
     expect(continuationMessage.id).toBe('msg_02');
   });
 });

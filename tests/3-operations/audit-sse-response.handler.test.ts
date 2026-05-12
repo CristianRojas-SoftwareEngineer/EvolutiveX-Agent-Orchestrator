@@ -477,7 +477,12 @@ describe('AuditSseResponseHandler', () => {
 
   it('debería registrar pendingAgentToolUse al ver content_block_start tool_use name=Agent', async () => {
     const config = makeConfig();
-    const calls: Array<{ dir: string; step: number; id: string; metadata?: { subagentType?: string } | undefined }> = [];
+    const calls: Array<{
+      dir: string;
+      step: number;
+      id: string;
+      metadata?: { subagentType?: string } | undefined;
+    }> = [];
     const interaction = makeActiveInteraction();
     const store = makeSessionStore(interaction, {
       registerPendingAgentToolUse: (dir, step, id, metadata) => {
@@ -516,7 +521,12 @@ describe('AuditSseResponseHandler', () => {
     // Dos llamadas esperadas: una en content_block_start (sin metadata)
     // y una al cerrar el bloque (con metadata.subagentType='Explore').
     expect(calls.length).toBeGreaterThanOrEqual(2);
-    expect(calls[0]).toEqual({ dir: interaction.interactionDir, step: 1, id: 'toolu_a', metadata: undefined });
+    expect(calls[0]).toEqual({
+      dir: interaction.interactionDir,
+      step: 1,
+      id: 'toolu_a',
+      metadata: undefined,
+    });
     const enriched = calls.find((c) => c.metadata?.subagentType === 'Explore');
     expect(enriched).toBeDefined();
     expect(enriched!.id).toBe('toolu_a');
@@ -899,7 +909,8 @@ describe('AuditSseResponseHandler', () => {
         runReconstruction: async () => ({
           sseResponseBodyAttempted: true,
           sseResponseBodyWritten: false,
-          sseResponseBodyError: 'sse.jsonl contiene múltiples mensajes completos (múltiples message_start)',
+          sseResponseBodyError:
+            'sse.jsonl contiene múltiples mensajes completos (múltiples message_start)',
         }),
       }),
       config,

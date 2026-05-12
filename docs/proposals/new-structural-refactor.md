@@ -59,14 +59,14 @@ sessions/
 
 ## Reglas de nomenclatura
 
-| Símbolo en diagrama | Dimensión | Formato | Ejemplo |
-|---|---|---|---|
-| `XX` | Índice de interacción en `main-agent/interactions/` | 2 dígitos, sin UUID | `01`, `12` |
-| `MM` | Índice de interacción en `side-interactions/` | 2 dígitos, sin UUID | `01`, `06` |
-| `YY` | Índice de step dentro de una interacción agéntica | 2 dígitos | `01`, `03` |
-| `ZZ` | Índice de step dentro de un subagente | 2 dígitos | `01`, `02` |
-| `NN` | Índice de step dentro de una side-interaction | 2 dígitos | `01`, `04` |
-| `TT` | Índice de subagente (`sub-agent-TT`) | 2 dígitos | `01`, `02` |
+| Símbolo en diagrama | Dimensión                                           | Formato             | Ejemplo    |
+| ------------------- | --------------------------------------------------- | ------------------- | ---------- |
+| `XX`                | Índice de interacción en `main-agent/interactions/` | 2 dígitos, sin UUID | `01`, `12` |
+| `MM`                | Índice de interacción en `side-interactions/`       | 2 dígitos, sin UUID | `01`, `06` |
+| `YY`                | Índice de step dentro de una interacción agéntica   | 2 dígitos           | `01`, `03` |
+| `ZZ`                | Índice de step dentro de un subagente               | 2 dígitos           | `01`, `02` |
+| `NN`                | Índice de step dentro de una side-interaction       | 2 dígitos           | `01`, `04` |
+| `TT`                | Índice de subagente (`sub-agent-TT`)                | 2 dígitos           | `01`, `02` |
 
 ---
 
@@ -77,6 +77,7 @@ sessions/
 Contiene las interacciones de tipo `agentic`: el agente principal recibió un prompt del usuario, lo procesó a través de uno o más steps HTTP, y produjo una respuesta reconstruida.
 
 Estructura fija por interacción:
+
 - `input/` — prompt inicial del usuario (top-level)
 - `steps/YY/` — cada llamada HTTP individual, con sus subdirectorios `request/`, `thought/` (opcional), `response/`, y `sub-agent-TT/` (opcional, uno por cada subagente que el step haya delegado)
 - `output/` — respuesta final reconstruida del pipeline completo
@@ -93,23 +94,23 @@ Contiene dos tipos de interacción secundaria:
 
 ## Subdirectorios dentro de cada step
 
-| Directorio | Presencia | Contenido |
-|---|---|---|
-| `request/` | Siempre | Petición HTTP enviada a Anthropic en este step |
-| `thought/` | Solo si el step contiene extended thinking | Bloques de extended thinking emitidos por el modelo |
-| `response/` | Siempre | Respuesta HTTP recibida de Anthropic en este step |
+| Directorio  | Presencia                                  | Contenido                                           |
+| ----------- | ------------------------------------------ | --------------------------------------------------- |
+| `request/`  | Siempre                                    | Petición HTTP enviada a Anthropic en este step      |
+| `thought/`  | Solo si el step contiene extended thinking | Bloques de extended thinking emitidos por el modelo |
+| `response/` | Siempre                                    | Respuesta HTTP recibida de Anthropic en este step   |
 
 ---
 
 ## Tabla de cambios respecto a la estructura actual
 
-| Estructura actual | Nueva estructura | Motivo |
-|---|---|---|
-| `interactions/NNNNNN_<uuid>/` (todos los tipos) | `main-agent/interactions/NN/` (solo agentic) | Separación física por tipo; legibilidad |
-| `interactions/NNNNNN_<uuid>/` (side-request/preflight) | `side-interactions/NN/` | Separación física por tipo |
-| `NNNNNN_<uuid>/` (6 dígitos + UUID) | `NN/` (2 dígitos, sin UUID) | Simplicidad; los UUIDs no aportan valor de navegación |
-| `request/` (top-level de interacción) | `input/` | Claridad semántica: es la entrada del ciclo, no una petición HTTP |
-| `response/` (top-level de interacción) | `output/` | Claridad semántica: es la salida reconstruida del ciclo completo |
-| `steps/NNN/` (3 dígitos) | `steps/NN/` (2 dígitos) | Consistencia con numeración de interacciones |
-| `steps/NNN/sub-interactions/NNN_<uuid>/` | `steps/YY/sub-agent-TT/` (siempre con índice) | Nombre más expresivo; índice uniforme independientemente de si hay uno o varios subagentes |
-| *(ausente)* | `steps/NN/thought/` | Soporte para extended thinking |
+| Estructura actual                                      | Nueva estructura                              | Motivo                                                                                     |
+| ------------------------------------------------------ | --------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `interactions/NNNNNN_<uuid>/` (todos los tipos)        | `main-agent/interactions/NN/` (solo agentic)  | Separación física por tipo; legibilidad                                                    |
+| `interactions/NNNNNN_<uuid>/` (side-request/preflight) | `side-interactions/NN/`                       | Separación física por tipo                                                                 |
+| `NNNNNN_<uuid>/` (6 dígitos + UUID)                    | `NN/` (2 dígitos, sin UUID)                   | Simplicidad; los UUIDs no aportan valor de navegación                                      |
+| `request/` (top-level de interacción)                  | `input/`                                      | Claridad semántica: es la entrada del ciclo, no una petición HTTP                          |
+| `response/` (top-level de interacción)                 | `output/`                                     | Claridad semántica: es la salida reconstruida del ciclo completo                           |
+| `steps/NNN/` (3 dígitos)                               | `steps/NN/` (2 dígitos)                       | Consistencia con numeración de interacciones                                               |
+| `steps/NNN/sub-interactions/NNN_<uuid>/`               | `steps/YY/sub-agent-TT/` (siempre con índice) | Nombre más expresivo; índice uniforme independientemente de si hay uno o varios subagentes |
+| _(ausente)_                                            | `steps/NN/thought/`                           | Soporte para extended thinking                                                             |

@@ -115,9 +115,17 @@ describe('Test de Integración - Decompresión Gzip', () => {
     // Damos un pequeño margen para que el stream en background termine de volcar al disco
     await new Promise((r) => setTimeout(r, 500));
 
-    const dirs = await fs.readdir(path.join(tempSessionsDir, 'test-gzip', 'main-agent', 'interactions'));
+    const dirs = await fs.readdir(
+      path.join(tempSessionsDir, 'test-gzip', 'main-agent', 'interactions'),
+    );
     const requestDirName = dirs[0];
-    const sessionPath = path.join(tempSessionsDir, 'test-gzip', 'main-agent', 'interactions', requestDirName);
+    const sessionPath = path.join(
+      tempSessionsDir,
+      'test-gzip',
+      'main-agent',
+      'interactions',
+      requestDirName,
+    );
 
     const responseBodyPath = path.join(sessionPath, 'output', 'body.json');
     // Retry con backoff para robustez en CI/sistemas lentos

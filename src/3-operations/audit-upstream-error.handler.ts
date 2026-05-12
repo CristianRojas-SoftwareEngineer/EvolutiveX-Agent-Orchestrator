@@ -67,7 +67,9 @@ export class AuditUpstreamErrorHandler {
       errorCode,
       ...(interaction?.parentContext ? { parentContext: interaction.parentContext } : {}),
       ...(interaction?.sideRequestKind ? { sideRequestKind: interaction.sideRequestKind } : {}),
-      ...(interaction?.resolvedInternalTools && interaction.resolvedInternalTools.length > 0 ? { resolvedInternalTools: interaction.resolvedInternalTools } : {}),
+      ...(interaction?.resolvedInternalTools && interaction.resolvedInternalTools.length > 0
+        ? { resolvedInternalTools: interaction.resolvedInternalTools }
+        : {}),
       truncation: {
         requestBodyOmitted,
         responseBodyBytesTotal: null,
@@ -87,7 +89,9 @@ export class AuditUpstreamErrorHandler {
       await this.sessionStore.withSessionLock(interaction.sessionId, async () => {
         await this.auditWriter
           .updateSessionMetrics(sessionDir, interaction.modelId!, totals, stepsMeta.length)
-          .catch(() => { /* error no crítico */ });
+          .catch(() => {
+            /* error no crítico */
+          });
       });
     }
 

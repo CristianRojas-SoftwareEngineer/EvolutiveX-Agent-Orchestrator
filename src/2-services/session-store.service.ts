@@ -56,7 +56,13 @@ export class SessionStoreService implements ISessionStore {
   public nextMainAgentSequence(sessionId: string): Promise<number> {
     return this.withSessionLock(sessionId, () =>
       this.allocateNextSequence(
-        path.join(this.auditBaseDir, sessionId, DIR_MAIN_AGENT, DIR_INTERACTIONS, FILE_INTERACTION_SEQUENCE),
+        path.join(
+          this.auditBaseDir,
+          sessionId,
+          DIR_MAIN_AGENT,
+          DIR_INTERACTIONS,
+          FILE_INTERACTION_SEQUENCE,
+        ),
         path.join(this.auditBaseDir, sessionId, DIR_MAIN_AGENT, DIR_INTERACTIONS),
       ),
     );
@@ -175,7 +181,11 @@ export class SessionStoreService implements ISessionStore {
     return interaction.pendingWebSearchToolUses.shift()!;
   }
 
-  public registerPendingWebFetchToolUse(interactionDir: string, stepIndex: number, toolUseId: string): void {
+  public registerPendingWebFetchToolUse(
+    interactionDir: string,
+    stepIndex: number,
+    toolUseId: string,
+  ): void {
     const interaction = this.interactionRegistry.get(interactionDir);
     if (!interaction) return;
     if (interaction.pendingWebFetchToolUses.some((p) => p.toolUseId === toolUseId)) return;
@@ -230,7 +240,10 @@ export class SessionStoreService implements ISessionStore {
     return null;
   }
 
-  public registerResolvedInternalTool(interactionDir: string, resolution: ResolvedInternalTool): void {
+  public registerResolvedInternalTool(
+    interactionDir: string,
+    resolution: ResolvedInternalTool,
+  ): void {
     const interaction = this.interactionRegistry.get(interactionDir);
     if (!interaction) return;
     // Idempotente: si ya existe una resolución para este toolUseId, actualizarla
@@ -315,7 +328,10 @@ export class SessionStoreService implements ISessionStore {
     }
   }
 
-  public findStaleInteractionsAwaitingContinuation(sessionId: string, maxAgeMs: number): ActiveInteraction[] {
+  public findStaleInteractionsAwaitingContinuation(
+    sessionId: string,
+    maxAgeMs: number,
+  ): ActiveInteraction[] {
     const dirs = this.sessionToActiveInteractions.get(sessionId);
     if (!dirs) return [];
     const now = Date.now();

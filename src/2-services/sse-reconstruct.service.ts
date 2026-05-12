@@ -1,7 +1,11 @@
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import { AuditWriterService } from './audit-writer.service.js';
-import { SseReconstructOptions, SseReconstructResult, SsePhase } from '../1-domain/types/audit.types.js';
+import {
+  SseReconstructOptions,
+  SseReconstructResult,
+  SsePhase,
+} from '../1-domain/types/audit.types.js';
 import type Anthropic from '@anthropic-ai/sdk';
 import type { ISseReconstructor } from './ports/sse-reconstructor.port.js';
 
@@ -270,7 +274,10 @@ export class SseReconstructService implements ISseReconstructor {
     return Buffer.from(wire, 'utf8');
   }
 
-  private reconstructMessageFromSseJsonlPhase(jsonlBuffer: Buffer, phase: SsePhase): Anthropic.Message {
+  private reconstructMessageFromSseJsonlPhase(
+    jsonlBuffer: Buffer,
+    phase: SsePhase,
+  ): Anthropic.Message {
     const text = jsonlBuffer.toString('utf8');
     const rawLines = text.split('\n');
     const events: unknown[] = [];
@@ -337,8 +344,10 @@ export class SseReconstructService implements ISseReconstructor {
         if (typeof msg.model === 'string') message.model = msg.model;
         if (msg.usage && message.usage) {
           const usage = msg.usage as Record<string, unknown>;
-          if (typeof usage.input_tokens === 'number') message.usage.input_tokens = usage.input_tokens;
-          if (typeof usage.output_tokens === 'number') message.usage.output_tokens = usage.output_tokens;
+          if (typeof usage.input_tokens === 'number')
+            message.usage.input_tokens = usage.input_tokens;
+          if (typeof usage.output_tokens === 'number')
+            message.usage.output_tokens = usage.output_tokens;
         }
       }
 
@@ -350,7 +359,11 @@ export class SseReconstructService implements ISseReconstructor {
         } else if (block.type === 'thinking') {
           contentBlocks.set(event.index, { type: 'thinking', thinking: '', signature: '' });
           thinkingAccumulators.set(event.index, '');
-        } else if (block.type === 'tool_use' && typeof block.id === 'string' && typeof block.name === 'string') {
+        } else if (
+          block.type === 'tool_use' &&
+          typeof block.id === 'string' &&
+          typeof block.name === 'string'
+        ) {
           contentBlocks.set(event.index, {
             type: 'tool_use',
             id: block.id,
@@ -408,7 +421,8 @@ export class SseReconstructService implements ISseReconstructor {
         }
         if (event.usage && message.usage) {
           const usage = event.usage as Record<string, unknown>;
-          if (typeof usage.output_tokens === 'number') message.usage.output_tokens = usage.output_tokens;
+          if (typeof usage.output_tokens === 'number')
+            message.usage.output_tokens = usage.output_tokens;
         }
       }
     }

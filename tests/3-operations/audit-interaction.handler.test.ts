@@ -222,8 +222,16 @@ describe('AuditInteractionHandler', () => {
     );
 
     const [r1, r2] = await Promise.all([
-      handler.execute({ headers: { 'x-cc-audit-session': 's' }, rawBody: FRESH_BODY, requestId: 'req-1' }),
-      handler.execute({ headers: { 'x-cc-audit-session': 's' }, rawBody: FRESH_BODY, requestId: 'req-2' }),
+      handler.execute({
+        headers: { 'x-cc-audit-session': 's' },
+        rawBody: FRESH_BODY,
+        requestId: 'req-1',
+      }),
+      handler.execute({
+        headers: { 'x-cc-audit-session': 's' },
+        rawBody: FRESH_BODY,
+        requestId: 'req-2',
+      }),
     ]);
 
     expect(r1).not.toBeNull();
@@ -370,7 +378,11 @@ describe('AuditInteractionHandler', () => {
       }),
       config,
     );
-    await handler.execute({ headers: { 'x-cc-audit-session': 'test' }, rawBody: FRESH_BODY, requestId: 'req-1' });
+    await handler.execute({
+      headers: { 'x-cc-audit-session': 'test' },
+      rawBody: FRESH_BODY,
+      requestId: 'req-1',
+    });
     expect(stepDirs).toHaveLength(1);
     expect(stepDirs[0]).toMatch(/steps[/\\]01$/);
   });
@@ -413,7 +425,11 @@ describe('AuditInteractionHandler', () => {
       }),
       config,
     );
-    await handler.execute({ headers: { 'x-cc-audit-session': 'test' }, rawBody: SIDE_REQUEST_BODY, requestId: 'req-side' });
+    await handler.execute({
+      headers: { 'x-cc-audit-session': 'test' },
+      rawBody: SIDE_REQUEST_BODY,
+      requestId: 'req-side',
+    });
     expect(stepDirs).toHaveLength(1);
     expect(stepDirs[0]).toMatch(/steps[/\\]01$/);
   });
@@ -432,9 +448,21 @@ describe('AuditInteractionHandler', () => {
       writer,
       config,
     );
-    await handler.execute({ headers: { 'x-cc-audit-session': 'test' }, rawBody: FRESH_BODY, requestId: 'r1' });
-    await handler.execute({ headers: { 'x-cc-audit-session': 'test' }, rawBody: SIDE_REQUEST_BODY, requestId: 'r2' });
-    await handler.execute({ headers: { 'x-cc-audit-session': 'test' }, rawBody: QUOTA_BODY, requestId: 'r3' });
+    await handler.execute({
+      headers: { 'x-cc-audit-session': 'test' },
+      rawBody: FRESH_BODY,
+      requestId: 'r1',
+    });
+    await handler.execute({
+      headers: { 'x-cc-audit-session': 'test' },
+      rawBody: SIDE_REQUEST_BODY,
+      requestId: 'r2',
+    });
+    await handler.execute({
+      headers: { 'x-cc-audit-session': 'test' },
+      rawBody: QUOTA_BODY,
+      requestId: 'r3',
+    });
     expect(stateDirs.some((s) => s.startsWith('agentic:'))).toBe(true);
     expect(stateDirs.some((s) => s.startsWith('side-request:'))).toBe(true);
     expect(stateDirs.some((s) => s.startsWith('client-preflight:'))).toBe(true);
@@ -480,7 +508,11 @@ describe('AuditInteractionHandler', () => {
       makeAuditWriter(),
       config,
     );
-    const result = await handler.execute({ headers: { 'x-cc-audit-session': 's' }, rawBody: body, requestId: 'r' });
+    const result = await handler.execute({
+      headers: { 'x-cc-audit-session': 's' },
+      rawBody: body,
+      requestId: 'r',
+    });
     expect(result!.auditInteractionDir).toBe('/tmp/parent');
   });
 
@@ -525,7 +557,11 @@ describe('AuditInteractionHandler', () => {
       config,
     );
     // No debe lanzar excepción
-    const result = await handler.execute({ headers: { 'x-cc-audit-session': 'test' }, rawBody: bodyNoIds, requestId: 'r' });
+    const result = await handler.execute({
+      headers: { 'x-cc-audit-session': 'test' },
+      rawBody: bodyNoIds,
+      requestId: 'r',
+    });
     expect(result).not.toBeNull();
   });
 
@@ -782,7 +818,11 @@ describe('AuditInteractionHandler', () => {
       config,
     );
 
-    await handler.execute({ headers: { 'x-cc-audit-session': 's' }, rawBody: FRESH_BODY, requestId: 'sub' });
+    await handler.execute({
+      headers: { 'x-cc-audit-session': 's' },
+      rawBody: FRESH_BODY,
+      requestId: 'sub',
+    });
     expect(order[0]).toBe('lock-acquire');
     expect(order[order.length - 1]).toBe('lock-release');
     expect(order.indexOf('next-seq')).toBeGreaterThan(order.indexOf('lock-acquire'));
@@ -979,7 +1019,9 @@ describe('AuditInteractionHandler', () => {
     let orphanClosed = false;
 
     const store = makeSessionStore({
-      findStaleInteractionsAwaitingContinuation: (_sid: string, _maxAge: number) => [orphanInteraction],
+      findStaleInteractionsAwaitingContinuation: (_sid: string, _maxAge: number) => [
+        orphanInteraction,
+      ],
       closeInteraction: (dir: string) => {
         if (dir === orphanInteraction.interactionDir) orphanClosed = true;
       },
@@ -1027,9 +1069,7 @@ describe('AuditInteractionHandler', () => {
       sessionId: 's',
       pendingAgentToolUses: [],
       pendingWebSearchToolUses: [],
-      pendingWebFetchToolUses: [
-        { stepIndex: 1, toolUseId: 'toolu_fetch_1' },
-      ],
+      pendingWebFetchToolUses: [{ stepIndex: 1, toolUseId: 'toolu_fetch_1' }],
       resolvedInternalTools: [],
     };
 
@@ -1089,9 +1129,7 @@ describe('AuditInteractionHandler', () => {
       sessionId: 's',
       pendingAgentToolUses: [{ stepIndex: 1, toolUseId: 'toolu_agent' }],
       pendingWebSearchToolUses: [],
-      pendingWebFetchToolUses: [
-        { stepIndex: 1, toolUseId: 'toolu_fetch' },
-      ],
+      pendingWebFetchToolUses: [{ stepIndex: 1, toolUseId: 'toolu_fetch' }],
       resolvedInternalTools: [],
     };
 
@@ -1195,8 +1233,16 @@ describe('AuditInteractionHandler', () => {
     );
 
     await Promise.all([
-      handler.execute({ headers: { 'x-cc-audit-session': 's' }, rawBody: FRESH_BODY, requestId: 'req-web-1' }),
-      handler.execute({ headers: { 'x-cc-audit-session': 's' }, rawBody: FRESH_BODY, requestId: 'req-web-2' }),
+      handler.execute({
+        headers: { 'x-cc-audit-session': 's' },
+        rawBody: FRESH_BODY,
+        requestId: 'req-web-1',
+      }),
+      handler.execute({
+        headers: { 'x-cc-audit-session': 's' },
+        rawBody: FRESH_BODY,
+        requestId: 'req-web-2',
+      }),
     ]);
 
     // Verificar que se llamó al lock para la sesión
@@ -1275,8 +1321,16 @@ describe('AuditInteractionHandler', () => {
     );
 
     await Promise.all([
-      handler.execute({ headers: { 'x-cc-audit-session': 's' }, rawBody: FRESH_BODY, requestId: 'req-fetch-1' }),
-      handler.execute({ headers: { 'x-cc-audit-session': 's' }, rawBody: FRESH_BODY, requestId: 'req-fetch-2' }),
+      handler.execute({
+        headers: { 'x-cc-audit-session': 's' },
+        rawBody: FRESH_BODY,
+        requestId: 'req-fetch-1',
+      }),
+      handler.execute({
+        headers: { 'x-cc-audit-session': 's' },
+        rawBody: FRESH_BODY,
+        requestId: 'req-fetch-2',
+      }),
     ]);
 
     // Verificar que se llamó al lock para la sesión
@@ -1305,9 +1359,7 @@ describe('AuditInteractionHandler', () => {
       stepsMeta: [],
       sessionId: 's',
       pendingAgentToolUses: [],
-      pendingWebSearchToolUses: [
-        { stepIndex: 1, toolUseId: 'toolu_search_1' },
-      ],
+      pendingWebSearchToolUses: [{ stepIndex: 1, toolUseId: 'toolu_search_1' }],
       pendingWebFetchToolUses: [],
       resolvedInternalTools: [],
     };
@@ -1358,9 +1410,7 @@ describe('AuditInteractionHandler', () => {
       sessionId: 's',
       pendingAgentToolUses: [],
       pendingWebSearchToolUses: [],
-      pendingWebFetchToolUses: [
-        { stepIndex: 1, toolUseId: 'toolu_fetch_1' },
-      ],
+      pendingWebFetchToolUses: [{ stepIndex: 1, toolUseId: 'toolu_fetch_1' }],
       resolvedInternalTools: [],
     };
 
@@ -1441,7 +1491,12 @@ describe('AuditInteractionHandler', () => {
         messages: [
           {
             role: 'user',
-            content: [{ type: 'text', text: 'Web page content:\n---\nExample Domain\n\nThis domain is for use in documentation examples.' }],
+            content: [
+              {
+                type: 'text',
+                text: 'Web page content:\n---\nExample Domain\n\nThis domain is for use in documentation examples.',
+              },
+            ],
           },
         ],
         tools: [],

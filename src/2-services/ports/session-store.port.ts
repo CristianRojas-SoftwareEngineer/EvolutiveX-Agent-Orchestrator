@@ -111,13 +111,19 @@ export interface ISessionStore {
    * coincide en la interacción registrada. Devuelve el pending consumido o
    * `null` si no existía. Idempotente: no-op si no hay coincidencia.
    */
-  consumeWebSearchPendingByToolUseId(interactionDir: string, toolUseId: string): PendingWebSearchToolUse | null;
+  consumeWebSearchPendingByToolUseId(
+    interactionDir: string,
+    toolUseId: string,
+  ): PendingWebSearchToolUse | null;
   /**
    * Consume (elimina) la entrada de `pendingWebFetchToolUses` cuyo `toolUseId`
    * coincide en la interacción registrada. Devuelve el pending consumido o
    * `null` si no existía. Idempotente: no-op si no hay coincidencia.
    */
-  consumeWebFetchPendingByToolUseId(interactionDir: string, toolUseId: string): PendingWebFetchToolUse | null;
+  consumeWebFetchPendingByToolUseId(
+    interactionDir: string,
+    toolUseId: string,
+  ): PendingWebFetchToolUse | null;
   /**
    * Registra una resolución observada de WebSearch/WebFetch.
    */
@@ -127,7 +133,10 @@ export interface ISessionStore {
    * `awaitingSince` supera `maxAgeMs` milisegundos. Devuelve las interacciones
    * stale para que el caller las cierre como orphans.
    */
-  findStaleInteractionsAwaitingContinuation(sessionId: string, maxAgeMs: number): ActiveInteraction[];
+  findStaleInteractionsAwaitingContinuation(
+    sessionId: string,
+    maxAgeMs: number,
+  ): ActiveInteraction[];
   /**
    * Devuelve todas las interacciones actualmente abiertas en el registry.
    * Usado para graceful shutdown.

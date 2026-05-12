@@ -1,4 +1,8 @@
-import { SseReconstructOptions, SseReconstructResult, SsePhase } from '../../1-domain/types/audit.types.js';
+import {
+  SseReconstructOptions,
+  SseReconstructResult,
+  SsePhase,
+} from '../../1-domain/types/audit.types.js';
 import type Anthropic from '@anthropic-ai/sdk';
 
 /**
@@ -30,10 +34,7 @@ export interface ISseReconstructor {
    * permitiendo reconstruir fases parciales (delegation/continuation) que no
    * necesariamente contienen message_stop.
    */
-  reconstructSseJsonlPhaseMessage(
-    jsonlPath: string,
-    phase: SsePhase,
-  ): Promise<Anthropic.Message>;
+  reconstructSseJsonlPhaseMessage(jsonlPath: string, phase: SsePhase): Promise<Anthropic.Message>;
 
   /**
    * Reconstruye mensaje del turno completo.

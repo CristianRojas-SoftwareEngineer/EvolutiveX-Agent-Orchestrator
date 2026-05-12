@@ -34,7 +34,9 @@ export class AuditStandardResponseHandler {
       return;
     }
 
-    const _activeInteraction = this.sessionStore.getInteractionByDirSync(context.auditInteractionDir);
+    const _activeInteraction = this.sessionStore.getInteractionByDirSync(
+      context.auditInteractionDir,
+    );
     const stepNumber = context.assignedStepIndex;
     const stepDir = path.join(
       context.auditInteractionDir,
@@ -94,7 +96,9 @@ export class AuditStandardResponseHandler {
             : {}),
         };
 
-        const interaction = await this.sessionStore.getInteractionByDir(context.auditInteractionDir);
+        const interaction = await this.sessionStore.getInteractionByDir(
+          context.auditInteractionDir,
+        );
         await this.sessionStore.pushStepMetaByDir(context.auditInteractionDir, stepMeta);
 
         if (context.interactionType !== 'client-preflight') {
@@ -180,10 +184,18 @@ export class AuditStandardResponseHandler {
           await this.sessionStore.pushStepMetaByDir(context.auditInteractionDir, stepMeta);
 
           // Cerrar preflight inmediatamente
-          const preflightInteraction = await this.sessionStore.getInteractionByDir(context.auditInteractionDir);
+          const preflightInteraction = await this.sessionStore.getInteractionByDir(
+            context.auditInteractionDir,
+          );
           this.sessionStore.closeInteraction(context.auditInteractionDir);
           if (preflightInteraction) {
-            await this.writeInteractionMeta(preflightInteraction, context, 'completed', false, totalBytes);
+            await this.writeInteractionMeta(
+              preflightInteraction,
+              context,
+              'completed',
+              false,
+              totalBytes,
+            );
           }
           return;
         }
@@ -209,14 +221,21 @@ export class AuditStandardResponseHandler {
         await this.sessionStore.pushStepMetaByDir(context.auditInteractionDir, stepMeta);
 
         // Actualizar métricas de sesión per-step
-        const currentInteraction = this.sessionStore.getInteractionByDirSync(context.auditInteractionDir);
+        const currentInteraction = this.sessionStore.getInteractionByDirSync(
+          context.auditInteractionDir,
+        );
         if (currentInteraction?.modelId) {
-          const sessionDir = path.join(this.sessionStore.getBaseDir(), currentInteraction.sessionId);
+          const sessionDir = path.join(
+            this.sessionStore.getBaseDir(),
+            currentInteraction.sessionId,
+          );
           const stepTotals = computeTokenTotals([stepMeta]);
           await this.sessionStore.withSessionLock(currentInteraction.sessionId, async () => {
             await this.auditWriter
               .updateSessionMetrics(sessionDir, currentInteraction.modelId!, stepTotals, 1)
-              .catch(() => { /* error no crítico */ });
+              .catch(() => {
+                /* error no crítico */
+              });
           });
         }
 
@@ -245,7 +264,9 @@ export class AuditStandardResponseHandler {
           );
         }
 
-        const interaction = await this.sessionStore.getInteractionByDir(context.auditInteractionDir);
+        const interaction = await this.sessionStore.getInteractionByDir(
+          context.auditInteractionDir,
+        );
         this.sessionStore.closeInteraction(context.auditInteractionDir);
 
         if (interaction) {
@@ -268,7 +289,9 @@ export class AuditStandardResponseHandler {
     const endedAt = Date.now();
 
     const totals =
-      interaction.interactionType !== 'client-preflight' ? computeTokenTotals(interaction.stepsMeta) : null;
+      interaction.interactionType !== 'client-preflight'
+        ? computeTokenTotals(interaction.stepsMeta)
+        : null;
 
     const meta: InteractionMetadata = {
       interactionType: interaction.interactionType,
@@ -290,7 +313,9 @@ export class AuditStandardResponseHandler {
       errorCode: null,
       ...(interaction.parentContext ? { parentContext: interaction.parentContext } : {}),
       ...(interaction.sideRequestKind ? { sideRequestKind: interaction.sideRequestKind } : {}),
-      ...(interaction.resolvedInternalTools.length > 0 ? { resolvedInternalTools: interaction.resolvedInternalTools } : {}),
+      ...(interaction.resolvedInternalTools.length > 0
+        ? { resolvedInternalTools: interaction.resolvedInternalTools }
+        : {}),
       truncation: {
         requestBodyOmitted: interaction.requestBodyOmitted,
         responseBodyBytesTotal: totalResponseBytes,

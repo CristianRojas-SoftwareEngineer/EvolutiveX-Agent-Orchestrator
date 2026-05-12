@@ -1,4 +1,10 @@
-import { InteractionState, InteractionMetadata, MarkdownRenderContext, SessionModelMetrics, SseLine } from '../../1-domain/types/audit.types.js';
+import {
+  InteractionState,
+  InteractionMetadata,
+  MarkdownRenderContext,
+  SessionModelMetrics,
+  SseLine,
+} from '../../1-domain/types/audit.types.js';
 import { JsonValue } from '../../1-domain/types/json.types.js';
 
 /**
@@ -103,7 +109,10 @@ export interface IAuditWriter {
   updateSessionMetrics(
     sessionDir: string,
     modelId: string,
-    totals: Pick<SessionModelMetrics, 'inputTokens' | 'cacheReadInputTokens' | 'cacheCreationInputTokens' | 'outputTokens'>,
+    totals: Pick<
+      SessionModelMetrics,
+      'inputTokens' | 'cacheReadInputTokens' | 'cacheCreationInputTokens' | 'outputTokens'
+    >,
     stepCount: number,
   ): Promise<void>;
   appendSseLine(interactionDir: string, lineObj: SseLine): void;

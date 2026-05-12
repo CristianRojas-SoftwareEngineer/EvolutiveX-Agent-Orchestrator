@@ -482,14 +482,26 @@ describe('MarkdownRendererService', () => {
           message: {
             content: [
               { type: 'text', text: 'Voy a invocar subagentes para analizar el código.' },
-              { type: 'tool_use', id: 'toolu_001', name: 'Agent', input: { description: 'Análisis de código' } },
+              {
+                type: 'tool_use',
+                id: 'toolu_001',
+                name: 'Agent',
+                input: { description: 'Análisis de código' },
+              },
             ],
           },
         },
         continuation: {
           request: {
             body: {
-              messages: [{ role: 'user', content: [{ type: 'tool_result', tool_use_id: 'toolu_001', content: 'Resultado' }] }],
+              messages: [
+                {
+                  role: 'user',
+                  content: [
+                    { type: 'tool_result', tool_use_id: 'toolu_001', content: 'Resultado' },
+                  ],
+                },
+              ],
             },
           },
           response: {
@@ -520,7 +532,12 @@ describe('MarkdownRendererService', () => {
         delegation: {
           message: {
             content: [
-              { type: 'tool_use', id: 'toolu_001', name: 'Agent', input: { description: 'Analizar' } },
+              {
+                type: 'tool_use',
+                id: 'toolu_001',
+                name: 'Agent',
+                input: { description: 'Analizar' },
+              },
             ],
           },
         },
@@ -585,7 +602,14 @@ describe('MarkdownRendererService', () => {
             type: 'coalesced-agent-step-response',
             delegation: {
               message: {
-                content: [{ type: 'tool_use', id: 'toolu_001', name: 'Agent', input: { description: 'Análisis' } }],
+                content: [
+                  {
+                    type: 'tool_use',
+                    id: 'toolu_001',
+                    name: 'Agent',
+                    input: { description: 'Análisis' },
+                  },
+                ],
               },
             },
             continuation: {
@@ -701,7 +725,8 @@ describe('MarkdownRendererService', () => {
 
   describe('diferenciación de contenido Skill', () => {
     it('debería detectar y renderizar contenido Skill en bloque colapsable', () => {
-      const skillContent = 'Base directory for this skill: /home/user/.claude/skills/test\n\nSkill line 1\nSkill line 2';
+      const skillContent =
+        'Base directory for this skill: /home/user/.claude/skills/test\n\nSkill line 1\nSkill line 2';
       const parsed = {
         model: 'test',
         messages: [{ role: 'user', content: skillContent }],
@@ -714,7 +739,8 @@ describe('MarkdownRendererService', () => {
     });
 
     it('debería extraer texto después del Skill si coexiste', () => {
-      const fullPrompt = 'Base directory for this skill: /skills/test\n\nLinea skill\n\n\n\nMi pregunta original';
+      const fullPrompt =
+        'Base directory for this skill: /skills/test\n\nLinea skill\n\n\n\nMi pregunta original';
       const parsed = {
         model: 'test',
         messages: [{ role: 'user', content: fullPrompt }],

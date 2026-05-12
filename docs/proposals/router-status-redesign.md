@@ -10,6 +10,7 @@ El statusline legacy (`~/.claude/router-status.ps1`) fue diseñado para dos modo
 Con Smart Code Proxy como intermediario universal, **`ANTHROPIC_BASE_URL` siempre apunta a `http://127.0.0.1:<PORT>`**, independientemente del proveedor upstream. El dispatch original siempre activa `router-mode-status.ps1`, que lee artefactos de Claude Code Router que ya no existen (`~/.claude-code-router/config.json`, `router-requests.jsonl`, etc.). El statusline muestra datos vacíos o incorrectos en todos los modos.
 
 El rediseño reemplaza los tres `.ps1` con un único `scripting/router-status.ts`:
+
 - Sin dependencia de PowerShell ni de archivos rc de shell
 - Dispatch basado en `UPSTREAM_ORIGIN` + método de autenticación activo
 - Lectura de sesión activa desde `sessions/` del proxy para métricas por nivel de razonamiento
@@ -18,20 +19,20 @@ El rediseño reemplaza los tres `.ps1` con un único `scripting/router-status.ts
 
 ## 2. Fuentes de datos
 
-| Dato | Fuente | Campo |
-|---|---|---|
-| Session ID | stdin (`$ctx`) | `ctx.session_id` |
-| Modelo activo (nombre de display) | stdin (`$ctx`) | `ctx.model.display_name` |
-| Contexto (tks) (tamaño) | stdin (`$ctx`) | `ctx.context_window.context_window_size` |
-| Porcentaje de uso de contexto | stdin (`$ctx`) | `ctx.context_window.used_percentage` |
-| Rate limits (solo OAuth) | stdin (`$ctx`) | `ctx.rate_limits.five_hour`, `ctx.rate_limits.seven_day` |
-| Provider upstream activo | `configs/.env` | `UPSTREAM_ORIGIN` |
-| Nombre del proveedor | cruce `UPSTREAM_ORIGIN` vs `routing/providers/*/config.json` | `config.ANTHROPIC_BASE_URL` |
-| Método de auth | `process.env` (heredado de Claude Code) | `ANTHROPIC_AUTH_TOKEN` / `ANTHROPIC_API_KEY` |
-| Modelos por nivel | `process.env` (heredado de Claude Code) | `ANTHROPIC_DEFAULT_HAIKU_MODEL`, `ANTHROPIC_DEFAULT_SONNET_MODEL`, `ANTHROPIC_DEFAULT_OPUS_MODEL` |
-| Display name de modelo por nivel | `routing/providers/<p>/models/<m>/metadata.json` | `displayName` (campo a añadir) |
-| Interacciones de la sesión actual | `sessions/<session>/interactions/*/meta.json` | `interactionType`, `totals` |
-| Modelo por interacción | `sessions/<session>/interactions/*/request/body.json` | `model` |
+| Dato                              | Fuente                                                       | Campo                                                                                             |
+| --------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| Session ID                        | stdin (`$ctx`)                                               | `ctx.session_id`                                                                                  |
+| Modelo activo (nombre de display) | stdin (`$ctx`)                                               | `ctx.model.display_name`                                                                          |
+| Contexto (tks) (tamaño)           | stdin (`$ctx`)                                               | `ctx.context_window.context_window_size`                                                          |
+| Porcentaje de uso de contexto     | stdin (`$ctx`)                                               | `ctx.context_window.used_percentage`                                                              |
+| Rate limits (solo OAuth)          | stdin (`$ctx`)                                               | `ctx.rate_limits.five_hour`, `ctx.rate_limits.seven_day`                                          |
+| Provider upstream activo          | `configs/.env`                                               | `UPSTREAM_ORIGIN`                                                                                 |
+| Nombre del proveedor              | cruce `UPSTREAM_ORIGIN` vs `routing/providers/*/config.json` | `config.ANTHROPIC_BASE_URL`                                                                       |
+| Método de auth                    | `process.env` (heredado de Claude Code)                      | `ANTHROPIC_AUTH_TOKEN` / `ANTHROPIC_API_KEY`                                                      |
+| Modelos por nivel                 | `process.env` (heredado de Claude Code)                      | `ANTHROPIC_DEFAULT_HAIKU_MODEL`, `ANTHROPIC_DEFAULT_SONNET_MODEL`, `ANTHROPIC_DEFAULT_OPUS_MODEL` |
+| Display name de modelo por nivel  | `routing/providers/<p>/models/<m>/metadata.json`             | `displayName` (campo a añadir)                                                                    |
+| Interacciones de la sesión actual | `sessions/<session>/interactions/*/meta.json`                | `interactionType`, `totals`                                                                       |
+| Modelo por interacción            | `sessions/<session>/interactions/*/request/body.json`        | `model`                                                                                           |
 
 ### Variables de entorno en `process.env`
 
@@ -55,12 +56,12 @@ El statusline consta de **dos o tres tablas** según el método de autenticació
 
 **Columnas (4 columnas planas):**
 
-| Columna | Contenido | Fuente | Alineación |
-|---|---|---|---|
-| Proveedor | nombre del proveedor resuelto (capitalizado) | cruce `UPSTREAM_ORIGIN` vs `config.json` | centrada |
-| Modelo activo | display name del modelo activo (`metadata.json → displayName`) | stdin (`ctx.model.display_name`) + resolución en `metadata.json` | centrada |
-| Contexto (tks) | tamaño de ventana formateado como `NNNk` / `NNNm` | stdin (`ctx.context_window.context_window_size`) | centrada |
-| Porcentaje de uso | barra de progreso + porcentaje | stdin (`ctx.context_window.used_percentage`) | centrada |
+| Columna           | Contenido                                                      | Fuente                                                           | Alineación |
+| ----------------- | -------------------------------------------------------------- | ---------------------------------------------------------------- | ---------- |
+| Proveedor         | nombre del proveedor resuelto (capitalizado)                   | cruce `UPSTREAM_ORIGIN` vs `config.json`                         | centrada   |
+| Modelo activo     | display name del modelo activo (`metadata.json → displayName`) | stdin (`ctx.model.display_name`) + resolución en `metadata.json` | centrada   |
+| Contexto (tks)    | tamaño de ventana formateado como `NNNk` / `NNNm`              | stdin (`ctx.context_window.context_window_size`)                 | centrada   |
+| Porcentaje de uso | barra de progreso + porcentaje                                 | stdin (`ctx.context_window.used_percentage`)                     | centrada   |
 
 **Barra de progreso:** 8 bloques, usando `█` (lleno) y `░` (vacío). Color dinámico por rango de porcentaje: verde (`#2ecc71`) 0–39%, naranja (`#f39c12`) 40–69%, rojo (`#e74c3c`) 70–100%. Vacío: gris (`\x1B[90m`).
 
@@ -84,14 +85,14 @@ Presente siempre, independientemente del método de autenticación. Permite al u
 
 **Columnas (6):**
 
-| Columna | Contenido | Fuente | Alineación |
-|---|---|---|---|
-| Nivel | `Lite` / `Standard` / `Reasoning` | texto fijo por slot | izquierda |
-| Modelo | display name del modelo del nivel | `metadata.json → displayName` (o `modelId` como fallback) | izquierda |
-| # Interacciones | cantidad de turnos del nivel en la sesión | conteo de `meta.json` por modelo | derecha |
-| Input (tks) | suma de `totals.inputTokens` para el nivel | `meta.json → totals.inputTokens` | derecha |
-| Cache In (tks) | suma de `totals.cacheReadInputTokens` para el nivel | `meta.json → totals.cacheReadInputTokens` | derecha |
-| Output (tks) | suma de `totals.outputTokens` para el nivel | `meta.json → totals.outputTokens` | derecha |
+| Columna         | Contenido                                           | Fuente                                                    | Alineación |
+| --------------- | --------------------------------------------------- | --------------------------------------------------------- | ---------- |
+| Nivel           | `Lite` / `Standard` / `Reasoning`                   | texto fijo por slot                                       | izquierda  |
+| Modelo          | display name del modelo del nivel                   | `metadata.json → displayName` (o `modelId` como fallback) | izquierda  |
+| # Interacciones | cantidad de turnos del nivel en la sesión           | conteo de `meta.json` por modelo                          | derecha    |
+| Input (tks)     | suma de `totals.inputTokens` para el nivel          | `meta.json → totals.inputTokens`                          | derecha    |
+| Cache In (tks)  | suma de `totals.cacheReadInputTokens` para el nivel | `meta.json → totals.cacheReadInputTokens`                 | derecha    |
+| Output (tks)    | suma de `totals.outputTokens` para el nivel         | `meta.json → totals.outputTokens`                         | derecha    |
 
 **Fila de totales:** celdas fusionadas en columnas 0+1 (texto `"Totales de sesión"`), suma de las tres filas de nivel para las columnas numéricas. Los separadores horizontales usan `┴` en la posición de la columna fusionada.
 
@@ -114,12 +115,12 @@ Se renderiza **únicamente** cuando `authMethod === 'oauth'`. Aplica al proveedo
 
 **Columnas (4):**
 
-| Columna | Contenido | Fuente | Alineación |
-|---|---|---|---|
-| Cuota | `"Cuota actual (5h)"` / `"Cuota semanal (7d)"` | texto fijo | izquierda |
-| Barra + % | barra de progreso + porcentaje (`XX%`) | `ctx.rate_limits.five_hour.used_percentage` / `seven_day.used_percentage` | izquierda |
-| Etiqueta reinicio | texto fijo `"Reinicio en"` | — | izquierda |
-| Tiempo restante | `"Xh Ym"` / `"Xd Yh"` | `ctx.rate_limits.five_hour.resets_at` / `seven_day.resets_at` (epoch segundos) | derecha |
+| Columna           | Contenido                                      | Fuente                                                                         | Alineación |
+| ----------------- | ---------------------------------------------- | ------------------------------------------------------------------------------ | ---------- |
+| Cuota             | `"Cuota actual (5h)"` / `"Cuota semanal (7d)"` | texto fijo                                                                     | izquierda  |
+| Barra + %         | barra de progreso + porcentaje (`XX%`)         | `ctx.rate_limits.five_hour.used_percentage` / `seven_day.used_percentage`      | izquierda  |
+| Etiqueta reinicio | texto fijo `"Reinicio en"`                     | —                                                                              | izquierda  |
+| Tiempo restante   | `"Xh Ym"` / `"Xd Yh"`                          | `ctx.rate_limits.five_hour.resets_at` / `seven_day.resets_at` (epoch segundos) | derecha    |
 
 **Barra de progreso:** colores dinámicos según porcentaje (verde/naranja/rojo), misma lógica que la Tabla 1.
 
@@ -148,16 +149,16 @@ renderTablas()
 
 El script usa códigos ANSI raw sin dependencias externas:
 
-| Elemento | Color | Código ANSI |
-|---|---|---|
-| Cabeceras y títulos | Azul `#253ecc` | `\x1B[38;2;37;62;204m` |
-| Valores de celdas | Blanco | `\x1B[37m` |
-| Nivel Lite | Gris | `\x1B[90m` |
-| Nivel Standard | Blanco | `\x1B[37m` |
-| Nivel Reasoning | Blanco bold | `\x1B[1;37m` |
-| Barra de progreso (lleno) | Blanco | `\x1B[37m` |
-| Barra de progreso (vacío) | Gris | `\x1B[90m` |
-| Bordes de tabla | Gris | `\x1B[90m` |
+| Elemento                  | Color          | Código ANSI            |
+| ------------------------- | -------------- | ---------------------- |
+| Cabeceras y títulos       | Azul `#253ecc` | `\x1B[38;2;37;62;204m` |
+| Valores de celdas         | Blanco         | `\x1B[37m`             |
+| Nivel Lite                | Gris           | `\x1B[90m`             |
+| Nivel Standard            | Blanco         | `\x1B[37m`             |
+| Nivel Reasoning           | Blanco bold    | `\x1B[1;37m`           |
+| Barra de progreso (lleno) | Blanco         | `\x1B[37m`             |
+| Barra de progreso (vacío) | Gris           | `\x1B[90m`             |
+| Bordes de tabla           | Gris           | `\x1B[90m`             |
 
 ---
 
@@ -181,11 +182,11 @@ La Tabla 1 y la Tabla 2 se renderizan lado a lado usando `renderSideBySide()`, c
 
 Los niveles se derivan de las variables de entorno que Claude Code establece al enrutar:
 
-| Nivel | Variable de entorno | Slot en la API |
-|---|---|---|
-| Lite | `ANTHROPIC_DEFAULT_HAIKU_MODEL` | haiku (menor costo, mayor velocidad) |
-| Standard | `ANTHROPIC_DEFAULT_SONNET_MODEL` | sonnet (uso general) |
-| Reasoning | `ANTHROPIC_DEFAULT_OPUS_MODEL` | opus (razonamiento complejo) |
+| Nivel     | Variable de entorno              | Slot en la API                       |
+| --------- | -------------------------------- | ------------------------------------ |
+| Lite      | `ANTHROPIC_DEFAULT_HAIKU_MODEL`  | haiku (menor costo, mayor velocidad) |
+| Standard  | `ANTHROPIC_DEFAULT_SONNET_MODEL` | sonnet (uso general)                 |
+| Reasoning | `ANTHROPIC_DEFAULT_OPUS_MODEL`   | opus (razonamiento complejo)         |
 
 Para clasificar una interacción en un nivel, el script lee el campo `model` de `request/body.json` y aplica un algoritmo de matching con `includes()` + heurísticas por nombre:
 
@@ -237,16 +238,16 @@ La columna `Modelo` de la Tabla 2 muestra el nombre de display de cada nivel. Or
 
 El script no contiene lógica específica de plataforma:
 
-| Operación | Mecanismo | Plataforma |
-|---|---|---|
-| Leer stdin | `process.stdin` | todas |
-| Leer `configs/.env` | `fs.readFileSync` + regex | todas |
-| Leer env vars de auth | `process.env.*` (heredado de Claude Code) | todas |
-| Escanear providers | `fs.readdirSync` | todas |
-| Leer `meta.json` / `request/body.json` | `fs.readFileSync` + `JSON.parse` | todas |
-| Colores | ANSI crudo con secuencias RGB (`\x1B[38;2;R;G;Bm`) | todas |
-| Bordes de tabla | Caracteres Unicode box-drawing (`╭╮╰╯─│├┤`) | todas |
-| Resolver rutas | `path.join`, `import.meta.dirname` | todas |
+| Operación                              | Mecanismo                                          | Plataforma |
+| -------------------------------------- | -------------------------------------------------- | ---------- |
+| Leer stdin                             | `process.stdin`                                    | todas      |
+| Leer `configs/.env`                    | `fs.readFileSync` + regex                          | todas      |
+| Leer env vars de auth                  | `process.env.*` (heredado de Claude Code)          | todas      |
+| Escanear providers                     | `fs.readdirSync`                                   | todas      |
+| Leer `meta.json` / `request/body.json` | `fs.readFileSync` + `JSON.parse`                   | todas      |
+| Colores                                | ANSI crudo con secuencias RGB (`\x1B[38;2;R;G;Bm`) | todas      |
+| Bordes de tabla                        | Caracteres Unicode box-drawing (`╭╮╰╯─│├┤`)        | todas      |
+| Resolver rutas                         | `path.join`, `import.meta.dirname`                 | todas      |
 
 No se usa `chalk`, `execSync`, `powershell.exe`, ni archivos rc de shell. Los colores se implementan con códigos ANSI raw, incluyendo soporte RGB para el azul `#253ecc` (`\x1B[38;2;37;62;204m`).
 
@@ -272,9 +273,9 @@ No se usa `chalk`, `execSync`, `powershell.exe`, ni archivos rc de shell. Los co
 
 ## 10. Limitaciones conocidas y mejoras futuras
 
-| Limitación | Causa | Mejora propuesta |
-|---|---|---|
-| `model` no está en `meta.json` | El proxy no persiste el modelo en InteractionMetadata | Añadir campo `model` a `InteractionMetadata` (schema change) |
-| `displayName` no está en `metadata.json` | Campo no definido en la especificación actual | ✅ Resuelto: añadir `displayName` a `metadata.json` de cada modelo |
-| Resolución de sesión es estática | El proxy no expone mapeo `session_id → carpeta` | ✅ Resuelto: resolución dinámica por `session_id` de `$ctx` |
-| `cacheReadInputTokens` puede ser `null` | Algunos proveedores no implementan prompt caching | Tratar `null` como `0` en la suma |
+| Limitación                               | Causa                                                 | Mejora propuesta                                                   |
+| ---------------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------ |
+| `model` no está en `meta.json`           | El proxy no persiste el modelo en InteractionMetadata | Añadir campo `model` a `InteractionMetadata` (schema change)       |
+| `displayName` no está en `metadata.json` | Campo no definido en la especificación actual         | ✅ Resuelto: añadir `displayName` a `metadata.json` de cada modelo |
+| Resolución de sesión es estática         | El proxy no expone mapeo `session_id → carpeta`       | ✅ Resuelto: resolución dinámica por `session_id` de `$ctx`        |
+| `cacheReadInputTokens` puede ser `null`  | Algunos proveedores no implementan prompt caching     | Tratar `null` como `0` en la suma                                  |

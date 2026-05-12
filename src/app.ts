@@ -48,11 +48,17 @@ export function buildApp(deps: ProxyDependencies, logger: Logger) {
       try {
         await deps.auditInteractionHandler.closeOrphanInteraction(interaction);
       } catch (err) {
-        app.log.error({ err, dir: interaction.interactionDir }, 'Error cerrando interacción orphan en shutdown');
+        app.log.error(
+          { err, dir: interaction.interactionDir },
+          'Error cerrando interacción orphan en shutdown',
+        );
       }
     }
     if (openInteractions.length > 0) {
-      app.log.info({ count: openInteractions.length }, 'Interacciones orphan cerradas en graceful shutdown');
+      app.log.info(
+        { count: openInteractions.length },
+        'Interacciones orphan cerradas en graceful shutdown',
+      );
     }
   });
 

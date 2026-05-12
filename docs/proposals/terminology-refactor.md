@@ -42,10 +42,12 @@ El clasificador de interacciones (`RequestClassifierService`) determina el tipo 
 Es la interacción principal: el proxy recibió un prompt del usuario, lo forwardó a Anthropic, y audita la respuesta completa incluyendo todos los pasos de tool_use/continuation.
 
 **Condiciones de clasificación:**
+
 - `fresh`: body con `"tools"` (array no vacío) → nueva interacción raíz o subagente
 - `continuation`: body con `"tool_result"` → step adicional de una interacción existente
 
 **Estructura en disco:**
+
 ```
 main-agent/interactions/NN/
   meta.json                     # InteractionMetadata — escrito al cerrar la interacción
@@ -79,12 +81,14 @@ main-agent/interactions/NN/
 El harness de Claude Code ejecuta un par de peticiones de inicialización antes de la primera interacción real: un quota-check y un cache warm-up. Ambas se registran como un único `client-preflight` con dos steps.
 
 **Condiciones de clasificación:**
+
 - `preflight-quota`: body con `"quota"` y `max_tokens:1`
 - `preflight-warmup`: body vacío o sin `"tools"`
 
 **Diferencia clave respecto a `agentic`:** no existe `input/` ni `output/` en el directorio raíz. Solo existen los `steps/` con sus propios archivos. La interacción se cierra inmediatamente al recibir la respuesta con `outcome: "completed"`.
 
 **Estructura en disco:**
+
 ```
 side-interactions/NN/
   meta.json                     # InteractionMetadata — sin input/ ni output/ raíz
@@ -103,6 +107,7 @@ side-interactions/NN/
 Peticiones con `"tools": []` (array vacío) que el harness envía en paralelo a la interacción agéntica activa. El caso más frecuente es `/v1/messages/count_tokens`. **No reemplazan ni interrumpen la interacción activa.**
 
 **Estructura en disco** (cuando se persiste):
+
 ```
 side-interactions/NN/
   meta.json                     # interactionType: "side-request"
@@ -135,6 +140,7 @@ side-interactions/NN/
 **Concepto:** una instancia concreta de ejecución. Tiene una entrada, una fase de procesamiento y una salida. Separa la identidad de la sesión de la ejecución particular que está ocurriendo.
 
 **En implementación:**
+
 - Interacciones agénticas: directorio `NN/` bajo `sessions/<session-id>/main-agent/interactions/`
 - Preflights y side-requests: directorio `NN/` bajo `sessions/<session-id>/side-interactions/`
 
@@ -143,6 +149,7 @@ El prefijo `NN` (2 dígitos, 1-based) es el número de secuencia dentro del árb
 **Tipo en TypeScript:** `ActiveInteraction` (en memoria durante la ejecución) → `InteractionMetadata` en `meta.json` (persistido al cerrar).
 
 **Campos clave de `InteractionMetadata`:**
+
 - `interactionType`: `'agentic'` / `'client-preflight'` / `'side-request'`
 - `outcome`: `'completed'` / `'upstream-error'` / `'client-error'` / `'truncated'` / `'orphaned'`
 - `stepCount`: cantidad de steps HTTP completados
@@ -158,6 +165,7 @@ El prefijo `NN` (2 dígitos, 1-based) es el número de secuencia dentro del árb
 **En implementación:** directorio `input/` en la raíz de la interacción.
 
 **Archivos:**
+
 - `headers.json`: cabeceras HTTP recibidas (contiene el API key completo — no compartir)
 - `body.bin`: cuerpo crudo en binario
 - `body.json`: cuerpo formateado (pretty print)
@@ -175,11 +183,11 @@ El prefijo `NN` (2 dígitos, 1-based) es el número de secuencia dentro del árb
 
 **Relación con HTTP:** cada step corresponde a **una llamada HTTP** entre el proxy y la API de Anthropic. No son etapas de procesamiento abstractas: son round-trips reales de red. El número de steps depende de cuántos ciclos tool_use/continuation ocurren:
 
-| Escenario | Steps |
-|-----------|-------|
-| Respuesta directa sin herramientas | 1 step |
-| Respuesta + 1 tool_use + 1 continuation | 2 steps |
-| Respuesta + N tool_uses encadenados | N+1 steps |
+| Escenario                               | Steps     |
+| --------------------------------------- | --------- |
+| Respuesta directa sin herramientas      | 1 step    |
+| Respuesta + 1 tool_use + 1 continuation | 2 steps   |
+| Respuesta + N tool_uses encadenados     | N+1 steps |
 
 ---
 
@@ -187,7 +195,7 @@ El prefijo `NN` (2 dígitos, 1-based) es el número de secuencia dentro del árb
 
 **Concepto:** un paso donde el agente procesa localmente, sin delegar a subagentes.
 
-**En implementación:** un step cuya respuesta SSE no contiene ningún `tool_use` con `name: "Agent"`. Puede contener tool_uses de built-in tools (`web_search_*`, etc.) o ninguno.
+**En implementación:** un step cuya respuesta SSE no contiene ningún `tool_use` con `name: "Agent"`. Puede contener tool*uses de built-in tools (`web_search*\*`, etc.) o ninguno.
 
 **`stopReason` típico:** `"end_turn"` (paso final) o `"tool_use"` (con herramientas no-Agent).
 
@@ -200,6 +208,7 @@ El prefijo `NN` (2 dígitos, 1-based) es el número de secuencia dentro del árb
 **En implementación:** un step cuya respuesta SSE contiene uno o más `content_block_start` con `type: "tool_use"` y `name: "Agent"`. El SSE handler detecta estos bloques en tiempo real y registra un `PendingAgentToolUse` por cada uno en el `SessionStore`.
 
 **Mecanismo de detección (SSE → disco):**
+
 1. El SSE handler detecta `content_block_start` con `name: "Agent"`.
 2. Acumula el JSON del bloque `input` vía `input_json_delta` (para extraer `subagent_type`, `description` y `prompt`).
 3. Registra `PendingAgentToolUse { stepIndex, toolUseId, subagentType, description, prompt }` en el `ActiveInteraction`.
@@ -228,6 +237,7 @@ El prefijo `NN` (2 dígitos, 1-based) es el número de secuencia dentro del árb
 **En implementación:** un `agentic` anidado directamente bajo `steps/NN/sub-agent-NN/`. Tiene exactamente la misma estructura interna que una interacción raíz (`meta.json`, `state.json`, `input/`, `output/`, `steps/`).
 
 **`parentContext` en `meta.json`:**
+
 ```json
 {
   "parentContext": {
@@ -277,21 +287,21 @@ Cuando la respuesta de un step incluye bloques de extended thinking (`type: "thi
 
 ## Mapeo de términos: conceptual → implementación
 
-| Término conceptual | Tipo TypeScript (runtime) | Archivo/directorio en disco | Campo clave |
-|---|---|---|---|
-| Sesión | `AuditSession` | `sessions/<session-id>/` | `sessionId` |
-| Interacción agéntica | `ActiveInteraction` | `main-agent/interactions/NN/` | `interactionType: "agentic"` |
-| Interacción de preflight/side | `ActiveInteraction` | `side-interactions/NN/` | `interactionType: "client-preflight"/"side-request"` |
-| Input | — | `input/` | — |
-| Pipeline | — | `steps/` | `stepCount` |
-| Step | `StepMeta` | `steps/NN/` | `stepIndex`, `stopReason` |
-| Step Compute | `StepMeta` (sin Agent pending) | `steps/NN/` | `stopReason: "end_turn"` |
-| Step Delegate | `StepMeta` + `PendingAgentToolUse[]` | `steps/NN/` | `pendingAgentToolUses` |
-| Output | — | `output/` | reconstruido de `sse.jsonl` |
-| Subagente | `ActiveInteraction` con `parentContext` | `steps/NN/sub-agent-NN/` | `parentContext` |
-| Delegación | — | — | SSE detecta `tool_use` `name: "Agent"` |
-| Continuación | clasificación `continuation` | `steps/NN+1/` | `tool_result` en body |
-| Extended thinking | — | `steps/NN/thought/content.md` | `hasThinking`, `thinkingBlockCount` |
+| Término conceptual            | Tipo TypeScript (runtime)               | Archivo/directorio en disco   | Campo clave                                          |
+| ----------------------------- | --------------------------------------- | ----------------------------- | ---------------------------------------------------- |
+| Sesión                        | `AuditSession`                          | `sessions/<session-id>/`      | `sessionId`                                          |
+| Interacción agéntica          | `ActiveInteraction`                     | `main-agent/interactions/NN/` | `interactionType: "agentic"`                         |
+| Interacción de preflight/side | `ActiveInteraction`                     | `side-interactions/NN/`       | `interactionType: "client-preflight"/"side-request"` |
+| Input                         | —                                       | `input/`                      | —                                                    |
+| Pipeline                      | —                                       | `steps/`                      | `stepCount`                                          |
+| Step                          | `StepMeta`                              | `steps/NN/`                   | `stepIndex`, `stopReason`                            |
+| Step Compute                  | `StepMeta` (sin Agent pending)          | `steps/NN/`                   | `stopReason: "end_turn"`                             |
+| Step Delegate                 | `StepMeta` + `PendingAgentToolUse[]`    | `steps/NN/`                   | `pendingAgentToolUses`                               |
+| Output                        | —                                       | `output/`                     | reconstruido de `sse.jsonl`                          |
+| Subagente                     | `ActiveInteraction` con `parentContext` | `steps/NN/sub-agent-NN/`      | `parentContext`                                      |
+| Delegación                    | —                                       | —                             | SSE detecta `tool_use` `name: "Agent"`               |
+| Continuación                  | clasificación `continuation`            | `steps/NN+1/`                 | `tool_result` en body                                |
+| Extended thinking             | —                                       | `steps/NN/thought/content.md` | `hasThinking`, `thinkingBlockCount`                  |
 
 ---
 

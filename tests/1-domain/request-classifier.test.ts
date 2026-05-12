@@ -139,7 +139,10 @@ describe('isWebFetchImplementationRequestBody', () => {
           {
             role: 'user',
             content: [
-              { type: 'text', text: 'Web page content:\n---\nExample Domain\n\nThis domain is for use in documentation examples.' },
+              {
+                type: 'text',
+                text: 'Web page content:\n---\nExample Domain\n\nThis domain is for use in documentation examples.',
+              },
             ],
           },
         ],

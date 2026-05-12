@@ -3,7 +3,17 @@ import * as fs from 'node:fs/promises';
 import * as fsSync from 'node:fs';
 import { RedactService } from '../1-domain/services/redact.service.js';
 import { MarkdownRendererService } from '../1-domain/services/markdown-renderer.service.js';
-import { InteractionState, InteractionMetadata, MarkdownRenderContext, SessionMetrics, SessionModelMetrics, SseLine, SubagentSummary, SubagentsSummary, CoalescedAgentStepResponse } from '../1-domain/types/audit.types.js';
+import {
+  InteractionState,
+  InteractionMetadata,
+  MarkdownRenderContext,
+  SessionMetrics,
+  SessionModelMetrics,
+  SseLine,
+  SubagentSummary,
+  SubagentsSummary,
+  CoalescedAgentStepResponse,
+} from '../1-domain/types/audit.types.js';
 import { JsonValue } from '../1-domain/types/json.types.js';
 import type { IAuditWriter } from './ports/audit-writer.port.js';
 import {
@@ -373,7 +383,10 @@ export class AuditWriterService implements IAuditWriter {
     );
   }
 
-  public async writeInteractionMeta(interactionDir: string, meta: InteractionMetadata): Promise<void> {
+  public async writeInteractionMeta(
+    interactionDir: string,
+    meta: InteractionMetadata,
+  ): Promise<void> {
     await this.writeJsonAtomic(
       path.join(interactionDir, 'meta.json'),
       meta as unknown as JsonValue,
@@ -400,9 +413,7 @@ export class AuditWriterService implements IAuditWriter {
    * paridad de protocolo (ver `docs/how-sse-reconstruction-works.md`).
    */
   public appendSseRawChunk(stepDir: string, chunk: Buffer): void {
-    const p = stepDir.endsWith('.txt')
-      ? stepDir
-      : path.join(stepDir, DIR_STEP_RESPONSE, 'sse.txt');
+    const p = stepDir.endsWith('.txt') ? stepDir : path.join(stepDir, DIR_STEP_RESPONSE, 'sse.txt');
     fsSync.mkdirSync(path.dirname(p), { recursive: true });
     fsSync.appendFileSync(p, chunk);
   }
@@ -499,7 +510,11 @@ export class AuditWriterService implements IAuditWriter {
    * Usa `parentContext.correlationStatus` para determinar si la correlación está resuelta.
    * Si `correlationStatus` es 'unresolved', no infiere por orden y deja toolUseId null.
    */
-  private async extractSubagentsSummary(stepDir: string, initialMessage: JsonValue, _toolUseIds: string[]): Promise<SubagentsSummary | null> {
+  private async extractSubagentsSummary(
+    stepDir: string,
+    initialMessage: JsonValue,
+    _toolUseIds: string[],
+  ): Promise<SubagentsSummary | null> {
     try {
       // Listar directorios sub-agent-NN directamente desde stepDir
       const entries = await fs.readdir(stepDir, { withFileTypes: true });
@@ -512,14 +527,23 @@ export class AuditWriterService implements IAuditWriter {
       }
 
       // Extraer tool_use Agent del mensaje de delegación
-      const agentToolUses: Array<{ id: string; description: string; prompt: string; subagentType: string | null }> = [];
+      const agentToolUses: Array<{
+        id: string;
+        description: string;
+        prompt: string;
+        subagentType: string | null;
+      }> = [];
       if (initialMessage && typeof initialMessage === 'object' && !Array.isArray(initialMessage)) {
         const msg = initialMessage as Record<string, JsonValue>;
         if (msg.content && Array.isArray(msg.content)) {
           for (const block of msg.content) {
             if (block && typeof block === 'object' && !Array.isArray(block)) {
               const contentBlock = block as Record<string, JsonValue>;
-              if (contentBlock.type === 'tool_use' && contentBlock.name === 'Agent' && contentBlock.input) {
+              if (
+                contentBlock.type === 'tool_use' &&
+                contentBlock.name === 'Agent' &&
+                contentBlock.input
+              ) {
                 const input = contentBlock.input as Record<string, JsonValue>;
                 agentToolUses.push({
                   id: String(contentBlock.id || ''),
@@ -560,7 +584,12 @@ export class AuditWriterService implements IAuditWriter {
         let outcome: SubagentSummary['outcome'] = 'unknown';
         if (meta) {
           if (meta.outcome === 'completed') outcome = 'completed';
-          else if (meta.outcome === 'client-error' || meta.outcome === 'upstream-error' || meta.outcome === 'truncated') outcome = 'client-error';
+          else if (
+            meta.outcome === 'client-error' ||
+            meta.outcome === 'upstream-error' ||
+            meta.outcome === 'truncated'
+          )
+            outcome = 'client-error';
           else if (meta.outcome === 'orphaned') outcome = 'orphaned';
         }
 
@@ -583,7 +612,8 @@ export class AuditWriterService implements IAuditWriter {
 
         // Obtener datos del tool_use Agent
         const agentToolUse = toolUseId
-          ? agentToolUses.find((t) => t.id === toolUseId) || (i < agentToolUses.length ? agentToolUses[i] : null)
+          ? agentToolUses.find((t) => t.id === toolUseId) ||
+            (i < agentToolUses.length ? agentToolUses[i] : null)
           : null;
 
         // Extraer métricas
@@ -788,7 +818,10 @@ export class AuditWriterService implements IAuditWriter {
   public async updateSessionMetrics(
     sessionDir: string,
     modelId: string,
-    totals: Pick<SessionModelMetrics, 'inputTokens' | 'cacheReadInputTokens' | 'cacheCreationInputTokens' | 'outputTokens'>,
+    totals: Pick<
+      SessionModelMetrics,
+      'inputTokens' | 'cacheReadInputTokens' | 'cacheCreationInputTokens' | 'outputTokens'
+    >,
     stepCount: number,
   ): Promise<void> {
     const filePath = path.join(sessionDir, 'session-metrics.json');

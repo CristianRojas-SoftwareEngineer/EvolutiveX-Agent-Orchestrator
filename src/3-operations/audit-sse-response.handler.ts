@@ -41,7 +41,9 @@ export class AuditSseResponseHandler {
       return;
     }
 
-    const activeInteraction = this.sessionStore.getInteractionByDirSync(context.auditInteractionDir);
+    const activeInteraction = this.sessionStore.getInteractionByDirSync(
+      context.auditInteractionDir,
+    );
     const coalescedAgentContinuation = context.coalescedAgentContinuation;
     const stepNumber = coalescedAgentContinuation?.targetStepIndex ?? context.assignedStepIndex;
     const isCoalescedAgentContinuation = coalescedAgentContinuation !== undefined;
@@ -167,7 +169,10 @@ export class AuditSseResponseHandler {
                 if (!stepUsage.input_tokens && evt.usage.input_tokens) {
                   stepUsage.input_tokens = evt.usage.input_tokens;
                 }
-                if (!stepUsage.cache_creation_input_tokens && evt.usage.cache_creation_input_tokens) {
+                if (
+                  !stepUsage.cache_creation_input_tokens &&
+                  evt.usage.cache_creation_input_tokens
+                ) {
                   stepUsage.cache_creation_input_tokens = evt.usage.cache_creation_input_tokens;
                 }
                 if (!stepUsage.cache_read_input_tokens && evt.usage.cache_read_input_tokens) {
@@ -201,16 +206,14 @@ export class AuditSseResponseHandler {
                     context.auditInteractionDir,
                   );
 
-                  const toolName = typeof evt.content_block.name === 'string'
-                    ? evt.content_block.name.toLowerCase()
-                    : '';
+                  const toolName =
+                    typeof evt.content_block.name === 'string'
+                      ? evt.content_block.name.toLowerCase()
+                      : '';
 
                   // Detección de Agent: registrar pending para que la siguiente
                   // fresh request en la misma sesión se clasifique como subagente.
-                  if (
-                    toolName === 'agent' &&
-                    typeof evt.index === 'number'
-                  ) {
+                  if (toolName === 'agent' && typeof evt.index === 'number') {
                     this.sessionStore.registerPendingAgentToolUse(
                       context.auditInteractionDir,
                       stepNumber,
@@ -351,7 +354,9 @@ export class AuditSseResponseHandler {
           ...(sseRawBytesWritten > 0 ? { sseRawBytesWritten } : {}),
           ...(sseRawTruncated ? { sseRawTruncatedByLimit: true } : {}),
           ...(anthropicMessageId ? { anthropicMessageId } : {}),
-          ...(thinkingBlocks.length > 0 ? { hasThinking: true, thinkingBlockCount: thinkingBlocks.length } : {}),
+          ...(thinkingBlocks.length > 0
+            ? { hasThinking: true, thinkingBlockCount: thinkingBlocks.length }
+            : {}),
         };
 
         if (context.interactionType === 'client-preflight') {
@@ -396,21 +401,39 @@ export class AuditSseResponseHandler {
           }
 
           if (activeInteraction?.modelId) {
-            const sessionDir = path.join(this.sessionStore.getBaseDir(), activeInteraction.sessionId);
-            const stepTotals = computeTokenTotals([{ stepIndex: stepNumber, sse: true, statusCode: context.responseStatusCode, coalescedAgentContinuation: continuationMeta }]);
+            const sessionDir = path.join(
+              this.sessionStore.getBaseDir(),
+              activeInteraction.sessionId,
+            );
+            const stepTotals = computeTokenTotals([
+              {
+                stepIndex: stepNumber,
+                sse: true,
+                statusCode: context.responseStatusCode,
+                coalescedAgentContinuation: continuationMeta,
+              },
+            ]);
             await this.sessionStore.withSessionLock(activeInteraction.sessionId, async () => {
               await this.auditWriter
                 .updateSessionMetrics(sessionDir, activeInteraction.modelId!, stepTotals, 1)
-                .catch(() => { /* error no crítico */ });
+                .catch(() => {
+                  /* error no crítico */
+                });
             });
           }
 
           let sseReconstructResult: SseReconstructResult | undefined;
           try {
             // Para steps coalesced, reconstruir initialMessage desde la fase "delegation"
-            const initialMessage = await this.sseReconstruct.reconstructSseJsonlPhaseMessage(sseJsonlPath, 'delegation');
+            const initialMessage = await this.sseReconstruct.reconstructSseJsonlPhaseMessage(
+              sseJsonlPath,
+              'delegation',
+            );
             // Reconstruir finalMessage desde la fase "continuation"
-            const finalMessage = await this.sseReconstruct.reconstructSseJsonlPhaseMessage(sseJsonlPath, 'continuation');
+            const finalMessage = await this.sseReconstruct.reconstructSseJsonlPhaseMessage(
+              sseJsonlPath,
+              'continuation',
+            );
             // La request de continuation viene del contexto en memoria, no de archivos
             const continuationRequest = coalescedAgentContinuation?.continuationRequest ?? null;
             const continuationHeaders = coalescedAgentContinuation?.continuationHeaders;
@@ -491,7 +514,9 @@ export class AuditSseResponseHandler {
           await this.sessionStore.withSessionLock(activeInteraction.sessionId, async () => {
             await this.auditWriter
               .updateSessionMetrics(sessionDir, activeInteraction.modelId!, stepTotals, 1)
-              .catch(() => { /* error no crítico */ });
+              .catch(() => {
+                /* error no crítico */
+              });
           });
         }
 
@@ -517,7 +542,9 @@ export class AuditSseResponseHandler {
           // Interacción no terminal — continúa con el próximo step (continuation).
           // Marcar la interacción como awaiting para que el cleanup pueda detectar
           // orphans cuya continuation nunca llegó.
-          const awaitInteraction = this.sessionStore.getInteractionByDirSync(context.auditInteractionDir);
+          const awaitInteraction = this.sessionStore.getInteractionByDirSync(
+            context.auditInteractionDir,
+          );
           if (awaitInteraction) {
             awaitInteraction.awaitingContinuation = true;
             awaitInteraction.awaitingSince = Date.now();
@@ -573,7 +600,9 @@ export class AuditSseResponseHandler {
         if (context.isInternalToolStep) {
           // Es un step interno (WebSearch/WebFetch). No cerrar la interacción padre.
           // Marcarla como awaitingContinuation para que la próxima continuation no la considere huérfana.
-          const awaitInteraction = this.sessionStore.getInteractionByDirSync(context.auditInteractionDir);
+          const awaitInteraction = this.sessionStore.getInteractionByDirSync(
+            context.auditInteractionDir,
+          );
           if (awaitInteraction) {
             awaitInteraction.awaitingContinuation = true;
             awaitInteraction.awaitingSince = Date.now();
@@ -691,7 +720,9 @@ export class AuditSseResponseHandler {
       ...(lostPendings ? { lostPendingAgents: lostPendings } : {}),
       ...(lostPendingsWebSearch ? { lostPendingWebSearch: lostPendingsWebSearch } : {}),
       ...(lostPendingsWebFetch ? { lostPendingWebFetch: lostPendingsWebFetch } : {}),
-      ...(turn.resolvedInternalTools.length > 0 ? { resolvedInternalTools: turn.resolvedInternalTools } : {}),
+      ...(turn.resolvedInternalTools.length > 0
+        ? { resolvedInternalTools: turn.resolvedInternalTools }
+        : {}),
       truncation: {
         requestBodyOmitted: turn.requestBodyOmitted,
         responseBodyBytesTotal: null,

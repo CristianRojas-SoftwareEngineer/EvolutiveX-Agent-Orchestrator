@@ -293,12 +293,12 @@ Para localizar `usage` en disco (jerarquía general: `sessions/<session-id>/inte
 
 En la nueva estructura, el `usage` de cada step SSE vive en `steps/{N}/response/sse.jsonl`. Si existe reconstrucción top-level, también en `response/body.json`. El `meta.json` del turno incluye `totals` con tokens agregados por turno (solo para `agentic` SSE) y `steps[]` donde cada step puede incluir tokens individuales.
 
-| Nivel         | Archivo                          | Cuándo                                                                        |
-| ------------- | -------------------------------- | ----------------------------------------------------------------------------- |
-| **Step SSE**  | `steps/NNN/response/sse.jsonl`   | Siempre en turnos SSE; contiene evento `message_delta` con `usage`            |
+| Nivel         | Archivo                          | Cuándo                                                                   |
+| ------------- | -------------------------------- | ------------------------------------------------------------------------ |
+| **Step SSE**  | `steps/NNN/response/sse.jsonl`   | Siempre en turnos SSE; contiene evento `message_delta` con `usage`       |
 | **Top-level** | `response/body.json`             | Siempre en agentic/side-request SSE completados (reconstrucción exitosa) |
 | **meta.json** | campo `totals`                   | Solo `agentic` SSE; agrega tokens de todos los steps                     |
-| **meta.json** | campo `steps[].inputTokens` etc. | Tokens por step individual                                                    |
+| **meta.json** | campo `steps[].inputTokens` etc. | Tokens por step individual                                               |
 
 Si **no** hay JSON reconstruido pero sí `steps/NNN/response/sse.jsonl`, el objeto `usage` aparece en el flujo SSE (p. ej. en el evento `message_delta` al finalizar el stream): parsea las líneas JSON del archivo hasta localizar el bloque `usage` asociado al mensaje completado.
 
@@ -331,6 +331,6 @@ Los directorios `sessions/` pueden contener **claves API** en cabeceras y **cont
 
 ## 13. Misma guía en Claude Code (opcional)
 
-La ecuación y convenciones de esta guía están recogidas en la skill global **`anthropic-api-cost-estimation`** (instalación típica: `~/.claude/skills/anthropic-api-cost-estimation/`), pensada para usarse junto con **`smart-code-proxy`** cuando trabajes con sesiones auditadas y costes estimados en Claude Code. Para OpenRouter (guía y skill **`openrouter-api-cost-estimation`**), véase el enlace de §1.
+La ecuación y convenciones de esta guía están recogidas en la skill global **`anthropic-api-cost-estimation`** (instalación típica: `~/.claude/skills/anthropic-api-cost-estimation/`), pensada para usarse junto con **`smart-code-proxy`** cuando trabajes con sesiones auditadas y costes estimados en Claude Code. Para OpenRouter, véase [Coste por generación: OpenRouter y la API Chat Completions](./how-to-calculate-openrouter-api-costs.md).
 
 Mantén alineados el presente documento y los archivos `references/*.md` de la skill **`anthropic-api-cost-estimation`** cuando cambie el contrato semántico (véase `MAINTENANCE.md` en el directorio de la skill).

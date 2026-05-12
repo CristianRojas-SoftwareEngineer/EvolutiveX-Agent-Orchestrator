@@ -18,7 +18,7 @@ El proxy utiliza **Progressive Kernel Architecture (PKA)** — un modelo arquite
 
 | Capa                           | Ubicación                | Responsabilidad                                                                   | Componentes Clave                                                                                                                                                   |
 | ------------------------------ | ------------------------ | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **1 - Dominio**                | `src/1-domain/`          | Tipos puros (entidades) y lógica de dominio sin dependencias externas             | `SessionResolverService`, `RequestClassifierService`, `RedactService`, `MarkdownRendererService`, `SseSimulatorService`, Tipos de auditoría                            |
+| **1 - Dominio**                | `src/1-domain/`          | Tipos puros (entidades) y lógica de dominio sin dependencias externas             | `SessionResolverService`, `RequestClassifierService`, `RedactService`, `MarkdownRendererService`, `SseSimulatorService`, Tipos de auditoría                         |
 | **2 - Servicios (Adapters)**   | `src/2-services/`        | Implementaciones concretas con I/O (filesystem, streams) y **ports** (interfaces) | `SessionStoreService`, `AuditWriterService`, `SseReconstructService`, `StreamTeeService`, Ports: `IAuditWriter`, `ISessionStore`, `ISseReconstructor`, `IStreamTee` |
 | **3 - Operaciones (Handlers)** | `src/3-operations/`      | Orquestación de casos de uso (Command Handlers)                                   | `AuditInteractionHandler`, `AuditSseResponseHandler`, `AuditStandardResponseHandler`, `AuditUpstreamErrorHandler`, `FilterToolsHandler`                             |
 | **4 - API (Composition Root)** | `src/4-api/`             | Wiring de dependencias y configuración                                            | `createProxyDependencies()`, Configuración de entorno                                                                                                               |
@@ -155,7 +155,7 @@ sessions/<session-id>/
 
 | `interactionType`  | Origen                                                                 | Cierre                                            |
 | ------------------ | ---------------------------------------------------------------------- | ------------------------------------------------- |
-| `agentic`     | Prompt del usuario con `tools` no vacíos (fresh) + continuations       | `stop_reason` terminal (`end_turn`, `max_tokens`) |
+| `agentic`          | Prompt del usuario con `tools` no vacíos (fresh) + continuations       | `stop_reason` terminal (`end_turn`, `max_tokens`) |
 | `client-preflight` | Quota check (`max_tokens:1`) o cache warm-up sin turno activo          | Al recibir la respuesta (inmediato)               |
 | `side-request`     | Peticiones con `tools: []` (ej. `count_tokens`, generación de títulos) | Respuesta terminal; no desplaza al turno activo   |
 
@@ -163,7 +163,7 @@ sessions/<session-id>/
 
 El campo `outcome` en `meta.json` indica el resultado final del turno:
 
-| `outcome`    | Significado                                                             | `statusCode` típico |
+| `outcome`        | Significado                                                             | `statusCode` típico |
 | ---------------- | ----------------------------------------------------------------------- | ------------------- |
 | `completed`      | Turno completado exitosamente                                           | 2xx                 |
 | `client-error`   | Error del cliente (request mal formada, autenticación fallida, etc.)    | 4xx                 |
@@ -220,22 +220,22 @@ Esto evita la creación de directorios `_unknown/` con interacciones vacías que
 
 Personaliza el comportamiento ajustando estas variables en tu entorno o en un archivo `configs/.env`:
 
-|    Categoría     | Variable                        | Descripción                                                                                                                        | Default                                                                                 |
-| :--------------: | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-|     **Core**     | `PORT`                          | Puerto de escucha del proxy.                                                                                                       | `8787`                                                                                  |
-|   **Upstream**   | `UPSTREAM_ORIGIN`               | URL objetivo de Anthropic.                                                                                                         | `https://api.anthropic.com`                                                             |
-|                  | `UPSTREAM_ACCEPT_ENCODING`      | Control de compresión (`identity`, `gzip`, `pass`, `remove`).                                                                      | `identity`                                                                              |
-|   **Headers**    | `AUDIT_SESSION_OVERRIDE_HEADER` | Cabecera primaria de sesión.                                                                                                       | `x-cc-audit-session`                                                                    |
-|                  | `AUDIT_SESSION_FALLBACK_HEADER` | Cabecera secundaria.                                                                                                               | `x-claude-code-session-id`                                                              |
-|                  | `STRIP_AUDIT_SESSION_HEADER`    | Elimina cabeceras de sesión hacia upstream.                                                                                        | `1` (Activo)                                                                            |
-|                  | `AUDIT_SESSION_HASH_SUFFIX`     | Añade hash al ID de sesión.                                                                                                        | `0` (Desactivo)                                                                         |
-|   **Límites**    | `MAX_REQUEST_BODY`              | Límite del cuerpo de petición (memoria en proxy).                                                                                  | `50mb`                                                                                  |
-|                  | `MAX_RESPONSE_BUFFER_BYTES`     | Tope de buffer en memoria para respuestas no-SSE.                                                                                  | `104857600`                                                                             |
-|                  | `MAX_AUDIT_REQUEST_BODY_BYTES`  | Tope de archivo físico para el cuerpo de petición.                                                                                 | `52428800`                                                                              |
-|                  | `MAX_AUDIT_RESPONSE_BODY_BYTES` | Tope de archivo físico para el cuerpo de respuesta.                                                                                | `52428800`                                                                              |
-|                  | `MAX_AUDIT_SSE_RAW_BYTES`       | Tope físico para `response/sse.txt` (raw dump debug; `0` = ilimitado). **No afecta** a la reconstrucción (que lee `sse.jsonl`).    | `52428800`                                                                              |
-|   **Thinking**   | `PROXY_UNREDACT_THINKING`       | Remueve el flag `redact-thinking-2026-02-12` del header `anthropic-beta` para capturar contenido thinking legible.                 | `false` (desactivado)                                                                   |
-|   **Filtrado**   | `FILTERED_TOOLS`                | Lista de tool names a excluir del request (coma-separado). Reduce tokens y ruido en auditoría.                                     | `ScheduleWakeup,NotebookEdit,ExitWorktree,EnterWorktree,CronList,CronDelete,CronCreate` |
+|  Categoría   | Variable                        | Descripción                                                                                                                     | Default                                                                                 |
+| :----------: | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+|   **Core**   | `PORT`                          | Puerto de escucha del proxy.                                                                                                    | `8787`                                                                                  |
+| **Upstream** | `UPSTREAM_ORIGIN`               | URL objetivo de Anthropic.                                                                                                      | `https://api.anthropic.com`                                                             |
+|              | `UPSTREAM_ACCEPT_ENCODING`      | Control de compresión (`identity`, `gzip`, `pass`, `remove`).                                                                   | `identity`                                                                              |
+| **Headers**  | `AUDIT_SESSION_OVERRIDE_HEADER` | Cabecera primaria de sesión.                                                                                                    | `x-cc-audit-session`                                                                    |
+|              | `AUDIT_SESSION_FALLBACK_HEADER` | Cabecera secundaria.                                                                                                            | `x-claude-code-session-id`                                                              |
+|              | `STRIP_AUDIT_SESSION_HEADER`    | Elimina cabeceras de sesión hacia upstream.                                                                                     | `1` (Activo)                                                                            |
+|              | `AUDIT_SESSION_HASH_SUFFIX`     | Añade hash al ID de sesión.                                                                                                     | `0` (Desactivo)                                                                         |
+| **Límites**  | `MAX_REQUEST_BODY`              | Límite del cuerpo de petición (memoria en proxy).                                                                               | `50mb`                                                                                  |
+|              | `MAX_RESPONSE_BUFFER_BYTES`     | Tope de buffer en memoria para respuestas no-SSE.                                                                               | `104857600`                                                                             |
+|              | `MAX_AUDIT_REQUEST_BODY_BYTES`  | Tope de archivo físico para el cuerpo de petición.                                                                              | `52428800`                                                                              |
+|              | `MAX_AUDIT_RESPONSE_BODY_BYTES` | Tope de archivo físico para el cuerpo de respuesta.                                                                             | `52428800`                                                                              |
+|              | `MAX_AUDIT_SSE_RAW_BYTES`       | Tope físico para `response/sse.txt` (raw dump debug; `0` = ilimitado). **No afecta** a la reconstrucción (que lee `sse.jsonl`). | `52428800`                                                                              |
+| **Thinking** | `PROXY_UNREDACT_THINKING`       | Remueve el flag `redact-thinking-2026-02-12` del header `anthropic-beta` para capturar contenido thinking legible.              | `false` (desactivado)                                                                   |
+| **Filtrado** | `FILTERED_TOOLS`                | Lista de tool names a excluir del request (coma-separado). Reduce tokens y ruido en auditoría.                                  | `ScheduleWakeup,NotebookEdit,ExitWorktree,EnterWorktree,CronList,CronDelete,CronCreate` |
 
 > **Auditoría por defecto.** El proxy escribe en `./sessions` para `agentic`, `client-preflight` y `side-request`. En side-request SSE auditados: (a) `steps/NNN/response/sse.jsonl` es la **fuente de verdad** (escritura síncrona, orden determinista); (b) `steps/NNN/response/sse.txt` es raw dump de depuración acotado por `MAX_AUDIT_SSE_RAW_BYTES`; (c) `response/body.json` top-level se reconstruye desde `sse.jsonl`. Detalle en [`docs/how-sse-reconstruction-works.md`](docs/how-sse-reconstruction-works.md).
 
@@ -308,14 +308,13 @@ routing/providers/
         └── mimo-v2-omni/metadata.json
 ```
 
-
 Cada `config.json` incluye el campo `AUTH_METHOD` que determina qué variable de entorno de autenticación usa Claude Code al comunicarse con ese proveedor:
 
-| `AUTH_METHOD` | Variable de entorno | Header HTTP | Cuándo usarlo |
-|---|---|---|---|
-| `oauth` | Ninguna (`ANTHROPIC_API_KEY` vacía) | `Authorization: Bearer` (vía OAuth) | Autenticación nativa (Suscripción Pro/Max) |
-| `api_key` | `ANTHROPIC_API_KEY` | `X-Api-Key` | Acceso directo a la API de Anthropic (pay-as-you-go) |
-| `bearer` | `ANTHROPIC_AUTH_TOKEN` | `Authorization: Bearer` | Gateways y proxies LLM (OpenRouter, Ollama, Xiaomi) |
+| `AUTH_METHOD` | Variable de entorno                 | Header HTTP                         | Cuándo usarlo                                        |
+| ------------- | ----------------------------------- | ----------------------------------- | ---------------------------------------------------- |
+| `oauth`       | Ninguna (`ANTHROPIC_API_KEY` vacía) | `Authorization: Bearer` (vía OAuth) | Autenticación nativa (Suscripción Pro/Max)           |
+| `api_key`     | `ANTHROPIC_API_KEY`                 | `X-Api-Key`                         | Acceso directo a la API de Anthropic (pay-as-you-go) |
+| `bearer`      | `ANTHROPIC_AUTH_TOKEN`              | `Authorization: Bearer`             | Gateways y proxies LLM (OpenRouter, Ollama, Xiaomi)  |
 
 Los archivos `secrets.json` contienen la credencial real y **no deben versionarse** (están en `.gitignore`). Usar `secrets.json.example` como plantilla — su contenido refleja el campo correcto según el `AUTH_METHOD` del proveedor.
 
@@ -327,7 +326,6 @@ Al ejecutar `npm run configure:provider <proveedor>`, el sistema realiza dos acc
 2. **Enrutamiento del Proxy**: Extrae la verdadera URL destino del proveedor (`config.json`) y la escribe como `UPSTREAM_ORIGIN` en el archivo `configs/.env` del proxy.
 
 > **Importante:** Si el Smart Code Proxy ya estaba ejecutándose al momento de cambiar de proveedor, debes detenerlo y volver a iniciarlo para que cargue el nuevo destino desde el archivo `.env`.
-
 
 ## 🐳 Docker y Contenerización
 

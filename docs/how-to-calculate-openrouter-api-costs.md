@@ -223,8 +223,3 @@ Las peticiones y los logs pueden incluir **claves API** en cabeceras y **conteni
 
 ---
 
-## 13. Misma guía en Claude Code (opcional)
-
-Las convenciones de esta guía están recogidas en la skill global **`openrouter-api-cost-estimation`** (instalación típica: `~/.claude/skills/openrouter-api-cost-estimation/`), pensada para interpretar `ResponseUsage`, streaming y agregación desde logs. Para la API Messages de Anthropic y sesiones del proxy en disco, usáis **`anthropic-api-cost-estimation`** y **`smart-code-proxy`** según corresponda.
-
-Mantén alineados el presente documento y los archivos `references/*.md` de esa skill cuando cambie el contrato semántico (véase `MAINTENANCE.md` en el directorio de la skill).

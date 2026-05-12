@@ -9,12 +9,7 @@
  * Lee stdin como JSON con el contexto de Claude Code ($ctx).
  */
 
-import {
-  readFileSync,
-  readdirSync,
-  existsSync,
-  writeFileSync,
-} from 'node:fs';
+import { readFileSync, readdirSync, existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 
@@ -31,7 +26,7 @@ interface ClaudeCodeContext {
   };
   rate_limits?: {
     five_hour?: { used_percentage?: number; resets_at?: number };
-    seven_day?:  { used_percentage?: number; resets_at?: number };
+    seven_day?: { used_percentage?: number; resets_at?: number };
   } | null;
 }
 
@@ -46,13 +41,16 @@ interface ModelMetadata {
 }
 
 interface SessionMetrics {
-  models: Record<string, {
-    count: number;
-    inputTokens: number;
-    cacheReadInputTokens: number;
-    cacheCreationInputTokens: number;
-    outputTokens: number;
-  }>;
+  models: Record<
+    string,
+    {
+      count: number;
+      inputTokens: number;
+      cacheReadInputTokens: number;
+      cacheCreationInputTokens: number;
+      outputTokens: number;
+    }
+  >;
 }
 
 interface TokenMetrics {
@@ -203,8 +201,7 @@ function computeColumnWidths(headers: string[], rows: string[][]): number[] {
     let maxW = visibleLength(headers[i]);
     for (const row of rows) {
       if (i < row.length && row[i] !== '' && row[i] !== undefined) {
-        const isMerged =
-          i + 1 < colCount && (row[i + 1] === '' || row[i + 1] === undefined);
+        const isMerged = i + 1 < colCount && (row[i + 1] === '' || row[i + 1] === undefined);
         if (!isMerged) {
           maxW = Math.max(maxW, visibleLength(row[i]));
         }
@@ -237,8 +234,7 @@ function renderTable(
   const widths = computeColumnWidths(headers, rows);
 
   // Ancho total: anchos de columnas + padding por columna + bordes + separadores
-  let totalWidth =
-    widths.reduce((sum, w) => sum + w, 0) + widths.length * 3 + 1;
+  let totalWidth = widths.reduce((sum, w) => sum + w, 0) + widths.length * 3 + 1;
 
   // Si minWidth es mayor que el ancho natural, expandir última columna
   if (minWidth !== undefined && totalWidth < minWidth) {
@@ -264,9 +260,7 @@ function renderTable(
     const headerCells = headers.map((h, i) => {
       const colored = `${C.label}${h}${C.reset}`;
       const aligned =
-        alignments[i] === 'right'
-          ? alignRight(colored, widths[i])
-          : padCenter(colored, widths[i]);
+        alignments[i] === 'right' ? alignRight(colored, widths[i]) : padCenter(colored, widths[i]);
       return aligned;
     });
     lines.push(
@@ -295,11 +289,7 @@ function renderTable(
 
       // Calcular ancho efectivo (incluyendo celdas vacías siguientes)
       let effectiveWidth = widths[i];
-      for (
-        let j = i + 1;
-        j < colCount && (row[j] === '' || row[j] === undefined);
-        j++
-      ) {
+      for (let j = i + 1; j < colCount && (row[j] === '' || row[j] === undefined); j++) {
         effectiveWidth += widths[j] + 3; // +3 para espacio, borde, espacio
       }
 
@@ -313,8 +303,7 @@ function renderTable(
       rowLine += aligned;
 
       // Agregar separador de columna (excepto si la siguiente celda está vacía)
-      const nextIsEmpty =
-        i + 1 < colCount && (row[i + 1] === '' || row[i + 1] === undefined);
+      const nextIsEmpty = i + 1 < colCount && (row[i + 1] === '' || row[i + 1] === undefined);
       if (i < colCount - 1 && !nextIsEmpty) {
         rowLine += ` ${C.border}${B.v}${C.reset} `;
       }
@@ -348,9 +337,7 @@ function renderSideBySide(
   for (let i = 0; i < minLines; i++) {
     const leftVisLen = visibleLength(left.lines[i]);
     const leftPad = ' '.repeat(Math.max(0, left.width - leftVisLen));
-    result.push(
-      `${left.lines[i]}${leftPad}${' '.repeat(gap)}${right.lines[i]}`,
-    );
+    result.push(`${left.lines[i]}${leftPad}${' '.repeat(gap)}${right.lines[i]}`);
   }
 
   // Renderizar las líneas sobrantes de la tabla más larga debajo
@@ -418,7 +405,9 @@ function readClaudeEnv(): Record<string, string> {
   const settingsPath = join(homedir(), '.claude', 'settings.json');
   if (!existsSync(settingsPath)) return {};
   try {
-    const settings = JSON.parse(readFileSync(settingsPath, 'utf-8')) as { env?: Record<string, string> };
+    const settings = JSON.parse(readFileSync(settingsPath, 'utf-8')) as {
+      env?: Record<string, string>;
+    };
     return settings.env ?? {};
   } catch {
     return {};
@@ -459,16 +448,13 @@ function resolveActiveProvider(): {
   }
 
   const providers = readdirSync(ROUTING_PATH, { withFileTypes: true }).filter(
-    (d) =>
-      d.isDirectory() && existsSync(join(ROUTING_PATH, d.name, 'config.json')),
+    (d) => d.isDirectory() && existsSync(join(ROUTING_PATH, d.name, 'config.json')),
   );
 
   for (const provider of providers) {
     try {
       const configPath = join(ROUTING_PATH, provider.name, 'config.json');
-      const config = JSON.parse(
-        readFileSync(configPath, 'utf-8'),
-      ) as ProviderConfig;
+      const config = JSON.parse(readFileSync(configPath, 'utf-8')) as ProviderConfig;
       if (config.ANTHROPIC_BASE_URL === upstreamOrigin) {
         return { providerName: provider.name, upstreamOrigin };
       }
@@ -492,8 +478,8 @@ function resolveAuthMethod(): 'api_key' | 'bearer' | 'oauth' {
 function resolveSessionPath(sessionId?: string): string | null {
   if (!existsSync(SESSIONS_PATH)) return null;
 
-  const sessions = readdirSync(SESSIONS_PATH, { withFileTypes: true }).filter(
-    (d) => d.isDirectory(),
+  const sessions = readdirSync(SESSIONS_PATH, { withFileTypes: true }).filter((d) =>
+    d.isDirectory(),
   );
 
   if (sessions.length === 0) return null;
@@ -506,25 +492,21 @@ function resolveSessionPath(sessionId?: string): string | null {
 function loadDisplayName(modelId: string): string {
   if (!existsSync(ROUTING_PATH)) return modelId;
 
-  const providers = readdirSync(ROUTING_PATH, { withFileTypes: true }).filter(
-    (d) => d.isDirectory(),
+  const providers = readdirSync(ROUTING_PATH, { withFileTypes: true }).filter((d) =>
+    d.isDirectory(),
   );
 
   for (const provider of providers) {
     const modelsDir = join(ROUTING_PATH, provider.name, 'models');
     if (!existsSync(modelsDir)) continue;
 
-    const models = readdirSync(modelsDir, { withFileTypes: true }).filter((d) =>
-      d.isDirectory(),
-    );
+    const models = readdirSync(modelsDir, { withFileTypes: true }).filter((d) => d.isDirectory());
 
     for (const model of models) {
       const metadataPath = join(modelsDir, model.name, 'metadata.json');
       if (!existsSync(metadataPath)) continue;
       try {
-        const metadata = JSON.parse(
-          readFileSync(metadataPath, 'utf-8'),
-        ) as ModelMetadata;
+        const metadata = JSON.parse(readFileSync(metadataPath, 'utf-8')) as ModelMetadata;
         if (metadata.modelId === modelId) {
           return metadata.displayName || modelId;
         }
@@ -544,24 +526,13 @@ function classifyModel(modelId: string): 'lite' | 'standard' | 'reasoning' {
 
   const modelBase = modelId.split('/').pop() || modelId;
 
-  if (haiku && (modelId.includes(haiku) || modelBase.includes('haiku')))
-    return 'lite';
-  if (opus && (modelId.includes(opus) || modelBase.includes('opus')))
-    return 'reasoning';
-  if (sonnet && (modelId.includes(sonnet) || modelBase.includes('sonnet')))
-    return 'standard';
+  if (haiku && (modelId.includes(haiku) || modelBase.includes('haiku'))) return 'lite';
+  if (opus && (modelId.includes(opus) || modelBase.includes('opus'))) return 'reasoning';
+  if (sonnet && (modelId.includes(sonnet) || modelBase.includes('sonnet'))) return 'standard';
 
-  if (
-    modelBase.includes('haiku') ||
-    modelBase.includes('flash') ||
-    modelBase.includes('mini')
-  )
+  if (modelBase.includes('haiku') || modelBase.includes('flash') || modelBase.includes('mini'))
     return 'lite';
-  if (
-    modelBase.includes('opus') ||
-    modelBase.includes('pro') ||
-    modelBase.includes('reasoning')
-  )
+  if (modelBase.includes('opus') || modelBase.includes('pro') || modelBase.includes('reasoning'))
     return 'reasoning';
   return 'standard';
 }
@@ -579,9 +550,18 @@ function createEmptyMetrics(): {
     modelName: '',
   };
   return {
-    lite:      { ...empty, modelName: loadDisplayName(claudeEnv['ANTHROPIC_DEFAULT_HAIKU_MODEL']  ?? '') },
-    standard:  { ...empty, modelName: loadDisplayName(claudeEnv['ANTHROPIC_DEFAULT_SONNET_MODEL'] ?? '') },
-    reasoning: { ...empty, modelName: loadDisplayName(claudeEnv['ANTHROPIC_DEFAULT_OPUS_MODEL']   ?? '') },
+    lite: {
+      ...empty,
+      modelName: loadDisplayName(claudeEnv['ANTHROPIC_DEFAULT_HAIKU_MODEL'] ?? ''),
+    },
+    standard: {
+      ...empty,
+      modelName: loadDisplayName(claudeEnv['ANTHROPIC_DEFAULT_SONNET_MODEL'] ?? ''),
+    },
+    reasoning: {
+      ...empty,
+      modelName: loadDisplayName(claudeEnv['ANTHROPIC_DEFAULT_OPUS_MODEL'] ?? ''),
+    },
   };
 }
 
@@ -651,33 +631,31 @@ function buildSessionTableData(ctx: ClaudeCodeContext, sessionPath?: string | nu
   const contextDisplay = formatContextSize(contextSize);
 
   const providerDisplay =
-    provider.providerName.charAt(0).toUpperCase() +
-    provider.providerName.slice(1);
+    provider.providerName.charAt(0).toUpperCase() + provider.providerName.slice(1);
 
   const rawModelName = ctx.model?.display_name || 'N/A';
   const modelName = loadDisplayName(rawModelName);
 
   let usagePercentage: number;
-  if (typeof contextUsedPercentage === 'number' && Number.isFinite(contextUsedPercentage) && contextUsedPercentage > 0) {
+  if (
+    typeof contextUsedPercentage === 'number' &&
+    Number.isFinite(contextUsedPercentage) &&
+    contextUsedPercentage > 0
+  ) {
     usagePercentage = contextUsedPercentage;
     if (sessionPath) writeStatuslineCache(sessionPath, { contextUsagePercentage: usagePercentage });
   } else {
     const cache = sessionPath ? readStatuslineCache(sessionPath) : {};
     const cached = cache.contextUsagePercentage;
-    usagePercentage = (typeof cached === 'number' && Number.isFinite(cached) && cached >= 0) ? cached : 0;
+    usagePercentage =
+      typeof cached === 'number' && Number.isFinite(cached) && cached >= 0 ? cached : 0;
   }
   const percentageDisplay = `${usagePercentage.toFixed(0)}%`;
   const barDisplay = ` ${renderBar(usagePercentage, 8)} ${percentageDisplay}`;
 
-  const sessionDisplay =
-    sessionId.length > 36 ? sessionId.slice(0, 33) + '...' : sessionId;
+  const sessionDisplay = sessionId.length > 36 ? sessionId.slice(0, 33) + '...' : sessionId;
 
-  const headers = [
-    'Proveedor',
-    'Modelo activo',
-    'Contexto (tks)',
-    'Porcentaje de uso',
-  ];
+  const headers = ['Proveedor', 'Modelo activo', 'Contexto (tks)', 'Porcentaje de uso'];
   const rows = [
     [
       `${C.provider}${providerDisplay}${C.reset}`,
@@ -686,9 +664,7 @@ function buildSessionTableData(ctx: ClaudeCodeContext, sessionPath?: string | nu
       barDisplay,
     ],
   ];
-  const alignments: Array<'left' | 'center' | 'right'> = [
-    'center', 'center', 'center', 'center',
-  ];
+  const alignments: Array<'left' | 'center' | 'right'> = ['center', 'center', 'center', 'center'];
 
   return { headers, rows, alignments, sessionDisplay };
 }
@@ -708,7 +684,14 @@ function renderSessionTable(
 } {
   const { headers, rows, alignments, sessionDisplay } = buildSessionTableData(ctx, sessionPath);
 
-  const { table, width } = renderTable(headers, rows, alignments, undefined, undefined, targetWidth);
+  const { table, width } = renderTable(
+    headers,
+    rows,
+    alignments,
+    undefined,
+    undefined,
+    targetWidth,
+  );
 
   const titleText = `╭─ Sesión actual «${sessionDisplay}» `;
   const titleVisLen = visibleLength(titleText);
@@ -719,11 +702,14 @@ function renderSessionTable(
   return { lines, width };
 }
 
-function renderTokenTable(metrics: {
-  lite: TokenMetrics;
-  standard: TokenMetrics;
-  reasoning: TokenMetrics;
-}, previous: MetricsSnapshot | null): { lines: string[]; width: number } {
+function renderTokenTable(
+  metrics: {
+    lite: TokenMetrics;
+    standard: TokenMetrics;
+    reasoning: TokenMetrics;
+  },
+  previous: MetricsSnapshot | null,
+): { lines: string[]; width: number } {
   // Función local para alinear a la derecha
   function alignRight(text: string, width: number): string {
     const vis = visibleLength(text);
@@ -736,8 +722,8 @@ function renderTokenTable(metrics: {
     label: string;
     color: string;
   }> = [
-    { key: 'lite',      label: 'Lite',      color: C.value },
-    { key: 'standard',  label: 'Standard',  color: C.value },
+    { key: 'lite', label: 'Lite', color: C.value },
+    { key: 'standard', label: 'Standard', color: C.value },
     { key: 'reasoning', label: 'Reasoning', color: C.value },
   ];
 
@@ -787,12 +773,7 @@ function renderTokenTable(metrics: {
   ];
 
   // Renderizar tabla sin fila de total
-  const { table, width, columnWidths } = renderTable(
-    headers,
-    rows,
-    alignments,
-    [0, 1, 2],
-  );
+  const { table, width, columnWidths } = renderTable(headers, rows, alignments, [0, 1, 2]);
 
   // Renderizar fila de total manualmente con celdas fusionadas
   const w0 = columnWidths[0];
@@ -814,9 +795,33 @@ function renderTokenTable(metrics: {
     reasoning: metrics.reasoning.count,
   };
   const tcCount = totalColor('count', totals, previous);
-  const tcInput = totalColor('inputTokens', { lite: metrics.lite.inputTokens, standard: metrics.standard.inputTokens, reasoning: metrics.reasoning.inputTokens }, previous);
-  const tcCache = totalColor('cacheReadInputTokens', { lite: metrics.lite.cacheReadInputTokens, standard: metrics.standard.cacheReadInputTokens, reasoning: metrics.reasoning.cacheReadInputTokens }, previous);
-  const tcOutput = totalColor('outputTokens', { lite: metrics.lite.outputTokens, standard: metrics.standard.outputTokens, reasoning: metrics.reasoning.outputTokens }, previous);
+  const tcInput = totalColor(
+    'inputTokens',
+    {
+      lite: metrics.lite.inputTokens,
+      standard: metrics.standard.inputTokens,
+      reasoning: metrics.reasoning.inputTokens,
+    },
+    previous,
+  );
+  const tcCache = totalColor(
+    'cacheReadInputTokens',
+    {
+      lite: metrics.lite.cacheReadInputTokens,
+      standard: metrics.standard.cacheReadInputTokens,
+      reasoning: metrics.reasoning.cacheReadInputTokens,
+    },
+    previous,
+  );
+  const tcOutput = totalColor(
+    'outputTokens',
+    {
+      lite: metrics.lite.outputTokens,
+      standard: metrics.standard.outputTokens,
+      reasoning: metrics.reasoning.outputTokens,
+    },
+    previous,
+  );
 
   const totalRow = `${C.border}${B.v}${C.reset} ${totalMerged} ${C.border}${B.v}${C.reset} ${alignRight(`${tcCount}${totalCount}${C.reset}`, w2)} ${C.border}${B.v}${C.reset} ${alignRight(`${tcInput}${formatTokens(totalInput)}${C.reset}`, w3)} ${C.border}${B.v}${C.reset} ${alignRight(`${tcCache}${formatTokens(totalCache)}${C.reset}`, w4)} ${C.border}${B.v}${C.reset} ${alignRight(`${tcOutput}${formatTokens(totalOutput)}${C.reset}`, w5)} ${C.border}${B.v}${C.reset}`;
 
@@ -849,9 +854,7 @@ function renderTokenTable(metrics: {
   const firstMmIdx = lastSep.indexOf(B.mm);
   if (firstMmIdx !== -1) {
     tableLines[lastSepIdx] =
-      lastSep.substring(0, firstMmIdx) +
-      B.mb +
-      lastSep.substring(firstMmIdx + 1);
+      lastSep.substring(0, firstMmIdx) + B.mb + lastSep.substring(firstMmIdx + 1);
   }
 
   const lines = [title, ...tableLines, totalRow, botLine];
@@ -885,9 +888,7 @@ function buildRateLimitTableData(ctx: ClaudeCodeContext) {
   }
 
   const headers = ['', '', '', ''];
-  const alignments: Array<'left' | 'center' | 'right'> = [
-    'left', 'left', 'left', 'right',
-  ];
+  const alignments: Array<'left' | 'center' | 'right'> = ['left', 'left', 'left', 'right'];
 
   return { headers, rows, alignments };
 }
@@ -948,9 +949,8 @@ function main(): void {
     // Tabla 3: Rate limits (solo OAuth) — calcular ancho primero para layout simétrico
     const authMethod = resolveAuthMethod();
     const rlWidth = authMethod === 'oauth' ? computeRateLimitTableWidth(ctx) : null;
-    const targetWidth = rlWidth !== null
-      ? Math.max(computeSessionTableWidth(ctx, sessionPath), rlWidth)
-      : undefined;
+    const targetWidth =
+      rlWidth !== null ? Math.max(computeSessionTableWidth(ctx, sessionPath), rlWidth) : undefined;
 
     // Tabla 1: Sesión y proveedor
     const table1 = renderSessionTable(ctx, sessionPath, targetWidth);
@@ -964,10 +964,25 @@ function main(): void {
       table2 = renderTokenTable(metrics, previous);
       writeStatuslineCache(sessionPath, {
         metricsSnapshot: {
-          lite:      { count: metrics.lite.count,      inputTokens: metrics.lite.inputTokens,      cacheReadInputTokens: metrics.lite.cacheReadInputTokens,      outputTokens: metrics.lite.outputTokens },
-          standard:  { count: metrics.standard.count,  inputTokens: metrics.standard.inputTokens,  cacheReadInputTokens: metrics.standard.cacheReadInputTokens,  outputTokens: metrics.standard.outputTokens },
-          reasoning: { count: metrics.reasoning.count,  inputTokens: metrics.reasoning.inputTokens, cacheReadInputTokens: metrics.reasoning.cacheReadInputTokens, outputTokens: metrics.reasoning.outputTokens },
-        }
+          lite: {
+            count: metrics.lite.count,
+            inputTokens: metrics.lite.inputTokens,
+            cacheReadInputTokens: metrics.lite.cacheReadInputTokens,
+            outputTokens: metrics.lite.outputTokens,
+          },
+          standard: {
+            count: metrics.standard.count,
+            inputTokens: metrics.standard.inputTokens,
+            cacheReadInputTokens: metrics.standard.cacheReadInputTokens,
+            outputTokens: metrics.standard.outputTokens,
+          },
+          reasoning: {
+            count: metrics.reasoning.count,
+            inputTokens: metrics.reasoning.inputTokens,
+            cacheReadInputTokens: metrics.reasoning.cacheReadInputTokens,
+            outputTokens: metrics.reasoning.outputTokens,
+          },
+        },
       });
     } else {
       table2 = renderTokenTable(createEmptyMetrics(), null);
@@ -984,9 +999,10 @@ function main(): void {
       };
       // Padding dinámico: igualar alturas para evitar interleaving
       const heightDiff = left.lines.length - table2.lines.length;
-      const paddedTable2 = heightDiff > 0
-        ? { lines: [...table2.lines, ...Array(heightDiff).fill('')], width: table2.width }
-        : table2;
+      const paddedTable2 =
+        heightDiff > 0
+          ? { lines: [...table2.lines, ...Array(heightDiff).fill('')], width: table2.width }
+          : table2;
       output.push(renderSideBySide(left, paddedTable2, 2));
     } else if (ctx.session_id || sessionPath) {
       output.push(renderSideBySide(table1, table2, 2));

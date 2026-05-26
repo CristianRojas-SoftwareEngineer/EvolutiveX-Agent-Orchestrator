@@ -1,115 +1,74 @@
-# Manejo de Health Checks
+# Peticiones sin sesión (pre-sesión)
 
-Smart Code Proxy detecta y filtra automáticamente los health checks de conectividad que el runtime Bun de Claude Code envía antes de establecer una sesión real de trabajo.
+Smart Code Proxy **no audita en disco** las peticiones que llegan sin cabecera de sesión válida. El proxy las reenvía al upstream con normalidad, pero no crea carpetas bajo `sessions/`.
 
 ## Motivación
 
-Claude Code (a través de su runtime Bun interno) envía ocasionalmente peticiones de prueba para verificar que el proxy está disponible antes de iniciar una conversación. Estas peticiones:
+Claude Code (y otros clientes) envían a veces peticiones **antes** de establecer una sesión de trabajo real: comprobaciones de conectividad (`HEAD /`), listados (`GET /v1/models`), probes del runtime Bun, etc. Esas peticiones:
 
-- No contienen cuerpo de petición
-- No incluyen autenticación
-- No tienen headers de sesión de Claude Code
-- Retornan errores 404 porque no son peticiones válidas de la API Anthropic
+- Suelen no incluir `x-claude-code-session-id` ni `x-cc-audit-session`
+- No aportan valor a la observabilidad de un turno de chat
+- No deben contaminar `sessions/` con árboles vacíos
 
-Sin filtrado, estas peticiones crean directorios `_unknown/` con interacciones vacías que contaminan el directorio de auditoría sin aportar valor a la observabilidad.
+## Mecanismo real (código)
 
-## Criterios de Detección
+La resolución de sesión sigue esta prioridad (véase también [README — Correlación de sesión](../README.md#correlación-de-sesión-sessionid)):
 
-Un request se clasifica como health check (y se ignora silenciosamente) si cumple **TODAS** estas condiciones:
+1. Cabecera `AUDIT_SESSION_OVERRIDE_HEADER` (por defecto `x-cc-audit-session`)
+2. Cabecera `AUDIT_SESSION_FALLBACK_HEADER` (por defecto `x-claude-code-session-id`)
+3. Si ninguna está presente o está vacía → el resolver devuelve `sessionId: "_unknown"`
 
-| Condición           | Descripción                                                    |
-| ------------------- | -------------------------------------------------------------- |
-| User-Agent          | Contiene "Bun" pero **NO** contiene "claude-cli"               |
-| Body vacío          | `rawBody.length === 0`                                         |
-| Sin autorización    | Ausencia de header `authorization`                             |
-| Sin sesión          | Ausencia de `x-claude-code-session-id` y `x-cc-audit-session`  |
-| Fallback `_unknown` | La sesión resuelta es `_unknown` (fallback final del resolver) |
+En `AuditInteractionHandler.execute()`, si `auditSessionId === '_unknown'`, el handler **retorna `null` inmediatamente**:
 
-## Comportamiento
+- No se crea directorio de interacción
+- No se escribe ningún archivo de auditoría
+- El proxy continúa reenviando la petición al upstream
 
-Cuando se detecta un health check:
+**Importante:** no existe filtrado adicional por User-Agent, body vacío ni `authorization`. Cualquier petición sin cabecera de sesión válida queda fuera de la auditoría, tenga o no token o cuerpo.
 
-1. El handler `AuditInteractionHandler.execute()` retorna `null` inmediatamente
-2. **No se crea directorio de interacción**
-3. **No se escribe ningún archivo de auditoría**
-4. El proxy continúa operando normalmente
+## Ejemplos habituales
 
-## Ejemplo de Request Filtrado
+```http
+HEAD / HTTP/1.1
+Host: 127.0.0.1:8787
+```
 
 ```http
 GET /v1/messages HTTP/1.1
 Host: 127.0.0.1:8787
 User-Agent: Bun/1.3.13
 Accept: */*
-Connection: keep-alive
-Accept-Encoding: identity
 ```
 
-Este request típico de Bun sería filtrado porque:
+Ambos resuelven a `_unknown` si no envían cabeceras de sesión y **no generan auditoría**.
 
-- User-Agent es "Bun/1.3.13" (sin "claude-cli")
-- No tiene body
-- No tiene `authorization`
-- No tiene headers de sesión
-- Resuelve a `_unknown`
+## Qué sí se audita
 
-## Requests que NO son Filtrados
+Solo las peticiones con sesión identificada (cabecera override o fallback presente y no vacía) crean o actualizan árboles bajo:
 
-Los siguientes requests **sí se auditan** aunque vengan de Bun o caigan en `_unknown`:
+- `sessions/<sessionId>/main-agent/interactions/NN/` — turnos agénticos
+- `sessions/<sessionId>/side-interactions/NN/` — preflights y side-requests
 
-- Requests con header `authorization` (peticiones autenticadas)
-- Requests con body no vacío (peticiones de API reales)
-- Requests con User-Agent de `claude-cli` (sesiones reales de Claude Code)
+No se crea `sessions/_unknown/`.
 
-## Implementación
+## Endpoint `GET /health` del proxy
 
-La lógica de detección está en `AuditInteractionHandler.isIgnorableHealthCheck()`:
-
-```typescript
-private isIgnorableHealthCheck(
-  params: { headers: Record<string, string | string[] | undefined>; rawBody: Buffer },
-  auditSessionId: string,
-): boolean {
-  // Todos los criterios deben cumplirse
-  if (auditSessionId !== '_unknown') return false;
-  if (params.rawBody.length > 0) return false;
-  const userAgent = this.getHeaderValue(params.headers, 'user-agent') || '';
-  if (!userAgent.includes('Bun') || userAgent.includes('claude-cli')) return false;
-  if (this.getHeaderValue(params.headers, 'authorization')) return false;
-  if (this.getHeaderValue(params.headers, 'x-claude-code-session-id')) return false;
-  if (this.getHeaderValue(params.headers, 'x-cc-audit-session')) return false;
-  return true;
-}
-```
-
-## Casos de Borde
-
-### ¿Qué pasa si Claude Code cambia su User-Agent?
-
-Si Claude Code envía peticiones legítimas sin el header `claude-cli` en el User-Agent, pero **con** cuerpo de petición o **con** autorización, estas peticiones **no serán filtradas** porque el criterio de body vacío y ausencia de auth prevalece.
-
-### ¿Y si un cliente alternativo usa Bun?
-
-Si otro cliente basado en Bun envía peticiones válidas de la API Anthropic (con autorización y body), estas serán auditadas correctamente porque el criterio de autorización o body no vacío evita el filtrado.
+El proxy expone `GET /health` en el puerto local (p. ej. `8787`) para monitoreo del proceso. Es independiente del mecanismo anterior: no pasa por la lógica de auditoría de tráfico Anthropic.
 
 ## Troubleshooting
 
-### Problema: Veo directorios `_unknown/` creados
+### No veo carpetas bajo `sessions/` al usar Claude Code
 
-**Causa probable:** El criterio de filtrado no está capturando todos los casos.
+Comprueba que el cliente envía `x-claude-code-session-id` (o tu override) y que `ANTHROPIC_BASE_URL` apunta al proxy. Sin cabecera de sesión, el comportamiento esperado es **cero** escritura en `sessions/`.
 
-**Diagnóstico:** Verifica los `request/headers.json` en los directorios `_unknown/`:
+### Quiero auditar peticiones sin cabecera de sesión
 
-```bash
-cat sessions/_unknown/interactions/000001_*/request/headers.json
-```
+No hay variable de entorno para ello. Requeriría cambiar el código (p. ej. dejar de retornar `null` en `_unknown`), lo cual no es el diseño actual del proxy.
 
-Si el request tiene `user-agent: Bun/...` pero **no** fue filtrado, verifica si tiene algún campo que evita el filtrado (authorization, body no vacío, o headers de sesión).
+### Carpetas antiguas `sessions/_unknown/` en disco
 
-### Problema: Quiero desactivar el filtrado
+Pueden ser restos de versiones anteriores o de otra herramienta. El código actual no las crea. Puedes eliminarlas con `npm run clean:sessions` si no las necesitas.
 
-No hay una variable de entorno para desactivar el filtrado. Si necesitas auditar estos requests, modifica temporalmente `isIgnorableHealthCheck()` para retornar `false` siempre.
+## Nota histórica
 
-## Historial de Cambios
-
-- **v1.x**: Introducción del filtrado de health checks basado en Bun UA + body vacío + ausencia de auth/sesión
+Versiones anteriores de la documentación describían un filtrado fino por User-Agent Bun, body vacío y ausencia de `authorization` (`isIgnorableHealthCheck`). **Esa lógica no está implementada** en el código actual: el único gate es la ausencia de cabecera de sesión → `_unknown` → sin auditoría.

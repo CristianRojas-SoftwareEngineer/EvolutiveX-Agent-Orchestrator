@@ -14,7 +14,7 @@ Este repositorio es un **programa que se ejecuta en tu ordenador** y hace de **i
 
 - Las peticiones de tu cliente **salen primero hacia este programa** (en un puerto de tu máquina).
 - El programa **las reenvía** a la API real de Anthropic (`https://api.anthropic.com` por defecto), **sin cambiar** cómo funciona la API.
-- A cambio, puedes ver **trazas en la consola** (JSON línea a línea) y, si lo activas, **copias en disco** de peticiones y respuestas bajo la carpeta `sessions/`.
+- A cambio, puedes ver **trazas en la consola** (formato legible vía Pino Pretty) y **copias en disco** de peticiones y respuestas bajo `sessions/` (para cada petición con sesión identificada).
 
 Eso sirve para **observar** y **auditar** el tráfico (depuración, cumplimiento, análisis), no para modificar el contrato de Anthropic.
 
@@ -102,7 +102,7 @@ Sigue estos pasos en orden:
 
 2. **No cierres esa terminal** mientras quieras usar el proxy: el proceso debe seguir en marcha.
 
-3. Comprueba el arranque: en la **terminal** debería aparecer el mensaje `Proxy levantado correctamente` con campos como `port`, `upstream`, `upstreamAcceptEncoding`, `maxResponseBufferBytes`, `maxAuditRequestBodyBytes`, `maxAuditResponseBodyBytes`, `maxAuditSseRawBytes`, `stripAuditSessionHeader` y `auditSessionHashSuffix` (salida legible vía Pino Pretty; no es JSON compacto). En **`server/logs.jsonl`** el mismo evento queda como **una línea JSON** (`event: "listening"`). También verás líneas previas de Fastify del tipo `Server listening at http://127.0.0.1:8787` — son normales. Si aparece `Proxy levantado correctamente`, el proxy está escuchando en tu PC (lista de variables en el [README](../README.md#configuracion)).
+3. Comprueba el arranque: en la **terminal** debería aparecer el mensaje `Proxy levantado correctamente` con campos como `port`, `upstream`, `upstreamAcceptEncoding`, `maxResponseBufferBytes`, `maxAuditRequestBodyBytes`, `maxAuditResponseBodyBytes`, `maxAuditSseRawBytes`, `stripAuditSessionHeader` y `auditSessionHashSuffix` (salida legible vía Pino Pretty; no es JSON compacto). En **`server/logs.jsonl`** el mismo evento queda como **una línea JSON** (`event: "listening"`). También verás líneas previas de Fastify del tipo `Server listening at http://127.0.0.1:8787` (y, al escuchar en `0.0.0.0`, pueden listarse otras interfaces de red) — son normales. Si aparece `Proxy levantado correctamente`, el proxy está escuchando en tu PC (lista de variables en el [README](../README.md#configuracion)).
 
 Por defecto el proxy reenvía a `https://api.anthropic.com`. Puedes cambiar la URL de destino con la variable `UPSTREAM_ORIGIN` si tu organización usa otro host (véase el README).
 
@@ -177,7 +177,7 @@ Abre tu flujo habitual (proyecto, chat, lo que use la API). Las peticiones pasar
 
 | Qué quieres ver                                         | Dónde está                                                                              | Qué es                                                                                                                                                                                                                   |
 | ------------------------------------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Actividad en vivo** (peticiones, respuestas, errores) | Terminal de `npm run dev` y archivo **`server/logs.jsonl`** (relativo al CWD)          | El proxy usa Pino con doble salida: consola formateada para seguir el tráfico al momento, y `server/logs.jsonl` en JSON línea a línea para revisar o filtrar después. Nivel configurable con `LOG_LEVEL` (por defecto `info`). |
+| **Actividad en vivo** (peticiones, respuestas, errores) | Terminal de `npm run dev` y archivo **`server/logs.jsonl`** (relativo al CWD)          | Consola: Pino Pretty (legible). Archivo: JSON línea a línea en `server/logs.jsonl` para revisar o filtrar después. Nivel configurable con `LOG_LEVEL` (por defecto `info`). |
 | **Copias en disco** por turno                           | Carpeta **`sessions/`** en el ordenador (relativa al CWD desde donde arrancas el proxy) | Árbol por sesión (`sessions/<sessionId>/`): `session-metrics.json`; turnos del chat en `main-agent/interactions/NN/`; preflights y side-requests en `side-interactions/NN/`. Cada interacción incluye `meta.json`, y según el tipo también `input/`, `output/` y `steps/`. Ver esquema abajo y el [README](../README.md#archivos-auditoria). |
 
 Esquema resumido (turno típico del agente principal):
@@ -185,14 +185,16 @@ Esquema resumido (turno típico del agente principal):
 ```
 sessions/<session-id>/
   session-metrics.json
-  main-agent/interactions/NN/
-    meta.json
-    input/          # petición inicial del turno
-    output/         # al cerrar turno SSE: body.json, body.parsed.md, headers.json
-    steps/NN/
-      request/      # petición de ese step
-      response/     # durante SSE: sse.jsonl, headers.json, sse.txt (debug)
-                      # al cerrar step: body.json, body.parsed.md
+  main-agent/interactions/
+    interaction-sequence.json
+    NN/
+      meta.json
+      input/          # petición inicial del turno
+      output/         # al cerrar turno SSE: body.json, body.parsed.md, headers.json
+      steps/NN/
+        request/      # petición de ese step
+        response/     # durante SSE: sse.jsonl, headers.json, sse.txt (debug)
+                        # al cerrar step: body.json, body.parsed.md
   side-interactions/
     interaction-sequence.json
     NN/
@@ -213,7 +215,7 @@ sessions/<session-id>/
 
 La auditoría en disco **no se puede desactivar por variable de entorno**: para cada petición con sesión identificada, el proxy escribe bajo `./sessions` (relativo al CWD). Las peticiones **sin** cabecera de sesión válida (p. ej. comprobaciones `HEAD /` antes de abrir sesión en Claude Code) se reenvían pero **no** crean carpetas en `sessions/`. Los logs de consola y `server/logs.jsonl` dependen de `LOG_LEVEL`.
 
-Para **limpiar** las sesiones acumuladas, ejecuta `npm run clean:sessions`. Para purga completa de todo (build, dependencias, sesiones y logs en `server/`): `npm run clean:all`. El próximo arranque con `npm run dev` recreará los directorios vacíos automáticamente.
+Para **limpiar** las sesiones acumuladas, ejecuta `npm run clean:sessions`. Para purga completa de todo (build, dependencias, sesiones y logs en `server/`): `npm run clean:all`. Tras `clean:all`, el próximo `npm run dev` recrea `server/` y la raíz `sessions/` (con `.gitkeep`); las subcarpetas por sesión aparecen cuando hay tráfico auditado con cabecera de sesión válida.
 
 ---
 
@@ -257,3 +259,4 @@ El resto (límites de tamaño, volcado SSE crudo, etc.) está en la Matriz de En
 - Entornos con **inspección SSL** (certificados corporativos): párrafo `NODE_EXTRA_CA_CERTS` en el [README](../README.md#configuracion).
 - [Estimación de Costos Anthropic](./how-to-calculate-anthropic-api-costs.md) (Ecuación y JSON local de precios).
 - [Estimación de Costos OpenRouter](./how-to-calculate-openrouter-api-costs.md) (Esquema ResponseUsage y agregación).
+- [Peticiones sin sesión (pre-sesión)](./health-check-handling.md) (por qué algunas peticiones no escriben en `sessions/`).

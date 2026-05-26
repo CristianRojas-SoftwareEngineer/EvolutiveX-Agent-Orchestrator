@@ -22,7 +22,7 @@ El proxy utiliza **Progressive Kernel Architecture (PKA)** — un modelo arquite
 | **2 - Servicios (Adapters)**   | `src/2-services/`        | Implementaciones concretas con I/O (filesystem, streams) y **ports** (interfaces) | `SessionStoreService`, `AuditWriterService`, `SseReconstructService`, `StreamTeeService`, Ports: `IAuditWriter`, `ISessionStore`, `ISseReconstructor`, `IStreamTee` |
 | **3 - Operaciones (Handlers)** | `src/3-operations/`      | Orquestación de casos de uso (Command Handlers)                                   | `AuditInteractionHandler`, `AuditSseResponseHandler`, `AuditStandardResponseHandler`, `AuditUpstreamErrorHandler`, `FilterToolsHandler`                             |
 | **4 - API (Composition Root)** | `src/4-api/`             | Wiring de dependencias y configuración                                            | `createProxyDependencies()`, Configuración de entorno                                                                                                               |
-| **5 - Interfaces de Usuario**  | `src/5-user-interfaces/` | Adaptadores HTTP (reciben deps inyectadas via options)                            | `ProxyController`, `InternalController`, `proxyRoutes`, `registerInternalRoutes`, `fastify.augments.d.ts`                                                           |
+| **5 - Interfaces de Usuario**  | `src/5-user-interfaces/` | Adaptadores HTTP (reciben deps inyectadas via options)                            | `ProxyController`, `proxyRoutes`, `fastify.augments.d.ts`                                                                                                           |
 
 ### 📐 Regla de Dependencia
 
@@ -197,20 +197,14 @@ Cada step en `meta.json` incluye `anthropicMessageId` — el `message.id` de la 
 **Proceso de correlación:**
 
 1. Extrae `"id"` del evento `assistant` en el log de Claude Code
-2. Busca ese valor en `sessions/<session>/interactions/*/meta.json` bajo `steps[].anthropicMessageId`
+2. Busca ese valor en `sessions/<session>/main-agent/interactions/*/meta.json` (y, si aplica, `side-interactions/*/meta.json`) bajo `steps[].anthropicMessageId`
 3. El directorio contenedor es la interacción correspondiente
 
-### Filtrado de Health Checks
+### Peticiones pre-sesión (sin auditoría)
 
-El proxy detecta y **ignora silenciosamente** los health checks de conectividad que Claude Code (runtime Bun) envía antes de iniciar una sesión real. Un request se considera health check (y no se audita) si cumple **TODAS** estas condiciones:
+Las peticiones **sin** cabecera de sesión válida (`AUDIT_SESSION_OVERRIDE_HEADER` ni `AUDIT_SESSION_FALLBACK_HEADER`) resuelven internamente a `_unknown` y **no generan archivos de auditoría**: el proxy las reenvía al upstream, pero `AuditInteractionHandler` retorna sin escribir bajo `sessions/`. Ejemplos habituales: `HEAD /`, `GET /v1/models`, o probes de conectividad del runtime Bun de Claude Code antes de abrir sesión.
 
-- `User-Agent` contiene "Bun" pero NO "claude-cli"
-- Body de la petición está vacío (`Content-Length: 0`)
-- Sin header `authorization`
-- Sin headers de sesión (`x-claude-code-session-id`, `x-cc-audit-session`)
-- Sesión resuelta a `_unknown` (fallback final)
-
-Esto evita la creación de directorios `_unknown/` con interacciones vacías que no aportan valor a la observabilidad.
+No se crea la carpeta `sessions/_unknown/`. Guía ampliada: [`docs/health-check-handling.md`](docs/health-check-handling.md).
 
 ---
 
@@ -236,6 +230,7 @@ Personaliza el comportamiento ajustando estas variables en tu entorno o en un ar
 |              | `MAX_AUDIT_SSE_RAW_BYTES`       | Tope físico para `response/sse.txt` (raw dump debug; `0` = ilimitado). **No afecta** a la reconstrucción (que lee `sse.jsonl`). | `52428800`                                                                              |
 | **Thinking** | `PROXY_UNREDACT_THINKING`       | Remueve el flag `redact-thinking-2026-02-12` del header `anthropic-beta` para capturar contenido thinking legible.              | `false` (desactivado)                                                                   |
 | **Filtrado** | `FILTERED_TOOLS`                | Tool names a excluir del request (coma-separado). Omitir la variable = default abajo. Desactivar filtrado: `FILTERED_TOOLS=""` o `FILTERED_TOOLS=`. | `ScheduleWakeup,NotebookEdit,ExitWorktree,EnterWorktree,CronList,CronDelete,CronCreate` |
+|   **Logs**   | `LOG_LEVEL`                     | Nivel de log de Pino (consola y `server/logs.jsonl`).                                                                          | `info`                                                                                  |
 
 > **Auditoría por defecto.** El proxy escribe en `./sessions` para `agentic`, `client-preflight` y `side-request`. En side-request SSE auditados: (a) `steps/NNN/response/sse.jsonl` es la **fuente de verdad** (escritura síncrona, orden determinista); (b) `steps/NNN/response/sse.txt` es raw dump de depuración acotado por `MAX_AUDIT_SSE_RAW_BYTES`; (c) `response/body.json` top-level se reconstruye desde `sse.jsonl`. Detalle en [`docs/how-sse-reconstruction-works.md`](docs/how-sse-reconstruction-works.md).
 
@@ -243,7 +238,7 @@ Personaliza el comportamiento ajustando estas variables en tu entorno o en un ar
 
 ### Correlación de Sesión (SessionId)
 
-El directorio de auditoría se nombra utilizando las cabeceras definidas en `AUDIT_SESSION_OVERRIDE_HEADER` o `AUDIT_SESSION_FALLBACK_HEADER`. Si ninguna está presente en la solicitud, se usa `_unknown` como nombre de sesión por defecto.
+El directorio de auditoría bajo `sessions/<sessionId>/` se nombra a partir de las cabeceras `AUDIT_SESSION_OVERRIDE_HEADER` (prioridad 1) o `AUDIT_SESSION_FALLBACK_HEADER` (prioridad 2). Si ninguna está presente, el resolver devuelve `_unknown` como fallback interno y **no se escribe auditoría en disco** (véase [Peticiones pre-sesión](#peticiones-pre-sesión-sin-auditoría) arriba).
 
 <a name="capas-bytes-env"></a>
 
@@ -266,7 +261,7 @@ El sistema previene la saturación en memoria o disco ignorando la escritura si 
 4.  **Modo Desarrollo**: `npm run dev` (Carga `configs/.env` mediante flag nativo de Node v22.9+; **v24 LTS recomendado**).
 5.  **Compilación**: `npm run build` (Genera `/dist` optimizado).
 6.  **Referencia de scripts**: `npm run help` (muestra todos los scripts disponibles con descripciones).
-7.  **Limpieza**: `npm run clean` (Purga `dist/` y `node_modules/`). Para purga completa incluyendo auditoría y logs: `npm run clean:all`. Para limpieza selectiva: `npm run clean:sessions` o `npm run clean:logs`.
+7.  **Limpieza**: `npm run clean:dist` (purga `dist/`), `npm run clean:modules` (purga `node_modules/`). Purga completa incluyendo auditoría y logs: `npm run clean:all`. Selectiva: `npm run clean:sessions` o `npm run clean:logs`.
 
 > Para una guía detallada de onboarding, consultar [docs/how-to-start.md](docs/how-to-start.md).
 
@@ -381,5 +376,7 @@ El proxy incluye validaciones defensivas para prevenir errores de reconstrucció
 
 El proxy intercepta métricas de uso de tokens que pueden ser cuantificadas. Consulta estas guías adicionales para configurar precios y estimar costos según el tráfico auditado:
 
+- [Cómo empezar (on-boarding)](./docs/how-to-start.md)
+- [Peticiones sin sesión (pre-sesión)](./docs/health-check-handling.md)
 - [Coste por interacción: Claude Code y la API de Anthropic](./docs/how-to-calculate-anthropic-api-costs.md)
 - [Coste por generación: OpenRouter y la API Chat Completions](./docs/how-to-calculate-openrouter-api-costs.md)

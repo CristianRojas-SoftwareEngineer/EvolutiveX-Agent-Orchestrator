@@ -104,9 +104,32 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 ---
 
-## 6. Tool Usage Warnings
+## 6. No Unapproved Artifacts or Automation
 
-**The `list_dir` tool is unreliable.**
+**Do not add process, files, or tooling the user did not explicitly request or approve.**
 
-- It frequently reports directories as empty when they actually contain files.
-- Use `find_by_name` instead to list directory contents (use `Pattern: "*"` to list all files).
+Even when it seems helpful (verification scripts, patch pipelines, extra docs, npm scripts, workflow automation), unrequested additions create accidental complexity and maintenance debt for the user.
+
+### Default rule
+
+- **Do not create** new files under `scripts/`, `docs/`, `.claude/`, or similar, unless the user explicitly asked for that artifact in the current task or approved it after you proposed it.
+- **Do not extend** the repo with new automation (shell/PowerShell scripts, CI steps, `package.json` scripts) unless it is part of an agreed plan.
+- **Prefer** solving the task with edits to existing files, inline commands, or a short explanation in chat.
+
+### Before creating anything new
+
+1. State what you would add and why (one or two sentences).
+2. Ask whether to proceed, or wait for explicit approval.
+3. Implement only after a clear yes (or an explicit create/add request in the same message).
+
+### Allowed without extra approval
+
+- Editing files the user already pointed at or that the task clearly requires.
+- Fixing bugs in scripts/docs that **already exist** when the user asked to fix or use them.
+- Mentioning a possible script or doc in the response **without** writing it.
+
+### Over-engineering
+
+Same spirit as §2 (Simplicity First): no speculative abstractions, no “while we're here” tooling, no preventive infrastructure unless the user scoped it.
+
+**These guidelines are working if:** the diff only contains what the user asked for, and new files appear only when they explicitly wanted them.

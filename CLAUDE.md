@@ -104,16 +104,7 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 ---
 
-## 6. Tool Usage Warnings
-
-**The `list_dir` tool is unreliable.**
-
-- It frequently reports directories as empty when they actually contain files.
-- Use `find_by_name` instead to list directory contents (use `Pattern: "*"` to list all files).
-
----
-
-## 7. No Unapproved Artifacts or Automation
+## 6. No Unapproved Artifacts or Automation
 
 **Do not add process, files, or tooling the user did not explicitly request or approve.**
 

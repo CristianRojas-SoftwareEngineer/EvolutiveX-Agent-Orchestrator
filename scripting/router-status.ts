@@ -401,12 +401,15 @@ function writeStatuslineCache(sessionPath: string, cache: StatuslineCache): void
 
 // ── Lógica de resolución ────────────────────────────────────────
 
-function readClaudeEnv(): Record<string, string> {
+/** Bloque `env` de `~/.claude/settings.json` (escrito por configure-provider). */
+type ClaudeSettingsEnv = Record<string, string>;
+
+function readClaudeSettingsEnv(): ClaudeSettingsEnv {
   const settingsPath = join(homedir(), '.claude', 'settings.json');
   if (!existsSync(settingsPath)) return {};
   try {
     const settings = JSON.parse(readFileSync(settingsPath, 'utf-8')) as {
-      env?: Record<string, string>;
+      env?: ClaudeSettingsEnv;
     };
     return settings.env ?? {};
   } catch {
@@ -414,7 +417,22 @@ function readClaudeEnv(): Record<string, string> {
   }
 }
 
-const claudeEnv = readClaudeEnv();
+/**
+ * Resuelve el método de auth desde `settings.json → env`.
+ * No usa `process.env`; la fuente canónica es el bloque escrito por configure-provider.
+ */
+function resolveAuthMethodFromEnv(
+  settingsEnv: ClaudeSettingsEnv,
+): 'api_key' | 'bearer' | 'oauth' {
+  const apiKey = settingsEnv['ANTHROPIC_API_KEY'];
+  const authToken = settingsEnv['ANTHROPIC_AUTH_TOKEN'];
+
+  if (apiKey && apiKey.trim() !== '') return 'api_key';
+  if (authToken && authToken.trim() !== '') return 'bearer';
+  return 'oauth';
+}
+
+const claudeSettingsEnv = readClaudeSettingsEnv();
 
 function readDotEnv(): Record<string, string> {
   const result: Record<string, string> = {};
@@ -466,15 +484,6 @@ function resolveActiveProvider(): {
   return { providerName: 'Desconocido', upstreamOrigin };
 }
 
-function resolveAuthMethod(): 'api_key' | 'bearer' | 'oauth' {
-  const apiKey = claudeEnv['ANTHROPIC_API_KEY'];
-  const authToken = claudeEnv['ANTHROPIC_AUTH_TOKEN'];
-
-  if (apiKey && apiKey.trim() !== '') return 'api_key';
-  if (authToken && authToken.trim() !== '') return 'bearer';
-  return 'oauth';
-}
-
 function resolveSessionPath(sessionId?: string): string | null {
   if (!existsSync(SESSIONS_PATH)) return null;
 
@@ -520,9 +529,9 @@ function loadDisplayName(modelId: string): string {
 }
 
 function classifyModel(modelId: string): 'lite' | 'standard' | 'reasoning' {
-  const haiku = claudeEnv['ANTHROPIC_DEFAULT_HAIKU_MODEL'] ?? '';
-  const sonnet = claudeEnv['ANTHROPIC_DEFAULT_SONNET_MODEL'] ?? '';
-  const opus = claudeEnv['ANTHROPIC_DEFAULT_OPUS_MODEL'] ?? '';
+  const haiku = claudeSettingsEnv['ANTHROPIC_DEFAULT_HAIKU_MODEL'] ?? '';
+  const sonnet = claudeSettingsEnv['ANTHROPIC_DEFAULT_SONNET_MODEL'] ?? '';
+  const opus = claudeSettingsEnv['ANTHROPIC_DEFAULT_OPUS_MODEL'] ?? '';
 
   const modelBase = modelId.split('/').pop() || modelId;
 
@@ -552,15 +561,15 @@ function createEmptyMetrics(): {
   return {
     lite: {
       ...empty,
-      modelName: loadDisplayName(claudeEnv['ANTHROPIC_DEFAULT_HAIKU_MODEL'] ?? ''),
+      modelName: loadDisplayName(claudeSettingsEnv['ANTHROPIC_DEFAULT_HAIKU_MODEL'] ?? ''),
     },
     standard: {
       ...empty,
-      modelName: loadDisplayName(claudeEnv['ANTHROPIC_DEFAULT_SONNET_MODEL'] ?? ''),
+      modelName: loadDisplayName(claudeSettingsEnv['ANTHROPIC_DEFAULT_SONNET_MODEL'] ?? ''),
     },
     reasoning: {
       ...empty,
-      modelName: loadDisplayName(claudeEnv['ANTHROPIC_DEFAULT_OPUS_MODEL'] ?? ''),
+      modelName: loadDisplayName(claudeSettingsEnv['ANTHROPIC_DEFAULT_OPUS_MODEL'] ?? ''),
     },
   };
 }
@@ -947,7 +956,7 @@ function main(): void {
     const sessionPath = resolveSessionPath(ctx.session_id);
 
     // Tabla 3: Rate limits (solo OAuth) — calcular ancho primero para layout simétrico
-    const authMethod = resolveAuthMethod();
+    const authMethod = resolveAuthMethodFromEnv(claudeSettingsEnv);
     const rlWidth = authMethod === 'oauth' ? computeRateLimitTableWidth(ctx) : null;
     const targetWidth =
       rlWidth !== null ? Math.max(computeSessionTableWidth(ctx, sessionPath), rlWidth) : undefined;

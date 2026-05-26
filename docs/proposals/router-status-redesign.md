@@ -19,26 +19,25 @@ El rediseño reemplaza los tres `.ps1` con un único `scripting/router-status.ts
 
 ## 2. Fuentes de datos
 
-| Dato                              | Fuente                                                       | Campo                                                                                             |
-| --------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
-| Session ID                        | stdin (`$ctx`)                                               | `ctx.session_id`                                                                                  |
-| Modelo activo (nombre de display) | stdin (`$ctx`)                                               | `ctx.model.display_name`                                                                          |
-| Contexto (tks) (tamaño)           | stdin (`$ctx`)                                               | `ctx.context_window.context_window_size`                                                          |
-| Porcentaje de uso de contexto     | stdin (`$ctx`)                                               | `ctx.context_window.used_percentage`                                                              |
-| Rate limits (solo OAuth)          | stdin (`$ctx`)                                               | `ctx.rate_limits.five_hour`, `ctx.rate_limits.seven_day`                                          |
-| Provider upstream activo          | `configs/.env`                                               | `UPSTREAM_ORIGIN`                                                                                 |
-| Nombre del proveedor              | cruce `UPSTREAM_ORIGIN` vs `routing/providers/*/config.json` | `config.ANTHROPIC_BASE_URL`                                                                       |
-| Método de auth                    | `process.env` (heredado de Claude Code)                      | `ANTHROPIC_AUTH_TOKEN` / `ANTHROPIC_API_KEY`                                                      |
-| Modelos por nivel                 | `process.env` (heredado de Claude Code)                      | `ANTHROPIC_DEFAULT_HAIKU_MODEL`, `ANTHROPIC_DEFAULT_SONNET_MODEL`, `ANTHROPIC_DEFAULT_OPUS_MODEL` |
-| Display name de modelo por nivel  | `routing/providers/<p>/models/<m>/metadata.json`             | `displayName` (campo a añadir)                                                                    |
-| Interacciones de la sesión actual | `sessions/<session>/session-metrics.json` (implementación actual) | contadores por `modelId` |
-| Modelo por interacción            | `meta.json` → `modelId`; histórico: `input/body.json`             | `modelId` / `"model"` en body |
+`router-status.ts` lee exactamente estas fuentes en el flujo soportado:
 
-> **Nota:** la propuesta original escaneaba `sessions/<session>/interactions/*/meta.json`. La implementación actual lee `session-metrics.json` (O(1)). Layout de sesión: [`session-audit-model.md`](../session-audit-model.md).
+| Dato | Fuente | Campo |
+| ---- | ------ | ----- |
+| Session ID | stdin (`$ctx`) | `ctx.session_id` |
+| Modelo activo | stdin (`$ctx`) | `ctx.model.display_name` |
+| Tamaño de contexto | stdin (`$ctx`) | `ctx.context_window.context_window_size` |
+| Porcentaje de uso de contexto | stdin (`$ctx`) | `ctx.context_window.used_percentage` |
+| Rate limits (solo OAuth) | stdin (`$ctx`) | `ctx.rate_limits.five_hour`, `ctx.rate_limits.seven_day` |
+| Provider upstream activo | `configs/.env` | `UPSTREAM_ORIGIN` |
+| Nombre del proveedor | `routing/providers/*/config.json` → cruce con `UPSTREAM_ORIGIN` | `config.ANTHROPIC_BASE_URL` |
+| Método de auth | `~/.claude/settings.json → env` | `ANTHROPIC_API_KEY` / `ANTHROPIC_AUTH_TOKEN` |
+| Modelos por nivel | `~/.claude/settings.json → env` | `ANTHROPIC_DEFAULT_HAIKU_MODEL`, `ANTHROPIC_DEFAULT_SONNET_MODEL`, `ANTHROPIC_DEFAULT_OPUS_MODEL` |
+| Display name de modelo | `routing/providers/<p>/models/<m>/metadata.json` | `displayName` |
+| Métricas acumuladas de sesión | `sessions/<ctx.session_id>/session-metrics.json` | contadores por `modelId` |
 
-### Variables de entorno en `process.env`
+### Variables de entorno de Claude Code
 
-Dado que el statusline es un proceso hijo de Claude Code, hereda el entorno completo de Claude Code. Las variables configuradas vía `settings.json → env` (por `configure-provider.ts`) están disponibles en `process.env` sin necesidad de leer el registro de Windows ni archivos rc de shell.
+`configure-provider.ts` escribe las variables `ANTHROPIC_*` en `~/.claude/settings.json → env` ([fuente oficial de configuración de Claude Code](https://code.claude.com/docs/en/env-vars)) y el upstream real del proxy en `configs/.env → UPSTREAM_ORIGIN`. El statusline lee ambas fuentes directamente. `process.env` no forma parte del contrato de diseño de esta versión.
 
 ---
 
@@ -89,16 +88,16 @@ Presente siempre, independientemente del método de autenticación. Permite al u
 
 | Columna         | Contenido                                           | Fuente                                                    | Alineación |
 | --------------- | --------------------------------------------------- | --------------------------------------------------------- | ---------- |
-| Nivel           | `Lite` / `Standard` / `Reasoning`                   | texto fijo por slot                                       | izquierda  |
-| Modelo          | display name del modelo del nivel                   | `metadata.json → displayName` (o `modelId` como fallback) | izquierda  |
-| # Interacciones | cantidad de turnos del nivel en la sesión           | conteo de `meta.json` por modelo                          | derecha    |
-| Input (tks)     | suma de `totals.inputTokens` para el nivel          | `meta.json → totals.inputTokens`                          | derecha    |
-| Cache In (tks)  | suma de `totals.cacheReadInputTokens` para el nivel | `meta.json → totals.cacheReadInputTokens`                 | derecha    |
-| Output (tks)    | suma de `totals.outputTokens` para el nivel         | `meta.json → totals.outputTokens`                         | derecha    |
+| Nivel           | `Lite` / `Standard` / `Reasoning`                   | texto fijo por slot                                    | izquierda  |
+| Modelo          | display name del modelo del nivel                   | `metadata.json → displayName` (o `modelId` si falta)  | izquierda  |
+| # Interacciones | cantidad de turnos del nivel en la sesión           | `session-metrics.json → models[modelId].count`         | derecha    |
+| Input (tks)     | suma de `inputTokens` para el nivel                 | `session-metrics.json → models[modelId].inputTokens`   | derecha    |
+| Cache In (tks)  | suma de `cacheReadInputTokens` para el nivel        | `session-metrics.json → models[modelId].cacheReadInputTokens` | derecha    |
+| Output (tks)    | suma de `outputTokens` para el nivel                | `session-metrics.json → models[modelId].outputTokens`  | derecha    |
 
 **Fila de totales:** celdas fusionadas en columnas 0+1 (texto `"Totales de sesión"`), suma de las tres filas de nivel para las columnas numéricas. Los separadores horizontales usan `┴` en la posición de la columna fusionada.
 
-> **Semántica:** las columnas Input / Cache In / Output suman tokens **facturados por interacción** (`meta.json → totals` y/o `session-metrics.json`). Eso refleja consumo acumulado de la sesión, no el tamaño del contexto en un único request. Ver [session-metrics-system.md](../session-metrics-system.md) y [propuesta gateway §7.7.1](./new-diseno-dominio-gateway-observabilidad.md#771-semántica-facturado-por-hop-vs-cardinalidad-de-contexto).
+> **Semántica:** las columnas Input / Cache In / Output reflejan consumo acumulado de la sesión (tokens facturados), no el tamaño del contexto en un único request. Ver [`session-metrics-system.md`](../session-metrics-system.md).
 
 **Formato de números:** entero con separador de miles (p. ej. `1,234,567`). Si el valor es `0`, muestra `-`.
 
@@ -135,10 +134,13 @@ Se renderiza **únicamente** cuando `authMethod === 'oauth'`. Aplica al proveedo
 ```
 resolveActiveProvider()
   ├── leer UPSTREAM_ORIGIN de configs/.env
-  ├── cruzar con routing/providers/*/config.json → nombre del proveedor
-  ├── leer process.env.ANTHROPIC_AUTH_TOKEN y process.env.ANTHROPIC_API_KEY
+  └── cruzar con routing/providers/*/config.json → nombre del proveedor
+
+resolveAuthMethod()
+  ├── leer ANTHROPIC_API_KEY de ~/.claude/settings.json → env
+  ├── leer ANTHROPIC_AUTH_TOKEN de ~/.claude/settings.json → env
   └── determinar authMethod:
-        ANTHROPIC_API_KEY presente   → 'api_key'
+        ANTHROPIC_API_KEY presente    → 'api_key'
         ANTHROPIC_AUTH_TOKEN presente → 'bearer'
         ninguno                       → 'oauth'
 
@@ -184,79 +186,51 @@ La Tabla 1 y la Tabla 2 se renderizan lado a lado usando `renderSideBySide()`, c
 
 ## 5. Mapeo de niveles de razonamiento
 
-Los niveles se derivan de las variables de entorno que Claude Code establece al enrutar:
+`configure-provider.ts` configura exactamente tres modelos en `~/.claude/settings.json → env`:
 
-| Nivel     | Variable de entorno              | Slot en la API                       |
-| --------- | -------------------------------- | ------------------------------------ |
-| Lite      | `ANTHROPIC_DEFAULT_HAIKU_MODEL`  | haiku (menor costo, mayor velocidad) |
-| Standard  | `ANTHROPIC_DEFAULT_SONNET_MODEL` | sonnet (uso general)                 |
-| Reasoning | `ANTHROPIC_DEFAULT_OPUS_MODEL`   | opus (razonamiento complejo)         |
+| Nivel | Variable | Slot en la API |
+| ----- | -------- | -------------- |
+| Lite | `ANTHROPIC_DEFAULT_HAIKU_MODEL` | haiku |
+| Standard | `ANTHROPIC_DEFAULT_SONNET_MODEL` | sonnet |
+| Reasoning | `ANTHROPIC_DEFAULT_OPUS_MODEL` | opus |
 
-Para clasificar una interacción en un nivel, el script lee el campo `model` de `request/body.json` y aplica un algoritmo de matching con `includes()` + heurísticas por nombre:
+Para clasificar una interacción en un nivel, el script compara el `modelId` del registro en `session-metrics.json` contra los tres valores configurados:
 
 ```
-1. Matching contra env vars (parcial con includes):
-   modelId.includes(ANTHROPIC_DEFAULT_HAIKU_MODEL)   → Lite
-   modelId.includes(ANTHROPIC_DEFAULT_OPUS_MODEL)     → Reasoning
-   modelId.includes(ANTHROPIC_DEFAULT_SONNET_MODEL)   → Standard
-
-2. Heurísticas por nombre (fallback si no matchea env var):
-   modelo contiene 'haiku', 'flash', 'mini'          → Lite
-   modelo contiene 'opus', 'pro', 'reasoning'        → Reasoning
-   por defecto                                        → Standard
+classifyModel(modelId):
+  modelId incluye ANTHROPIC_DEFAULT_HAIKU_MODEL  → Lite
+  modelId incluye ANTHROPIC_DEFAULT_OPUS_MODEL   → Reasoning
+  modelId incluye ANTHROPIC_DEFAULT_SONNET_MODEL → Standard
 ```
 
-Se cuentan interacciones con `interactionType === 'agentic'` o `'side-request'` y `totals !== null`.
+Si `modelId` no coincide con ninguno de los tres modelos configurados, el registro no se suma a ningún nivel.
 
 ---
 
 ## 6. Resolución de sesión activa
 
-La sesión en `sessions/` se resuelve utilizando el `session_id` proporcionado por Claude Code en `$ctx`:
-
-1. Buscar un directorio en `sessions/` cuyo nombre comience con el `session_id` (el proxy puede añadir un sufijo hash).
-2. Si no hay coincidencia por prefijo: usar el directorio con fecha de modificación más reciente.
-3. Si no hay sesiones: usar `_unknown`.
+El statusline recibe `ctx.session_id` por stdin. Con ese valor busca el directorio de sesión en `sessions/`:
 
 ```
-sessionDir = sessions/ → buscar por prefijo de ctx.session_id
-metrics = sessions/<sessionDir>/session-metrics.json
-interactions = sessions/<sessionDir>/main-agent/interactions/*/meta.json  (referencia offline)
+sessionDir = sessions/<directorio cuyo nombre comienza con ctx.session_id>
+metrics    = sessions/<sessionDir>/session-metrics.json
 ```
 
-Layout vigente: [`session-audit-model.md`](../session-audit-model.md).
+El proxy puede añadir un sufijo al nombre de la carpeta, por lo que la búsqueda usa coincidencia de prefijo. Si no hay coincidencia, la Tabla 2 se renderiza en cero/sin datos.
 
-> **Nota:** `DEFAULT_AUDIT_SESSION` ha sido eliminado del proyecto. La resolución de sesión ahora depende exclusivamente de las cabeceras HTTP (para el proxy) y del `session_id` de `$ctx` (para el statusline).
+Layout de sesiones: [`session-audit-model.md`](../session-audit-model.md).
 
 ---
 
 ## 7. Resolución del nombre de display de modelo
 
-La columna `Modelo` de la Tabla 2 muestra el nombre de display de cada nivel. Orden de resolución:
-
-1. `routing/providers/<provider>/models/<modelId>/metadata.json → displayName` (campo nuevo, a añadir en sprint futuro)
-2. Si `displayName` no existe: usar `modelId` directamente como fallback
-
-> **Mejora futura:** añadir campo `displayName` a `metadata.json` de cada modelo.
+La columna `Modelo` de la Tabla 2 muestra el `displayName` definido en `routing/providers/<provider>/models/<modelId>/metadata.json`. Si el archivo no existe o no tiene ese campo, se muestra el `modelId` como degradación visual.
 
 ---
 
-## 8. Diseño multiplataforma
+## 8. Multiplataforma
 
-El script no contiene lógica específica de plataforma:
-
-| Operación                              | Mecanismo                                          | Plataforma |
-| -------------------------------------- | -------------------------------------------------- | ---------- |
-| Leer stdin                             | `process.stdin`                                    | todas      |
-| Leer `configs/.env`                    | `fs.readFileSync` + regex                          | todas      |
-| Leer env vars de auth                  | `process.env.*` (heredado de Claude Code)          | todas      |
-| Escanear providers                     | `fs.readdirSync`                                   | todas      |
-| Leer `meta.json` / `request/body.json` | `fs.readFileSync` + `JSON.parse`                   | todas      |
-| Colores                                | ANSI crudo con secuencias RGB (`\x1B[38;2;R;G;Bm`) | todas      |
-| Bordes de tabla                        | Caracteres Unicode box-drawing (`╭╮╰╯─│├┤`)        | todas      |
-| Resolver rutas                         | `path.join`, `import.meta.dirname`                 | todas      |
-
-No se usa `chalk`, `execSync`, `powershell.exe`, ni archivos rc de shell. Los colores se implementan con códigos ANSI raw, incluyendo soporte RGB para el azul `#253ecc` (`\x1B[38;2;37;62;204m`).
+El script usa únicamente Node.js APIs estándar (`fs`, `path`, `process.stdin`). No depende de PowerShell, archivos rc de shell ni del registro de Windows. Los colores son códigos ANSI raw sin dependencias externas.
 
 ---
 
@@ -274,15 +248,25 @@ No se usa `chalk`, `execSync`, `powershell.exe`, ni archivos rc de shell. Los co
 
 ### configure-provider.ts
 
-`configure-provider.ts` escribe las variables de configuración en `~/.claude/settings.json → env` (un único `ClaudeSettingsEnvManager` cross-platform). El statusline las lee vía `process.env`, sin acceso al registro de Windows ni a archivos rc.
+`configure-provider.ts` escribe las variables `ANTHROPIC_*` en `~/.claude/settings.json → env` mediante `ClaudeSettingsEnvManager`. El statusline lee esa fuente directamente al arrancar.
 
 ---
 
-## 10. Limitaciones conocidas y mejoras futuras
+## 10. Validaciones mínimas y fuera de alcance
 
-| Limitación                               | Causa                                                 | Mejora propuesta                                                   |
-| ---------------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------ |
-| `model` no está en `meta.json`           | El proxy no persiste el modelo en InteractionMetadata | Añadir campo `model` a `InteractionMetadata` (schema change)       |
-| `displayName` no está en `metadata.json` | Campo no definido en la especificación actual         | ✅ Resuelto: añadir `displayName` a `metadata.json` de cada modelo |
-| Resolución de sesión es estática         | El proxy no expone mapeo `session_id → carpeta`       | ✅ Resuelto: resolución dinámica por `session_id` de `$ctx`        |
-| `cacheReadInputTokens` puede ser `null`  | Algunos proveedores no implementan prompt caching     | Tratar `null` como `0` en la suma                                  |
+### Validaciones mínimas v1
+
+| Condición | Comportamiento esperado |
+| --------- | ----------------------- |
+| `ctx.session_id` sin carpeta coincidente en `sessions/` | Tabla 2 se renderiza en cero/sin datos |
+| `session-metrics.json` ausente o malformado | Tabla 2 se renderiza en cero/sin datos |
+| `modelId` de un registro no coincide con ningún modelo configurado | El registro no se suma a ningún nivel |
+| `cacheReadInputTokens` es `null` | Se trata como `0` en la suma |
+| `displayName` ausente en `metadata.json` | Se muestra `modelId` como texto de la columna |
+
+### Fuera de alcance v1
+
+- Configurar auth o modelos por nivel desde `process.env` directamente.
+- Escanear `interactions/*/meta.json` para reconstruir métricas (sustituido por `session-metrics.json`).
+- Inferir nivel de razonamiento por heurísticas del nombre del modelo.
+- Seleccionar una sesión alternativa si `ctx.session_id` no coincide con ninguna carpeta.

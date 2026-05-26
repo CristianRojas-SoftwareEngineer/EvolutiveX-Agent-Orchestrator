@@ -37,7 +37,27 @@ const STARTUP_WAIT_SECONDS = 15;
 
 // --- Utility Functions ---
 
-// --- Utility Functions ---
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return String(error);
+}
+
+function parseExecSyncFailure(error: unknown): ProcessResult {
+  if (error && typeof error === 'object') {
+    const err = error as {
+      status?: number;
+      stdout?: string;
+      stderr?: string;
+      message?: string;
+    };
+    return {
+      exitCode: err.status ?? 1,
+      stdout: err.stdout ?? '',
+      stderr: err.stderr ?? err.message ?? '',
+    };
+  }
+  return { exitCode: 1, stdout: '', stderr: String(error) };
+}
 
 function getShortText(text: string, maxLength = 180): string {
   if (!text || text.trim().length === 0) return '';
@@ -62,12 +82,8 @@ function invokeExternalCommand(filePath: string, argumentList: string[]): Proces
       stdio: 'pipe',
     });
     return { exitCode: 0, stdout: output, stderr: '' };
-  } catch (error: any) {
-    return {
-      exitCode: error.status || 1,
-      stdout: error.stdout || '',
-      stderr: error.stderr || error.message || '',
-    };
+  } catch (error: unknown) {
+    return parseExecSyncFailure(error);
   }
 }
 
@@ -133,13 +149,13 @@ function invokeBlockingStep(
       packageScript,
       durationMs,
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     const durationMs = Date.now() - startTime;
     console.log('» Finalizando prueba.');
     console.log(`» Duración: ${(durationMs / 1000).toFixed(2)} segundos`);
     console.log('');
     const exitCode = '—';
-    const snippet = getShortText(error.message || 'Unknown error');
+    const snippet = getShortText(getErrorMessage(error));
     addStepResult(number, scriptName, '❌', exitCode, snippet, packageScript, durationMs);
   }
 }
@@ -194,7 +210,7 @@ async function invokeBackgroundStep(
     stderr += data.toString();
   });
 
-  childProcess.on('exit', (code) => {
+  childProcess.on('exit', (_code) => {
     processExited = true;
   });
 
@@ -264,14 +280,14 @@ async function invokeBackgroundStep(
     console.log('» Finalizando prueba.');
     console.log(`» Duración: ${(durationMs / 1000).toFixed(2)} segundos`);
     console.log('');
-  } catch (error: any) {
+  } catch (error: unknown) {
     const durationMs = Date.now() - stepStartTime;
     addStepResult(
       number,
       scriptName,
       '❌',
       '—',
-      getShortText(error.message || 'Unknown error'),
+      getShortText(getErrorMessage(error)),
       true,
       durationMs,
     );
@@ -419,7 +435,7 @@ async function main() {
     (r) => getShortText(getFirstMeaningfulLine(r.stdout)),
   );
 
-  invokeBlockingStep(3, 'create:agents-reference', ['run', 'create:agents-reference'], (r) => {
+  invokeBlockingStep(3, 'create:agents-reference', ['run', 'create:agents-reference'], (_r) => {
     const agents = join(projectRoot, 'AGENTS.md');
     const claude = join(projectRoot, 'CLAUDE.md');
     assertPathPresent([agents, claude], 'AGENTS/CLAUDE reference files');
@@ -446,7 +462,7 @@ async function main() {
     getShortText(getFirstMeaningfulLine(r.stdout)),
   );
 
-  invokeBlockingStep(9, 'build', ['run', 'build'], (r) => {
+  invokeBlockingStep(9, 'build', ['run', 'build'], (_r) => {
     const jsFile = join(projectRoot, 'dist/index.js');
     assertPathPresent([join(projectRoot, 'dist')], 'dist/');
     if (!existsSync(jsFile)) {
@@ -460,10 +476,10 @@ async function main() {
     10,
     'test:quick',
     ['run', 'test:quick'],
-    (r) => 'Quick validation pipeline completed.',
+    (_r) => 'Quick validation pipeline completed.',
   );
 
-  invokeBlockingStep(11, 'test', ['test'], (r) => 'Full validation pipeline completed.');
+  invokeBlockingStep(11, 'test', ['test'], (_r) => 'Full validation pipeline completed.');
 
   // --- Phase 6: Server scripts ---
 
@@ -479,17 +495,17 @@ async function main() {
 
   // --- Phase 7: Destructive cleanup scripts ---
 
-  invokeBlockingStep(15, 'clean:sessions', ['run', 'clean:sessions'], (r) => {
+  invokeBlockingStep(15, 'clean:sessions', ['run', 'clean:sessions'], (_r) => {
     assertPathAbsent([join(projectRoot, 'sessions')], 'sessions/');
     return 'sessions/ cleaned.';
   });
 
-  invokeBlockingStep(16, 'clean:logs', ['run', 'clean:logs'], (r) => {
+  invokeBlockingStep(16, 'clean:logs', ['run', 'clean:logs'], (_r) => {
     assertPathAbsent([join(projectRoot, 'logs')], 'logs/');
     return 'logs/ cleaned.';
   });
 
-  invokeBlockingStep(17, 'clean:dist', ['run', 'clean:dist'], (r) => {
+  invokeBlockingStep(17, 'clean:dist', ['run', 'clean:dist'], (_r) => {
     assertPathAbsent([join(projectRoot, 'dist')], 'dist/');
     return 'dist/ removed.';
   });
@@ -498,7 +514,7 @@ async function main() {
     getShortText(getFirstMeaningfulLine(r.stdout)),
   );
 
-  invokeBlockingStep(19, 'build', ['run', 'build'], (r) => {
+  invokeBlockingStep(19, 'build', ['run', 'build'], (_r) => {
     const jsFile = join(projectRoot, 'dist/index.js');
     assertPathPresent([join(projectRoot, 'dist')], 'dist/');
     if (!existsSync(jsFile)) {

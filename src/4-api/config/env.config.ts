@@ -13,6 +13,31 @@ function parseBytesLimit(envVal: string | undefined, defaultVal: number): number
   return n;
 }
 
+const DEFAULT_FILTERED_TOOLS = [
+  'ScheduleWakeup',
+  'NotebookEdit',
+  'ExitWorktree',
+  'EnterWorktree',
+  'CronList',
+  'CronDelete',
+  'CronCreate',
+] as const;
+
+/**
+ * Resuelve FILTERED_TOOLS desde entorno.
+ * - `undefined`: lista por defecto (7 tools internas de Claude Code).
+ * - `""` o solo espacios: sin filtrado (`[]`).
+ * - Lista coma-separada: nombres a excluir del request.
+ */
+function parseFilteredTools(envVal: string | undefined): string[] {
+  if (envVal === undefined) return [...DEFAULT_FILTERED_TOOLS];
+  if (envVal.trim() === '') return [];
+  return envVal
+    .split(',')
+    .map((t) => t.trim())
+    .filter(Boolean);
+}
+
 /**
  * Objeto de configuración global para el Proxy.
  * Resuelve los ajustes desde variables de entorno con valores seguros por defecto.
@@ -46,18 +71,5 @@ export const config: ProxyEnvironmentConfig = {
   // Unredact thinking content (opt-in, desactivado por defecto)
   PROXY_UNREDACT_THINKING: process.env.PROXY_UNREDACT_THINKING === 'true',
 
-  // Filtrado de tools: lista de tool names a excluir del request
-  FILTERED_TOOLS: process.env.FILTERED_TOOLS
-    ? process.env.FILTERED_TOOLS.split(',')
-        .map((t) => t.trim())
-        .filter(Boolean)
-    : [
-        'ScheduleWakeup',
-        'NotebookEdit',
-        'ExitWorktree',
-        'EnterWorktree',
-        'CronList',
-        'CronDelete',
-        'CronCreate',
-      ],
+  FILTERED_TOOLS: parseFilteredTools(process.env.FILTERED_TOOLS),
 };

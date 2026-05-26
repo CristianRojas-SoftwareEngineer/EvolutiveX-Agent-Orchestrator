@@ -7,10 +7,21 @@ import { describe, it, expect, beforeEach, afterAll, vi } from 'vitest';
 describe('Resolución de configuración de entorno', () => {
   const originalEnv = { ...process.env };
 
+  const DEFAULT_FILTERED_TOOLS = [
+    'ScheduleWakeup',
+    'NotebookEdit',
+    'ExitWorktree',
+    'EnterWorktree',
+    'CronList',
+    'CronDelete',
+    'CronCreate',
+  ];
+
   beforeEach(() => {
     vi.resetModules();
     delete process.env.MAX_AUDIT_SSE_RAW_BYTES;
     delete process.env.AUDIT_SESSION_FALLBACK_HEADER;
+    delete process.env.FILTERED_TOOLS;
   });
 
   // Restaurar el entorno completo después de todos los tests
@@ -58,5 +69,35 @@ describe('Resolución de configuración de entorno', () => {
     delete process.env.AUDIT_SESSION_FALLBACK_HEADER;
     const { config } = await import('../../src/4-api/config/env.config.js');
     expect(config.AUDIT_SESSION_FALLBACK_HEADER).toBe('x-claude-code-session-id');
+  });
+
+  it('FILTERED_TOOLS sin definir debería usar la lista por defecto', async () => {
+    delete process.env.FILTERED_TOOLS;
+    const { config } = await import('../../src/4-api/config/env.config.js');
+    expect(config.FILTERED_TOOLS).toEqual(DEFAULT_FILTERED_TOOLS);
+  });
+
+  it('FILTERED_TOOLS="" debería desactivar el filtrado', async () => {
+    process.env.FILTERED_TOOLS = '';
+    const { config } = await import('../../src/4-api/config/env.config.js');
+    expect(config.FILTERED_TOOLS).toEqual([]);
+  });
+
+  it('FILTERED_TOOLS con solo espacios debería desactivar el filtrado', async () => {
+    process.env.FILTERED_TOOLS = '   ';
+    const { config } = await import('../../src/4-api/config/env.config.js');
+    expect(config.FILTERED_TOOLS).toEqual([]);
+  });
+
+  it('FILTERED_TOOLS="," debería desactivar el filtrado', async () => {
+    process.env.FILTERED_TOOLS = ',';
+    const { config } = await import('../../src/4-api/config/env.config.js');
+    expect(config.FILTERED_TOOLS).toEqual([]);
+  });
+
+  it('FILTERED_TOOLS con lista personalizada debería parsearla', async () => {
+    process.env.FILTERED_TOOLS = 'ScheduleWakeup,CronCreate';
+    const { config } = await import('../../src/4-api/config/env.config.js');
+    expect(config.FILTERED_TOOLS).toEqual(['ScheduleWakeup', 'CronCreate']);
   });
 });

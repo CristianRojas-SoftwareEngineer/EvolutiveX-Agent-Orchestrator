@@ -24,7 +24,7 @@ Eso sirve para **observar** y **auditar** el tráfico (depuración, cumplimiento
 
 ## Qué necesitas instalado
 
-- **Node.js v24 (LTS)** o superior ([página oficial de Node](https://nodejs.org/)). Esta versión garantiza el soporte nativo completo para la gestión de archivos `.env` (flag `--env-file-if-exists`) y el rendimiento óptimo de los flujos asíncronos del proxy.
+- **Node.js v22.9** o superior ([página oficial de Node](https://nodejs.org/)); **v24 LTS recomendado**. El mínimo cubre el flag `--env-file-if-exists` que usa `npm run dev` para cargar `configs/.env`. En producción (`npm start`) las variables se inyectan en el entorno del sistema; ahí no hace falta ese flag.
 - Conexión a **internet** hacia la API de Anthropic cuando quieras usar el servicio real (el “servidor al que el proxy reenvía”; en la documentación técnica se llama a veces _upstream_).
 
 ---
@@ -42,7 +42,15 @@ Sigue estos pasos en orden:
    npm install
    ```
 
-4. **Opcional:** configura variables de entorno para desarrollo local usando un archivo `.env`:
+4. **Opcional — configurar proveedor en Claude Code:** si usas el CLI de Anthropic y quieres que apunte al proxy (y opcionalmente a un backend distinto de la API pública), ejecuta el asistente interactivo:
+
+   ```bash
+   npm run configure:provider
+   ```
+
+   Escribe variables como `ANTHROPIC_BASE_URL` en el entorno de Claude Code para que el tráfico pase por este proxy. Detalle de proveedores soportados en el [README](../README.md#-enrutamiento-de-proveedores).
+
+5. **Opcional:** configura variables de entorno para desarrollo local usando un archivo `.env`:
 
    a. Copia el archivo de referencia dentro de la carpeta `configs/`:
 
@@ -62,7 +70,7 @@ Sigue estos pasos en orden:
 
    **¿Cómo se carga?** El script `npm run dev` usa el flag nativo de Node.js `--env-file-if-exists=configs/.env` (disponible desde Node v22.9; Node v24+ recomendado). A diferencia de `--env-file`, este flag **no falla** si el archivo `.env` no existe: el proxy arranca igualmente con los valores por defecto del código. **El script `npm start` (producción) no carga `.env`** a propósito: en producción las variables se inyectan en el entorno del sistema directamente.
 
-5. **Opcional:** puedes verificar que el código compila sin errores antes de arrancar:
+6. **Opcional:** puedes verificar que el código compila sin errores antes de arrancar:
 
    ```bash
    npm run build
@@ -70,7 +78,7 @@ Sigue estos pasos en orden:
 
    El proyecto incluye un script de validación integral (`npm test`) que ejecuta el análisis estático (`lint`), la validación de tipos (`typecheck`), la validación de pruebas integradas (`test:unit`) y la compilación (`build`) para asegurar la exactitud funcional y la integridad del código TypeScript. Se recomienda ejecutarlo antes de cada despliegue relevante.
 
-6. **Opcional — compatibilidad multi-agente:** Si usas otros agentes de código además de Claude Code (Codex CLI, Copilot, Cursor, etc.), puedes crear un hardlink `AGENTS.md` → `CLAUDE.md` para que también lean las instrucciones del proyecto:
+7. **Opcional — compatibilidad multi-agente:** Si usas otros agentes de código además de Claude Code (Codex CLI, Copilot, Cursor, etc.), puedes crear un hardlink `AGENTS.md` → `CLAUDE.md` para que también lean las instrucciones del proyecto:
 
    ```bash
    npm run create:agents-reference
@@ -169,12 +177,36 @@ Abre tu flujo habitual (proyecto, chat, lo que use la API). Las peticiones pasar
 
 | Qué quieres ver                                         | Dónde está                                                                              | Qué es                                                                                                                                                                                                                   |
 | ------------------------------------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Actividad en vivo** (peticiones, respuestas, errores) | La **misma terminal** donde ejecutaste `npm run dev`                                    | Líneas JSON estructuradas generadas por Fastify Logger: métricas de petición/respuesta (método, URL, status, tiempos, tamaños). Es la "observabilidad" en tiempo real.                                                   |
-| **Copias en disco** por turno                           | Carpeta **`sessions/`** en el ordenador (relativa al CWD desde donde arrancas el proxy) | Subcarpetas por sesión y por turno de interacción (`interactions/`); dentro hay `meta.json` (resumen del turno), `request/`, `response/` y `steps/`. Detalle de nombres en el [README](../README.md#archivos-auditoria). |
+| **Actividad en vivo** (peticiones, respuestas, errores) | Terminal de `npm run dev` y archivo **`server/logs.jsonl`** (relativo al CWD)          | El proxy usa Pino con doble salida: consola formateada para seguir el tráfico al momento, y `server/logs.jsonl` en JSON línea a línea para revisar o filtrar después. Nivel configurable con `LOG_LEVEL` (por defecto `info`). |
+| **Copias en disco** por turno                           | Carpeta **`sessions/`** en el ordenador (relativa al CWD desde donde arrancas el proxy) | Árbol por sesión (`sessions/<sessionId>/`): `session-metrics.json`; turnos del chat en `main-agent/interactions/NN/`; preflights y side-requests en `side-interactions/NN/`. Cada interacción incluye `meta.json`, y según el tipo también `input/`, `output/` y `steps/`. Ver esquema abajo y el [README](../README.md#archivos-auditoria). |
 
-La auditoría en disco es incondicional: el proxy siempre escribe en `./sessions`. La consola muestra tráfico adicional según la configuración de logs.
+Esquema resumido (turno típico del agente principal):
 
-Para **limpiar** las sesiones acumuladas, ejecuta `npm run clean:sessions`. Para purga completa de todo (build, dependencias, sesiones y logs): `npm run clean:all`. El próximo arranque con `npm run dev` recreará los directorios vacíos automáticamente.
+```
+sessions/<session-id>/
+  session-metrics.json
+  main-agent/interactions/NN/
+    meta.json
+    input/          # petición inicial del turno
+    output/         # al cerrar turno SSE: body.json, body.parsed.md, headers.json
+    steps/NN/
+      request/      # petición de ese step
+      response/     # durante SSE: sse.jsonl, headers.json, sse.txt (debug)
+                      # al cerrar step: body.json, body.parsed.md
+  side-interactions/NN/   # quota warm-up, count_tokens, etc.
+    meta.json, steps/NN/request/, steps/NN/response/  # mismas convenciones bajo steps/
+```
+
+**Dos árboles bajo cada sesión**
+
+- **`main-agent/interactions/`** — Turnos del chat principal: prompts del usuario, continuaciones con `tool_result` y respuestas SSE del agente. Es lo que sueles abrir para seguir una conversación.
+- **`side-interactions/`** — Peticiones auxiliares con contador propio: _preflights_ (`client-preflight`, p. ej. comprobación de cuota o warm-up de caché) y _side-requests_ (p. ej. `count_tokens`, generación de título de sesión). No mezclan su numeración con los turnos del agente principal.
+
+**`session-metrics.json`** (en la raíz de `sessions/<sessionId>/`) agrega tokens por modelo a medida que se cierran turnos; sirve para consultas rápidas (p. ej. statusline) sin reescanear todos los `meta.json`. Esquema y motivación en [`session-metrics-system.md`](./session-metrics-system.md).
+
+La auditoría en disco es incondicional: el proxy siempre escribe en `./sessions`. Los logs de consola y `server/logs.jsonl` dependen de `LOG_LEVEL`.
+
+Para **limpiar** las sesiones acumuladas, ejecuta `npm run clean:sessions`. Para purga completa de todo (build, dependencias, sesiones y logs en `server/`): `npm run clean:all`. El próximo arranque con `npm run dev` recreará los directorios vacíos automáticamente.
 
 ---
 
@@ -186,12 +218,22 @@ No hace falta leer la tabla entera del README el primer día:
 | ------------------------- | ------------------------------------------------------------------------------------------------ |
 | `PORT`                    | Puerto donde escucha el proxy en tu máquina (por defecto `8787`).                                |
 | `UPSTREAM_ORIGIN`         | URL base del API al que el proxy reenvía (por defecto Anthropic).                                |
-| `FILTERED_TOOLS`          | Lista de tool names a excluir del request (coma-separado). Para desactivar: `FILTERED_TOOLS=""`. |
+| `FILTERED_TOOLS`          | Lista de tool names a excluir del request (coma-separado). Sin definir la variable = lista por defecto (7 tools). Para desactivar el filtrado: `FILTERED_TOOLS=` o `FILTERED_TOOLS=""`. |
 | `PROXY_UNREDACT_THINKING` | Remueve flag de redacción de thinking para capturar contenido legible (por defecto `false`).     |
 
 La carpeta de salida es siempre `./sessions`, relativa al directorio desde donde ejecutas el proxy.
 
-**`response.body` en respuestas streaming (SSE):** las respuestas SSE generan `response.headers.json`, capturan los eventos en `response.sse.jsonl` línea por línea y vuelcan los bytes crudos en `response.sse.txt` (acotado por `MAX_AUDIT_SSE_RAW_BYTES`; `0` = ilimitado). Al finalizar el stream, el proxy reconstruye el mensaje final del asistente como `response/body.json` top-level junto con su versión procesada `.parsed.md`, de igual manera a como funcionan las operaciones no-streaming. Detalle técnico en [`how-sse-reconstruction-works.md`](./how-sse-reconstruction-works.md).
+**Streaming (SSE) en disco:** las rutas siguientes son relativas a cada interacción, p. ej. `sessions/<sessionId>/main-agent/interactions/01/` (o `side-interactions/NN/`).
+
+| Momento | Ruta | Qué contiene |
+| ------- | ---- | ------------ |
+| Durante el stream | `steps/NN/response/sse.jsonl` | Eventos SSE línea a línea (**fuente de verdad** para reconstruir) |
+| Durante el stream | `steps/NN/response/headers.json` | Cabeceras de la respuesta de ese step |
+| Durante el stream | `steps/NN/response/sse.txt` | Volcado raw opcional (límite `MAX_AUDIT_SSE_RAW_BYTES`; `0` = ilimitado; no afecta la reconstrucción) |
+| Al cerrar cada step | `steps/NN/response/body.json`, `body.parsed.md` | Mensaje del asistente reconstruido **de ese step** |
+| Al cerrar el turno (step terminal) | `output/body.json`, `output/body.parsed.md`, `output/headers.json` | Resumen **top-level** del turno (agrega los `body.json` de los steps) |
+
+No existe un directorio `response/` en la raíz de la interacción: `request/` y `response/` solo viven bajo `steps/NN/`. Detalle técnico en [`how-sse-reconstruction-works.md`](./how-sse-reconstruction-works.md).
 
 El resto (límites de tamaño, volcado SSE crudo, etc.) está en la Matriz de Entorno del [README](../README.md#configuracion). Para ver cómo se aplican los límites de memoria y disco usa [Capas de Bytes y Convenciones de Logs](../README.md#capas-bytes-env).
 

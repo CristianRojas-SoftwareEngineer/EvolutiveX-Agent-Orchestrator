@@ -96,6 +96,8 @@ Presente siempre, independientemente del método de autenticación. Permite al u
 
 **Fila de totales:** celdas fusionadas en columnas 0+1 (texto `"Totales de sesión"`), suma de las tres filas de nivel para las columnas numéricas. Los separadores horizontales usan `┴` en la posición de la columna fusionada.
 
+> **Semántica:** las columnas Input / Cache In / Output suman tokens **facturados por interacción** (`meta.json → totals` y/o `session-metrics.json`). Eso refleja consumo acumulado de la sesión, no el tamaño del contexto en un único request. Ver [session-metrics-system.md](../session-metrics-system.md) y [propuesta gateway §7.7.1](./new-diseno-dominio-gateway-observabilidad.md#771-semántica-facturado-por-hop-vs-cardinalidad-de-contexto).
+
 **Formato de números:** entero con separador de miles (p. ej. `1,234,567`). Si el valor es `0`, muestra `-`.
 
 **Headers simples:** cada columna tiene su propio header (sin celdas fusionadas en la fila de headers).

@@ -113,6 +113,14 @@ Para el cálculo económico, **prioriza el desglose 5m/1h** cuando exista: permi
 
 **Categorías de facturación, no “suma = tamaño del prompt”:** `input_tokens`, líneas de caché y `output_tokens` describen **cómo** se cobran tramos del trabajo (base, escritura 5m/1h, lectura, generación). No trates `input_tokens + cache_* + output_tokens` como un recuento único y mutuamente excluyente del mismo conjunto de tokens en el sentido de “tamaño total del prompt en un solo número”; la API ya devuelve los buckets listos para multiplicar por su tarifa (§8).
 
+### 4.1 Varios POST en un mismo turno (agent loop)
+
+Si un turno incluye varias llamadas a `/v1/messages` (p. ej. `stop_reason: tool_use` y luego otro POST con `tool_result` en `messages`), **cada respuesta** trae su propio `usage`. Para el **coste total del turno**, suma **por campo** (`input_tokens`, `cache_creation_input_tokens`, `cache_read_input_tokens`, subcampos de `cache_creation` si aplican, `output_tokens`) entre llamadas. Eso replica lo que Anthropic factura hop a hop; **no** es el tamaño único del historial en un solo número.
+
+En el último POST del turno, su `input_tokens` suele aproximar el **tamaño del prompt de ese hop** (historial reenviado completo en esa llamada). No sustituye la suma de todos los hops para estimar coste acumulado del turno.
+
+En el diseño de dominio gateway (propuesta), esa agregación corresponde a `WorkflowResult.usage`: [§7.7.1 — facturado por hop vs cardinalidad de contexto](./proposals/new-diseno-dominio-gateway-observabilidad.md#771-semántica-facturado-por-hop-vs-cardinalidad-de-contexto).
+
 ---
 
 ## 5. Precios: documentación oficial vs configuración local
@@ -318,7 +326,7 @@ Para estimar el coste **total** de una sesión de Claude Code a partir de audito
 
 1. Recorre cada carpeta `interactions/NNNNNN_*/` en orden de secuencia (p. ej. orden numérico del prefijo). Nota: cada interacción puede agrupar múltiples llamadas HTTP; los `usage` individuales están en los steps (`steps/{N}/response/sse.jsonl`).
 2. Clasifica por **ruta sin query** (quita `?beta=true` u otros parámetros antes de comparar). **Orden importa:** el endpoint de conteo contiene el segmento `count_tokens`. Si solo buscas si la URL contiene `/v1/messages`, **ambas** rutas coincidirían (porque `.../messages/count_tokens` también incluye `messages`). Regla segura: si el path contiene `count_tokens` → petición de **conteo**; si no, y el path corresponde a `POST /v1/messages` (sin `count_tokens`) → **generación**. Omite `count_tokens` para el coste de generación (coste **0** con la política actual de conteo gratuito). La ruta por step está en `meta.json → steps[].url` (si aplica) o en los archivos de request del step.
-3. Para cada step de generación con respuesta válida y `usage` disponible, aplica la §8. El `model` suele estar en el cuerpo de respuesta reconstruido o en el último evento SSE del step. Alternativamente, `meta.json → totals` agrega los tokens de todos los steps del turno para `agentic` SSE.
+3. Para cada step de generación con respuesta válida y `usage` disponible, aplica la §8. El `model` suele estar en el cuerpo de respuesta reconstruido o en el último evento SSE del step. Alternativamente, `meta.json → totals` agrega los tokens de todos los steps del turno para `agentic` SSE (suma por hop; ver §4.1).
 4. **Suma** los costes por step. Si el proxy registró error de upstream (`outcome: "upstream-error"` en `meta.json`), o si no hay archivos de respuesta utilizables en el step, no hay `usage` fiable para esa llamada.
 
 ---

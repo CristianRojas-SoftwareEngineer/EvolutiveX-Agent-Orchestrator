@@ -6,6 +6,7 @@ Documento de diseño para el dominio de **observabilidad y enrutamiento** de un 
 
 - [Hooks reference (Claude Code)](https://code.claude.com/docs/en/hooks)
 - Estructura de capas: `src/1. domain/README.md`
+- Coste y categorías de `usage`: [how-to-calculate-anthropic-api-costs.md](../how-to-calculate-anthropic-api-costs.md) (§4, §4.1)
 
 ---
 
@@ -21,6 +22,7 @@ Documento de diseño para el dominio de **observabilidad y enrutamiento** de un 
 - [5. Entidades de enrutamiento (Provider, LanguageModel)](#5-entidades-de-enrutamiento-provider-languagemodel)
 - [6. Session y Workflow](#6-session-y-workflow)
 - [7. WorkflowResult](#7-workflowresult)
+  - [7.7.1 Semántica: facturado por hop vs cardinalidad de contexto](#771-semántica-facturado-por-hop-vs-cardinalidad-de-contexto)
 - [8. Step](#8-step)
 - [9. ToolUse](#9-tooluse)
 - [10. Invariantes globales (G1–G17)](#10-invariantes-globales)
@@ -104,6 +106,8 @@ flowchart TB
 > **Step:** agrupa la llamada a la API de inferencia, la respuesta del modelo, y la ejecución y resultados de las tools asociadas a esa respuesta. El Step siguiente es el que procesa los resultados de las tools del Step anterior (vía `messages` del request de inferencia).
 >
 > **Workflow:** agrupa la ejecución E2E desde el input del usuario hasta el Step final que contiene el mensaje de cierre del workflow.
+>
+> **Consumo facturado por hop:** contadores `usage` de un `POST /v1/messages`. La agregación en `WorkflowResult.usage` suma esos contadores **por categoría** entre hops; representa lo facturado en el workflow, no el tamaño único del historial (§7.7.1).
 
 ---
 
@@ -146,12 +150,12 @@ Session (raíz de continuidad)
   └── Workflow[]
         ├── kind, agentType?, agentId?
         ├── languageModelId? (ref)
-        ├── WorkflowResult? (valor al cerrar; usage? §7.7; finalText? §7.8)
+        ├── WorkflowResult? (valor al cerrar; usage? consumo facturado E2E §7.7.1; finalText? §7.8)
         └── Step[]
               ├── inferenceRequest  → IAnthropicRequest (snapshot)
               ├── assistantMessage  → IAnthropicMessage
               ├── toolUses[]        → ToolUse[]
-              └── usage?, stopReason?   ← Step.usage = hop wire; no agregado E2E
+              └── usage?, stopReason?   ← Step.usage = hop wire; agregación E2E en WorkflowResult §7.7.1
                     ToolUse
                       ├── toolUseBlock    → IAnthropicContentBlock (type: tool_use)
                       ├── toolResultBlock? → IAnthropicContentBlock (type: tool_result)
@@ -296,6 +300,7 @@ Responde: *¿cómo terminó la ejecución E2E del workflow?* — resultado globa
 - **No** sustituye `Step.assistantMessage`, `Step.usage` ni `Step.stopReason`.
 - **No** proviene del SDK Agent (`ResultMessage`); el cierre se observa vía **hooks Claude Code** + agregación de Steps.
 - **`WorkflowResult.usage` no** es el `usage` del último `IAnthropicResponse` del workflow; es agregación gateway. Ver **§7.7**.
+- **`WorkflowResult.usage` no** mide cardinalidad única del contexto; es consumo facturado por hop agregado. Ver **§7.7.1**.
 - **`WorkflowResult.finalText` no** es `IAnthropicResponse.content` del último POST ni extracto de `Step.assistantMessage`; es passthrough de `last_assistant_message`. Ver **§7.8**.
 - El `stop_reason` del modelo vive en **`Step.stopReason`** (wire Anthropic); **no** se denormaliza en `WorkflowResult`.
 
@@ -306,7 +311,7 @@ Responde: *¿cómo terminó la ejecución E2E del workflow?* — resultado globa
 |-------|------|--------|-------------|
 | `outcome` | `WorkflowOutcome` | Hook + reglas de cierre (§7.4) | Resultado global: `'success' \| 'api_error' \| 'aborted' \| 'unknown'` |
 | `finalText?` | `string` | Hook de cierre | Texto plano E2E; passthrough de `last_assistant_message` (**hook**, no StepBuffer). Fuentes primarias: `Stop`, `SubagentStop`; `StopFailure` solo si el campo viene. Ver **§7.8** |
-| `usage?` | `IAnthropicUsage` | Agregación | Σ `Step.usage` cerrados **+ rollup** sub-workflows completados. Ver **§7.7** |
+| `usage?` | `IAnthropicUsage` | Agregación | Suma **por categoría** de `Step.usage` cerrados (+ rollup hijos). **Consumo facturado E2E** del workflow; no cardinalidad única de contexto. Ver **§7.7** y **§7.7.1**. |
 | `totalCostUsd?` | `number` | Cálculo gateway | Coste estimado con tarifas propias; no viene del wire Anthropic |
 | `stepCount` | `number` | Agregación | Cantidad de Steps **cerrados** al momento del cierre |
 | `closedByEvent` | `WorkflowClosedByEvent` | Hook | Evento que disparó el cierre: `'Stop' \| 'SubagentStop' \| 'StopFailure'` |
@@ -318,6 +323,7 @@ Contrato TypeScript de referencia:
 interface WorkflowResult {
   outcome: WorkflowOutcome;
   finalText?: string;
+  /** Consumo facturado por hop agregado; no tamaño único de contexto. §7.7.1 */
   usage?: IAnthropicUsage;
   totalCostUsd?: number;
   stepCount: number;
@@ -369,7 +375,7 @@ const result: WorkflowResult = {
 };
 ```
 
-Ver también mapeo hook → dominio en **§12**, semántica de `usage` en **§7.7** y de `finalText` en **§7.8**.
+Ver también mapeo hook → dominio en **§12**, semántica de `usage` en **§7.7** / **§7.7.1** y de `finalText` en **§7.8**.
 
 
 #### 7.6 Caso `StopFailure` (Step abierto o parcial)
@@ -387,11 +393,28 @@ Cuando la inferencia falla antes de consolidar un Step completo:
 
 `IAnthropicUsage` es un **tipo compartido** entre wire Anthropic y dominio gateway, pero **`Step.usage` y `WorkflowResult.usage` no son la misma entidad**: distinto alcance, origen y momento de fijación.
 
+
+#### 7.7.1 Semántica: facturado por hop vs cardinalidad de contexto
+
+`WorkflowResult.usage` y la agregación a nivel **Session** (G16) representan la **suma de los contadores `usage` facturados en cada hop** (cada `POST /v1/messages` cerrado en un Step), no la cardinalidad única del historial ni el tamaño del prompt en un solo instante.
+
+- En cada hop, `input_tokens` incluye **todo** el prompt de ese request (historial reenviado + novedades). Anthropic cobra ese hop completo.
+- Sumar `input_tokens` entre Steps del mismo workflow **repite** contexto ya contado en hops anteriores; eso es **correcto para coste/consumo facturado** e **incorrecto** si se interpreta como «cuántos tokens únicos tuvo el workflow».
+- Para aproximar el **tamaño del contexto en el último hop**, usar el último Step cerrado: `steps[steps.length - 1].usage` (o su `inferenceRequest`), no `WorkflowResult.usage`.
+
+| Pregunta | Fuente recomendada |
+|----------|-------------------|
+| ¿Cuánto me cobraron en este workflow/turno? | `WorkflowResult.usage` (+ `totalCostUsd`) |
+| ¿Cuánto midió el prompt en la última inferencia? | Último `Step.usage` / último `inferenceRequest` |
+| Detalle forense por hop | `Workflow.steps[]` |
+
+Los campos `cache_read_input_tokens` y `cache_creation_input_tokens` son **categorías de facturación** del mismo hop (ver [how-to-calculate-anthropic-api-costs.md](../how-to-calculate-anthropic-api-costs.md) §4 y skill `anthropic-api-protocol`). Al agregar entre hops, se suman **por categoría** para la ecuación de coste (§7.7, separación con `totalCostUsd`), no para un único número «tamaño del prompt». No trates `input_tokens + cache_*` agregados como cardinalidad única del contexto.
+
 **Tabla comparativa**
 
 | Aspecto | `Step.usage` | `WorkflowResult.usage` |
 |---------|--------------|------------------------|
-| Alcance | Un hop de inferencia (un POST) | Workflow E2E al cierre |
+| Alcance | Un hop de inferencia (un POST) | Workflow E2E (consumo facturado agregado) |
 | Origen | Wire: `IAnthropicResponse.usage` o StepBuffer | Agregación gateway |
 | Cuándo se fija | Al cerrar el Step (`message_stop` / response sync) | Una vez en hook `Stop` / `SubagentStop` / `StopFailure` |
 | Relación con Anthropic | Copia 1:1 del campo wire | **No existe** en ningún JSON de respuesta única |
@@ -399,6 +422,8 @@ Cuando la inferencia falla antes de consolidar un Step completo:
 **Anti-patrón**
 
 > No usar `IAnthropicResponse.usage` del último POST como `WorkflowResult.usage`. Un workflow con tools implica N inferencias; omitir Steps anteriores subestima tokens (y coste). La agregación es una **decisión del gateway**, no un campo que venga en una sola response Anthropic.
+>
+> No interpretar `WorkflowResult.usage.input_tokens` como tamaño único del contexto ni como cardinalidad del historial: es la suma de `input_tokens` **facturados en cada hop**, donde cada hop reenvía el historial completo (§7.7.1).
 
 **Ejemplo multi-Step (main workflow, sin subagente)**
 
@@ -408,7 +433,7 @@ Cuando la inferencia falla antes de consolidar un Step completo:
 | 1 | `tool_use` | 2400 in / 120 out |
 | 2 | `end_turn` | 2600 in / 200 out |
 
-`WorkflowResult.usage` = suma aritmética de los tres (6200 in / 400 out), **no** el usage del Step 2 solo (2600 in / 200 out).
+`WorkflowResult.usage` = suma aritmética de los tres (6200 in / 400 out), **no** el usage del Step 2 solo (2600 in / 200 out). Los 6200 `input_tokens` agregados son **consumo facturado acumulado** (1200+2400+2600), no el tamaño del prompt del Step 2 (2600). Omitir Steps 0–1 subestima el **coste**; usar solo el último Step no sustituye al agregado para facturación E2E.
 
 **Reglas de agregación (`sumStepUsage` / `aggregateWorkflowUsage`)**
 
@@ -460,8 +485,8 @@ Sumar todos los `WorkflowResult.usage` de una Session (main + sub) **contaría d
 
 **Separación con `totalCostUsd`**
 
-- `usage` = tokens observados en wire (suma aritmética).
-- `totalCostUsd` = cálculo gateway con tarifas propias desde los mismos Steps cerrados (+ hijos en rollup), **no** derivado únicamente del agregado final de tokens. Ver **§7.3** y **§7.5**.
+- `usage` = contadores **facturados** del wire, sumados por hop y **por categoría** (§7.7.1).
+- `totalCostUsd` = cálculo gateway con tarifas propias desde los mismos Steps cerrados (+ hijos en rollup), **no** derivado únicamente del agregado final de tokens ni como `input_tokens × un solo precio`. Ver **§7.3** y **§7.5**.
 
 
 #### 7.8 Semántica de `finalText`
@@ -691,10 +716,10 @@ tool_result → toolResultBlock  (tool_use_id, content, is_error)
 | G10 | Los `tool_result` del Step N aparecen en `inferenceRequest.messages` del Step N+1, no como campo separado en Step N. |
 | G11 | StepBuffer no persiste eventos SSE; solo el correlador persiste el Step al cerrarlo. Ver **§15**. |
 | G12 | `WorkflowResult` no contiene campos duplicados de un solo Step (`stopReason`, `assistantMessage`, etc.); eso permanece en `Step`. Ver **§7.2**. |
-| G13 | `stepCount` y `usage` en `WorkflowResult` consideran solo Steps con `closedAt` definido (más rollup de hijos en main). Ver **§7.3** y **§7.7**. |
-| G14 | `WorkflowResult.usage` no debe derivarse del `usage` de un único POST; es agregación gateway. Ver **§7.7**. |
+| G13 | `stepCount` y `usage` en `WorkflowResult` consideran solo Steps con `closedAt` definido (más rollup de hijos en main). Ver **§7.3**, **§7.7** y **§7.7.1**. |
+| G14 | `WorkflowResult.usage` no debe derivarse del `usage` de un único POST; es agregación gateway por hop. No debe interpretarse como cardinalidad única del contexto. Ver **§7.7** y **§7.7.1**. |
 | G15 | `WorkflowResult.usage` de un workflow **main** incluye rollup de sub-workflows completados enlazados por `ToolUse.childWorkflowId`. Ver **§7.7**. |
-| G16 | Métricas a nivel **Session** suman solo `WorkflowResult.usage` de workflows `kind: 'main'` (evitar doble conteo padre/hijo). Ver **§7.7**. |
+| G16 | Métricas a nivel **Session** suman solo `WorkflowResult.usage` de workflows `kind: 'main'` (evitar doble conteo padre/hijo). Consumo facturado acumulado, no cardinalidad de contexto. Ver **§7.7** y **§7.7.1**. |
 | G17 | `WorkflowResult.finalText` no debe derivarse de `IAnthropicResponse.content` ni de `Step.assistantMessage`; proviene del hook (`last_assistant_message`). Ver **§7.8**. |
 
 ---
@@ -770,7 +795,7 @@ Referencia normativa: [Hooks reference](https://code.claude.com/docs/en/hooks).
 | `Stop` / `SubagentStop` | `Workflow.complete(WorkflowResult)` |
 | `StopFailure` | `Workflow.fail(...)` con `outcome: 'api_error'` |
 
-> **`WorkflowResult` desde hooks:** al cerrar, el correlador construye el snapshot (§7.5). Del hook provienen `closedByEvent`, `sessionId`, `finalText` (`last_assistant_message` — voz del orquestador; **no** derivar de wire; ver **§7.8**) y la base para `outcome`. De Steps **cerrados** provienen `stepCount` y la base de `usage`; el rollup de sub-workflows al padre se aplica en `aggregateWorkflowUsage` (§7.7). `totalCostUsd` es cálculo gateway.
+> **`WorkflowResult` desde hooks:** al cerrar, el correlador construye el snapshot (§7.5). Del hook provienen `closedByEvent`, `sessionId`, `finalText` (`last_assistant_message` — voz del orquestador; **no** derivar de wire; ver **§7.8**) y la base para `outcome`. De Steps **cerrados** provienen `stepCount` y la base de `usage` (consumo facturado por hop; semántica §7.7.1); el rollup de sub-workflows al padre se aplica en `aggregateWorkflowUsage` (§7.7). `totalCostUsd` es cálculo gateway.
 
 > **`finalText` y subagentes:** el `finalText` del workflow **main** proviene del hook `Stop` (texto final del agente main). El del sub-workflow hijo proviene de `SubagentStop` (texto final del subagente). El resumen del hijo **no** se denormaliza en el `finalText` del padre; el padre lo observa vía `ToolUse` / `tool_result` en sus Steps. Ver **§7.8**.
 
@@ -1060,7 +1085,7 @@ Las entidades del gateway **referencian** DTOs Anthropic; no redefinen mensajes 
 | Texto final E2E (resumen) | `string` en `WorkflowResult.finalText` — origen hook; ver **§7.8** |
 | Bloques en ToolUse | `IAnthropicContentBlock` |
 | Uso de tokens (por hop) | `IAnthropicUsage` en `Step.usage` |
-| Uso de tokens (agregado E2E) | `IAnthropicUsage` en `WorkflowResult.usage` — misma forma, distinta semántica; ver **§7.7** |
+| Uso de tokens (consumo facturado del workflow) | `IAnthropicUsage` en `WorkflowResult.usage` — misma forma, suma por hop; ver **§7.7** y **§7.7.1** |
 | Respuesta síncrona | `IAnthropicResponse` / clase `Response` |
 | Streaming SSE | `AnthropicSseEvent` + interfaces `IAnthropicSse*` |
 | Roles y tipos de bloque | `AnthropicRole`, `AnthropicBlockType` |
@@ -1195,7 +1220,7 @@ src/1. domain/
 │       ├── IWorkflow.ts
 │       ├── IStep.ts
 │       ├── IToolUse.ts
-│       └── IWorkflowResult.ts   # finalText? hook; usage? agregado; ver §7.7–§7.8
+│       └── IWorkflowResult.ts   # finalText? hook; usage? consumo facturado; ver §7.7–§7.8, §7.7.1
 ├── models/
 │   ├── Request.ts          # Anthropic — existente
 │   ├── Response.ts         # existente
@@ -1232,7 +1257,7 @@ El diseño refinado:
 
 - Define el gateway como **proxy transparente** con **observabilidad correlacionada** (tráfico HTTP + hooks Claude Code).
 - Usa **Step** como ciclo inferencia + tools, y **Workflow** como ejecución E2E desde input de usuario hasta mensaje final.
-- Integra mensajes y tokens vía **tipos Anthropic existentes**, evitando duplicación. `IAnthropicUsage` tiene **semántica dual**: hop wire en `Step.usage`, agregado E2E (+ rollup subagentes en main) en `WorkflowResult.usage` (§7.7). `finalText` es **passthrough del orquestador** (hook); el wire estructurado queda en `Step.assistantMessage` (§7.8).
+- Integra mensajes y tokens vía **tipos Anthropic existentes**, evitando duplicación. `IAnthropicUsage` tiene **semántica dual**: hop wire en `Step.usage`, consumo facturado E2E (+ rollup subagentes en main) en `WorkflowResult.usage` (§7.7, §7.7.1). `finalText` es **passthrough del orquestador** (hook); el wire estructurado queda en `Step.assistantMessage` (§7.8).
 - Modela **subagentes** como workflows hijos (`kind: 'subagent'`) enlazados desde `ToolUse`.
 - Cierra cada workflow con **WorkflowResult**: snapshot E2E inmutable (hooks + agregación de Steps cerrados), sin metadata de inferencia por hop; ver **§7**.
 - Trata streaming SSE con **reenvío transparente, StepBuffer obligatorio en streaming, y persistencia solo en Steps cerrados** (§15).

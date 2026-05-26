@@ -90,6 +90,8 @@ session-metrics.json → classifyModel(modelId) → acumular en lite / standard 
 
 Si el archivo no existe (sesión anterior a la feature, o sesión vacía), retorna métricas en cero. No hay fallback a escaneo legacy: las sesiones anteriores simplemente no muestran métricas de Tabla 2.
 
+Para el layout de sesión e interacciones, véase [`session-audit-model.md`](./session-audit-model.md) (§5 y §6.1).
+
 #### Contabilización de subagentes
 
 Cada turno (padre y subagente) contribuye a `session-metrics.json` exclusivamente con su propio consumo de API. `computeTokenTotals` opera sobre `turn.stepsMeta`, que se puebla mediante `pushStepMetaByDir(context.auditInteractionDir, ...)` — donde `auditInteractionDir` es el directorio propio del turno. Los steps del subagente nunca se registran en el `stepsMeta` del padre, y viceversa.

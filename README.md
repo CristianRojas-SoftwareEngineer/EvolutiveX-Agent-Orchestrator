@@ -102,54 +102,16 @@ La sesión se divide en dos árboles independientes bajo `./sessions/<session-id
 
 ```
 sessions/<session-id>/
-  session-metrics.json          # Métricas agregadas de tokens por modelo (O(1) para el statusline)
-  main-agent/                   # Turnos agénticos del usuario (fresh + continuations)
-    interactions/
-      interaction-sequence.json # Contador de secuencia exclusivo de este árbol
-      NN/                       # Secuencia de 2 dígitos (01, 02, …)
-        meta.json               # InteractionMetadata: resumen del turno
-        state.json              # Marcador "in-progress" (solo existe mientras está abierto)
-        input/                  # Petición inicial top-level (agentic y side-request)
-          headers.json, body.bin, body.json, body.parsed.md
-        output/                 # Respuesta final reconstruida (SSE completados)
-          body.json, body.parsed.md, headers.json
-        steps/
-          NN/                   # Step lógico observable (01, 02, …)
-            request/            # Petición del step (auto-contenida)
-              headers.json, body.bin, body.json, body.parsed.md
-            response/           # SSE: sse.jsonl (fuente de verdad) + reconstruidos; No-SSE: body.json
-              sse.jsonl, headers.json
-              body.json, body.parsed.md
-              # sse.txt solo para steps no-coalesced (raw dump debug)
-            thought/            # Solo si el step contiene extended thinking
-              content.md
-            sub-agent-NN/       # Solo si el step emitió tool_use Agent (subagente anidado)
-              meta.json, state.json
-              input/, output/, steps/
-  side-interactions/            # Preflights y side-requests (contadores independientes)
+  session-metrics.json
+  main-agent/interactions/
     interaction-sequence.json
-    NN/                         # Secuencia de 2 dígitos (01, 02, …)
-      meta.json
-      state.json
-      input/                    # Solo en side-request (no en client-preflight)
-        headers.json, body.bin, body.json, body.parsed.md
-      steps/
-        NN/
-          request/
-            headers.json, body.bin, body.json, body.parsed.md
-          response/
-            sse.jsonl / body.json / headers.json
+    NN/                    # meta.json, state.json, input/, output/, steps/NN/
+  side-interactions/
+    interaction-sequence.json
+    NN/                    # meta.json, state.json; input/ y output/ solo en side-request
 ```
 
-> **Preflights (`client-preflight`):** No escriben `input/` ni `output/` en el nivel raíz; solo tienen `steps/` con sus archivos individuales. Se alojan en `side-interactions/`.
-
-> **Side-requests:** Peticiones con `tools: []` (ej. `count_tokens`). Escriben `input/` top-level y se alojan en `side-interactions/`.
-
-> **Subagentes (`Task` / herramienta `Agent`):** Se anidan directamente bajo `steps/NN/sub-agent-NN/` con la misma estructura interna (`input/`, `output/`, `steps/`, `meta.json`, `state.json`). El `meta.json` del subagente incluye `parentContext: { parentInteractionDir, parentStepIndex, triggeringToolUseId, subagentType }`. La continuation que trae los `tool_result` de esos subagentes se coalesce en `steps/NN/response/body.*` del step padre, de modo que la delegación y la respuesta final combinada quedan en el mismo step lógico. La profundidad está acotada a 2 niveles.
-
-> **Steps coalesced de Agent:** Para steps que invocan subagentes, el `response/sse.jsonl` es **multi-fase** — cada línea incluye `phase: "delegation"` (stream inicial) o `phase: "continuation"` (stream terminal con tool_result). El `response/body.json` tiene estructura consolidada con `delegation.message`, `continuation.request.body`, `continuation.request.headers`, `continuation.response.message`, `toolUseIds` y `subagents` (resumen estructurado de subagentes ejecutados en Fase 2). El `response/body.parsed.md` muestra tres fases: **Fase 1: Delegación inicial**, **Fase 2: Ejecución de subagentes** (con tabla resumen de cada subagente) y **Fase 3: Respuesta final coalesced**. Los archivos `continuation.*` temporales ya no se crean; la request de continuation se almacena en memoria y se escribe directamente en `body.json`. Para steps coalesced, `sse.txt` se elimina al consolidar (solo `sse.jsonl` es canónico).
-
-> **state.json:** Archivo marcador escrito al iniciar la interacción con `{ state: "in-progress", startedAt, interactionType, parentContext? }`. Se elimina al cerrar el turno (cuando se escribe `meta.json`). Su presencia indica una interacción huérfana por crash del proceso.
+> **Referencia completa:** modelo conceptual, layout detallado, tipos de interacción, protocolo HTTP, subagentes, `meta.json` y correlación con logs — [`docs/session-audit-model.md`](docs/session-audit-model.md).
 
 ### Tipos de Interacción
 
@@ -159,52 +121,7 @@ sessions/<session-id>/
 | `client-preflight` | Quota check (`max_tokens:1`) o cache warm-up sin turno activo          | Al recibir la respuesta (inmediato)               |
 | `side-request`     | Peticiones con `tools: []` (ej. `count_tokens`, generación de títulos) | Respuesta terminal; no desplaza al turno activo   |
 
-### Resultados de Turno (`outcome`)
-
-El campo `outcome` en `meta.json` indica el resultado final del turno:
-
-| `outcome`        | Significado                                                             | `statusCode` típico |
-| ---------------- | ----------------------------------------------------------------------- | ------------------- |
-| `completed`      | Turno completado exitosamente                                           | 2xx                 |
-| `client-error`   | Error del cliente (request mal formada, autenticación fallida, etc.)    | 4xx                 |
-| `upstream-error` | Error del servidor upstream (fallo de conexión, timeout, error SSE)     | 5xx o `null`        |
-| `truncated`      | Respuesta truncada por `max_tokens`                                     | 2xx                 |
-| `orphaned`       | Turno cerrado por cleanup (continuation nunca llegó, graceful shutdown) | `null`              |
-
-> **Campos forenses en `meta.json`:** Cuando un turno se cierra con `upstream-error` o `orphaned` habiendo emitido `tool_use` de tipo `Agent` que no se correlacionaron con subagentes, el campo `lostPendingAgents?: PendingAgentToolUse[]` registra los IDs de esos tool_uses pendientes para facilitar correlación offline.
-
-### Correlación con Logs de Claude Code
-
-Cada step en `meta.json` incluye `anthropicMessageId` — el `message.id` de la API de Anthropic — permitiendo correlacionar directamente con los logs oficiales de Claude Code:
-
-```json
-{
-  "steps": [
-    {
-      "stepIndex": 1,
-      "anthropicMessageId": "msg_01SweCL7ReWWANWSRsPc8mfn",
-      "stopReason": "tool_use"
-    }
-  ]
-}
-```
-
-| Sistema                       | Ubicación del ID             | Valor de ejemplo               |
-| ----------------------------- | ---------------------------- | ------------------------------ |
-| Log Claude Code (`.jsonl`)    | `message.id`                 | `msg_01SweCL7ReWWANWSRsPc8mfn` |
-| Auditoría Proxy (`meta.json`) | `steps[].anthropicMessageId` | `msg_01SweCL7ReWWANWSRsPc8mfn` |
-
-**Proceso de correlación:**
-
-1. Extrae `"id"` del evento `assistant` en el log de Claude Code
-2. Busca ese valor en `sessions/<session>/main-agent/interactions/*/meta.json` (y, si aplica, `side-interactions/*/meta.json`) bajo `steps[].anthropicMessageId`
-3. El directorio contenedor es la interacción correspondiente
-
-### Peticiones pre-sesión (sin auditoría)
-
-Las peticiones **sin** cabecera de sesión válida (`AUDIT_SESSION_OVERRIDE_HEADER` ni `AUDIT_SESSION_FALLBACK_HEADER`) resuelven internamente a `_unknown` y **no generan archivos de auditoría**: el proxy las reenvía al upstream, pero `AuditInteractionHandler` retorna sin escribir bajo `sessions/`. Ejemplos habituales: `HEAD /`, `GET /v1/models`, o probes de conectividad del runtime Bun de Claude Code antes de abrir sesión.
-
-No se crea la carpeta `sessions/_unknown/`. Guía ampliada: [`docs/health-check-handling.md`](docs/health-check-handling.md).
+Las peticiones **sin** cabecera de sesión válida no generan archivos bajo `sessions/`. Guía: [`docs/health-check-handling.md`](docs/health-check-handling.md).
 
 ---
 
@@ -238,7 +155,7 @@ Personaliza el comportamiento ajustando estas variables en tu entorno o en un ar
 
 ### Correlación de Sesión (SessionId)
 
-El directorio de auditoría bajo `sessions/<sessionId>/` se nombra a partir de las cabeceras `AUDIT_SESSION_OVERRIDE_HEADER` (prioridad 1) o `AUDIT_SESSION_FALLBACK_HEADER` (prioridad 2). Si ninguna está presente, el resolver devuelve `_unknown` como fallback interno y **no se escribe auditoría en disco** (véase [Peticiones pre-sesión](#peticiones-pre-sesión-sin-auditoría) arriba).
+El directorio de auditoría bajo `sessions/<sessionId>/` se nombra a partir de las cabeceras `AUDIT_SESSION_OVERRIDE_HEADER` (prioridad 1) o `AUDIT_SESSION_FALLBACK_HEADER` (prioridad 2). Si ninguna está presente, el resolver devuelve `_unknown` como fallback interno y **no se escribe auditoría en disco** (véase [`docs/health-check-handling.md`](docs/health-check-handling.md)).
 
 <a name="capas-bytes-env"></a>
 

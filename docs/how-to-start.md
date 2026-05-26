@@ -178,38 +178,12 @@ Abre tu flujo habitual (proyecto, chat, lo que use la API). Las peticiones pasar
 | Qué quieres ver                                         | Dónde está                                                                              | Qué es                                                                                                                                                                                                                   |
 | ------------------------------------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **Actividad en vivo** (peticiones, respuestas, errores) | Terminal de `npm run dev` y archivo **`server/logs.jsonl`** (relativo al CWD)          | Consola: Pino Pretty (legible). Archivo: JSON línea a línea en `server/logs.jsonl` para revisar o filtrar después. Nivel configurable con `LOG_LEVEL` (por defecto `info`). |
-| **Copias en disco** por turno                           | Carpeta **`sessions/`** en el ordenador (relativa al CWD desde donde arrancas el proxy) | Árbol por sesión (`sessions/<sessionId>/`): `session-metrics.json`; turnos del chat en `main-agent/interactions/NN/`; preflights y side-requests en `side-interactions/NN/`. Cada interacción incluye `meta.json`, y según el tipo también `input/`, `output/` y `steps/`. Ver esquema abajo y el [README](../README.md#archivos-auditoria). |
-
-Esquema resumido (turno típico del agente principal):
-
-```
-sessions/<session-id>/
-  session-metrics.json
-  main-agent/interactions/
-    interaction-sequence.json
-    NN/
-      meta.json
-      input/          # petición inicial del turno
-      output/         # al cerrar turno SSE: body.json, body.parsed.md, headers.json
-      steps/NN/
-        request/      # petición de ese step
-        response/     # durante SSE: sse.jsonl, headers.json, sse.txt (debug)
-                        # al cerrar step: body.json, body.parsed.md
-  side-interactions/
-    interaction-sequence.json
-    NN/
-      meta.json
-      state.json              # solo mientras la interacción está abierta
-      input/                  # solo side-request (no client-preflight)
-      steps/NN/
-        request/
-        response/
-```
+| **Copias en disco** por turno                           | Carpeta **`sessions/`** en el ordenador (relativa al CWD desde donde arrancas el proxy) | Árbol por sesión: turnos del chat en `main-agent/interactions/NN/`; preflights y side-requests en `side-interactions/NN/`. Referencia completa en [`session-audit-model.md`](./session-audit-model.md). |
 
 **Dos árboles bajo cada sesión**
 
-- **`main-agent/interactions/`** — Turnos del chat principal: prompts del usuario, continuaciones con `tool_result` y respuestas SSE del agente. Es lo que sueles abrir para seguir una conversación.
-- **`side-interactions/`** — Peticiones auxiliares con contador propio: _preflights_ (`client-preflight`, p. ej. comprobación de cuota o warm-up de caché) y _side-requests_ (p. ej. `count_tokens`, generación de título de sesión). No mezclan su numeración con los turnos del agente principal. Los _preflights_ no tienen `input/` ni `output/` en la raíz; los _side-requests_ sí escriben `input/` top-level.
+- **`main-agent/interactions/`** — Turnos del chat principal: prompts del usuario, continuaciones con `tool_result` y respuestas SSE del agente.
+- **`side-interactions/`** — Preflights (`client-preflight`) y side-requests (p. ej. `count_tokens`). Contador de numeración independiente del agente principal.
 
 **`session-metrics.json`** (en la raíz de `sessions/<sessionId>/`) agrega tokens por modelo a medida que se cierran turnos; sirve para consultas rápidas (p. ej. statusline) sin reescanear todos los `meta.json`. Esquema y motivación en [`session-metrics-system.md`](./session-metrics-system.md).
 
@@ -232,17 +206,7 @@ No hace falta leer la tabla entera del README el primer día:
 
 La carpeta de salida es siempre `./sessions`, relativa al directorio desde donde ejecutas el proxy.
 
-**Streaming (SSE) en disco:** las rutas siguientes son relativas a cada interacción, p. ej. `sessions/<sessionId>/main-agent/interactions/01/` (o `side-interactions/NN/`).
-
-| Momento | Ruta | Qué contiene |
-| ------- | ---- | ------------ |
-| Durante el stream | `steps/NN/response/sse.jsonl` | Eventos SSE línea a línea (**fuente de verdad** para reconstruir) |
-| Durante el stream | `steps/NN/response/headers.json` | Cabeceras de la respuesta de ese step |
-| Durante el stream | `steps/NN/response/sse.txt` | Volcado raw opcional (límite `MAX_AUDIT_SSE_RAW_BYTES`; `0` = ilimitado; no afecta la reconstrucción) |
-| Al cerrar cada step | `steps/NN/response/body.json`, `body.parsed.md` | Mensaje del asistente reconstruido **de ese step** |
-| Al cerrar el turno (step terminal) | `output/body.json`, `output/body.parsed.md`, `output/headers.json` | Resumen **top-level** del turno (agrega los `body.json` de los steps) |
-
-No existe un directorio `response/` en la raíz de la interacción: `request/` y `response/` solo viven bajo `steps/NN/`. Detalle técnico en [`how-sse-reconstruction-works.md`](./how-sse-reconstruction-works.md).
+**Streaming (SSE) en disco:** `steps/NN/response/sse.jsonl` es la fuente de verdad; al cerrar el turno se escribe `output/body.json`. Layout completo en [`session-audit-model.md` §6.6](./session-audit-model.md#66-output); reconstrucción técnica en [`how-sse-reconstruction-works.md`](./how-sse-reconstruction-works.md).
 
 El resto (límites de tamaño, volcado SSE crudo, etc.) está en la Matriz de Entorno del [README](../README.md#configuracion). Para ver cómo se aplican los límites de memoria y disco usa [Capas de Bytes y Convenciones de Logs](../README.md#capas-bytes-env).
 
@@ -255,7 +219,8 @@ El resto (límites de tamaño, volcado SSE crudo, etc.) está en la Matriz de En
 - [Variables de entorno](../README.md#configuracion) (matriz completa de configuración).
 - [Capas de bytes y convenciones](../README.md#capas-bytes-env) (diagrama y límites en memoria y disco).
 - [Correlación de sesión](../README.md#correlación-de-sesión-sessionid) (resolución de session ID y overrides).
-- [Archivos de auditoría en disco y `meta.json`](../README.md#archivos-auditoria).
+- [Modelo de auditoría de sesiones (`session-audit-model.md`)](./session-audit-model.md) — referencia canónica del layout en `sessions/`.
+- [Archivos de auditoría (resumen)](../README.md#archivos-auditoria).
 - Entornos con **inspección SSL** (certificados corporativos): párrafo `NODE_EXTRA_CA_CERTS` en el [README](../README.md#configuracion).
 - [Estimación de Costos Anthropic](./how-to-calculate-anthropic-api-costs.md) (Ecuación y JSON local de precios).
 - [Estimación de Costos OpenRouter](./how-to-calculate-openrouter-api-costs.md) (Esquema ResponseUsage y agregación).

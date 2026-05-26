@@ -31,8 +31,10 @@ El rediseño reemplaza los tres `.ps1` con un único `scripting/router-status.ts
 | Método de auth                    | `process.env` (heredado de Claude Code)                      | `ANTHROPIC_AUTH_TOKEN` / `ANTHROPIC_API_KEY`                                                      |
 | Modelos por nivel                 | `process.env` (heredado de Claude Code)                      | `ANTHROPIC_DEFAULT_HAIKU_MODEL`, `ANTHROPIC_DEFAULT_SONNET_MODEL`, `ANTHROPIC_DEFAULT_OPUS_MODEL` |
 | Display name de modelo por nivel  | `routing/providers/<p>/models/<m>/metadata.json`             | `displayName` (campo a añadir)                                                                    |
-| Interacciones de la sesión actual | `sessions/<session>/interactions/*/meta.json`                | `interactionType`, `totals`                                                                       |
-| Modelo por interacción            | `sessions/<session>/interactions/*/request/body.json`        | `model`                                                                                           |
+| Interacciones de la sesión actual | `sessions/<session>/session-metrics.json` (implementación actual) | contadores por `modelId` |
+| Modelo por interacción            | `meta.json` → `modelId`; histórico: `input/body.json`             | `modelId` / `"model"` en body |
+
+> **Nota:** la propuesta original escaneaba `sessions/<session>/interactions/*/meta.json`. La implementación actual lee `session-metrics.json` (O(1)). Layout de sesión: [`session-audit-model.md`](../session-audit-model.md).
 
 ### Variables de entorno en `process.env`
 
@@ -218,8 +220,11 @@ La sesión en `sessions/` se resuelve utilizando el `session_id` proporcionado p
 
 ```
 sessionDir = sessions/ → buscar por prefijo de ctx.session_id
-interactions = sessions/<sessionDir>/interactions/*/meta.json
+metrics = sessions/<sessionDir>/session-metrics.json
+interactions = sessions/<sessionDir>/main-agent/interactions/*/meta.json  (referencia offline)
 ```
+
+Layout vigente: [`session-audit-model.md`](../session-audit-model.md).
 
 > **Nota:** `DEFAULT_AUDIT_SESSION` ha sido eliminado del proyecto. La resolución de sesión ahora depende exclusivamente de las cabeceras HTTP (para el proxy) y del `session_id` de `$ctx` (para el statusline).
 

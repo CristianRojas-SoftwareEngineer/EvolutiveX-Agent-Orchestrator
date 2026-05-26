@@ -2,6 +2,8 @@
 
 Smart Code Proxy **no audita en disco** las peticiones que llegan sin cabecera de sesión válida. El proxy las reenvía al upstream con normalidad, pero no crea carpetas bajo `sessions/`.
 
+Modelo de sesión y resolución de `session-id`: [`session-audit-model.md` §6.1](./session-audit-model.md#61-sesión).
+
 ## Motivación
 
 Claude Code (y otros clientes) envían a veces peticiones **antes** de establecer una sesión de trabajo real: comprobaciones de conectividad (`HEAD /`), listados (`GET /v1/models`), probes del runtime Bun, etc. Esas peticiones:

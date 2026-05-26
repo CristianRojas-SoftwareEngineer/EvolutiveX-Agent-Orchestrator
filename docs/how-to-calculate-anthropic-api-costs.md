@@ -313,7 +313,7 @@ Si **no** hay JSON reconstruido pero sí `steps/NN/response/sse.jsonl`, el objet
 
 El campo `model` para la §6.4 suele coincidir en petición y respuesta; si solo tienes cuerpo de petición (`input/body.json` o `steps/NN/request/body.json`) por un fallo de auditoría, puedes leer `model` de ahí como respaldo.
 
-Convención detallada de nombres y reglas de presencia: [README del repositorio](../README.md#archivos-auditoria).
+Convención detallada de nombres y reglas de presencia: [`session-audit-model.md`](./session-audit-model.md).
 
 Opcional: la skill global **`smart-code-proxy`** (`~/.claude/skills/smart-code-proxy/`, si la tienes instalada en Claude Code) describe la jerarquía bajo `sessions/`. Esta sección solo indica **dónde** suele aparecer `usage` en relación con la estructura de steps.
 

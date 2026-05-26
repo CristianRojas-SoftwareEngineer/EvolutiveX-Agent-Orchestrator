@@ -48,7 +48,7 @@ Sigue estos pasos en orden:
    npm run configure:provider
    ```
 
-   Escribe variables como `ANTHROPIC_BASE_URL` en el entorno de Claude Code para que el tráfico pase por este proxy. Detalle de proveedores soportados en el [README](../README.md#-enrutamiento-de-proveedores).
+   Escribe variables como `ANTHROPIC_BASE_URL` en el entorno de Claude Code para que el tráfico pase por este proxy. Detalle de proveedores soportados en el [README](../README.md#enrutamiento-de-proveedores).
 
 5. **Opcional:** configura variables de entorno para desarrollo local usando un archivo `.env`:
 
@@ -66,7 +66,7 @@ Sigue estos pasos en orden:
 
    b. Abre `configs/.env` y edita solo las variables que quieras cambiar. Las que no definas tomarán su valor por defecto del código (ver la [tabla de variables](#variables-que-suelen-bastar-al-principio) y el [README](../README.md#configuracion)).
 
-   El archivo `.env` está en `.gitignore` (no se sube al repositorio). El archivo `.env.example` sí está versionado y sirve de guía: muestra todas las variables disponibles con sus valores por defecto.
+   El archivo `configs/.env` está en `.gitignore` (no se sube al repositorio). El archivo [`configs/.env.example`](../configs/.env.example) sí está versionado y sirve de guía: muestra todas las variables disponibles con sus valores por defecto.
 
    **¿Cómo se carga?** El script `npm run dev` usa el flag nativo de Node.js `--env-file-if-exists=configs/.env` (disponible desde Node v22.9; Node v24+ recomendado). A diferencia de `--env-file`, este flag **no falla** si el archivo `.env` no existe: el proxy arranca igualmente con los valores por defecto del código. **El script `npm start` (producción) no carga `.env`** a propósito: en producción las variables se inyectan en el entorno del sistema directamente.
 
@@ -76,7 +76,7 @@ Sigue estos pasos en orden:
    npm run build
    ```
 
-   El proyecto incluye un script de validación integral (`npm test`) que ejecuta el análisis estático (`lint`), la validación de tipos (`typecheck`), la validación de pruebas integradas (`test:unit`) y la compilación (`build`) para asegurar la exactitud funcional y la integridad del código TypeScript. Se recomienda ejecutarlo antes de cada despliegue relevante.
+   El proyecto incluye un script de validación integral (`npm test`) que ejecuta el análisis estático (`lint`), la validación de tipos (`typecheck`), las pruebas unitarias (`test:unit`, Vitest) y la compilación (`build`) para asegurar la exactitud funcional y la integridad del código TypeScript. Se recomienda ejecutarlo antes de cada despliegue relevante.
 
 7. **Opcional — compatibilidad multi-agente:** Si usas otros agentes de código además de Claude Code (Codex CLI, Copilot, Cursor, etc.), puedes crear un hardlink `AGENTS.md` → `CLAUDE.md` para que también lean las instrucciones del proyecto:
 
@@ -102,7 +102,7 @@ Sigue estos pasos en orden:
 
 2. **No cierres esa terminal** mientras quieras usar el proxy: el proceso debe seguir en marcha.
 
-3. Comprueba el arranque: debería imprimirse **una línea JSON** con el mensaje `Proxy levantado correctamente` junto con campos como `port`, `upstream`, `upstreamAcceptEncoding`, `maxResponseBufferBytes`, `maxAuditRequestBodyBytes`, `maxAuditResponseBodyBytes`, `maxAuditSseRawBytes`, `stripAuditSessionHeader` y `auditSessionHashSuffix` (lista de variables de entorno en el [README](../README.md#configuracion)). Si ves esa línea, el proxy está escuchando en tu PC.
+3. Comprueba el arranque: en la **terminal** debería aparecer el mensaje `Proxy levantado correctamente` con campos como `port`, `upstream`, `upstreamAcceptEncoding`, `maxResponseBufferBytes`, `maxAuditRequestBodyBytes`, `maxAuditResponseBodyBytes`, `maxAuditSseRawBytes`, `stripAuditSessionHeader` y `auditSessionHashSuffix` (salida legible vía Pino Pretty; no es JSON compacto). En **`server/logs.jsonl`** el mismo evento queda como **una línea JSON** (`event: "listening"`). También verás líneas previas de Fastify del tipo `Server listening at http://127.0.0.1:8787` — son normales. Si aparece `Proxy levantado correctamente`, el proxy está escuchando en tu PC (lista de variables en el [README](../README.md#configuracion)).
 
 Por defecto el proxy reenvía a `https://api.anthropic.com`. Puedes cambiar la URL de destino con la variable `UPSTREAM_ORIGIN` si tu organización usa otro host (véase el README).
 
@@ -149,7 +149,7 @@ Efecto práctico: las rutas que el SDK añada (por ejemplo `/v1/messages`) se pe
 
 ### Paso C — Identificar la sesión de auditoría en disco
 
-Con **Claude Code** y el proxy por defecto, las carpetas bajo `sessions/<sessionId>/` suelen **alinearse solas** con la sesión del CLI: el cliente envía `x-claude-code-session-id` (prioridad secundaria o fallback). La cabecera `x-cc-audit-session` solo interviene si el cliente la envía (override; p. ej. `ANTHROPIC_CUSTOM_HEADERS`). Orden y variables en el [README](../README.md#correlación-de-sesión-sessionid).
+Con **Claude Code** y el proxy por defecto, las carpetas bajo `sessions/<sessionId>/` suelen **alinearse solas**: el proxy resuelve el ID en este orden — **(1)** cabecera de override `x-cc-audit-session` si el cliente la envía (p. ej. vía `ANTHROPIC_CUSTOM_HEADERS`); **(2)** cabecera de fallback `x-claude-code-session-id` (la que envía Claude Code por defecto); **(3)** si ninguna está presente, la petición no genera árbol de auditoría (`_unknown`). Detalle y variables en el [README](../README.md#correlación-de-sesión-sessionid).
 
 **Opcional:** si quieres **otro** identificador (por ejemplo un UUID que tú elijas), envía cabeceras extra con **`ANTHROPIC_CUSTOM_HEADERS`**. El formato es: una o más líneas `Nombre: Valor`. Documentación oficial: [variables de entorno de Claude Code](https://code.claude.com/docs/en/env-vars).
 
@@ -193,18 +193,25 @@ sessions/<session-id>/
       request/      # petición de ese step
       response/     # durante SSE: sse.jsonl, headers.json, sse.txt (debug)
                       # al cerrar step: body.json, body.parsed.md
-  side-interactions/NN/   # quota warm-up, count_tokens, etc.
-    meta.json, steps/NN/request/, steps/NN/response/  # mismas convenciones bajo steps/
+  side-interactions/
+    interaction-sequence.json
+    NN/
+      meta.json
+      state.json              # solo mientras la interacción está abierta
+      input/                  # solo side-request (no client-preflight)
+      steps/NN/
+        request/
+        response/
 ```
 
 **Dos árboles bajo cada sesión**
 
 - **`main-agent/interactions/`** — Turnos del chat principal: prompts del usuario, continuaciones con `tool_result` y respuestas SSE del agente. Es lo que sueles abrir para seguir una conversación.
-- **`side-interactions/`** — Peticiones auxiliares con contador propio: _preflights_ (`client-preflight`, p. ej. comprobación de cuota o warm-up de caché) y _side-requests_ (p. ej. `count_tokens`, generación de título de sesión). No mezclan su numeración con los turnos del agente principal.
+- **`side-interactions/`** — Peticiones auxiliares con contador propio: _preflights_ (`client-preflight`, p. ej. comprobación de cuota o warm-up de caché) y _side-requests_ (p. ej. `count_tokens`, generación de título de sesión). No mezclan su numeración con los turnos del agente principal. Los _preflights_ no tienen `input/` ni `output/` en la raíz; los _side-requests_ sí escriben `input/` top-level.
 
 **`session-metrics.json`** (en la raíz de `sessions/<sessionId>/`) agrega tokens por modelo a medida que se cierran turnos; sirve para consultas rápidas (p. ej. statusline) sin reescanear todos los `meta.json`. Esquema y motivación en [`session-metrics-system.md`](./session-metrics-system.md).
 
-La auditoría en disco es incondicional: el proxy siempre escribe en `./sessions`. Los logs de consola y `server/logs.jsonl` dependen de `LOG_LEVEL`.
+La auditoría en disco **no se puede desactivar por variable de entorno**: para cada petición con sesión identificada, el proxy escribe bajo `./sessions` (relativo al CWD). Las peticiones **sin** cabecera de sesión válida (p. ej. comprobaciones `HEAD /` antes de abrir sesión en Claude Code) se reenvían pero **no** crean carpetas en `sessions/`. Los logs de consola y `server/logs.jsonl` dependen de `LOG_LEVEL`.
 
 Para **limpiar** las sesiones acumuladas, ejecuta `npm run clean:sessions`. Para purga completa de todo (build, dependencias, sesiones y logs en `server/`): `npm run clean:all`. El próximo arranque con `npm run dev` recreará los directorios vacíos automáticamente.
 
@@ -237,7 +244,7 @@ No existe un directorio `response/` en la raíz de la interacción: `request/` y
 
 El resto (límites de tamaño, volcado SSE crudo, etc.) está en la Matriz de Entorno del [README](../README.md#configuracion). Para ver cómo se aplican los límites de memoria y disco usa [Capas de Bytes y Convenciones de Logs](../README.md#capas-bytes-env).
 
-**Perfil rápido (Claude Code):** con `ANTHROPIC_BASE_URL` apuntando al proxy y el proxy en marcha (`npm run dev`), suele bastar correlacionar sesiones con la cabecera por defecto `x-claude-code-session-id` (fallback/segunda prioridad). La correlación de sesión y overrides (`x-cc-audit-session`, etc.) está en el [README: correlación de sesión](../README.md#correlación-de-sesión-sessionid).
+**Perfil rápido (Claude Code):** con `ANTHROPIC_BASE_URL` apuntando al proxy y el proxy en marcha (`npm run dev`), suele bastar la cabecera de fallback `x-claude-code-session-id` (prioridad 2); el override `x-cc-audit-session` (prioridad 1) solo aplica si la envías explícitamente. Detalle en el [README: correlación de sesión](../README.md#correlación-de-sesión-sessionid).
 
 ---
 

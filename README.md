@@ -270,6 +270,8 @@ El sistema previene la saturación en memoria o disco ignorando la escritura si 
 
 > Para una guía detallada de onboarding, consultar [docs/how-to-start.md](docs/how-to-start.md).
 
+<a name="enrutamiento-de-proveedores"></a>
+
 ## 📡 Enrutamiento de Proveedores
 
 El directorio `routing/providers/` contiene la configuración de los diferentes proveedores de modelos LLM soportados:

@@ -14,23 +14,16 @@ export async function proxyRoutes(fastify: FastifyInstance, opts: { deps: ProxyD
 
   /**
    * Hook: preHandler
-   * - Negocia la compresión con el Upstream para asegurar transparencia en la auditoría.
+   * - Fuerza `Accept-Encoding: identity` hacia upstream (auditoría legible).
    * - Opcionalmente remueve el flag de redacción de thinking para capturar contenido legible.
    * - Dispara la lógica pre-proxy del controlador (resolución de sesión, captura de request).
    */
   fastify.addHook('preHandler', async (request: FastifyRequest, reply: FastifyReply) => {
     const headers = request.headers as Record<string, string | string[] | undefined>;
 
-    // 1. Lógica para asegurar auditorías legibles eliminando Gzip del upstream si es posible
-    const mode = deps.config.UPSTREAM_ACCEPT_ENCODING;
-    if (mode !== 'pass') {
-      delete headers['accept-encoding'];
-      if (mode !== 'remove') {
-        headers['accept-encoding'] = mode;
-      }
-    }
+    delete headers['accept-encoding'];
+    headers['accept-encoding'] = 'identity';
 
-    // 2. Opcional: remover flag de redacción de thinking para capturar contenido legible
     if (deps.config.PROXY_UNREDACT_THINKING) {
       const betaHeader = headers['anthropic-beta'];
       if (typeof betaHeader === 'string' && betaHeader.includes('redact-thinking-2026-02-12')) {
@@ -44,7 +37,6 @@ export async function proxyRoutes(fastify: FastifyInstance, opts: { deps: ProxyD
       }
     }
 
-    // 3. Orquestar la sesión de auditoría y captura de petición
     await proxyController.preHandler(request, reply);
     if (reply.sent) return;
   });

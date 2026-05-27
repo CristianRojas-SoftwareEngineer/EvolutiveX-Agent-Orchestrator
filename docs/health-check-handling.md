@@ -16,8 +16,8 @@ Claude Code (y otros clientes) envían a veces peticiones **antes** de establece
 
 La resolución de sesión sigue esta prioridad (véase también [README — Correlación de sesión](../README.md#correlación-de-sesión-sessionid)):
 
-1. Cabecera `AUDIT_SESSION_OVERRIDE_HEADER` (por defecto `x-cc-audit-session`)
-2. Cabecera `AUDIT_SESSION_FALLBACK_HEADER` (por defecto `x-claude-code-session-id`)
+1. Cabecera `x-cc-audit-session` (override)
+2. Cabecera `x-claude-code-session-id` (fallback Claude Code)
 3. Si ninguna está presente o está vacía → el resolver devuelve `sessionId: "_unknown"`
 
 En `AuditInteractionHandler.execute()`, si `auditSessionId === '_unknown'`, el handler **retorna `null` inmediatamente**:

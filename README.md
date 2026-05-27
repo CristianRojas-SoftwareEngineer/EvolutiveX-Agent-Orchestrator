@@ -68,7 +68,7 @@ graph TD
 A diferencia de un proxy genérico, este sistema "entiende" los flujos binarios de Anthropic.
 
 - Extrae cada línea de datos y la convierte en una entrada con _timestamp_ en `steps/NN/response/sse.jsonl` (escrito **síncronamente**: fuente de verdad ordenada para la reconstrucción).
-- Mantiene un volcado binario crudo (`steps/NN/response/sse.txt`) para depuración de paridad de protocolos. **No** es la fuente de la reconstrucción y puede truncarse por `MAX_AUDIT_SSE_RAW_BYTES` sin afectar al mensaje final reconstruido.
+- Mantiene un volcado binario crudo (`steps/NN/response/sse.txt`) para depuración de paridad de protocolos. **No** es la fuente de la reconstrucción y puede truncarse por `MAX_AUDIT_BYTES` sin afectar al mensaje final reconstruido.
 
 ### 🛡️ Privacidad Avanzada
 
@@ -129,33 +129,25 @@ Las peticiones **sin** cabecera de sesión válida no generan archivos bajo `ses
 
 ## ⚙️ Configuración (Matriz de Entorno)
 
-Personaliza el comportamiento ajustando estas variables en tu entorno o en un archivo `configs/.env`:
+Personaliza el comportamiento ajustando estas variables en tu entorno o en un archivo `configs/.env`. Cabeceras de sesión, compresión upstream y límites internos de memoria están fijados en código; véase [`docs/advanced-configuration.md`](docs/advanced-configuration.md).
 
-|  Categoría   | Variable                        | Descripción                                                                                                                     | Default                                                                                 |
-| :----------: | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-|   **Core**   | `PORT`                          | Puerto de escucha del proxy.                                                                                                    | `8787`                                                                                  |
-| **Upstream** | `UPSTREAM_ORIGIN`               | URL objetivo de Anthropic.                                                                                                      | `https://api.anthropic.com`                                                             |
-|              | `UPSTREAM_ACCEPT_ENCODING`      | Control de compresión (`identity`, `gzip`, `pass`, `remove`).                                                                   | `identity`                                                                              |
-| **Headers**  | `AUDIT_SESSION_OVERRIDE_HEADER` | Cabecera primaria de sesión.                                                                                                    | `x-cc-audit-session`                                                                    |
-|              | `AUDIT_SESSION_FALLBACK_HEADER` | Cabecera secundaria.                                                                                                            | `x-claude-code-session-id`                                                              |
-|              | `STRIP_AUDIT_SESSION_HEADER`    | Elimina cabeceras de sesión hacia upstream.                                                                                     | `1` (Activo)                                                                            |
-|              | `AUDIT_SESSION_HASH_SUFFIX`     | Añade hash al ID de sesión.                                                                                                     | `0` (Desactivo)                                                                         |
-| **Límites**  | `MAX_REQUEST_BODY`              | Límite del cuerpo de petición (memoria en proxy).                                                                               | `50mb`                                                                                  |
-|              | `MAX_RESPONSE_BUFFER_BYTES`     | Tope de buffer en memoria para respuestas no-SSE.                                                                               | `104857600`                                                                             |
-|              | `MAX_AUDIT_REQUEST_BODY_BYTES`  | Tope de archivo físico para el cuerpo de petición.                                                                              | `52428800`                                                                              |
-|              | `MAX_AUDIT_RESPONSE_BODY_BYTES` | Tope de archivo físico para el cuerpo de respuesta.                                                                             | `52428800`                                                                              |
-|              | `MAX_AUDIT_SSE_RAW_BYTES`       | Tope físico para `response/sse.txt` (raw dump debug; `0` = ilimitado). **No afecta** a la reconstrucción (que lee `sse.jsonl`). | `52428800`                                                                              |
-| **Thinking** | `PROXY_UNREDACT_THINKING`       | Remueve el flag `redact-thinking-2026-02-12` del header `anthropic-beta` para capturar contenido thinking legible.              | `false` (desactivado)                                                                   |
-| **Filtrado** | `FILTERED_TOOLS`                | Tool names a excluir del request (coma-separado). Omitir la variable = default abajo. Desactivar filtrado: `FILTERED_TOOLS=""` o `FILTERED_TOOLS=`. | `ScheduleWakeup,NotebookEdit,ExitWorktree,EnterWorktree,CronList,CronDelete,CronCreate` |
-|   **Logs**   | `LOG_LEVEL`                     | Nivel de log de Pino (consola y `server/logs.jsonl`).                                                                          | `info`                                                                                  |
+|  Categoría   | Variable                  | Descripción                                                                                                                     | Default                                                                                 |
+| :----------: | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+|   **Core**   | `PORT`                    | Puerto de escucha del proxy.                                                                                                    | `8787`                                                                                  |
+| **Upstream** | `UPSTREAM_ORIGIN`         | URL objetivo (Anthropic, OpenRouter, etc.).                                                                                     | `https://api.anthropic.com`                                                             |
+| **Límites**  | `MAX_REQUEST_BODY`        | Límite del cuerpo de petición (memoria en proxy).                                                                               | `50mb`                                                                                  |
+|              | `MAX_AUDIT_BYTES`         | Tope único de volcado en disco (request, response, `sse.txt` raw). Buffer en memoria se deriva internamente.                     | `52428800`                                                                              |
+| **Thinking** | `PROXY_UNREDACT_THINKING` | Remueve el flag `redact-thinking-2026-02-12` del header `anthropic-beta` para capturar contenido thinking legible.              | `false` (desactivado)                                                                   |
+| **Filtrado** | `FILTERED_TOOLS`          | Tool names a excluir del request (coma-separado). Omitir la variable = default abajo. Desactivar filtrado: `FILTERED_TOOLS=""`. | `ScheduleWakeup,NotebookEdit,ExitWorktree,EnterWorktree,CronList,CronDelete,CronCreate` |
+|   **Logs**   | `LOG_LEVEL`               | Nivel de log de Pino (consola y `server/logs.jsonl`).                                                                           | `info`                                                                                  |
 
-> **Auditoría por defecto.** El proxy escribe en `./sessions` para `agentic`, `client-preflight` y `side-request`. En side-request SSE auditados: (a) `steps/NNN/response/sse.jsonl` es la **fuente de verdad** (escritura síncrona, orden determinista); (b) `steps/NNN/response/sse.txt` es raw dump de depuración acotado por `MAX_AUDIT_SSE_RAW_BYTES`; (c) `response/body.json` top-level se reconstruye desde `sse.jsonl`. Detalle en [`docs/how-sse-reconstruction-works.md`](docs/how-sse-reconstruction-works.md).
+> **Auditoría por defecto.** El proxy escribe en `./sessions` para `agentic`, `client-preflight` y `side-request`. En side-request SSE auditados: (a) `steps/NNN/response/sse.jsonl` es la **fuente de verdad**; (b) `steps/NNN/response/sse.txt` es raw dump acotado por `MAX_AUDIT_BYTES`; (c) `response/body.json` top-level se reconstruye desde `sse.jsonl`. Detalle en [`docs/how-sse-reconstruction-works.md`](docs/how-sse-reconstruction-works.md).
 
 <a name="correlación-de-sesión-sessionid"></a>
 
 ### Correlación de Sesión (SessionId)
 
-El directorio de auditoría bajo `sessions/<sessionId>/` se nombra a partir de las cabeceras `AUDIT_SESSION_OVERRIDE_HEADER` (prioridad 1) o `AUDIT_SESSION_FALLBACK_HEADER` (prioridad 2). Si ninguna está presente, el resolver devuelve `_unknown` como fallback interno y **no se escribe auditoría en disco** (véase [`docs/health-check-handling.md`](docs/health-check-handling.md)).
+El directorio de auditoría bajo `sessions/<sessionId>/` se nombra a partir de `x-cc-audit-session` (prioridad 1) o `x-claude-code-session-id` (prioridad 2). Si ninguna está presente, el resolver devuelve `_unknown` y **no se escribe auditoría en disco** (véase [`docs/health-check-handling.md`](docs/health-check-handling.md)). Nombres alternativos: [`docs/advanced-configuration.md`](docs/advanced-configuration.md).
 
 <a name="capas-bytes-env"></a>
 

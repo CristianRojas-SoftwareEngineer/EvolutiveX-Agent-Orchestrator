@@ -56,7 +56,7 @@ export class AuditStandardResponseHandler {
           interactionDir: stepDir,
           bodyBuffer: buf,
           totalBytes,
-          maxAuditResponseBytes: this.config.MAX_AUDIT_RESPONSE_BODY_BYTES,
+          maxAuditResponseBytes: this.config.MAX_AUDIT_BYTES,
           maxBufferBytes: maxBuffer,
           contentType,
           streamErrorMessage: err?.message || String(err),
@@ -155,7 +155,7 @@ export class AuditStandardResponseHandler {
           interactionDir: stepDir,
           bodyBuffer: buf,
           totalBytes,
-          maxAuditResponseBytes: this.config.MAX_AUDIT_RESPONSE_BODY_BYTES,
+          maxAuditResponseBytes: this.config.MAX_AUDIT_BYTES,
           maxBufferBytes: maxBuffer,
           contentType,
         });
@@ -321,11 +321,11 @@ export class AuditStandardResponseHandler {
         responseBodyBytesTotal: totalResponseBytes,
         responseBodyBytesAudited: Math.min(
           totalResponseBytes,
-          this.config.MAX_AUDIT_RESPONSE_BODY_BYTES,
+          this.config.MAX_AUDIT_BYTES,
         ),
         responseTruncatedByProxyBuffer: totalResponseBytes > this.config.MAX_RESPONSE_BUFFER_BYTES,
         responseTruncatedByAuditLimit:
-          totalResponseBytes > this.config.MAX_AUDIT_RESPONSE_BODY_BYTES,
+          totalResponseBytes > this.config.MAX_AUDIT_BYTES,
         sseRawBytesAudited: null,
         sseRawBytesLimit: null,
         sseRawTruncatedByLimit: false,

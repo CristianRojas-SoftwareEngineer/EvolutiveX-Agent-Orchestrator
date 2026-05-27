@@ -1,6 +1,6 @@
 /**
  * Esquema de configuración para el Entorno del Proxy.
- * Mapea las variables de entorno a ajustes de aplicación fuertemente tipados.
+ * Solo incluye variables de entorno públicas y límites derivados en arranque.
  */
 export interface ProxyEnvironmentConfig {
   /** El puerto en el que el servidor proxy escuchará. Por defecto: 8787 */
@@ -12,32 +12,14 @@ export interface ProxyEnvironmentConfig {
   /** Tamaño máximo del cuerpo de petición que Fastify acepta en memoria (ej. '50mb') */
   MAX_REQUEST_BODY: string;
 
-  /** Buffer de memoria máximo para interceptar respuestas que no sean SSE. */
+  /** Tope único de volcado en disco (request, response, sse.txt raw). Env: `MAX_AUDIT_BYTES`. */
+  MAX_AUDIT_BYTES: number;
+
+  /** Buffer en memoria para respuestas no-SSE; derivado de `MAX_AUDIT_BYTES`, no configurable por env. */
   MAX_RESPONSE_BUFFER_BYTES: number;
 
-  /** Límite para guardar el cuerpo de la petición en disco (request.body.bin). */
-  MAX_AUDIT_REQUEST_BODY_BYTES: number;
-
-  /** Límite para guardar el cuerpo de la respuesta en disco (response.body.json). */
-  MAX_AUDIT_RESPONSE_BODY_BYTES: number;
-
-  /** Límite para guardar el volcado binario crudo de SSE en disco (response.sse.txt). 0 = ilimitado. */
-  MAX_AUDIT_SSE_RAW_BYTES: number;
-
-  /** Si es true, añade un hash corto a los nombres de directorio de sesión para prevenir colisiones. */
-  AUDIT_SESSION_HASH_SUFFIX: boolean;
-
-  /** Cabecera primaria para resolver el Session ID (ej. x-cc-audit-session). */
-  AUDIT_SESSION_OVERRIDE_HEADER: string;
-
-  /** Cabecera secundaria para resolver el Session ID si la primaria no existe. */
-  AUDIT_SESSION_FALLBACK_HEADER: string;
-
-  /** Si es true, elimina las cabeceras de sesión antes de reenviar al upstream. */
-  STRIP_AUDIT_SESSION_HEADER: boolean;
-
-  /** Control de compresión (gzip, identity) al comunicarse con el upstream. */
-  UPSTREAM_ACCEPT_ENCODING: string;
+  /** Nivel de log Pino (consola y `server/logs.jsonl`). Env: `LOG_LEVEL`. */
+  LOG_LEVEL: string;
 
   /** Si es true, remueve el flag redact-thinking-2026-02-12 del header anthropic-beta para capturar thinking legible. */
   PROXY_UNREDACT_THINKING?: boolean;

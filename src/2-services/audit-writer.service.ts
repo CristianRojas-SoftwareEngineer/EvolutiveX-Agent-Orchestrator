@@ -185,7 +185,7 @@ export class AuditWriterService implements IAuditWriter {
     await this.writeFileAtomic(
       path.join(requestDir, 'body.omitted.txt'),
       Buffer.from(
-        `Omitted: request body is ${size} bytes (limit MAX_AUDIT_REQUEST_BODY_BYTES=${maxAuditRequestBytes}).`,
+        `Omitted: request body is ${size} bytes (limit MAX_AUDIT_BYTES=${maxAuditRequestBytes}).`,
         'utf8',
       ),
     );
@@ -224,7 +224,7 @@ export class AuditWriterService implements IAuditWriter {
     await this.writeFileAtomic(
       path.join(requestDir, 'body.omitted.txt'),
       Buffer.from(
-        `Omitted: request body is ${size} bytes (limit MAX_AUDIT_REQUEST_BODY_BYTES=${params.maxAuditRequestBytes}).`,
+        `Omitted: request body is ${size} bytes (limit MAX_AUDIT_BYTES=${params.maxAuditRequestBytes}).`,
         'utf8',
       ),
     );
@@ -272,7 +272,7 @@ export class AuditWriterService implements IAuditWriter {
               ? `Proxy buffer cap MAX_RESPONSE_BUFFER_BYTES=${params.maxBufferBytes}.`
               : '',
             truncatedAudit
-              ? `Audit stored up to MAX_AUDIT_RESPONSE_BODY_BYTES=${params.maxAuditResponseBytes}.`
+              ? `Audit stored up to MAX_AUDIT_BYTES=${params.maxAuditResponseBytes}.`
               : '',
           ]
             .filter(Boolean)
@@ -332,7 +332,7 @@ export class AuditWriterService implements IAuditWriter {
             ? `Proxy buffer cap MAX_RESPONSE_BUFFER_BYTES=${params.maxBufferBytes}.`
             : '',
           truncatedAudit
-            ? `Audit stored up to MAX_AUDIT_RESPONSE_BODY_BYTES=${params.maxAuditResponseBytes}.`
+            ? `Audit stored up to MAX_AUDIT_BYTES=${params.maxAuditResponseBytes}.`
             : '',
         ]
           .filter(Boolean)

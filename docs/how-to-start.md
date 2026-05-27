@@ -167,7 +167,7 @@ $env:ANTHROPIC_CUSTOM_HEADERS = 'X-CC-Audit-Session: 550e8400-e29b-41d4-a716-446
 
 (Persistencia entre sesiones: `SetEnvironmentVariable` con ámbito `User`, igual que `ANTHROPIC_BASE_URL`.)
 
-Por defecto el proxy **no reenvía al upstream** la cabecera que haya definido el `sessionId` (para no mandar cabeceras arbitrarias al proveedor). Eso se controla con `STRIP_AUDIT_SESSION_HEADER` en el proxy (ver README).
+Por defecto el proxy **no reenvía al upstream** la cabecera que haya definido el `sessionId` (comportamiento fijo; ver [`advanced-configuration.md`](advanced-configuration.md)).
 
 ### Paso D — Usar Claude Code con normalidad
 

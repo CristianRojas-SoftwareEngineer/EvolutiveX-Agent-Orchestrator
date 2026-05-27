@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import { STRIP_AUDIT_SESSION_HEADER } from '../1-domain/constants/session-headers.js';
 import { SessionResolverService } from '../1-domain/services/session-resolver.service.js';
 import type { ISessionStore } from '../2-services/ports/session-store.port.js';
 import type { IAuditWriter } from '../2-services/ports/audit-writer.port.js';
@@ -82,7 +83,7 @@ export class AuditInteractionHandler {
     // Capturar headers ANTES del strip para preservar cabeceras de sesión en auditoría
     const headersForAudit = { ...params.headers };
 
-    if (this.config.STRIP_AUDIT_SESSION_HEADER && auditSession.stripHeaderName) {
+    if (STRIP_AUDIT_SESSION_HEADER && auditSession.stripHeaderName) {
       this.sessionResolver.stripAuditHeaderInPlace(params.headers, auditSession.stripHeaderName);
     }
 
@@ -202,7 +203,7 @@ export class AuditInteractionHandler {
       interactionDir,
       headers: headersForAudit,
       bodyBuffer: params.rawBody,
-      maxAuditRequestBytes: this.config.MAX_AUDIT_REQUEST_BODY_BYTES,
+      maxAuditRequestBytes: this.config.MAX_AUDIT_BYTES,
       context: { interactionType: 'agentic', stepIndex: 1 },
     });
 
@@ -212,7 +213,7 @@ export class AuditInteractionHandler {
       stepDir,
       headers: headersForAudit,
       bodyBuffer: params.rawBody,
-      maxAuditRequestBytes: this.config.MAX_AUDIT_REQUEST_BODY_BYTES,
+      maxAuditRequestBytes: this.config.MAX_AUDIT_BYTES,
       context: { interactionType: 'agentic', stepIndex: 1 },
     });
 
@@ -382,7 +383,7 @@ export class AuditInteractionHandler {
         folderName,
         headers: headersForAudit,
         bodyBuffer: params.rawBody,
-        maxAuditRequestBytes: this.config.MAX_AUDIT_REQUEST_BODY_BYTES,
+        maxAuditRequestBytes: this.config.MAX_AUDIT_BYTES,
         context: subagentContext,
       });
 
@@ -392,7 +393,7 @@ export class AuditInteractionHandler {
         stepDir,
         headers: headersForAudit,
         bodyBuffer: params.rawBody,
-        maxAuditRequestBytes: this.config.MAX_AUDIT_REQUEST_BODY_BYTES,
+        maxAuditRequestBytes: this.config.MAX_AUDIT_BYTES,
         context: subagentContext,
       });
 
@@ -477,7 +478,7 @@ export class AuditInteractionHandler {
         stepDir,
         headers: params.headersForAudit,
         bodyBuffer: params.rawBody,
-        maxAuditRequestBytes: this.config.MAX_AUDIT_REQUEST_BODY_BYTES,
+        maxAuditRequestBytes: this.config.MAX_AUDIT_BYTES,
         context: {
           interactionType: 'agentic',
           stepIndex: stepCount,
@@ -535,7 +536,7 @@ export class AuditInteractionHandler {
         stepDir,
         headers: params.headersForAudit,
         bodyBuffer: params.rawBody,
-        maxAuditRequestBytes: this.config.MAX_AUDIT_REQUEST_BODY_BYTES,
+        maxAuditRequestBytes: this.config.MAX_AUDIT_BYTES,
         context: {
           interactionType: 'agentic',
           stepIndex: stepCount,
@@ -680,7 +681,7 @@ export class AuditInteractionHandler {
       const body = params.rawBody ?? Buffer.alloc(0);
       let continuationRequest: JsonValue | null;
 
-      if (body.length > this.config.MAX_AUDIT_REQUEST_BODY_BYTES) {
+      if (body.length > this.config.MAX_AUDIT_BYTES) {
         continuationRequest = null; // Body omitido por tamaño
       } else {
         try {
@@ -726,7 +727,7 @@ export class AuditInteractionHandler {
       stepDir,
       headers: headersForAudit,
       bodyBuffer: params.rawBody,
-      maxAuditRequestBytes: this.config.MAX_AUDIT_REQUEST_BODY_BYTES,
+      maxAuditRequestBytes: this.config.MAX_AUDIT_BYTES,
       context: {
         interactionType: parentInteraction.interactionType,
         stepIndex: stepCount,
@@ -830,7 +831,7 @@ export class AuditInteractionHandler {
       interactionDir,
       headers: headersForAudit,
       bodyBuffer: params.rawBody,
-      maxAuditRequestBytes: this.config.MAX_AUDIT_REQUEST_BODY_BYTES,
+      maxAuditRequestBytes: this.config.MAX_AUDIT_BYTES,
       skipTopLevelRequest: true,
     });
 
@@ -839,7 +840,7 @@ export class AuditInteractionHandler {
       stepDir,
       headers: headersForAudit,
       bodyBuffer: params.rawBody,
-      maxAuditRequestBytes: this.config.MAX_AUDIT_REQUEST_BODY_BYTES,
+      maxAuditRequestBytes: this.config.MAX_AUDIT_BYTES,
       context: { interactionType: 'client-preflight', stepIndex: 1 },
     });
 
@@ -898,7 +899,7 @@ export class AuditInteractionHandler {
       interactionDir,
       headers: headersForAudit,
       bodyBuffer: params.rawBody,
-      maxAuditRequestBytes: this.config.MAX_AUDIT_REQUEST_BODY_BYTES,
+      maxAuditRequestBytes: this.config.MAX_AUDIT_BYTES,
       context: { interactionType: 'side-request', stepIndex: 1 },
     });
 
@@ -908,7 +909,7 @@ export class AuditInteractionHandler {
       stepDir,
       headers: headersForAudit,
       bodyBuffer: params.rawBody,
-      maxAuditRequestBytes: this.config.MAX_AUDIT_REQUEST_BODY_BYTES,
+      maxAuditRequestBytes: this.config.MAX_AUDIT_BYTES,
       context: { interactionType: 'side-request', stepIndex: 1 },
     });
 
@@ -1013,7 +1014,7 @@ export class AuditInteractionHandler {
       interactionDir,
       headers: headersForAudit,
       bodyBuffer: params.rawBody,
-      maxAuditRequestBytes: this.config.MAX_AUDIT_REQUEST_BODY_BYTES,
+      maxAuditRequestBytes: this.config.MAX_AUDIT_BYTES,
       skipTopLevelRequest: true,
     });
 
@@ -1022,7 +1023,7 @@ export class AuditInteractionHandler {
       stepDir,
       headers: headersForAudit,
       bodyBuffer: params.rawBody,
-      maxAuditRequestBytes: this.config.MAX_AUDIT_REQUEST_BODY_BYTES,
+      maxAuditRequestBytes: this.config.MAX_AUDIT_BYTES,
       context: { interactionType: 'client-preflight', stepIndex: 1 },
     });
 
@@ -1108,9 +1109,7 @@ export class AuditInteractionHandler {
    */
   public async closeOrphanInteraction(interaction: ActiveInteraction): Promise<void> {
     const endedAt = Date.now();
-    const sseRawBytesLimit = Number.isFinite(this.config.MAX_AUDIT_SSE_RAW_BYTES)
-      ? this.config.MAX_AUDIT_SSE_RAW_BYTES
-      : null;
+    const sseRawBytesLimit = this.config.MAX_AUDIT_BYTES;
     const sseRawBytesTotal = computeSseRawBytesTotal(interaction.stepsMeta);
     const sseRawTruncatedAny = interaction.stepsMeta.some((s) => s.sseRawTruncatedByLimit === true);
     const totals =

@@ -2,31 +2,12 @@ import { describe, it, expect, vi } from 'vitest';
 import { AuditUpstreamErrorHandler } from '../../src/3-operations/audit-upstream-error.handler.js';
 import type { IAuditWriter } from '../../src/2-services/ports/audit-writer.port.js';
 import type { ISessionStore } from '../../src/2-services/ports/session-store.port.js';
-import { ProxyEnvironmentConfig } from '../../src/1-domain/types/config.types.js';
 import {
   ActiveInteraction,
   StepMeta,
   InteractionMetadata,
 } from '../../src/1-domain/types/audit.types.js';
-
-function makeConfig(overrides: Partial<ProxyEnvironmentConfig> = {}): ProxyEnvironmentConfig {
-  return {
-    PORT: 8787,
-    UPSTREAM_ORIGIN: 'https://api.anthropic.com',
-    MAX_REQUEST_BODY: '50mb',
-    MAX_RESPONSE_BUFFER_BYTES: 104857600,
-    MAX_AUDIT_REQUEST_BODY_BYTES: 52428800,
-    MAX_AUDIT_RESPONSE_BODY_BYTES: 52428800,
-    MAX_AUDIT_SSE_RAW_BYTES: 52428800,
-    AUDIT_SESSION_OVERRIDE_HEADER: 'x-cc-audit-session',
-    AUDIT_SESSION_FALLBACK_HEADER: 'x-claude-code-session-id',
-    STRIP_AUDIT_SESSION_HEADER: true,
-    AUDIT_SESSION_HASH_SUFFIX: false,
-    UPSTREAM_ACCEPT_ENCODING: 'identity',
-    FILTERED_TOOLS: [],
-    ...overrides,
-  };
-}
+import { makeTestConfig as makeConfig } from '../helpers/test-config.js';
 
 function makeSessionStore(
   interaction: ActiveInteraction | null = null,

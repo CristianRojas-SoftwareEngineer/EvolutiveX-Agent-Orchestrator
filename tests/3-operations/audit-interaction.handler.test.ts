@@ -3,27 +3,8 @@ import { AuditInteractionHandler } from '../../src/3-operations/audit-interactio
 import { SessionResolverService } from '../../src/1-domain/services/session-resolver.service.js';
 import type { ISessionStore } from '../../src/2-services/ports/session-store.port.js';
 import type { IAuditWriter } from '../../src/2-services/ports/audit-writer.port.js';
-import { ProxyEnvironmentConfig } from '../../src/1-domain/types/config.types.js';
 import { ActiveInteraction, StepMeta } from '../../src/1-domain/types/audit.types.js';
-
-function makeConfig(overrides: Partial<ProxyEnvironmentConfig> = {}): ProxyEnvironmentConfig {
-  return {
-    PORT: 8787,
-    UPSTREAM_ORIGIN: 'https://api.anthropic.com',
-    MAX_REQUEST_BODY: '50mb',
-    MAX_RESPONSE_BUFFER_BYTES: 104857600,
-    MAX_AUDIT_REQUEST_BODY_BYTES: 52428800,
-    MAX_AUDIT_RESPONSE_BODY_BYTES: 52428800,
-    MAX_AUDIT_SSE_RAW_BYTES: 52428800,
-    AUDIT_SESSION_OVERRIDE_HEADER: 'x-cc-audit-session',
-    AUDIT_SESSION_FALLBACK_HEADER: 'x-claude-code-session-id',
-    STRIP_AUDIT_SESSION_HEADER: true,
-    AUDIT_SESSION_HASH_SUFFIX: false,
-    UPSTREAM_ACCEPT_ENCODING: 'identity',
-    FILTERED_TOOLS: [],
-    ...overrides,
-  };
-}
+import { makeTestConfig as makeConfig } from '../helpers/test-config.js';
 
 function makeSessionStore(overrides: Partial<ISessionStore> = {}): ISessionStore {
   const registry = new Map<string, ActiveInteraction>();
@@ -176,7 +157,7 @@ describe('AuditInteractionHandler', () => {
       },
     });
     const handler = new AuditInteractionHandler(
-      new SessionResolverService(config),
+      new SessionResolverService(),
       store,
       makeAuditWriter(),
       config,
@@ -209,7 +190,7 @@ describe('AuditInteractionHandler', () => {
     });
     const dirs: string[] = [];
     const handler = new AuditInteractionHandler(
-      new SessionResolverService(config),
+      new SessionResolverService(),
       store,
       makeAuditWriter({
         writeInteractionRequest: async () => {
@@ -267,7 +248,7 @@ describe('AuditInteractionHandler', () => {
       },
     });
     const handler = new AuditInteractionHandler(
-      new SessionResolverService(config),
+      new SessionResolverService(),
       store,
       makeAuditWriter({
         writeStepRequest: async () => {
@@ -295,7 +276,7 @@ describe('AuditInteractionHandler', () => {
       getInteractionByToolUseId: () => null,
     });
     const handler = new AuditInteractionHandler(
-      new SessionResolverService(config),
+      new SessionResolverService(),
       store,
       makeAuditWriter({
         writeInteractionState: async (dir, state) => {
@@ -323,7 +304,7 @@ describe('AuditInteractionHandler', () => {
     let skipTopLevelRequest = false;
     let registeredInteraction: ActiveInteraction | null = null;
     const handler = new AuditInteractionHandler(
-      new SessionResolverService(config),
+      new SessionResolverService(),
       makeSessionStore({
         registerInteraction: (t: ActiveInteraction) => {
           registeredInteraction = t;
@@ -348,14 +329,14 @@ describe('AuditInteractionHandler', () => {
     expect(registeredInteraction!.interactionType).toBe('client-preflight');
   });
 
-  it('debería strip header de sesión si STRIP_AUDIT_SESSION_HEADER=true', async () => {
-    const config = makeConfig({ STRIP_AUDIT_SESSION_HEADER: true });
+  it('debería eliminar la cabecera de sesión antes de reenviar al upstream', async () => {
+    const config = makeConfig();
     const headers: Record<string, string | string[] | undefined> = {
       'x-cc-audit-session': 'my-session',
       'content-type': 'application/json',
     };
     const handler = new AuditInteractionHandler(
-      new SessionResolverService(config),
+      new SessionResolverService(),
       makeSessionStore(),
       makeAuditWriter(),
       config,
@@ -369,7 +350,7 @@ describe('AuditInteractionHandler', () => {
     const config = makeConfig();
     const stepDirs: string[] = [];
     const handler = new AuditInteractionHandler(
-      new SessionResolverService(config),
+      new SessionResolverService(),
       makeSessionStore(),
       makeAuditWriter({
         writeStepRequest: async (p) => {
@@ -396,7 +377,7 @@ describe('AuditInteractionHandler', () => {
       },
     });
     const handler = new AuditInteractionHandler(
-      new SessionResolverService(config),
+      new SessionResolverService(),
       store,
       makeAuditWriter(),
       config,
@@ -416,7 +397,7 @@ describe('AuditInteractionHandler', () => {
     const config = makeConfig();
     const stepDirs: string[] = [];
     const handler = new AuditInteractionHandler(
-      new SessionResolverService(config),
+      new SessionResolverService(),
       makeSessionStore(),
       makeAuditWriter({
         writeStepRequest: async (p) => {
@@ -443,7 +424,7 @@ describe('AuditInteractionHandler', () => {
       },
     });
     const handler = new AuditInteractionHandler(
-      new SessionResolverService(config),
+      new SessionResolverService(),
       makeSessionStore(),
       writer,
       config,
@@ -503,7 +484,7 @@ describe('AuditInteractionHandler', () => {
       }),
     );
     const handler = new AuditInteractionHandler(
-      new SessionResolverService(config),
+      new SessionResolverService(),
       store,
       makeAuditWriter(),
       config,
@@ -526,7 +507,7 @@ describe('AuditInteractionHandler', () => {
       },
     });
     const handler = new AuditInteractionHandler(
-      new SessionResolverService(config),
+      new SessionResolverService(),
       store,
       makeAuditWriter(),
       config,
@@ -551,7 +532,7 @@ describe('AuditInteractionHandler', () => {
     );
     const store = makeSessionStore({ getInteractionByToolUseId: () => null });
     const handler = new AuditInteractionHandler(
-      new SessionResolverService(config),
+      new SessionResolverService(),
       store,
       makeAuditWriter(),
       config,
@@ -569,7 +550,7 @@ describe('AuditInteractionHandler', () => {
     const config = makeConfig();
     let interactionWritten = false;
     const handler = new AuditInteractionHandler(
-      new SessionResolverService(config),
+      new SessionResolverService(),
       makeSessionStore(),
       makeAuditWriter({
         writeInteractionRequest: async () => {
@@ -599,7 +580,7 @@ describe('AuditInteractionHandler', () => {
     const config = makeConfig();
     let interactionWritten = false;
     const handler = new AuditInteractionHandler(
-      new SessionResolverService(config),
+      new SessionResolverService(),
       makeSessionStore(),
       makeAuditWriter({
         writeInteractionRequest: async () => {
@@ -662,7 +643,7 @@ describe('AuditInteractionHandler', () => {
       },
     });
     const handler = new AuditInteractionHandler(
-      new SessionResolverService(config),
+      new SessionResolverService(),
       store,
       makeAuditWriter({
         nextSubInteractionSequence: async () => 1,
@@ -743,7 +724,7 @@ describe('AuditInteractionHandler', () => {
       },
     });
     const handler = new AuditInteractionHandler(
-      new SessionResolverService(config),
+      new SessionResolverService(),
       store,
       makeAuditWriter({
         nextSubInteractionSequence: async () => 1,
@@ -803,7 +784,7 @@ describe('AuditInteractionHandler', () => {
       },
     });
     const handler = new AuditInteractionHandler(
-      new SessionResolverService(config),
+      new SessionResolverService(),
       store,
       makeAuditWriter({
         nextSubInteractionSequence: async () => {
@@ -856,7 +837,7 @@ describe('AuditInteractionHandler', () => {
       },
     });
     const handler = new AuditInteractionHandler(
-      new SessionResolverService(config),
+      new SessionResolverService(),
       store,
       makeAuditWriter(),
       config,
@@ -899,7 +880,7 @@ describe('AuditInteractionHandler', () => {
       },
     });
     const handler = new AuditInteractionHandler(
-      new SessionResolverService(config),
+      new SessionResolverService(),
       store,
       makeAuditWriter({}),
       config,
@@ -924,7 +905,7 @@ describe('AuditInteractionHandler', () => {
     const config = makeConfig();
     let subCalled = false;
     const handler = new AuditInteractionHandler(
-      new SessionResolverService(config),
+      new SessionResolverService(),
       makeSessionStore({ findInteractionWithPendingAgents: () => null }),
       makeAuditWriter({
         writeSubInteractionRequest: async () => {
@@ -974,7 +955,7 @@ describe('AuditInteractionHandler', () => {
     });
 
     const handler = new AuditInteractionHandler(
-      new SessionResolverService(config),
+      new SessionResolverService(),
       store,
       makeAuditWriter({
         updateSessionMetrics: async () => {
@@ -1028,7 +1009,7 @@ describe('AuditInteractionHandler', () => {
     });
 
     const handler = new AuditInteractionHandler(
-      new SessionResolverService(config),
+      new SessionResolverService(),
       store,
       makeAuditWriter({
         writeInteractionMeta: async (dir, meta) => {
@@ -1092,7 +1073,7 @@ describe('AuditInteractionHandler', () => {
     });
 
     const handler = new AuditInteractionHandler(
-      new SessionResolverService(config),
+      new SessionResolverService(),
       store,
       makeAuditWriter({
         writeStepRequest: async (p) => {
@@ -1147,7 +1128,7 @@ describe('AuditInteractionHandler', () => {
 
     let subCalled = false;
     const handler = new AuditInteractionHandler(
-      new SessionResolverService(config),
+      new SessionResolverService(),
       store,
       makeAuditWriter({
         writeSubInteractionRequest: async () => {
@@ -1222,7 +1203,7 @@ describe('AuditInteractionHandler', () => {
     });
 
     const handler = new AuditInteractionHandler(
-      new SessionResolverService(config),
+      new SessionResolverService(),
       store,
       makeAuditWriter({
         writeStepRequest: async (p) => {
@@ -1310,7 +1291,7 @@ describe('AuditInteractionHandler', () => {
     });
 
     const handler = new AuditInteractionHandler(
-      new SessionResolverService(config),
+      new SessionResolverService(),
       store,
       makeAuditWriter({
         writeStepRequest: async (p) => {
@@ -1379,7 +1360,7 @@ describe('AuditInteractionHandler', () => {
     });
 
     const handler = new AuditInteractionHandler(
-      new SessionResolverService(config),
+      new SessionResolverService(),
       store,
       makeAuditWriter({}),
       config,
@@ -1429,7 +1410,7 @@ describe('AuditInteractionHandler', () => {
     });
 
     const handler = new AuditInteractionHandler(
-      new SessionResolverService(config),
+      new SessionResolverService(),
       store,
       makeAuditWriter({}),
       config,
@@ -1451,7 +1432,7 @@ describe('AuditInteractionHandler', () => {
     const store = makeSessionStore({});
 
     const handler = new AuditInteractionHandler(
-      new SessionResolverService(config),
+      new SessionResolverService(),
       store,
       makeAuditWriter({}),
       config,
@@ -1525,7 +1506,7 @@ describe('AuditInteractionHandler', () => {
     });
 
     const handler = new AuditInteractionHandler(
-      new SessionResolverService(config),
+      new SessionResolverService(),
       store,
       makeAuditWriter({
         writeStepRequest: async (p) => {
@@ -1573,7 +1554,7 @@ describe('AuditInteractionHandler', () => {
     });
 
     const handler = new AuditInteractionHandler(
-      new SessionResolverService(config),
+      new SessionResolverService(),
       store,
       makeAuditWriter({
         writeInteractionRequest: async () => {
@@ -1625,7 +1606,7 @@ describe('AuditInteractionHandler', () => {
     });
 
     const handler = new AuditInteractionHandler(
-      new SessionResolverService(config),
+      new SessionResolverService(),
       store,
       makeAuditWriter({
         writeInteractionRequest: async () => {

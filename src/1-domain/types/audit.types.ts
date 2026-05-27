@@ -504,7 +504,7 @@ export interface SseReconstructOptions {
    */
   sseRawBytesWritten: number;
   /**
-   * Si el raw dump `sse.txt` fue truncado por `MAX_AUDIT_SSE_RAW_BYTES`.
+   * Si el raw dump `sse.txt` fue truncado por `MAX_AUDIT_BYTES`.
    * Informativo: NO aborta la reconstrucción (fuente es `sse.jsonl`).
    */
   sseRawTruncatedByLimit: boolean;
@@ -543,7 +543,7 @@ export interface AuditTruncationMeta {
   responseBodyBytesAudited: number | null;
   /** True si la respuesta fue truncada por exceder MAX_RESPONSE_BUFFER_BYTES. */
   responseTruncatedByProxyBuffer: boolean | null;
-  /** True si el archivo de auditoría fue truncado por exceder MAX_AUDIT_RESPONSE_BODY_BYTES. */
+  /** True si el archivo de auditoría fue truncado por exceder MAX_AUDIT_BYTES. */
   responseTruncatedByAuditLimit: boolean | null;
   /** Total de bytes registrados en el volcado crudo de SSE. */
   sseRawBytesAudited: number | null;

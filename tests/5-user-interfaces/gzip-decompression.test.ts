@@ -58,7 +58,6 @@ describe('Test de Integración - Decompresión Gzip', () => {
     tempSessionsDir = path.join(os.tmpdir(), `scp-gzip-${Date.now()}`);
 
     process.env.UPSTREAM_ORIGIN = `http://127.0.0.1:${upstreamPort}`;
-    process.env.UPSTREAM_ACCEPT_ENCODING = 'gzip'; // Forzamos al proxy a pedir gzip
 
     // Reload conf
     const { vi } = await import('vitest');

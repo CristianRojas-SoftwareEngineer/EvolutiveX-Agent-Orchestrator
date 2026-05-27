@@ -26,7 +26,7 @@ async function start() {
   // Crear logger Pino con dual-transport: terminal (formateada) + archivo (JSON crudo)
   const logger = pino(
     {
-      level: process.env.LOG_LEVEL || 'info',
+      level: config.LOG_LEVEL,
     },
     pino.multistream([
       {
@@ -45,15 +45,10 @@ async function start() {
         event: 'listening',
         port: config.PORT,
         upstream: config.UPSTREAM_ORIGIN,
-        upstreamAcceptEncoding: config.UPSTREAM_ACCEPT_ENCODING,
+        upstreamAcceptEncoding: 'identity',
+        maxAuditBytes: config.MAX_AUDIT_BYTES,
         maxResponseBufferBytes: config.MAX_RESPONSE_BUFFER_BYTES,
-        maxAuditRequestBodyBytes: config.MAX_AUDIT_REQUEST_BODY_BYTES,
-        maxAuditResponseBodyBytes: config.MAX_AUDIT_RESPONSE_BODY_BYTES,
-        maxAuditSseRawBytes: Number.isFinite(config.MAX_AUDIT_SSE_RAW_BYTES)
-          ? config.MAX_AUDIT_SSE_RAW_BYTES
-          : 'unlimited',
-        stripAuditSessionHeader: config.STRIP_AUDIT_SESSION_HEADER,
-        auditSessionHashSuffix: config.AUDIT_SESSION_HASH_SUFFIX,
+        logLevel: config.LOG_LEVEL,
       },
       'Proxy levantado correctamente',
     );

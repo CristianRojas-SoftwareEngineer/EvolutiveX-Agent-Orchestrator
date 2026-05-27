@@ -1,6 +1,10 @@
 import { createHash } from 'node:crypto';
+import {
+  AUDIT_SESSION_FALLBACK_HEADER,
+  AUDIT_SESSION_HASH_SUFFIX,
+  AUDIT_SESSION_OVERRIDE_HEADER,
+} from '../constants/session-headers.js';
 import { AuditSession } from '../types/audit.types.js';
-import { ProxyEnvironmentConfig } from '../types/config.types.js';
 
 const FALLBACK_SESSION_DIR = '_unknown';
 
@@ -9,28 +13,24 @@ const FALLBACK_SESSION_DIR = '_unknown';
  * Sin dependencias de I/O ni filesystem.
  */
 export class SessionResolverService {
-  constructor(private config: ProxyEnvironmentConfig) {}
-
   /**
    * Identifica la sesión de auditoría a partir de las cabeceras de la petición usando lógica de prioridad:
-   * 1. Cabecera Primaria (Override)
-   * 2. Cabecera Secundaria (Fallback)
-   * 3. ID de Sesión por Defecto
-   * 4. Fallback a Desconocido
+   * 1. Cabecera primaria (override)
+   * 2. Cabecera secundaria (fallback Claude Code)
+   * 3. Fallback a Desconocido
    */
   public getAuditSessionId(headers: Record<string, string | string[] | undefined>): AuditSession {
-    const tryNamedHeader = (name?: string): AuditSession | null => {
-      if (!name) return null;
+    const tryNamedHeader = (name: string): AuditSession | null => {
       const v = this.getHeaderValue(headers, name);
       if (v == null || String(v).trim() === '') return null;
       const raw = String(v).trim();
       return { sessionId: this.sessionIdFromRaw(raw), stripHeaderName: name };
     };
 
-    const primary = tryNamedHeader(this.config.AUDIT_SESSION_OVERRIDE_HEADER);
+    const primary = tryNamedHeader(AUDIT_SESSION_OVERRIDE_HEADER);
     if (primary) return primary;
 
-    const fb = tryNamedHeader(this.config.AUDIT_SESSION_FALLBACK_HEADER);
+    const fb = tryNamedHeader(AUDIT_SESSION_FALLBACK_HEADER);
     if (fb) return fb;
 
     return { sessionId: FALLBACK_SESSION_DIR, stripHeaderName: null };
@@ -98,7 +98,7 @@ export class SessionResolverService {
    */
   private sessionIdFromRaw(raw: string): string {
     const dir = this.safeSessionDirName(raw);
-    if (!this.config.AUDIT_SESSION_HASH_SUFFIX) return dir;
+    if (!AUDIT_SESSION_HASH_SUFFIX) return dir;
     if (!raw || raw.trim() === '' || dir === FALLBACK_SESSION_DIR) return dir;
 
     const h = createHash('sha256').update(raw.trim()).digest('hex').slice(0, 8);

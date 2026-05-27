@@ -29,7 +29,7 @@ export async function createProxyDependencies(
   auditBaseDir: string = path.join(process.cwd(), 'sessions'),
 ) {
   // Capa 1 — Domain Services
-  const sessionResolver = new SessionResolverService(config);
+  const sessionResolver = new SessionResolverService();
 
   // Capa 2 — Adapters
   const redactService = new RedactService();

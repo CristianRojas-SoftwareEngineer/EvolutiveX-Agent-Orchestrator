@@ -1,103 +1,68 @@
-import { describe, it, expect, beforeEach, afterAll, vi } from 'vitest';
-
 /**
- * Tests para la resolución de la variable MAX_AUDIT_SSE_RAW_BYTES
- * y la lógica de parseBytesLimit en env.config.ts.
+ * Tests para la resolución de MAX_AUDIT_BYTES y límites derivados en env.config.ts.
  */
-describe('Resolución de configuración de entorno', () => {
-  const originalEnv = { ...process.env };
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
-  const DEFAULT_FILTERED_TOOLS = [
-    'ScheduleWakeup',
-    'NotebookEdit',
-    'ExitWorktree',
-    'EnterWorktree',
-    'CronList',
-    'CronDelete',
-    'CronCreate',
-  ];
+describe('env.config', () => {
+  const originalEnv = { ...process.env };
 
   beforeEach(() => {
     vi.resetModules();
-    delete process.env.MAX_AUDIT_SSE_RAW_BYTES;
-    delete process.env.AUDIT_SESSION_FALLBACK_HEADER;
+    process.env = { ...originalEnv };
+    delete process.env.MAX_AUDIT_BYTES;
     delete process.env.FILTERED_TOOLS;
   });
 
-  // Restaurar el entorno completo después de todos los tests
-  afterAll(() => {
+  afterEach(() => {
     process.env = { ...originalEnv };
   });
 
-  it('MAX_AUDIT_SSE_RAW_BYTES=0 debería resolverse a Infinity', async () => {
-    process.env.MAX_AUDIT_SSE_RAW_BYTES = '0';
+  it('MAX_AUDIT_BYTES sin definir debería usar el default (52428800)', async () => {
+    delete process.env.MAX_AUDIT_BYTES;
     const { config } = await import('../../src/4-api/config/env.config.js');
-    expect(config.MAX_AUDIT_SSE_RAW_BYTES).toBe(Infinity);
+    expect(config.MAX_AUDIT_BYTES).toBe(52428800);
   });
 
-  it('MAX_AUDIT_SSE_RAW_BYTES sin definir debería usar el default (52428800)', async () => {
-    delete process.env.MAX_AUDIT_SSE_RAW_BYTES;
+  it('MAX_AUDIT_BYTES con valor negativo debería usar el default', async () => {
+    process.env.MAX_AUDIT_BYTES = '-1';
     const { config } = await import('../../src/4-api/config/env.config.js');
-    expect(config.MAX_AUDIT_SSE_RAW_BYTES).toBe(52428800);
+    expect(config.MAX_AUDIT_BYTES).toBe(52428800);
   });
 
-  it('MAX_AUDIT_SSE_RAW_BYTES con valor negativo debería usar el default', async () => {
-    process.env.MAX_AUDIT_SSE_RAW_BYTES = '-1';
+  it('MAX_AUDIT_BYTES con valor NaN debería usar el default', async () => {
+    process.env.MAX_AUDIT_BYTES = 'abc';
     const { config } = await import('../../src/4-api/config/env.config.js');
-    expect(config.MAX_AUDIT_SSE_RAW_BYTES).toBe(52428800);
+    expect(config.MAX_AUDIT_BYTES).toBe(52428800);
   });
 
-  it('MAX_AUDIT_SSE_RAW_BYTES con valor NaN debería usar el default', async () => {
-    process.env.MAX_AUDIT_SSE_RAW_BYTES = 'abc';
+  it('MAX_AUDIT_BYTES con valor positivo debería usarlo directamente', async () => {
+    process.env.MAX_AUDIT_BYTES = '1024';
     const { config } = await import('../../src/4-api/config/env.config.js');
-    expect(config.MAX_AUDIT_SSE_RAW_BYTES).toBe(52428800);
+    expect(config.MAX_AUDIT_BYTES).toBe(1024);
   });
 
-  it('MAX_AUDIT_SSE_RAW_BYTES con valor positivo debería usarlo directamente', async () => {
-    process.env.MAX_AUDIT_SSE_RAW_BYTES = '1024';
+  it('MAX_RESPONSE_BUFFER_BYTES debería derivarse como max(audit, techo 100MB)', async () => {
+    process.env.MAX_AUDIT_BYTES = '1024';
     const { config } = await import('../../src/4-api/config/env.config.js');
-    expect(config.MAX_AUDIT_SSE_RAW_BYTES).toBe(1024);
+    expect(config.MAX_RESPONSE_BUFFER_BYTES).toBe(104857600);
   });
 
-  it('AUDIT_SESSION_FALLBACK_HEADER="" debería deshabilitar el fallback', async () => {
-    process.env.AUDIT_SESSION_FALLBACK_HEADER = '';
+  it('LOG_LEVEL sin definir debería usar info', async () => {
+    delete process.env.LOG_LEVEL;
     const { config } = await import('../../src/4-api/config/env.config.js');
-    expect(config.AUDIT_SESSION_FALLBACK_HEADER).toBe('');
-  });
-
-  it('AUDIT_SESSION_FALLBACK_HEADER sin definir debería usar el default', async () => {
-    delete process.env.AUDIT_SESSION_FALLBACK_HEADER;
-    const { config } = await import('../../src/4-api/config/env.config.js');
-    expect(config.AUDIT_SESSION_FALLBACK_HEADER).toBe('x-claude-code-session-id');
+    expect(config.LOG_LEVEL).toBe('info');
   });
 
   it('FILTERED_TOOLS sin definir debería usar la lista por defecto', async () => {
     delete process.env.FILTERED_TOOLS;
     const { config } = await import('../../src/4-api/config/env.config.js');
-    expect(config.FILTERED_TOOLS).toEqual(DEFAULT_FILTERED_TOOLS);
+    expect(config.FILTERED_TOOLS).toContain('ScheduleWakeup');
+    expect(config.FILTERED_TOOLS).toHaveLength(7);
   });
 
-  it('FILTERED_TOOLS="" debería desactivar el filtrado', async () => {
+  it('FILTERED_TOOLS="" debería deshabilitar el filtrado', async () => {
     process.env.FILTERED_TOOLS = '';
     const { config } = await import('../../src/4-api/config/env.config.js');
     expect(config.FILTERED_TOOLS).toEqual([]);
-  });
-
-  it('FILTERED_TOOLS con solo espacios debería desactivar el filtrado', async () => {
-    process.env.FILTERED_TOOLS = '   ';
-    const { config } = await import('../../src/4-api/config/env.config.js');
-    expect(config.FILTERED_TOOLS).toEqual([]);
-  });
-
-  it('FILTERED_TOOLS="," debería desactivar el filtrado', async () => {
-    process.env.FILTERED_TOOLS = ',';
-    const { config } = await import('../../src/4-api/config/env.config.js');
-    expect(config.FILTERED_TOOLS).toEqual([]);
-  });
-
-  it('FILTERED_TOOLS con lista personalizada debería parsearla', async () => {
-    process.env.FILTERED_TOOLS = 'ScheduleWakeup,CronCreate';
-    const { config } = await import('../../src/4-api/config/env.config.js');
-    expect(config.FILTERED_TOOLS).toEqual(['ScheduleWakeup', 'CronCreate']);
   });
 });

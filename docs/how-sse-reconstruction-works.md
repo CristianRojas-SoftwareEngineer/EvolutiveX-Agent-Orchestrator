@@ -13,8 +13,8 @@ Smart Code Proxy toma un atajo: **reusa `@anthropic-ai/sdk` como parser**. El SD
 La reconstrucción **siempre** lee `steps/NNN/response/sse.jsonl`, nunca `sse.txt`. Razones:
 
 1. **`sse.jsonl` es determinista.** Se escribe vía `AuditWriterService.appendSseLine`, que usa `fsSync.appendFileSync` en el mismo callback `stream.on('data')`. El orden de líneas coincide 1:1 con el orden en que los chunks llegaron del upstream.
-2. **`sse.txt` es un raw dump de depuración.** Se escribe vía `AuditWriterService.appendSseRawChunk` (también síncrono, pero semánticamente opcional: está sujeto a `MAX_AUDIT_SSE_RAW_BYTES`, puede truncarse y no afecta a la reconstrucción).
-3. **Desacoplamiento de fuentes.** Ambos writers usan `appendFileSync`; la diferencia es semántica: `sse.txt` es volcado raw opcional sujeto a `MAX_AUDIT_SSE_RAW_BYTES` (puede truncarse) y **no** alimenta la reconstrucción. Solo `sse.jsonl` es fuente de verdad para el parser del SDK, que requiere eventos en orden estricto.
+2. **`sse.txt` es un raw dump de depuración.** Se escribe vía `AuditWriterService.appendSseRawChunk` (también síncrono, pero semánticamente opcional: está sujeto a `MAX_AUDIT_BYTES`, puede truncarse y no afecta a la reconstrucción).
+3. **Desacoplamiento de fuentes.** Ambos writers usan `appendFileSync`; la diferencia es semántica: `sse.txt` es volcado raw opcional sujeto a `MAX_AUDIT_BYTES` (puede truncarse) y **no** alimenta la reconstrucción. Solo `sse.jsonl` es fuente de verdad para el parser del SDK, que requiere eventos en orden estricto.
 
 ### Reensamblado del wire-format desde `sse.jsonl`
 

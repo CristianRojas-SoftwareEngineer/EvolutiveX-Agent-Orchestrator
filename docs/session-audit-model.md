@@ -324,8 +324,8 @@ side-interactions/NN/
 
 **Implementación:** directorio `sessions/<session-id>/` donde `session-id` se resuelve desde cabeceras HTTP con la prioridad:
 
-1. `AUDIT_SESSION_OVERRIDE_HEADER` (default: `x-cc-audit-session`)
-2. `AUDIT_SESSION_FALLBACK_HEADER` (default: `x-claude-code-session-id`)
+1. `x-cc-audit-session` (override)
+2. `x-claude-code-session-id` (fallback Claude Code)
 3. Fallback interno `_unknown` — **no genera archivos de auditoría**
 
 **Persistencia en la raíz de sesión:**
@@ -428,7 +428,7 @@ Ver también: [§7.3 Delegación y correlación](#73-delegación-y-correlación-
 | ------- | ---- | ------------ |
 | Durante el stream | `steps/NN/response/sse.jsonl` | Eventos SSE línea a línea (**fuente de verdad**) |
 | Durante el stream | `steps/NN/response/headers.json` | Cabeceras de la respuesta de ese step |
-| Durante el stream | `steps/NN/response/sse.txt` | Volcado raw opcional (límite `MAX_AUDIT_SSE_RAW_BYTES`; no afecta reconstrucción) |
+| Durante el stream | `steps/NN/response/sse.txt` | Volcado raw opcional (límite `MAX_AUDIT_BYTES`; no afecta reconstrucción) |
 | Al cerrar cada step | `steps/NN/response/body.json`, `body.parsed.md` | Mensaje del asistente reconstruido **de ese step** |
 | Al cerrar el turno (step terminal) | `output/body.json`, `output/body.parsed.md`, `output/headers.json` | Resumen **top-level** del turno |
 

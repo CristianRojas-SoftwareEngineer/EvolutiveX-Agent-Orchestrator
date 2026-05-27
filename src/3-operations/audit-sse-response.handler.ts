@@ -63,7 +63,7 @@ export class AuditSseResponseHandler {
       console.error('Error al escribir cabeceras de step SSE:', e);
     });
 
-    const maxSseRaw = this.config.MAX_AUDIT_SSE_RAW_BYTES;
+    const maxSseRaw = this.config.MAX_AUDIT_BYTES;
     const decoder = new StringDecoder('utf8');
     let lineBuffer = '';
     let sseLineIndex = 0;
@@ -99,7 +99,7 @@ export class AuditSseResponseHandler {
     });
 
     stream.on('data', (chunk: Buffer) => {
-      // Captura cruda: siempre activa, acotada por MAX_AUDIT_SSE_RAW_BYTES.
+      // Captura cruda: siempre activa, acotada por MAX_AUDIT_BYTES.
       // Síncrona (ver AuditWriterService.appendSseRawChunk) para preservar
       // el orden de los chunks. Raw dump puro: la reconstrucción se basa en
       // sse.jsonl, no en sse.txt.
@@ -678,9 +678,7 @@ export class AuditSseResponseHandler {
     sseErrorType?: string | null,
   ): Promise<void> {
     const endedAt = Date.now();
-    const sseRawBytesLimit = Number.isFinite(this.config.MAX_AUDIT_SSE_RAW_BYTES)
-      ? this.config.MAX_AUDIT_SSE_RAW_BYTES
-      : null;
+    const sseRawBytesLimit = this.config.MAX_AUDIT_BYTES;
 
     // Agregar bytes crudos SSE de todos los steps
     const sseRawBytesTotal = computeSseRawBytesTotal(turn.stepsMeta);

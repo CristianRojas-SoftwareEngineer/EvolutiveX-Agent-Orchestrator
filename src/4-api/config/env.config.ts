@@ -1,17 +1,9 @@
 import process from 'node:process';
+import {
+  parseMaxAuditBytes,
+  resolveProxyResponseBufferBytes,
+} from '../../1-domain/constants/audit-limits.js';
 import { ProxyEnvironmentConfig } from '../../1-domain/types/config.types.js';
-
-/**
- * Resuelve un valor numérico de bytes desde una variable de entorno.
- * Semántica: `0 → Infinity` (ilimitado), `NaN`/`negativo` → default.
- */
-function parseBytesLimit(envVal: string | undefined, defaultVal: number): number {
-  if (envVal === undefined || envVal === '') return defaultVal;
-  const n = parseInt(envVal, 10);
-  if (Number.isNaN(n) || n < 0) return defaultVal;
-  if (n === 0) return Infinity;
-  return n;
-}
 
 const DEFAULT_FILTERED_TOOLS = [
   'ScheduleWakeup',
@@ -38,6 +30,8 @@ function parseFilteredTools(envVal: string | undefined): string[] {
     .filter(Boolean);
 }
 
+const maxAuditBytes = parseMaxAuditBytes(process.env.MAX_AUDIT_BYTES);
+
 /**
  * Objeto de configuración global para el Proxy.
  * Resuelve los ajustes desde variables de entorno con valores seguros por defecto.
@@ -46,30 +40,9 @@ export const config: ProxyEnvironmentConfig = {
   PORT: process.env.PORT ? parseInt(process.env.PORT, 10) : 8787,
   UPSTREAM_ORIGIN: process.env.UPSTREAM_ORIGIN || 'https://api.anthropic.com',
   MAX_REQUEST_BODY: process.env.MAX_REQUEST_BODY || '50mb',
-
-  MAX_RESPONSE_BUFFER_BYTES: process.env.MAX_RESPONSE_BUFFER_BYTES
-    ? parseInt(process.env.MAX_RESPONSE_BUFFER_BYTES, 10)
-    : 104857600,
-  MAX_AUDIT_REQUEST_BODY_BYTES: process.env.MAX_AUDIT_REQUEST_BODY_BYTES
-    ? parseInt(process.env.MAX_AUDIT_REQUEST_BODY_BYTES, 10)
-    : 52428800,
-  MAX_AUDIT_RESPONSE_BODY_BYTES: process.env.MAX_AUDIT_RESPONSE_BODY_BYTES
-    ? parseInt(process.env.MAX_AUDIT_RESPONSE_BODY_BYTES, 10)
-    : 52428800,
-  MAX_AUDIT_SSE_RAW_BYTES: parseBytesLimit(process.env.MAX_AUDIT_SSE_RAW_BYTES, 52428800),
-
-  AUDIT_SESSION_OVERRIDE_HEADER: process.env.AUDIT_SESSION_OVERRIDE_HEADER || 'x-cc-audit-session',
-  AUDIT_SESSION_FALLBACK_HEADER:
-    process.env.AUDIT_SESSION_FALLBACK_HEADER !== undefined
-      ? process.env.AUDIT_SESSION_FALLBACK_HEADER
-      : 'x-claude-code-session-id',
-  STRIP_AUDIT_SESSION_HEADER: process.env.STRIP_AUDIT_SESSION_HEADER !== '0',
-  AUDIT_SESSION_HASH_SUFFIX: process.env.AUDIT_SESSION_HASH_SUFFIX === '1',
-
-  UPSTREAM_ACCEPT_ENCODING: process.env.UPSTREAM_ACCEPT_ENCODING || 'identity',
-
-  // Unredact thinking content (opt-in, desactivado por defecto)
+  MAX_AUDIT_BYTES: maxAuditBytes,
+  MAX_RESPONSE_BUFFER_BYTES: resolveProxyResponseBufferBytes(maxAuditBytes),
+  LOG_LEVEL: process.env.LOG_LEVEL || 'info',
   PROXY_UNREDACT_THINKING: process.env.PROXY_UNREDACT_THINKING === 'true',
-
   FILTERED_TOOLS: parseFilteredTools(process.env.FILTERED_TOOLS),
 };

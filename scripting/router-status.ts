@@ -10,8 +10,9 @@
  */
 
 import { readFileSync, readdirSync, existsSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { homedir } from 'node:os';
+import { fileURLToPath } from 'node:url';
 
 // ── Tipos ───────────────────────────────────────────────────────
 
@@ -212,12 +213,6 @@ function computeColumnWidths(headers: string[], rows: string[][]): number[] {
   return widths;
 }
 
-// Calcular ancho total de tabla: anchos de columnas + padding + bordes + separadores
-function computeTableWidth(headers: string[], rows: string[][]): number {
-  const widths = computeColumnWidths(headers, rows);
-  return widths.reduce((sum, w) => sum + w, 0) + widths.length * 3 + 1;
-}
-
 function renderTable(
   headers: string[],
   rows: string[][],
@@ -402,7 +397,9 @@ function writeStatuslineCache(sessionPath: string, cache: StatuslineCache): void
 // ── Lógica de resolución ────────────────────────────────────────
 
 /** Bloque `env` de `~/.claude/settings.json` (escrito por configure-provider). */
-type ClaudeSettingsEnv = Record<string, string>;
+export type ClaudeSettingsEnv = Record<string, string>;
+
+export type ReasoningLevel = 'lite' | 'standard' | 'reasoning';
 
 function readClaudeSettingsEnv(): ClaudeSettingsEnv {
   const settingsPath = join(homedir(), '.claude', 'settings.json');
@@ -528,22 +525,26 @@ function loadDisplayName(modelId: string): string {
   return modelId;
 }
 
-function classifyModel(modelId: string): 'lite' | 'standard' | 'reasoning' {
-  const haiku = claudeSettingsEnv['ANTHROPIC_DEFAULT_HAIKU_MODEL'] ?? '';
-  const sonnet = claudeSettingsEnv['ANTHROPIC_DEFAULT_SONNET_MODEL'] ?? '';
-  const opus = claudeSettingsEnv['ANTHROPIC_DEFAULT_OPUS_MODEL'] ?? '';
+/**
+ * Clasifica un modelId según §5 de la propuesta (solo variables ANTHROPIC_DEFAULT_*).
+ * Orden: haiku → opus → sonnet. Sin coincidencia → null (no suma a ningún nivel).
+ */
+export function classifyModelWithEnv(
+  modelId: string,
+  settingsEnv: ClaudeSettingsEnv,
+): ReasoningLevel | null {
+  const haiku = settingsEnv['ANTHROPIC_DEFAULT_HAIKU_MODEL'] ?? '';
+  const opus = settingsEnv['ANTHROPIC_DEFAULT_OPUS_MODEL'] ?? '';
+  const sonnet = settingsEnv['ANTHROPIC_DEFAULT_SONNET_MODEL'] ?? '';
 
-  const modelBase = modelId.split('/').pop() || modelId;
+  if (haiku && modelId.includes(haiku)) return 'lite';
+  if (opus && modelId.includes(opus)) return 'reasoning';
+  if (sonnet && modelId.includes(sonnet)) return 'standard';
+  return null;
+}
 
-  if (haiku && (modelId.includes(haiku) || modelBase.includes('haiku'))) return 'lite';
-  if (opus && (modelId.includes(opus) || modelBase.includes('opus'))) return 'reasoning';
-  if (sonnet && (modelId.includes(sonnet) || modelBase.includes('sonnet'))) return 'standard';
-
-  if (modelBase.includes('haiku') || modelBase.includes('flash') || modelBase.includes('mini'))
-    return 'lite';
-  if (modelBase.includes('opus') || modelBase.includes('pro') || modelBase.includes('reasoning'))
-    return 'reasoning';
-  return 'standard';
+function classifyModel(modelId: string): ReasoningLevel | null {
+  return classifyModelWithEnv(modelId, claudeSettingsEnv);
 }
 
 function createEmptyMetrics(): {
@@ -589,6 +590,7 @@ function aggregateInteractionMetrics(sessionPath: string): {
 
     for (const [modelId, m] of Object.entries(data.models)) {
       const level = classifyModel(modelId);
+      if (!level) continue;
       const levelMetrics = metrics[level];
 
       levelMetrics.modelName = loadDisplayName(modelId);
@@ -678,11 +680,6 @@ function buildSessionTableData(ctx: ClaudeCodeContext, sessionPath?: string | nu
   return { headers, rows, alignments, sessionDisplay };
 }
 
-function computeSessionTableWidth(ctx: ClaudeCodeContext, sessionPath?: string | null): number {
-  const { headers, rows } = buildSessionTableData(ctx, sessionPath);
-  return computeTableWidth(headers, rows);
-}
-
 function renderSessionTable(
   ctx: ClaudeCodeContext,
   sessionPath?: string | null,
@@ -731,9 +728,9 @@ function renderTokenTable(
     label: string;
     color: string;
   }> = [
-    { key: 'lite', label: 'Lite', color: C.value },
-    { key: 'standard', label: 'Standard', color: C.value },
-    { key: 'reasoning', label: 'Reasoning', color: C.value },
+    { key: 'lite', label: 'Lite', color: C.lite },
+    { key: 'standard', label: 'Standard', color: C.standard },
+    { key: 'reasoning', label: 'Reasoning', color: C.reasoning },
   ];
 
   const rows: string[][] = [];
@@ -880,7 +877,7 @@ function buildRateLimitTableData(ctx: ClaudeCodeContext) {
     const usedPercentage = five_hour.used_percentage ?? 0;
     rows.push([
       `${C.label}Cuota actual (5h)${C.reset}`,
-      `${renderBar(usedPercentage)} ${usedPercentage.toFixed(0)}%`,
+      `${renderBar(usedPercentage, 8)} ${usedPercentage.toFixed(0)}%`,
       `${C.dim}Reinicio en${C.reset}`,
       `${C.value}${formatTimeRemaining(five_hour.resets_at)}${C.reset}`,
     ]);
@@ -890,7 +887,7 @@ function buildRateLimitTableData(ctx: ClaudeCodeContext) {
     const usedPercentage = seven_day.used_percentage ?? 0;
     rows.push([
       `${C.label}Cuota semanal (7d)${C.reset}`,
-      `${renderBar(usedPercentage)} ${usedPercentage.toFixed(0)}%`,
+      `${renderBar(usedPercentage, 8)} ${usedPercentage.toFixed(0)}%`,
       `${C.dim}Reinicio en${C.reset}`,
       `${C.value}${formatTimeRemaining(seven_day.resets_at)}${C.reset}`,
     ]);
@@ -900,12 +897,6 @@ function buildRateLimitTableData(ctx: ClaudeCodeContext) {
   const alignments: Array<'left' | 'center' | 'right'> = ['left', 'left', 'left', 'right'];
 
   return { headers, rows, alignments };
-}
-
-function computeRateLimitTableWidth(ctx: ClaudeCodeContext): number | null {
-  const data = buildRateLimitTableData(ctx);
-  if (!data) return null;
-  return computeTableWidth(data.headers, data.rows);
 }
 
 function renderRateLimitTable(
@@ -955,14 +946,10 @@ function main(): void {
     // Resolver sesión antes de renderizar para caché per-session
     const sessionPath = resolveSessionPath(ctx.session_id);
 
-    // Tabla 3: Rate limits (solo OAuth) — calcular ancho primero para layout simétrico
     const authMethod = resolveAuthMethodFromEnv(claudeSettingsEnv);
-    const rlWidth = authMethod === 'oauth' ? computeRateLimitTableWidth(ctx) : null;
-    const targetWidth =
-      rlWidth !== null ? Math.max(computeSessionTableWidth(ctx, sessionPath), rlWidth) : undefined;
 
     // Tabla 1: Sesión y proveedor
-    const table1 = renderSessionTable(ctx, sessionPath, targetWidth);
+    const table1 = renderSessionTable(ctx, sessionPath);
 
     // Tabla 2: Métricas de interacciones
     let table2: { lines: string[]; width: number };
@@ -997,30 +984,27 @@ function main(): void {
       table2 = renderTokenTable(createEmptyMetrics(), null);
     }
 
-    // Tabla 3: Rate limits (solo OAuth)
-    const table3 = rlWidth !== null ? renderRateLimitTable(ctx, targetWidth) : null;
+    // Tabla 3: Rate limits (solo OAuth), debajo de Tabla 1 + Tabla 2 (§4.2)
+    const table3 =
+      authMethod === 'oauth' ? renderRateLimitTable(ctx) : null;
 
-    if (table3) {
-      // Layout: [Tabla1 + Tabla3] a la izquierda | Tabla2 a la derecha
-      const left = {
-        lines: [...table1.lines, ...table3.lines],
-        width: targetWidth!,
-      };
-      // Padding dinámico: igualar alturas para evitar interleaving
-      const heightDiff = left.lines.length - table2.lines.length;
-      const paddedTable2 =
-        heightDiff > 0
-          ? { lines: [...table2.lines, ...Array(heightDiff).fill('')], width: table2.width }
-          : table2;
-      output.push(renderSideBySide(left, paddedTable2, 2));
-    } else if (ctx.session_id || sessionPath) {
+    if (ctx.session_id || sessionPath) {
       output.push(renderSideBySide(table1, table2, 2));
     } else {
       output.push(table1.lines.join('\n'));
+    }
+    if (table3) {
+      output.push(table3.lines.join('\n'));
     }
 
     console.log(output.join('\n'));
   });
 }
 
-main();
+const isDirectRun =
+  process.argv[1] !== undefined &&
+  resolve(fileURLToPath(import.meta.url)) === resolve(process.argv[1]);
+
+if (isDirectRun) {
+  main();
+}

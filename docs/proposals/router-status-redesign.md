@@ -125,7 +125,7 @@ Se renderiza **únicamente** cuando `authMethod === 'oauth'`. Aplica al proveedo
 | Etiqueta reinicio | texto fijo `"Reinicio en"`                     | —                                                                              | izquierda  |
 | Tiempo restante   | `"Xh Ym"` / `"Xd Yh"`                          | `ctx.rate_limits.five_hour.resets_at` / `seven_day.resets_at` (epoch segundos) | derecha    |
 
-**Barra de progreso:** colores dinámicos según porcentaje (verde/naranja/rojo), misma lógica que la Tabla 1.
+**Barra de progreso:** 8 bloques (`█` / `░`), colores dinámicos según porcentaje (verde/naranja/rojo), misma lógica que la Tabla 1.
 
 ---
 
@@ -145,8 +145,10 @@ resolveAuthMethod()
         ninguno                       → 'oauth'
 
 renderTablas()
-  ├── Tabla 1 + Tabla 2: Side-by-side (siempre)
-  └── Tabla 3: Rate Limits (solo authMethod === 'oauth', debajo)
+  ├── si hay sessionDir: leer .statusline-state.json (caché)
+  ├── Tabla 1 + Tabla 2: Side-by-side (si hay sesión)
+  ├── si hay sessionDir: escribir .statusline-state.json (caché)
+  └── Tabla 3: Rate Limits (solo authMethod === 'oauth', debajo del bloque anterior)
 ```
 
 ---
@@ -172,6 +174,8 @@ El script usa códigos ANSI raw sin dependencias externas:
 
 La Tabla 1 y la Tabla 2 se renderizan lado a lado usando `renderSideBySide()`, con un gap de 2 espacios entre ellas. Si la Tabla 2 tiene más líneas que la Tabla 1, las líneas sobrantes se renderizan debajo con indentación.
 
+Cuando `authMethod === 'oauth'`, la Tabla 3 (rate limits) se imprime **en líneas independientes debajo** del bloque Tabla 1 + Tabla 2, no en la misma fila que la Tabla 1.
+
 ---
 
 ## 4.3 Alineaciones por tabla
@@ -181,6 +185,27 @@ La Tabla 1 y la Tabla 2 se renderizan lado a lado usando `renderSideBySide()`, c
 **Tabla 2 (6 columnas):** izquierda, izquierda, derecha, derecha, derecha, derecha (`left, left, right, right, right, right`).
 
 **Tabla 3 (4 columnas):** izquierda, izquierda, izquierda, derecha (`left, left, left, right`).
+
+---
+
+## 4.4 Caché por sesión (`.statusline-state.json`)
+
+Extensión v1 deliberada: el statusline persiste estado ligero por sesión para mejorar la lectura entre re-invocaciones de Claude Code. **No** sustituye a `session-metrics.json`.
+
+| Aspecto | Detalle |
+| ------- | ------- |
+| Ruta | `sessions/<sessionDir>/.statusline-state.json` |
+| Lectura | Al renderizar Tabla 2 (si existe `sessionDir`) |
+| Escritura | Al final de la misma invocación, tras calcular métricas y % de contexto |
+
+**Campos:**
+
+| Campo | Uso |
+| ----- | --- |
+| `contextUsagePercentage` | Fallback de la barra de contexto (Tabla 1) cuando stdin no trae `ctx.context_window.used_percentage` usable |
+| `metricsSnapshot` | Snapshot `{ lite, standard, reasoning }` con `count`, `inputTokens`, `cacheReadInputTokens`, `outputTokens` para atenuar (`dim`) o resaltar (`value`) celdas numéricas en Tabla 2 vía `cellColor` |
+
+**Fuera de alcance de la caché:** reconstruir métricas de sesión si falta o está corrupto `session-metrics.json`; la Tabla 2 sigue dependiendo exclusivamente de ese archivo.
 
 ---
 
@@ -263,6 +288,7 @@ El script usa únicamente Node.js APIs estándar (`fs`, `path`, `process.stdin`)
 | `modelId` de un registro no coincide con ningún modelo configurado | El registro no se suma a ningún nivel |
 | `cacheReadInputTokens` es `null` | Se trata como `0` en la suma |
 | `displayName` ausente en `metadata.json` | Se muestra `modelId` como texto de la columna |
+| `.statusline-state.json` ausente, corrupto o ilegible | Ignorar caché; Tabla 2 sin diff de celdas; Tabla 1 sin % de contexto cacheado |
 
 ### Fuera de alcance v1
 

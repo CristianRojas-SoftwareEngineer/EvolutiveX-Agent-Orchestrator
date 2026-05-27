@@ -116,6 +116,6 @@ No uses los totales de sesión como «tamaño del contexto en un solo request»:
 
 #### Validez multi-proveedor
 
-El sistema funciona para cualquier proveedor configurado en Smart Code Proxy (Anthropic, OpenRouter, etc.) porque depende únicamente del campo `"model"` del request body JSON, no de APIs ni formatos de respuesta propietarios. La clasificación lite/standard/reasoning en el statusline (`classifyModel` en `scripting/router-status.ts`) usa heurísticas sobre el `modelId` y, si existen, las variables `ANTHROPIC_DEFAULT_*_MODEL` del entorno de **Claude Code** (`~/.claude/settings.json`), no las variables del `.env` del proxy.
+El sistema funciona para cualquier proveedor configurado en Smart Code Proxy (Anthropic, OpenRouter, etc.) porque depende únicamente del campo `"model"` del request body JSON, no de APIs ni formatos de respuesta propietarios. La clasificación lite/standard/reasoning en el statusline (`classifyModelWithEnv` en `scripting/router-status.ts`) compara el `modelId` de cada entrada de `session-metrics.json` solo con las variables `ANTHROPIC_DEFAULT_*_MODEL` del entorno de **Claude Code** (`~/.claude/settings.json`); si no hay coincidencia, el registro no se suma a ningún nivel (véase §5 de [`router-status-redesign.md`](./proposals/router-status-redesign.md)). El resaltado entre invocaciones usa la caché `.statusline-state.json` (§4.4 de la misma propuesta).
 
 ---

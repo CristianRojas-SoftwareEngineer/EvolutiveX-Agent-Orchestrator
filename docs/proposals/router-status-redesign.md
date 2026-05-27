@@ -70,7 +70,7 @@ El statusline consta de **dos o tres tablas** según el método de autenticació
 
 ### 3.2 Tabla 2 — Interacciones y consumo de tokens (común a todos los proveedores)
 
-Presente siempre, independientemente del método de autenticación. Permite al usuario conocer cuántos tokens consume por nivel de razonamiento en la sesión actual, tanto para providers con facturación por token (bearer) como para suscripciones (OAuth).
+Presente siempre, independientemente del método de autenticación. Se renderiza en side-by-side con la Tabla 1 incluso sin `ctx.session_id` ni carpeta en `sessions/` (métricas en cero). Permite al usuario conocer cuántos tokens consume por nivel de razonamiento en la sesión actual, tanto para providers con facturación por token (bearer) como para suscripciones (OAuth).
 
 ```
 ╭─ Interacciones por nivel de razonamiento ──────────────────────────────────────────────────────────────────────╮
@@ -286,7 +286,7 @@ El script usa únicamente Node.js APIs estándar (`fs`, `path`, `process.stdin`)
 | `ctx.session_id` sin carpeta coincidente en `sessions/` | Tabla 2 se renderiza en cero/sin datos |
 | `session-metrics.json` ausente o malformado | Tabla 2 se renderiza en cero/sin datos |
 | `modelId` de un registro no coincide con ningún modelo configurado | El registro no se suma a ningún nivel |
-| `cacheReadInputTokens` es `null` | Se trata como `0` en la suma |
+| `cacheReadInputTokens` es `null` | Se trata como `0` en la suma (`coerceMetricNumber` en el lector del statusline; mismo criterio para `count`, `inputTokens`, `outputTokens`) |
 | `displayName` ausente en `metadata.json` | Se muestra `modelId` como texto de la columna |
 | `.statusline-state.json` ausente, corrupto o ilegible | Ignorar caché; Tabla 2 sin diff de celdas; Tabla 1 sin % de contexto cacheado |
 

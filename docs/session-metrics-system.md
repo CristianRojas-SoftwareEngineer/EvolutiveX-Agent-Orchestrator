@@ -88,7 +88,7 @@ Los `client-preflight` están explícitamente excluidos porque no generan tokens
 session-metrics.json → classifyModel(modelId) → acumular en lite / standard / reasoning
 ```
 
-Si el archivo no existe (sesión anterior a la feature, o sesión vacía), retorna métricas en cero. No hay fallback a escaneo legacy: las sesiones anteriores simplemente no muestran métricas de Tabla 2.
+Si el archivo no existe (sesión anterior a la feature, o sesión vacía), retorna métricas en cero. No hay fallback a escaneo legacy: las sesiones anteriores simplemente no muestran métricas de Tabla 2. Al leer `session-metrics.json`, el agregador del statusline normaliza valores `null` o no numéricos a `0` antes de sumar (véase §10 de [`router-status-redesign.md`](./proposals/router-status-redesign.md)).
 
 Para el layout de sesión e interacciones, véase [`session-audit-model.md`](./session-audit-model.md) (§5 y §6.1).
 

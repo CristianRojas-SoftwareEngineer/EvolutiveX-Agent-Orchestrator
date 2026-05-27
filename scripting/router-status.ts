@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url';
 
 // ── Tipos ───────────────────────────────────────────────────────
 
-interface ClaudeCodeContext {
+export interface ClaudeCodeContext {
   session_id?: string;
   model?: {
     display_name?: string;
@@ -62,12 +62,35 @@ interface TokenMetrics {
   modelName: string;
 }
 
-// ── Constantes ──────────────────────────────────────────────────
+// ── Rutas resueltas (cwd o inyectables en tests) ─────────────────
 
-const PROJECT_ROOT = join(process.cwd());
-const ROUTING_PATH = join(PROJECT_ROOT, 'routing', 'providers');
-const SESSIONS_PATH = join(PROJECT_ROOT, 'sessions');
-const ENV_PATH = join(PROJECT_ROOT, 'configs', '.env');
+export interface StatuslineBuildOptions {
+  sessionsRoot?: string;
+  projectRoot?: string;
+}
+
+interface ResolvedStatuslinePaths {
+  projectRoot: string;
+  routingPath: string;
+  sessionsPath: string;
+  envPath: string;
+}
+
+function resolveStatuslinePaths(options?: StatuslineBuildOptions): ResolvedStatuslinePaths {
+  const projectRoot = options?.projectRoot ?? join(process.cwd());
+  return {
+    projectRoot,
+    routingPath: join(projectRoot, 'routing', 'providers'),
+    sessionsPath: options?.sessionsRoot ?? join(projectRoot, 'sessions'),
+    envPath: join(projectRoot, 'configs', '.env'),
+  };
+}
+
+/** Normaliza contadores de session-metrics.json (§10: null → 0). */
+export function coerceMetricNumber(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return 0;
+  return value;
+}
 
 // ── Colores ANSI ────────────────────────────────────────────────
 
@@ -418,7 +441,7 @@ function readClaudeSettingsEnv(): ClaudeSettingsEnv {
  * Resuelve el método de auth desde `settings.json → env`.
  * No usa `process.env`; la fuente canónica es el bloque escrito por configure-provider.
  */
-function resolveAuthMethodFromEnv(
+export function resolveAuthMethodFromEnv(
   settingsEnv: ClaudeSettingsEnv,
 ): 'api_key' | 'bearer' | 'oauth' {
   const apiKey = settingsEnv['ANTHROPIC_API_KEY'];
@@ -429,12 +452,10 @@ function resolveAuthMethodFromEnv(
   return 'oauth';
 }
 
-const claudeSettingsEnv = readClaudeSettingsEnv();
-
-function readDotEnv(): Record<string, string> {
+function readDotEnv(envPath: string): Record<string, string> {
   const result: Record<string, string> = {};
-  if (!existsSync(ENV_PATH)) return result;
-  const content = readFileSync(ENV_PATH, 'utf-8');
+  if (!existsSync(envPath)) return result;
+  const content = readFileSync(envPath, 'utf-8');
   for (const line of content.split('\n')) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith('#')) continue;
@@ -447,28 +468,28 @@ function readDotEnv(): Record<string, string> {
   return result;
 }
 
-function resolveActiveProvider(): {
+function resolveActiveProvider(paths: ResolvedStatuslinePaths): {
   providerName: string;
   upstreamOrigin: string;
 } {
-  const envVars = readDotEnv();
+  const envVars = readDotEnv(paths.envPath);
   const upstreamOrigin = envVars['UPSTREAM_ORIGIN'] || '';
 
   if (!upstreamOrigin) {
     return { providerName: 'Desconocido', upstreamOrigin: '' };
   }
 
-  if (!existsSync(ROUTING_PATH)) {
+  if (!existsSync(paths.routingPath)) {
     return { providerName: 'Desconocido', upstreamOrigin };
   }
 
-  const providers = readdirSync(ROUTING_PATH, { withFileTypes: true }).filter(
-    (d) => d.isDirectory() && existsSync(join(ROUTING_PATH, d.name, 'config.json')),
+  const providers = readdirSync(paths.routingPath, { withFileTypes: true }).filter(
+    (d) => d.isDirectory() && existsSync(join(paths.routingPath, d.name, 'config.json')),
   );
 
   for (const provider of providers) {
     try {
-      const configPath = join(ROUTING_PATH, provider.name, 'config.json');
+      const configPath = join(paths.routingPath, provider.name, 'config.json');
       const config = JSON.parse(readFileSync(configPath, 'utf-8')) as ProviderConfig;
       if (config.ANTHROPIC_BASE_URL === upstreamOrigin) {
         return { providerName: provider.name, upstreamOrigin };
@@ -481,10 +502,13 @@ function resolveActiveProvider(): {
   return { providerName: 'Desconocido', upstreamOrigin };
 }
 
-function resolveSessionPath(sessionId?: string): string | null {
-  if (!existsSync(SESSIONS_PATH)) return null;
+function resolveSessionPath(
+  sessionId: string | undefined,
+  sessionsPath: string,
+): string | null {
+  if (!existsSync(sessionsPath)) return null;
 
-  const sessions = readdirSync(SESSIONS_PATH, { withFileTypes: true }).filter((d) =>
+  const sessions = readdirSync(sessionsPath, { withFileTypes: true }).filter((d) =>
     d.isDirectory(),
   );
 
@@ -492,18 +516,18 @@ function resolveSessionPath(sessionId?: string): string | null {
   if (!sessionId) return null;
 
   const match = sessions.find((s) => s.name.startsWith(sessionId));
-  return match ? join(SESSIONS_PATH, match.name) : null;
+  return match ? join(sessionsPath, match.name) : null;
 }
 
-function loadDisplayName(modelId: string): string {
-  if (!existsSync(ROUTING_PATH)) return modelId;
+function loadDisplayName(modelId: string, routingPath: string): string {
+  if (!existsSync(routingPath)) return modelId;
 
-  const providers = readdirSync(ROUTING_PATH, { withFileTypes: true }).filter((d) =>
+  const providers = readdirSync(routingPath, { withFileTypes: true }).filter((d) =>
     d.isDirectory(),
   );
 
   for (const provider of providers) {
-    const modelsDir = join(ROUTING_PATH, provider.name, 'models');
+    const modelsDir = join(routingPath, provider.name, 'models');
     if (!existsSync(modelsDir)) continue;
 
     const models = readdirSync(modelsDir, { withFileTypes: true }).filter((d) => d.isDirectory());
@@ -543,11 +567,10 @@ export function classifyModelWithEnv(
   return null;
 }
 
-function classifyModel(modelId: string): ReasoningLevel | null {
-  return classifyModelWithEnv(modelId, claudeSettingsEnv);
-}
-
-function createEmptyMetrics(): {
+function createEmptyMetrics(
+  settingsEnv: ClaudeSettingsEnv,
+  routingPath: string,
+): {
   lite: TokenMetrics;
   standard: TokenMetrics;
   reasoning: TokenMetrics;
@@ -562,25 +585,29 @@ function createEmptyMetrics(): {
   return {
     lite: {
       ...empty,
-      modelName: loadDisplayName(claudeSettingsEnv['ANTHROPIC_DEFAULT_HAIKU_MODEL'] ?? ''),
+      modelName: loadDisplayName(settingsEnv['ANTHROPIC_DEFAULT_HAIKU_MODEL'] ?? '', routingPath),
     },
     standard: {
       ...empty,
-      modelName: loadDisplayName(claudeSettingsEnv['ANTHROPIC_DEFAULT_SONNET_MODEL'] ?? ''),
+      modelName: loadDisplayName(settingsEnv['ANTHROPIC_DEFAULT_SONNET_MODEL'] ?? '', routingPath),
     },
     reasoning: {
       ...empty,
-      modelName: loadDisplayName(claudeSettingsEnv['ANTHROPIC_DEFAULT_OPUS_MODEL'] ?? ''),
+      modelName: loadDisplayName(settingsEnv['ANTHROPIC_DEFAULT_OPUS_MODEL'] ?? '', routingPath),
     },
   };
 }
 
-function aggregateInteractionMetrics(sessionPath: string): {
+export function aggregateInteractionMetrics(
+  sessionPath: string,
+  settingsEnv: ClaudeSettingsEnv,
+  routingPath: string,
+): {
   lite: TokenMetrics;
   standard: TokenMetrics;
   reasoning: TokenMetrics;
 } {
-  const metrics = createEmptyMetrics();
+  const metrics = createEmptyMetrics(settingsEnv, routingPath);
 
   const metricsPath = join(sessionPath, 'session-metrics.json');
   if (!existsSync(metricsPath)) return metrics;
@@ -589,15 +616,15 @@ function aggregateInteractionMetrics(sessionPath: string): {
     const data = JSON.parse(readFileSync(metricsPath, 'utf-8')) as SessionMetrics;
 
     for (const [modelId, m] of Object.entries(data.models)) {
-      const level = classifyModel(modelId);
+      const level = classifyModelWithEnv(modelId, settingsEnv);
       if (!level) continue;
       const levelMetrics = metrics[level];
 
-      levelMetrics.modelName = loadDisplayName(modelId);
-      levelMetrics.count += m.count;
-      levelMetrics.inputTokens += m.inputTokens;
-      levelMetrics.cacheReadInputTokens += m.cacheReadInputTokens;
-      levelMetrics.outputTokens += m.outputTokens;
+      levelMetrics.modelName = loadDisplayName(modelId, routingPath);
+      levelMetrics.count += coerceMetricNumber(m.count);
+      levelMetrics.inputTokens += coerceMetricNumber(m.inputTokens);
+      levelMetrics.cacheReadInputTokens += coerceMetricNumber(m.cacheReadInputTokens);
+      levelMetrics.outputTokens += coerceMetricNumber(m.outputTokens);
     }
   } catch {
     // session-metrics.json corrupto — retornar métricas vacías
@@ -633,8 +660,12 @@ function totalColor(
 
 // ── Renderizado de tablas completas ─────────────────────────────
 
-function buildSessionTableData(ctx: ClaudeCodeContext, sessionPath?: string | null) {
-  const provider = resolveActiveProvider();
+function buildSessionTableData(
+  ctx: ClaudeCodeContext,
+  paths: ResolvedStatuslinePaths,
+  sessionPath?: string | null,
+) {
+  const provider = resolveActiveProvider(paths);
   const sessionId = ctx.session_id || 'N/A';
   const contextSize = ctx.context_window?.context_window_size;
   const contextUsedPercentage = ctx.context_window?.used_percentage;
@@ -645,7 +676,7 @@ function buildSessionTableData(ctx: ClaudeCodeContext, sessionPath?: string | nu
     provider.providerName.charAt(0).toUpperCase() + provider.providerName.slice(1);
 
   const rawModelName = ctx.model?.display_name || 'N/A';
-  const modelName = loadDisplayName(rawModelName);
+  const modelName = loadDisplayName(rawModelName, paths.routingPath);
 
   let usagePercentage: number;
   if (
@@ -682,13 +713,18 @@ function buildSessionTableData(ctx: ClaudeCodeContext, sessionPath?: string | nu
 
 function renderSessionTable(
   ctx: ClaudeCodeContext,
+  paths: ResolvedStatuslinePaths,
   sessionPath?: string | null,
   targetWidth?: number,
 ): {
   lines: string[];
   width: number;
 } {
-  const { headers, rows, alignments, sessionDisplay } = buildSessionTableData(ctx, sessionPath);
+  const { headers, rows, alignments, sessionDisplay } = buildSessionTableData(
+    ctx,
+    paths,
+    sessionPath,
+  );
 
   const { table, width } = renderTable(
     headers,
@@ -924,6 +960,64 @@ function renderRateLimitTable(
   return { lines, width };
 }
 
+// ── Pipeline de salida (testeable) ──────────────────────────────
+
+export function buildStatuslineOutput(
+  ctx: ClaudeCodeContext,
+  settingsEnv: ClaudeSettingsEnv,
+  options?: StatuslineBuildOptions,
+): string {
+  const paths = resolveStatuslinePaths(options);
+  const output: string[] = [];
+
+  const sessionPath = resolveSessionPath(ctx.session_id, paths.sessionsPath);
+  const authMethod = resolveAuthMethodFromEnv(settingsEnv);
+
+  const table1 = renderSessionTable(ctx, paths, sessionPath);
+
+  let table2: { lines: string[]; width: number };
+  if (sessionPath) {
+    const metrics = aggregateInteractionMetrics(sessionPath, settingsEnv, paths.routingPath);
+    const cache = readStatuslineCache(sessionPath);
+    const previous = cache.metricsSnapshot || null;
+    table2 = renderTokenTable(metrics, previous);
+    writeStatuslineCache(sessionPath, {
+      metricsSnapshot: {
+        lite: {
+          count: metrics.lite.count,
+          inputTokens: metrics.lite.inputTokens,
+          cacheReadInputTokens: metrics.lite.cacheReadInputTokens,
+          outputTokens: metrics.lite.outputTokens,
+        },
+        standard: {
+          count: metrics.standard.count,
+          inputTokens: metrics.standard.inputTokens,
+          cacheReadInputTokens: metrics.standard.cacheReadInputTokens,
+          outputTokens: metrics.standard.outputTokens,
+        },
+        reasoning: {
+          count: metrics.reasoning.count,
+          inputTokens: metrics.reasoning.inputTokens,
+          cacheReadInputTokens: metrics.reasoning.cacheReadInputTokens,
+          outputTokens: metrics.reasoning.outputTokens,
+        },
+      },
+    });
+  } else {
+    table2 = renderTokenTable(createEmptyMetrics(settingsEnv, paths.routingPath), null);
+  }
+
+  // §3.3: Tabla 3 solo con oauth; api_key y bearer comparten layout sin rate limits.
+  const table3 = authMethod === 'oauth' ? renderRateLimitTable(ctx) : null;
+
+  output.push(renderSideBySide(table1, table2, 2));
+  if (table3) {
+    output.push(table3.lines.join('\n'));
+  }
+
+  return output.join('\n');
+}
+
 // ── Main ────────────────────────────────────────────────────────
 
 function main(): void {
@@ -941,63 +1035,8 @@ function main(): void {
       }
     }
 
-    const output: string[] = [];
-
-    // Resolver sesión antes de renderizar para caché per-session
-    const sessionPath = resolveSessionPath(ctx.session_id);
-
-    const authMethod = resolveAuthMethodFromEnv(claudeSettingsEnv);
-
-    // Tabla 1: Sesión y proveedor
-    const table1 = renderSessionTable(ctx, sessionPath);
-
-    // Tabla 2: Métricas de interacciones
-    let table2: { lines: string[]; width: number };
-    if (sessionPath) {
-      const metrics = aggregateInteractionMetrics(sessionPath);
-      const cache = readStatuslineCache(sessionPath);
-      const previous = cache.metricsSnapshot || null;
-      table2 = renderTokenTable(metrics, previous);
-      writeStatuslineCache(sessionPath, {
-        metricsSnapshot: {
-          lite: {
-            count: metrics.lite.count,
-            inputTokens: metrics.lite.inputTokens,
-            cacheReadInputTokens: metrics.lite.cacheReadInputTokens,
-            outputTokens: metrics.lite.outputTokens,
-          },
-          standard: {
-            count: metrics.standard.count,
-            inputTokens: metrics.standard.inputTokens,
-            cacheReadInputTokens: metrics.standard.cacheReadInputTokens,
-            outputTokens: metrics.standard.outputTokens,
-          },
-          reasoning: {
-            count: metrics.reasoning.count,
-            inputTokens: metrics.reasoning.inputTokens,
-            cacheReadInputTokens: metrics.reasoning.cacheReadInputTokens,
-            outputTokens: metrics.reasoning.outputTokens,
-          },
-        },
-      });
-    } else {
-      table2 = renderTokenTable(createEmptyMetrics(), null);
-    }
-
-    // Tabla 3: Rate limits (solo OAuth), debajo de Tabla 1 + Tabla 2 (§4.2)
-    const table3 =
-      authMethod === 'oauth' ? renderRateLimitTable(ctx) : null;
-
-    if (ctx.session_id || sessionPath) {
-      output.push(renderSideBySide(table1, table2, 2));
-    } else {
-      output.push(table1.lines.join('\n'));
-    }
-    if (table3) {
-      output.push(table3.lines.join('\n'));
-    }
-
-    console.log(output.join('\n'));
+    const settingsEnv = readClaudeSettingsEnv();
+    console.log(buildStatuslineOutput(ctx, settingsEnv));
   });
 }
 

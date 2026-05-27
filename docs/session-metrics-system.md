@@ -88,7 +88,7 @@ Los `client-preflight` están explícitamente excluidos porque no generan tokens
 session-metrics.json → classifyModelWithEnv(modelId, settingsEnv) → acumular en lite / standard / reasoning
 ```
 
-Si el archivo no existe (sesión anterior a la feature, o sesión vacía), retorna métricas en cero. No hay fallback a escaneo legacy: las sesiones anteriores simplemente no muestran métricas de Tabla 2. Al leer `session-metrics.json`, el agregador del statusline normaliza valores `null` o no numéricos a `0` antes de sumar (véase §10 de [`router-status-redesign.md`](./proposals/router-status-redesign.md), incluidas reglas de `used_percentage` y caché de contexto).
+Si el archivo no existe (sesión anterior a la feature, o sesión vacía), retorna métricas en cero. No hay fallback a escaneo de `interactions/*/meta.json`: las sesiones anteriores simplemente no muestran métricas de Tabla 2. Al leer `session-metrics.json`, el agregador del statusline normaliza valores `null` o no numéricos a `0` antes de sumar (véase §10 de [`router-statusline.md`](./router-statusline.md), incluidas reglas de `used_percentage` y caché de contexto).
 
 Para el layout de sesión e interacciones, véase [`session-audit-model.md`](./session-audit-model.md) (§5 y §6.1).
 
@@ -116,6 +116,6 @@ No uses los totales de sesión como «tamaño del contexto en un solo request»:
 
 #### Validez multi-proveedor
 
-El sistema funciona para cualquier proveedor configurado en Smart Code Proxy (Anthropic, OpenRouter, etc.) porque depende únicamente del campo `"model"` del request body JSON, no de APIs ni formatos de respuesta propietarios. La clasificación lite/standard/reasoning en el statusline (`classifyModelWithEnv` en `scripting/router-status.ts`) compara el `modelId` de cada entrada de `session-metrics.json` solo con las variables `ANTHROPIC_DEFAULT_*_MODEL` del entorno de **Claude Code** (`~/.claude/settings.json`); si no hay coincidencia, el registro no se suma a ningún nivel (véase §5 de [`router-status-redesign.md`](./proposals/router-status-redesign.md)). El resaltado entre invocaciones usa la caché `.statusline-state.json` (§4.4 de la misma propuesta).
+El sistema funciona para cualquier proveedor configurado en Smart Code Proxy (Anthropic, OpenRouter, etc.) porque depende únicamente del campo `"model"` del request body JSON, no de APIs ni formatos de respuesta propietarios. La clasificación lite/standard/reasoning en el statusline (`classifyModelWithEnv` en `scripting/router-status.ts`) compara el `modelId` de cada entrada de `session-metrics.json` solo con las variables `ANTHROPIC_DEFAULT_*_MODEL` del entorno de **Claude Code** (`~/.claude/settings.json`); si no hay coincidencia, el registro no se suma a ningún nivel (véase §5 de [`router-statusline.md`](./router-statusline.md)). El resaltado entre invocaciones usa la caché `.statusline-state.json` (§4.4 del statusline).
 
 ---

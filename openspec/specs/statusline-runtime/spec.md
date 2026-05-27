@@ -48,7 +48,7 @@ La resolución de `projectRoot` SHALL ocurrir en cada invocación del statusline
 
 ### Requirement: Métricas de sesión bajo ROOT correcto
 
-Cuando `ctx.session_id` tiene carpeta coincidente bajo `<projectRoot>/sessions/`, la Tabla 2 SHALL agregar desde `<projectRoot>/sessions/<dir>/session-metrics.json` según el diseño existente en [`docs/proposals/router-status-redesign.md`](../../../../docs/proposals/router-status-redesign.md).
+Cuando `ctx.session_id` tiene carpeta coincidente bajo `<projectRoot>/sessions/`, la Tabla 2 SHALL agregar desde `<projectRoot>/sessions/<dir>/session-metrics.json` según el diseño en [`docs/router-statusline.md`](../../../docs/router-statusline.md).
 
 #### Scenario: Workspace distinto al repo del proxy
 

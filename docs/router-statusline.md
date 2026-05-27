@@ -1,19 +1,35 @@
-# router-status.ts — Propuesta de rediseño del statusline
+# Statusline de Claude Code (router-status.ts)
 
-## 1. Contexto y motivación
+Especificación del statusline de Smart Code Proxy: diseño visual, fuentes de datos, dispatch e integración con Claude Code.
 
-El statusline legacy (`~/.claude/router-status.ps1`) fue diseñado para dos modos excluyentes:
+## Implementación
 
-- `ANTHROPIC_BASE_URL` presente → Claude Code Router activo → `router-mode-status.ps1`
-- `ANTHROPIC_BASE_URL` ausente → API Anthropic oficial → `official-mode-status.ps1`
+| Artefacto | Ruta |
+| --------- | ---- |
+| Script principal | [`scripting/router-status.ts`](../scripting/router-status.ts) |
+| Instalador | [`scripting/install-statusline.ts`](../scripting/install-statusline.ts) |
+| Lectura/escritura de settings | [`scripting/shared/claude-settings.ts`](../scripting/shared/claude-settings.ts) |
+| Tests | `tests/scripting/router-status-*.test.ts` |
 
-Con Smart Code Proxy como intermediario universal, **`ANTHROPIC_BASE_URL` siempre apunta a `http://127.0.0.1:<PORT>`**, independientemente del proveedor upstream. El dispatch original siempre activa `router-mode-status.ps1`, que lee artefactos de Claude Code Router que ya no existen (`~/.claude-code-router/config.json`, `router-requests.jsonl`, etc.). El statusline muestra datos vacíos o incorrectos en todos los modos.
+---
 
-El rediseño reemplaza los tres `.ps1` con un único `scripting/router-status.ts`:
+## 1. Resumen
 
-- Sin dependencia de PowerShell ni de archivos rc de shell
-- Dispatch basado en `UPSTREAM_ORIGIN` + método de autenticación activo
-- Lectura de sesión activa desde `sessions/` del proxy para métricas por nivel de razonamiento
+El statusline es el comando que Claude Code invoca en cada actualización de la barra de estado. Smart Code Proxy proporciona [`scripting/router-status.ts`](../scripting/router-status.ts), que renderiza tablas Unicode con información de sesión, proveedor upstream, consumo de tokens por nivel de razonamiento y, cuando aplica, límites de suscripción OAuth.
+
+Claude Code envía el contexto de la sesión actual por **stdin** (JSON, `$ctx`). El script combina esos datos con la configuración en `~/.claude/settings.json → env` y con artefactos del repositorio del proxy (`configs/.env`, `routing/providers/`, `sessions/`).
+
+Con el proxy activo, **`ANTHROPIC_BASE_URL` en Claude Code apunta al proxy local** (`http://127.0.0.1:<PORT>`). El proveedor upstream real se resuelve cruzando `UPSTREAM_ORIGIN` (en `configs/.env`) con `routing/providers/*/config.json`.
+
+**Capacidades:**
+
+- Dos o tres tablas según el método de autenticación (`api_key`, `bearer`, `oauth`).
+- Tablas 1 y 2 siempre en layout side-by-side; métricas de Tabla 2 desde `session-metrics.json` por sesión.
+- Tabla 3 (rate limits) solo con OAuth y datos de cuota en stdin.
+- Caché ligera por sesión (`.statusline-state.json`) para porcentaje de contexto y resaltado de métricas.
+- Ejecución multiplataforma con Node.js estándar (`fs`, `path`, `process.stdin`); sin dependencia de shell scripts externos.
+
+Instalación: [`npm run install:statusline`](#9-integración) (véase [how-to-start.md](./how-to-start.md)).
 
 ---
 
@@ -37,13 +53,13 @@ El rediseño reemplaza los tres `.ps1` con un único `scripting/router-status.ts
 
 ### Variables de entorno de Claude Code
 
-`configure-provider.ts` escribe las variables `ANTHROPIC_*` en `~/.claude/settings.json → env` ([fuente oficial de configuración de Claude Code](https://code.claude.com/docs/en/env-vars)) y el upstream real del proxy en `configs/.env → UPSTREAM_ORIGIN`. El statusline lee ambas fuentes directamente. `process.env` no forma parte del contrato de diseño de esta versión.
+`configure-provider.ts` escribe las variables `ANTHROPIC_*` en `~/.claude/settings.json → env` ([fuente oficial de configuración de Claude Code](https://code.claude.com/docs/en/env-vars)) y el upstream real del proxy en `configs/.env → UPSTREAM_ORIGIN`. El statusline lee ambas fuentes directamente. `process.env` no forma parte del contrato de diseño.
 
 ---
 
 ## 3. Layout general
 
-El statusline consta de **dos o tres tablas** según el método de autenticación. La Tabla 1 y la Tabla 2 se renderizan **side-by-side** (lado a lado). La Tabla 3 aparece debajo, únicamente para `authMethod === 'oauth'`.
+El statusline consta de **dos o tres tablas** según el método de autenticación. La Tabla 1 y la Tabla 2 se renderizan **side-by-side** (lado a lado). La Tabla 3 aparece debajo cuando aplica OAuth con datos de cuota.
 
 ### 3.1 Tabla 1 — Información de sesión y proveedor (común)
 
@@ -99,7 +115,7 @@ Presente siempre, independientemente del método de autenticación. Se renderiza
 
 **Fila de totales:** celdas fusionadas en columnas 0+1 (texto `"Totales de sesión"`), suma de las tres filas de nivel para las columnas numéricas. Los separadores horizontales usan `┴` en la posición de la columna fusionada.
 
-> **Semántica:** las columnas Input / Cache In / Output reflejan consumo acumulado de la sesión (tokens facturados), no el tamaño del contexto en un único request. Ver [`session-metrics-system.md`](../session-metrics-system.md).
+> **Semántica:** las columnas Input / Cache In / Output reflejan consumo acumulado de la sesión (tokens facturados), no el tamaño del contexto en un único request. Ver [`session-metrics-system.md`](./session-metrics-system.md).
 
 **Formato de números:** entero con separador de miles (p. ej. `1,234,567`). Si el valor es `0`, muestra `-`.
 
@@ -138,7 +154,7 @@ resolveActiveProvider()
   ├── leer UPSTREAM_ORIGIN de configs/.env
   └── cruzar con routing/providers/*/config.json → nombre del proveedor
 
-resolveAuthMethod()
+resolveAuthMethodFromEnv(settingsEnv)
   ├── leer ANTHROPIC_API_KEY de ~/.claude/settings.json → env
   ├── leer ANTHROPIC_AUTH_TOKEN de ~/.claude/settings.json → env
   └── determinar authMethod:
@@ -146,7 +162,7 @@ resolveAuthMethod()
         ANTHROPIC_AUTH_TOKEN presente → 'bearer'
         ninguno                       → 'oauth'
 
-renderTablas()
+buildStatuslineOutput()
   ├── si hay sessionDir: leer .statusline-state.json (caché, para Tabla 2 y fallback de % en Tabla 1)
   ├── Tabla 1 + Tabla 2: side-by-side (siempre; con o sin sessionDir)
   ├── si hay sessionDir: escribir .statusline-state.json (caché: metricsSnapshot; % de contexto al renderizar Tabla 1 si stdin aportó valor usable)
@@ -196,7 +212,7 @@ Cuando `authMethod === 'oauth'`, la Tabla 3 (rate limits) se imprime **en línea
 
 ## 4.4 Caché por sesión (`.statusline-state.json`)
 
-Extensión v1 deliberada: el statusline persiste estado ligero por sesión para mejorar la lectura entre re-invocaciones de Claude Code. **No** sustituye a `session-metrics.json`.
+El statusline persiste estado ligero por sesión para mejorar la lectura entre re-invocaciones de Claude Code. **No** sustituye a `session-metrics.json`.
 
 | Aspecto | Detalle |
 | ------- | ------- |
@@ -228,13 +244,13 @@ Extensión v1 deliberada: el statusline persiste estado ligero por sesión para 
 Para clasificar una interacción en un nivel, el script compara el `modelId` del registro en `session-metrics.json` contra los tres valores configurados:
 
 ```
-classifyModel(modelId):
+classifyModelWithEnv(modelId, settingsEnv):
   modelId incluye ANTHROPIC_DEFAULT_HAIKU_MODEL  → Lite
   modelId incluye ANTHROPIC_DEFAULT_OPUS_MODEL   → Reasoning
   modelId incluye ANTHROPIC_DEFAULT_SONNET_MODEL → Standard
 ```
 
-Si `modelId` no coincide con ninguno de los tres modelos configurados, el registro no se suma a ningún nivel.
+Orden de evaluación: haiku → opus → sonnet. Si `modelId` no coincide con ninguno de los tres modelos configurados, el registro no se suma a ningún nivel.
 
 ---
 
@@ -249,7 +265,7 @@ metrics    = sessions/<sessionDir>/session-metrics.json
 
 El proxy puede añadir un sufijo al nombre de la carpeta, por lo que la búsqueda usa coincidencia de prefijo. Si no hay coincidencia, la Tabla 2 se renderiza en cero/sin datos.
 
-Layout de sesiones: [`session-audit-model.md`](../session-audit-model.md).
+Layout de sesiones: [`session-audit-model.md`](./session-audit-model.md).
 
 ---
 
@@ -277,7 +293,7 @@ Desde la raíz del repositorio del proxy:
 npm run install:statusline
 ```
 
-El instalador (`scripting/install-statusline.ts`) escribe en `~/.claude/settings.json`:
+El instalador ([`scripting/install-statusline.ts`](../scripting/install-statusline.ts)) escribe en `~/.claude/settings.json`:
 
 - `statusLine` con `type: "command"`, `padding: 0` y un comando multiplataforma `npx --prefix "<ROOT>" tsx scripting/router-status.ts`
 - `env.SMART_CODE_PROXY_ROOT` con la ruta absoluta del proxy (para resolver `sessions/`, `routing/` y `configs/.env` aunque Claude Code abra otro workspace)
@@ -308,9 +324,9 @@ y en `env`: `"SMART_CODE_PROXY_ROOT": "<RUTA_ABSOLUTA_DEL_PROXY>"`.
 
 ---
 
-## 10. Validaciones mínimas y fuera de alcance
+## 10. Comportamiento ante entradas inválidas y límites
 
-### Validaciones mínimas v1
+### Comportamiento ante entradas inválidas
 
 | Condición | Comportamiento esperado |
 | --------- | ----------------------- |
@@ -323,7 +339,7 @@ y en `env`: `"SMART_CODE_PROXY_ROOT": "<RUTA_ABSOLUTA_DEL_PROXY>"`.
 | `authMethod === 'oauth'` sin `five_hour` ni `seven_day` en `ctx.rate_limits` | No se muestra Tabla 3 |
 | `.statusline-state.json` ausente, corrupto o ilegible | Ignorar caché; Tabla 2 sin diff de celdas; Tabla 1 sin % de contexto cacheado |
 
-### Fuera de alcance v1
+### Fuera de alcance
 
 - Configurar auth o modelos por nivel desde `process.env` directamente.
 - Escanear `interactions/*/meta.json` para reconstruir métricas (sustituido por `session-metrics.json`).

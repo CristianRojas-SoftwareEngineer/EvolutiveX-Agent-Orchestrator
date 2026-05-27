@@ -56,7 +56,7 @@ Sigue estos pasos en orden:
    npm run install:statusline
    ```
 
-   El comando escribe `statusLine` y `env.SMART_CODE_PROXY_ROOT` en `~/.claude/settings.json`. **Reinicie Claude Code** tras instalar. El diseño visual de las tablas está en la [propuesta de rediseño del statusline](./proposals/router-status-redesign.md). Para desinstalar: `npm run install:statusline -- --uninstall`.
+   El comando escribe `statusLine` y `env.SMART_CODE_PROXY_ROOT` en `~/.claude/settings.json`. **Reinicie Claude Code** tras instalar. El diseño del statusline está en [router-statusline.md](./router-statusline.md). Para desinstalar: `npm run install:statusline -- --uninstall`.
 
 6. **Opcional:** configura variables de entorno para desarrollo local usando un archivo `.env`:
 

@@ -11,8 +11,11 @@
 
 import { readFileSync, readdirSync, existsSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
+import {
+  readClaudeSettings,
+  SMART_CODE_PROXY_ROOT_KEY,
+} from './lib/claude-settings.js';
 
 // ── Tipos ───────────────────────────────────────────────────────
 
@@ -69,6 +72,9 @@ export interface StatuslineBuildOptions {
   projectRoot?: string;
 }
 
+/** Bloque `env` de `~/.claude/settings.json` (escrito por configure-provider / install-statusline). */
+export type ClaudeSettingsEnv = Record<string, string>;
+
 interface ResolvedStatuslinePaths {
   projectRoot: string;
   routingPath: string;
@@ -76,8 +82,29 @@ interface ResolvedStatuslinePaths {
   envPath: string;
 }
 
-function resolveStatuslinePaths(options?: StatuslineBuildOptions): ResolvedStatuslinePaths {
-  const projectRoot = options?.projectRoot ?? join(process.cwd());
+/**
+ * Resuelve la raíz del repositorio del proxy desde settings o cwd.
+ * Si `SMART_CODE_PROXY_ROOT` no apunta a un repo válido (`routing/providers`), usa cwd.
+ */
+export function resolveProjectRoot(
+  settingsEnv: ClaudeSettingsEnv,
+  cwd?: string,
+): string {
+  const fallback = resolve(cwd ?? process.cwd());
+  const fromSettings = settingsEnv[SMART_CODE_PROXY_ROOT_KEY]?.trim();
+  if (!fromSettings) return fallback;
+  const candidate = resolve(fromSettings);
+  if (existsSync(join(candidate, 'routing', 'providers'))) return candidate;
+  return fallback;
+}
+
+function resolveStatuslinePaths(
+  options: StatuslineBuildOptions | undefined,
+  settingsEnv: ClaudeSettingsEnv,
+): ResolvedStatuslinePaths {
+  const projectRoot = options?.projectRoot
+    ? resolve(options.projectRoot)
+    : resolveProjectRoot(settingsEnv);
   return {
     projectRoot,
     routingPath: join(projectRoot, 'routing', 'providers'),
@@ -419,22 +446,10 @@ function writeStatuslineCache(sessionPath: string, cache: StatuslineCache): void
 
 // ── Lógica de resolución ────────────────────────────────────────
 
-/** Bloque `env` de `~/.claude/settings.json` (escrito por configure-provider). */
-export type ClaudeSettingsEnv = Record<string, string>;
-
 export type ReasoningLevel = 'lite' | 'standard' | 'reasoning';
 
 function readClaudeSettingsEnv(): ClaudeSettingsEnv {
-  const settingsPath = join(homedir(), '.claude', 'settings.json');
-  if (!existsSync(settingsPath)) return {};
-  try {
-    const settings = JSON.parse(readFileSync(settingsPath, 'utf-8')) as {
-      env?: ClaudeSettingsEnv;
-    };
-    return settings.env ?? {};
-  } catch {
-    return {};
-  }
+  return readClaudeSettings().env ?? {};
 }
 
 /**
@@ -967,7 +982,7 @@ export function buildStatuslineOutput(
   settingsEnv: ClaudeSettingsEnv,
   options?: StatuslineBuildOptions,
 ): string {
-  const paths = resolveStatuslinePaths(options);
+  const paths = resolveStatuslinePaths(options, settingsEnv);
   const output: string[] = [];
 
   const sessionPath = resolveSessionPath(ctx.session_id, paths.sessionsPath);

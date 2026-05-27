@@ -50,7 +50,15 @@ Sigue estos pasos en orden:
 
    Escribe variables como `ANTHROPIC_BASE_URL` en el entorno de Claude Code para que el tráfico pase por este proxy. Detalle de proveedores soportados en el [README](../README.md#enrutamiento-de-proveedores).
 
-5. **Opcional:** configura variables de entorno para desarrollo local usando un archivo `.env`:
+5. **Opcional — statusline en Claude Code:** para ver métricas de sesión y proveedor en la barra de estado (tablas del proxy), desde la raíz del repositorio:
+
+   ```bash
+   npm run install:statusline
+   ```
+
+   El comando escribe `statusLine` y `env.SMART_CODE_PROXY_ROOT` en `~/.claude/settings.json`. **Reinicie Claude Code** tras instalar. El diseño visual de las tablas está en la [propuesta de rediseño del statusline](./proposals/router-status-redesign.md). Para desinstalar: `npm run install:statusline -- --uninstall`.
+
+6. **Opcional:** configura variables de entorno para desarrollo local usando un archivo `.env`:
 
    a. Copia el archivo de referencia dentro de la carpeta `configs/`:
 
@@ -70,7 +78,7 @@ Sigue estos pasos en orden:
 
    **¿Cómo se carga?** El script `npm run dev` usa el flag nativo de Node.js `--env-file-if-exists=configs/.env` (disponible desde Node v22.9; Node v24+ recomendado). A diferencia de `--env-file`, este flag **no falla** si el archivo `.env` no existe: el proxy arranca igualmente con los valores por defecto del código. **El script `npm start` (producción) no carga `.env`** a propósito: en producción las variables se inyectan en el entorno del sistema directamente.
 
-6. **Opcional:** puedes verificar que el código compila sin errores antes de arrancar:
+7. **Opcional:** puedes verificar que el código compila sin errores antes de arrancar:
 
    ```bash
    npm run build
@@ -78,7 +86,7 @@ Sigue estos pasos en orden:
 
    El proyecto incluye un script de validación integral (`npm test`) que ejecuta el análisis estático (`lint`), la validación de tipos (`typecheck`), las pruebas unitarias (`test:unit`, Vitest) y la compilación (`build`) para asegurar la exactitud funcional y la integridad del código TypeScript. Se recomienda ejecutarlo antes de cada despliegue relevante.
 
-7. **Opcional — compatibilidad multi-agente:** Si usas otros agentes de código además de Claude Code (Codex CLI, Copilot, Cursor, etc.), puedes crear un hardlink `AGENTS.md` → `CLAUDE.md` para que también lean las instrucciones del proyecto:
+8. **Opcional — compatibilidad multi-agente:** Si usas otros agentes de código además de Claude Code (Codex CLI, Copilot, Cursor, etc.), puedes crear un hardlink `AGENTS.md` → `CLAUDE.md` para que también lean las instrucciones del proyecto:
 
    ```bash
    npm run create:agents-reference

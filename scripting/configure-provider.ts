@@ -1,8 +1,8 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { readFileSync, writeFileSync, readdirSync, existsSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { homedir } from 'node:os';
+import { readClaudeSettings, writeClaudeSettings } from './lib/claude-settings.js';
 
 // ── Tipos y constantes ──────────────────────────────────────────
 
@@ -209,30 +209,6 @@ function loadProviderConfig(providerName: string, basePath = PROVIDERS_BASE_PATH
 }
 
 // ── Gestión de variables de entorno ─────────────────────────────
-
-const CLAUDE_SETTINGS_PATH = join(homedir(), '.claude', 'settings.json');
-
-interface ClaudeSettings {
-  env?: Record<string, string>;
-  [key: string]: unknown;
-}
-
-function readClaudeSettings(): ClaudeSettings {
-  if (!existsSync(CLAUDE_SETTINGS_PATH)) return {};
-  try {
-    return JSON.parse(readFileSync(CLAUDE_SETTINGS_PATH, 'utf-8')) as ClaudeSettings;
-  } catch {
-    return {};
-  }
-}
-
-function writeClaudeSettings(settings: ClaudeSettings): void {
-  const dir = join(homedir(), '.claude');
-  if (!existsSync(dir)) {
-    mkdirSync(dir, { recursive: true });
-  }
-  writeFileSync(CLAUDE_SETTINGS_PATH, JSON.stringify(settings, null, 2) + '\n', 'utf-8');
-}
 
 class ClaudeSettingsEnvManager implements IEnvManager {
   async setEnvVar(name: string, value: string): Promise<void> {

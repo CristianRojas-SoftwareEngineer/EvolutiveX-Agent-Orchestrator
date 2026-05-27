@@ -261,19 +261,38 @@ El script usa únicamente Node.js APIs estándar (`fs`, `path`, `process.stdin`)
 
 ## 9. Integración
 
-### settings.json
+### Instalación recomendada
+
+Desde la raíz del repositorio del proxy:
+
+```bash
+npm run install:statusline
+```
+
+El instalador (`scripting/install-statusline.ts`) escribe en `~/.claude/settings.json`:
+
+- `statusLine` con `type: "command"`, `padding: 0` y un comando multiplataforma `npx --prefix "<ROOT>" tsx scripting/router-status.ts`
+- `env.SMART_CODE_PROXY_ROOT` con la ruta absoluta del proxy (para resolver `sessions/`, `routing/` y `configs/.env` aunque Claude Code abra otro workspace)
+
+Reinicie Claude Code tras instalar. Opciones: `--dry-run`, `--force` (sobrescribir un statusLine ajeno), `--uninstall`. Si mueve el clon del repo, vuelva a ejecutar el instalador.
+
+### Configuración manual (alternativa)
+
+Si prefiere editar a mano, el bloque equivalente es:
 
 ```json
 "statusLine": {
   "type": "command",
-  "command": "npx tsx 'C:/Users/Cristian/Desktop/Proyectos/Smart Code Proxy/scripting/router-status.ts'",
+  "command": "npx --prefix \"<RUTA_ABSOLUTA_DEL_PROXY>\" tsx scripting/router-status.ts",
   "padding": 0
 }
 ```
 
+y en `env`: `"SMART_CODE_PROXY_ROOT": "<RUTA_ABSOLUTA_DEL_PROXY>"`.
+
 ### configure-provider.ts
 
-`configure-provider.ts` escribe las variables `ANTHROPIC_*` en `~/.claude/settings.json → env` mediante `ClaudeSettingsEnvManager`. El statusline lee esa fuente directamente al arrancar.
+`configure-provider.ts` escribe las variables `ANTHROPIC_*` en `~/.claude/settings.json → env` mediante `ClaudeSettingsEnvManager`. El statusline lee ese bloque `env` al arrancar (auth, modelos por nivel y `SMART_CODE_PROXY_ROOT`).
 
 ---
 

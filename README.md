@@ -153,7 +153,12 @@ El directorio de auditoría bajo `sessions/<sessionId>/` se nombra a partir de `
 
 ### Capas de Bytes y Convenciones de Logs
 
-El sistema previene la saturación en memoria o disco ignorando la escritura si se superan los límites configurados. Todo volcado que se trunca genera un archivo `.omitted.txt` documentando la omisión. El proxy utiliza Fastify Logger para la salida de consola, delegando el registro de los eventos directamente al framework.
+El sistema previene la saturación en memoria o disco ignorando la escritura si se superan los límites configurados:
+
+- **Disco (`sessions/`):** un solo tope operativo, `MAX_AUDIT_BYTES` (request, response y volcado raw `sse.txt`).
+- **Memoria (respuestas no-SSE):** buffer derivado internamente como `max(MAX_AUDIT_BYTES, 100 MiB)`; no es variable de entorno.
+
+Todo volcado que se trunca genera un archivo `.omitted.txt` documentando la omisión. Detalle de constantes internas: [`docs/advanced-configuration.md`](docs/advanced-configuration.md). El proxy utiliza Fastify Logger (`LOG_LEVEL`) para consola y `server/logs.jsonl`.
 
 > [!TIP]
 > **Certificados SSL corporativos:** si tu organización intercepta tráfico HTTPS, configura la variable de entorno estándar de Node.js [`NODE_EXTRA_CA_CERTS`](https://nodejs.org/api/cli.html#node_extra_ca_certsfile) con la ruta a un archivo PEM que contenga los certificados raíz adicionales. Esta variable es gestionada directamente por Node.js, no por el proxy.

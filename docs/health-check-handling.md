@@ -65,7 +65,7 @@ Comprueba que el cliente envía `x-claude-code-session-id` (o tu override) y que
 
 ### Quiero auditar peticiones sin cabecera de sesión
 
-No hay variable de entorno para ello. Requeriría cambiar el código (p. ej. dejar de retornar `null` en `_unknown`), lo cual no es el diseño actual del proxy.
+No hay variable de entorno para ello. Requeriría cambiar el código (p. ej. dejar de retornar `null` en `_unknown`) o adaptar las cabeceras de sesión en [`advanced-configuration.md`](./advanced-configuration.md); no es el diseño actual del proxy.
 
 ### Carpetas antiguas `sessions/_unknown/` en disco
 

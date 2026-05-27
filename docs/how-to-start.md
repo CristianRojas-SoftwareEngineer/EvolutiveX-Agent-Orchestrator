@@ -102,7 +102,7 @@ Sigue estos pasos en orden:
 
 2. **No cierres esa terminal** mientras quieras usar el proxy: el proceso debe seguir en marcha.
 
-3. Comprueba el arranque: en la **terminal** debería aparecer el mensaje `Proxy levantado correctamente` con campos como `port`, `upstream`, `upstreamAcceptEncoding`, `maxResponseBufferBytes`, `maxAuditRequestBodyBytes`, `maxAuditResponseBodyBytes`, `maxAuditSseRawBytes`, `stripAuditSessionHeader` y `auditSessionHashSuffix` (salida legible vía Pino Pretty; no es JSON compacto). En **`server/logs.jsonl`** el mismo evento queda como **una línea JSON** (`event: "listening"`). También verás líneas previas de Fastify del tipo `Server listening at http://127.0.0.1:8787` (y, al escuchar en `0.0.0.0`, pueden listarse otras interfaces de red) — son normales. Si aparece `Proxy levantado correctamente`, el proxy está escuchando en tu PC (lista de variables en el [README](../README.md#configuracion)).
+3. Comprueba el arranque: en la **terminal** debería aparecer el mensaje `Proxy levantado correctamente` con campos como `port`, `upstream`, `upstreamAcceptEncoding` (siempre `identity`), `maxAuditBytes`, `maxResponseBufferBytes` (derivado internamente) y `logLevel` (salida legible vía Pino Pretty; no es JSON compacto). En **`server/logs.jsonl`** el mismo evento queda como **una línea JSON** (`event: "listening"`). También verás líneas previas de Fastify del tipo `Server listening at http://127.0.0.1:8787` (y, al escuchar en `0.0.0.0`, pueden listarse otras interfaces de red) — son normales. Si aparece `Proxy levantado correctamente`, el proxy está escuchando en tu PC (lista de variables en el [README](../README.md#configuracion)).
 
 Por defecto el proxy reenvía a `https://api.anthropic.com`. Puedes cambiar la URL de destino con la variable `UPSTREAM_ORIGIN` si tu organización usa otro host (véase el README).
 
@@ -201,6 +201,9 @@ No hace falta leer la tabla entera del README el primer día:
 | ------------------------- | ------------------------------------------------------------------------------------------------ |
 | `PORT`                    | Puerto donde escucha el proxy en tu máquina (por defecto `8787`).                                |
 | `UPSTREAM_ORIGIN`         | URL base del API al que el proxy reenvía (por defecto Anthropic).                                |
+| `MAX_REQUEST_BODY`        | Tamaño máximo del body que Fastify acepta en memoria (por defecto `50mb`).                       |
+| `MAX_AUDIT_BYTES`         | Tope único de volcado en disco bajo `sessions/` (request, response, `sse.txt` raw; default 50 MiB). |
+| `LOG_LEVEL`               | Nivel de logs en consola y `server/logs.jsonl` (por defecto `info`).                             |
 | `FILTERED_TOOLS`          | Lista de tool names a excluir del request (coma-separado). Sin definir la variable = lista por defecto (7 tools). Para desactivar el filtrado: `FILTERED_TOOLS=` o `FILTERED_TOOLS=""`. |
 | `PROXY_UNREDACT_THINKING` | Remueve flag de redacción de thinking para capturar contenido legible (por defecto `false`).     |
 
@@ -208,7 +211,7 @@ La carpeta de salida es siempre `./sessions`, relativa al directorio desde donde
 
 **Streaming (SSE) en disco:** `steps/NN/response/sse.jsonl` es la fuente de verdad; al cerrar el turno se escribe `output/body.json`. Layout completo en [`session-audit-model.md` §6.6](./session-audit-model.md#66-output); reconstrucción técnica en [`how-sse-reconstruction-works.md`](./how-sse-reconstruction-works.md).
 
-El resto (límites de tamaño, volcado SSE crudo, etc.) está en la Matriz de Entorno del [README](../README.md#configuracion). Para ver cómo se aplican los límites de memoria y disco usa [Capas de Bytes y Convenciones de Logs](../README.md#capas-bytes-env).
+Cabeceras de sesión, compresión hacia upstream (`identity` fijo) y ajustes finos de buffer en memoria no son variables de entorno: véase [`advanced-configuration.md`](./advanced-configuration.md). Matriz completa en el [README](../README.md#configuracion).
 
 **Perfil rápido (Claude Code):** con `ANTHROPIC_BASE_URL` apuntando al proxy y el proxy en marcha (`npm run dev`), suele bastar la cabecera de fallback `x-claude-code-session-id` (prioridad 2); el override `x-cc-audit-session` (prioridad 1) solo aplica si la envías explícitamente. Detalle en el [README: correlación de sesión](../README.md#correlación-de-sesión-sessionid).
 
@@ -217,7 +220,8 @@ El resto (límites de tamaño, volcado SSE crudo, etc.) está en la Matriz de En
 ## Siguientes pasos
 
 - [Variables de entorno](../README.md#configuracion) (matriz completa de configuración).
-- [Capas de bytes y convenciones](../README.md#capas-bytes-env) (diagrama y límites en memoria y disco).
+- [Configuración avanzada](./advanced-configuration.md) (constantes internas: cabeceras, gzip, buffer derivado).
+- [Capas de bytes y convenciones](../README.md#capas-bytes-env) (truncado en memoria y disco).
 - [Correlación de sesión](../README.md#correlación-de-sesión-sessionid) (resolución de session ID y overrides).
 - [Modelo de auditoría de sesiones (`session-audit-model.md`)](./session-audit-model.md) — referencia canónica del layout en `sessions/`.
 - [Archivos de auditoría (resumen)](../README.md#archivos-auditoria).

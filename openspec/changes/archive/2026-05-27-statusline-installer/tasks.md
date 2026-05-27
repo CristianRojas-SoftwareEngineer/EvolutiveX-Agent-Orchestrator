@@ -1,7 +1,7 @@
 ## 1. Módulo compartido de settings
 
-- [x] 1.1 Crear `scripting/lib/claude-settings.ts` con `readClaudeSettings`, `writeClaudeSettings`, tipo `ClaudeSettings` y ruta `CLAUDE_SETTINGS_PATH`
-- [x] 1.2 Refactorizar `configure-provider.ts` para importar desde `claude-settings.ts` sin cambiar comportamiento
+- [x] 1.1 Crear `scripting/shared/claude-settings.ts` con `readClaudeSettings`, `writeClaudeSettings`, tipo `ClaudeSettings` y ruta `CLAUDE_SETTINGS_PATH`
+- [x] 1.2 Refactorizar `configure-provider.ts` para importar desde `shared/claude-settings.ts` sin cambiar comportamiento
 - [x] 1.3 Verificar: `npm run test:quick` pasa (o al menos typecheck + tests existentes de scripting si los hay)
 
 ## 2. Resolución de rutas en router-status

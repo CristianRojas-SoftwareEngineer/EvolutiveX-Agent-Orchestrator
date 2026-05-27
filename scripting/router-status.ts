@@ -15,7 +15,7 @@ import { fileURLToPath } from 'node:url';
 import {
   readClaudeSettings,
   SMART_CODE_PROXY_ROOT_KEY,
-} from './lib/claude-settings.js';
+} from './shared/claude-settings.js';
 
 // ── Tipos ───────────────────────────────────────────────────────
 

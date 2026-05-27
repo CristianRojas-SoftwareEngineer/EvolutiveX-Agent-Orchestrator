@@ -34,7 +34,7 @@ Se necesita un instalador dedicado, independiente de `configure-provider`, que c
 
 ## Impact
 
-- **Directorios:** `scripting/` (nuevo instalador, posible `lib/claude-settings.ts`), `scripting/router-status.ts`, `tests/scripting/`, `package.json`, `docs/how-to-start.md` (párrafo de enlace).
+- **Directorios:** `scripting/` (nuevo instalador, `shared/claude-settings.ts`), `scripting/router-status.ts`, `tests/scripting/`, `package.json`, `docs/how-to-start.md` (párrafo de enlace).
 - **Capas PKA:** sin cambios en `src/`; el proxy HTTP y la auditoría en `sessions/` no se modifican, solo cómo el statusline las localiza en disco.
 - **Sistemas externos:** `~/.claude/settings.json` del usuario; reinicio de Claude Code tras instalar.
 - **Dependencias:** ninguna npm nueva; reutiliza `tsx`, `node:path`, `node:fs`.

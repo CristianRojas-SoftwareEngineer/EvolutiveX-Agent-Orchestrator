@@ -8,7 +8,7 @@ import {
   writeClaudeSettings,
   SMART_CODE_PROXY_ROOT_KEY,
   type ClaudeSettings,
-} from './lib/claude-settings.js';
+} from './shared/claude-settings.js';
 
 export { SMART_CODE_PROXY_ROOT_KEY };
 const ROUTER_STATUS_SEGMENT = 'router-status.ts';

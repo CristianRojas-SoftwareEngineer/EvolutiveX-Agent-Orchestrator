@@ -32,7 +32,7 @@ El diseño visual y de tablas permanece en [`docs/proposals/router-status-redesi
 
 **Alternativa rechazada:** Hook post-`applyConfig` en `configure-provider` — acoplamiento y riesgo de borrar `statusLine` en flujos de limpieza.
 
-### 2. Módulo compartido `scripting/lib/claude-settings.ts`
+### 2. Módulo compartido `scripting/shared/claude-settings.ts`
 
 **Decisión:** Extraer `readClaudeSettings`, `writeClaudeSettings`, `CLAUDE_SETTINGS_PATH` y tipo `ClaudeSettings` desde `configure-provider.ts`; ambos scripts importan desde ahí.
 

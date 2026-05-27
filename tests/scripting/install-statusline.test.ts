@@ -14,7 +14,7 @@ import {
 import {
   setClaudeSettingsPathForTests,
   SMART_CODE_PROXY_ROOT_KEY,
-} from '../../scripting/lib/claude-settings.js';
+} from '../../scripting/shared/claude-settings.js';
 import { createValidProxyRoot } from './helpers/proxy-root-fixture.js';
 
 describe('buildStatusLineCommand', () => {

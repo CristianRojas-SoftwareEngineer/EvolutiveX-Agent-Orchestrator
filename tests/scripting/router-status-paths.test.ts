@@ -7,7 +7,7 @@ import {
   resolveProjectRoot,
   type ClaudeSettingsEnv,
 } from '../../scripting/router-status.js';
-import { SMART_CODE_PROXY_ROOT_KEY } from '../../scripting/lib/claude-settings.js';
+import { SMART_CODE_PROXY_ROOT_KEY } from '../../scripting/shared/claude-settings.js';
 import { createValidProxyRoot } from './helpers/proxy-root-fixture.js';
 
 const modelSettings: ClaudeSettingsEnv = {

@@ -2,7 +2,7 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import { readFileSync, writeFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { readClaudeSettings, writeClaudeSettings } from './lib/claude-settings.js';
+import { readClaudeSettings, writeClaudeSettings } from './shared/claude-settings.js';
 
 // ── Tipos y constantes ──────────────────────────────────────────
 

@@ -60,11 +60,13 @@ El statusline consta de **dos o tres tablas** según el método de autenticació
 | Columna           | Contenido                                                      | Fuente                                                           | Alineación |
 | ----------------- | -------------------------------------------------------------- | ---------------------------------------------------------------- | ---------- |
 | Proveedor         | nombre del proveedor resuelto (capitalizado)                   | cruce `UPSTREAM_ORIGIN` vs `config.json`                         | centrada   |
-| Modelo activo     | display name del modelo activo (`metadata.json → displayName`) | stdin (`ctx.model.display_name`) + resolución en `metadata.json` | centrada   |
+| Modelo activo     | texto de `ctx.model.display_name`, enriquecido con `displayName` si coincide con un `modelId` en `metadata.json` | stdin (`ctx.model.display_name`) + búsqueda en `metadata.json` por `modelId` | centrada   |
 | Contexto (tks)    | tamaño de ventana formateado como `NNNk` / `NNNm`              | stdin (`ctx.context_window.context_window_size`)                 | centrada   |
-| Porcentaje de uso | barra de progreso + porcentaje                                 | stdin (`ctx.context_window.used_percentage`)                     | centrada   |
+| Porcentaje de uso | barra de progreso + porcentaje                                 | stdin (`ctx.context_window.used_percentage`) con fallback a caché (véase abajo) | centrada   |
 
 **Barra de progreso:** 8 bloques, usando `█` (lleno) y `░` (vacío). Color dinámico por rango de porcentaje: verde (`#2ecc71`) 0–39%, naranja (`#f39c12`) 40–69%, rojo (`#e74c3c`) 70–100%. Vacío: gris (`\x1B[90m`).
+
+**Porcentaje de contexto (prioridad):** (1) si stdin trae `used_percentage` numérico, finito y **mayor que 0**, se usa y se persiste en `.statusline-state.json`; (2) si está ausente, no es finito o es `0`, se usa `contextUsagePercentage` de la caché de sesión; (3) si no hay caché, la barra muestra `0%`. Un `used_percentage === 0` en stdin **no** se muestra tal cual: activa el fallback a caché.
 
 ---
 
@@ -107,7 +109,7 @@ Presente siempre, independientemente del método de autenticación. Se renderiza
 
 ### 3.3 Tabla 3 — Rate Limits (solo OAuth)
 
-Se renderiza **únicamente** cuando `authMethod === 'oauth'`. Aplica al proveedor `anthropic` con suscripción PRO/Max.
+Se renderiza cuando `authMethod === 'oauth'` **y** `ctx.rate_limits` incluye al menos `five_hour` o `seven_day`. Si el método es OAuth pero stdin no trae datos de cuota, no se imprime Tabla 3 (el bloque Tabla 1 + Tabla 2 no cambia). Aplica al proveedor `anthropic` con suscripción PRO/Max.
 
 ```
 ╭─ Límites de uso por suscripción ─────────────────────────────────────────────────────╮
@@ -145,10 +147,10 @@ resolveAuthMethod()
         ninguno                       → 'oauth'
 
 renderTablas()
-  ├── si hay sessionDir: leer .statusline-state.json (caché)
-  ├── Tabla 1 + Tabla 2: Side-by-side (si hay sesión)
-  ├── si hay sessionDir: escribir .statusline-state.json (caché)
-  └── Tabla 3: Rate Limits (solo authMethod === 'oauth', debajo del bloque anterior)
+  ├── si hay sessionDir: leer .statusline-state.json (caché, para Tabla 2 y fallback de % en Tabla 1)
+  ├── Tabla 1 + Tabla 2: side-by-side (siempre; con o sin sessionDir)
+  ├── si hay sessionDir: escribir .statusline-state.json (caché: metricsSnapshot; % de contexto al renderizar Tabla 1 si stdin aportó valor usable)
+  └── Tabla 3: Rate Limits (solo authMethod === 'oauth' y cuotas en ctx, debajo del bloque anterior)
 ```
 
 ---
@@ -164,9 +166,13 @@ El script usa códigos ANSI raw sin dependencias externas:
 | Nivel Lite                | Gris           | `\x1B[90m`             |
 | Nivel Standard            | Blanco         | `\x1B[37m`             |
 | Nivel Reasoning           | Blanco bold    | `\x1B[1;37m`           |
-| Barra de progreso (lleno) | Blanco         | `\x1B[37m`             |
+| Barra de progreso (lleno, 0–39%) | Verde `#2ecc71` | `\x1B[38;2;46;204;113m` |
+| Barra de progreso (lleno, 40–69%) | Naranja `#f39c12` | `\x1B[38;2;243;156;18m` |
+| Barra de progreso (lleno, 70–100%) | Rojo `#e74c3c` | `\x1B[38;2;231;76;60m` |
 | Barra de progreso (vacío) | Gris           | `\x1B[90m`             |
 | Bordes de tabla           | Gris           | `\x1B[90m`             |
+
+Los bloques llenos (`█`) de las barras de contexto (Tabla 1) y de cuotas (Tabla 3) usan la escala dinámica anterior; ver §3.1.
 
 ---
 
@@ -195,14 +201,14 @@ Extensión v1 deliberada: el statusline persiste estado ligero por sesión para 
 | Aspecto | Detalle |
 | ------- | ------- |
 | Ruta | `sessions/<sessionDir>/.statusline-state.json` |
-| Lectura | Al renderizar Tabla 2 (si existe `sessionDir`) |
-| Escritura | Al final de la misma invocación, tras calcular métricas y % de contexto |
+| Lectura | Al renderizar Tabla 1 (fallback de %) y Tabla 2 (diff de celdas), si existe `sessionDir` |
+| Escritura | Tras renderizar Tabla 1 (`contextUsagePercentage` si stdin aportó valor usable) y al final de Tabla 2 (`metricsSnapshot`) |
 
 **Campos:**
 
 | Campo | Uso |
 | ----- | --- |
-| `contextUsagePercentage` | Fallback de la barra de contexto (Tabla 1) cuando stdin no trae `ctx.context_window.used_percentage` usable |
+| `contextUsagePercentage` | Fallback de la barra de contexto (Tabla 1) cuando stdin no trae `ctx.context_window.used_percentage` **usable** (`number`, `Number.isFinite`, `> 0`) |
 | `metricsSnapshot` | Snapshot `{ lite, standard, reasoning }` con `count`, `inputTokens`, `cacheReadInputTokens`, `outputTokens` para atenuar (`dim`) o resaltar (`value`) celdas numéricas en Tabla 2 vía `cellColor` |
 
 **Fuera de alcance de la caché:** reconstruir métricas de sesión si falta o está corrupto `session-metrics.json`; la Tabla 2 sigue dependiendo exclusivamente de ese archivo.
@@ -247,9 +253,11 @@ Layout de sesiones: [`session-audit-model.md`](../session-audit-model.md).
 
 ---
 
-## 7. Resolución del nombre de display de modelo
+## 7. Resolución del nombre de display de modelo (Tabla 2)
 
-La columna `Modelo` de la Tabla 2 muestra el `displayName` definido en `routing/providers/<provider>/models/<modelId>/metadata.json`. Si el archivo no existe o no tiene ese campo, se muestra el `modelId` como degradación visual.
+Esta sección aplica a la columna **Modelo** de la **Tabla 2** (métricas por nivel), no a la columna **Modelo activo** de la Tabla 1 (véase §3.1).
+
+Para cada `modelId` agregado desde `session-metrics.json`, se muestra el `displayName` de `routing/providers/<provider>/models/<modelId>/metadata.json`. Si el archivo no existe o no tiene ese campo, se muestra el `modelId` como degradación visual.
 
 ---
 
@@ -290,9 +298,13 @@ Si prefiere editar a mano, el bloque equivalente es:
 
 y en `env`: `"SMART_CODE_PROXY_ROOT": "<RUTA_ABSOLUTA_DEL_PROXY>"`.
 
-### configure-provider.ts
+### Scripts de configuración en `settings.json`
 
-`configure-provider.ts` escribe las variables `ANTHROPIC_*` en `~/.claude/settings.json → env` mediante `ClaudeSettingsEnvManager`. El statusline lee ese bloque `env` al arrancar (auth, modelos por nivel y `SMART_CODE_PROXY_ROOT`).
+**`configure-provider.ts`** escribe las variables `ANTHROPIC_*` en `~/.claude/settings.json → env` mediante `ClaudeSettingsEnvManager` (auth y modelos por nivel). No modifica `statusLine` ni `SMART_CODE_PROXY_ROOT`.
+
+**`install-statusline.ts`** (véase instalación recomendada arriba) escribe `statusLine` y `env.SMART_CODE_PROXY_ROOT`.
+
+**`router-status.ts`** lee el bloque `env` completo en cada invocación: `ANTHROPIC_*` (dispatch y clasificación), `SMART_CODE_PROXY_ROOT` (rutas a `sessions/`, `routing/` y `configs/.env`).
 
 ---
 
@@ -306,7 +318,9 @@ y en `env`: `"SMART_CODE_PROXY_ROOT": "<RUTA_ABSOLUTA_DEL_PROXY>"`.
 | `session-metrics.json` ausente o malformado | Tabla 2 se renderiza en cero/sin datos |
 | `modelId` de un registro no coincide con ningún modelo configurado | El registro no se suma a ningún nivel |
 | `cacheReadInputTokens` es `null` | Se trata como `0` en la suma (`coerceMetricNumber` en el lector del statusline; mismo criterio para `count`, `inputTokens`, `outputTokens`) |
-| `displayName` ausente en `metadata.json` | Se muestra `modelId` como texto de la columna |
+| `displayName` ausente en `metadata.json` (Tabla 2) | Se muestra `modelId` como texto de la columna Modelo |
+| `ctx.context_window.used_percentage` ausente, no finito o `0` | Usar `contextUsagePercentage` de `.statusline-state.json` si existe; si no, barra al `0%` |
+| `authMethod === 'oauth'` sin `five_hour` ni `seven_day` en `ctx.rate_limits` | No se muestra Tabla 3 |
 | `.statusline-state.json` ausente, corrupto o ilegible | Ignorar caché; Tabla 2 sin diff de celdas; Tabla 1 sin % de contexto cacheado |
 
 ### Fuera de alcance v1

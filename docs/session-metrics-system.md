@@ -85,10 +85,10 @@ Los `client-preflight` están explícitamente excluidos porque no generan tokens
 `aggregateInteractionMetrics` fue reescrita de O(N) a O(1):
 
 ```
-session-metrics.json → classifyModel(modelId) → acumular en lite / standard / reasoning
+session-metrics.json → classifyModelWithEnv(modelId, settingsEnv) → acumular en lite / standard / reasoning
 ```
 
-Si el archivo no existe (sesión anterior a la feature, o sesión vacía), retorna métricas en cero. No hay fallback a escaneo legacy: las sesiones anteriores simplemente no muestran métricas de Tabla 2. Al leer `session-metrics.json`, el agregador del statusline normaliza valores `null` o no numéricos a `0` antes de sumar (véase §10 de [`router-status-redesign.md`](./proposals/router-status-redesign.md)).
+Si el archivo no existe (sesión anterior a la feature, o sesión vacía), retorna métricas en cero. No hay fallback a escaneo legacy: las sesiones anteriores simplemente no muestran métricas de Tabla 2. Al leer `session-metrics.json`, el agregador del statusline normaliza valores `null` o no numéricos a `0` antes de sumar (véase §10 de [`router-status-redesign.md`](./proposals/router-status-redesign.md), incluidas reglas de `used_percentage` y caché de contexto).
 
 Para el layout de sesión e interacciones, véase [`session-audit-model.md`](./session-audit-model.md) (§5 y §6.1).
 

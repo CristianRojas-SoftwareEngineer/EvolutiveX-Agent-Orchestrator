@@ -192,7 +192,7 @@ describe('AuditStandardResponseHandler', () => {
     expect(interactionCleared).toBe(true);
   });
 
-  it('debería respetar MAX_RESPONSE_BUFFER_BYTES al acumular chunks', async () => {
+  it('debería truncar el buffer en memoria al acumular chunks', async () => {
     const config = makeConfig({ MAX_RESPONSE_BUFFER_BYTES: 10 });
     let capturedTotalBytes: number | null = null;
     let capturedBufferLength: number | null = null;

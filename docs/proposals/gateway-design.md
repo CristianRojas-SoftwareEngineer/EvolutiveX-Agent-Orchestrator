@@ -4,6 +4,79 @@ Documento **unificado** que describe el estado actual de Smart Code Proxy, el mo
 
 ---
 
+## Tabla de contenidos
+
+### [Parte I — Fundamentos](#parte-i--fundamentos)
+
+- [1. Contexto del producto](#1-contexto-del-producto)
+- [2. Progressive Kernel Architecture](#2-progressive-kernel-architecture)
+- [3. Principios de diseño gateway](#3-principios-de-diseño-gateway)
+- [4. Glosario y definiciones canónicas](#4-glosario-y-definiciones-canónicas)
+- [5. Integración con tipos Anthropic](#5-integración-con-tipos-anthropic)
+
+### [Parte II — Estado actual (implementación en `src/`)](#parte-ii--estado-actual-implementación-en-src)
+
+- [6. Composición PKA actual](#6-composición-pka-actual)
+- [7. Flujo runtime actual](#7-flujo-runtime-actual)
+- [8. Detalle por capa](#8-detalle-por-capa)
+- [9. Modelo de auditoría en disco actual](#9-modelo-de-auditoría-en-disco-actual)
+- [10. Correlación actual: heurísticas y limitaciones](#10-correlación-actual-heurísticas-y-limitaciones)
+- [11. Tabla de equivalencias: vocabulario actual ↔ objetivo](#11-tabla-de-equivalencias-vocabulario-actual--objetivo)
+
+### [Parte III — Modelo de dominio objetivo](#parte-iii--modelo-de-dominio-objetivo-con-guía-de-implementación)
+
+- [12. Vista de agregados](#12-vista-de-agregados)
+- [13. Entidades de enrutamiento](#13-entidades-de-enrutamiento)
+- [14. Session y Workflow](#14-session-y-workflow)
+- [15. WorkflowResult](#15-workflowresult)
+- [16. Step](#16-step)
+- [17. ToolUse](#17-tooluse)
+- [18. Invariantes globales (G1–G17)](#18-invariantes-globales-g1g17)
+- [19. Tipos primitivos y estructura de archivos](#19-tipos-primitivos-y-estructura-de-archivos)
+
+### [Parte IV — Observabilidad y correlación (runtime objetivo)](#parte-iv--observabilidad-y-correlación-runtime-objetivo)
+
+- [20. Sistema de correlación: tres planos de señal](#20-sistema-de-correlación-tres-planos-de-señal)
+- [21. Reglas de autoridad por concern](#21-reglas-de-autoridad-por-concern)
+- [22. Plano A — Cabeceras Claude Code ≥ 2.1.139](#22-plano-a--cabeceras-claude-code--21139)
+- [23. Plano B — Delegación SSE y join tool↔agente](#23-plano-b--delegación-sse-y-join-toolagente)
+- [24. Plano C — Hooks Claude Code](#24-plano-c--hooks-claude-code)
+- [25. Flujo proxy HTTP objetivo](#25-flujo-proxy-http-objetivo)
+- [26. Streaming SSE y StepBuffer](#26-streaming-sse-y-stepbuffer)
+- [27. Subagentes](#27-subagentes)
+- [28. Integración Wire ↔ Hooks: carreras y estados](#28-integración-wire--hooks-carreras-y-estados)
+
+### [Parte V — Persistencia objetivo](#parte-v--persistencia-objetivo)
+
+- [29. Terminología de entradas y salidas](#29-terminología-de-entradas-y-salidas)
+- [30. Estructura de directorios target](#30-estructura-de-directorios-target)
+- [31. Reglas adaptativas](#31-reglas-adaptativas)
+- [32. Escenarios de workflows](#32-escenarios-de-workflows)
+- [33. Artefactos de persistencia](#33-artefactos-de-persistencia)
+- [34. Reconstrucción de bodies](#34-reconstrucción-de-bodies)
+- [35. Resolución canónica de ubicaciones](#35-resolución-canónica-de-ubicaciones)
+- [36. Garantías de robustez](#36-garantías-de-robustez)
+- [37. Matriz entidad dominio ↔ ruta disco + migración](#37-matriz-entidad-dominio--ruta-disco--migración)
+- [37b. Checklist de aceptación E2E del layout](#37b-checklist-de-aceptación-e2e-del-layout)
+
+### [Parte VI — Arquitectura PKA objetivo](#parte-vi--arquitectura-pka-objetivo)
+
+- [38. Diagrama objetivo (capas + dos entradas wire/hooks)](#38-diagrama-objetivo-capas--dos-entradas-wirehooks)
+- [39. Capa 1 objetivo](#39-capa-1-objetivo)
+- [40. Capa 2 objetivo](#40-capa-2-objetivo)
+- [41. Capa 3 objetivo](#41-capa-3-objetivo)
+- [42. Capas 4–5 objetivo](#42-capas-45-objetivo)
+
+### [Parte VII — Estrategia de refactorización y cierre](#parte-vii--estrategia-de-refactorización-y-cierre)
+
+- [43. Fases de implementación](#43-fases-de-implementación)
+- [44. Comparativa lado a lado (actual vs objetivo)](#44-comparativa-lado-a-lado-actual-vs-objetivo)
+- [45. Fuera de alcance (v1)](#45-fuera-de-alcance-v1)
+- [46. Referencias y trazabilidad](#46-referencias-y-trazabilidad)
+- [47. Resumen ejecutivo](#47-resumen-ejecutivo)
+
+---
+
 # Parte I — Fundamentos
 
 ## 1. Contexto del producto

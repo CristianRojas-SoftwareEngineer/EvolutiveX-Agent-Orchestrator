@@ -67,13 +67,13 @@
 
 ## 9. Gobernanza
 
-- [ ] 9.1 Ejecutar `openspec validate --changes gateway-c1-wire-agent-headers` → passed
+- [x] 9.1 Ejecutar `openspec validate --changes gateway-c1-wire-agent-headers` → passed
   - _Criterio: 1 passed, 0 failed_
-- [ ] 9.2 Ejecutar `migration-phase-gate` sobre este change antes de archivar
+- [x] 9.2 Ejecutar `migration-phase-gate` sobre este change antes de archivar
   - _Criterio: veredicto PASS_
-- [ ] 9.3 Actualizar estado de C1 a `validada` en el registro de `openspec/changes/gateway-migration/design.md`
+- [x] 9.3 Actualizar estado de C1 a `validada` en el registro de `openspec/changes/gateway-migration/design.md`
   - _Criterio: columna Estado de C1 = `validada`_
-- [ ] 9.4 Si este change modifica comportamiento acordado en `openspec/specs/`, ejecutar `openspec-sync`
+- [x] 9.4 Si este change modifica comportamiento acordado en `openspec/specs/`, ejecutar `openspec-sync`
   - _Criterio: ejecutado si aplica; no ejecutado si no hay delta de specs existentes_
-- [ ] 9.5 Archivar este change: `openspec-archive`
+- [x] 9.5 Archivar este change: `openspec-archive`
   - _Criterio: directorio movido a `openspec/changes/archive/`; estado de C1 en el registro = `archivada`_

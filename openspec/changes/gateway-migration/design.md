@@ -27,7 +27,7 @@ La relación padre→hijo entre este orquestador y los changes de segundo nivel 
 | Fase | Change hijo | Bloque | Dependencia (§43) | Gate de validación | Docs a actualizar | Legacy a retirar | Estado |
 |------|-------------|--------|-------------------|--------------------|-------------------|------------------|--------|
 | C0 | *(sin change hijo — es este documento)* | Documentación | — | Artefactos del orquestador completos | `docs/proposals/gateway-design.md` | — | validada |
-| C1 | `gateway-c1-wire-agent-headers` | Correlación wire | — | `npm run test:quick` + test E2E Fastify con cabeceras | `README.md`, `docs/session-audit-model.md` | Lógica heurística de correlación de agente (degradada a fallback en C1; eliminada en G2) | validada |
+| C1 | `gateway-c1-wire-agent-headers` | Correlación wire | — | `npm run test:quick` + test E2E Fastify con cabeceras | `README.md`, `docs/session-audit-model.md` | Lógica heurística de correlación de agente (degradada a fallback en C1; eliminada en G2) | archivada |
 | C2 | `gateway-c2-sse-subagent-join` | Correlación wire | C1 | Pruebas de join `tool_use_id`↔subagente + fallback legacy E2E | `docs/session-audit-model.md` | Correlación pending heurística de subagente | pendiente |
 | C3 | `gateway-c3-hooks-endpoint` | Borde hooks | C1 | Pruebas de endpoint `POST /hooks` + `AuditHookEventHandler` E2E | `README.md`, `docs/proposals/gateway-design.md` | — | pendiente |
 | C4 | `gateway-c4-workflow-closure` | Cierre integrado | C2, C3 | Pruebas de `buildWorkflowResult` + proyección disco E2E (subset §37b) | `README.md`, `docs/session-audit-model.md`, `docs/proposals/gateway-design.md` | Cierre wire-only como ruta principal | pendiente |

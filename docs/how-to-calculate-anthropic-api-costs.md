@@ -120,7 +120,7 @@ Si un turno incluye varias llamadas a `/v1/messages` (p. ej. `stop_reason: tool_
 
 En el último POST del turno, su `input_tokens` suele aproximar el **tamaño del prompt de ese hop** (historial reenviado completo en esa llamada). No sustituye la suma de todos los hops para estimar coste acumulado del turno.
 
-En el diseño de dominio gateway (propuesta), esa agregación corresponde a `WorkflowResult.usage`: [§7.7.1 — facturado por hop vs cardinalidad de contexto](./proposals/new-diseno-dominio-gateway-observabilidad.md#771-semántica-facturado-por-hop-vs-cardinalidad-de-contexto).
+En el diseño de dominio gateway (propuesta), esa agregación corresponde a `WorkflowResult.usage`: [§15.7.1 — facturado por hop vs cardinalidad de contexto](./proposals/gateway-design.md#1571-semántica-facturado-por-hop-vs-cardinalidad-de-contexto).
 
 ---
 

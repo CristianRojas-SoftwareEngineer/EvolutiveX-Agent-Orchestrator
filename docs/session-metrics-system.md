@@ -110,7 +110,7 @@ No existe doble conteo. Sumar todos los turnos da el costo total efectivo de la 
 
 #### Semántica de los totales
 
-`session-metrics.json` acumula contadores `usage` **por step/llamada HTTP** (cada invocación que actualiza métricas suma su propio `totals` al bucket del modelo). Es **consumo facturado acumulado** en la sesión, equivalente en intención a `WorkflowResult.usage` en la [propuesta de dominio gateway](./proposals/new-diseno-dominio-gateway-observabilidad.md#771-semántica-facturado-por-hop-vs-cardinalidad-de-contexto) (§7.7.1).
+`session-metrics.json` acumula contadores `usage` **por step/llamada HTTP** (cada invocación que actualiza métricas suma su propio `totals` al bucket del modelo). Es **consumo facturado acumulado** en la sesión, equivalente en intención a `WorkflowResult.usage` en el [diseño unificado del gateway](./proposals/gateway-design.md#1571-semántica-facturado-por-hop-vs-cardinalidad-de-contexto) (§15.7.1).
 
 No uses los totales de sesión como «tamaño del contexto en un solo request»: para eso conviene el último step del turno o su `usage` individual, no la suma de toda la sesión.
 

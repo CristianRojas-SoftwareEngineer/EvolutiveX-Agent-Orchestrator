@@ -338,7 +338,7 @@ sequenceDiagram
 
 | Ruta | Responsabilidad |
 | ---- | ---------------- |
-| `1-domain/types/audit.types.ts` | Modelo de turno en memoria y en `meta.json`: `ActiveInteraction`, `StepMeta`, `InteractionMetadata`, pending tools, `computeTokenTotals()`. |
+| `1-domain/types/audit.types.ts` | Modelo de turno en memoria y en `meta.json`: `ActiveInteraction`, `StepMeta`, `InteractionMetadata`, pending tools (`PendingAgentToolUse`, `PendingWebFetchToolUse`, `PendingWebSearchToolUse` — extensiones SCP), `computeTokenTotals()`. |
 | `1-domain/types/anthropic.types.ts` | Contratos wire Anthropic. |
 | `1-domain/types/config.types.ts`, `logger.types.ts`, `json.types.ts`, `pricing.types.ts` | Config, logging, JSON, pricing. |
 | `1-domain/constants/audit-paths.ts`, `audit-limits.ts`, `session-headers.ts` | Layout lógico, límites, nombres de cabeceras. |
@@ -2471,6 +2471,8 @@ Este artefacto proporciona:
 - **Debugging:** Permite reconstruir el flujo completo de una sesión sin navegar el árbol de directorios.
 - **Auditoría:** Base para métricas, dashboards y análisis post-mortem.
 
+> **Nota de diseño (dual-write intencional):** El árbol de directorios (§29–§32) y `events.ndjson` son proyecciones complementarias del mismo flujo de ejecución. La redundancia es intencional: el log cronológico optimiza para replay y debugging temporal; el árbol causal optimiza para navegación humana y crash recovery parcial. Análogo a un event store + vista materializada.
+
 ---
 
 ## 37b. Checklist de aceptación E2E del layout
@@ -2792,6 +2794,108 @@ En todas las fases C y G: **mismo layout `sessions/`** salvo campos adicionales 
 | `output/body.json` | Preferir `finalText` hook; mantener reconstrucción SSE como fallback | Hook > SSE |
 
 > **Nota:** `session-audit-model.md` §7.3 se actualizará en el plan de implementación que materialice fases C1–C4; este documento describe el diseño objetivo sin afirmar que ya está implementado en `src/`.
+
+### 46.5 Evolución API Anthropic: campos por incorporar
+
+Campos de la API Anthropic (documentados en 2025-2026) que el diseño actual no cubre explícitamente. Ninguno invalida el modelo Step/Workflow/ToolUse; requieren extensiones aditivas.
+
+#### 46.5.1 `stop_reason: "pause_turn"`
+
+**Semántica API:** Indica que el server-side sampling loop (usado por server tools como `web_search`, `web_fetch`) alcanzó su límite de iteraciones (default 10). La respuesta puede contener un bloque `server_tool_use` sin su correspondiente resultado. Para continuar, el cliente reenvía la respuesta del assistant tal cual en el siguiente request — la API reanuda donde quedó.
+
+**Impacto en el modelo SCP:**
+
+- El Step actual se **cierra** con `stopReason: 'pause_turn'`.
+- El siguiente POST (continuation) abre un nuevo Step en el mismo Workflow — misma semántica que `tool_use` seguido de continuation.
+- No requiere estado nuevo en Step; `stopReason` ya es `string` (§16).
+
+**Decisión de diseño:** Tratar `pause_turn` como cualquier otro `stopReason` que genera continuation. El diagrama de estados del Step (§16 mermaid) se extiende:
+
+```
+Open --> Closed: stop_reason pause_turn (server tool loop limit)
+```
+
+No se necesita `AwaitingTools` intermedio porque el proxy no ejecuta la tool — Anthropic la ejecuta server-side.
+
+#### 46.5.2 `stop_reason: "refusal"`
+
+**Semántica API:** Claude rehúsa generar respuesta por violación de política de seguridad. Disponible por defecto en Sonnet 4.5+ y Claude 4+. La respuesta incluye contenido parcial (texto generado antes del corte) y opcionalmente un campo `stop_details: { type: "refusal", category?: "cyber" | "bio" | null, explanation?: string }`. El cliente **debe** resetear contexto (reformular o limpiar historial) antes de continuar.
+
+**Impacto en el modelo SCP:**
+
+- El Step se cierra con `stopReason: 'refusal'`.
+- Si es el último Step del Workflow (sin continuation posterior), `WorkflowResult.outcome` debería reflejar la negativa: nuevo valor `'refused'` en el enum de outcomes.
+- `stop_details` es metadata forense útil; puede persistirse en `Step` como campo opcional `stopDetails?: { category?: string; explanation?: string }`.
+
+**Decisión de diseño:**
+
+1. `Step.stopReason = 'refusal'` — sin cambios al tipo (ya es `string`).
+2. Agregar campo opcional `Step.stopDetails` para metadata de refusal.
+3. Nuevo outcome en `WorkflowResult`: `'refused'` — indica que el modelo rehusó y no hubo continuation exitosa posterior.
+4. El diagrama de estados del Step se extiende:
+```
+Open --> Closed: stop_reason refusal (policy violation)
+```
+
+#### 46.5.3 `usage.server_tool_use`
+
+**Semántica API:** Objeto dentro de `usage` que reporta el consumo de server-side tools. Estructura actual documentada:
+
+```json
+{
+  "usage": {
+    "input_tokens": 6039,
+    "output_tokens": 931,
+    "server_tool_use": {
+      "web_search_requests": 1
+    }
+  }
+}
+```
+
+Cobro: $10 por 1000 búsquedas web. Los resultados de búsqueda cuentan como input tokens en el mismo turno y en turnos subsiguientes.
+
+**Impacto en el modelo SCP:**
+
+- `IAnthropicUsage` (actualmente en `src/1-domain/types/anthropic.types.ts`) **no tiene** este campo.
+- `Step.usage` hereda `IAnthropicUsage` 1:1 del wire, así que debe reflejar el campo.
+- `WorkflowResult.usage` agrega por categoría; `server_tool_use.web_search_requests` se suma entre hops.
+
+**Decisión de diseño:**
+
+1. Extender `IAnthropicUsage`:
+```typescript
+server_tool_use?: {
+  web_search_requests?: number;
+  web_fetch_requests?: number;
+};
+```
+2. En agregación de `WorkflowResult.usage`, sumar `web_search_requests` y `web_fetch_requests` entre Steps.
+3. Incluir en `totalCostUsd` el coste de búsquedas ($0.01/búsqueda).
+
+#### 46.5.4 `cache_creation.ephemeral_5m` / `ephemeral_1h`
+
+**Semántica API:** Desglose de `cache_creation_input_tokens` por TTL del cache. El request marca bloques con `cache_control: { type: "ephemeral", ttl?: "5m" | "1h" }`. La respuesta desglosa en `usage`:
+
+- `cache_creation_input_tokens`: total (campo existente, retrocompatible).
+- `cache_creation.ephemeral_5m_input_tokens`: tokens cacheados con TTL 5 min.
+- `cache_creation.ephemeral_1h_input_tokens`: tokens cacheados con TTL 1 hora (write cost 2×).
+
+**Estado actual en src/:** `AnthropicUsage` ya tiene el desglose (`anthropic.types.ts`):
+```typescript
+cache_creation?: {
+  ephemeral_5m_input_tokens?: number;
+  ephemeral_1h_input_tokens?: number;
+};
+```
+
+**Impacto en el modelo SCP:** Nulo a nivel conceptual. El desglose ya existe en el tipo wire. La agregación en `WorkflowResult.usage` suma por subcategoría igual que `cache_creation_input_tokens` ya documentado.
+
+**Decisión de diseño:** Documentar en §15.7 que el desglose por TTL existe y se agrega por suma directa. No requiere cambio de modelo; solo visibilidad en la fórmula de coste si se quiere calcular ahorro por tier de cache.
+
+---
+
+> **Nota general:** Los cuatro campos son aditivos al diseño existente. El modelo Step/Workflow/ToolUse permanece válido. La implementación puede incorporarlos incrementalmente sin refactoring.
 
 ---
 

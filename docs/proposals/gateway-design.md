@@ -1,15 +1,6 @@
 # Smart Code Proxy — Diseño del Gateway: Estado Actual y Arquitectura Objetivo
 
-Documento **unificado** que describe el estado actual de Smart Code Proxy, el modelo de dominio objetivo para el refactor gateway, la estrategia de persistencia target (`causal-workflows-v1`) y la hoja de ruta de refactorización.
-
-**Documentos fuente integrados** (propuestas previas eliminadas tras unificación; trazabilidad en §46.4):
-
-| Documento (histórico) | Rol en este unificado |
-|----------------------|----------------------|
-| [session-audit-model.md](../session-audit-model.md) | Estado actual de disco (referencia canónica) |
-| `smart-code-proxy-pka-current-and-target.md` | Capas PKA, estado actual `src/`, correlación Wire+Hooks |
-| `new-diseno-dominio-gateway-observabilidad.md` | Modelo de dominio: entidades, invariantes, StepBuffer, hooks |
-| `new-structure-of-observability.md` | Layout físico `causal-workflows-v1`, escenarios, terminología |
+Documento **unificado** que describe el estado actual de Smart Code Proxy, el modelo de dominio objetivo para el refactor gateway, la estrategia de persistencia target y la hoja de ruta de refactorización.
 
 ---
 
@@ -26,7 +17,7 @@ Documento **unificado** que describe el estado actual de Smart Code Proxy, el mo
 | **Proxy transparente** | Reenviar `POST /v1/messages` (y rutas afines) al upstream con latencia mínima; reenviar streams SSE al cliente. |
 | **Auditoría orientada al humano** | Persistir bajo `sessions/<session-id>/` una jerarquía legible: interacciones, steps HTTP, subagentes, reconstrucción de mensajes. No es un event store exhaustivo de cada delta SSE como entidad de dominio. |
 
-El refactor planificado **no reemplaza** el producto: **eleva el modelo de dominio** (vocabulario gateway) y **reubica responsabilidades** según PKA, convergiendo el layout en disco hacia `causal-workflows-v1` y añadiendo un segundo borde normativo (hooks Claude Code). En **primera fase**, la proyección a `sessions/` existente sigue siendo compatible con `session-audit-model.md`; la convergencia al nuevo layout es incremental (fases P documentadas en §43).
+El refactor planificado **no reemplaza** el producto: **eleva el modelo de dominio** (vocabulario gateway) y **reubica responsabilidades** según PKA, convergiendo el layout en disco hacia la estructura objetivo (ver Parte V, §29–§37) y añadiendo un segundo borde normativo (hooks Claude Code). En **primera fase**, la proyección a `sessions/` existente sigue siendo compatible con `session-audit-model.md`; la convergencia al nuevo layout es incremental (fases P documentadas en §43).
 
 **Documentos hermanos (profundidad, no prerequisito):**
 
@@ -445,7 +436,7 @@ Definidos en `audit.types.ts`:
 
 ### 11.1 Extensiones que SCP conserva
 
-Funcionalidades presentes en SCP que no están en SWG v1 pero siguen siendo necesarias en el diseño objetivo:
+Funcionalidades presentes en SCP que no están en el modelo de dominio v1 pero siguen siendo necesarias en el diseño objetivo:
 
 | Extensión SCP | Tratamiento en objetivo |
 | ------------- | ---------------------- |
@@ -1728,9 +1719,13 @@ stateDiagram-v2
 | 6 | CC < 2.1.139: sin cabeceras ni hooks configurados | Fallback completo a heurística actual (pending+prompt + cierre por wire). |
 
 **Idempotencia:** hooks pueden llegar duplicados (reintentos); el handler verifica estado en repo antes de mutar.
-# Parte V — Persistencia objetivo (layout causal-workflows-v1)
+# Parte V — Persistencia objetivo
 
-> Esta parte describe el **layout de persistencia target** al que Smart Code Proxy convergerá. El diseño canónico se denomina `causal-workflows-v1` y modela cada sesión LLM como un árbol causal en disco. La persistencia es **event-driven**: un componente `SessionPersistence` se suscribe a un bus de eventos y reacciona a eventos de telemetría (`session_start`, `workflow_start`, `workflow_spawn`, `step_request`, `tool_call`, `tool_result`, `stream_chunk`, `workflow_complete`, `workflow_cancel`, `session_complete`, `token_usage`). No hay acoplamiento directo con handlers de transporte.
+> Esta parte describe el **layout de persistencia target** al que Smart Code Proxy convergerá.
+>
+> **`causal-workflows-v1`** es el identificador de versión de este layout. Se llama *causal* porque modela cada sesión LLM como un árbol causal en disco: cada workflow contiene steps, cada step contiene tools, y las tools de tipo Agent anidan un sub-workflow hijo bajo la tool invocadora — reflejando la cadena causa→efecto. El sufijo *v1* permite evoluciones futuras del schema sin romper retrocompatibilidad (cada `meta.json` declara su `layoutVersion`).
+>
+> La persistencia es **event-driven**: un componente `SessionPersistence` se suscribe a un bus de eventos y reacciona a eventos de telemetría (`session_start`, `workflow_start`, `workflow_spawn`, `step_request`, `tool_call`, `tool_result`, `stream_chunk`, `workflow_complete`, `workflow_cancel`, `session_complete`, `token_usage`). No hay acoplamiento directo con handlers de transporte.
 
 **Conceptos clave de persistencia:**
 
@@ -2407,7 +2402,7 @@ Este artefacto proporciona:
 
 ## 37b. Checklist de aceptación E2E del layout
 
-Criterios de verificación derivados de la implementación SWG (`session-persistence-e2e.test.ts`, 159/159 tests). Sirven como checklist de aceptación para validar la convergencia de SCP al layout `causal-workflows-v1`:
+Criterios de verificación para validar la convergencia de SCP al layout `causal-workflows-v1`. Derivados del test suite de referencia (`session-persistence-e2e.test.ts`, 159/159 tests):
 
 | # | Caso de test | Qué valida |
 | - | ------------ | ---------- |
@@ -2569,20 +2564,20 @@ src/1-domain/
 | **Validaciones** | G1–G17; sub-workflow requiere `parentWorkflowId` + `parentToolUseId`. |
 | **Sin I/O** | Ningún `fs`, `fetch`, ni parseo SSE aquí. |
 
-**Nota sobre perfil anémico:** `Workflow.complete()` del documento SWG se implementa como **`buildWorkflowResult(...)`** — función pura invocada desde el handler de capa 3, no como método con efectos secundarios. Esto permite testear la lógica de cierre sin dependencias de infraestructura.
+**Nota sobre perfil anémico:** en lugar de `Workflow.complete()` como método con efectos secundarios, SCP implementa **`buildWorkflowResult(...)`** — función pura invocada desde el handler de capa 3. Esto permite testear la lógica de cierre sin dependencias de infraestructura.
 
 ---
 
 ## 40. Capa 2 objetivo
 
-| Componente | Rol | Relación SWG |
-| ---------- | --- | ------------ |
-| `WorkflowRepository` (memoria) | `Session`, workflows activos, steps abiertos, índices `tool_use_id` | Correlador §11 |
+| Componente | Rol | Referencia interna |
+| ---------- | --- | ------------------ |
+| `WorkflowRepository` (memoria) | `Session`, workflows activos, steps abiertos, índices `tool_use_id` | Correlador §20 |
 | `AuditProjectionFs` | Traducir agregados/DTOs → árbol actual `sessions/…` | Conserva screaming architecture |
 | `StepAssembler` | RAM: SSE → `assistantMessage`, `usage`, `stopReason`; callback `onInferenceComplete` | StepBuffer §26 |
 | `SseReconstructService` | Forense / `output/` desde `sse.jsonl` | Complemento; no sustituye `finalText` de hooks |
 | `StreamTeeService` | Sin cambio respecto a implementación actual | Reenvío + rama audit |
-| `ProviderCatalog` | Leer `routing/providers/` → `Provider`, `LanguageModel` | §5 SWG |
+| `ProviderCatalog` | Leer `routing/providers/` → `Provider`, `LanguageModel` | Entidades §13 |
 
 **Principio:** los adapters **no** deciden cuándo cerrar un workflow; ejecutan lo que capa 3 ordena.
 
@@ -2591,7 +2586,7 @@ src/1-domain/
 | Artefacto | Capa | ¿Persiste deltas SSE? |
 | --------- | ---- | --------------------- |
 | Agregado `Step` en dominio | 1 | No — solo snapshot al cerrar step. |
-| `sse.jsonl` en disco | 2 (proyección) | Sí — decisión de auditoría humana SCP (streaming/*.ndjson en target), ortogonal a G8 SWG. |
+| `sse.jsonl` en disco | 2 (proyección) | Sí — decisión de auditoría humana SCP (streaming/*.ndjson en target), ortogonal a G8. |
 
 ---
 
@@ -2715,23 +2710,7 @@ En todas las fases C y G: **mismo layout `sessions/`** salvo campos adicionales 
 | LLM gateway Claude Code (cabeceras agente) | [https://code.claude.com/docs/en/llm-gateway](https://code.claude.com/docs/en/llm-gateway) |
 | Hooks reference Claude Code | [https://code.claude.com/docs/en/hooks](https://code.claude.com/docs/en/hooks) |
 
-### 46.4 Tabla de trazabilidad: diseño → documentos fuente
-
-| Sección unificado | Documento fuente | Sección fuente |
-| ----------------- | ---------------- | -------------- |
-| §3–§5 Principios, glosario, tipos | `new-diseno-dominio-gateway-observabilidad.md` | §1–§3, §16–§17 |
-| §6–§11 Estado actual y equivalencias | `smart-code-proxy-pka-current-and-target.md` | §3–§4, §3.3 |
-| §11.2 Modelo conceptual en un vistazo | `smart-code-proxy-pka-current-and-target.md` | §3.2 |
-| §12–§19 Modelo de dominio | `new-diseno-dominio-gateway-observabilidad.md` | §4–§10, §18–§22 |
-| §20–§28 Correlación Wire+Hooks | `smart-code-proxy-pka-current-and-target.md` | §5.8.1–§5.8.6 |
-| §24 Hooks → dominio | `new-diseno-dominio-gateway-observabilidad.md` | §11–§12 |
-| §26 StepBuffer | `new-diseno-dominio-gateway-observabilidad.md` | §15 |
-| §29–§37 Persistencia | `new-structure-of-observability.md` | §3–§12 |
-| §38–§42 PKA objetivo | `smart-code-proxy-pka-current-and-target.md` | §5.1–§5.6 |
-| §43 Fases C/G/P | `smart-code-proxy-pka-current-and-target.md` | §5.7 |
-| §37 Migración | `new-structure-of-observability.md` | §6 |
-
-### 46.5 Proyección a disco: campos nuevos al implementar
+### 46.4 Proyección a disco: campos nuevos al implementar
 
 | Archivo disco | Campo nuevo | Origen |
 | ------------- | ----------- | ------ |

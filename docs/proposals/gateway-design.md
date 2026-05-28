@@ -31,7 +31,7 @@ Documento **unificado** que describe el estado actual de Smart Code Proxy, el mo
 - [15. WorkflowResult](#15-workflowresult)
 - [16. Step](#16-step)
 - [17. ToolUse](#17-tooluse)
-- [18. Invariantes globales (G1–G17)](#18-invariantes-globales-g1g17)
+- [18. Invariantes globales (G1–G19)](#18-invariantes-globales-g1g19)
 - [19. Tipos primitivos y estructura de archivos](#19-tipos-primitivos-y-estructura-de-archivos)
 
 ### [Parte IV — Observabilidad y correlación (runtime objetivo)](#parte-iv--observabilidad-y-correlación-runtime-objetivo)
@@ -41,10 +41,12 @@ Documento **unificado** que describe el estado actual de Smart Code Proxy, el mo
 - [22. Plano A — Cabeceras Claude Code ≥ 2.1.139](#22-plano-a--cabeceras-claude-code--21139)
 - [23. Plano B — Delegación SSE y join tool↔agente](#23-plano-b--delegación-sse-y-join-toolagente)
 - [24. Plano C — Hooks Claude Code](#24-plano-c--hooks-claude-code)
+- [24.1 Timer de timeout para ToolUse](#241-timer-de-timeout-para-tooluse-ownership-correlador)
 - [25. Flujo proxy HTTP objetivo](#25-flujo-proxy-http-objetivo)
 - [26. Streaming SSE y StepBuffer](#26-streaming-sse-y-stepbuffer)
 - [27. Subagentes](#27-subagentes)
 - [28. Integración Wire ↔ Hooks: carreras y estados](#28-integración-wire--hooks-carreras-y-estados)
+- [28b. Integración correlador — bus de eventos — persistencia](#28b-integración-correlador--bus-de-eventos--persistencia)
 
 ### [Parte V — Persistencia objetivo](#parte-v--persistencia-objetivo)
 
@@ -500,7 +502,7 @@ Definidos en `audit.types.ts`:
 | `Session` | Sesión `sessions/<id>/` |
 | `Workflow` `kind: main` | Interacción `agentic` en `main-agent/interactions/NN/` |
 | `Workflow` `kind: subagent` | Carpeta `steps/YY/sub-agent-TT/` |
-| `Step` (ciclo lógico) | Uno o más `steps/NN/` HTTP + estado pending en memoria |
+| `Step` (ciclo lógico; ver **§16.1**) | Un directorio `steps/NN/` por POST HTTP; la fase de tools no se observa hoy (se observará vía hooks). 1 Step dominio = 1 POST + tools; ver tabla de proyección en **§16.1** |
 | `ToolUse` | `Pending*ToolUse` + bloques en respuestas; sin entidad de dominio dedicada |
 | `WorkflowResult` | `InteractionMetadata` en `meta.json` + `output/` |
 | `Provider` / `LanguageModel` | `routing/providers/*` (hoy consumido por statusline, no dominio) |
@@ -1109,6 +1111,30 @@ stateDiagram-v2
 - Los `tool_result` del Step N aparecen en `inferenceRequest.messages` del Step N+1 (ver **G10**).
 - `Step.usage` describe **solo** el hop de inferencia del Step; **no** incluye tokens de sub-workflows hijos ni de ejecución local de tools. Rollup E2E → **§15.7**.
 
+### 16.1 Relación Step de dominio, Step HTTP y proyección en disco
+
+El término **Step** tiene significados distintos en la Parte II (estado actual) y la Parte III (modelo objetivo). Esta subsección los desambigua y prescribe cómo conviven durante la migración.
+
+**Definición canónica:** La entidad **Step** del dominio gateway (Parte III, §16) es el ciclo completo: inferencia (POST proxied) + respuesta del modelo + ejecución y resultados de las tools de esa respuesta. El "step HTTP" descrito en la Parte II (§8, §9) es un término operativo que describe la implementación actual, donde cada `POST /v1/messages` genera un directorio `steps/YY/` sin observar la fase de ejecución de tools.
+
+**Regla de mapeo:** En el modelo objetivo, 1 Step de dominio = 1 POST de inferencia + la fase de tools observada vía hooks (estado `AwaitingTools` → `Closed`). En la implementación actual (sin hooks), 1 Step de dominio colapsa a 1 round-trip HTTP porque la fase de tools no se observa — el Step se cierra en `message_stop`.
+
+**Tabla de proyección:**
+
+| Concepto | Dominio (Parte III) | Disco actual (Parte II) | Disco target (Parte V) |
+| -------- | ------------------- | ----------------------- | ---------------------- |
+| Step | Ciclo inferencia + tools | `steps/YY/` (1 POST) | `steps/MM/` (1 POST + `tools/`) |
+| Fase tools | Estado `AwaitingTools` en correlador | No observable (cierre en `message_stop`) | Directorios `tools/KK-slug/` bajo el step |
+| Cierre | `PostToolUse` completa todas tools o `end_turn` | `message_stop` del stream | Correlador cierra + emite evento al bus (§28b) |
+
+**Cardinalidad invariante:** 1 Step de dominio = 1 POST de inferencia. No existe el caso de "1 Step = N POST". La diferencia entre actual y objetivo no es la cardinalidad del POST sino la **amplitud del ciclo de vida**: el Step objetivo incluye la fase de tools que el actual no observa.
+
+**Nota de migración (fases C1–C4):**
+
+- **Sin endpoint de hooks activo (fases C1–C2):** El Step se cierra en `message_stop` (comportamiento actual). El estado `AwaitingTools` no se utiliza. La proyección a disco es idéntica a la actual.
+- **Con endpoint de hooks activo (fases C3–C4):** Al recibir `stop_reason === 'tool_use'`, el Step transiciona a `AwaitingTools` y permanece abierto hasta que los hooks `PostToolUse` completen todas las `ToolUse` del Step. El handler verifica si el endpoint `/hooks` está registrado para decidir el modo de cierre.
+- **Criterio de decisión:** Variable de configuración o feature flag que indica si el borde hooks está activo. Mientras el flag esté desactivado, `message_stop` cierra el Step como hoy.
+
 ---
 
 ## 17. ToolUse
@@ -1148,7 +1174,7 @@ tool_result → toolResultBlock  (tool_use_id, content, is_error)
 
 ---
 
-## 18. Invariantes globales (G1–G17)
+## 18. Invariantes globales (G1–G19)
 
 | # | Regla |
 |---|--------|
@@ -1169,6 +1195,8 @@ tool_result → toolResultBlock  (tool_use_id, content, is_error)
 | G15 | `WorkflowResult.usage` de un workflow **main** incluye rollup de sub-workflows completados enlazados por `ToolUse.childWorkflowId`. Ver **§15.7**. |
 | G16 | Métricas a nivel **Session** suman solo `WorkflowResult.usage` de workflows `kind: 'main'` (evitar doble conteo padre/hijo). Consumo facturado acumulado, no cardinalidad de contexto. Ver **§15.7** y **§15.7.1**. |
 | G17 | `WorkflowResult.finalText` no debe derivarse de `IAnthropicResponse.content` ni de `Step.assistantMessage`; proviene del hook (`last_assistant_message`). Ver **§15.8**. |
+| G18 | El correlador emite eventos de telemetría al bus (`IEventBus`); `SessionPersistence` consume eventos del bus para proyectar a disco. El bus es unidireccional (emisor → suscriptores); la persistencia no muta el correlador. Ver **§28b**. |
+| G19 | El timer de timeout de `ToolUse` vive en el correlador; `SessionPersistence` no implementa timers de timeout propios. La persistencia reacciona al evento `tool_result` (timeout) emitido por el correlador. Ver **§24.1**. |
 
 ---
 
@@ -1525,6 +1553,44 @@ buildWorkflowResult(workflow, closedSteps, hookPayload) → {
 
 > **`PostToolUse` y el StepBuffer:** Los hooks de tools operan **después** de que StepBuffer entregó `assistantMessage` al correlador en `message_stop`. Los hooks no sustituyen al StepBuffer; completan la fase de ejecución de tools del Step ya abierto.
 
+### 24.1 Timer de timeout para ToolUse (ownership correlador)
+
+**Regla de ownership:** El timer de timeout de `ToolUse` vive en el **correlador** (capa 2), no en `SessionPersistence`. Es el correlador quien decide si una tool expiró, porque esa decisión afecta el estado del `ToolUse`, el cierre del Step, y potencialmente el cierre del Workflow. Ubicar el timer en persistencia crearía una fuente de verdad paralela no reconciliada con el correlador.
+
+**Mecanismo:**
+
+1. Al registrar un `ToolUse` pending (observado vía SSE `tool_use` block en `message_stop`), el correlador inicia un timer configurable (variable de entorno, default sugerido 30s).
+2. Si `PostToolUse` / `PostToolUseFailure` llega **antes** del timeout → cancelar el timer; completar `ToolUse` normalmente (`status: 'completed'` o `'error'`); emitir `tool_result` al bus (§28b).
+3. Si el timer expira **antes** del hook → marcar `ToolUse.status = 'timeout'`; emitir `tool_result` al bus con `is_error: true` y `error: 'Tool execution timeout'`.
+
+**Precedencia hook > timeout (con inmutabilidad de cierre):**
+
+Si el hook llega **después** de que el timer ya expiró y emitió timeout:
+
+- El correlador **ignora** el hook tardío.
+- **Justificación:** el correlador cierra Steps de forma determinista. Si el Step ya se procesó con el timeout (y potencialmente ya cerró el Step o el Workflow), reabrir un Step cerrado viola la inmutabilidad del snapshot (coherente con la idempotencia descrita en §28).
+- El hook tardío se loggea como `tool_hook_after_timeout` para auditoría, sin mutar el estado.
+
+```mermaid
+flowchart TD
+  A["ToolUse registrada pending"] --> B["Iniciar timer configurable"]
+  B --> C{"¿Qué llega primero?"}
+  C -->|"Hook PostToolUse"| D["Cancelar timer"]
+  D --> E["Completar ToolUse normal"]
+  E --> F["Emitir tool_result al bus"]
+  C -->|"Timer expira"| G["Marcar ToolUse timeout"]
+  G --> H["Emitir tool_result is_error al bus"]
+  H --> I{"¿Llega hook tardío?"}
+  I -->|"Sí"| J["Ignorar: log tool_hook_after_timeout"]
+  I -->|"No"| K["Fin"]
+  J --> K
+  F --> K
+```
+
+**Variable de entorno:** Nombre reservado para el timeout (a definir en implementación; sugerido `SCP_TOOL_TIMEOUT_MS`).
+
+**Referencia cruzada:** Ver §32.9 para la proyección a disco del timeout; la persistencia consume el evento `tool_result` (timeout) emitido por el correlador al bus (§28b), no implementa timer propio.
+
 ---
 
 ## 25. Flujo proxy HTTP objetivo
@@ -1792,13 +1858,167 @@ stateDiagram-v2
 | 6 | CC < 2.1.139: sin cabeceras ni hooks configurados | Fallback completo a heurística actual (pending+prompt + cierre por wire). |
 
 **Idempotencia:** hooks pueden llegar duplicados (reintentos); el handler verifica estado en repo antes de mutar.
+
+---
+
+## 28b. Integración correlador — bus de eventos — persistencia
+
+Esta sección define el puente prescriptivo entre la Parte IV (correlación runtime) y la Parte V (persistencia en disco). El correlador (§20) y `SessionPersistence` (§29+) se conectan mediante un **bus de eventos de telemetría** interno.
+
+### 28b.1 Ubicación PKA del bus de eventos
+
+| Componente | Capa PKA | Rol |
+| ---------- | -------- | --- |
+| `IEventBus` (port) | 1 (Domain) | Contrato abstracto de emisión/suscripción; sin I/O. |
+| `EventBus` (adapter) | 2 (Services) | Implementación async in-process (pub/sub en memoria). No contiene lógica de dominio. |
+| `IWorkflowRepository` / Correlador | 2 (Services) | Adapter en memoria; mutado por handlers de capa 3. Al mutar, emite eventos al bus. |
+| `SessionPersistence` | 2 (Services) | Suscriptor independiente; consume eventos del bus y proyecta a disco bajo `sessions/`. |
+
+### 28b.2 Flujo prescriptivo: handler → correlador → bus → persistencia
+
+```mermaid
+sequenceDiagram
+  participant H as Handler capa3
+  participant C as Correlador capa2
+  participant B as EventBus capa2
+  participant P as SessionPersistence capa2
+  participant D as Disco sessions/
+
+  H->>C: mutar estado "abrir Step N"
+  C->>C: actualizar estado en memoria
+  C->>B: emit step_request
+  B-->>P: entrega async fire-and-forget
+  P->>D: escribir steps/MM/request/body.json
+
+  Note over H,D: El handler NO escribe disco
+  Note over C,P: El correlador NO conoce SessionPersistence
+  Note over P,C: La persistencia NO muta el correlador
+```
+
+**Secuencia completa de un ciclo Step con tools (streaming):**
+
+```mermaid
+sequenceDiagram
+  participant CC as ClaudeCode
+  participant H as Handler capa3
+  participant SB as StepBuffer RAM
+  participant C as Correlador
+  participant B as EventBus
+  participant P as SessionPersistence
+
+  CC->>H: POST /v1/messages
+  H->>C: onRequest → abrir Step N
+  C->>B: emit step_request
+
+  loop Por cada evento SSE
+    H->>SB: onEvent
+    H->>B: emit stream_chunk
+  end
+
+  Note over SB,C: message_stop
+  SB->>C: onInferenceComplete
+  C->>B: emit step_inference_complete
+  C->>C: crear ToolUse pending desde tool_use blocks
+  C->>B: emit tool_call por cada ToolUse
+
+  CC->>H: PostToolUse hook
+  H->>C: completar ToolUse
+  C->>B: emit tool_result
+
+  C->>C: cerrar Step N
+  C->>B: emit step_closed
+
+  B-->>P: todos los eventos anteriores async
+  P->>P: proyectar a disco
+```
+
+### 28b.3 Catálogo de eventos de telemetría
+
+Eventos emitidos por el correlador al bus. `SessionPersistence` consume todos (`*`) para proyectar a disco.
+
+| Mutación en correlador | Evento emitido | Datos clave |
+| ---------------------- | -------------- | ----------- |
+| Crear/reconciliar sesión | `session_start` | `session_id` |
+| Abrir workflow main | `workflow_start` | `workflow_id`, `session_id`, `kind: 'main'`, `agent_id` |
+| Abrir workflow subagente | `workflow_spawn` | `workflow_id`, `parent_workflow_id`, `triggering_tool_use_id`, `agent_id` |
+| Abrir Step | `step_request` | `request_id`, `workflow_id`, body snapshot (request) |
+| StepBuffer completa inferencia | `step_inference_complete` | `assistantMessage`, `usage`, `stopReason` |
+| Registrar ToolUse pending (SSE) | `tool_call` | `tool_use_id`, `tool_name`, `input`, `workflow_id` |
+| Completar ToolUse (hook o timeout §24.1) | `tool_result` | `tool_use_id`, `result`, `is_error`, `execution_duration_ms` |
+| Cerrar Step | `step_closed` | Step snapshot completo (index, assistantMessage, toolUses, usage, stopReason) |
+| Chunk SSE (streaming forense) | `stream_chunk` | Chunk data, sequence number, `request_id` |
+| Cerrar workflow (éxito) | `workflow_complete` | `WorkflowResult` snapshot, `stop_reason` |
+| Cerrar workflow (fallo/cancel) | `workflow_cancel` | `outcome`, `reason` |
+| Token usage por hop | `token_usage` | `model_id`, `usage` desglose |
+| Cerrar sesión | `session_complete` | `session_id`, `duration_ms` |
+
+> **Nota:** `stream_chunk` es emitido directamente por el handler SSE (capa 3) al bus, no por el correlador. El handler SSE opera en dos ramas paralelas: reenvío transparente a Claude Code y emisión de chunks al bus. El StepBuffer consume los mismos eventos SSE internamente para ensamblar `assistantMessage` (§26).
+
+### 28b.4 Reglas de acoplamiento
+
+1. Los handlers de capa 3 **no** escriben disco directamente; mutan el correlador y, para `stream_chunk`, emiten al bus.
+2. El correlador **no** conoce `SessionPersistence`; emite eventos a `IEventBus` (port abstracto). La inyección del adapter ocurre en composition root (capa 4).
+3. `SessionPersistence` **no** muta el correlador; solo consume eventos y proyecta a disco. Es un suscriptor de solo lectura.
+4. El bus es **unidireccional**: emisor(es) → suscriptor(es). No hay canal de feedback de persistencia al correlador.
+5. La entrega del bus es **async fire-and-forget**: errores de escritura en disco se loggean sin interrumpir el flujo del correlador ni del proxy.
+6. Múltiples suscriptores pueden coexistir (e.g. `SessionPersistence`, futuro WebSocket backend, métricas). Cada suscriptor es independiente.
+
+### 28b.5 Diagrama de capas con bus de eventos
+
+```mermaid
+flowchart TB
+  subgraph L5["Capa 5 — Delivery"]
+    HTTP["POST /v1/messages"]
+    HOOKR["POST /hooks"]
+  end
+
+  subgraph L3["Capa 3 — Operations"]
+    H_IN[AuditInteractionHandler]
+    H_SSE[AuditSseResponseHandler]
+    H_HOOK[AuditHookEventHandler]
+    H_CLOSE[AuditWorkflowClosureHandler]
+  end
+
+  subgraph L2["Capa 2 — Services"]
+    REPO[Correlador InMemoryWorkflowRepository]
+    BUS[EventBus]
+    PROJ[SessionPersistence suscriptor]
+    ASM[StepAssembler StepBuffer]
+    TEE[StreamTeeService]
+  end
+
+  subgraph L1["Capa 1 — Domain"]
+    GW["tipos/interfaces gateway"]
+    DS["domain services puros"]
+    IBUS["IEventBus port"]
+  end
+
+  HTTP --> H_IN
+  HTTP --> H_SSE
+  HOOKR --> H_HOOK
+  H_IN --> REPO
+  H_SSE --> REPO
+  H_SSE --> ASM
+  H_SSE --> BUS
+  H_HOOK --> REPO
+  H_HOOK --> H_CLOSE
+  H_CLOSE --> DS
+  REPO --> BUS
+  BUS --> PROJ
+  BUS -.->|"implementa"| IBUS
+  L3 --> L1
+  L2 --> L1
+```
+
+---
+
 # Parte V — Persistencia objetivo
 
-> Esta parte describe el **layout de persistencia target** al que Smart Code Proxy convergerá.
+> Esta parte describe el **layout de persistencia target** al que Smart Code Proxy convergerá. La conexión entre el correlador runtime (Parte IV) y la persistencia se define en **§28b**: el correlador emite eventos de telemetría al bus; `SessionPersistence` los consume y proyecta a disco. Esta parte se centra en el **layout de disco** y las **reglas de proyección**; para el flujo runtime completo, ver §28b.
 >
 > **`causal-workflows-v1`** es el identificador de versión de este layout. Se llama *causal* porque modela cada sesión LLM como un árbol causal en disco: cada workflow contiene steps, cada step contiene tools, y las tools de tipo Agent anidan un sub-workflow hijo bajo la tool invocadora — reflejando la cadena causa→efecto. El sufijo *v1* permite evoluciones futuras del schema sin romper retrocompatibilidad (cada `meta.json` declara su `layoutVersion`).
 >
-> La persistencia es **event-driven**: un componente `SessionPersistence` se suscribe a un bus de eventos y reacciona a eventos de telemetría (`session_start`, `workflow_start`, `workflow_spawn`, `step_request`, `tool_call`, `tool_result`, `stream_chunk`, `workflow_complete`, `workflow_cancel`, `session_complete`, `token_usage`). No hay acoplamiento directo con handlers de transporte.
+> `SessionPersistence` se suscribe al bus de eventos (§28b) y reacciona a eventos de telemetría (`session_start`, `workflow_start`, `workflow_spawn`, `step_request`, `tool_call`, `tool_result`, `stream_chunk`, `workflow_complete`, `workflow_cancel`, `session_complete`, `token_usage`). No hay acoplamiento directo con handlers de transporte ni con el correlador; la persistencia solo consume eventos del bus.
 
 **Conceptos clave de persistencia:**
 
@@ -2192,10 +2412,13 @@ El `resolveWorkflowLocation` resuelve la ubicación canónica para cualquier niv
 
 ### 32.9. Tool con timeout / Tool con retry
 
-**Timeout:** Si `tool_result` no llega antes del timeout configurado (default 30s):
+**Timeout:** El timer de timeout es propiedad del **correlador** (ver **§24.1**). `SessionPersistence` no implementa timer propio; consume el evento `tool_result` con `is_error: true` emitido por el correlador al bus (§28b) cuando el timeout expira. Al recibir ese evento, persiste:
+
 ```json
 { "isError": true, "result": { "error": "Tool execution timeout" } }
 ```
+
+El artefacto de disco (`result.json`) es idéntico al de un error normal; la diferencia es que el **trigger** es el evento del bus emitido por el correlador, no un timer local de persistencia.
 
 **Retry:** Si llega un `tool_call` con el mismo `tool_use_id` que uno previo, se incrementa `retryCount` en `meta.json` y se preserva el historial en `previousAttempts[]`.
 
@@ -2320,7 +2543,7 @@ Se añaden propiedades al schema `StepMetadata`. Un monitor dinámico asíncrono
 
 | Propósito | Descripción | Default sugerido |
 | --------- | ----------- | ---------------- |
-| Tool timeout | Timer máximo antes de escribir result de timeout si `tool_result` no llega. | 30s |
+| Tool timeout | Timer del **correlador** (§24.1); `SessionPersistence` consume el evento `tool_result` (timeout), no implementa timer propio. | 30s |
 | Streaming max chunks | Límite de chunks SSE persistidos por step (protección contra streams infinitos). | 10000 |
 
 ---
@@ -2408,7 +2631,7 @@ Todos usan `resolveWorkflowLocation(sessionId, workflowId)` para obtener el `wor
 ## 36. Garantías de robustez
 
 1. **Out-of-order tool results:** Correlación por `tool_use_id`, no por índice posicional.
-2. **Tool timeouts:** Timer configurable (default 30s) escribe result de timeout si no llega `tool_result`.
+2. **Tool timeouts:** Timer configurable en el **correlador** (§24.1, default 30s); `SessionPersistence` consume el evento `tool_result` (timeout) emitido por el correlador (G19).
 3. **Tool retries:** Detección por `tool_use_id` duplicado; incrementa `retryCount` y preserva `previousAttempts[]`.
 4. **Workflow cancellation:** Status `cancelled` + `cancellationReason`.
 5. **Crash recovery:** Chunks SSE individuales preservados; `detectOrphans()` escanea workflows sin `state.json` terminal al startup.
@@ -2489,7 +2712,7 @@ Criterios de verificación para validar la convergencia de SCP al layout `causal
 | 6 | Sub-agent steps dentro del nested workflow | Steps del hijo en `workflows/NN/steps/MM/` del directorio nested. |
 | 7 | No crear `tools/` sin tools | Si un step no invoca tools, no se crea el directorio. |
 | 8 | Out-of-order tool results | Correlación por `tool_use_id`, no por índice posicional. |
-| 9 | Tool timeout | Timer configurable escribe result de timeout si no llega `tool_result`. |
+| 9 | Tool timeout | Timer del correlador (§24.1) emite `tool_result` timeout; persistencia consume el evento (G19). |
 | 10 | Tool retry con `retryCount` | Detección por `tool_use_id` duplicado; `previousAttempts[]` en `meta.json`. |
 | 11 | Workflow cancellation | Status `cancelled` + `cancellationReason` en `state.json`. |
 | 12 | Streaming chunks + body reconstruction | Chunks SSE → `body.json` / `body.parsed.md` correctos (text + tool_use + partial_json). |
@@ -2599,8 +2822,8 @@ flowchart TB
 
 | Capa | Componentes objetivo |
 | ---- | -------------------- |
-| **1** | `resolveAgentContext`, `joinToolUseToSubagent`, `buildWorkflowResult`, `deriveOutcome`, `deriveFinalText`, `IWorkflowRepository`, tipos hook (`ClaudeHookEvent`), extensión `ParentContext` (`agentId`, `parentAgentId`), `CorrelationMethod` extendido. |
-| **2** | `InMemoryWorkflowRepository` (índices: `sessionId+agentId`, `interactionDir`, `tool_use_id`), `AuditProjection` (`WorkflowResult` → `meta.json` / `output/body.json`), `StepAssembler`, `ProviderCatalog`. |
+| **1** | `resolveAgentContext`, `joinToolUseToSubagent`, `buildWorkflowResult`, `deriveOutcome`, `deriveFinalText`, `IWorkflowRepository`, `IEventBus` (port abstracto §28b), tipos hook (`ClaudeHookEvent`), extensión `ParentContext` (`agentId`, `parentAgentId`), `CorrelationMethod` extendido. |
+| **2** | `InMemoryWorkflowRepository` (índices: `sessionId+agentId`, `interactionDir`, `tool_use_id`), `EventBus` (adapter §28b), `SessionPersistence` (suscriptor §28b), `AuditProjection` (`WorkflowResult` → `meta.json` / `output/body.json`), `StepAssembler`, `ProviderCatalog`. |
 | **3** | `AuditInteractionHandler` (clasificación + routing), `AuditSseResponseHandler`, `AuditHookEventHandler` (mapa hooks), `AuditWorkflowClosureHandler` (cierre + resultado). |
 | **5** | `POST /v1/messages` (proxy), `POST /hooks` (excluida de side-interactions, respuesta rápida 2xx). |
 
@@ -2636,7 +2859,7 @@ src/1-domain/
 | -------------- | -------- |
 | **Datos de dominio** | `Workflow`, `Step`, `ToolUse`, `WorkflowResult`, `Provider`, `LanguageModel`. |
 | **Transformaciones puras** | `aggregateWorkflowUsage(steps, childWorkflows)`, `deriveOutcome(hook)`, `deriveFinalText(hook)`. |
-| **Validaciones** | G1–G17; sub-workflow requiere `parentWorkflowId` + `parentToolUseId`. |
+| **Validaciones** | G1–G19; sub-workflow requiere `parentWorkflowId` + `parentToolUseId`. |
 | **Sin I/O** | Ningún `fs`, `fetch`, ni parseo SSE aquí. |
 
 **Nota sobre perfil anémico:** en lugar de `Workflow.complete()` como método con efectos secundarios, SCP implementa **`buildWorkflowResult(...)`** — función pura invocada desde el handler de capa 3. Esto permite testear la lógica de cierre sin dependencias de infraestructura.
@@ -2648,6 +2871,8 @@ src/1-domain/
 | Componente | Rol | Referencia interna |
 | ---------- | --- | ------------------ |
 | `WorkflowRepository` (memoria) | `Session`, workflows activos, steps abiertos, índices `tool_use_id` | Correlador §20 |
+| `EventBus` | Adapter async in-process del port `IEventBus`; pub/sub unidireccional | Bus de eventos §28b |
+| `SessionPersistence` | Suscriptor del bus; proyecta eventos de telemetría a disco `sessions/` | §28b, Parte V |
 | `AuditProjectionFs` | Traducir agregados/DTOs → árbol actual `sessions/…` | Conserva screaming architecture |
 | `StepAssembler` | RAM: SSE → `assistantMessage`, `usage`, `stopReason`; callback `onInferenceComplete` | StepBuffer §26 |
 | `SseReconstructService` | Forense / `output/` desde `sse.jsonl` | Complemento; no sustituye `finalText` de hooks |
@@ -2730,7 +2955,7 @@ En todas las fases C y G: **mismo layout `sessions/`** salvo campos adicionales 
 | Aspecto | Actual | Objetivo |
 | ------- | ------ | -------- |
 | Unidad de turno | `Interaction` | `Workflow` |
-| Step | 1 step = 1 HTTP | Step lógico (puede mapear a 1..N HTTP; proyección puede conservar NN) |
+| Step | 1 step = 1 POST HTTP; cierre en `message_stop` (sin fase tools) | Step dominio = 1 POST + fase tools vía hooks; cierre en `PostToolUse` o `end_turn`. Misma cardinalidad POST, mayor amplitud de ciclo de vida. Ver **§16.1** |
 | Estado activo | `ActiveInteraction` en port capa 2 | `Workflow` en `IWorkflowRepository` (interface capa 1, adapter capa 2) |
 | Bordes normativos | Solo wire (HTTP/SSE) | Wire + Hooks (dos bordes coordinados) |
 | Correlación subagente | Pending heurístico (prompt/unique) | Headers plano A + SSE join plano B + `SubagentStart` plano C |
@@ -2911,7 +3136,9 @@ El diseño unificado del gateway:
 - Trata streaming SSE con **reenvío transparente, StepBuffer obligatorio, y persistencia solo en Steps cerrados**.
 - Converge layout disco a **causal-workflows-v1** en fases P (`workflows/NN/`, `tools/KK/`, artefactos tipados).
 - Correlación **Wire + Hooks** con tres planos de señal (A: headers identidad agente, B: SSE `tool_use_id` join, C: hooks lifecycle).
+- Integra correlador y persistencia mediante **bus de eventos unidireccional** (§28b): el correlador emite eventos de telemetría; `SessionPersistence` consume y proyecta a disco sin acoplar capas.
+- Timeout de tools como **decisión del correlador** (§24.1), no de persistencia; precedencia hook > timeout con inmutabilidad de cierre.
 
 ---
 
-*Última actualización: diseño unificado gateway (dominio + persistencia + correlación Wire+Hooks); convergencia a causal-workflows-v1; fases C/G/P.*
+*Última actualización: diseño unificado gateway (dominio + persistencia + correlación Wire+Hooks + bus de eventos); convergencia a causal-workflows-v1; fases C/G/P.*

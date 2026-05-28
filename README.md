@@ -83,6 +83,7 @@ Ideal para depurar comportamientos erráticos en herramientas de CLI (como `clau
 - Los `side-request` se auditan en su propia interacción sin desplazar al turno activo principal, evitando corrupción de metadata por race conditions.
 - Los turnos se indexan por `interactionDir` (único por request) permitiendo múltiples turnos concurrentes en la misma sesión (parallel subagents).
 - Las continuaciones (`tool_result`) se rutean al turno padre mediante correlación por `tool_use_id`, eliminando la misatribución de steps. Las continuaciones de `Agent`/subagentes se coalescen en el `response` del step que emitió los subagentes; las demás tools conservan steps separados.
+- **Correlación de subagentes (plano A):** Claude Code ≥ 2.1.139 emite cabeceras `X-Claude-Code-Agent-Id` y `X-Claude-Code-Parent-Agent-Id` en cada request. Cuando están presentes, la correlación es **determinista** (`correlationMethod: 'agent-headers'`), con mayor autoridad que los métodos heurísticos anteriores. Para clientes sin estas cabeceras el fallback heurístico (`prompt` / `unique-pending`) sigue operativo.
 - Los preflights (`client-preflight`) se cierran inmediatamente al recibir su respuesta, evitando turnos zombie que bloquean la sesión.
 - Cada step en `meta.json` puede incluir `toolUseIds: string[]` — los IDs de tool_use emitidos en ese step, usados para correlacionar con futuras continuaciones.
 - `meta.json` resume el turno completo: steps individuales, tokens agregados en `totals`, duración y `outcome`.

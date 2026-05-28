@@ -3,8 +3,26 @@ import { AuditInteractionHandler } from '../../src/3-operations/audit-interactio
 import { SessionResolverService } from '../../src/1-domain/services/session-resolver.service.js';
 import type { ISessionStore } from '../../src/2-services/ports/session-store.port.js';
 import type { IAuditWriter } from '../../src/2-services/ports/audit-writer.port.js';
+import type { IWorkflowRepository, WireSubagentEntry } from '../../src/1-domain/repositories/IWorkflowRepository.js';
+import type { AgentContext } from '../../src/1-domain/types/audit.types.js';
 import { ActiveInteraction, StepMeta } from '../../src/1-domain/types/audit.types.js';
 import { makeTestConfig as makeConfig } from '../helpers/test-config.js';
+
+function makeWorkflowRepo(overrides: Partial<IWorkflowRepository> = {}): IWorkflowRepository & { calls: AgentContext[] } {
+  const calls: AgentContext[] = [];
+  const store = new Map<string, WireSubagentEntry>();
+  return {
+    calls,
+    openSubagentFromWire: vi.fn().mockImplementation((sessionId: string, agentCtx: AgentContext) => {
+      calls.push(agentCtx);
+      const entry: WireSubagentEntry = { sessionId, agentId: agentCtx.agentId ?? '', ...(agentCtx.parentAgentId ? { parentAgentId: agentCtx.parentAgentId } : {}) };
+      if (agentCtx.agentId) store.set(agentCtx.agentId, entry);
+      return entry;
+    }),
+    getWorkflowByAgentId: (id: string) => store.get(id),
+    ...overrides,
+  };
+}
 
 function makeSessionStore(overrides: Partial<ISessionStore> = {}): ISessionStore {
   const registry = new Map<string, ActiveInteraction>();
@@ -1579,6 +1597,133 @@ describe('AuditInteractionHandler', () => {
     expect(sideInteractionWritten).toBe(true);
     expect(stepDirWritten).not.toBeNull(); // side-requests también escriben steps
     expect(result!.isInternalToolStep).toBeUndefined(); // no es step interno de herramienta
+  });
+
+  it('fresh con X-Claude-Code-Parent-Agent-Id + pending → correlationMethod agent-headers, openSubagentFromWire llamado, resolvePendingByPrompt no invocado', async () => {
+    const config = makeConfig();
+    const parentInteraction: ActiveInteraction = {
+      interactionDir: '/tmp/sessions/s/interactions/000001_parent',
+      interactionType: 'agentic',
+      stepCount: 2,
+      requestSequence: 1,
+      startedAt: Date.now(),
+      requestBodyOmitted: false,
+      requestBodyBytes: 100,
+      stepsMeta: [],
+      sessionId: 's',
+      pendingAgentToolUses: [{ stepIndex: 1, toolUseId: 'toolu_abc', subagentType: 'Explore' }],
+      pendingWebSearchToolUses: [],
+      pendingWebFetchToolUses: [],
+      resolvedInternalTools: [],
+    };
+    let registeredSub: ActiveInteraction | null = null;
+    const workflowRepo = makeWorkflowRepo();
+
+    const store = makeSessionStore({
+      findInteractionWithPendingAgents: () => ({
+        interaction: parentInteraction,
+        pendings: [...parentInteraction.pendingAgentToolUses],
+      }),
+      registerInteraction: (t: ActiveInteraction) => {
+        registeredSub = t;
+      },
+    });
+
+    const handler = new AuditInteractionHandler(
+      new SessionResolverService(),
+      store,
+      makeAuditWriter({
+        nextSubInteractionSequence: async () => 1,
+        writeSubInteractionRequest: async (p) => ({
+          dir: `${p.parentInteractionDir}/steps/001/sub-interactions/${p.folderName}`,
+          requestBodyOmitted: false,
+        }),
+      }),
+      config,
+      undefined,
+      workflowRepo,
+    );
+
+    await handler.execute({
+      headers: {
+        'x-cc-audit-session': 's',
+        'X-Claude-Code-Agent-Id': 'agent-child',
+        'X-Claude-Code-Parent-Agent-Id': 'agent-parent',
+      },
+      rawBody: FRESH_BODY,
+      requestId: 'sub-wire-1',
+    });
+
+    // openSubagentFromWire debe haberse llamado
+    expect(workflowRepo.openSubagentFromWire).toHaveBeenCalledOnce();
+    expect(workflowRepo.calls[0].parentAgentId).toBe('agent-parent');
+
+    // correlationMethod debe ser agent-headers
+    expect(registeredSub).not.toBeNull();
+    expect(registeredSub!.parentContext?.correlationMethod).toBe('agent-headers');
+    expect(registeredSub!.parentContext?.correlationStatus).toBe('resolved');
+    expect(registeredSub!.parentContext?.wireAgentId).toBe('agent-child');
+    expect(registeredSub!.parentContext?.wireParentAgentId).toBe('agent-parent');
+  });
+
+  it('fresh sin cabeceras de agente + pending único → fallback unique-pending, openSubagentFromWire no invocado', async () => {
+    const config = makeConfig();
+    const parentInteraction: ActiveInteraction = {
+      interactionDir: '/tmp/sessions/s/interactions/000001_parent',
+      interactionType: 'agentic',
+      stepCount: 2,
+      requestSequence: 1,
+      startedAt: Date.now(),
+      requestBodyOmitted: false,
+      requestBodyBytes: 100,
+      stepsMeta: [],
+      sessionId: 's',
+      pendingAgentToolUses: [{ stepIndex: 1, toolUseId: 'toolu_xyz', subagentType: 'Plan' }],
+      pendingWebSearchToolUses: [],
+      pendingWebFetchToolUses: [],
+      resolvedInternalTools: [],
+    };
+    let registeredSub: ActiveInteraction | null = null;
+    const workflowRepo = makeWorkflowRepo();
+
+    const store = makeSessionStore({
+      findInteractionWithPendingAgents: () => ({
+        interaction: parentInteraction,
+        pendings: [...parentInteraction.pendingAgentToolUses],
+      }),
+      registerInteraction: (t: ActiveInteraction) => {
+        registeredSub = t;
+      },
+    });
+
+    const handler = new AuditInteractionHandler(
+      new SessionResolverService(),
+      store,
+      makeAuditWriter({
+        nextSubInteractionSequence: async () => 1,
+        writeSubInteractionRequest: async (p) => ({
+          dir: `${p.parentInteractionDir}/steps/001/sub-interactions/${p.folderName}`,
+          requestBodyOmitted: false,
+        }),
+      }),
+      config,
+      undefined,
+      workflowRepo,
+    );
+
+    await handler.execute({
+      headers: { 'x-cc-audit-session': 's' },
+      rawBody: FRESH_BODY,
+      requestId: 'sub-legacy-1',
+    });
+
+    // openSubagentFromWire NO debe haberse llamado
+    expect(workflowRepo.openSubagentFromWire).not.toHaveBeenCalled();
+
+    // correlationMethod debe ser unique-pending (heurística)
+    expect(registeredSub).not.toBeNull();
+    expect(registeredSub!.parentContext?.correlationMethod).toBe('unique-pending');
+    expect(registeredSub!.parentContext?.wireAgentId).toBeUndefined();
   });
 
   it('Web page content: sin pending WebFetch cae a side-request normal', async () => {

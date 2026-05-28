@@ -1,8 +1,10 @@
 import * as path from 'node:path';
 import { STRIP_AUDIT_SESSION_HEADER } from '../1-domain/constants/session-headers.js';
 import { SessionResolverService } from '../1-domain/services/session-resolver.service.js';
+import { resolveAgentContext } from '../1-domain/services/resolve-agent-context.service.js';
 import type { ISessionStore } from '../2-services/ports/session-store.port.js';
 import type { IAuditWriter } from '../2-services/ports/audit-writer.port.js';
+import type { IWorkflowRepository } from '../1-domain/repositories/IWorkflowRepository.js';
 import {
   classifyRequestBody,
   extractModelFromRequestBody,
@@ -10,6 +12,7 @@ import {
 } from '../1-domain/services/request-classifier.service.js';
 import {
   ActiveInteraction,
+  AgentContext,
   InteractionType,
   MarkdownRenderContext,
   ParentContext,
@@ -63,6 +66,7 @@ export class AuditInteractionHandler {
     private auditWriter: IAuditWriter,
     private config: ProxyEnvironmentConfig,
     private logger?: Logger,
+    private workflowRepo?: IWorkflowRepository,
   ) {}
 
   public async execute(params: {
@@ -156,12 +160,14 @@ export class AuditInteractionHandler {
       // padre correspondiente.
       const pendingMatch = this.sessionStore.findInteractionWithPendingAgents(auditSessionId);
       if (pendingMatch) {
+        const agentCtx = resolveAgentContext(headersForAudit);
         return this.handleSubagent(
           params,
           headersForAudit,
           auditSessionId,
           classification,
           pendingMatch,
+          agentCtx,
         );
       }
       return this.handleFresh(params, headersForAudit, auditSessionId, classification);
@@ -332,6 +338,7 @@ export class AuditInteractionHandler {
       interaction: { interactionDir: string; pendingAgentToolUses: PendingAgentToolUse[] };
       pendings: PendingAgentToolUse[];
     },
+    agentCtx?: AgentContext,
   ): Promise<AuditInteractionResult> {
     return this.sessionStore.withSessionLock(auditSessionId, async () => {
       const parentInteractionDir = match.interaction.interactionDir;
@@ -343,26 +350,49 @@ export class AuditInteractionHandler {
         match.pendings[0].stepIndex,
       );
 
-      // Correlación tool_use ↔ subagente por contenido determinístico.
-      // Extraer el prompt del request del subagente y buscar match en pendings.
-      const subagentPrompt = this.extractSubagentPrompt(params.rawBody);
-      const resolution = this.resolvePendingByPrompt(match.pendings, subagentPrompt);
-
       let triggeringToolUseId: string | null;
       let subagentType: string | undefined;
       let correlationStatus: 'resolved' | 'unresolved';
-      let correlationMethod: 'prompt' | 'unique-pending' | 'none' | undefined;
+      let correlationMethod: 'agent-headers' | 'prompt' | 'unique-pending' | 'none' | undefined;
+      let wireAgentId: string | undefined;
+      let wireParentAgentId: string | undefined;
 
-      if (resolution) {
-        triggeringToolUseId = resolution.pending.toolUseId;
-        subagentType = resolution.pending.subagentType;
+      if (agentCtx?.isSubagentRequest && this.workflowRepo) {
+        // Ruta plano A: correlación determinista por cabeceras de agente (§21).
+        this.workflowRepo.openSubagentFromWire(auditSessionId, agentCtx);
+        // En C1 no disponemos del join exacto tool_use_id↔header (eso es C2/C3).
+        // Usamos el pending único si hay uno solo; si hay varios, dejamos null.
+        const uniquePending = match.pendings.length === 1 ? match.pendings[0] : null;
+        triggeringToolUseId = uniquePending?.toolUseId ?? null;
+        subagentType = uniquePending?.subagentType;
         correlationStatus = 'resolved';
-        correlationMethod = resolution.method;
+        correlationMethod = 'agent-headers';
+        wireAgentId = agentCtx.agentId;
+        wireParentAgentId = agentCtx.parentAgentId;
+        if (triggeringToolUseId) {
+          this.sessionStore.consumePendingAgentToolUse(parentInteractionDir, triggeringToolUseId);
+        }
       } else {
-        triggeringToolUseId = null;
-        subagentType = undefined;
-        correlationStatus = 'unresolved';
-        correlationMethod = 'none';
+        // @deprecated-fallback: ruta heurística para clientes Claude Code < 2.1.139 u otros harnesses sin cabeceras de agente.
+        // Planificado para retirar en fase G2 (fecha estimada: 2026-Q3).
+        // Extraer el prompt del request del subagente y buscar match en pendings.
+        const subagentPrompt = this.extractSubagentPrompt(params.rawBody);
+        const resolution = this.resolvePendingByPrompt(match.pendings, subagentPrompt);
+
+        if (resolution) {
+          triggeringToolUseId = resolution.pending.toolUseId;
+          subagentType = resolution.pending.subagentType;
+          correlationStatus = 'resolved';
+          correlationMethod = resolution.method;
+        } else {
+          triggeringToolUseId = null;
+          subagentType = undefined;
+          correlationStatus = 'unresolved';
+          correlationMethod = 'none';
+        }
+        if (triggeringToolUseId) {
+          this.sessionStore.consumePendingAgentToolUse(parentInteractionDir, triggeringToolUseId);
+        }
       }
 
       const subSeq = await this.auditWriter.nextSubInteractionSequence(
@@ -405,6 +435,8 @@ export class AuditInteractionHandler {
         correlationStatus,
         correlationMethod,
         ...(subagentType ? { subagentType } : {}),
+        ...(wireAgentId ? { wireAgentId } : {}),
+        ...(wireParentAgentId ? { wireParentAgentId } : {}),
       };
 
       await this.auditWriter.writeInteractionState(wr.dir, {
@@ -413,11 +445,6 @@ export class AuditInteractionHandler {
         interactionType: 'agentic',
         parentContext,
       });
-
-      // Si la correlación fue unívoca, consumimos el pending en este momento.
-      if (triggeringToolUseId) {
-        this.sessionStore.consumePendingAgentToolUse(parentInteractionDir, triggeringToolUseId);
-      }
 
       this.sessionStore.registerInteraction({
         interactionDir: wr.dir,

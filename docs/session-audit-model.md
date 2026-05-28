@@ -455,13 +455,18 @@ Detalle técnico de reconstrucción: [`how-sse-reconstruction-works.md`](./how-s
 }
 ```
 
-**Valores de `correlationMethod`:**
+**Valores de `correlationMethod`** (ordenados por autoridad descendente, §21):
 
-| Valor | Significado |
-| ----- | ----------- |
-| `prompt` | Correlación por match exacto del prompt del request con el pending Agent |
-| `unique-pending` | Correlación por ser el único pending disponible |
-| `none` | No se pudo resolver la correlación |
+| Valor | Significado | Autoridad |
+| ----- | ----------- | --------- |
+| `agent-headers` | Correlación determinista por cabeceras `X-Claude-Code-Agent-Id` / `X-Claude-Code-Parent-Agent-Id` (plano A) | Mayor |
+| `prompt` | Correlación por match exacto del prompt del request con el pending Agent | Media |
+| `unique-pending` | Correlación por ser el único pending disponible | Media (legacy) |
+| `none` | No se pudo resolver la correlación | — |
+
+Cuando `correlationMethod === 'agent-headers'`, el `parentContext` también incluye `wireAgentId` y `wireParentAgentId` con los valores de las cabeceras originales de la request del subagente.
+
+La ruta heurística (`prompt`, `unique-pending`) se mantiene operativa como fallback para clientes Claude Code &lt; 2.1.139 u otros harnesses sin cabeceras de agente. Está marcada como `@deprecated-fallback` en el código (retirada planificada en G2).
 
 **Profundidad máxima: 2 niveles.** Un subagente con `parentContext` no puede ser padre de otros subagentes. Limitación intencional, consistente con el comportamiento observable del harness de Claude Code.
 
@@ -516,9 +521,19 @@ Las continuaciones se rutean al turno padre mediante correlación por `tool_use_
 1. El SSE handler detecta `content_block_start` con `name: "Agent"`.
 2. Acumula el JSON del bloque `input` vía `input_json_delta` (para extraer `subagent_type`, `description` y `prompt`).
 3. Registra `PendingAgentToolUse { stepIndex, toolUseId, subagentType, description, prompt }` en el `ActiveInteraction`.
-4. Al llegar la siguiente request `fresh` de la misma sesión, `AuditInteractionHandler` extrae el prompt del request del subagente y lo compara con los pendings para correlación determinística.
-5. Si hay match exacto por prompt, se asigna el `triggeringToolUseId` correspondiente y se marca `correlationStatus: 'resolved'`.
-6. Si no hay match determinístico, se anida el subagente con `triggeringToolUseId: null` y `correlationStatus: 'unresolved'`.
+4. Al llegar la siguiente request `fresh` de la misma sesión, `AuditInteractionHandler` determina el método de correlación según las cabeceras presentes:
+
+**Plano A — correlación por cabeceras (mayor autoridad, §21):**
+
+Si la request trae `X-Claude-Code-Parent-Agent-Id` (Claude Code ≥ 2.1.139), el handler resuelve la correlación determinísticamente mediante `IWorkflowRepository.openSubagentFromWire()`. En este caso `correlationMethod === 'agent-headers'` y el `parentContext` incluye `wireAgentId` y `wireParentAgentId`.
+
+**Fallback heurístico (clientes legacy):**
+
+Si la request no trae cabeceras de agente, se aplica la ruta heurística original:
+
+5. El handler extrae el prompt del request del subagente y lo compara con los pendings para correlación determinística.
+6. Si hay match exacto por prompt, se asigna el `triggeringToolUseId` correspondiente y se marca `correlationStatus: 'resolved'`.
+7. Si no hay match determinístico, se anida el subagente con `triggeringToolUseId: null` y `correlationStatus: 'unresolved'`.
 
 #### Subagentes paralelos
 

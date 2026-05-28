@@ -242,6 +242,10 @@ export interface ParentContext {
    * Opcional porque puede no haberse capturado a tiempo o no haberse provisto.
    */
   subagentType?: string;
+  /** `X-Claude-Code-Agent-Id` de la request del subagente. Presente cuando `correlationMethod === 'agent-headers'`. */
+  wireAgentId?: string;
+  /** `X-Claude-Code-Parent-Agent-Id` de la request del subagente. Presente cuando `correlationMethod === 'agent-headers'`. */
+  wireParentAgentId?: string;
 }
 
 /**
@@ -253,11 +257,23 @@ export type CorrelationStatus = 'resolved' | 'unresolved';
 
 /**
  * Método usado para resolver la correlación del subagente con su tool_use padre.
+ * - 'agent-headers': Correlación determinista por cabeceras X-Claude-Code-Agent-Id / X-Claude-Code-Parent-Agent-Id (mayor autoridad, §21).
  * - 'prompt': Correlación por match exacto del prompt del request con el pending Agent.
  * - 'unique-pending': Correlación por ser el único pending disponible.
  * - 'none': No se pudo resolver la correlación.
  */
-export type CorrelationMethod = 'prompt' | 'unique-pending' | 'none';
+export type CorrelationMethod = 'agent-headers' | 'prompt' | 'unique-pending' | 'none';
+
+/**
+ * Contexto de agente extraído de las cabeceras X-Claude-Code-Agent-Id y X-Claude-Code-Parent-Agent-Id.
+ * Producido por `resolveAgentContext()` en capa 1 (función pura, sin I/O).
+ */
+export interface AgentContext {
+  agentId?: string;
+  parentAgentId?: string;
+  /** True cuando hay `parentAgentId` no vacío — indica request de subagente. */
+  isSubagentRequest: boolean;
+}
 
 /**
  * Entrada que tracquea un tool_use `Agent` emitido por el SSE del padre y aún

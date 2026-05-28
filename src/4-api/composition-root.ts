@@ -6,6 +6,7 @@ import { SessionStoreService } from '../2-services/session-store.service.js';
 import { AuditWriterService } from '../2-services/audit-writer.service.js';
 import { SseReconstructService } from '../2-services/sse-reconstruct.service.js';
 import { StreamTeeService } from '../2-services/stream-tee.service.js';
+import { WorkflowRepositoryService } from '../2-services/workflow-repository.service.js';
 import { AuditInteractionHandler } from '../3-operations/audit-interaction.handler.js';
 import { AuditSseResponseHandler } from '../3-operations/audit-sse-response.handler.js';
 import { AuditStandardResponseHandler } from '../3-operations/audit-standard-response.handler.js';
@@ -38,6 +39,7 @@ export async function createProxyDependencies(
   const auditWriter = new AuditWriterService(redactService, markdownRenderer);
   const sseReconstruct = new SseReconstructService(auditWriter);
   const streamTee = new StreamTeeService();
+  const workflowRepo = new WorkflowRepositoryService();
 
   await sessionStore.ensureAuditSessionsRoot();
 
@@ -48,6 +50,7 @@ export async function createProxyDependencies(
     auditWriter,
     config,
     logger,
+    workflowRepo,
   );
   const auditSseResponseHandler = new AuditSseResponseHandler(
     auditWriter,

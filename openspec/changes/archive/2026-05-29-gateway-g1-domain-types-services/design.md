@@ -108,8 +108,8 @@ crear el repositorio sin el adapter crea contratos huérfanos.
 | `src/1-domain/types/gateway/provider.types.ts` | Crear | `ProviderKind` |
 | `src/1-domain/types/gateway/tool-use.types.ts` | Crear | `ToolUseStatus` |
 | `src/1-domain/interfaces/gateway/IWorkflow.ts` | Crear | Interfaz DTO del workflow |
-| `src/1-domain/interfaces/gateway/IStep.ts` | Crear | Referencia a `IAnthropicContentBlock` sin duplicar |
-| `src/1-domain/interfaces/gateway/IToolUse.ts` | Crear | Referencia a tipos Anthropic |
+| `src/1-domain/interfaces/gateway/IStep.ts` | Crear | Referencia a `AnthropicContentBlock`, `AnthropicMessage`, `AnthropicRequest`, `AnthropicUsage` sin duplicar |
+| `src/1-domain/interfaces/gateway/IToolUse.ts` | Crear | Referencia a `AnthropicContentBlock` (sin prefijo `I`) |
 | `src/1-domain/interfaces/gateway/IWorkflowResult.ts` | Crear | Incluye `finalText?`, `usage?` (§19) |
 | `src/1-domain/interfaces/gateway/IProvider.ts` | Crear | |
 | `src/1-domain/interfaces/gateway/ILanguageModel.ts` | Crear | |

@@ -260,9 +260,10 @@ export type CorrelationStatus = 'resolved' | 'unresolved';
  * - 'agent-headers': Correlación determinista por cabeceras X-Claude-Code-Agent-Id / X-Claude-Code-Parent-Agent-Id (mayor autoridad, §21).
  * - 'prompt': Correlación por match exacto del prompt del request con el pending Agent.
  * - 'unique-pending': Correlación por ser el único pending disponible.
+ * - 'fifo-pending': Señal posicional (primer pending registrado); último recurso determinista cuando hay N pendings sin match, por debajo de prompt/unique.
  * - 'none': No se pudo resolver la correlación.
  */
-export type CorrelationMethod = 'agent-headers' | 'prompt' | 'unique-pending' | 'none';
+export type CorrelationMethod = 'agent-headers' | 'prompt' | 'unique-pending' | 'fifo-pending' | 'none';
 
 /**
  * Contexto de agente extraído de las cabeceras X-Claude-Code-Agent-Id y X-Claude-Code-Parent-Agent-Id.

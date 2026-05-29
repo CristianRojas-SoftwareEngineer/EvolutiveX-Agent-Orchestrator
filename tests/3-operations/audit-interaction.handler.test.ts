@@ -706,7 +706,7 @@ describe('AuditInteractionHandler', () => {
     expect(subState).toBeDefined();
   });
 
-  it('subagente ambiguo: fresh + >1 pending → triggeringToolUseId=null y NO se consume pending', async () => {
+  it('sin cabeceras + >1 pending sin match de prompt → fifo-pending / resuelto al primer pending', async () => {
     const config = makeConfig();
     const parentInteraction: ActiveInteraction = {
       interactionDir: '/tmp/sessions/s/interactions/000001_parent',
@@ -761,13 +761,15 @@ describe('AuditInteractionHandler', () => {
     });
 
     expect(result).not.toBeNull();
-    expect(consumeCalls).toBe(0);
+    // Con C2, N pendings sin match de prompt → FIFO resuelve al primer pending
+    expect(consumeCalls).toBe(1);
     expect(registeredSub!.parentContext).toEqual({
       parentInteractionDir: parentInteraction.interactionDir,
       parentStepIndex: 1,
-      triggeringToolUseId: null,
-      correlationStatus: 'unresolved',
-      correlationMethod: 'none',
+      triggeringToolUseId: 'toolu_a',
+      subagentType: 'Explore',
+      correlationStatus: 'resolved',
+      correlationMethod: 'fifo-pending',
     });
   });
 
@@ -1599,7 +1601,7 @@ describe('AuditInteractionHandler', () => {
     expect(result!.isInternalToolStep).toBeUndefined(); // no es step interno de herramienta
   });
 
-  it('fresh con X-Claude-Code-Parent-Agent-Id + pending → correlationMethod agent-headers, openSubagentFromWire llamado, resolvePendingByPrompt no invocado', async () => {
+  it('fresh con X-Claude-Code-Parent-Agent-Id + pending → correlationMethod agent-headers, openSubagentFromWire llamado', async () => {
     const config = makeConfig();
     const parentInteraction: ActiveInteraction = {
       interactionDir: '/tmp/sessions/s/interactions/000001_parent',
@@ -1724,6 +1726,144 @@ describe('AuditInteractionHandler', () => {
     expect(registeredSub).not.toBeNull();
     expect(registeredSub!.parentContext?.correlationMethod).toBe('unique-pending');
     expect(registeredSub!.parentContext?.wireAgentId).toBeUndefined();
+  });
+
+  it('con cabeceras + 2 pendings con prompts distintos + request que matchea uno → agent-headers / triggeringToolUseId del match', async () => {
+    const config = makeConfig();
+    // El body del subagente tiene prompt "Task Alpha" que matchea toolu_alpha
+    const subagentBody = Buffer.from(
+      JSON.stringify({
+        model: 'claude-3-5-sonnet',
+        messages: [{ role: 'user', content: [{ type: 'text', text: 'Task Alpha' }] }],
+        tools: [{ name: 'Read', description: 'lee', input_schema: { type: 'object', properties: {} } }],
+        max_tokens: 256,
+      }),
+    );
+    const parentInteraction: ActiveInteraction = {
+      interactionDir: '/tmp/sessions/s/interactions/000001_parent',
+      interactionType: 'agentic',
+      stepCount: 2,
+      requestSequence: 1,
+      startedAt: Date.now(),
+      requestBodyOmitted: false,
+      requestBodyBytes: 100,
+      stepsMeta: [],
+      sessionId: 's',
+      pendingAgentToolUses: [
+        { stepIndex: 1, toolUseId: 'toolu_alpha', subagentType: 'general-purpose', prompt: 'Task Alpha' },
+        { stepIndex: 1, toolUseId: 'toolu_beta', subagentType: 'Plan', prompt: 'Task Beta' },
+      ],
+      pendingWebSearchToolUses: [],
+      pendingWebFetchToolUses: [],
+      resolvedInternalTools: [],
+    };
+    let consumed: { dir: string; id: string } | null = null;
+    let registeredSub: ActiveInteraction | null = null;
+    const workflowRepo = makeWorkflowRepo();
+
+    const store = makeSessionStore({
+      findInteractionWithPendingAgents: () => ({
+        interaction: parentInteraction,
+        pendings: [...parentInteraction.pendingAgentToolUses],
+      }),
+      consumePendingAgentToolUse: (dir, id) => { consumed = { dir, id }; },
+      registerInteraction: (t: ActiveInteraction) => { registeredSub = t; },
+    });
+
+    const handler = new AuditInteractionHandler(
+      new SessionResolverService(),
+      store,
+      makeAuditWriter({
+        nextSubInteractionSequence: async () => 1,
+        writeSubInteractionRequest: async (p) => ({
+          dir: `${p.parentInteractionDir}/steps/001/sub-interactions/${p.folderName}`,
+          requestBodyOmitted: false,
+        }),
+      }),
+      config,
+      undefined,
+      workflowRepo,
+    );
+
+    await handler.execute({
+      headers: {
+        'x-cc-audit-session': 's',
+        'X-Claude-Code-Agent-Id': 'agent-child',
+        'X-Claude-Code-Parent-Agent-Id': 'agent-parent',
+      },
+      rawBody: subagentBody,
+      requestId: 'sub-headers-match',
+    });
+
+    expect(workflowRepo.openSubagentFromWire).toHaveBeenCalledOnce();
+    expect(registeredSub).not.toBeNull();
+    expect(registeredSub!.parentContext?.correlationMethod).toBe('agent-headers');
+    expect(registeredSub!.parentContext?.correlationStatus).toBe('resolved');
+    expect(registeredSub!.parentContext?.triggeringToolUseId).toBe('toolu_alpha');
+    expect(consumed).toEqual({ dir: parentInteraction.interactionDir, id: 'toolu_alpha' });
+  });
+
+  it('sin cabeceras + 2 pendings sin match de prompt → fifo-pending / triggeringToolUseId=primer pending / correlationStatus resolved', async () => {
+    const config = makeConfig();
+    const parentInteraction: ActiveInteraction = {
+      interactionDir: '/tmp/sessions/s/interactions/000001_parent',
+      interactionType: 'agentic',
+      stepCount: 2,
+      requestSequence: 1,
+      startedAt: Date.now(),
+      requestBodyOmitted: false,
+      requestBodyBytes: 100,
+      stepsMeta: [],
+      sessionId: 's',
+      pendingAgentToolUses: [
+        { stepIndex: 1, toolUseId: 'toolu_first', subagentType: 'Explore', prompt: 'Task X' },
+        { stepIndex: 1, toolUseId: 'toolu_second', subagentType: 'Plan', prompt: 'Task Y' },
+      ],
+      pendingWebSearchToolUses: [],
+      pendingWebFetchToolUses: [],
+      resolvedInternalTools: [],
+    };
+    let consumed: { dir: string; id: string } | null = null;
+    let registeredSub: ActiveInteraction | null = null;
+    const workflowRepo = makeWorkflowRepo();
+
+    const store = makeSessionStore({
+      findInteractionWithPendingAgents: () => ({
+        interaction: parentInteraction,
+        pendings: [...parentInteraction.pendingAgentToolUses],
+      }),
+      consumePendingAgentToolUse: (dir, id) => { consumed = { dir, id }; },
+      registerInteraction: (t: ActiveInteraction) => { registeredSub = t; },
+    });
+
+    const handler = new AuditInteractionHandler(
+      new SessionResolverService(),
+      store,
+      makeAuditWriter({
+        nextSubInteractionSequence: async () => 1,
+        writeSubInteractionRequest: async (p) => ({
+          dir: `${p.parentInteractionDir}/steps/001/sub-interactions/${p.folderName}`,
+          requestBodyOmitted: false,
+        }),
+      }),
+      config,
+      undefined,
+      workflowRepo,
+    );
+
+    await handler.execute({
+      headers: { 'x-cc-audit-session': 's' },
+      rawBody: FRESH_BODY, // sin prompt en messages.content (string simple), no matchea
+      requestId: 'sub-fifo',
+    });
+
+    // openSubagentFromWire NO debe invocarse sin cabeceras
+    expect(workflowRepo.openSubagentFromWire).not.toHaveBeenCalled();
+    expect(registeredSub).not.toBeNull();
+    expect(registeredSub!.parentContext?.correlationMethod).toBe('fifo-pending');
+    expect(registeredSub!.parentContext?.correlationStatus).toBe('resolved');
+    expect(registeredSub!.parentContext?.triggeringToolUseId).toBe('toolu_first');
+    expect(consumed).toEqual({ dir: parentInteraction.interactionDir, id: 'toolu_first' });
   });
 
   it('Web page content: sin pending WebFetch cae a side-request normal', async () => {

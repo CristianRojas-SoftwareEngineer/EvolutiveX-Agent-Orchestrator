@@ -462,11 +462,12 @@ Detalle técnico de reconstrucción: [`how-sse-reconstruction-works.md`](./how-s
 | `agent-headers` | Correlación determinista por cabeceras `X-Claude-Code-Agent-Id` / `X-Claude-Code-Parent-Agent-Id` (plano A) | Mayor |
 | `prompt` | Correlación por match exacto del prompt del request con el pending Agent | Media |
 | `unique-pending` | Correlación por ser el único pending disponible | Media (legacy) |
-| `none` | No se pudo resolver la correlación | — |
+| `fifo-pending` | Señal posicional: primer pending registrado (FIFO); último recurso determinista cuando hay N pendings sin match | Baja (legacy) |
+| `none` | No se pudo resolver la correlación (0 pendings, sin cabeceras) | — |
 
 Cuando `correlationMethod === 'agent-headers'`, el `parentContext` también incluye `wireAgentId` y `wireParentAgentId` con los valores de las cabeceras originales de la request del subagente.
 
-La ruta heurística (`prompt`, `unique-pending`) se mantiene operativa como fallback para clientes Claude Code &lt; 2.1.139 u otros harnesses sin cabeceras de agente. Está marcada como `@deprecated-fallback` en el código (retirada planificada en G2).
+El join `tool_use_id`↔subagente (plano B, §23) está centralizado en la función pura de dominio `joinToolUseToSubagent` con política única/prompt/FIFO/diferido. La ruta heurística (`prompt`, `unique-pending`, `fifo-pending`) se mantiene operativa como fallback para clientes Claude Code &lt; 2.1.139 u otros harnesses sin cabeceras de agente. Está marcada como `@deprecated-fallback` en el código (retirada planificada en G2).
 
 **Profundidad máxima: 2 niveles.** Un subagente con `parentContext` no puede ser padre de otros subagentes. Limitación intencional, consistente con el comportamiento observable del harness de Claude Code.
 

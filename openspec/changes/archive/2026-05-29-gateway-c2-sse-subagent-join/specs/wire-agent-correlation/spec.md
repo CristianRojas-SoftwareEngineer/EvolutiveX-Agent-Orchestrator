@@ -1,53 +1,4 @@
-# wire-agent-correlation Specification
-
-## Purpose
-
-Correlación determinista de subagentes mediante las cabeceras `X-Claude-Code-Agent-Id` y
-`X-Claude-Code-Parent-Agent-Id` emitidas por Claude Code ≥ 2.1.139 (plano A, §22). Introduce
-`resolveAgentContext()`, `IWorkflowRepository` mínima y `correlationMethod: 'agent-headers'` con
-mayor autoridad que la heurística preexistente. La ruta heurística se conserva como fallback
-documentado para clientes sin cabeceras (retirada planificada en G2).
-
-## Requirements
-
-### Requirement: Parsing puro de cabeceras de agente
-
-El sistema SHALL exponer una función pura `resolveAgentContext(headers)` en
-`src/1-domain/services/resolve-agent-context.service.ts` que lea las cabeceras HTTP
-`X-Claude-Code-Agent-Id` y `X-Claude-Code-Parent-Agent-Id` de forma case-insensitive y devuelva
-`{ agentId?: string, parentAgentId?: string, isSubagentRequest: boolean }` sin realizar ninguna
-operación de I/O.
-
-#### Scenario: Cabeceras presentes — request de subagente
-
-- **GIVEN** una request HTTP con cabecera `X-Claude-Code-Agent-Id: agent-abc` y
-  `X-Claude-Code-Parent-Agent-Id: agent-root`
-- **WHEN** se invoca `resolveAgentContext(headers)`
-- **THEN** el resultado SHALL ser `{ agentId: 'agent-abc', parentAgentId: 'agent-root', isSubagentRequest: true }`
-
-#### Scenario: Solo `Agent-Id` presente (agente raíz)
-
-- **GIVEN** una request HTTP con cabecera `X-Claude-Code-Agent-Id: agent-root` y sin
-  `X-Claude-Code-Parent-Agent-Id`
-- **WHEN** se invoca `resolveAgentContext(headers)`
-- **THEN** `isSubagentRequest` SHALL ser `false`
-- **AND** `agentId` SHALL ser `'agent-root'`
-- **AND** `parentAgentId` SHALL ser `undefined`
-
-#### Scenario: Sin cabeceras de agente (cliente legacy)
-
-- **GIVEN** una request HTTP sin `X-Claude-Code-Agent-Id` ni `X-Claude-Code-Parent-Agent-Id`
-- **WHEN** se invoca `resolveAgentContext(headers)`
-- **THEN** el resultado SHALL ser `{ agentId: undefined, parentAgentId: undefined, isSubagentRequest: false }`
-
-#### Scenario: Cabeceras en mayúsculas mixtas
-
-- **GIVEN** una request HTTP con cabecera `x-claude-code-agent-id: agent-xyz` (minúsculas)
-- **WHEN** se invoca `resolveAgentContext(headers)`
-- **THEN** `agentId` SHALL ser `'agent-xyz'` (case-insensitive lookup, mismo resultado que en
-  mayúsculas canónicas)
-
----
+## MODIFIED Requirements
 
 ### Requirement: Precedencia de correlación por cabeceras sobre heurística
 
@@ -111,19 +62,7 @@ El tipo `CorrelationMethod` SHALL incluir los valores `'agent-headers'`, `'promp
 
 ---
 
-### Requirement: Conservación del fallback heurístico
-
-La ruta heurística de correlación (rama sin-cabeceras de `joinToolUseToSubagent`: `unique-pending`, `prompt`, `fifo-pending`) SHALL conservarse operativa cuando la request no trae cabeceras de agente, garantizando compatibilidad con clientes Claude Code < 2.1.139 u otros harnesses. La implementación SHALL señalar esta ruta con un comentario `@deprecated-fallback` que indique la fase de retirada planificada (G2) y la fecha estimada.
-
-#### Scenario: Cliente legacy sin cabeceras — correlación heurística operativa
-
-- **GIVEN** una request `fresh` sin cabeceras de agente y un único `PendingAgentToolUse` en el padre
-- **WHEN** el `AuditInteractionHandler` intenta correlacionar
-- **THEN** `correlationMethod` SHALL ser `'unique-pending'`
-- **AND** el subagente SHALL abrirse correctamente como en el comportamiento preexistente
-- **AND** no SHALL lanzarse ningún error relacionado con cabeceras ausentes
-
----
+## ADDED Requirements
 
 ### Requirement: Join determinista tool_use_id↔subagente (plano B)
 
@@ -171,21 +110,3 @@ El sistema SHALL exponer una función pura `joinToolUseToSubagent(pendings, agen
 - **AND** `subagentPrompt: null`
 - **WHEN** se invoca `joinToolUseToSubagent(pendings, agentCtx, subagentPrompt)`
 - **THEN** el resultado SHALL ser `{ toolUseId: null, correlationMethod: 'agent-headers', correlationStatus: 'resolved' }`
-
----
-
-### Requirement: Índice mínimo en IWorkflowRepository
-
-La interface `IWorkflowRepository` mínima SHALL exponer al menos los métodos
-`openSubagentFromWire(sessionId, agentCtx)` para abrir un subagente a partir del contexto de
-cabeceras, y `getWorkflowByAgentId(agentId)` para resolver el contexto de un agente registrado
-por `agentId`. El adapter en memoria SHALL implementar ambos métodos.
-
-#### Scenario: Apertura de subagente por wire y recuperación posterior
-
-- **GIVEN** un `WorkflowRepository` en memoria vacío
-- **WHEN** se invoca `openSubagentFromWire('session-1', { agentId: 'agent-child', parentAgentId: 'agent-root', isSubagentRequest: true })`
-- **THEN** el repo SHALL registrar la entrada indexada por `agentId`
-- **AND** una llamada posterior a `getWorkflowByAgentId('agent-child')` SHALL devolver la entrada
-  registrada
-- **AND** `getWorkflowByAgentId('agent-unknown')` SHALL devolver `undefined`

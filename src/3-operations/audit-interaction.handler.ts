@@ -13,6 +13,7 @@ import {
 import {
   ActiveInteraction,
   AgentContext,
+  CorrelationMethod,
   InteractionType,
   MarkdownRenderContext,
   ParentContext,
@@ -23,6 +24,7 @@ import {
   computeTokenTotals,
   computeSseRawBytesTotal,
 } from '../1-domain/types/audit.types.js';
+import { joinToolUseToSubagent } from '../1-domain/services/join-tool-use-to-subagent.service.js';
 import type { JsonValue } from '../1-domain/types/json.types.js';
 import { ProxyEnvironmentConfig } from '../1-domain/types/config.types.js';
 import type { Logger } from '../1-domain/types/logger.types.js';
@@ -292,38 +294,6 @@ export class AuditInteractionHandler {
   }
 
   /**
-   * Resuelve el pending Agent correspondiente al request del subagente
-   * comparando el prompt del request con los prompts de los pendings.
-   * Devuelve el pending resuelto o null si no hay match determinístico.
-   */
-  private resolvePendingByPrompt(
-    pendings: PendingAgentToolUse[],
-    subagentPrompt: string | null,
-  ): { pending: PendingAgentToolUse; method: 'prompt' | 'unique-pending' } | null {
-    if (pendings.length === 0) return null;
-
-    // Si hay un solo pending y el subagente no tiene prompt, usar pending único
-    if (pendings.length === 1 && !subagentPrompt) {
-      return { pending: pendings[0], method: 'unique-pending' };
-    }
-
-    // Si el subagente tiene prompt, buscar match exacto en pendings
-    if (subagentPrompt) {
-      const matches = pendings.filter((p) => p.prompt === subagentPrompt);
-      if (matches.length === 1) {
-        return { pending: matches[0], method: 'prompt' };
-      }
-    }
-
-    // Si hay un solo pending, usarlo como fallback
-    if (pendings.length === 1) {
-      return { pending: pendings[0], method: 'unique-pending' };
-    }
-
-    return null;
-  }
-
-  /**
    * Crea una interacción de subagente anidada bajo el step padre que emitió
    * el tool_use `Agent`. La asignación de la secuencia local del subagente y
    * la escritura del request van serializadas dentro de `withSessionLock`
@@ -350,49 +320,29 @@ export class AuditInteractionHandler {
         match.pendings[0].stepIndex,
       );
 
-      let triggeringToolUseId: string | null;
-      let subagentType: string | undefined;
-      let correlationStatus: 'resolved' | 'unresolved';
-      let correlationMethod: 'agent-headers' | 'prompt' | 'unique-pending' | 'none' | undefined;
       let wireAgentId: string | undefined;
       let wireParentAgentId: string | undefined;
 
+      const subagentPrompt = this.extractSubagentPrompt(params.rawBody);
+      const join = joinToolUseToSubagent(match.pendings, agentCtx, subagentPrompt);
+
       if (agentCtx?.isSubagentRequest && this.workflowRepo) {
-        // Ruta plano A: correlación determinista por cabeceras de agente (§21).
+        // Ruta plano A (§21): registra el subagente en el grafo de agentes.
         this.workflowRepo.openSubagentFromWire(auditSessionId, agentCtx);
-        // En C1 no disponemos del join exacto tool_use_id↔header (eso es C2/C3).
-        // Usamos el pending único si hay uno solo; si hay varios, dejamos null.
-        const uniquePending = match.pendings.length === 1 ? match.pendings[0] : null;
-        triggeringToolUseId = uniquePending?.toolUseId ?? null;
-        subagentType = uniquePending?.subagentType;
-        correlationStatus = 'resolved';
-        correlationMethod = 'agent-headers';
         wireAgentId = agentCtx.agentId;
         wireParentAgentId = agentCtx.parentAgentId;
-        if (triggeringToolUseId) {
-          this.sessionStore.consumePendingAgentToolUse(parentInteractionDir, triggeringToolUseId);
-        }
-      } else {
-        // @deprecated-fallback: ruta heurística para clientes Claude Code < 2.1.139 u otros harnesses sin cabeceras de agente.
-        // Planificado para retirar en fase G2 (fecha estimada: 2026-Q3).
-        // Extraer el prompt del request del subagente y buscar match en pendings.
-        const subagentPrompt = this.extractSubagentPrompt(params.rawBody);
-        const resolution = this.resolvePendingByPrompt(match.pendings, subagentPrompt);
+      }
+      // @deprecated-fallback: sin cabeceras de agente, joinToolUseToSubagent aplica la
+      // heurística legacy (prompt / unique-pending / fifo-pending) para clientes
+      // Claude Code < 2.1.139. Retirada planificada en G2 (2026-Q3).
 
-        if (resolution) {
-          triggeringToolUseId = resolution.pending.toolUseId;
-          subagentType = resolution.pending.subagentType;
-          correlationStatus = 'resolved';
-          correlationMethod = resolution.method;
-        } else {
-          triggeringToolUseId = null;
-          subagentType = undefined;
-          correlationStatus = 'unresolved';
-          correlationMethod = 'none';
-        }
-        if (triggeringToolUseId) {
-          this.sessionStore.consumePendingAgentToolUse(parentInteractionDir, triggeringToolUseId);
-        }
+      const triggeringToolUseId = join.toolUseId;
+      const subagentType = join.subagentType;
+      const correlationStatus = join.correlationStatus;
+      const correlationMethod: CorrelationMethod = join.correlationMethod;
+
+      if (triggeringToolUseId) {
+        this.sessionStore.consumePendingAgentToolUse(parentInteractionDir, triggeringToolUseId);
       }
 
       const subSeq = await this.auditWriter.nextSubInteractionSequence(

@@ -4,6 +4,8 @@ export interface WireSubagentEntry {
   sessionId: string;
   agentId: string;
   parentAgentId?: string;
+  confirmed?: boolean;
+  triggeringToolUseId?: string;
 }
 
 export interface IWorkflowRepository {
@@ -17,4 +19,10 @@ export interface IWorkflowRepository {
    * Devuelve la entrada registrada para un agentId, o `undefined` si no existe.
    */
   getWorkflowByAgentId(agentId: string): WireSubagentEntry | undefined;
+
+  /**
+   * Confirma un subagente a partir de un evento hook `SubagentStart`.
+   * Maneja la carrera hook-antes-wire creando un placeholder si la entrada aún no existe.
+   */
+  confirmSubagentFromHook(agentId: string, toolUseId?: string): void;
 }

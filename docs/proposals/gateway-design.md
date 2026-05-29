@@ -2929,7 +2929,7 @@ Consideraciones para `POST /hooks`:
 | **C0** | Diseño objetivo documentado (este documento) | Documentación | — |
 | **C1** | Wire: cabeceras `agent-id` + `resolveAgentContext` + `IWorkflowRepository` mínimo | Correlación wire | — |
 | **C2** | Wire: join SSE `tool_use_id` ↔ subagente + fallback legacy (clientes sin cabeceras) | Correlación wire | C1 |
-| **C3** | Hooks: endpoint `POST /hooks` + `AuditHookEventHandler` | Borde hooks | C1 |
+| **C3** | Hooks: endpoint `POST /hooks` + `AuditHookEventHandler` | Borde hooks | C1 | ✅ implementada |
 | **C4** | Cierre E2E: `buildWorkflowResult` + `AuditWorkflowClosureHandler` + proyección disco | Cierre integrado | C2, C3 |
 | **G1** | Tipos gateway + domain services puros (`aggregateWorkflowUsage`, `buildWorkflowResult`) | Refactor gateway | — |
 | **G2** | `IWorkflowRepository` completo + adapter memoria; handlers delegan en repo | Refactor gateway | G1 |

@@ -1,6 +1,7 @@
 import fastify from 'fastify';
 import { randomUUID } from 'node:crypto';
 import { proxyRoutes } from './5-user-interfaces/http/proxy.routes.js';
+import { HooksController } from './5-user-interfaces/http/hooks.controller.js';
 import type { ProxyDependencies } from './4-api/composition-root.js';
 import type { Logger } from './1-domain/types/logger.types.js';
 
@@ -36,6 +37,10 @@ export function buildApp(deps: ProxyDependencies, logger: Logger) {
   app.get('/health', async (_request, _reply) => {
     return { status: 'OK' };
   });
+
+  // Borde hooks (C3): recibe eventos del lifecycle de Claude Code y los despacha al handler
+  const hooksController = new HooksController(deps.hookEventHandler);
+  app.post('/hooks', (request, reply) => hooksController.handle(request, reply));
 
   // Registrar las rutas principales de orquestación del proxy con deps inyectadas
   app.register(proxyRoutes, { deps });

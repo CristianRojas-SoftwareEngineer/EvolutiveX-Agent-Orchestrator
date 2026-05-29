@@ -20,6 +20,7 @@ function makeWorkflowRepo(overrides: Partial<IWorkflowRepository> = {}): IWorkfl
       return entry;
     }),
     getWorkflowByAgentId: (id: string) => store.get(id),
+    confirmSubagentFromHook: vi.fn(),
     ...overrides,
   };
 }

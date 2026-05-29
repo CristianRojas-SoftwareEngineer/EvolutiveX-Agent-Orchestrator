@@ -7,6 +7,7 @@ import { AuditWriterService } from '../2-services/audit-writer.service.js';
 import { SseReconstructService } from '../2-services/sse-reconstruct.service.js';
 import { StreamTeeService } from '../2-services/stream-tee.service.js';
 import { WorkflowRepositoryService } from '../2-services/workflow-repository.service.js';
+import { AuditHookEventHandler } from '../3-operations/audit-hook-event.handler.js';
 import { AuditInteractionHandler } from '../3-operations/audit-interaction.handler.js';
 import { AuditSseResponseHandler } from '../3-operations/audit-sse-response.handler.js';
 import { AuditStandardResponseHandler } from '../3-operations/audit-standard-response.handler.js';
@@ -70,6 +71,7 @@ export async function createProxyDependencies(
     sessionStore,
   );
   const filterToolsHandler = new FilterToolsHandler(config);
+  const hookEventHandler = new AuditHookEventHandler(workflowRepo, logger);
 
   return {
     auditInteractionHandler,
@@ -77,6 +79,7 @@ export async function createProxyDependencies(
     auditStandardResponseHandler,
     auditUpstreamErrorHandler,
     filterToolsHandler,
+    hookEventHandler,
     streamTee,
     sessionStore,
     config,

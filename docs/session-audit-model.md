@@ -704,6 +704,26 @@ StopFailure      → close(workflowId, hook) directo (sin readyToClose — §15.
 
 `close` es idempotente (§28): si `workflow.result != null`, devuelve el resultado existente sin mutar el estado. La proyección del `IWorkflowResult` a disco (`sessions/`) es responsabilidad de G4.
 
+### 8.2 StepAssembler y propagación de modelo (G3)
+
+A partir de G3, el ensamblaje en RAM de cada respuesta de inferencia SSE vive en `StepAssemblerService` (`src/2-services/step-assembler.service.ts`, port `IStepAssembler`). Es efímero: el composition root inyecta una factory `() => new StepAssemblerService()` y `AuditSseResponseHandler` crea una instancia por stream.
+
+**Responsabilidades separadas:**
+
+| Componente | Qué hace |
+| ---------- | -------- |
+| `AuditSseResponseHandler` | Borde: `sse.txt`, `sse.jsonl`, side-effects legacy en `ISessionStore`, reconstrucción, `StepMeta` en disco |
+| `StepAssembler` | Acumula `usage` (con fallback en `message_delta`), `stopReason`, `anthropicMessageId`, `model` (respuesta), bloques `thinking` y `tool_use` |
+
+Por cada evento SSE parseado, el handler invoca `assembler.onEvent(evt)` en paralelo a los registros legacy. Al `stream.on('end')`, lee `assembler.result()` para construir `StepMeta` y escribir `thought/content.md`.
+
+**Propagación de `languageModelId`:** al cerrar el stream, si la interacción activa tiene `modelId` (extraído del request), el handler llama `IWorkflowRepository.setWorkflowModel(workflowId, modelId)`:
+
+- Workflow main: `workflowId = sessionId`
+- Subagente: `workflowId = parentContext.wireAgentId` cuando existe
+
+La operación es idempotente (primer modelo observado) y no-op si el workflow aún no fue abierto en el correlador (p. ej. hooks deshabilitados). Este campo es prerequisito de `SessionMetricsService` en G4; el registro de Steps en el correlador desde el wire se difiere a G4.
+
 ---
 
 ## 9. Documentación relacionada

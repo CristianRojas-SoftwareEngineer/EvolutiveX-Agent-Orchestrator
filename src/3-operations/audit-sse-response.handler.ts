@@ -1,8 +1,10 @@
 import * as path from 'node:path';
 import { StringDecoder } from 'node:string_decoder';
+import type { IWorkflowRepository } from '../1-domain/repositories/IWorkflowRepository.js';
 import type { IAuditWriter } from '../2-services/ports/audit-writer.port.js';
 import type { ISseReconstructor } from '../2-services/ports/sse-reconstructor.port.js';
 import type { ISessionStore } from '../2-services/ports/session-store.port.js';
+import type { AssembledInference, IStepAssembler } from '../2-services/ports/step-assembler.port.js';
 import { ProxyEnvironmentConfig } from '../1-domain/types/config.types.js';
 import { JsonValue } from '../1-domain/types/json.types.js';
 import {
@@ -29,6 +31,8 @@ export class AuditSseResponseHandler {
     private sseReconstruct: ISseReconstructor,
     private config: ProxyEnvironmentConfig,
     private sessionStore: ISessionStore,
+    private createStepAssembler: () => IStepAssembler,
+    private workflowRepo: IWorkflowRepository,
     private logger?: Logger,
   ) {}
 
@@ -58,6 +62,7 @@ export class AuditSseResponseHandler {
     // Eliminamos sse.txt para steps coalesced (solo body.json y sse.jsonl son canónicos)
     const sseRawPath = isCoalescedAgentContinuation ? null : path.join(responseDir, 'sse.txt');
     const currentPhase: SsePhase = isCoalescedAgentContinuation ? 'continuation' : 'delegation';
+    const assembler = this.createStepAssembler();
 
     this.auditWriter.writeResponseHeadersAudit(stepDir, responseHeaders).catch((e) => {
       console.error('Error al escribir cabeceras de step SSE:', e);
@@ -70,12 +75,8 @@ export class AuditSseResponseHandler {
     let streamError = false;
     let sseRawBytesWritten = 0;
     let sseRawTruncated = false;
-    let stopReason: string | null = null;
-    let anthropicMessageId: string | undefined;
     let sseErrorMessage: string | null = null;
     let sseErrorType: string | null = null;
-    const toolCalls: string[] = [];
-    const toolUseIds: string[] = [];
     /**
      * Tracker de bloques tool_use cuyo `name` es `Agent`. Indexado por el
      * `index` del content_block para acumular el JSON parcial del input
@@ -83,15 +84,6 @@ export class AuditSseResponseHandler {
      * `subagent_type` para enriquecer la entrada en `pendingAgentToolUses`.
      */
     const agentBlockTracker = new Map<number, { toolUseId: string; jsonAcc: string }>();
-    /** Tracker de bloques thinking. Indexado por `index` del content_block. */
-    const thinkingBlockTracker = new Map<number, { textAcc: string }>();
-    const thinkingBlocks: string[] = [];
-    const stepUsage = {
-      input_tokens: 0,
-      output_tokens: 0,
-      cache_creation_input_tokens: 0,
-      cache_read_input_tokens: 0,
-    };
 
     stream.on('error', (err) => {
       streamError = true;
@@ -146,61 +138,9 @@ export class AuditSseResponseHandler {
           if (trimmed.startsWith('data: ')) {
             try {
               const evt = JSON.parse(trimmed.slice(6));
-              if (evt.type === 'message_delta' && evt.delta?.stop_reason) {
-                stopReason = evt.delta.stop_reason;
-              }
-              if (evt.type === 'message_stop' && !stopReason && evt.stop_reason) {
-                stopReason = evt.stop_reason;
-              }
-              if (evt.type === 'message_start' && evt.message) {
-                // Extraer message.id para correlación con logs de Claude Code
-                anthropicMessageId = evt.message.id;
-                if (evt.message.usage) {
-                  stepUsage.input_tokens = evt.message.usage.input_tokens ?? 0;
-                  stepUsage.cache_creation_input_tokens =
-                    evt.message.usage.cache_creation_input_tokens ?? 0;
-                  stepUsage.cache_read_input_tokens =
-                    evt.message.usage.cache_read_input_tokens ?? 0;
-                }
-              }
-              if (evt.type === 'message_delta' && evt.usage) {
-                stepUsage.output_tokens = evt.usage.output_tokens ?? 0;
-                // Fallback: proveedores como Xiaomi envían input tokens solo en message_delta
-                if (!stepUsage.input_tokens && evt.usage.input_tokens) {
-                  stepUsage.input_tokens = evt.usage.input_tokens;
-                }
-                if (
-                  !stepUsage.cache_creation_input_tokens &&
-                  evt.usage.cache_creation_input_tokens
-                ) {
-                  stepUsage.cache_creation_input_tokens = evt.usage.cache_creation_input_tokens;
-                }
-                if (!stepUsage.cache_read_input_tokens && evt.usage.cache_read_input_tokens) {
-                  stepUsage.cache_read_input_tokens = evt.usage.cache_read_input_tokens;
-                }
-              }
-              if (
-                evt.type === 'content_block_start' &&
-                evt.content_block?.type === 'thinking' &&
-                typeof evt.index === 'number'
-              ) {
-                thinkingBlockTracker.set(evt.index, { textAcc: '' });
-              }
-              if (
-                evt.type === 'content_block_delta' &&
-                evt.delta?.type === 'thinking_delta' &&
-                typeof evt.index === 'number' &&
-                typeof evt.delta.thinking === 'string'
-              ) {
-                const thinkingTracked = thinkingBlockTracker.get(evt.index);
-                if (thinkingTracked) {
-                  thinkingTracked.textAcc += evt.delta.thinking;
-                }
-              }
+              assembler.onEvent(evt);
               if (evt.type === 'content_block_start' && evt.content_block?.type === 'tool_use') {
-                toolCalls.push(evt.content_block.name);
                 if (typeof evt.content_block.id === 'string') {
-                  toolUseIds.push(evt.content_block.id);
                   this.sessionStore.registerToolUseId(
                     evt.content_block.id,
                     context.auditInteractionDir,
@@ -298,13 +238,6 @@ export class AuditSseResponseHandler {
                   }
                   agentBlockTracker.delete(evt.index);
                 }
-                const thinkingTracked = thinkingBlockTracker.get(evt.index);
-                if (thinkingTracked) {
-                  if (thinkingTracked.textAcc) {
-                    thinkingBlocks.push(thinkingTracked.textAcc);
-                  }
-                  thinkingBlockTracker.delete(evt.index);
-                }
               }
             } catch {
               /* línea no JSON, ignorar */
@@ -327,6 +260,12 @@ export class AuditSseResponseHandler {
           });
         }
 
+        const assembled = assembler.result();
+        this.propagateWorkflowModel(activeInteraction);
+
+        const thinkingBlocks = assembled.thinkingTexts;
+        const stopReason = assembled.stopReason ?? null;
+
         // Escribir extended thinking si se detectaron bloques
         if (thinkingBlocks.length > 0) {
           this.auditWriter.writeStepThought(stepDir, thinkingBlocks).catch((e) => {
@@ -334,30 +273,14 @@ export class AuditSseResponseHandler {
           });
         }
 
-        // Registrar sseRawBytesWritten y sseRawTruncatedByLimit por step
-        const stepMeta: StepMeta = {
-          stepIndex: stepNumber,
-          sse: true,
-          statusCode: context.responseStatusCode,
-          sseLineCount: sseLineIndex,
-          stopReason: stopReason ?? undefined,
-          ...(toolCalls.length > 0 ? { toolCalls } : {}),
-          ...(toolUseIds.length > 0 ? { toolUseIds } : {}),
-          ...(stepUsage.input_tokens ? { inputTokens: stepUsage.input_tokens } : {}),
-          ...(stepUsage.output_tokens ? { outputTokens: stepUsage.output_tokens } : {}),
-          ...(stepUsage.cache_creation_input_tokens
-            ? { cacheCreationInputTokens: stepUsage.cache_creation_input_tokens }
-            : {}),
-          ...(stepUsage.cache_read_input_tokens
-            ? { cacheReadInputTokens: stepUsage.cache_read_input_tokens }
-            : {}),
-          ...(sseRawBytesWritten > 0 ? { sseRawBytesWritten } : {}),
-          ...(sseRawTruncated ? { sseRawTruncatedByLimit: true } : {}),
-          ...(anthropicMessageId ? { anthropicMessageId } : {}),
-          ...(thinkingBlocks.length > 0
-            ? { hasThinking: true, thinkingBlockCount: thinkingBlocks.length }
-            : {}),
-        };
+        const stepMeta = this.buildStepMeta(
+          assembled,
+          stepNumber,
+          context.responseStatusCode,
+          sseLineIndex,
+          sseRawBytesWritten,
+          sseRawTruncated,
+        );
 
         if (context.interactionType === 'client-preflight') {
           await this.handlePreflightStepEnd(context, stepMeta, streamError);
@@ -374,17 +297,17 @@ export class AuditSseResponseHandler {
             sseLineCount: sseLineIndex,
             stopReason: stopReason ?? undefined,
             statusCode: context.responseStatusCode,
-            ...(stepUsage.input_tokens ? { inputTokens: stepUsage.input_tokens } : {}),
-            ...(stepUsage.output_tokens ? { outputTokens: stepUsage.output_tokens } : {}),
-            ...(stepUsage.cache_creation_input_tokens
-              ? { cacheCreationInputTokens: stepUsage.cache_creation_input_tokens }
+            ...(assembled.usage.input_tokens ? { inputTokens: assembled.usage.input_tokens } : {}),
+            ...(assembled.usage.output_tokens ? { outputTokens: assembled.usage.output_tokens } : {}),
+            ...(assembled.usage.cache_creation_input_tokens
+              ? { cacheCreationInputTokens: assembled.usage.cache_creation_input_tokens }
               : {}),
-            ...(stepUsage.cache_read_input_tokens
-              ? { cacheReadInputTokens: stepUsage.cache_read_input_tokens }
+            ...(assembled.usage.cache_read_input_tokens
+              ? { cacheReadInputTokens: assembled.usage.cache_read_input_tokens }
               : {}),
             ...(sseRawBytesWritten > 0 ? { sseRawBytesWritten } : {}),
             ...(sseRawTruncated ? { sseRawTruncatedByLimit: true } : {}),
-            ...(anthropicMessageId ? { anthropicMessageId } : {}),
+            ...(assembled.anthropicMessageId ? { anthropicMessageId: assembled.anthropicMessageId } : {}),
           };
 
           if (targetMeta) {
@@ -629,6 +552,47 @@ export class AuditSseResponseHandler {
         console.error('Error al procesar fin de stream SSE:', err);
       }
     });
+  }
+
+  private propagateWorkflowModel(interaction: ActiveInteraction | null | undefined): void {
+    if (!interaction?.modelId) return;
+    const workflowId = interaction.parentContext?.wireAgentId ?? interaction.sessionId;
+    this.workflowRepo.setWorkflowModel(workflowId, interaction.modelId);
+  }
+
+  private buildStepMeta(
+    assembled: AssembledInference,
+    stepIndex: number,
+    statusCode: number | null,
+    sseLineCount: number,
+    sseRawBytesWritten: number,
+    sseRawTruncated: boolean,
+  ): StepMeta {
+    const toolCalls = assembled.toolUseBlocks.map((b) => b.name);
+    const toolUseIds = assembled.toolUseBlocks.map((b) => b.id);
+    const usage = assembled.usage;
+
+    return {
+      stepIndex,
+      sse: true,
+      statusCode,
+      sseLineCount,
+      stopReason: assembled.stopReason,
+      ...(toolCalls.length > 0 ? { toolCalls } : {}),
+      ...(toolUseIds.length > 0 ? { toolUseIds } : {}),
+      ...(usage.input_tokens ? { inputTokens: usage.input_tokens } : {}),
+      ...(usage.output_tokens ? { outputTokens: usage.output_tokens } : {}),
+      ...(usage.cache_creation_input_tokens
+        ? { cacheCreationInputTokens: usage.cache_creation_input_tokens }
+        : {}),
+      ...(usage.cache_read_input_tokens ? { cacheReadInputTokens: usage.cache_read_input_tokens } : {}),
+      ...(sseRawBytesWritten > 0 ? { sseRawBytesWritten } : {}),
+      ...(sseRawTruncated ? { sseRawTruncatedByLimit: true } : {}),
+      ...(assembled.anthropicMessageId ? { anthropicMessageId: assembled.anthropicMessageId } : {}),
+      ...(assembled.thinkingTexts.length > 0
+        ? { hasThinking: true, thinkingBlockCount: assembled.thinkingTexts.length }
+        : {}),
+    };
   }
 
   private async handlePreflightStepEnd(

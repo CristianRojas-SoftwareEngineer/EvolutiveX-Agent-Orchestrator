@@ -5,6 +5,10 @@ import { AuditSseResponseHandler } from '../../src/3-operations/audit-sse-respon
 import type { IAuditWriter } from '../../src/2-services/ports/audit-writer.port.js';
 import type { ISessionStore } from '../../src/2-services/ports/session-store.port.js';
 import type { ISseReconstructor } from '../../src/2-services/ports/sse-reconstructor.port.js';
+import type { IWorkflowRepository } from '../../src/1-domain/repositories/IWorkflowRepository.js';
+import { StepAssemblerService } from '../../src/2-services/step-assembler.service.js';
+import { WorkflowRepositoryService } from '../../src/2-services/workflow-repository.service.js';
+import { ProxyEnvironmentConfig } from '../../src/1-domain/types/config.types.js';
 import {
   AuditInteractionContext,
   ActiveInteraction,
@@ -156,6 +160,23 @@ function makeSseReconstructor(overrides: Partial<ISseReconstructor> = {}): ISseR
   };
 }
 
+function makeSseHandler(
+  auditWriter: IAuditWriter,
+  sseReconstruct: ISseReconstructor,
+  config: ProxyEnvironmentConfig,
+  sessionStore: ISessionStore,
+  workflowRepo: IWorkflowRepository = new WorkflowRepositoryService(),
+): AuditSseResponseHandler {
+  return new AuditSseResponseHandler(
+    auditWriter,
+    sseReconstruct,
+    config,
+    sessionStore,
+    () => new StepAssemblerService(),
+    workflowRepo,
+  );
+}
+
 describe('AuditSseResponseHandler', () => {
   it('debería capturar líneas SSE en stepDir y escribir interactionMeta al finalizar (end_turn)', async () => {
     const config = makeConfig();
@@ -174,7 +195,7 @@ describe('AuditSseResponseHandler', () => {
       '',
     ].join('\n');
 
-    const handler = new AuditSseResponseHandler(
+    const handler = makeSseHandler(
       makeAuditWriter({
         appendSseLine: (_dir, line) => {
           appendedLines.push(line);
@@ -209,7 +230,7 @@ describe('AuditSseResponseHandler', () => {
       '',
     ].join('\n');
 
-    const handler = new AuditSseResponseHandler(
+    const handler = makeSseHandler(
       makeAuditWriter({
         writeInteractionMeta: async () => {
           interactionMetaWritten = true;
@@ -241,7 +262,7 @@ describe('AuditSseResponseHandler', () => {
       },
     });
 
-    const handler = new AuditSseResponseHandler(
+    const handler = makeSseHandler(
       makeAuditWriter({
         writeInteractionMeta: async () => {
           interactionMetaWritten = true;
@@ -282,7 +303,7 @@ describe('AuditSseResponseHandler', () => {
 
     const sseData =
       'event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"end_turn"}}\n\n';
-    const handler = new AuditSseResponseHandler(
+    const handler = makeSseHandler(
       makeAuditWriter(),
       makeSseReconstructor(),
       config,
@@ -301,7 +322,7 @@ describe('AuditSseResponseHandler', () => {
   it('NO debería escribir headers top-level si la reconstrucción no produjo body', async () => {
     const config = makeConfig();
     const headerDirs: string[] = [];
-    const handler = new AuditSseResponseHandler(
+    const handler = makeSseHandler(
       makeAuditWriter({
         writeResponseHeadersAudit: async (dir) => {
           headerDirs.push(dir);
@@ -332,7 +353,7 @@ describe('AuditSseResponseHandler', () => {
   it('debería escribir headers top-level cuando la reconstrucción escribió body', async () => {
     const config = makeConfig();
     const headerDirs: string[] = [];
-    const handler = new AuditSseResponseHandler(
+    const handler = makeSseHandler(
       makeAuditWriter({
         writeResponseHeadersAudit: async (dir) => {
           headerDirs.push(dir);
@@ -375,7 +396,7 @@ describe('AuditSseResponseHandler', () => {
       },
     });
 
-    const handler = new AuditSseResponseHandler(
+    const handler = makeSseHandler(
       makeAuditWriter({
         writeInteractionMeta: async () => {
           interactionMetaWritten = true;
@@ -406,7 +427,7 @@ describe('AuditSseResponseHandler', () => {
   it('debería llamar removeInteractionState al cerrar la interacción', async () => {
     const config = makeConfig();
     let removeCalled = false;
-    const handler = new AuditSseResponseHandler(
+    const handler = makeSseHandler(
       makeAuditWriter({
         removeInteractionState: async () => {
           removeCalled = true;
@@ -435,7 +456,7 @@ describe('AuditSseResponseHandler', () => {
     const sseData =
       'event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"end_turn"}}\n\n';
 
-    const handler = new AuditSseResponseHandler(
+    const handler = makeSseHandler(
       makeAuditWriter(),
       makeSseReconstructor({
         runReconstruction: async () => {
@@ -470,7 +491,7 @@ describe('AuditSseResponseHandler', () => {
         calls.push({ dir, step, id, metadata });
       },
     });
-    const handler = new AuditSseResponseHandler(
+    const handler = makeSseHandler(
       makeAuditWriter(),
       makeSseReconstructor(),
       config,
@@ -521,7 +542,7 @@ describe('AuditSseResponseHandler', () => {
         calls.push(args);
       },
     });
-    const handler = new AuditSseResponseHandler(
+    const handler = makeSseHandler(
       makeAuditWriter(),
       makeSseReconstructor(),
       config,
@@ -554,7 +575,7 @@ describe('AuditSseResponseHandler', () => {
         calls.push({ id, metadata });
       },
     });
-    const handler = new AuditSseResponseHandler(
+    const handler = makeSseHandler(
       makeAuditWriter(),
       makeSseReconstructor(),
       config,
@@ -600,7 +621,7 @@ describe('AuditSseResponseHandler', () => {
       '',
     ].join('\n');
 
-    const handler = new AuditSseResponseHandler(
+    const handler = makeSseHandler(
       makeAuditWriter({
         writeInteractionMeta: async (_dir, meta) => {
           captured = meta;
@@ -640,7 +661,7 @@ describe('AuditSseResponseHandler', () => {
       '',
     ].join('\n');
 
-    const handler = new AuditSseResponseHandler(
+    const handler = makeSseHandler(
       makeAuditWriter({
         writeInteractionMeta: async (_dir, meta) => {
           captured = meta;
@@ -673,7 +694,7 @@ describe('AuditSseResponseHandler', () => {
       '\n',
     );
 
-    const handler = new AuditSseResponseHandler(
+    const handler = makeSseHandler(
       makeAuditWriter(),
       makeSseReconstructor(),
       config,
@@ -693,7 +714,7 @@ describe('AuditSseResponseHandler', () => {
     const config = makeConfig();
     let captured: InteractionMetadata | null = null;
 
-    const handler = new AuditSseResponseHandler(
+    const handler = makeSseHandler(
       makeAuditWriter({
         writeInteractionMeta: async (_dir, meta) => {
           captured = meta;
@@ -729,7 +750,7 @@ describe('AuditSseResponseHandler', () => {
     const sseData =
       'event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"end_turn"}}\n\n';
 
-    const handler = new AuditSseResponseHandler(
+    const handler = makeSseHandler(
       makeAuditWriter({
         updateSessionMetrics: async () => {
           metricsCalled = true;
@@ -767,7 +788,7 @@ describe('AuditSseResponseHandler', () => {
       },
     });
 
-    const handler = new AuditSseResponseHandler(
+    const handler = makeSseHandler(
       makeAuditWriter({
         writeInteractionMeta: async (_dir, meta) => {
           captured = meta;
@@ -803,7 +824,7 @@ describe('AuditSseResponseHandler', () => {
         calls.push({ dir, step, id });
       },
     });
-    const handler = new AuditSseResponseHandler(
+    const handler = makeSseHandler(
       makeAuditWriter(),
       makeSseReconstructor(),
       config,
@@ -846,7 +867,7 @@ describe('AuditSseResponseHandler', () => {
       '',
     ].join('\n');
 
-    const handler = new AuditSseResponseHandler(
+    const handler = makeSseHandler(
       makeAuditWriter({
         writeInteractionMeta: async (_dir, meta) => {
           captured = meta;
@@ -880,7 +901,7 @@ describe('AuditSseResponseHandler', () => {
       '',
     ].join('\n');
 
-    const handler = new AuditSseResponseHandler(
+    const handler = makeSseHandler(
       makeAuditWriter({
         writeInteractionMeta: async (_dir, meta) => {
           capturedMeta = meta;
@@ -910,5 +931,100 @@ describe('AuditSseResponseHandler', () => {
     expect(capturedMeta!.outcome).toBe('completed');
     // El error de reconstrucción se registra en sseResponseBodyError del step meta
     // pero el flujo no se rompe
+  });
+
+  it('propaga modelId al workflow main del correlador al cerrar el stream', async () => {
+    const config = makeConfig();
+    const repo = new WorkflowRepositoryService();
+    repo.openWorkflow('test', { agentId: 'agent-root', isSubagentRequest: false });
+    const setModelSpy = vi.spyOn(repo, 'setWorkflowModel');
+
+    const sseData =
+      'data: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":1}}\n\n';
+
+    const handler = makeSseHandler(
+      makeAuditWriter(),
+      makeSseReconstructor(),
+      config,
+      makeSessionStore(makeActiveInteraction({ sessionId: 'test', modelId: 'claude-sonnet-4-6' })),
+      repo,
+    );
+
+    const stream = new PassThrough();
+    handler.execute(stream, makeContext(), {});
+    stream.write(sseData);
+    stream.end();
+    await new Promise((r) => setTimeout(r, 100));
+
+    expect(setModelSpy).toHaveBeenCalledWith('test', 'claude-sonnet-4-6');
+    expect(repo.getWorkflow('test')?.languageModelId).toBe('claude-sonnet-4-6');
+  });
+
+  it('propaga modelId al sub-workflow por wireAgentId', async () => {
+    const config = makeConfig();
+    const repo = new WorkflowRepositoryService();
+    repo.openSubagentWorkflow(
+      'parent-session',
+      { agentId: 'agent-child', isSubagentRequest: true },
+      'parent-session',
+      'tu-parent',
+    );
+
+    const handler = makeSseHandler(
+      makeAuditWriter(),
+      makeSseReconstructor(),
+      config,
+      makeSessionStore(
+        makeActiveInteraction({
+          sessionId: 'parent-session',
+          modelId: 'claude-haiku',
+          parentContext: {
+            parentInteractionDir: '/parent',
+            parentStepIndex: 1,
+            triggeringToolUseId: 'tu-parent',
+            correlationStatus: 'resolved',
+            correlationMethod: 'agent-headers',
+            wireAgentId: 'agent-child',
+          },
+        }),
+      ),
+      repo,
+    );
+
+    const stream = new PassThrough();
+    handler.execute(
+      stream,
+      makeContext(),
+      {},
+    );
+    stream.write(
+      'data: {"type":"message_delta","delta":{"stop_reason":"tool_use"},"usage":{"output_tokens":1}}\n\n',
+    );
+    stream.end();
+    await new Promise((r) => setTimeout(r, 100));
+
+    expect(repo.getWorkflow('agent-child')?.languageModelId).toBe('claude-haiku');
+  });
+
+  it('setWorkflowModel no lanza si el workflow no existe en el correlador', async () => {
+    const config = makeConfig();
+    const repo = new WorkflowRepositoryService();
+
+    const handler = makeSseHandler(
+      makeAuditWriter(),
+      makeSseReconstructor(),
+      config,
+      makeSessionStore(makeActiveInteraction({ sessionId: 'orphan', modelId: 'any-model' })),
+      repo,
+    );
+
+    const stream = new PassThrough();
+    expect(() => {
+      handler.execute(stream, makeContext(), {});
+      stream.write('data: {"type":"message_delta","delta":{"stop_reason":"end_turn"}}\n\n');
+      stream.end();
+    }).not.toThrow();
+    await new Promise((r) => setTimeout(r, 100));
+    expect(repo.getWorkflow('orphan')).toBeUndefined();
   });
 });

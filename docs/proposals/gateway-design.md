@@ -2878,13 +2878,15 @@ src/1-domain/
 | Tipo de lógica | Ejemplos |
 | -------------- | -------- |
 | **Datos de dominio** | `IWorkflow`, `IStep`, `IToolUse`, `IWorkflowResult`, `IProvider`, `ILanguageModel`. |
-| **Transformaciones puras** | `aggregateWorkflowUsage(closedSteps, childResults)`, `deriveOutcome(hook)`, `deriveFinalText(hook)`, `buildWorkflowResult(wf, steps, childResults, hook)`. |
+| **Transformaciones puras** | `aggregateWorkflowUsage(closedSteps, childResults)`, `deriveOutcome(hook)`, `deriveFinalText(hook)`, `buildWorkflowResult(wf, steps, childResults, hook)`, `aggregateWorkflowUsageByModel(closedSteps)` (G4: agrupa `Step.usage` por `modelId`). |
 | **Validaciones** | Invariante G5: sub-workflow requiere `parentWorkflowId` + `parentToolUseId`. |
 | **Sin I/O** | Ningún `fs`, `fetch`, ni parseo SSE aquí. |
 
 **Nota sobre perfil anémico:** en lugar de `Workflow.complete()` como método con efectos secundarios, SCP implementa **`buildWorkflowResult(...)`** — función pura invocada desde el handler de capa 3. Esto permite testear la lógica de cierre sin dependencias de infraestructura.
 
 **Tipos Interaction* deprecados (G1):** `InteractionType`, `InteractionOutcome`, `InteractionMetadata`, `ActiveInteraction`, `InteractionState`, `AuditInteractionContext` en `audit.types.ts` marcados `@deprecated`. Retirada planificada en fase G4/P (al migrar el último consumidor).
+
+**Pendiente G4:** `aggregate-workflow-usage-by-model.ts` (función pura L1: agrupa `Step.usage` por `step.inferenceRequest.model`; retorna `Record<modelId, { usage: AnthropicUsage; stepCount: number }>`). Tipo `ISessionMetrics` en `types/gateway/` migrado desde `audit.types.ts`.
 
 ---
 
@@ -2900,6 +2902,7 @@ src/1-domain/
 | `SseReconstructService` | Forense / `output/` desde `sse.jsonl` | Complemento; no sustituye `finalText` de hooks |
 | `StreamTeeService` | Sin cambio respecto a implementación actual | Reenvío + rama audit |
 | `ProviderCatalog` | Leer `routing/providers/` → `Provider`, `LanguageModel` | Entidades §13 |
+| `SessionMetricsService` | Escritura atómica de `session-metrics.json` agrupada por modelo (`models`, `session_totals`, `cache_efficiency`); solo workflows `kind: 'main'` (invariante G16). Implementado en G4. | §33.2 |
 
 **Principio:** los adapters **no** deciden cuándo cerrar un workflow; ejecutan lo que capa 3 ordena.
 
@@ -2954,8 +2957,8 @@ Consideraciones para `POST /hooks`:
 | **C3** | Hooks: endpoint `POST /hooks` + `AuditHookEventHandler` | Borde hooks | C1 | ✅ implementada |
 | **G1** | Tipos gateway + domain services puros de cierre: `aggregateWorkflowUsage`, `buildWorkflowResult`, `deriveOutcome`, `deriveFinalText`; tipos `WorkflowResult/Workflow/Step/ToolUse` | Refactor gateway | — |
 | **G2** | `IWorkflowRepository` completo con lifecycle de cierre (`readyToClose`, open/close) + adapter memoria; handlers delegan en repo; integra costuras C1/C2/C3 | Refactor gateway | G1, C2, C3 |
-| **G3** | Extraer `StepAssembler` desde `audit-sse-response.handler` | Refactor gateway | G2 |
-| **G4** | `AuditProjection` explícita; `InteractionMetadata` generado desde `WorkflowResult`; `AuditWorkflowClosureHandler` hook-driven (des-stub `Stop`/`SubagentStop`/`StopFailure`); proyección `WorkflowResult` a disco; aceptación E2E subset §37b; retiro cierre wire-only como ruta principal | Refactor gateway | G3 |
+| **G3** | Extraer `StepAssembler` desde `audit-sse-response.handler`; propagar `step.inferenceRequest.model` → `workflow.languageModelId` al correlador al completar cada step | Refactor gateway | G2 |
+| **G4** | `AuditProjection` explícita; `InteractionMetadata` generado desde `WorkflowResult`; `AuditWorkflowClosureHandler` hook-driven (des-stub `Stop`/`SubagentStop`/`StopFailure`); proyección `WorkflowResult` a disco; `aggregateWorkflowUsageByModel` (L1) + `SessionMetricsService` (L2): `session-metrics.json` por modelo con `session_totals` y `cache_efficiency` (§33.2, invariante G16); aceptación E2E subset §37b; retiro cierre wire-only como ruta principal | Refactor gateway | G3 |
 | **G5** | `ProviderCatalog` desde `routing/providers/` | Refactor gateway | — |
 | **P0** | Spike: diff layout SCP actual vs causal-workflows-v1 + coste migración | Persistencia | G4 |
 | **P1** | Migración estructura directorios (`workflows/NN/`, `tools/KK/`) | Persistencia | P0, G4 |
@@ -2982,7 +2985,7 @@ En todas las fases C y G: **mismo layout `sessions/`** salvo campos adicionales 
 | Correlación subagente | Pending heurístico (prompt/unique) | Headers plano A + SSE join plano B + `SubagentStart` plano C |
 | Cierre E2E | Wire `stop_reason` | Hook `Stop`/`SubagentStop` + `buildWorkflowResult` (wire como respaldo transitorio) |
 | Texto final | `output/body.json` reconstruido SSE | `WorkflowResult.finalText` passthrough hook; `output/` como fallback |
-| Tokens turno | `InteractionMetadata.totals` | `WorkflowResult.usage` (semántica §7.7.1: hop wire en Step, facturado E2E en Result) |
+| Tokens turno | `InteractionMetadata.totals`; `session-metrics.json` por modelo (schema simple) | `WorkflowResult.usage` (hop wire en Step, facturado E2E en Result; ver §15.7); `session-metrics.json` desglosado por modelo con `session_totals` y `cache_efficiency` (§33.2, invariante G16, implementado en G4) |
 | Multi-proveedor | Solo en `routing/` + statusline | `Provider` / `LanguageModel` en dominio capa 1 |
 | SSE en dominio | `SseLine[]` en audit | Snapshots `Step`; deltas solo en proyección capa 2 |
 | Handlers | Monolíticos, alta línea | Orquestación explícita: wire + hooks → correlador compartido |

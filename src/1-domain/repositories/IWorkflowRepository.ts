@@ -63,4 +63,10 @@ export interface IWorkflowRepository {
 
   /** Cierra el workflow invocando `buildWorkflowResult`; idempotente si ya está cerrado. */
   close(workflowId: string, hook: ClaudeHookEvent): IWorkflowResult;
+
+  /**
+   * Fija `languageModelId` con el primer modelo observado (idempotente).
+   * No-op si el workflowId no existe.
+   */
+  setWorkflowModel(workflowId: string, modelId: string): void;
 }

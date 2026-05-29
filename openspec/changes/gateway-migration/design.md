@@ -32,8 +32,8 @@ La relación padre→hijo entre este orquestador y los changes de segundo nivel 
 | C3 | `gateway-c3-hooks-endpoint` | Borde hooks | C1 | Pruebas de endpoint `POST /hooks` + `AuditHookEventHandler` E2E | `README.md`, `docs/proposals/gateway-design.md` | — | archivada |
 | G1 | `gateway-g1-domain-types-services` | Refactor gateway | — | `npm run test:quick` | `docs/proposals/gateway-design.md` §39 | Tipos `Interaction*` en capa 1 reemplazados | archivada |
 | G2 | `gateway-g2-workflow-repository` | Refactor gateway | G1, C2, C3 | `npm run test:quick` | `docs/session-audit-model.md` | `ActiveInteraction` en port capa 2 | archivada |
-| G3 | `gateway-g3-step-assembler` | Refactor gateway | G2 | `npm run test:quick` | `docs/session-audit-model.md` | Lógica de ensamblaje incrustada en `audit-sse-response.handler` | pendiente |
-| G4 | `gateway-g4-audit-projection` | Refactor gateway | G3 | `npm run test:quick` (si toca persistencia: `npm run test`) + subset §37b | `docs/session-audit-model.md`, `docs/proposals/gateway-design.md` §40 | `InteractionMetadata` generado directamente (reemplazado por `WorkflowResult`); cierre wire-only como ruta principal | pendiente |
+| G3 | `gateway-g3-step-assembler` | Refactor gateway | G2 | `npm run test:quick` | `docs/session-audit-model.md` | Lógica de ensamblaje incrustada en `audit-sse-response.handler` | archivada |
+| G4 | `gateway-g4-audit-projection` | Refactor gateway | G3 | `npm run test:quick` (si toca persistencia: `npm run test`) + subset §37b | `docs/session-audit-model.md`, `docs/proposals/gateway-design.md` §33.2, §40 | `InteractionMetadata` generado directamente (reemplazado por `WorkflowResult`); cierre wire-only como ruta principal; `updateSessionMetrics()` en `audit-writer.service.ts` (reemplazado por `SessionMetricsService`); tipo `SessionMetrics` en `audit.types.ts` (migrado a tipos gateway) | pendiente |
 | G5 | `gateway-g5-provider-catalog` | Refactor gateway | — | `npm run test:quick` | `docs/proposals/gateway-design.md` §39 | `ProviderCatalog` inline en `routing/` | pendiente |
 | P0 | `gateway-p0-layout-diff-spike` | Persistencia | G4 | Spike documentado — sin gate de tests | `docs/proposals/gateway-design.md` §29–§37 | — | pendiente |
 | P1 | `gateway-p1-directory-migration` | Persistencia | P0, G4 | `npm run test` + casos 1–7, 15, 16, 19 del checklist [§37b](../../../docs/proposals/gateway-design.md#37b-checklist-de-aceptación-e2e-del-layout) | `docs/session-audit-model.md`, `README.md`, `docs/proposals/gateway-design.md` §30 | Layout flat `sessions/{session}/{interaction}/` | pendiente |
@@ -131,3 +131,12 @@ El legacy a retirar de cada fase se lista en el registro. La política es:
 **Decisión:** G1 y G5 pueden iniciarse en paralelo con las fases C (ambos tienen dependencia `—`). G2–G4 siguen la cadena G1→G2→G3→G4. G2 depende además de C2 y C3 (el borde hooks/SSE debe existir para que el lifecycle de cierre `readyToClose` pueda integrarse con las costuras C1/C2/C3 en el repositorio).
 
 **Rationale:** §43 lo explicita. Maximiza el paralelismo sin romper la integridad del dominio. El cierre E2E vive íntegramente en el bloque G: domain services en G1, lifecycle de cierre en G2, `AuditWorkflowClosureHandler` y proyección `WorkflowResult` en G4.
+
+### Integración de métricas de tokens de sesión en G3 y G4
+
+**Decisión:** La lógica de agregación de consumo de tokens por sesión — actualmente dispersa en `audit-interaction.handler.ts` y `audit-writer.service.ts` — se integra en el stack objetivo distribuyendo la responsabilidad entre G3 y G4.
+
+- **G3** añade la propagación de `step.inferenceRequest.model` → `workflow.languageModelId` al completar cada step (primer modelo observado). Provee el dato de modelo que G4 necesita para el desglose por `modelId` en `session-metrics.json`.
+- **G4** añade `aggregateWorkflowUsageByModel` (L1 puro: agrupa `Step.usage` por `modelId`) y `SessionMetricsService` (L2: escritura atómica de `session-metrics.json` con desglose por modelo, `session_totals` y `cache_efficiency` alineados a §33.2). La invariante G16 se enforce aquí: solo workflows `kind: 'main'` actualizan las métricas de sesión (los sub-workflows ya están incluidos en el rollup del padre). `duration_ms` y `outcome` se difieren al igual que `totalCostUsd`.
+
+**Rationale:** La proyección `WorkflowResult` a disco ya ocurre en G4. Añadir `SessionMetricsService` en la misma fase evita una fase adicional y es el punto natural: el workflow está cerrado, su `usage` agregado está disponible y el `languageModelId` propagado en G3 ya es accesible. El tipo `SessionMetrics` de `audit.types.ts` migra a tipos gateway en G4 junto con la retirada de `updateSessionMetrics()` y `InteractionMetadata`.

@@ -124,24 +124,28 @@
 
 ## G3 — Extraer `StepAssembler` desde `audit-sse-response.handler`
 
-- [ ] Verificar dependencias §43: G2 en estado `validada` o `archivada`
-- [ ] Crear change de segundo nivel `gateway-g3-step-assembler` (skill `openspec-propose`)
-- [ ] El `proposal.md` del change hijo incluye back-reference al orquestador
-- [ ] Actualizar estado de G3 a `en-curso` en el registro del orquestador
-- [ ] Seguimiento de implementación del change hijo (`openspec-apply`)
+- [x] Verificar dependencias §43: G2 en estado `validada` o `archivada`
+  - _Criterio: columna Estado de G2 = `archivada` en el registro_
+- [x] Crear change de segundo nivel `gateway-g3-step-assembler` (skill `openspec-propose`)
+- [x] El `proposal.md` del change hijo incluye back-reference al orquestador
+- [x] Actualizar estado de G3 a `en-curso` en el registro del orquestador
+- [x] Seguimiento de implementación del change hijo (`openspec-apply`)
   - _Criterio: `StepAssembler` extraído como servicio de capa 2; handler delgado_
-- [ ] Gate superado: `npm run test:quick` sin errores
-- [ ] Documentación actualizada: `docs/session-audit-model.md`
-- [ ] Legacy retirado: lógica de ensamblaje incrustada en `audit-sse-response.handler` eliminada
+- [x] Gate superado: `npm run test:quick` sin errores
+- [x] Documentación actualizada: `docs/session-audit-model.md`
+- [x] Legacy retirado: lógica de ensamblaje incrustada en `audit-sse-response.handler` eliminada
   - _Criterio: `npm run lint` + `npm run typecheck` pasan; no hay duplicación_
-- [ ] Sync de specs si aplica (`openspec-sync`)
-- [ ] Marcar G3 como `validada` y archivar el change hijo (`openspec-archive`)
+- [x] Sync de specs si aplica (`openspec-sync`)
+  - _Criterio: `openspec/specs/gateway-step-assembly/spec.md` creado; delta G3 en `gateway-workflow-lifecycle`_
+- [x] Marcar G3 como `validada` y archivar el change hijo (`openspec-archive`)
+  - _Archivo: `openspec/changes/archive/2026-05-29-gateway-g3-step-assembler/`; registro G3 = `archivada`_
 
 ---
 
 ## G4 — `AuditProjection` explícita; `AuditWorkflowClosureHandler` hook-driven; proyección `WorkflowResult`; aceptación E2E
 
-- [ ] Verificar dependencias §43: G3 en estado `validada` o `archivada`
+- [x] Verificar dependencias §43: G3 en estado `validada` o `archivada`
+  - _Criterio: columna Estado de G3 = `archivada` en el registro_
 - [ ] Crear change de segundo nivel `gateway-g4-audit-projection` (skill `openspec-propose`)
 - [ ] El `proposal.md` del change hijo incluye back-reference al orquestador
 - [ ] Actualizar estado de G4 a `en-curso` en el registro del orquestador

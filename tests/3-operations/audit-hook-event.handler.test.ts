@@ -16,6 +16,7 @@ function makeRepo(overrides: Partial<IWorkflowRepository> = {}): IWorkflowReposi
     registerToolUse: vi.fn(),
     readyToClose: vi.fn(),
     close: vi.fn(),
+    setWorkflowModel: vi.fn(),
     ...overrides,
   };
 }

@@ -104,21 +104,21 @@
 
 ## G2 — `IWorkflowRepository` completo con lifecycle de cierre; integra costuras C1/C2/C3
 
-- [ ] Verificar dependencias §43: G1, C2 y C3 en estado `validada` o `archivada`
+- [x] Verificar dependencias §43: G1, C2 y C3 en estado `validada` o `archivada`
   - _Criterio: columnas Estado de G1, C2 y C3 = `validada` o `archivada` en el registro_
-- [ ] Crear change de segundo nivel `gateway-g2-workflow-repository` (skill `openspec-propose`)
-- [ ] El `proposal.md` del change hijo incluye back-reference al orquestador
-- [ ] Actualizar estado de G2 a `en-curso` en el registro del orquestador
-- [ ] Seguimiento de implementación del change hijo (`openspec-apply`)
+- [x] Crear change de segundo nivel `gateway-g2-workflow-repository` (skill `openspec-propose`)
+- [x] El `proposal.md` del change hijo incluye back-reference al orquestador
+- [x] Actualizar estado de G2 a `en-curso` en el registro del orquestador
+- [x] Seguimiento de implementación del change hijo (`openspec-apply`)
   - _Criterio: `IWorkflowRepository` en capa 1 (interface); adapter en capa 2_
-- [ ] Lifecycle de cierre implementado: `readyToClose`, operaciones `open`/`close` integradas con costuras C1 (cabeceras), C2 (join SSE), C3 (hooks)
+- [x] Lifecycle de cierre implementado: `readyToClose`, operaciones `open`/`close` integradas con costuras C1 (cabeceras), C2 (join SSE), C3 (hooks)
   - _Criterio: el repositorio gestiona el ciclo de vida completo del Workflow incluyendo transición `readyToClose` vía hooks_
-- [ ] Gate superado: `npm run test:quick` sin errores
-- [ ] Documentación actualizada: `docs/session-audit-model.md`
+- [x] Gate superado: `npm run test:quick` sin errores
+- [x] Documentación actualizada: `docs/session-audit-model.md`
   - _Criterio: `IWorkflowRepository` como estado activo descrito en lugar de `ActiveInteraction`; lifecycle de cierre documentado_
-- [ ] Legacy retirado: `ActiveInteraction` en port capa 2 eliminado o deprecado
-- [ ] Sync de specs si aplica (`openspec-sync`)
-- [ ] Marcar G2 como `validada` y archivar el change hijo (`openspec-archive`)
+- [x] Legacy retirado: `ActiveInteraction` en port capa 2 eliminado o deprecado
+- [x] Sync de specs si aplica (`openspec-sync`)
+- [x] Marcar G2 como `validada` y archivar el change hijo (`openspec-archive`)
 
 ---
 

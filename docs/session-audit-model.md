@@ -674,6 +674,36 @@ Estas herramientas no crean subagentes anidados; sus continuaciones se rutean al
 | Secuencia agéntica | — | `main-agent/interactions/interaction-sequence.json` | contador numérico |
 | Secuencia side | — | `side-interactions/interaction-sequence.json` | contador numérico |
 
+### 8.1 Estado activo del correlador (G2)
+
+A partir de la fase G2, el correlador en memoria para el lifecycle de cierre es `IWorkflowRepository` (`src/1-domain/repositories/IWorkflowRepository.ts`). Corre **en paralelo** al pipeline legacy `ISessionStore`/`ActiveInteraction` hasta que G4 complete la migración.
+
+**Entidades del correlador G2:**
+
+| Entidad | Tipo TypeScript | Referencia |
+| ------- | --------------- | ---------- |
+| Workflow principal (por sesión) | `IWorkflow` con `kind: 'main'`, `id = sessionId` | `src/1-domain/interfaces/gateway/IWorkflow.ts` |
+| Sub-workflow (por agente) | `IWorkflow` con `kind: 'subagent'`, `id = agentId` | — |
+| Resultado de cierre | `IWorkflowResult` | `src/1-domain/interfaces/gateway/IWorkflowResult.ts` |
+| Correlador en memoria | `WorkflowRepositoryService` | `src/2-services/workflow-repository.service.ts` |
+
+**Lifecycle de cierre:**
+
+```
+UserPromptSubmit → openWorkflow(sessionId)     → IWorkflow { status: 'running' }
+                 → registerStep / registerToolUse (G3/G4)
+Stop/SubagentStop → readyToClose(workflowId, hook)
+                     ├─ false si stopHookActive === true
+                     ├─ false si backgroundTasks > 0
+                     └─ true → close(workflowId, hook)
+                                 → buildWorkflowResult(workflow, closedSteps, childResults, hook)
+                                 → IWorkflowResult { outcome, finalText, usage, stepCount }
+                                 → IWorkflow { status: 'completed' | 'failed' }
+StopFailure      → close(workflowId, hook) directo (sin readyToClose — §15.4)
+```
+
+`close` es idempotente (§28): si `workflow.result != null`, devuelve el resultado existente sin mutar el estado. La proyección del `IWorkflowResult` a disco (`sessions/`) es responsabilidad de G4.
+
 ---
 
 ## 9. Documentación relacionada

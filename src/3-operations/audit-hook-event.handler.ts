@@ -11,21 +11,65 @@ export class AuditHookEventHandler {
   public execute(event: ClaudeHookEvent): void {
     switch (event.eventName) {
       case 'SubagentStart':
-        // Única mutación real de C3: confirmar el subagente en el correlador
         if (event.agentId) {
           this.workflowRepo.confirmSubagentFromHook(event.agentId, event.toolUseId);
         }
         break;
 
-      // Los eventos siguientes son stubs — mutaciones diferidas a G2/C4
       case 'UserPromptSubmit':
+        this.workflowRepo.openWorkflow(event.sessionId, {
+          agentId: event.agentId,
+          isSubagentRequest: false,
+        });
+        break;
+
+      case 'Stop': {
+        const wf = this.workflowRepo.getWorkflow(event.sessionId);
+        if (!wf) {
+          this.logger?.info({ eventName: event.eventName, sessionId: event.sessionId }, 'workflow no encontrado — evento ignorado');
+          break;
+        }
+        if (this.workflowRepo.readyToClose(event.sessionId, event)) {
+          this.workflowRepo.close(event.sessionId, event);
+        }
+        break;
+      }
+
+      case 'SubagentStop': {
+        const agentId = event.agentId;
+        if (!agentId) break;
+        const wf = this.workflowRepo.getWorkflow(agentId);
+        if (!wf) {
+          this.logger?.info({ eventName: event.eventName, agentId }, 'sub-workflow no encontrado — evento ignorado');
+          break;
+        }
+        if (this.workflowRepo.readyToClose(agentId, event)) {
+          this.workflowRepo.close(agentId, event);
+        }
+        break;
+      }
+
+      case 'StopFailure': {
+        const wf = this.workflowRepo.getWorkflow(event.sessionId);
+        if (!wf) {
+          this.logger?.info({ eventName: event.eventName, sessionId: event.sessionId }, 'workflow no encontrado — evento ignorado');
+          break;
+        }
+        this.workflowRepo.close(event.sessionId, event);
+        break;
+      }
+
+      // Stubs — ToolUse.status tracking diferido a G4
       case 'PreToolUse':
+        this.logger?.info({ eventName: event.eventName }, 'hook recibido — ToolUse.status = running diferido a G4');
+        break;
+
       case 'PostToolUse':
+        this.logger?.info({ eventName: event.eventName }, 'hook recibido — ToolUse.status = completed diferido a G4');
+        break;
+
       case 'PostToolUseFailure':
-      case 'SubagentStop':
-      case 'Stop':
-      case 'StopFailure':
-        this.logger?.info({ eventName: event.eventName }, 'hook recibido — mutación diferida a G2/C4');
+        this.logger?.info({ eventName: event.eventName }, 'hook recibido — ToolUse.status = error diferido a G4');
         break;
 
       default:

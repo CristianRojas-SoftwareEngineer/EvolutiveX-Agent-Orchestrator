@@ -5,9 +5,7 @@
 Define el comportamiento del borde hooks del proxy: el endpoint `POST /hooks`, el parsing puro de eventos de Claude Code, el despacho al correlador (`AuditHookEventHandler`) y la mutación real de confirmación de subagente (`confirmSubagentFromHook`). Implementado en C3; los eventos de cierre y las mutaciones de estado de `ToolUse` se difieren a C4/G2.
 
 ---
-
 ## Requirements
-
 ### Requirement: Endpoint `POST /hooks`
 
 El sistema SHALL exponer un endpoint `POST /hooks` que:
@@ -68,40 +66,49 @@ donde `HookEventName` es la unión de los 8 nombres de evento del lifecycle:
 
 ### Requirement: Mapeo de eventos al correlador (`AuditHookEventHandler`)
 
-El sistema SHALL implementar un handler `AuditHookEventHandler` en capa 3 (`src/3-operations/`) que reciba un `ClaudeHookEvent` parseado y despache cada uno de los 8 eventos del lifecycle. **Solo `SubagentStart`** ejecuta una mutación real en C3. Los demás eventos se reconocen y se enrutan como stubs que registran en log el evento recibido; sus mutaciones de estado (`ToolUse.status`, `readyToClose`, apertura de workflow `main`) requieren el modelo `Workflow/Step/ToolUse` de G1/G2 y se difieren a G2/C4:
+El sistema SHALL implementar un handler `AuditHookEventHandler` en capa 3 (`src/3-operations/`) que reciba un `ClaudeHookEvent` parseado y despache cada uno de los 8 eventos del lifecycle. En G2, los eventos de cierre y apertura ejecutan mutaciones reales en el repo; solo los eventos de estado de `ToolUse` permanecen como stubs:
 
-| Evento | Acción en C3 |
+| Evento | Acción en G2 |
 |--------|-------------|
-| `UserPromptSubmit` | Stub — log "recibido; apertura de workflow main diferida a G2/C4" |
-| `SubagentStart` | **`confirmSubagentFromHook(agentId, toolUseId?)`** (mutación real) |
-| `PreToolUse` | Stub — log "recibido; `ToolUse.status = running` diferido a G2/C4" |
-| `PostToolUse` | Stub — log "recibido; `ToolUse.status = completed` diferido a G2/C4" |
-| `PostToolUseFailure` | Stub — log "recibido; `ToolUse.status = error` diferido a G2/C4" |
-| `SubagentStop` | Stub — log "recibido; cierre de sub-workflow diferido a C4" |
-| `Stop` | Stub — log "recibido; cierre de workflow main diferido a C4" (sin acción) |
-| `StopFailure` | Stub — log "recibido; cierre con error diferido a C4" (sin acción) |
+| `UserPromptSubmit` | **Abre o confirma el workflow main en el repo** (idempotente; ver `gateway-workflow-lifecycle`) |
+| `SubagentStart` | **`confirmSubagentFromHook(agentId, toolUseId?)`** (sin cambio respecto a C3) |
+| `Stop` | **`readyToClose` → si true: `close`** (§15.4) |
+| `SubagentStop` | **`readyToClose` para sub-workflow → si true: `close`** (§15.4) |
+| `StopFailure` | **`close` directamente** (§15.4: siempre cierra en error) |
+| `PreToolUse` | Stub — log "recibido; `ToolUse.status = running` diferido a G4" |
+| `PostToolUse` | Stub — log "recibido; `ToolUse.status = completed` diferido a G4" |
+| `PostToolUseFailure` | Stub — log "recibido; `ToolUse.status = error` diferido a G4" |
 
-#### Scenario: `SubagentStart` → `confirmSubagentFromHook` invocado
+#### Scenario: `SubagentStart` → `confirmSubagentFromHook` invocado (sin cambio)
 
 - **GIVEN** un `ClaudeHookEvent` con `eventName: 'SubagentStart'`, `agentId: 'agent-child'`, `toolUseId: 'tu-abc'`
 - **WHEN** `AuditHookEventHandler.execute(event)` se invoca
 - **THEN** SHALL llamarse `workflowRepo.confirmSubagentFromHook('agent-child', 'tu-abc')`
 
-#### Scenario: `PreToolUse` → stub reconocido, sin mutación de estado
+#### Scenario: `Stop` con repo activo → delegado a readyToClose/close
+
+- **GIVEN** un workflow activo identificado por `agentId` en el repo
+- **AND** un `ClaudeHookEvent` con `eventName: 'Stop'`, `stopHookActive: false`, `backgroundTasks: 0`
+- **WHEN** `AuditHookEventHandler.execute(event)` se invoca
+- **THEN** el handler SHALL invocar `readyToClose` sobre el workflow
+- **AND** SHALL invocar `close` ya que `readyToClose` devolvió `true`
+- **AND** el workflow SHALL quedar cerrado con `outcome: 'success'`
+
+#### Scenario: `StopFailure` → close directo
+
+- **GIVEN** un workflow activo en el repo
+- **AND** un `ClaudeHookEvent` con `eventName: 'StopFailure'`
+- **WHEN** `AuditHookEventHandler.execute(event)` se invoca
+- **THEN** el handler SHALL invocar `close` directamente sin `readyToClose`
+- **AND** el workflow SHALL quedar cerrado con `outcome: 'api_error'`
+
+#### Scenario: `PreToolUse` → stub reconocido, sin mutación de estado (sin cambio)
 
 - **GIVEN** un `ClaudeHookEvent` con `eventName: 'PreToolUse'`, `sessionId: 's1'`, `toolUseId: 'tu-xyz'`
 - **WHEN** `AuditHookEventHandler.execute(event)` se invoca
 - **THEN** el handler SHALL completar sin lanzar excepción
-- **AND** `workflowRepo.confirmSubagentFromHook` NO SHALL haberse llamado
-- **AND** el correlador en memoria NO SHALL haber mutado (sin tipo `ToolUse` con `status`)
-
-#### Scenario: `Stop` con cualquier valor de `stopHookActive` → sin acción de cierre en C3
-
-- **GIVEN** un `ClaudeHookEvent` con `eventName: 'Stop'`, `stopHookActive: true` o `false`
-- **WHEN** `AuditHookEventHandler.execute(event)` se invoca
-- **THEN** el handler SHALL completar sin lanzar excepción
-- **AND** no SHALL construirse ningún `WorkflowResult`
-- **AND** `workflowRepo` NO SHALL haber recibido ninguna llamada (el tipo `ToolUse`/`readyToClose` no existe en C3)
+- **AND** `workflowRepo.close` NO SHALL haberse llamado
+- **AND** ningún workflow en el repo SHALL haber cambiado de estado
 
 ---
 
@@ -128,15 +135,3 @@ El sistema SHALL exponer el método `confirmSubagentFromHook(agentId: string, to
 
 ---
 
-### Requirement: Cierre diferido a C4/G2
-
-Los eventos de cierre (`Stop`, `SubagentStop`, `StopFailure`) se reconocen en C3 pero no se actúan: el lifecycle de workflow (`readyToClose`, `WorkflowResult`) requiere el modelo `Workflow/Step/ToolUse` que G2 introduce. C3 NO SHALL mutar ninguna entrada de workflow en respuesta a eventos de cierre ni escribir nada en `sessions/`.
-
-#### Scenario: `Stop` → reconocido, sin escritura ni mutación en C3
-
-- **GIVEN** un `ClaudeHookEvent` con `eventName: 'Stop'`, `stopHookActive: false`
-- **WHEN** `AuditHookEventHandler.execute(event)` se invoca
-- **THEN** el handler SHALL completar sin lanzar excepción
-- **AND** NO SHALL escribirse ningún archivo bajo `sessions/`
-- **AND** NO SHALL construirse ningún `WorkflowResult`
-- **AND** el correlador en memoria NO SHALL tener un campo `readyToClose` modificado (el campo no existe en C3)

@@ -21,6 +21,14 @@ function makeWorkflowRepo(overrides: Partial<IWorkflowRepository> = {}): IWorkfl
     }),
     getWorkflowByAgentId: (id: string) => store.get(id),
     confirmSubagentFromHook: vi.fn(),
+    openWorkflow: vi.fn(),
+    openSubagentWorkflow: vi.fn(),
+    getWorkflow: vi.fn(),
+    registerStep: vi.fn(),
+    closeStep: vi.fn(),
+    registerToolUse: vi.fn(),
+    readyToClose: vi.fn(),
+    close: vi.fn(),
     ...overrides,
   };
 }

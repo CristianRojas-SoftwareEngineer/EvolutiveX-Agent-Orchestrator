@@ -1129,10 +1129,10 @@ El término **Step** tiene significados distintos en la Parte II (estado actual)
 
 **Cardinalidad invariante:** 1 Step de dominio = 1 POST de inferencia. No existe el caso de "1 Step = N POST". La diferencia entre actual y objetivo no es la cardinalidad del POST sino la **amplitud del ciclo de vida**: el Step objetivo incluye la fase de tools que el actual no observa.
 
-**Nota de migración (fases C1–C4):**
+**Nota de migración (fases C–G):**
 
 - **Sin endpoint de hooks activo (fases C1–C2):** El Step se cierra en `message_stop` (comportamiento actual). El estado `AwaitingTools` no se utiliza. La proyección a disco es idéntica a la actual.
-- **Con endpoint de hooks activo (fases C3–C4):** Al recibir `stop_reason === 'tool_use'`, el Step transiciona a `AwaitingTools` y permanece abierto hasta que los hooks `PostToolUse` completen todas las `ToolUse` del Step. El handler verifica si el endpoint `/hooks` está registrado para decidir el modo de cierre.
+- **Con endpoint de hooks activo (fase C3 en adelante, cierre completo en G4):** Al recibir `stop_reason === 'tool_use'`, el Step transiciona a `AwaitingTools` y permanece abierto hasta que los hooks `PostToolUse` completen todas las `ToolUse` del Step. El handler verifica si el endpoint `/hooks` está registrado para decidir el modo de cierre.
 - **Criterio de decisión:** Variable de configuración o feature flag que indica si el borde hooks está activo. Mientras el flag esté desactivado, `message_stop` cierra el Step como hoy.
 
 ---
@@ -2930,20 +2930,19 @@ Consideraciones para `POST /hooks`:
 | **C1** | Wire: cabeceras `agent-id` + `resolveAgentContext` + `IWorkflowRepository` mínimo | Correlación wire | — |
 | **C2** | Wire: join SSE `tool_use_id` ↔ subagente + fallback legacy (clientes sin cabeceras) | Correlación wire | C1 |
 | **C3** | Hooks: endpoint `POST /hooks` + `AuditHookEventHandler` | Borde hooks | C1 | ✅ implementada |
-| **C4** | Cierre E2E: `buildWorkflowResult` + `AuditWorkflowClosureHandler` + proyección disco | Cierre integrado | C2, C3 |
-| **G1** | Tipos gateway + domain services puros (`aggregateWorkflowUsage`, `buildWorkflowResult`) | Refactor gateway | — |
-| **G2** | `IWorkflowRepository` completo + adapter memoria; handlers delegan en repo | Refactor gateway | G1 |
+| **G1** | Tipos gateway + domain services puros de cierre: `aggregateWorkflowUsage`, `buildWorkflowResult`, `deriveOutcome`, `deriveFinalText`; tipos `WorkflowResult/Workflow/Step/ToolUse` | Refactor gateway | — |
+| **G2** | `IWorkflowRepository` completo con lifecycle de cierre (`readyToClose`, open/close) + adapter memoria; handlers delegan en repo; integra costuras C1/C2/C3 | Refactor gateway | G1, C2, C3 |
 | **G3** | Extraer `StepAssembler` desde `audit-sse-response.handler` | Refactor gateway | G2 |
-| **G4** | `AuditProjection` explícita; `InteractionMetadata` generado desde `WorkflowResult` | Refactor gateway | G3 |
+| **G4** | `AuditProjection` explícita; `InteractionMetadata` generado desde `WorkflowResult`; `AuditWorkflowClosureHandler` hook-driven (des-stub `Stop`/`SubagentStop`/`StopFailure`); proyección `WorkflowResult` a disco; aceptación E2E subset §37b; retiro cierre wire-only como ruta principal | Refactor gateway | G3 |
 | **G5** | `ProviderCatalog` desde `routing/providers/` | Refactor gateway | — |
-| **P0** | Spike: diff layout SCP actual vs causal-workflows-v1 + coste migración | Persistencia | C4 |
+| **P0** | Spike: diff layout SCP actual vs causal-workflows-v1 + coste migración | Persistencia | G4 |
 | **P1** | Migración estructura directorios (`workflows/NN/`, `tools/KK/`) | Persistencia | P0, G4 |
 | **P2** | Artefactos nuevos (`events.ndjson`, `workflow-sequence.json`, `streaming/*.ndjson`) | Persistencia | P1 |
 
 **Nomenclatura de bloques:**
 
-- **Fases C** = correlación Wire+Hooks (plan inmediato).
-- **Fases G** = refactor gateway dominio (encadenable después de C o en paralelo con G5).
+- **Fases C** = bordes de correlación Wire+Hooks (C1–C3).
+- **Fases G** = refactor gateway dominio **incluido el cierre E2E** (servicios capa 1 en G1, lifecycle de cierre en G2, handler capa 3 y proyección capa 2 en G4; encadenable después de C o en paralelo con G5).
 - **Fases P** = persistencia / convergencia layout a causal-workflows-v1.
 
 En todas las fases C y G: **mismo layout `sessions/`** salvo campos adicionales en `meta.json` alineados a `WorkflowResult`. Las fases P migran el layout completo.
@@ -3018,7 +3017,7 @@ En todas las fases C y G: **mismo layout `sessions/`** salvo campos adicionales 
 | `meta.json` | `agentId`, `parentAgentId`, `outcome`, `closedByEvent`, `finalText`, `usage` (agregado E2E) | `WorkflowResult` (plano C cierre) |
 | `output/body.json` | Preferir `finalText` hook; mantener reconstrucción SSE como fallback | Hook > SSE |
 
-> **Nota:** `session-audit-model.md` §7.3 se actualizará en el plan de implementación que materialice fases C1–C4; este documento describe el diseño objetivo sin afirmar que ya está implementado en `src/`.
+> **Nota:** `session-audit-model.md` §7.3 se actualizará en el plan de implementación que materialice fases C1–C3 y el bloque G; este documento describe el diseño objetivo sin afirmar que ya está implementado en `src/`.
 
 ### 46.5 Evolución API Anthropic: campos por incorporar
 

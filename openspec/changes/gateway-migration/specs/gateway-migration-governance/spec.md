@@ -2,20 +2,20 @@
 
 ### Requirement: Trazabilidad 1:1 a §43
 
-La migración del gateway SHALL dividirse en fases identificadas 1:1 con el [catálogo §43](../../../../docs/proposals/gateway-design.md#43-fases-de-implementación): bloques C (C0–C4), G (G1–G5) y P (P0–P2). Cada fase SHALL tener un identificador canónico (`c0`, `c1`, `c2`, `c3`, `c4`, `g1`, `g2`, `g3`, `g4`, `g5`, `p0`, `p1`, `p2`) referenciable en el registro del orquestador.
+La migración del gateway SHALL dividirse en fases identificadas 1:1 con el [catálogo §43](../../../../docs/proposals/gateway-design.md#43-fases-de-implementación): bloques C (C0–C3), G (G1–G5) y P (P0–P2). Cada fase SHALL tener un identificador canónico (`c0`, `c1`, `c2`, `c3`, `g1`, `g2`, `g3`, `g4`, `g5`, `p0`, `p1`, `p2`) referenciable en el registro del orquestador.
 
 #### Scenario: Verificación de trazabilidad del registro
 
 - **GIVEN** el registro de fases en `design.md` del orquestador
 - **WHEN** se listan todas las entradas del registro
-- **THEN** SHALL existir exactamente 13 fases: C0, C1, C2, C3, C4, G1, G2, G3, G4, G5, P0, P1, P2
+- **THEN** SHALL existir exactamente 12 fases: C0, C1, C2, C3, G1, G2, G3, G4, G5, P0, P1, P2
 - **AND** cada fase SHALL tener definidos: bloque (C/G/P), dependencia según §43, gate de validación, docs a actualizar y legacy a retirar
 
 ---
 
 ### Requirement: Materialización por change de segundo nivel
 
-Cada fase de implementación (C1–C4, G1–G5, P0–P2) SHALL materializarse como un change OpenSpec de segundo nivel independiente, nombrado `gateway-<faseid>-<slug>` (p. ej. `gateway-c1-wire-agent-headers`). La fase C0 (diseño documentado) es excepción: se considera validada al completar el orquestador.
+Cada fase de implementación (C1–C3, G1–G5, P0–P2) SHALL materializarse como un change OpenSpec de segundo nivel independiente, nombrado `gateway-<faseid>-<slug>` (p. ej. `gateway-c1-wire-agent-headers`). La fase C0 (diseño documentado) es excepción: se considera validada al completar el orquestador.
 
 #### Scenario: Nomenclatura y back-reference del change hijo
 
@@ -26,7 +26,7 @@ Cada fase de implementación (C1–C4, G1–G5, P0–P2) SHALL materializarse co
 
 #### Scenario: Creación incremental — no se crean de golpe
 
-- **GIVEN** el registro del orquestador que enumera los 12 changes hijos posibles
+- **GIVEN** el registro del orquestador que enumera los 11 changes hijos posibles
 - **WHEN** se inicia la fase C1 (primera fase implementable)
 - **THEN** SHALL existir únicamente el change hijo de C1 en `openspec/changes/`
 - **AND** los changes hijos de C2–P2 NO SHALL existir todavía

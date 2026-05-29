@@ -30,13 +30,12 @@ La relación padre→hijo entre este orquestador y los changes de segundo nivel 
 | C1 | `gateway-c1-wire-agent-headers` | Correlación wire | — | `npm run test:quick` + test E2E Fastify con cabeceras | `README.md`, `docs/session-audit-model.md` | Lógica heurística de correlación de agente (degradada a fallback en C1; eliminada en G2) | archivada |
 | C2 | `gateway-c2-sse-subagent-join` | Correlación wire | C1 | Pruebas de join `tool_use_id`↔subagente + fallback legacy E2E | `docs/session-audit-model.md` | Correlación pending heurística de subagente | archivada |
 | C3 | `gateway-c3-hooks-endpoint` | Borde hooks | C1 | Pruebas de endpoint `POST /hooks` + `AuditHookEventHandler` E2E | `README.md`, `docs/proposals/gateway-design.md` | — | archivada |
-| C4 | `gateway-c4-workflow-closure` | Cierre integrado | C2, C3 | Pruebas de `buildWorkflowResult` + proyección disco E2E (subset §37b) | `README.md`, `docs/session-audit-model.md`, `docs/proposals/gateway-design.md` | Cierre wire-only como ruta principal | pendiente |
 | G1 | `gateway-g1-domain-types-services` | Refactor gateway | — | `npm run test:quick` | `docs/proposals/gateway-design.md` §39 | Tipos `Interaction*` en capa 1 reemplazados | pendiente |
-| G2 | `gateway-g2-workflow-repository` | Refactor gateway | G1 | `npm run test:quick` | `docs/session-audit-model.md` | `ActiveInteraction` en port capa 2 | pendiente |
+| G2 | `gateway-g2-workflow-repository` | Refactor gateway | G1, C2, C3 | `npm run test:quick` | `docs/session-audit-model.md` | `ActiveInteraction` en port capa 2 | pendiente |
 | G3 | `gateway-g3-step-assembler` | Refactor gateway | G2 | `npm run test:quick` | `docs/session-audit-model.md` | Lógica de ensamblaje incrustada en `audit-sse-response.handler` | pendiente |
-| G4 | `gateway-g4-audit-projection` | Refactor gateway | G3 | `npm run test:quick` | `docs/session-audit-model.md`, `docs/proposals/gateway-design.md` §40 | `InteractionMetadata` generado directamente (reemplazado por `WorkflowResult`) | pendiente |
+| G4 | `gateway-g4-audit-projection` | Refactor gateway | G3 | `npm run test:quick` (si toca persistencia: `npm run test`) + subset §37b | `docs/session-audit-model.md`, `docs/proposals/gateway-design.md` §40 | `InteractionMetadata` generado directamente (reemplazado por `WorkflowResult`); cierre wire-only como ruta principal | pendiente |
 | G5 | `gateway-g5-provider-catalog` | Refactor gateway | — | `npm run test:quick` | `docs/proposals/gateway-design.md` §39 | `ProviderCatalog` inline en `routing/` | pendiente |
-| P0 | `gateway-p0-layout-diff-spike` | Persistencia | C4 | Spike documentado — sin gate de tests | `docs/proposals/gateway-design.md` §29–§37 | — | pendiente |
+| P0 | `gateway-p0-layout-diff-spike` | Persistencia | G4 | Spike documentado — sin gate de tests | `docs/proposals/gateway-design.md` §29–§37 | — | pendiente |
 | P1 | `gateway-p1-directory-migration` | Persistencia | P0, G4 | `npm run test` + casos 1–7, 15, 16, 19 del checklist [§37b](../../../docs/proposals/gateway-design.md#37b-checklist-de-aceptación-e2e-del-layout) | `docs/session-audit-model.md`, `README.md`, `docs/proposals/gateway-design.md` §30 | Layout flat `sessions/{session}/{interaction}/` | pendiente |
 | P2 | `gateway-p2-new-artifacts` | Persistencia | P1 | `npm run test` + checklist [§37b](../../../docs/proposals/gateway-design.md#37b-checklist-de-aceptación-e2e-del-layout) completo (20 casos) | `docs/session-audit-model.md`, `docs/proposals/gateway-design.md` §33 | Artefactos de persistencia obsoletos | pendiente |
 
@@ -69,9 +68,8 @@ Gates de integración/E2E que verifican identidad de correlación, join `tool_us
 - Pruebas de correlación con cabeceras plano A (§22).
 - Pruebas de join SSE plano B (§23) con `tool_use_id` out-of-order.
 - Pruebas de `POST /hooks` plano C (§24) y `AuditHookEventHandler`.
-- `buildWorkflowResult` y proyección a disco con subset del checklist §37b.
 
-Comando base: `npm run test:quick` (lint + typecheck + toda la suite Vitest, incluidos E2E Fastify). Las fases C que toquen `build` o el layout de `sessions/` de forma definitiva (C4) pueden elevarse a `npm run test`. Los tests E2E de correlación se añaden en cada change hijo.
+Comando base: `npm run test:quick` (lint + typecheck + toda la suite Vitest, incluidos E2E Fastify). Los tests E2E de correlación se añaden en cada change hijo.
 
 ### Bloque G — Refactor dominio
 
@@ -113,7 +111,7 @@ El legacy a retirar de cada fase se lista en el registro. La política es:
 
 ## Política de creación incremental de changes hijos
 
-- El registro enumera los 12 changes hijos posibles con slugs propuestos.
+- El registro enumera los 11 changes hijos posibles con slugs propuestos.
 - **No se crean de golpe**: cada change hijo se crea con `openspec-propose` al **iniciar** su fase.
 - Antes de crear el change hijo se verifica en el registro que sus dependencias están en estado `validada` o `archivada`.
 - Orden de inicio según dependencias PKA dentro de cada bloque: dominio (capa 1) → servicios (capa 2) → operations (capa 3) → api (capa 4) → UI (capa 5).
@@ -130,6 +128,6 @@ El legacy a retirar de cada fase se lista en el registro. La política es:
 
 ### Fases G en paralelo con C o entre sí
 
-**Decisión:** G1 y G5 pueden iniciarse en paralelo con las fases C (ambos tienen dependencia `—`). G2–G4 siguen la cadena G1→G2→G3→G4.
+**Decisión:** G1 y G5 pueden iniciarse en paralelo con las fases C (ambos tienen dependencia `—`). G2–G4 siguen la cadena G1→G2→G3→G4. G2 depende además de C2 y C3 (el borde hooks/SSE debe existir para que el lifecycle de cierre `readyToClose` pueda integrarse con las costuras C1/C2/C3 en el repositorio).
 
-**Rationale:** §43 lo explicita. Maximiza el paralelismo sin romper la integridad del dominio.
+**Rationale:** §43 lo explicita. Maximiza el paralelismo sin romper la integridad del dominio. El cierre E2E vive íntegramente en el bloque G: domain services en G1, lifecycle de cierre en G2, `AuditWorkflowClosureHandler` y proyección `WorkflowResult` en G4.

@@ -7,8 +7,8 @@
 
 - [x] Artefactos del orquestador (`proposal.md`, `specs/`, `design.md`, `tasks.md`) completos y revisados
   - _Criterio: `openspec status --change gateway-migration` reporta todos los artefactos como `done`_
-- [x] Registro de fases en `design.md` refleja las 13 fases de §43 con sus dependencias
-  - _Criterio: tabla del registro contiene C0–C4, G1–G5, P0–P2_
+- [x] Registro de fases en `design.md` refleja las 12 fases de §43 con sus dependencias
+  - _Criterio: tabla del registro contiene C0–C3, G1–G5, P0–P2_
 - [x] Fase C0 marcada como `validada` en el registro
   - _Criterio: columna Estado de C0 = `validada`_
 
@@ -75,26 +75,7 @@
 
 ---
 
-## C4 — Cierre E2E: `buildWorkflowResult` + `AuditWorkflowClosureHandler` + proyección disco
-
-- [ ] Verificar dependencias §43: C2 y C3 en estado `validada` o `archivada`
-  - _Criterio: columnas Estado de C2 y C3 = `validada` o `archivada`_
-- [ ] Crear change de segundo nivel `gateway-c4-workflow-closure` (skill `openspec-propose`)
-  - _Criterio: directorio `openspec/changes/gateway-c4-workflow-closure/` con `.openspec.yaml` creado_
-- [ ] El `proposal.md` del change hijo incluye back-reference al orquestador
-- [ ] Actualizar estado de C4 a `en-curso` en el registro del orquestador
-- [ ] Seguimiento de implementación del change hijo (`openspec-apply`)
-- [ ] Gate superado: `buildWorkflowResult`, cierre Wire+Hooks y proyección disco E2E
-  - _Criterio: `npm run test` sin errores; subset inicial del checklist §37b verificado_
-- [ ] Documentación actualizada: `README.md`, `docs/session-audit-model.md`, `docs/proposals/gateway-design.md`
-  - _Criterio: `WorkflowResult`, cierre E2E y modelo de dos bordes descritos como implementados_
-- [ ] Legacy retirado: cierre wire-only como ruta principal eliminado o deprecado
-- [ ] Sync de specs si aplica (`openspec-sync`)
-- [ ] Marcar C4 como `validada` y archivar el change hijo (`openspec-archive`)
-
----
-
-## G1 — Tipos gateway + domain services puros (`aggregateWorkflowUsage`, `buildWorkflowResult`)
+## G1 — Tipos gateway + domain services puros de cierre (`aggregateWorkflowUsage`, `buildWorkflowResult`, `deriveOutcome`, `deriveFinalText`; tipos `WorkflowResult/Workflow/Step/ToolUse`)
 
 > Puede iniciarse en paralelo con las fases C (dependencia `—` en §43).
 
@@ -105,9 +86,11 @@
 - [ ] Actualizar estado de G1 a `en-curso` en el registro del orquestador
 - [ ] Seguimiento de implementación del change hijo (`openspec-apply`)
   - _Criterio: implementación respeta PKA — nuevos tipos y servicios en capa 1_
+- [ ] Domain services de cierre implementados en capa 1: `aggregateWorkflowUsage`, `buildWorkflowResult`, `deriveOutcome`, `deriveFinalText`
+  - _Criterio: tipos `WorkflowResult`, `Workflow`, `Step`, `ToolUse` definidos; servicios puros sin dependencias de infraestructura_
 - [ ] Gate superado: `npm run test:quick` (lint + typecheck + unit) sin errores
 - [ ] Documentación actualizada: `docs/proposals/gateway-design.md` §39
-  - _Criterio: tipos `Workflow`, `Step`, `ToolUse` y servicios `aggregateWorkflowUsage`, `buildWorkflowResult` descritos como implementados_
+  - _Criterio: tipos `Workflow`, `Step`, `ToolUse`, `WorkflowResult` y servicios de cierre descritos como implementados_
 - [ ] Legacy retirado: tipos `Interaction*` en capa 1 reemplazados
   - _Criterio: `npm run lint` pasa; no hay referencias huérfanas a `Interaction*` en capa 1_
 - [ ] Sync de specs si aplica (`openspec-sync`)
@@ -115,17 +98,20 @@
 
 ---
 
-## G2 — `IWorkflowRepository` completo + adapter memoria; handlers delegan en repo
+## G2 — `IWorkflowRepository` completo con lifecycle de cierre; integra costuras C1/C2/C3
 
-- [ ] Verificar dependencias §43: G1 en estado `validada` o `archivada`
+- [ ] Verificar dependencias §43: G1, C2 y C3 en estado `validada` o `archivada`
+  - _Criterio: columnas Estado de G1, C2 y C3 = `validada` o `archivada` en el registro_
 - [ ] Crear change de segundo nivel `gateway-g2-workflow-repository` (skill `openspec-propose`)
 - [ ] El `proposal.md` del change hijo incluye back-reference al orquestador
 - [ ] Actualizar estado de G2 a `en-curso` en el registro del orquestador
 - [ ] Seguimiento de implementación del change hijo (`openspec-apply`)
   - _Criterio: `IWorkflowRepository` en capa 1 (interface); adapter en capa 2_
+- [ ] Lifecycle de cierre implementado: `readyToClose`, operaciones `open`/`close` integradas con costuras C1 (cabeceras), C2 (join SSE), C3 (hooks)
+  - _Criterio: el repositorio gestiona el ciclo de vida completo del Workflow incluyendo transición `readyToClose` vía hooks_
 - [ ] Gate superado: `npm run test:quick` sin errores
 - [ ] Documentación actualizada: `docs/session-audit-model.md`
-  - _Criterio: `IWorkflowRepository` como estado activo descrito en lugar de `ActiveInteraction`_
+  - _Criterio: `IWorkflowRepository` como estado activo descrito en lugar de `ActiveInteraction`; lifecycle de cierre documentado_
 - [ ] Legacy retirado: `ActiveInteraction` en port capa 2 eliminado o deprecado
 - [ ] Sync de specs si aplica (`openspec-sync`)
 - [ ] Marcar G2 como `validada` y archivar el change hijo (`openspec-archive`)
@@ -149,7 +135,7 @@
 
 ---
 
-## G4 — `AuditProjection` explícita; `InteractionMetadata` generado desde `WorkflowResult`
+## G4 — `AuditProjection` explícita; `AuditWorkflowClosureHandler` hook-driven; proyección `WorkflowResult`; aceptación E2E
 
 - [ ] Verificar dependencias §43: G3 en estado `validada` o `archivada`
 - [ ] Crear change de segundo nivel `gateway-g4-audit-projection` (skill `openspec-propose`)
@@ -157,9 +143,15 @@
 - [ ] Actualizar estado de G4 a `en-curso` en el registro del orquestador
 - [ ] Seguimiento de implementación del change hijo (`openspec-apply`)
   - _Criterio: `AuditProjection` en capa 2; `InteractionMetadata` derivado de `WorkflowResult`_
+- [ ] `AuditWorkflowClosureHandler` hook-driven implementado: des-stub eventos `Stop`, `SubagentStop`, `StopFailure`
+  - _Criterio: handler procesa los tres eventos de cierre vía bus de hooks; no usa stub transitorio_
+- [ ] Proyección `WorkflowResult` a disco implementada (subset §37b)
+  - _Criterio: campos `outcome`, `closedByEvent`, `finalText`, `usage` escritos en `meta.json`_
+- [ ] Aceptación E2E (subset §37b): casos de cierre via hooks verificados
+  - _Criterio: casos de cierre E2E del checklist §37b verificados; cierre wire-only solo como fallback_
+- [ ] Legacy retirado: cierre wire-only como ruta principal eliminado o deprecado; `InteractionMetadata` generado directamente reemplazado
 - [ ] Gate superado: `npm run test:quick` sin errores (si toca persistencia, `npm run test`)
 - [ ] Documentación actualizada: `docs/session-audit-model.md`, `docs/proposals/gateway-design.md` §40
-- [ ] Legacy retirado: `InteractionMetadata` generado directamente reemplazado
 - [ ] Sync de specs si aplica (`openspec-sync`)
 - [ ] Marcar G4 como `validada` y archivar el change hijo (`openspec-archive`)
 
@@ -185,7 +177,7 @@
 
 ## P0 — Spike: diff layout SCP actual vs `causal-workflows-v1` + coste migración
 
-- [ ] Verificar dependencias §43: C4 en estado `validada` o `archivada`
+- [ ] Verificar dependencias §43: G4 en estado `validada` o `archivada`
 - [ ] Crear change de segundo nivel `gateway-p0-layout-diff-spike` (skill `openspec-propose`)
   - _Criterio: spike documentado; no requiere gate de tests_
 - [ ] El `proposal.md` del change hijo incluye back-reference al orquestador
@@ -236,7 +228,7 @@
 
 ## Cierre de migración
 
-- [ ] Verificar que todas las fases (C1–C4, G1–G5, P0–P2) tienen estado `archivada` en el registro
+- [ ] Verificar que todas las fases (C1–C3, G1–G5, P0–P2) tienen estado `archivada` en el registro
   - _Criterio: tabla del registro sin ningún estado `pendiente`, `en-curso` o `validada`_
 - [ ] Verificación E2E global: checklist [§37b](../../../docs/proposals/gateway-design.md#37b-checklist-de-aceptación-e2e-del-layout) completo (20 casos) pasado
   - _Criterio: todos los casos verificados con el sistema final_

@@ -7,7 +7,7 @@ Migrar de golpe es inviable por el riesgo de regresión y la amplitud del cambio
 ## What Changes
 
 - Se introduce el change orquestador `gateway-migration` que **solo** define el marco de gobernanza de la migración; no toca `src/`.
-- Se establece un **registro de fases** trazable 1:1 a [§43](../../../docs/proposals/gateway-design.md#43-fases-de-implementación) (C0–C4, G1–G5, P0–P2), con estados y dependencias.
+- Se establece un **registro de fases** trazable 1:1 a [§43](../../../docs/proposals/gateway-design.md#43-fases-de-implementación) (C0–C3, G1–G5, P0–P2), con estados y dependencias.
 - Se definen, por cada fase, el change de segundo nivel a crear, el gate de validación, los docs a actualizar y el legacy a retirar.
 - Se acuerda el modelo de dos niveles: Nivel 1 = este orquestador (gobernanza); Nivel 2 = un change por fase (`gateway-<faseid>-<slug>`), creados de forma incremental.
 
@@ -25,7 +25,7 @@ _(ninguna — este change no modifica comportamiento acordado existente en `open
 
 - Este change no contiene tareas de implementación concretas de ninguna fase.
 - No toca `src/`, `tests/`, `sessions/` ni ningún archivo de código durante su propia implementación.
-- No crea los 12 changes de segundo nivel de antemano; cada change hijo se crea de forma incremental al iniciar su fase.
+- No crea los 11 changes de segundo nivel de antemano; cada change hijo se crea de forma incremental al iniciar su fase.
 - No define el diseño técnico de cada fase (eso va en el design.md del change de segundo nivel correspondiente).
 
 ## Impact
@@ -34,6 +34,6 @@ _(ninguna — este change no modifica comportamiento acordado existente en `open
 - **`docs/`**: mantenimiento continuo tras cada fase (`README.md`, `docs/session-audit-model.md`, `docs/proposals/gateway-design.md`).
 - **`sessions/`** (futuro, fases P): convergencia del layout a `causal-workflows-v1`.
 - **Capas PKA implicadas por bloque:**
-  - Bloque C (correlación Wire+Hooks): capas 2 (adapters/ports), 3 (handlers), 5 (HTTP delivery — nueva ruta `POST /hooks`).
-  - Bloque G (refactor dominio): capas 1→2→3→4 en cadena, siguiendo dependencias PKA.
+  - Bloque C (correlación Wire+Hooks, C1–C3): capas 2 (adapters/ports), 3 (handlers), 5 (HTTP delivery — nueva ruta `POST /hooks`).
+  - Bloque G (refactor dominio **incluido el cierre E2E**): capas 1→2→3→4 en cadena; domain services de cierre en G1 (capa 1), lifecycle de cierre en G2 (capas 1+2), `AuditWorkflowClosureHandler` y proyección `WorkflowResult` en G4 (capas 2+3).
   - Bloque P (persistencia/layout): capa 2 (`SessionPersistence`) + disco `sessions/`.

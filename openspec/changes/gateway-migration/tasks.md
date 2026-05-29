@@ -93,6 +93,10 @@
   - _Criterio: tipos `Workflow`, `Step`, `ToolUse`, `WorkflowResult` y servicios de cierre descritos como implementados_
 - [ ] Legacy retirado: tipos `Interaction*` en capa 1 reemplazados
   - _Criterio: `npm run lint` pasa; no hay referencias huérfanas a `Interaction*` en capa 1_
+  - _Nota (diferido G1): `InteractionType`, `InteractionOutcome`, `InteractionMetadata`,
+    `ActiveInteraction`, `InteractionState`, `AuditInteractionContext` marcados `@deprecated`
+    en `audit.types.ts` (2026-05-29). Eliminación efectiva diferida a la fase que migre el último
+    consumidor en capas 2-5 (G4 o P, a confirmar al implementar G4)._
 - [ ] Sync de specs si aplica (`openspec-sync`)
 - [ ] Marcar G1 como `validada` y archivar el change hijo (`openspec-archive`)
 

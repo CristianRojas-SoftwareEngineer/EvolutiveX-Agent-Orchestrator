@@ -194,6 +194,9 @@ export function computeSseRawBytesTotal(steps: StepMeta[]): number {
 
 /**
  * Estado en memoria de un turno activo en una sesión.
+ * @deprecated Reemplazado por los tipos gateway de G1 (`WorkflowKind`, `WorkflowStatus`, etc.)
+ * en `src/1-domain/types/gateway/`. Retirada planificada en la fase que migre el último consumidor
+ * (G4 o P, a confirmar al implementar G4). Fecha de deprecación: 2026-05-29.
  */
 export type InteractionType = 'client-preflight' | 'agentic' | 'side-request';
 
@@ -204,6 +207,9 @@ export type InteractionType = 'client-preflight' | 'agentic' | 'side-request';
  * - upstream-error: Error del servidor upstream (5xx o fallo de conexión)
  * - truncated: Truncado por max_tokens
  * - orphaned: Interacción cerrada por cleanup (continuation nunca llegó, graceful shutdown, etc.)
+ * @deprecated Reemplazado por `WorkflowOutcome` en `src/1-domain/types/gateway/workflow.types.ts`
+ * (fase G1). Retirada planificada en la fase que migre el último consumidor (G4 o P, a confirmar
+ * al implementar G4). Fecha de deprecación: 2026-05-29.
  */
 export type InteractionOutcome =
   | 'completed'
@@ -344,6 +350,11 @@ export interface ResolvedInternalTool {
   resolvedInStepIndex?: number;
 }
 
+/**
+ * @deprecated Reemplazado por las entidades gateway de G1 (`IWorkflow`, `IStep`, etc.) en
+ * `src/1-domain/interfaces/gateway/`. Retirada planificada en la fase que migre el último
+ * consumidor (G4 o P, a confirmar al implementar G4). Fecha de deprecación: 2026-05-29.
+ */
 export interface ActiveInteraction {
   interactionDir: string;
   interactionType: InteractionType;
@@ -414,6 +425,9 @@ export type SideRequestKind = 'session-naming' | 'generic';
 /**
  * Metadatos del turno completo escritos en meta.json.
  * Refleja la perspectiva de turno lógico del usuario.
+ * @deprecated Reemplazado por `IWorkflowResult` + interfaces gateway de G1 en
+ * `src/1-domain/interfaces/gateway/`. Retirada planificada en la fase que migre el último
+ * consumidor (G4 o P, a confirmar al implementar G4). Fecha de deprecación: 2026-05-29.
  */
 export interface InteractionMetadata {
   interactionType: InteractionType;
@@ -485,6 +499,9 @@ export interface SessionMetrics {
  * Estado persistente de una interacción en curso, escrito como state.json
  * al crear la interacción y eliminado al cerrar el turno.
  * Permite a herramientas externas detectar interacciones huérfanas por crash.
+ * @deprecated Reemplazado por `WorkflowStatus` en `src/1-domain/types/gateway/workflow.types.ts`
+ * (fase G1). Retirada planificada en la fase que migre el último consumidor (G4 o P, a confirmar
+ * al implementar G4). Fecha de deprecación: 2026-05-29.
  */
 export interface InteractionState {
   state: 'in-progress';
@@ -575,6 +592,8 @@ export interface AuditTruncationMeta {
 /**
  * Contexto de interacción que los handlers de Capa 3 reciben del controller.
  * Desacopla los handlers de Fastify.
+ * @deprecated Reemplazado por los contratos gateway de G1. Retirada planificada en la fase que
+ * migre el último consumidor (G4 o P, a confirmar al implementar G4). Fecha de deprecación: 2026-05-29.
  */
 export interface AuditInteractionContext {
   requestId: string;

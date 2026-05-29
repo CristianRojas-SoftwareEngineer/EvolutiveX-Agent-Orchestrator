@@ -2831,38 +2831,60 @@ flowchart TB
 
 ## 39. Capa 1 objetivo
 
-Estructura alineada con la convención del repo `1-domain/`:
+> **Estado G1 (implementado 2026-05-29):** tipos primitivos, interfaces DTO, modelos de clase y
+> servicios puros de cierre están implementados. El hook de cierre usa `ClaudeHookEvent` de
+> `hook.types.ts` (no `ClosureHookPayload`). `totalCostUsd` queda `undefined` en G1 (cálculo
+> de coste depende de pricing — diferido a fase posterior). Tests en `tests/1-domain/gateway/`.
+
+Estructura implementada en `1-domain/`:
 
 ```text
 src/1-domain/
 ├── types/
-│   ├── anthropic/              # evolución de anthropic.types.ts
-│   └── gateway/                # ProviderKind, WorkflowKind, WorkflowStatus, …
+│   ├── anthropic.types.ts      # contratos wire Anthropic (existente)
+│   └── gateway/                # IMPLEMENTADO (G1)
+│       ├── provider.types.ts   # ProviderKind
+│       ├── workflow.types.ts   # WorkflowKind, WorkflowStatus, WorkflowOutcome, WorkflowClosedByEvent
+│       └── tool-use.types.ts   # ToolUseStatus
 ├── interfaces/
-│   ├── anthropic/              # DTO wire (opcional)
-│   └── gateway/                # ISession, IWorkflow, IStep, IToolUse, IWorkflowResult
-├── models/gateway/             # opcional; perfil anémico puede usar solo interfaces + funciones
+│   └── gateway/                # IMPLEMENTADO (G1)
+│       ├── IProvider.ts
+│       ├── ILanguageModel.ts
+│       ├── ISession.ts
+│       ├── IWorkflow.ts
+│       ├── IStep.ts
+│       ├── IToolUse.ts
+│       └── IWorkflowResult.ts  # finalText? hook; usage? AnthropicUsage|undefined; ver §15.7–§15.8
+├── models/gateway/             # IMPLEMENTADO (G1) — clases anémicas con helpers de clasificación
+│   ├── Provider.ts
+│   ├── LanguageModel.ts
+│   ├── Session.ts
+│   ├── Workflow.ts
+│   ├── Step.ts
+│   └── ToolUse.ts
 ├── services/
-│   ├── gateway/
-│   │   ├── aggregate-workflow-usage.ts
-│   │   ├── build-workflow-result.ts
-│   │   ├── validate-workflow-invariants.ts
-│   │   └── …
+│   ├── gateway/                # IMPLEMENTADO (G1) — funciones puras
+│   │   ├── aggregate-workflow-usage.ts   # AnthropicUsage|undefined; undefined si sin datos
+│   │   ├── build-workflow-result.ts      # compone IWorkflowResult; totalCostUsd=undefined en G1
+│   │   ├── derive-outcome.ts             # eventName → WorkflowOutcome
+│   │   ├── derive-final-text.ts          # passthrough lastAssistantMessage
+│   │   └── validate-workflow-invariants.ts  # invariante G5
 │   ├── request-classifier.service.ts
 │   └── session-resolver.service.ts
 └── repositories/
-    ├── IWorkflowRepository.ts
-    └── IAuditProjection.ts
+    └── IWorkflowRepository.ts
 ```
 
 | Tipo de lógica | Ejemplos |
 | -------------- | -------- |
-| **Datos de dominio** | `Workflow`, `Step`, `ToolUse`, `WorkflowResult`, `Provider`, `LanguageModel`. |
-| **Transformaciones puras** | `aggregateWorkflowUsage(steps, childWorkflows)`, `deriveOutcome(hook)`, `deriveFinalText(hook)`. |
-| **Validaciones** | G1–G19; sub-workflow requiere `parentWorkflowId` + `parentToolUseId`. |
+| **Datos de dominio** | `IWorkflow`, `IStep`, `IToolUse`, `IWorkflowResult`, `IProvider`, `ILanguageModel`. |
+| **Transformaciones puras** | `aggregateWorkflowUsage(closedSteps, childResults)`, `deriveOutcome(hook)`, `deriveFinalText(hook)`, `buildWorkflowResult(wf, steps, childResults, hook)`. |
+| **Validaciones** | Invariante G5: sub-workflow requiere `parentWorkflowId` + `parentToolUseId`. |
 | **Sin I/O** | Ningún `fs`, `fetch`, ni parseo SSE aquí. |
 
 **Nota sobre perfil anémico:** en lugar de `Workflow.complete()` como método con efectos secundarios, SCP implementa **`buildWorkflowResult(...)`** — función pura invocada desde el handler de capa 3. Esto permite testear la lógica de cierre sin dependencias de infraestructura.
+
+**Tipos Interaction* deprecados (G1):** `InteractionType`, `InteractionOutcome`, `InteractionMetadata`, `ActiveInteraction`, `InteractionState`, `AuditInteractionContext` en `audit.types.ts` marcados `@deprecated`. Retirada planificada en fase G4/P (al migrar el último consumidor).
 
 ---
 

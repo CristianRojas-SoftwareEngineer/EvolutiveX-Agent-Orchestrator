@@ -1,10 +1,10 @@
 {
   "AUTH_METHOD": "bearer",
   "ANTHROPIC_BASE_URL": "https://openrouter.ai/api",
-  "ANTHROPIC_DEFAULT_HAIKU_MODEL": "models/ring-2.6",
-  "ANTHROPIC_DEFAULT_SONNET_MODEL": "models/ring-2.6",
-  "ANTHROPIC_DEFAULT_OPUS_MODEL": "models/ring-2.6",
-  "CLAUDE_CODE_SUBAGENT_MODEL": "models/ring-2.6",
+  "ANTHROPIC_DEFAULT_HAIKU_MODEL": "models/owl-alpha",
+  "ANTHROPIC_DEFAULT_SONNET_MODEL": "models/owl-alpha",
+  "ANTHROPIC_DEFAULT_OPUS_MODEL": "models/kimi-k2.6",
+  "CLAUDE_CODE_SUBAGENT_MODEL": "models/owl-alpha",
   "pricing_rules": {
     "schemaVersion": 1,
     "updatedAt": "2026-04-30T00:00:00.000Z",

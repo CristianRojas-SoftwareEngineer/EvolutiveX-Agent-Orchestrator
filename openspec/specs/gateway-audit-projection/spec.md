@@ -52,3 +52,10 @@ El cierre del turno basado únicamente en `stop_reason` del wire (sin hook `Stop
 ### Requirement: Retiro de InteractionMetadata como fuente primaria de meta.json
 
 Los handlers wire (`AuditSseResponseHandler`, `AuditStandardResponseHandler`) NO SHALL construir `InteractionMetadata` como fuente primaria de `meta.json` al cierre del turno nominal con hooks. El tipo `InteractionMetadata` MAY permanecer como `@deprecated` para consumidores transitorios (p. ej. `audit-upstream-error.handler.ts`).
+
+#### Scenario: Ruta nominal de cierre no construye InteractionMetadata
+
+- **GIVEN** hooks configurados y un workflow con cierre normativo vía hook `Stop`
+- **WHEN** el turno finaliza y `AuditWorkflowClosureHandler` proyecta el resultado a disco
+- **THEN** `meta.json` SHALL derivarse de `IWorkflowResult` mediante el mapper dedicado
+- **AND** los handlers wire (`AuditSseResponseHandler`, `AuditStandardResponseHandler`) NO SHALL escribir `meta.json` como fuente primaria en ese flujo

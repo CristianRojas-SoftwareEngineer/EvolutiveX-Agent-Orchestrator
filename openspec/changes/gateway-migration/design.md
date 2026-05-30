@@ -36,7 +36,7 @@ La relación padre→hijo entre este orquestador y los changes de segundo nivel 
 | G4 | `gateway-g4-audit-projection` | Refactor gateway | G3 | `npm run test:quick` (si toca persistencia: `npm run test`) + subset §37b | `docs/session-audit-model.md`, `docs/proposals/gateway-design.md` §33.2, §40 | `InteractionMetadata` generado directamente (reemplazado por `WorkflowResult`); cierre wire-only como ruta principal; `updateSessionMetrics()` en `audit-writer.service.ts` (reemplazado por `SessionMetricsService`); tipo `SessionMetrics` en `audit.types.ts` (migrado a tipos gateway) | archivada |
 | G5 | `gateway-g5-provider-catalog` | Refactor gateway | — | `npm run test:quick` | `docs/proposals/gateway-design.md` §39 | `ProviderCatalog` inline en `routing/` (no existía en src/; diferido a P0+) | archivada |
 | P0 | `gateway-p0-layout-diff-spike` | Persistencia | G4 | Spike documentado — sin gate de tests | `docs/proposals/gateway-design.md` §28b, §40, §42 | — (spike de análisis, no retira código) | pendiente |
-| P1 | `gateway-p1-new-session-layout` | Persistencia | P0, G4 | `npm run test` + casos 3–7, 16, 19 (estructurales) del checklist [§37b](../../../docs/proposals/gateway-design.md#37b-checklist-de-aceptación-e2e-del-layout) | `docs/session-audit-model.md`, `README.md`, `docs/proposals/gateway-design.md` §30, §40 | `audit-writer.service.ts`, `session-store.service.ts`, `workflow-result-projector.service.ts`, constantes flat de `audit-paths.ts` (`DIR_MAIN_AGENT`, `DIR_INTERACTIONS`, `PREFIX_SUB_AGENT`), tipos `ActiveInteraction`/`InteractionMetadata` | pendiente |
+| P1 | `gateway-p1-new-session-layout` | Persistencia | P0, G4 | `npm run test` + casos 3–7, 16, 19 (estructurales) del checklist [§37b](../../../docs/proposals/gateway-design.md#37b-checklist-de-aceptación-e2e-del-layout) | `docs/session-audit-model.md`, `README.md`, `docs/proposals/gateway-design.md` §29, §30, §33, §37b, §40, §46.4 | `audit-writer.service.ts`, `session-store.service.ts`, `workflow-result-projector.service.ts`, constantes flat de `audit-paths.ts` (`DIR_MAIN_AGENT`, `DIR_INTERACTIONS`, `PREFIX_SUB_AGENT`), tipos `ActiveInteraction`/`InteractionMetadata` | pendiente |
 | P2 | `gateway-p2-new-artifacts` | Persistencia | P1 | `npm run test` + checklist [§37b](../../../docs/proposals/gateway-design.md#37b-checklist-de-aceptación-e2e-del-layout) completo (20 casos) | `docs/session-audit-model.md`, `docs/proposals/gateway-design.md` §33 | Escritura de `sse.jsonl` (reemplazada por `streaming/NNNN-chunk.ndjson`) | pendiente |
 
 ## Decisión técnica del bloque P
@@ -60,7 +60,7 @@ Componentes a crear, alineados con §28b.1 y §40. Los destinos siguen las conve
 | `EventBus` (adapter pub/sub async in-process, fire-and-forget) | 2 | `src/2-services/event-bus.service.ts` | P1 |
 | Rutas de sesión (`getWorkflowDir`, `getStepDir`, `getToolsDir`) | 2 | `src/2-services/` | P1 |
 | Aislamiento async (`fireAndForget`, `withTimeout`) | 2 | `src/2-services/utils/` | P1 |
-| `SessionPersistence` — estructura de directorios | 2 | `src/2-services/session-persistence.service.ts` | P1 |
+| `SessionPersistence` — estructura de directorios (`meta.json` con estado fusionado, `output/result.json`, `steps/MM/`, `tools/KK/`; sin `state.json`) | 2 | `src/2-services/session-persistence.service.ts` | P1 |
 | `SessionPersistence` — artefactos nuevos | 2 | *(mismo archivo)* | P2 |
 | Emisión al bus desde el correlador | 2 | `src/2-services/workflow-repository.service.ts` | P1 |
 | Cableado bus + suscriptor en composition root | 4 | composition root | P1 |
@@ -172,6 +172,53 @@ El legacy a retirar de cada fase se lista en el registro. La política es:
 **Decisión:** G1 y G5 pueden iniciarse en paralelo con las fases C (ambos tienen dependencia `—`). G2–G4 siguen la cadena G1→G2→G3→G4. G2 depende además de C2 y C3 (el borde hooks/SSE debe existir para que el lifecycle de cierre `readyToClose` pueda integrarse con las costuras C1/C2/C3 en el repositorio).
 
 **Rationale:** §43 lo explicita. Maximiza el paralelismo sin romper la integridad del dominio. El cierre E2E vive íntegramente en el bloque G: domain services en G1, lifecycle de cierre en G2, `AuditWorkflowClosureHandler` y proyección `WorkflowResult` en G4.
+
+### D1 — Archivo de salida del workflow: `output/result.json`
+
+**Decisión:** el artefacto de salida del workflow en `causal-workflows-v1` se denomina
+`output/result.json` (y su render Markdown `output/result.parsed.md`). Los nombres
+`output/response.json` y `output/body.json`, que aparecían en distintas secciones del
+diseño, quedan **descartados**.
+
+**Rationale:** §29 establece que el nivel workflow pertenece al dominio del "proceso
+agéntico", no al del "protocolo HTTP". `body` y `response` son vocabulario HTTP, correcto
+para el nivel Step (`request/body.json`, `response/body.json`) pero incorrecto en el nivel
+Workflow. `result` es coherente con el tipo de dominio `IWorkflowResult` y con la dualidad
+`outcome: 'success' | 'api_error' | 'aborted'`, análoga a la dualidad `{ isError }` de
+`tool/result.json`.
+
+**Alternativas rechazadas:** `output/response.json` (vocabulario HTTP; inconsistente con
+§29.2.1) · `output/body.json` (ídem; usado en 8/12 referencias del spec pero igualmente
+incorrecto).
+
+### D2 — Fusión de `state.json` en `meta.json`
+
+**Decisión:** el layout `causal-workflows-v1` **no incluye `state.json`**. Los campos que
+`state.json` iba a alojar (`status`, `lastActivity`, `parentContext`) se incorporan
+directamente en `meta.json`.
+
+**Rationale:** `WorkflowStatus` tiene ≤ 3 transiciones por workflow
+(`pending → running → completed|failed|aborted`). El argumento de "hot path" que justificaría
+un archivo separado no aplica. La separación solo generaba solapamiento de `status` y
+`agentId`/`parentAgentId` entre dos archivos. Con la fusión, `detectOrphans()` escanea
+`meta.json` directamente.
+
+**Alternativas rechazadas:** Opción 2 (sacar `status` de `meta.json`) — crea la paradoja
+de que `meta.json` sabe `endedAt` pero no `status`. Opción 1 (conservar dos archivos) —
+justificada solo si hay hot path de escritura, que no existe.
+
+### D3 — Separación estricta de responsabilidades entre `meta.json` y `output/result.json`
+
+**Decisión:** `meta.json` contiene exclusivamente identidad y estado del workflow.
+`output/result.json` contiene el `IWorkflowResult` completo más el contenido narrativo
+(`steps[]`). Los campos `outcome`, `finalText`, `usage`, `closedByEvent`, `sessionId` **no
+se duplican** en `meta.json`.
+
+**Rationale:** antes de esta decisión, varios campos de resultado aparecían tanto en
+`meta.json` (§46.4) como en `output/body.json` (§40/§44), creando ambigüedad sobre cuál
+era la fuente de verdad. La separación elimina el solapamiento: `meta.json` es la fuente de
+verdad del estado (para orphan detection, navegación, índices); `output/result.json` es la
+fuente de verdad del resultado (para auditoría, replay, análisis post-mortem).
 
 ### Integración de métricas de tokens de sesión en G3 y G4
 

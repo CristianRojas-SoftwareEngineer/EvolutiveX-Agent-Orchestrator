@@ -1375,7 +1375,7 @@ sequenceDiagram
   CC->>Hook: SubagentStop (last_assistant_message)
   Hook->>Close: closeWorkflow(agentId)
   Close->>Repo: buildWorkflowResult
-  Close->>Disk: meta.json + output/body.json (finalText)
+  Close->>Disk: meta.json + output/result.json (IWorkflowResult + steps[])
 ```
 
 ### 20.3 Lifecycle completo del correlador (workflow main)
@@ -1420,7 +1420,7 @@ sequenceDiagram
 | **Abrir workflow subagente** | Plano A: cabeceras `agent-id` + `parent-agent-id` en POST `fresh`. | Legacy: `findInteractionWithPendingAgents` + prompt si CC < 2.1.139. Hook `SubagentStart` confirma y enlaza `childWorkflowId`. |
 | **Enlazar `tool_use_id` ↔ hijo** | Plano B: SSE `registerPendingTool` + `joinToolUseToSubagent`. | Hook `PreToolUse`/`PostToolUse` enriquecen `ToolUse.status` y timing. |
 | **Cerrar workflow** | **Plano C**: hook `Stop` / `SubagentStop` (autoritativo). | Wire `stop_reason` como cierre **transitorio** solo si hook no llega (ventana documentada). |
-| **Texto final E2E** | **Plano C**: `last_assistant_message` del hook de cierre. | `output/body.json` reconstruido desde SSE como proyección/fallback si hook no incluye el campo. |
+| **Texto final E2E** | **Plano C**: `last_assistant_message` del hook de cierre. | `output/result.json` (`finalText` + `steps[]`); reconstrucción SSE como fallback si hook no incluye el campo. |
 | **Join paralelo (N hijos)** | Prompt match → FIFO por orden SSE (limitación documentada). | Si CC envía agent-id único por hijo, join es trivial por identidad. |
 
 ---
@@ -1432,7 +1432,7 @@ Referencia: [LLM gateway — Claude Code](https://code.claude.com/docs/en/llm-ga
 | Cabecera HTTP | Campo dominio objetivo | Persistencia disco |
 | ------------- | ---------------------- | ------------------ |
 | `X-Claude-Code-Agent-Id` | `agentId` en `ActiveWorkflow` y `ParentContext` | `meta.json` → `agentId` |
-| `X-Claude-Code-Parent-Agent-Id` | `parentAgentId`; indexado en `IWorkflowRepository` | `parentContext.parentAgentId` en `state.json` / `meta.json` |
+| `X-Claude-Code-Parent-Agent-Id` | `parentAgentId`; indexado en `IWorkflowRepository` | `parentContext.parentAgentId` en `meta.json` |
 
 **Servicio puro** `resolveAgentContext(headers)` → `{ agentId?, parentAgentId?, isSubagentRequest: boolean }` (case-insensitive, sin I/O).
 
@@ -1843,7 +1843,7 @@ stateDiagram-v2
 | 1 | POST subagent (headers) → `SubagentStart` → steps → `SubagentStop` | Caso nominal: wire abre `sub-agent-TT/`, hook confirma y cierra. |
 | 2 | `SubagentStart` → POST subagent (headers) | Crear workflow `status: pending` indexado por `agent_id`; al llegar POST, reconciliar con carpeta en disco. |
 | 3 | Main: wire `fresh` → `UserPromptSubmit` | Wire abre interacción; hook alinea workflow main en repo (idempotente). |
-| 4 | Wire cierra por `stop_reason` → hook `Stop` llega después | Hook **gana**: reescribir `meta.json` con `finalText` del orquestador; `closedByEvent: 'Stop'`. |
+| 4 | Wire cierra por `stop_reason` → hook `Stop` llega después | Hook **gana**: reescribir `output/result.json` con `finalText` del orquestador; `closedByEvent: 'Stop'`; actualizar `meta.json` con `status: completed`. |
 | 5 | Hook `Stop` llega → wire `stop_reason` en request posterior | Hook ya cerró; wire posterior se ignora para cierre (workflow ya inmutable). |
 | 6 | CC < 2.1.139: sin cabeceras ni hooks configurados | Fallback completo a heurística actual (pending+prompt + cierre por wire). |
 
@@ -2015,7 +2015,7 @@ flowchart TB
 | Concepto | Definición en contexto de persistencia |
 | -------- | -------------------------------------- |
 | **Session** | Unidad de continuidad; agrupa todos los workflows de una sesión de usuario. Directorio raíz `sessions/<id>/`. |
-| **Workflow** | Ejecución E2E (main o subagent). Directorio `workflows/NN/`. Contiene `meta.json`, `state.json`, `input/`, `output/`, `steps/`. |
+| **Workflow** | Ejecución E2E (main o subagent). Directorio `workflows/NN/`. Contiene `meta.json` (identidad + estado), `input/`, `output/result.json`, `steps/`. |
 | **Step** | Un turno LLM (request + response + tools). Directorio `steps/MM/`. |
 | **Tool** | Invocación de herramienta. Directorio `tools/KK-<slug>/` bajo el step que la produjo. |
 | **Sub-agent** | Workflow anidado bajo una tool Agent. Directorio `sub-agent/workflow/` bajo la tool invocadora. |
@@ -2031,7 +2031,7 @@ La implementación target utiliza **tres pares de conceptos distintos** según e
 
 | Nivel | Entrada | Salida | Ubicación física |
 |---|---|---|---|
-| **Workflow** | `input/` | `output/` | `workflows/00/input/prompt.json` / `output/response.json` |
+| **Workflow** | `input/` | `output/` | `workflows/00/input/prompt.json` / `output/result.json` |
 | **Step** | `request/` | `response/` | `steps/01/request/body.json` / `response/body.json` |
 | **Tool** | `input.json` | `result.json` | `tools/00-read/input.json` / `result.json` |
 
@@ -2049,6 +2049,13 @@ No existe homogeneidad terminológica, y esta **inconsistencia aparente es inten
 - **Independencia de transporte:** Un workflow no es una llamada HTTP; es un proceso lógico que puede ejecutarse localmente, en un sub-agente, o distribuirse.
 
 **Por qué no `request/response`:** Un workflow no es una petición de red; es un proceso agéntico que puede contener múltiples llamadas HTTP (steps). Usar `request/response` sería incorrecto porque un workflow no tiene un único par de petición/respuesta.
+
+**Archivo de salida: `output/result.json`** — el archivo dentro del directorio `output/` se denomina `result.json` (no `body.json` ni `response.json`) por dos razones complementarias:
+
+1. **Coherencia con el tipo de dominio:** `IWorkflowResult` es el tipo que encapsula el resultado al cierre del workflow. El nombre del artefacto en disco debe reflejar ese vocabulario de dominio, no el de transporte HTTP.
+2. **Dualidad éxito/fallo:** un workflow puede concluir con `outcome: 'success'`, `'api_error'` o `'aborted'`. El término `result` captura esa dualidad igual que `tool/result.json` captura `{ isError: true/false }`. El término `body` (alternativa HTTP) o `response` (alternativa HTTP) asumen implícitamente una transacción de red exitosa, que no es la naturaleza de un proceso agéntico.
+
+**Alternativas rechazadas:** `output/response.json` y `output/body.json` son vocabulario del dominio de protocolo HTTP/LLM, que §29.2.2 asigna correctamente al nivel Step. Usarlos en el nivel Workflow contradice la separación de dominios semánticos que justifica este apartado.
 
 #### 29.2.2. Step: `request/response` — Dominio del Protocolo de Red
 
@@ -2074,11 +2081,11 @@ No existe homogeneidad terminológica, y esta **inconsistencia aparente es inten
 
 ### 29.3. Tabla de decisiones de diseño
 
-| Nivel | Par elegido | Dominio semántico | Razón principal | Alternativa rechazada |
-|---|---|---|---|---|
-| Workflow | `input/output` | Proceso agéntico | Ambigüedad intencional del contenido; no es una llamada HTTP | `request/response` (incorrecto: workflow ≠ HTTP) |
-| Step | `request/response` | Protocolo de red (LLM) | Precisión técnica: es exactamente una llamada HTTP con streaming | `input/output` (pierde naturaleza de transporte) |
-| Tool | `input/result` | Operación con efecto | Dualidad éxito/error (`is_error`); efecto colateral | `input/output` (`output` sugiere siempre éxito) |
+| Nivel | Par elegido | Archivo de salida | Dominio semántico | Razón principal | Alternativa rechazada |
+|---|---|---|---|---|---|
+| Workflow | `input/output` | `output/result.json` | Proceso agéntico | Ambigüedad intencional del contenido; no es una llamada HTTP; `result` alineado con `IWorkflowResult` y dualidad outcome | `request/response` (HTTP); `output/response.json` y `output/body.json` (vocabulario HTTP en nivel de proceso) |
+| Step | `request/response` | `response/body.json` | Protocolo de red (LLM) | Precisión técnica: es exactamente una llamada HTTP con streaming | `input/output` (pierde naturaleza de transporte) |
+| Tool | `input/result` | `result.json` | Operación con efecto | Dualidad éxito/error (`is_error`); efecto colateral | `input/output` (`output` sugiere siempre éxito) |
 
 ### 29.4. ¿Por qué no homogeneizar?
 
@@ -2104,12 +2111,13 @@ sessions/<session-id>/
 ├── workflows/
 │   ├── workflow-sequence.json       # Índice cronológico incremental de workflows
 │   └── NN/                          # NN = índice top-level (00, 01, ...)
-│       ├── meta.json                # WorkflowMetadata (kind=main|subagent, status, ...)
-│       ├── state.json               # Causal state.json runtime para orphan detection
+│       ├── meta.json                # WorkflowMetadata (kind, status, agentId, lastActivity, ...)
 │       ├── input/
 │       │   └── prompt.json          # Primer prompt de entrada del workflow
 │       ├── output/
-│       │   └── response.json        # Respuesta final consolidada del workflow
+│       │   ├── result.json          # IWorkflowResult (outcome, finalText, usage, stepCount,
+│       │   │                        #   closedByEvent, sessionId) + steps[] con contenido narrativo
+│       │   └── result.parsed.md     # Vista Markdown del resultado del workflow
 │       └── steps/
 │           └── MM/                  # MM = índice step (local al workflow, 00, 01, ...)
 │               ├── request/
@@ -2130,12 +2138,12 @@ sessions/<session-id>/
 │                       ├── result.json  # { isError, result }
 │                       └── sub-agent/   # ← Sólo si la tool dispara sub-agent
 │                           └── workflow/
-│                               ├── meta.json    # workflowKind=subagent
-│                               ├── state.json   # Causal state.json runtime
+│                               ├── meta.json    # workflowKind=subagent, status, lastActivity, ...
 │                               ├── input/
 │                               │   └── prompt.json
 │                               ├── output/
-│                               │   └── response.json
+│                               │   ├── result.json       # IWorkflowResult + steps[]
+│                               │   └── result.parsed.md
 │                               └── steps/
 │                                   └── ...      # Estructura recursiva idéntica (nota: Claude Code limita anidamiento a 1 nivel, ver §32.7)
 └── side-requests/
@@ -2216,12 +2224,12 @@ sessions/<sid>/
 └── workflows/
     ├── workflow-sequence.json
     └── 00/
-        ├── meta.json                    # workflowKind=main, status=completed
-        ├── state.json                   # status=completed
+        ├── meta.json                    # workflowKind=main, status=completed, lastActivity=...
         ├── input/
         │   └── prompt.json              # Primer prompt original
         ├── output/
-        │   └── response.json            # Respuesta final reconstituida
+        │   ├── result.json              # IWorkflowResult + steps[] (escrito en workflow_complete)
+        │   └── result.parsed.md
         └── steps/00/
             ├── request/body.json
             └── response/
@@ -2360,7 +2368,7 @@ Cada uno se anida bajo su propia tool invocadora. El `WorkflowTracker` mantiene 
 
 `inferExecutionMode()` detecta `blocking: "background"` cuando el `input` de la tool contiene `subagent_config.background === true`. La estructura de directorios es idéntica a la foreground; la diferencia es semántica (el parent no bloquea esperando, y el sub-agent puede completarse después de continuations del parent).
 
-**Riesgo conocido:** La completación del sub-agent en background puede llegar después de que el parent ya escribió continuations. El `state.json` por workflow y los eventos en `events.ndjson` representan explícitamente el estado in-progress.
+**Riesgo conocido:** La completación del sub-agent en background puede llegar después de que el parent ya escribió continuations. El campo `status` de `meta.json` por workflow y los eventos en `events.ndjson` representan explícitamente el estado in-progress.
 
 ### 32.7. Sub-agents anidados — limitación Claude Code
 
@@ -2446,16 +2454,29 @@ Escritura atómica (temp file + rename) y serializada vía `writeQueue` para evi
 
 ### 33.3. Workflow `meta.json` (`WorkflowMetadata`)
 
+Contiene **identidad y estado** del workflow. NO contiene campos de resultado (`outcome`,
+`finalText`, `usage`, `closedByEvent`): esos van en `output/result.json` (§33.4b). Escrito
+atómicamente en cada transición de estado (`pending → running → completed|failed|aborted`),
+máximo 3 veces por workflow. `detectOrphans()` escanea este archivo al arranque: si
+`status` es `pending` o `running` y `lastActivity` supera el umbral de inactividad, el
+workflow se marca como huérfano.
+
 ```typescript
 {
   layoutVersion: "causal-workflows-v1",
   workflowKind: "main" | "subagent",
-  workflowIndex: number,             // Sólo top-level; null si nested
+  workflowIndex: number,               // Sólo top-level; null si nested
   workflowId: string,
   parentWorkflowId?: string | null,
-  parentStepIndex?: number | null,   // Step del parent que disparó (sub-agents)
+  parentStepIndex?: number | null,     // Step del parent que disparó (sub-agents)
   triggeringToolUseId?: string | null, // Tool que disparó (sub-agents)
-  status: "running" | "completed" | "failed" | "cancelled" | "timeout",
+  status: "pending" | "running" | "completed" | "failed" | "aborted",
+  lastActivity: string,                // ISO timestamp; actualizado en cada transición
+  parentContext?: {                     // Procedente de wire headers plano A
+    agentId: string,
+    parentAgentId: string | null,
+    correlationMethod: "agent-headers" | "heuristic" | null
+  },
   startedAt: string,
   completedAt?: string,
   cancelledAt?: string,
@@ -2464,9 +2485,54 @@ Escritura atómica (temp file + rename) y serializada vía `writeQueue` para evi
 }
 ```
 
-### 33.4. Workflow `state.json`
+### 33.4. Estado runtime en `meta.json` (sin `state.json` separado)
 
-Escrito atómicamente en el directorio de cada workflow (`workflows/NN/state.json`) sincronizado con los cambios de estado. Almacena el estado actual (`status`) y el timestamp de la última actividad. Facilita la detección robusta de workflows huérfanos (`detectOrphans()`) en el arranque.
+El layout `causal-workflows-v1` **no genera `state.json`**. El estado mutable del workflow
+(`status`, `lastActivity`, `cancellationReason`) vive directamente en `meta.json` (§33.3).
+
+**Justificación de la fusión:** las transiciones de `WorkflowStatus` son ≤ 3 por workflow
+(`pending → running → completed|failed|aborted`), lo que hace a `meta.json` un archivo de
+baja frecuencia de escritura. La separación en dos archivos no aporta protección de hot
+path real y crea solapamiento de campos (`status`, `agentId`). Un único archivo atómico
+simplifica la implementación y elimina la redundancia.
+
+**Detección de huérfanos (`detectOrphans()`):** al arranque, `SessionPersistence` escanea
+`meta.json` de cada workflow en `sessions/`. Un workflow es candidato a huérfano si
+`status ∈ { "pending", "running" }` y `lastActivity` supera el umbral de inactividad
+configurado. El workflow se marca `aborted` y se emite un evento de diagnóstico.
+
+### 33.4b. Workflow `output/result.json` (`WorkflowResult`)
+
+Escrito una única vez por `SessionPersistence` al recibir el evento `workflow_complete`.
+Contiene el `IWorkflowResult` completo más el contenido narrativo de todos los steps del
+workflow. Es el único artefacto que recoge los campos de resultado; `meta.json` no los
+duplica.
+
+```typescript
+{
+  layoutVersion: "causal-workflows-v1",
+  // --- IWorkflowResult ---
+  outcome: "success" | "api_error" | "aborted" | "unknown",
+  finalText?: string,          // Passthrough de last_assistant_message del hook de cierre;
+                               // ausente si el hook no incluyó el campo. Ver §15.8.
+  usage?: AnthropicUsage,      // Consumo facturado E2E agregado por hop. Ver §15.7.
+  stepCount: number,           // Cantidad de steps cerrados al momento del cierre.
+  closedByEvent: "Stop" | "SubagentStop" | "StopFailure",
+  sessionId: string,
+  // --- Contenido narrativo ---
+  steps: Array<{
+    stepIndex: number,         // 0-based, local al workflow
+    model: string,
+    id: string,                // anthropicMessageId
+    role: "assistant",
+    content: IAnthropicContentBlock[],  // thinking, text, tool_use blocks
+    stop_reason: string
+  }>
+}
+```
+
+El archivo hermano `output/result.parsed.md` contiene el render Markdown del workflow
+completo, generado a partir de `steps[].content`.
 
 ### 33.5. `workflow-sequence.json`
 
@@ -2624,7 +2690,7 @@ Todos usan `resolveWorkflowLocation(sessionId, workflowId)` para obtener el `wor
 2. **Tool timeouts:** Timer configurable en el **correlador** (§24.1, default 30s); `SessionPersistence` consume el evento `tool_result` (timeout) emitido por el correlador (G19).
 3. **Tool retries:** Detección por `tool_use_id` duplicado; incrementa `retryCount` y preserva `previousAttempts[]`.
 4. **Workflow cancellation:** Status `cancelled` + `cancellationReason`.
-5. **Crash recovery:** Chunks SSE individuales preservados; `detectOrphans()` escanea workflows sin `state.json` terminal al startup.
+5. **Crash recovery:** Chunks SSE individuales preservados; `detectOrphans()` escanea `meta.json` de cada workflow al startup buscando `status ∈ {pending, running}` con `lastActivity` antigua.
 6. **Streaming bounds:** Límite configurable de chunks máximos por step (default 10000) para evitar crecimiento descontrolado.
 7. **Fire-and-forget escrituras:** Cada escritura va vía `fireAndForget` para no bloquear el bus; errores se loggean sin interrumpir telemetría.
 8. **Cleanup de Maps:** `onSessionComplete` limpia todos los maps por sesión para evitar memory leaks.
@@ -2706,15 +2772,15 @@ Criterios de verificación para validar la convergencia de SCP al layout `causal
 | 8 | Out-of-order tool results | Correlación por `tool_use_id`, no por índice posicional. |
 | 9 | Tool timeout | Timer del correlador (§24.1) emite `tool_result` timeout; persistencia consume el evento (G19). |
 | 10 | Tool retry con `retryCount` | Detección por `tool_use_id` duplicado; `previousAttempts[]` en `meta.json`. |
-| 11 | Workflow cancellation | Status `cancelled` + `cancellationReason` en `state.json`. |
+| 11 | Workflow cancellation | Status `cancelled` + `cancellationReason` en `meta.json`. |
 | 12 | Streaming chunks + body reconstruction | Chunks SSE → `body.json` / `body.parsed.md` correctos (text + tool_use + partial_json). |
 | 13 | Filtrado de pings | Eventos `ping` excluidos de chunks persistidos. |
 | 14 | Equivalencia stream-reconstructed ≡ direct write | Cuerpo reconstruido desde chunks idéntico al body directo. |
 | 15 | `workflow-sequence.json` | Índice incremental de workflows por sesión. |
-| 16 | `state.json` por workflow | Detección de huérfanos (`detectOrphans()`) al startup. |
+| 16 | `meta.json` con `status`/`lastActivity` por workflow | Detección de huérfanos (`detectOrphans()`) al startup: `status ∈ {pending, running}` + `lastActivity` antigua. |
 | 17 | `previousAttempts[]` en tool metadata | Historial de reintentos con timestamp y error. |
 | 18 | Vistas coalesced | `body.coalesced.json` / `body.coalesced.parsed.md` integran sub-agentes recursivamente. |
-| 19 | `input/` y `output/` de workflows | `prompt.json` al inicio; `response.json` al completar. |
+| 19 | `input/` y `output/` de workflows | `prompt.json` al inicio; `result.json` + `result.parsed.md` al completar (`workflow_complete`). |
 | 20 | `observedExecutionMode` en step metadata | Detección dinámica `parallel` / `sequential` de tools en un step. |
 
 ---
@@ -2815,7 +2881,7 @@ flowchart TB
 | Capa | Componentes objetivo |
 | ---- | -------------------- |
 | **1** | `resolveAgentContext`, `joinToolUseToSubagent`, `buildWorkflowResult`, `deriveOutcome`, `deriveFinalText`, `IWorkflowRepository`, `IEventBus` (port abstracto §28b), tipos hook (`ClaudeHookEvent`), extensión `ParentContext` (`agentId`, `parentAgentId`), `CorrelationMethod` extendido. |
-| **2** | `InMemoryWorkflowRepository` (índices: `sessionId+agentId`, `interactionDir`, `tool_use_id`), `EventBus` (adapter §28b), `SessionPersistence` (suscriptor §28b), `AuditProjection` (`WorkflowResult` → `meta.json` / `output/body.json`), `StepAssembler`, `ProviderCatalog`. |
+| **2** | `InMemoryWorkflowRepository` (índices: `sessionId+agentId`, `interactionDir`, `tool_use_id`), `EventBus` (adapter §28b), `SessionPersistence` (suscriptor §28b), `AuditProjection` (`WorkflowResult` → `meta.json` / `output/result.json`), `StepAssembler`, `ProviderCatalog`. |
 | **3** | `AuditInteractionHandler` (clasificación + routing), `AuditSseResponseHandler`, `AuditHookEventHandler` (mapa hooks), `AuditWorkflowClosureHandler` (cierre + resultado). |
 | **5** | `POST /v1/messages` (proxy), `POST /hooks` (excluida de side-interactions, respuesta rápida 2xx). |
 
@@ -2900,7 +2966,7 @@ src/1-domain/
 | `SessionPersistence` | Suscriptor del bus; proyecta eventos de telemetría a disco `sessions/` | §28b, Parte V |
 | `AuditProjectionFs` | Traducir agregados/DTOs → árbol actual `sessions/…` | Conserva screaming architecture |
 | `StepAssembler` | RAM: SSE → `assistantMessage`, `usage`, `stopReason`; callback `onInferenceComplete` | StepBuffer §26 |
-| `SseReconstructService` | Forense / `output/` desde `sse.jsonl` | Complemento; no sustituye `finalText` de hooks |
+| `SseReconstructService` | Forense / `output/result.json` desde chunks SSE | Complemento; no sustituye `finalText` de hooks |
 | `StreamTeeService` | Sin cambio respecto a implementación actual | Reenvío + rama audit |
 | `ProviderCatalog` | Leer `routing/providers/` → `Provider`, `LanguageModel` | Entidades §13 |
 | `SessionMetricsService` | Escritura atómica de `session-metrics.json` agrupada por modelo (`models`, `session_totals`, `cache_efficiency`); solo workflows `kind: 'main'` (invariante G16). Implementado en G4. | §33.2 |
@@ -2963,8 +3029,8 @@ Consideraciones para `POST /hooks`:
 | **G3** | Extraer `StepAssembler` desde `audit-sse-response.handler`; propagar `step.inferenceRequest.model` → `workflow.languageModelId` al correlador al completar cada step | Refactor gateway | G2 |
 | **G4** | `AuditProjection` explícita; `InteractionMetadata` generado desde `WorkflowResult`; `AuditWorkflowClosureHandler` hook-driven (des-stub `Stop`/`SubagentStop`/`StopFailure`); proyección `WorkflowResult` a disco; `aggregateWorkflowUsageByModel` (L1) + `SessionMetricsService` (L2): `session-metrics.json` por modelo con `session_totals` y `cache_efficiency` (§33.2, invariante G16); aceptación E2E subset §37b; retiro cierre wire-only como ruta principal | Refactor gateway | G3 |
 | **G5** | `ProviderCatalog` derivado de `UPSTREAM_ORIGIN` (env var); lectura de `routing/providers/` diferida a P0+ | Refactor gateway | — |
-| **P0** | Spike: detallar la adaptación de §28b/§40 (Opción A ratificada): inventario de componentes con archivo destino en `src/`, puntos de emisión del correlador (§28b.3), ownership del timer en el correlador (§24.1/G19), cableado en composition root (§42) y estrategia de corte limpio. Las sesiones anteriores se eliminan (no se migran) | Persistencia | G4 |
-| **P1** | Crear pila `IEventBus` (L1) → `EventBus` (L2) → `SessionPersistence` (L2, suscriptor); conectar correlador al bus (emite eventos §28b.3 en cada mutación de estado); `SessionPersistence` escribe árbol `causal-workflows-v1` (`workflows/NN/steps/MM/tools/KK/`, `meta.json`). Retirar layout flat: `audit-writer.service.ts`, `session-store.service.ts`, `workflow-result-projector.service.ts`, constantes flat de `audit-paths.ts`, tipos `ActiveInteraction`/`InteractionMetadata` | Persistencia | P0, G4 |
+| **P0** | Spike: confirmar ubicaciones de código en `src/` para los componentes de §28b/§40 (Opción A ratificada), puntos de emisión del correlador (§28b.3), ownership del timer (§24.1/G19), cableado en composition root (§42) y estrategia de corte limpio. El diseño del layout objetivo (naming, schemas, fusión `state.json`→`meta.json`) está fijado en §29/§30/§33 y no es trabajo del spike. Las sesiones anteriores se eliminan (no se migran) | Persistencia | G4 |
+| **P1** | Crear pila `IEventBus` (L1) → `EventBus` (L2) → `SessionPersistence` (L2, suscriptor); conectar correlador al bus (emite eventos §28b.3 en cada mutación de estado); `SessionPersistence` escribe árbol `causal-workflows-v1`: `workflows/NN/meta.json` (estado fusionado, sin `state.json`), `output/result.json` (IWorkflowResult + steps[]), `steps/MM/`, `tools/KK/`. Retirar layout flat: `audit-writer.service.ts`, `session-store.service.ts`, `workflow-result-projector.service.ts`, constantes flat de `audit-paths.ts`, tipos `ActiveInteraction`/`InteractionMetadata` | Persistencia | P0, G4 |
 | **P2** | Artefactos nuevos como suscripciones adicionales de `SessionPersistence` (la pila de bus creada en P1 los habilita): wildcard `*` → `events.ndjson`, `stream_chunk` → `streaming/NNNN-chunk.ndjson` + reconstrucción de `body.json`, `workflow-sequence.json`. Retirar escritura de `sse.jsonl` | Persistencia | P1 |
 
 **Nomenclatura de bloques:**
@@ -2987,7 +3053,7 @@ En todas las fases C y G: **mismo layout `sessions/`** salvo campos adicionales 
 | Bordes normativos | Solo wire (HTTP/SSE) | Wire + Hooks (dos bordes coordinados) |
 | Correlación subagente | Pending heurístico (prompt/unique) | Headers plano A + SSE join plano B + `SubagentStart` plano C |
 | Cierre E2E | Wire `stop_reason` | Hook `Stop`/`SubagentStop` + `buildWorkflowResult` (wire como respaldo transitorio) |
-| Texto final | `output/body.json` reconstruido SSE | `WorkflowResult.finalText` passthrough hook; `output/` como fallback |
+| Texto final | `output/body.json` reconstruido SSE | `output/result.json` (`finalText` passthrough hook + `steps[]`); fallback SSE si hook no provee `last_assistant_message` |
 | Tokens turno | `InteractionMetadata.totals`; `session-metrics.json` por modelo (schema simple) | `WorkflowResult.usage` (hop wire en Step, facturado E2E en Result; ver §15.7); `session-metrics.json` desglosado por modelo con `session_totals` y `cache_efficiency` (§33.2, invariante G16, implementado en G4) |
 | Multi-proveedor | Solo en `routing/` + statusline | `Provider` / `LanguageModel` en dominio capa 1 |
 | SSE en dominio | `SseLine[]` en audit | Snapshots `Step`; deltas solo en proyección capa 2 |
@@ -3038,11 +3104,10 @@ En todas las fases C y G: **mismo layout `sessions/`** salvo campos adicionales 
 
 ### 46.4 Proyección a disco: campos nuevos al implementar
 
-| Archivo disco | Campo nuevo | Origen |
-| ------------- | ----------- | ------ |
-| `state.json` | `parentContext.agentId`, `parentContext.parentAgentId`, `parentContext.correlationMethod: 'agent-headers'` | Wire headers (plano A) |
-| `meta.json` | `agentId`, `parentAgentId`, `outcome`, `closedByEvent`, `finalText`, `usage` (agregado E2E) | `WorkflowResult` (plano C cierre) |
-| `output/body.json` | Preferir `finalText` hook; mantener reconstrucción SSE como fallback | Hook > SSE |
+| Archivo disco | Campos | Origen |
+| ------------- | ------ | ------ |
+| `workflows/NN/meta.json` | `parentContext: { agentId, parentAgentId, correlationMethod }`, `lastActivity` | Wire headers plano A (parentContext); transiciones de estado (lastActivity) |
+| `workflows/NN/output/result.json` | `outcome`, `closedByEvent`, `finalText`, `usage` (agregado E2E), `stepCount`, `sessionId`, `steps[]` | `IWorkflowResult` de `buildWorkflowResult()` + `Step[]` del correlador (plano C cierre) |
 
 > **Nota:** `session-audit-model.md` §7.3 se actualizará en el plan de implementación que materialice fases C1–C3 y el bloque G; este documento describe el diseño objetivo sin afirmar que ya está implementado en `src/`.
 

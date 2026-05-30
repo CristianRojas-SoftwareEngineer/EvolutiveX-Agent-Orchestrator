@@ -183,10 +183,14 @@
 
 ---
 
-## P0 — Spike: detallar la adaptación e inventario de integración del bus (Opción A ratificada)
+## P0 — Spike: confirmar inventario de integración del bus (Opción A ratificada)
 
 > Las sesiones anteriores se eliminan antes del corte; no hay migración de datos en reposo.
 > La Opción A (EventBus + SessionPersistence, §28b/§40) está ratificada. Este spike no decide entre A y B; produce el inventario que P1 ejecuta.
+> **El diseño del layout objetivo ya está fijado** (naming `output/result.json`, fusión
+> `state.json`→`meta.json`, schemas de §33.3 y §33.4b, decisiones D1/D2/D3 del orquestador).
+> P0 solo confirma las preguntas de implementación: ubicaciones de código en `src/`,
+> puntos de emisión, timer y composition root.
 
 - [ ] Verificar dependencias §43: G4 en estado `validada` o `archivada`
 - [ ] Crear change de segundo nivel `gateway-p0-layout-diff-spike` (skill `openspec-propose`)
@@ -223,15 +227,15 @@
   - _`EventBus` adapter (pub/sub async in-process, fire-and-forget) en `src/2-services/event-bus.service.ts`_
   - _Funciones de rutas de sesión (`getWorkflowDir`, `getStepDir`, `getToolsDir`) para layout `causal-workflows-v1`_
   - _Utilidades de aislamiento async (`fireAndForget`, `withTimeout`) en `src/2-services/utils/`_
-  - _`SessionPersistence` (parte estructural): suscriptores `session_start`, `workflow_start`, `workflow_spawn`, `workflow_complete`, `workflow_cancel`, `step_request`, `tool_call`, `tool_result` → escribe `meta.json`, `state.json`, `request/body.json`, `tools/NN-name/{input,result,meta}.json`, `workflow-sequence.json` en `src/2-services/session-persistence.service.ts`_
+  - _`SessionPersistence` (parte estructural): suscriptores `session_start`, `workflow_start`, `workflow_spawn`, `workflow_complete`, `workflow_cancel`, `step_request`, `tool_call`, `tool_result` → escribe `meta.json` (estado fusionado, sin `state.json`), `output/result.json` + `output/result.parsed.md` (en `workflow_complete`), `request/body.json`, `tools/NN-name/{input,result,meta}.json` en `src/2-services/session-persistence.service.ts`_
 - [ ] Correlador conectado al bus:
   - _`WorkflowRepositoryService` recibe `IEventBus` en constructor y emite el evento correspondiente (§28b.3) en cada método de mutación de estado_
   - _Criterio: los seis puntos de emisión del mapa de adaptación están implementados_
 - [ ] Composition root cableado: `EventBus` creado e inyectado en correlador y `SessionPersistence` (capa 4, §42)
 - [ ] Gate superado: `npm run test` + subconjunto estructural del checklist §37b (casos 3–7, 16, 19)
   - _Criterio: nuevas sesiones generadas en tests adoptan la estructura `workflows/NN/`, `steps/MM/`, `tools/KK/`; todos los casos del subconjunto verificados. Casos 1 y 15 excluidos (artefactos nuevos, pertenecen a P2); caso 2 excluido (ya verde en G4)_
-- [ ] Documentación actualizada: `docs/session-audit-model.md`, `README.md`, `docs/proposals/gateway-design.md` §30, §40
-  - _Criterio: estructura `workflows/NN/`, `tools/KK/` descrita como el layout vigente para sesiones nuevas_
+- [ ] Documentación actualizada: `docs/session-audit-model.md`, `README.md`, `docs/proposals/gateway-design.md` §29, §30, §33, §37b, §40, §46.4
+  - _Criterio: estructura `workflows/NN/`, `tools/KK/`, `output/result.json` descrita como el layout vigente para sesiones nuevas_
 - [ ] Legacy retirado:
   - _`audit-writer.service.ts` eliminado de `src/`_
   - _`session-store.service.ts` eliminado de `src/`_

@@ -193,7 +193,7 @@
 - [ ] El `proposal.md` del change hijo incluye back-reference al orquestador
 - [ ] Actualizar estado de P0 a `en-curso` en el registro del orquestador
 - [ ] Spike completado: análisis de cambios de código documentado
-  - _Criterio: documento de spike en `docs/` identifica qué rutas de escritura cambian en `src/2-services/` y `src/3-operations/`, qué artefactos son nuevos, y cómo se ejecuta el corte limpio (eliminación de sesiones anteriores)_
+  - _Criterio: documento de spike en `docs/` identifica qué rutas de escritura cambian en `src/2-services/` (adapters capa 2; no capa 3), qué artefactos son nuevos, la **decisión sobre el bus de eventos (§28b): implementar `EventBus`+`SessionPersistence` completos vs. escribir `events.ndjson` directamente desde los handlers de capa 3**, y cómo se ejecuta el corte limpio (eliminación de sesiones anteriores)_
 - [ ] Documentación actualizada: `docs/proposals/gateway-design.md` §29–§37 refleja el estado real
 - [ ] Marcar P0 como `validada` y archivar el change hijo (`openspec-archive`)
   - _Criterio: no requiere gate técnico; validación = spike documentado y revisado_
@@ -210,8 +210,8 @@
 - [ ] El `proposal.md` del change hijo incluye back-reference al orquestador
 - [ ] Actualizar estado de P1 a `en-curso` en el registro del orquestador
 - [ ] Seguimiento de implementación del change hijo (`openspec-apply`)
-- [ ] Gate superado: `npm run test` + subconjunto del checklist §37b (casos 1–7, 15, 16, 19)
-  - _Criterio: nuevas sesiones generadas en tests adoptan la estructura `workflows/NN/`, `steps/MM/`, `tools/KK/`; todos los casos del subconjunto verificados_
+- [ ] Gate superado: `npm run test` + subconjunto estructural del checklist §37b (casos 3–7, 16, 19)
+  - _Criterio: nuevas sesiones generadas en tests adoptan la estructura `workflows/NN/`, `steps/MM/`, `tools/KK/`; todos los casos del subconjunto verificados. Casos 1 y 15 excluidos (artefactos nuevos, pertenecen a P2); caso 2 excluido (ya verde en G4)_
 - [ ] Documentación actualizada: `docs/session-audit-model.md`, `README.md`, `docs/proposals/gateway-design.md` §30
   - _Criterio: estructura `workflows/NN/`, `tools/KK/` descrita como el layout vigente para sesiones nuevas_
 - [ ] Legacy retirado: rutas de escritura al layout flat `sessions/{session}/{interaction}/` eliminadas de `src/`

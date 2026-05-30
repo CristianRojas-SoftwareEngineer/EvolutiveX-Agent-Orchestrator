@@ -2971,10 +2971,10 @@ Consideraciones para `POST /hooks`:
 | **G2** | `IWorkflowRepository` completo con lifecycle de cierre (`readyToClose`, open/close) + adapter memoria; handlers delegan en repo; integra costuras C1/C2/C3 | Refactor gateway | G1, C2, C3 |
 | **G3** | Extraer `StepAssembler` desde `audit-sse-response.handler`; propagar `step.inferenceRequest.model` → `workflow.languageModelId` al correlador al completar cada step | Refactor gateway | G2 |
 | **G4** | `AuditProjection` explícita; `InteractionMetadata` generado desde `WorkflowResult`; `AuditWorkflowClosureHandler` hook-driven (des-stub `Stop`/`SubagentStop`/`StopFailure`); proyección `WorkflowResult` a disco; `aggregateWorkflowUsageByModel` (L1) + `SessionMetricsService` (L2): `session-metrics.json` por modelo con `session_totals` y `cache_efficiency` (§33.2, invariante G16); aceptación E2E subset §37b; retiro cierre wire-only como ruta principal | Refactor gateway | G3 |
-| **G5** | `ProviderCatalog` desde `routing/providers/` | Refactor gateway | — |
+| **G5** | `ProviderCatalog` derivado de `UPSTREAM_ORIGIN` (env var); lectura de `routing/providers/` diferida a P0+ | Refactor gateway | — |
 | **P0** | Spike: mapear qué rutas de escritura en capa 2 deben cambiar para emitir `causal-workflows-v1` en sesiones nuevas; las sesiones anteriores se eliminan (no se migran) | Persistencia | G4 |
 | **P1** | Reescribir proyección (capa 2): nuevas sesiones generan estructura `causal-workflows-v1` (`workflows/NN/`, `steps/MM/`, `tools/KK/`); retirar rutas de escritura del layout flat de `src/` | Persistencia | P0, G4 |
-| **P2** | Completar proyección: añadir escritura de artefactos nuevos en sesiones nuevas (`events.ndjson`, `workflow-sequence.json`, `streaming/*.ndjson`); retirar código de escritura de artefactos obsoletos | Persistencia | P1 |
+| **P2** | Completar proyección: añadir escritura de artefactos nuevos en sesiones nuevas (`events.ndjson`, `workflow-sequence.json`, `streaming/*.ndjson`); retirar código de escritura de artefactos obsoletos. `events.ndjson` depende de la decisión de bus tomada en P0 | Persistencia | P1 |
 
 **Nomenclatura de bloques:**
 

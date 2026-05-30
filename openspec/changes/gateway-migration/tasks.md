@@ -206,6 +206,7 @@
 - [x] Documentación actualizada: `docs/proposals/gateway-design.md` §28b, §40, §42 refleja el estado real
 - [x] Marcar P0 como `validada` y archivar el change hijo (`openspec-archive`)
   - _Criterio: no requiere gate técnico; validación = spike documentado y revisado_
+  - _Archivo: `openspec/changes/archive/2026-05-30-gateway-p0-layout-diff-spike/`; registro P0 = `archivada`_
 
 ---
 

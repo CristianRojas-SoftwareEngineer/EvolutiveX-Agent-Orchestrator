@@ -35,9 +35,9 @@
 
 ## 4. Composition root (capa 4)
 
-- [ ] 4.1 Modificar `composition-root.ts`: crear `EventBus` en `createProxyDependencies()`, inyectar en correlador y crear `SessionPersistence` con `eventBus`
+- [x] 4.1 Modificar `composition-root.ts`: crear `EventBus` en `createProxyDependencies()`, inyectar en correlador y crear `SessionPersistence` con `eventBus`
   - _Criterio: `npm run typecheck` pasa; `EventBus` creado una vez, inyectado en ambos_
-- [ ] 4.2 Implementar corte limpio de sesiones anteriores en `createProxyDependencies()`: detectar layout legacy (`main-agent/` o `interaction-sequence.json`), eliminar `sessions/`, recrear `.gitkeep`
+- [x] 4.2 Implementar corte limpio de sesiones anteriores en `createProxyDependencies()`: detectar layout legacy (`main-agent/` o `interaction-sequence.json`), eliminar `sessions/`, recrear `.gitkeep`
   - _Criterio: `npm run test:quick` pasa; detección idempotente verificada_
 
 ## 5. Migración de handlers L3 a tipos gateway

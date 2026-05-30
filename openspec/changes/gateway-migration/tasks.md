@@ -183,41 +183,47 @@
 
 ---
 
-## P0 — Spike: diff layout SCP actual vs `causal-workflows-v1` + coste migración
+## P0 — Spike: mapear cambios de código en proyección (capa 2) para emitir `causal-workflows-v1`
+
+> Las sesiones anteriores se eliminan antes del corte; no hay migración de datos en reposo.
 
 - [ ] Verificar dependencias §43: G4 en estado `validada` o `archivada`
 - [ ] Crear change de segundo nivel `gateway-p0-layout-diff-spike` (skill `openspec-propose`)
   - _Criterio: spike documentado; no requiere gate de tests_
 - [ ] El `proposal.md` del change hijo incluye back-reference al orquestador
 - [ ] Actualizar estado de P0 a `en-curso` en el registro del orquestador
-- [ ] Spike completado: diff entre layout actual y `causal-workflows-v1` documentado
-  - _Criterio: documento de spike en `docs/` describe rutas actuales vs objetivo, coste de migración y estrategia_
+- [ ] Spike completado: análisis de cambios de código documentado
+  - _Criterio: documento de spike en `docs/` identifica qué rutas de escritura cambian en `src/2-services/` y `src/3-operations/`, qué artefactos son nuevos, y cómo se ejecuta el corte limpio (eliminación de sesiones anteriores)_
 - [ ] Documentación actualizada: `docs/proposals/gateway-design.md` §29–§37 refleja el estado real
 - [ ] Marcar P0 como `validada` y archivar el change hijo (`openspec-archive`)
   - _Criterio: no requiere gate técnico; validación = spike documentado y revisado_
 
 ---
 
-## P1 — Migración estructura directorios (`workflows/NN/`, `tools/KK/`)
+## P1 — Reescribir proyección: nuevas sesiones en estructura `causal-workflows-v1`
+
+> Objetivo: cambiar el código generador en `src/` para que las sesiones nuevas adopten el layout `causal-workflows-v1`. No se transforman sesiones anteriores.
 
 - [ ] Verificar dependencias §43: P0 y G4 en estado `validada` o `archivada`
   - _Criterio: columnas Estado de P0 y G4 = `validada` o `archivada`_
-- [ ] Crear change de segundo nivel `gateway-p1-directory-migration` (skill `openspec-propose`)
+- [ ] Crear change de segundo nivel `gateway-p1-new-session-layout` (skill `openspec-propose`)
 - [ ] El `proposal.md` del change hijo incluye back-reference al orquestador
 - [ ] Actualizar estado de P1 a `en-curso` en el registro del orquestador
 - [ ] Seguimiento de implementación del change hijo (`openspec-apply`)
 - [ ] Gate superado: `npm run test` + subconjunto del checklist §37b (casos 1–7, 15, 16, 19)
-  - _Criterio: todos los casos del subconjunto verificados manualmente o por test suite_
+  - _Criterio: nuevas sesiones generadas en tests adoptan la estructura `workflows/NN/`, `steps/MM/`, `tools/KK/`; todos los casos del subconjunto verificados_
 - [ ] Documentación actualizada: `docs/session-audit-model.md`, `README.md`, `docs/proposals/gateway-design.md` §30
-  - _Criterio: nueva estructura `workflows/NN/`, `tools/KK/` descrita como implementada_
-- [ ] Legacy retirado: layout flat `sessions/{session}/{interaction}/` eliminado
-  - _Criterio: no quedan rutas de escritura al layout antiguo en `src/`_
+  - _Criterio: estructura `workflows/NN/`, `tools/KK/` descrita como el layout vigente para sesiones nuevas_
+- [ ] Legacy retirado: rutas de escritura al layout flat `sessions/{session}/{interaction}/` eliminadas de `src/`
+  - _Criterio: no quedan rutas de escritura al layout anterior en `src/`; `npm run lint` y `npm run typecheck` pasan_
 - [ ] Sync de specs si aplica (`openspec-sync`)
 - [ ] Marcar P1 como `validada` y archivar el change hijo (`openspec-archive`)
 
 ---
 
-## P2 — Artefactos nuevos (`events.ndjson`, `workflow-sequence.json`, `streaming/*.ndjson`)
+## P2 — Completar proyección: artefactos nuevos en sesiones nuevas (`events.ndjson`, `workflow-sequence.json`, `streaming/*.ndjson`)
+
+> Objetivo: añadir la escritura de los artefactos que no existen en el layout actual. Todas las sesiones generadas tras P2 son `causal-workflows-v1` completas.
 
 - [ ] Verificar dependencias §43: P1 en estado `validada` o `archivada`
 - [ ] Crear change de segundo nivel `gateway-p2-new-artifacts` (skill `openspec-propose`)
@@ -225,10 +231,11 @@
 - [ ] Actualizar estado de P2 a `en-curso` en el registro del orquestador
 - [ ] Seguimiento de implementación del change hijo (`openspec-apply`)
 - [ ] Gate superado: `npm run test` + checklist [§37b](../../../docs/proposals/gateway-design.md#37b-checklist-de-aceptación-e2e-del-layout) completo (20 casos)
-  - _Criterio: los 20 casos de §37b verificados; `npm run test` sin errores_
+  - _Criterio: los 20 casos de §37b verificados en sesiones nuevas generadas por los tests; `npm run test` sin errores_
 - [ ] Documentación actualizada: `docs/session-audit-model.md`, `docs/proposals/gateway-design.md` §33
-  - _Criterio: `events.ndjson`, `workflow-sequence.json`, `streaming/*.ndjson` descritos como implementados_
-- [ ] Legacy retirado: artefactos de persistencia obsoletos eliminados
+  - _Criterio: `events.ndjson`, `workflow-sequence.json`, `streaming/*.ndjson` descritos como generados para sesiones nuevas_
+- [ ] Legacy retirado: código de escritura de artefactos obsoletos eliminado de `src/`
+  - _Criterio: `npm run lint` y `npm run typecheck` pasan; no quedan rutas de escritura a artefactos del layout anterior_
 - [ ] Sync de specs si aplica (`openspec-sync`)
 - [ ] Marcar P2 como `validada` y archivar el change hijo (`openspec-archive`)
 

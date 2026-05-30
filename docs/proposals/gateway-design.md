@@ -2641,20 +2641,22 @@ Todos usan `resolveWorkflowLocation(sessionId, workflowId)` para obtener el `wor
 
 ---
 
-## 37. Matriz entidad dominio ↔ ruta disco + migración
+## 37. Matriz entidad dominio ↔ ruta disco (layout actual vs. objetivo)
+
+> **Alcance de las fases P:** las sesiones anteriores al corte se eliminan; no se transforman datos en reposo. La columna "Cambio en código generador" describe qué debe cambiar en `src/2-services/` (proyección) para que **las nuevas sesiones** se escriban ya con el layout `causal-workflows-v1`.
 
 ### 37.1. Mapeo de entidades
 
-| Entidad | Ruta `causal-workflows-v1` | Ruta SCP actual | Acción migración |
+| Entidad | Ruta `causal-workflows-v1` | Ruta SCP actual | Cambio en código generador |
 |---|---|---|---|
-| Session | `sessions/<id>/` | `sessions/<id>/` | Compatible |
-| Workflow main | `workflows/NN/` | `main-agent/interactions/NN/` | Reestructurar |
-| Workflow subagent | `tools/KK-agent/sub-agent/workflow/` | `steps/YY/sub-agent-TT/` | Reestructurar |
-| Step | `workflows/NN/steps/MM/` | `main-agent/interactions/NN/steps/YY/` | Renombrar + reestructurar |
-| ToolUse | `steps/MM/tools/KK-slug/` | (no existe como entidad hoy, inline en SSE) | Nuevo |
-| `events.ndjson` | `sessions/<id>/events.ndjson` | (no existe) | Artefacto nuevo |
-| `session-metrics.json` | `sessions/<id>/session-metrics.json` | `sessions/<id>/session-metrics.json` | Compatible |
-| `workflow-sequence.json` | `workflows/workflow-sequence.json` | (no existe) | Artefacto nuevo |
+| Session | `sessions/<id>/` | `sessions/<id>/` | Sin cambio (raíz compatible) |
+| Workflow main | `workflows/NN/` | `main-agent/interactions/NN/` | Reescribir ruta de escritura en proyección |
+| Workflow subagent | `tools/KK-agent/sub-agent/workflow/` | `steps/YY/sub-agent-TT/` | Reescribir ruta de escritura en proyección |
+| Step | `workflows/NN/steps/MM/` | `main-agent/interactions/NN/steps/YY/` | Reescribir ruta de escritura en proyección |
+| ToolUse | `steps/MM/tools/KK-slug/` | (no existe como entidad hoy, inline en SSE) | Nuevo: añadir escritura en proyección |
+| `events.ndjson` | `sessions/<id>/events.ndjson` | (no existe) | Nuevo: añadir escritura en proyección |
+| `session-metrics.json` | `sessions/<id>/session-metrics.json` | `sessions/<id>/session-metrics.json` | Sin cambio (ruta compatible) |
+| `workflow-sequence.json` | `workflows/workflow-sequence.json` | (no existe) | Nuevo: añadir escritura en proyección |
 
 ### 37.2. Comparativa de persistencia: SCP actual vs. target
 
@@ -2970,17 +2972,17 @@ Consideraciones para `POST /hooks`:
 | **G3** | Extraer `StepAssembler` desde `audit-sse-response.handler`; propagar `step.inferenceRequest.model` → `workflow.languageModelId` al correlador al completar cada step | Refactor gateway | G2 |
 | **G4** | `AuditProjection` explícita; `InteractionMetadata` generado desde `WorkflowResult`; `AuditWorkflowClosureHandler` hook-driven (des-stub `Stop`/`SubagentStop`/`StopFailure`); proyección `WorkflowResult` a disco; `aggregateWorkflowUsageByModel` (L1) + `SessionMetricsService` (L2): `session-metrics.json` por modelo con `session_totals` y `cache_efficiency` (§33.2, invariante G16); aceptación E2E subset §37b; retiro cierre wire-only como ruta principal | Refactor gateway | G3 |
 | **G5** | `ProviderCatalog` desde `routing/providers/` | Refactor gateway | — |
-| **P0** | Spike: diff layout SCP actual vs causal-workflows-v1 + coste migración | Persistencia | G4 |
-| **P1** | Migración estructura directorios (`workflows/NN/`, `tools/KK/`) | Persistencia | P0, G4 |
-| **P2** | Artefactos nuevos (`events.ndjson`, `workflow-sequence.json`, `streaming/*.ndjson`) | Persistencia | P1 |
+| **P0** | Spike: mapear qué rutas de escritura en capa 2 deben cambiar para emitir `causal-workflows-v1` en sesiones nuevas; las sesiones anteriores se eliminan (no se migran) | Persistencia | G4 |
+| **P1** | Reescribir proyección (capa 2): nuevas sesiones generan estructura `causal-workflows-v1` (`workflows/NN/`, `steps/MM/`, `tools/KK/`); retirar rutas de escritura del layout flat de `src/` | Persistencia | P0, G4 |
+| **P2** | Completar proyección: añadir escritura de artefactos nuevos en sesiones nuevas (`events.ndjson`, `workflow-sequence.json`, `streaming/*.ndjson`); retirar código de escritura de artefactos obsoletos | Persistencia | P1 |
 
 **Nomenclatura de bloques:**
 
 - **Fases C** = bordes de correlación Wire+Hooks (C1–C3).
 - **Fases G** = refactor gateway dominio **incluido el cierre E2E** (servicios capa 1 en G1, lifecycle de cierre en G2, handler capa 3 y proyección capa 2 en G4; encadenable después de C o en paralelo con G5).
-- **Fases P** = persistencia / convergencia layout a causal-workflows-v1.
+- **Fases P** = reescritura de la proyección a disco (capa 2) para que **nuevas sesiones** adopten el layout `causal-workflows-v1`; las sesiones anteriores no se migran (se eliminan antes del corte).
 
-En todas las fases C y G: **mismo layout `sessions/`** salvo campos adicionales en `meta.json` alineados a `WorkflowResult`. Las fases P migran el layout completo.
+En todas las fases C y G: **mismo layout `sessions/`** salvo campos adicionales en `meta.json` alineados a `WorkflowResult`. Las fases P reemplazan el código generador de sesiones en `src/`; no transforman datos en reposo.
 
 ---
 
@@ -2999,7 +3001,7 @@ En todas las fases C y G: **mismo layout `sessions/`** salvo campos adicionales 
 | Multi-proveedor | Solo en `routing/` + statusline | `Provider` / `LanguageModel` en dominio capa 1 |
 | SSE en dominio | `SseLine[]` en audit | Snapshots `Step`; deltas solo en proyección capa 2 |
 | Handlers | Monolíticos, alta línea | Orquestación explícita: wire + hooks → correlador compartido |
-| Layout disco | `sessions/{session}/{interaction}/` flat | Convergencia a `workflows/NN/`, `tools/KK/`, artefactos tipados (fases P) |
+| Layout disco | `sessions/{session}/{interaction}/` flat | `causal-workflows-v1`: `workflows/NN/`, `tools/KK/`, artefactos tipados — generado por código nuevo (fases P); sesiones anteriores eliminadas en el corte |
 
 ---
 

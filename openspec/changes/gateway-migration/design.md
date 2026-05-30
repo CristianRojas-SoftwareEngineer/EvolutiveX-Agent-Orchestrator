@@ -35,9 +35,50 @@ La relación padre→hijo entre este orquestador y los changes de segundo nivel 
 | G3 | `gateway-g3-step-assembler` | Refactor gateway | G2 | `npm run test:quick` | `docs/session-audit-model.md` | Lógica de ensamblaje incrustada en `audit-sse-response.handler` | archivada |
 | G4 | `gateway-g4-audit-projection` | Refactor gateway | G3 | `npm run test:quick` (si toca persistencia: `npm run test`) + subset §37b | `docs/session-audit-model.md`, `docs/proposals/gateway-design.md` §33.2, §40 | `InteractionMetadata` generado directamente (reemplazado por `WorkflowResult`); cierre wire-only como ruta principal; `updateSessionMetrics()` en `audit-writer.service.ts` (reemplazado por `SessionMetricsService`); tipo `SessionMetrics` en `audit.types.ts` (migrado a tipos gateway) | archivada |
 | G5 | `gateway-g5-provider-catalog` | Refactor gateway | — | `npm run test:quick` | `docs/proposals/gateway-design.md` §39 | `ProviderCatalog` inline en `routing/` (no existía en src/; diferido a P0+) | archivada |
-| P0 | `gateway-p0-layout-diff-spike` | Persistencia | G4 | Spike documentado — sin gate de tests | `docs/proposals/gateway-design.md` §29–§37 | — (spike de análisis, no retira código) | pendiente |
-| P1 | `gateway-p1-new-session-layout` | Persistencia | P0, G4 | `npm run test` + casos 3–7, 16, 19 (estructurales) del checklist [§37b](../../../docs/proposals/gateway-design.md#37b-checklist-de-aceptación-e2e-del-layout) | `docs/session-audit-model.md`, `README.md`, `docs/proposals/gateway-design.md` §30 | Rutas de escritura al layout flat `sessions/{session}/{interaction}/` en `src/` | pendiente |
-| P2 | `gateway-p2-new-artifacts` | Persistencia | P1 | `npm run test` + checklist [§37b](../../../docs/proposals/gateway-design.md#37b-checklist-de-aceptación-e2e-del-layout) completo (20 casos) | `docs/session-audit-model.md`, `docs/proposals/gateway-design.md` §33 | Código de escritura de artefactos obsoletos en `src/` | pendiente |
+| P0 | `gateway-p0-layout-diff-spike` | Persistencia | G4 | Spike documentado — sin gate de tests | `docs/proposals/gateway-design.md` §28b, §40, §42 | — (spike de análisis, no retira código) | pendiente |
+| P1 | `gateway-p1-new-session-layout` | Persistencia | P0, G4 | `npm run test` + casos 3–7, 16, 19 (estructurales) del checklist [§37b](../../../docs/proposals/gateway-design.md#37b-checklist-de-aceptación-e2e-del-layout) | `docs/session-audit-model.md`, `README.md`, `docs/proposals/gateway-design.md` §30, §40 | `audit-writer.service.ts`, `session-store.service.ts`, `workflow-result-projector.service.ts`, constantes flat de `audit-paths.ts` (`DIR_MAIN_AGENT`, `DIR_INTERACTIONS`, `PREFIX_SUB_AGENT`), tipos `ActiveInteraction`/`InteractionMetadata` | pendiente |
+| P2 | `gateway-p2-new-artifacts` | Persistencia | P1 | `npm run test` + checklist [§37b](../../../docs/proposals/gateway-design.md#37b-checklist-de-aceptación-e2e-del-layout) completo (20 casos) | `docs/session-audit-model.md`, `docs/proposals/gateway-design.md` §33 | Escritura de `sse.jsonl` (reemplazada por `streaming/NNNN-chunk.ndjson`) | pendiente |
+
+## Decisión técnica del bloque P
+
+### Bus de eventos — Opción A ratificada
+
+Las fases P implementan la pila `EventBus` + `SessionPersistence` descrita en §28b/§40. La alternativa (escribir `events.ndjson` directamente desde los handlers de capa 3) queda **descartada** por dos razones:
+
+1. Viola §28b.4 regla 1: «Los handlers de capa 3 **no** escriben disco directamente».
+2. `events.ndjson` es un log append-only de **todos** los eventos del correlador (§33.1); los handlers solo conocen sus propios eventos y no pueden capturar las mutaciones internas del correlador (`workflow_start`, `step_request`, `tool_call`, etc.).
+
+### Mapa de adaptación
+
+Componentes a crear, alineados con §28b.1 y §40. Los destinos siguen las convenciones de capa de `src/`. El spike de P0 confirma el subdirectorio exacto donde haya ambigüedad.
+
+| Componente | Capa PKA | Archivo destino propuesto | Fase |
+| --- | --- | --- | --- |
+| `IEventBus` (port) | 1 | `src/1-domain/repositories/IEventBus.ts` | P1 |
+| Tipos de telemetría (`TelemetryEvent`, `EventCallback`, `SubscriptionRef`) | 1 | `src/1-domain/types/telemetry.types.ts` | P1 |
+| Matcher de patrones (`*`, `prefix_*`, `*_suffix`) | 1 | `src/1-domain/services/gateway/` | P1 |
+| `EventBus` (adapter pub/sub async in-process, fire-and-forget) | 2 | `src/2-services/event-bus.service.ts` | P1 |
+| Rutas de sesión (`getWorkflowDir`, `getStepDir`, `getToolsDir`) | 2 | `src/2-services/` | P1 |
+| Aislamiento async (`fireAndForget`, `withTimeout`) | 2 | `src/2-services/utils/` | P1 |
+| `SessionPersistence` — estructura de directorios | 2 | `src/2-services/session-persistence.service.ts` | P1 |
+| `SessionPersistence` — artefactos nuevos | 2 | *(mismo archivo)* | P2 |
+| Emisión al bus desde el correlador | 2 | `src/2-services/workflow-repository.service.ts` | P1 |
+| Cableado bus + suscriptor en composition root | 4 | composition root | P1 |
+
+**Puntos de emisión del correlador (§28b.3) — a fijar en P0, implementar en P1:**
+
+- `openWorkflow()` → `workflow_start`
+- `openSubagentWorkflow()` → `workflow_spawn`
+- `openStep()` → `step_request`
+- `registerToolUse()` → `tool_call`
+- `completeToolUse()` → `tool_result` *(timer de timeout permanece en el correlador, §24.1/G19; `SessionPersistence` no lleva timer propio)*
+- `closeWorkflow()` → `workflow_complete` | `workflow_cancel`
+- `AuditSseResponseHandler` emite `stream_chunk` al bus por cada evento SSE (consumido por `SessionPersistence` en P2)
+
+**Legacy a retirar (detalle):**
+
+- **P1:** `audit-writer.service.ts` · `session-store.service.ts` · `workflow-result-projector.service.ts` · constantes flat de `audit-paths.ts` (`DIR_MAIN_AGENT`, `DIR_INTERACTIONS`, `PREFIX_SUB_AGENT`) · tipos `ActiveInteraction`/`InteractionMetadata` · llamadas directas a disco en handlers de capa 3
+- **P2:** escritura de `sse.jsonl` (reemplazada por `streaming/NNNN-chunk.ndjson`)
 
 ## Convención de nombres de changes hijos
 

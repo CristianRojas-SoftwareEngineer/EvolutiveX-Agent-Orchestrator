@@ -183,26 +183,31 @@
 
 ---
 
-## P0 — Spike: mapear cambios de código en proyección (capa 2) para emitir `causal-workflows-v1`
+## P0 — Spike: detallar la adaptación e inventario de integración del bus (Opción A ratificada)
 
 > Las sesiones anteriores se eliminan antes del corte; no hay migración de datos en reposo.
+> La Opción A (EventBus + SessionPersistence, §28b/§40) está ratificada. Este spike no decide entre A y B; produce el inventario que P1 ejecuta.
 
 - [ ] Verificar dependencias §43: G4 en estado `validada` o `archivada`
 - [ ] Crear change de segundo nivel `gateway-p0-layout-diff-spike` (skill `openspec-propose`)
   - _Criterio: spike documentado; no requiere gate de tests_
 - [ ] El `proposal.md` del change hijo incluye back-reference al orquestador
 - [ ] Actualizar estado de P0 a `en-curso` en el registro del orquestador
-- [ ] Spike completado: análisis de cambios de código documentado
-  - _Criterio: documento de spike en `docs/` identifica qué rutas de escritura cambian en `src/2-services/` (adapters capa 2; no capa 3), qué artefactos son nuevos, la **decisión sobre el bus de eventos (§28b): implementar `EventBus`+`SessionPersistence` completos vs. escribir `events.ndjson` directamente desde los handlers de capa 3**, y cómo se ejecuta el corte limpio (eliminación de sesiones anteriores)_
-- [ ] Documentación actualizada: `docs/proposals/gateway-design.md` §29–§37 refleja el estado real
+- [ ] Spike completado: los cinco entregables del documento de spike están cubiertos
+  - _Criterio 1 — Inventario de componentes:_ documento en `docs/` lista cada componente de §28b/§40 con su archivo destino propuesto en `src/` y su fase (P1 o P2)
+  - _Criterio 2 — Puntos de emisión del correlador:_ para cada método de mutación de `WorkflowRepositoryService` se especifica qué evento de §28b.3 emite (`openWorkflow → workflow_start`, `openSubagentWorkflow → workflow_spawn`, `openStep → step_request`, `registerToolUse → tool_call`, `completeToolUse → tool_result`, `closeWorkflow → workflow_complete | workflow_cancel`)
+  - _Criterio 3 — Ownership del timer:_ confirmado que el timer de timeout permanece en el correlador (§24.1/G19); `SessionPersistence` no implementa timer propio
+  - _Criterio 4 — Composition root:_ estrategia de cableado (dónde crear `EventBus`, inyectarlo en el correlador y en `SessionPersistence`) documentada para capa 4 (§42)
+  - _Criterio 5 — Corte limpio:_ estrategia de eliminación de `sessions/` anterior especificada
+- [ ] Documentación actualizada: `docs/proposals/gateway-design.md` §28b, §40, §42 refleja el estado real
 - [ ] Marcar P0 como `validada` y archivar el change hijo (`openspec-archive`)
   - _Criterio: no requiere gate técnico; validación = spike documentado y revisado_
 
 ---
 
-## P1 — Reescribir proyección: nuevas sesiones en estructura `causal-workflows-v1`
+## P1 — Reescribir proyección: bus + estructura de directorios `causal-workflows-v1`
 
-> Objetivo: cambiar el código generador en `src/` para que las sesiones nuevas adopten el layout `causal-workflows-v1`. No se transforman sesiones anteriores.
+> Objetivo: crear la pila `IEventBus` → `EventBus` → `SessionPersistence`, conectar el correlador al bus y que las sesiones nuevas produzcan el árbol `causal-workflows-v1`. Retirar el layout flat completo. No se transforman sesiones anteriores.
 
 - [ ] Verificar dependencias §43: P0 y G4 en estado `validada` o `archivada`
   - _Criterio: columnas Estado de P0 y G4 = `validada` o `archivada`_
@@ -210,32 +215,56 @@
 - [ ] El `proposal.md` del change hijo incluye back-reference al orquestador
 - [ ] Actualizar estado de P1 a `en-curso` en el registro del orquestador
 - [ ] Seguimiento de implementación del change hijo (`openspec-apply`)
+- [ ] Componentes de infraestructura creados (capa 1):
+  - _`IEventBus` port en `src/1-domain/repositories/IEventBus.ts`_
+  - _Tipos de telemetría (`TelemetryEvent`, `EventCallback`, `SubscriptionRef`) en `src/1-domain/types/telemetry.types.ts`_
+  - _Matcher de patrones (`*`, `prefix_*`, `*_suffix`) en `src/1-domain/services/gateway/`_
+- [ ] Componentes de infraestructura creados (capa 2):
+  - _`EventBus` adapter (pub/sub async in-process, fire-and-forget) en `src/2-services/event-bus.service.ts`_
+  - _Funciones de rutas de sesión (`getWorkflowDir`, `getStepDir`, `getToolsDir`) para layout `causal-workflows-v1`_
+  - _Utilidades de aislamiento async (`fireAndForget`, `withTimeout`) en `src/2-services/utils/`_
+  - _`SessionPersistence` (parte estructural): suscriptores `session_start`, `workflow_start`, `workflow_spawn`, `workflow_complete`, `workflow_cancel`, `step_request`, `tool_call`, `tool_result` → escribe `meta.json`, `state.json`, `request/body.json`, `tools/NN-name/{input,result,meta}.json`, `workflow-sequence.json` en `src/2-services/session-persistence.service.ts`_
+- [ ] Correlador conectado al bus:
+  - _`WorkflowRepositoryService` recibe `IEventBus` en constructor y emite el evento correspondiente (§28b.3) en cada método de mutación de estado_
+  - _Criterio: los seis puntos de emisión del mapa de adaptación están implementados_
+- [ ] Composition root cableado: `EventBus` creado e inyectado en correlador y `SessionPersistence` (capa 4, §42)
 - [ ] Gate superado: `npm run test` + subconjunto estructural del checklist §37b (casos 3–7, 16, 19)
   - _Criterio: nuevas sesiones generadas en tests adoptan la estructura `workflows/NN/`, `steps/MM/`, `tools/KK/`; todos los casos del subconjunto verificados. Casos 1 y 15 excluidos (artefactos nuevos, pertenecen a P2); caso 2 excluido (ya verde en G4)_
-- [ ] Documentación actualizada: `docs/session-audit-model.md`, `README.md`, `docs/proposals/gateway-design.md` §30
+- [ ] Documentación actualizada: `docs/session-audit-model.md`, `README.md`, `docs/proposals/gateway-design.md` §30, §40
   - _Criterio: estructura `workflows/NN/`, `tools/KK/` descrita como el layout vigente para sesiones nuevas_
-- [ ] Legacy retirado: rutas de escritura al layout flat `sessions/{session}/{interaction}/` eliminadas de `src/`
-  - _Criterio: no quedan rutas de escritura al layout anterior en `src/`; `npm run lint` y `npm run typecheck` pasan_
+- [ ] Legacy retirado:
+  - _`audit-writer.service.ts` eliminado de `src/`_
+  - _`session-store.service.ts` eliminado de `src/`_
+  - _`workflow-result-projector.service.ts` eliminado de `src/`_
+  - _Constantes flat de `audit-paths.ts` (`DIR_MAIN_AGENT`, `DIR_INTERACTIONS`, `PREFIX_SUB_AGENT`) eliminadas_
+  - _Tipos `ActiveInteraction` e `InteractionMetadata` eliminados_
+  - _Llamadas directas a disco en handlers de capa 3 eliminadas_
+  - _Criterio: `npm run lint` y `npm run typecheck` pasan; no quedan referencias a los artefactos retirados_
 - [ ] Sync de specs si aplica (`openspec-sync`)
 - [ ] Marcar P1 como `validada` y archivar el change hijo (`openspec-archive`)
 
 ---
 
-## P2 — Completar proyección: artefactos nuevos en sesiones nuevas (`events.ndjson`, `workflow-sequence.json`, `streaming/*.ndjson`)
+## P2 — Completar proyección: artefactos nuevos como suscripciones de `SessionPersistence`
 
-> Objetivo: añadir la escritura de los artefactos que no existen en el layout actual. Todas las sesiones generadas tras P2 son `causal-workflows-v1` completas.
+> Objetivo: con la pila de bus ya existente (P1), añadir las suscripciones de `SessionPersistence` que producen los tres artefactos nuevos. Todas las sesiones generadas tras P2 son `causal-workflows-v1` completas.
 
 - [ ] Verificar dependencias §43: P1 en estado `validada` o `archivada`
 - [ ] Crear change de segundo nivel `gateway-p2-new-artifacts` (skill `openspec-propose`)
 - [ ] El `proposal.md` del change hijo incluye back-reference al orquestador
 - [ ] Actualizar estado de P2 a `en-curso` en el registro del orquestador
 - [ ] Seguimiento de implementación del change hijo (`openspec-apply`)
+- [ ] Suscripciones de `SessionPersistence` implementadas:
+  - _Wildcard `*` → append-only a `sessions/<id>/events.ndjson` (log cronológico completo, §33.1)_
+  - _`stream_chunk` → `steps/MM/response/streaming/NNNN-chunk.ndjson` por cada evento SSE; reconstrucción de `response/body.json` al cierre del step (al recibir `message_stop`)_
+  - _`AuditSseResponseHandler` emite `stream_chunk` al bus por cada evento SSE (en lugar de escribir directamente `sse.jsonl`)_
+  - _`workflow-sequence.json` completo: el ciclo `workflow_complete` / `workflow_cancel` actualiza correctamente el status en el archivo_
 - [ ] Gate superado: `npm run test` + checklist [§37b](../../../docs/proposals/gateway-design.md#37b-checklist-de-aceptación-e2e-del-layout) completo (20 casos)
   - _Criterio: los 20 casos de §37b verificados en sesiones nuevas generadas por los tests; `npm run test` sin errores_
 - [ ] Documentación actualizada: `docs/session-audit-model.md`, `docs/proposals/gateway-design.md` §33
-  - _Criterio: `events.ndjson`, `workflow-sequence.json`, `streaming/*.ndjson` descritos como generados para sesiones nuevas_
-- [ ] Legacy retirado: código de escritura de artefactos obsoletos eliminado de `src/`
-  - _Criterio: `npm run lint` y `npm run typecheck` pasan; no quedan rutas de escritura a artefactos del layout anterior_
+  - _Criterio: `events.ndjson`, `workflow-sequence.json`, `streaming/NNNN-chunk.ndjson` descritos como generados para sesiones nuevas_
+- [ ] Legacy retirado: escritura de `sse.jsonl` eliminada de `src/`
+  - _Criterio: `npm run lint` y `npm run typecheck` pasan; no quedan referencias a `sse.jsonl` en código de producción_
 - [ ] Sync de specs si aplica (`openspec-sync`)
 - [ ] Marcar P2 como `validada` y archivar el change hijo (`openspec-archive`)
 

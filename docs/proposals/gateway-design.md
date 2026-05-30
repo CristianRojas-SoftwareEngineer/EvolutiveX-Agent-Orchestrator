@@ -2918,6 +2918,8 @@ src/1-domain/
 
 **Principio:** los adapters **no** deciden cuándo cerrar un workflow; ejecutan lo que capa 3 ordena.
 
+> **Decisión P-block (ratificada):** la proyección a disco se implementa mediante `EventBus` + `SessionPersistence` (Opción A, §28b). Los handlers de capa 3 **no** escriben disco directamente (§28b.4 regla 1); la escritura directa de `events.ndjson` desde handlers queda descartada porque `events.ndjson` requiere eventos del correlador que los handlers no conocen.
+
 ### Doble persistencia SSE (decisión explícita)
 
 | Artefacto | Capa | ¿Persiste deltas SSE? |
@@ -2972,9 +2974,9 @@ Consideraciones para `POST /hooks`:
 | **G3** | Extraer `StepAssembler` desde `audit-sse-response.handler`; propagar `step.inferenceRequest.model` → `workflow.languageModelId` al correlador al completar cada step | Refactor gateway | G2 |
 | **G4** | `AuditProjection` explícita; `InteractionMetadata` generado desde `WorkflowResult`; `AuditWorkflowClosureHandler` hook-driven (des-stub `Stop`/`SubagentStop`/`StopFailure`); proyección `WorkflowResult` a disco; `aggregateWorkflowUsageByModel` (L1) + `SessionMetricsService` (L2): `session-metrics.json` por modelo con `session_totals` y `cache_efficiency` (§33.2, invariante G16); aceptación E2E subset §37b; retiro cierre wire-only como ruta principal | Refactor gateway | G3 |
 | **G5** | `ProviderCatalog` derivado de `UPSTREAM_ORIGIN` (env var); lectura de `routing/providers/` diferida a P0+ | Refactor gateway | — |
-| **P0** | Spike: mapear qué rutas de escritura en capa 2 deben cambiar para emitir `causal-workflows-v1` en sesiones nuevas; las sesiones anteriores se eliminan (no se migran) | Persistencia | G4 |
-| **P1** | Reescribir proyección (capa 2): nuevas sesiones generan estructura `causal-workflows-v1` (`workflows/NN/`, `steps/MM/`, `tools/KK/`); retirar rutas de escritura del layout flat de `src/` | Persistencia | P0, G4 |
-| **P2** | Completar proyección: añadir escritura de artefactos nuevos en sesiones nuevas (`events.ndjson`, `workflow-sequence.json`, `streaming/*.ndjson`); retirar código de escritura de artefactos obsoletos. `events.ndjson` depende de la decisión de bus tomada en P0 | Persistencia | P1 |
+| **P0** | Spike: detallar la adaptación de §28b/§40 (Opción A ratificada): inventario de componentes con archivo destino en `src/`, puntos de emisión del correlador (§28b.3), ownership del timer en el correlador (§24.1/G19), cableado en composition root (§42) y estrategia de corte limpio. Las sesiones anteriores se eliminan (no se migran) | Persistencia | G4 |
+| **P1** | Crear pila `IEventBus` (L1) → `EventBus` (L2) → `SessionPersistence` (L2, suscriptor); conectar correlador al bus (emite eventos §28b.3 en cada mutación de estado); `SessionPersistence` escribe árbol `causal-workflows-v1` (`workflows/NN/steps/MM/tools/KK/`, `meta.json`). Retirar layout flat: `audit-writer.service.ts`, `session-store.service.ts`, `workflow-result-projector.service.ts`, constantes flat de `audit-paths.ts`, tipos `ActiveInteraction`/`InteractionMetadata` | Persistencia | P0, G4 |
+| **P2** | Artefactos nuevos como suscripciones adicionales de `SessionPersistence` (la pila de bus creada en P1 los habilita): wildcard `*` → `events.ndjson`, `stream_chunk` → `streaming/NNNN-chunk.ndjson` + reconstrucción de `body.json`, `workflow-sequence.json`. Retirar escritura de `sse.jsonl` | Persistencia | P1 |
 
 **Nomenclatura de bloques:**
 

@@ -1,8 +1,9 @@
 ## Purpose
 
 Domain services puros de cierre del workflow en `src/1-domain/services/gateway/`.
-Funciones puras sin I/O: `aggregateWorkflowUsage`, `buildWorkflowResult`, `deriveOutcome`,
-`deriveFinalText`, `validate-workflow-invariants`. Implementado en fase G1 (2026-05-29).
+Funciones puras sin I/O: `aggregateWorkflowUsage`, `aggregateWorkflowUsageByModel` (G4),
+`buildWorkflowResult`, `deriveOutcome`, `deriveFinalText`, `validate-workflow-invariants`.
+Implementado en fases G1 (2026-05-29) y G4 (proyección y métricas de sesión).
 
 ## Requirements
 
@@ -174,3 +175,33 @@ Estas funciones exponen `isValidSubWorkflow` (devuelve `boolean`) y `assertValid
 - **GIVEN** un objeto que representa un workflow raíz con `kind: 'main'` y `parentWorkflowId: undefined`
 - **WHEN** se invoca el validador de invariante de sub-workflow
 - **THEN** el resultado SHALL indicar invariante satisfecho (retorno `true` o sin error lanzado)
+
+---
+
+### Requirement: aggregateWorkflowUsageByModel — agrupación pura por modelo
+
+El sistema SHALL proveer la función pura `aggregateWorkflowUsageByModel(closedSteps: IStep[])` en `src/1-domain/services/gateway/aggregate-workflow-usage-by-model.ts`.
+
+Contrato:
+- Recibe un array de `IStep` cerrados del workflow.
+- Agrupa `step.usage` por `step.inferenceRequest.model` (modelId).
+- Devuelve `Record<string, { usage: AnthropicUsage; stepCount: number }>` donde cada entrada acumula tokens de todos los steps de ese modelo y cuenta cuántos steps contribuyeron.
+- Si un step no tiene `usage`, no contribuye al agregado de su modelo.
+- Si ningún step aporta `usage`, devuelve un objeto vacío `{}` (no inventar ceros por modelo).
+- Omite `service_tier` e `inference_geo` (no son aditivos), coherente con `aggregateWorkflowUsage`.
+- La función SHALL ser determinista y sin efectos secundarios ni I/O.
+
+Referencia: [§33.2 gateway-design.md](../../docs/proposals/gateway-design.md#332-session-metricsjson-raíz-de-sesión).
+
+#### Scenario: Agrupación de dos modelos distintos
+
+- **GIVEN** dos steps cerrados con `inferenceRequest.model` `'model-a'` y `'model-b'` y `usage` definido en cada uno
+- **WHEN** se invoca `aggregateWorkflowUsageByModel(steps)`
+- **THEN** el resultado SHALL tener entradas separadas para `'model-a'` y `'model-b'`
+- **AND** cada entrada SHALL incluir `stepCount` igual al número de steps de ese modelo
+
+#### Scenario: Steps sin usage no contribuyen
+
+- **GIVEN** un step cerrado sin campo `usage`
+- **WHEN** se invoca `aggregateWorkflowUsageByModel([step])`
+- **THEN** el resultado SHALL ser `{}`

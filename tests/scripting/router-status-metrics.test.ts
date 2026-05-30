@@ -100,6 +100,30 @@ describe('aggregateInteractionMetrics', () => {
     expect(Number.isNaN(m.lite.cacheReadInputTokens)).toBe(false);
   });
 
+  it('acumula con contadores snake_case (esquema G4 §33.2)', () => {
+    const dir = sessionDir();
+    writeFileSync(
+      join(dir, 'session-metrics.json'),
+      JSON.stringify({
+        models: {
+          'provider/m1-haiku': {
+            count: 2,
+            input_tokens: 300,
+            cache_read_input_tokens: 50,
+            cache_creation_input_tokens: 0,
+            output_tokens: 120,
+          },
+        },
+      }),
+      'utf-8',
+    );
+    const m = aggregateInteractionMetrics(dir, configuredEnv, routingPath);
+    expect(m.lite.count).toBe(2);
+    expect(m.lite.inputTokens).toBe(300);
+    expect(m.lite.cacheReadInputTokens).toBe(50);
+    expect(m.lite.outputTokens).toBe(120);
+  });
+
   it('acumula en el nivel correcto cuando el modelId coincide', () => {
     const dir = sessionDir();
     writeFileSync(

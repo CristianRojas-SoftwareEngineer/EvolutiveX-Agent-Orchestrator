@@ -1141,22 +1141,6 @@ export class AuditInteractionHandler {
       },
     });
 
-    if (interaction.interactionType !== 'client-preflight' && interaction.modelId && totals) {
-      const sessionDir = path.join(this.sessionStore.getBaseDir(), interaction.sessionId);
-      await this.sessionStore.withSessionLock(interaction.sessionId, async () => {
-        await this.auditWriter
-          .updateSessionMetrics(
-            sessionDir,
-            interaction.modelId!,
-            totals,
-            interaction.stepsMeta.length,
-          )
-          .catch(() => {
-            /* error no crítico */
-          });
-      });
-    }
-
     await this.auditWriter.removeInteractionState(interaction.interactionDir);
   }
 }

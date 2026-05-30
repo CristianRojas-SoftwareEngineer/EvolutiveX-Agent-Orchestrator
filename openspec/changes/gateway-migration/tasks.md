@@ -146,22 +146,22 @@
 
 - [x] Verificar dependencias §43: G3 en estado `validada` o `archivada`
   - _Criterio: columna Estado de G3 = `archivada` en el registro_
-- [ ] Crear change de segundo nivel `gateway-g4-audit-projection` (skill `openspec-propose`)
-- [ ] El `proposal.md` del change hijo incluye back-reference al orquestador
-- [ ] Actualizar estado de G4 a `en-curso` en el registro del orquestador
-- [ ] Seguimiento de implementación del change hijo (`openspec-apply`)
+- [x] Crear change de segundo nivel `gateway-g4-audit-projection` (skill `openspec-propose`)
+- [x] El `proposal.md` del change hijo incluye back-reference al orquestador
+- [x] Actualizar estado de G4 a `en-curso` en el registro del orquestador
+- [x] Seguimiento de implementación del change hijo (`openspec-apply`)
   - _Criterio: `AuditProjection` en capa 2; `InteractionMetadata` derivado de `WorkflowResult`_
-- [ ] `AuditWorkflowClosureHandler` hook-driven implementado: des-stub eventos `Stop`, `SubagentStop`, `StopFailure`
+- [x] `AuditWorkflowClosureHandler` hook-driven implementado: des-stub eventos `Stop`, `SubagentStop`, `StopFailure`
   - _Criterio: handler procesa los tres eventos de cierre vía bus de hooks; no usa stub transitorio_
-- [ ] Proyección `WorkflowResult` a disco implementada (subset §37b)
+- [x] Proyección `WorkflowResult` a disco implementada (subset §37b)
   - _Criterio: campos `outcome`, `closedByEvent`, `finalText`, `usage` escritos en `meta.json`_
-- [ ] Aceptación E2E (subset §37b): casos de cierre via hooks verificados
+- [x] Aceptación E2E (subset §37b): casos de cierre via hooks verificados
   - _Criterio: casos de cierre E2E del checklist §37b verificados; cierre wire-only solo como fallback_
-- [ ] Legacy retirado: cierre wire-only como ruta principal eliminado o deprecado; `InteractionMetadata` generado directamente reemplazado
-- [ ] Gate superado: `npm run test:quick` sin errores (si toca persistencia, `npm run test`)
-- [ ] Documentación actualizada: `docs/session-audit-model.md`, `docs/proposals/gateway-design.md` §40
-- [ ] Sync de specs si aplica (`openspec-sync`)
-- [ ] Marcar G4 como `validada` y archivar el change hijo (`openspec-archive`)
+- [x] Legacy retirado: cierre wire-only como ruta principal eliminado o deprecado; `InteractionMetadata` generado directamente reemplazado
+- [x] Gate superado: `npm run test:quick` sin errores (si toca persistencia, `npm run test`)
+- [x] Documentación actualizada: `docs/session-audit-model.md`, `docs/proposals/gateway-design.md` §40
+- [x] Sync de specs si aplica (`openspec-sync`)
+- [x] Marcar G4 como `validada` y archivar el change hijo (`openspec-archive`)
 
 ---
 

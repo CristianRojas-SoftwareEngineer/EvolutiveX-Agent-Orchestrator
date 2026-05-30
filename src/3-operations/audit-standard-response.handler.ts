@@ -1,6 +1,15 @@
 import * as path from 'node:path';
+import type { IWorkflowRepository } from '../1-domain/repositories/IWorkflowRepository.js';
 import type { IAuditWriter } from '../2-services/ports/audit-writer.port.js';
 import type { ISessionStore } from '../2-services/ports/session-store.port.js';
+import type { AnthropicMessage } from '../1-domain/types/anthropic.types.js';
+import {
+  buildInferenceRequestSnapshot,
+  buildWireStep,
+  registerWireStepInCorrelator,
+  resolveWorkflowIdForInteraction,
+  shouldDeferMetaCloseToHooks,
+} from './gateway-wire-step.util.js';
 import { ProxyEnvironmentConfig } from '../1-domain/types/config.types.js';
 import {
   AuditInteractionContext,
@@ -22,6 +31,7 @@ export class AuditStandardResponseHandler {
     private auditWriter: IAuditWriter,
     private config: ProxyEnvironmentConfig,
     private sessionStore: ISessionStore,
+    private workflowRepo: IWorkflowRepository,
   ) {}
 
   public execute(
@@ -140,11 +150,17 @@ export class AuditStandardResponseHandler {
               cache_read_input_tokens?: number;
             }
           | undefined;
+        let stopReason: string | undefined;
+        let assistantMessage: AnthropicMessage = { role: 'assistant', content: [] };
         try {
-          const json = JSON.parse(buf.toString('utf8'));
-          anthropicMessageId = json.id;
-          if (json.usage) {
-            bodyUsage = json.usage;
+          const json = JSON.parse(buf.toString('utf8')) as Record<string, unknown>;
+          if (typeof json.id === 'string') anthropicMessageId = json.id;
+          if (json.usage && typeof json.usage === 'object') {
+            bodyUsage = json.usage as typeof bodyUsage;
+          }
+          if (typeof json.stop_reason === 'string') stopReason = json.stop_reason;
+          if (Array.isArray(json.content)) {
+            assistantMessage = { role: 'assistant', content: json.content as AnthropicMessage['content'] };
           }
         } catch {
           // Body no es JSON válido — sin messageId ni usage
@@ -220,23 +236,37 @@ export class AuditStandardResponseHandler {
         };
         await this.sessionStore.pushStepMetaByDir(context.auditInteractionDir, stepMeta);
 
-        // Actualizar métricas de sesión per-step
         const currentInteraction = this.sessionStore.getInteractionByDirSync(
           context.auditInteractionDir,
         );
-        if (currentInteraction?.modelId) {
-          const sessionDir = path.join(
-            this.sessionStore.getBaseDir(),
-            currentInteraction.sessionId,
-          );
-          const stepTotals = computeTokenTotals([stepMeta]);
-          await this.sessionStore.withSessionLock(currentInteraction.sessionId, async () => {
-            await this.auditWriter
-              .updateSessionMetrics(sessionDir, currentInteraction.modelId!, stepTotals, 1)
-              .catch(() => {
-                /* error no crítico */
-              });
+        if (currentInteraction && bodyUsage) {
+          const inferenceRequest = buildInferenceRequestSnapshot(currentInteraction);
+          const now = new Date();
+          const wireStep = buildWireStep({
+            interaction: currentInteraction,
+            inferenceRequest,
+            assistantMessage,
+            usage: {
+              input_tokens: bodyUsage.input_tokens ?? 0,
+              output_tokens: bodyUsage.output_tokens ?? 0,
+              ...(bodyUsage.cache_creation_input_tokens != null
+                ? { cache_creation_input_tokens: bodyUsage.cache_creation_input_tokens }
+                : {}),
+              ...(bodyUsage.cache_read_input_tokens != null
+                ? { cache_read_input_tokens: bodyUsage.cache_read_input_tokens }
+                : {}),
+            },
+            stopReason,
+            startedAt: now,
+            closedAt: now,
           });
+          registerWireStepInCorrelator(this.workflowRepo, wireStep, stopReason);
+          if (currentInteraction.modelId) {
+            this.workflowRepo.setWorkflowModel(
+              resolveWorkflowIdForInteraction(currentInteraction),
+              currentInteraction.modelId,
+            );
+          }
         }
 
         if (terminalStatus !== 'terminal') {
@@ -267,10 +297,23 @@ export class AuditStandardResponseHandler {
         const interaction = await this.sessionStore.getInteractionByDir(
           context.auditInteractionDir,
         );
+        if (interaction) {
+          const workflowId = resolveWorkflowIdForInteraction(interaction);
+          const wf = this.workflowRepo.getWorkflow(workflowId);
+          if (wf?.result != null) {
+            this.sessionStore.closeInteraction(context.auditInteractionDir);
+            return;
+          }
+          if (shouldDeferMetaCloseToHooks(this.workflowRepo, workflowId)) {
+            return;
+          }
+        }
+
         this.sessionStore.closeInteraction(context.auditInteractionDir);
 
         if (interaction) {
           const outcome = this.computeInteractionOutcome(context.responseStatusCode);
+          // @deprecated-fallback
           await this.writeInteractionMeta(interaction, context, outcome, false, totalBytes);
         }
       } catch (err) {

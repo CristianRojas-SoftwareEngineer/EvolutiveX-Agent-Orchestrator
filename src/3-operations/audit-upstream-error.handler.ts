@@ -1,4 +1,3 @@
-import * as path from 'node:path';
 import type { IAuditWriter } from '../2-services/ports/audit-writer.port.js';
 import type { ISessionStore } from '../2-services/ports/session-store.port.js';
 import { ProxyEnvironmentConfig } from '../1-domain/types/config.types.js';
@@ -82,18 +81,8 @@ export class AuditUpstreamErrorHandler {
         sseRawWriteError: false,
       },
     };
+    // Excepción G4: error upstream sin WorkflowResult — meta inline (no SessionMetricsService).
     await this.auditWriter.writeInteractionMeta(params.auditInteractionDir, meta);
-
-    if (interaction && interactionType !== 'client-preflight' && interaction.modelId && totals) {
-      const sessionDir = path.join(this.sessionStore.getBaseDir(), interaction.sessionId);
-      await this.sessionStore.withSessionLock(interaction.sessionId, async () => {
-        await this.auditWriter
-          .updateSessionMetrics(sessionDir, interaction.modelId!, totals, stepsMeta.length)
-          .catch(() => {
-            /* error no crítico */
-          });
-      });
-    }
 
     await this.auditWriter.removeInteractionState(params.auditInteractionDir);
   }

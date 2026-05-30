@@ -53,6 +53,7 @@ function makeSessionStore(
     findStaleInteractionsAwaitingContinuation: () => [],
     getAllOpenInteractions: () => [],
     withSessionLock: async <T>(_sessionId: string, fn: () => Promise<T>): Promise<T> => fn(),
+    findInteractionForWorkflowClose: () => null,
     ...overrides,
   };
 }
@@ -87,7 +88,6 @@ function makeAuditWriter(overrides: Partial<IAuditWriter> = {}): IAuditWriter {
     writeCoalescedAgentStepResponse: async () => {},
     writeStepThought: async () => {},
     writeTopLevelMultiStepResponse: async () => ({ written: true }),
-    updateSessionMetrics: async () => {},
     ...overrides,
   };
 }
@@ -192,10 +192,9 @@ describe('AuditUpstreamErrorHandler', () => {
     expect(capturedMeta!.steps).toEqual([]);
   });
 
-  it('debería invocar updateSessionMetrics dentro de withSessionLock al cerrar interacción agentic', async () => {
+  it('error upstream escribe meta inline sin actualizar session-metrics per-step', async () => {
     const config = makeConfig();
-    let lockSessionId: string | null = null;
-    let metricsCalled = false;
+    let metaWritten = false;
 
     const activeInteraction: ActiveInteraction = {
       interactionDir: '/tmp/sessions/s/interactions/000001_req-1',
@@ -216,17 +215,12 @@ describe('AuditUpstreamErrorHandler', () => {
 
     const handler = new AuditUpstreamErrorHandler(
       makeAuditWriter({
-        updateSessionMetrics: async () => {
-          metricsCalled = true;
+        writeInteractionMeta: async () => {
+          metaWritten = true;
         },
       }),
       config,
-      makeSessionStore(activeInteraction, {
-        withSessionLock: async <T>(sessionId: string, fn: () => Promise<T>): Promise<T> => {
-          lockSessionId = sessionId;
-          return fn();
-        },
-      }),
+      makeSessionStore(activeInteraction),
     );
 
     await handler.execute({
@@ -234,8 +228,7 @@ describe('AuditUpstreamErrorHandler', () => {
       error: Object.assign(new Error('ECONNREFUSED'), { code: 'ECONNREFUSED' }),
     });
 
-    expect(lockSessionId).toBe('s');
-    expect(metricsCalled).toBe(true);
+    expect(metaWritten).toBe(true);
   });
 
   it('debería propagar parentContext si el interaction activo es subagente', async () => {

@@ -20,6 +20,13 @@ import {
 } from '../1-domain/types/audit.types.js';
 import type { Logger } from '../1-domain/types/logger.types.js';
 import { PAD_STEP } from '../1-domain/constants/audit-paths.js';
+import {
+  buildInferenceRequestSnapshot,
+  buildWireStep,
+  registerWireStepInCorrelator,
+  resolveWorkflowIdForInteraction,
+  shouldDeferMetaCloseToHooks,
+} from './gateway-wire-step.util.js';
 
 /**
  * Handler para orquestar la auditoría de respuestas SSE.
@@ -262,6 +269,7 @@ export class AuditSseResponseHandler {
 
         const assembled = assembler.result();
         this.propagateWorkflowModel(activeInteraction);
+        this.registerWireInference(activeInteraction, assembled);
 
         const thinkingBlocks = assembled.thinkingTexts;
         const stopReason = assembled.stopReason ?? null;
@@ -320,28 +328,6 @@ export class AuditSseResponseHandler {
               statusCode: context.responseStatusCode,
               stopReason: stopReason ?? undefined,
               coalescedAgentContinuation: continuationMeta,
-            });
-          }
-
-          if (activeInteraction?.modelId) {
-            const sessionDir = path.join(
-              this.sessionStore.getBaseDir(),
-              activeInteraction.sessionId,
-            );
-            const stepTotals = computeTokenTotals([
-              {
-                stepIndex: stepNumber,
-                sse: true,
-                statusCode: context.responseStatusCode,
-                coalescedAgentContinuation: continuationMeta,
-              },
-            ]);
-            await this.sessionStore.withSessionLock(activeInteraction.sessionId, async () => {
-              await this.auditWriter
-                .updateSessionMetrics(sessionDir, activeInteraction.modelId!, stepTotals, 1)
-                .catch(() => {
-                  /* error no crítico */
-                });
             });
           }
 
@@ -413,35 +399,20 @@ export class AuditSseResponseHandler {
                 : 'completed';
 
           turn.coalescedAgentContinuation = undefined;
-          this.sessionStore.closeInteraction(context.auditInteractionDir);
-          await this.writeInteractionMeta(
-            turn,
+          await this.finishTerminalSseInteraction({
             context,
+            activeInteraction: turn,
             outcome,
-            true,
             streamError,
             sseReconstructResult,
             sseErrorMessage,
             sseErrorType,
-          );
+          });
           return;
         }
 
         // Agentic interaction o side-request
         await this.sessionStore.pushStepMetaByDir(context.auditInteractionDir, stepMeta);
-
-        // Actualizar métricas de sesión per-step
-        if (activeInteraction?.modelId) {
-          const sessionDir = path.join(this.sessionStore.getBaseDir(), activeInteraction.sessionId);
-          const stepTotals = computeTokenTotals([stepMeta]);
-          await this.sessionStore.withSessionLock(activeInteraction.sessionId, async () => {
-            await this.auditWriter
-              .updateSessionMetrics(sessionDir, activeInteraction.modelId!, stepTotals, 1)
-              .catch(() => {
-                /* error no crítico */
-              });
-          });
-        }
 
         // Reconstruir mensaje del step y generar archivos markdown (best-effort)
         try {
@@ -533,25 +504,84 @@ export class AuditSseResponseHandler {
           return;
         }
 
-        const turn = await this.sessionStore.getInteractionByDir(context.auditInteractionDir);
-        this.sessionStore.closeInteraction(context.auditInteractionDir);
-
-        if (turn) {
-          await this.writeInteractionMeta(
-            turn,
-            context,
-            outcome,
-            true,
-            streamError,
-            sseReconstructResult,
-            sseErrorMessage,
-            sseErrorType,
-          );
-        }
+        await this.finishTerminalSseInteraction({
+          context,
+          activeInteraction,
+          outcome,
+          streamError,
+          sseReconstructResult,
+          sseErrorMessage,
+          sseErrorType,
+        });
       } catch (err) {
         console.error('Error al procesar fin de stream SSE:', err);
       }
     });
+  }
+
+  private registerWireInference(
+    interaction: ActiveInteraction | null | undefined,
+    assembled: AssembledInference,
+  ): void {
+    if (!interaction || interaction.interactionType === 'client-preflight') return;
+
+    const inferenceRequest = buildInferenceRequestSnapshot(interaction, assembled);
+    const now = new Date();
+    const wireStep = buildWireStep({
+      interaction,
+      inferenceRequest,
+      assistantMessage: assembled.assistantMessage,
+      usage: assembled.usage,
+      stopReason: assembled.stopReason,
+      startedAt: now,
+      closedAt: now,
+    });
+    registerWireStepInCorrelator(this.workflowRepo, wireStep, assembled.stopReason);
+  }
+
+  /**
+   * Cierra el turno en store y escribe meta, o difiere al hook Stop si el correlador está abierto.
+   */
+  private async finishTerminalSseInteraction(params: {
+    context: AuditInteractionContext;
+    activeInteraction: ActiveInteraction | null | undefined;
+    outcome: InteractionOutcome;
+    streamError: boolean;
+    sseReconstructResult?: SseReconstructResult;
+    sseErrorMessage?: string | null;
+    sseErrorType?: string | null;
+  }): Promise<void> {
+    const { context, activeInteraction, outcome } = params;
+
+    if (activeInteraction) {
+      const workflowId = resolveWorkflowIdForInteraction(activeInteraction);
+      const wf = this.workflowRepo.getWorkflow(workflowId);
+      if (wf?.result != null) {
+        const turn = await this.sessionStore.getInteractionByDir(context.auditInteractionDir);
+        if (turn) this.sessionStore.closeInteraction(context.auditInteractionDir);
+        return;
+      }
+      if (shouldDeferMetaCloseToHooks(this.workflowRepo, workflowId)) {
+        return;
+      }
+    }
+
+    const turn = await this.sessionStore.getInteractionByDir(context.auditInteractionDir);
+    this.sessionStore.closeInteraction(context.auditInteractionDir);
+
+    if (turn) {
+      // @deprecated-fallback — sin hooks o workflow ausente en correlador
+      await this.writeInteractionMeta(
+        turn,
+        context,
+        outcome,
+        true,
+        params.streamError,
+        params.sseReconstructResult,
+        params.sseErrorMessage,
+        params.sseErrorType,
+      );
+    }
   }
 
   private propagateWorkflowModel(interaction: ActiveInteraction | null | undefined): void {

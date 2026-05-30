@@ -44,17 +44,21 @@ interface ModelMetadata {
   displayName?: string;
 }
 
+/** Entrada por modelo en session-metrics.json (camelCase legacy o snake_case G4). */
+interface SessionModelMetricsEntry {
+  count: number;
+  inputTokens?: number;
+  cacheReadInputTokens?: number;
+  cacheCreationInputTokens?: number;
+  outputTokens?: number;
+  input_tokens?: number;
+  cache_read_input_tokens?: number;
+  cache_creation_input_tokens?: number;
+  output_tokens?: number;
+}
+
 interface SessionMetrics {
-  models: Record<
-    string,
-    {
-      count: number;
-      inputTokens: number;
-      cacheReadInputTokens: number;
-      cacheCreationInputTokens: number;
-      outputTokens: number;
-    }
-  >;
+  models: Record<string, SessionModelMetricsEntry>;
 }
 
 interface TokenMetrics {
@@ -634,12 +638,16 @@ export function aggregateInteractionMetrics(
       const level = classifyModelWithEnv(modelId, settingsEnv);
       if (!level) continue;
       const levelMetrics = metrics[level];
+      const entry = m;
 
       levelMetrics.modelName = loadDisplayName(modelId, routingPath);
-      levelMetrics.count += coerceMetricNumber(m.count);
-      levelMetrics.inputTokens += coerceMetricNumber(m.inputTokens);
-      levelMetrics.cacheReadInputTokens += coerceMetricNumber(m.cacheReadInputTokens);
-      levelMetrics.outputTokens += coerceMetricNumber(m.outputTokens);
+      levelMetrics.count += coerceMetricNumber(entry.count);
+      // G4 escribe snake_case (§33.2); sesiones antiguas pueden usar camelCase
+      levelMetrics.inputTokens += coerceMetricNumber(entry.input_tokens ?? entry.inputTokens);
+      levelMetrics.cacheReadInputTokens += coerceMetricNumber(
+        entry.cache_read_input_tokens ?? entry.cacheReadInputTokens,
+      );
+      levelMetrics.outputTokens += coerceMetricNumber(entry.output_tokens ?? entry.outputTokens);
     }
   } catch {
     // session-metrics.json corrupto — retornar métricas vacías

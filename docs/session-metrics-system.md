@@ -8,114 +8,88 @@ Antes de este sistema, el statusline calculaba las métricas de la Tabla 2 ("Int
 2. **Rescan O(N)**: La función crecía linealmente con el número de interacciones de la sesión.
 3. **Acoplamiento innecesario**: El statusline duplicaba lógica de lectura de artefactos del proxy (meta.json, body.json) cuando el proxy ya tenía toda la información al cerrar cada turno.
 
-### Diseño actual
+### Diseño actual (post-G4)
 
 #### Archivo `session-metrics.json`
 
-Se escribe a nivel de sesión (`sessions/<session-id>/session-metrics.json`) con el siguiente esquema:
+Se escribe a nivel de sesión (`sessions/<session-id>/session-metrics.json`). Desde la fase **G4** del gateway el esquema canónico sigue [§33.2 de `gateway-design.md`](./proposals/gateway-design.md#332-session-metricsjson-raíz-de-sesión):
 
 ```json
 {
   "models": {
     "claude-opus-4-5": {
       "count": 3,
-      "inputTokens": 12400,
-      "cacheReadInputTokens": 8200,
-      "cacheCreationInputTokens": 3100,
-      "outputTokens": 950
-    },
-    "claude-haiku-4-5-20251001": {
-      "count": 1,
-      "inputTokens": 400,
-      "cacheReadInputTokens": 0,
-      "cacheCreationInputTokens": 0,
-      "outputTokens": 120
+      "input_tokens": 12400,
+      "output_tokens": 950,
+      "cache_creation_input_tokens": 3100,
+      "cache_read_input_tokens": 8200,
+      "cache_efficiency": 0.67
     }
+  },
+  "session_totals": {
+    "input_tokens": 12400,
+    "output_tokens": 950,
+    "cache_creation_input_tokens": 3100,
+    "cache_read_input_tokens": 8200,
+    "total_steps": 3
   }
 }
 ```
 
-Cada clave en `models` es el `modelId` exacto extraído del request body (`"model"` field). Los valores son contadores acumulados desde el inicio de la sesión.
+Cada clave en `models` es el `modelId` (`step.inferenceRequest.model` en el correlador). Los valores son contadores acumulados desde el inicio de la sesión. Los campos `duration_ms` y `outcome` a nivel de archivo están diferidos (no se escriben en G4).
 
-#### Tipos de dominio (`src/1-domain/types/audit.types.ts`)
+Sesiones creadas antes de G4 pueden conservar entradas en **camelCase** (`inputTokens`, etc.) sin `session_totals`; el statusline acepta ambos formatos al leer.
 
-```typescript
-export interface SessionModelMetrics {
-  count: number;
-  inputTokens: number;
-  cacheReadInputTokens: number;
-  cacheCreationInputTokens: number;
-  outputTokens: number;
-}
+#### Tipos de dominio
 
-export interface SessionMetrics {
-  models: Record<string, SessionModelMetrics>;
-}
-```
+- **Canónico (G4):** `ISessionMetrics` e `IModelSessionMetrics` en `src/1-domain/types/gateway/session-metrics.types.ts`.
+- **Legacy:** `SessionMetrics` / `SessionModelMetrics` en `audit.types.ts` son alias `@deprecated` hacia los tipos gateway.
 
-Adicionalmente, `ActiveInteraction` y `InteractionMetadata` fueron extendidos con `modelId?: string` para que el modelo quede disponible al momento del cierre de turno y persista en cada `meta.json` individual para inspección offline.
+`ActiveInteraction` y `InteractionMetadata` siguen llevando `modelId?: string` para inspección offline por turno.
 
-#### Escritura atómica (`src/2-services/audit-writer.service.ts`)
+#### Escritura (`SessionMetricsService`, G4)
 
-`updateSessionMetrics` implementa read-modify-write atómico:
+`updateSessionMetrics()` en `AuditWriterService` fue **retirado** en G4. La actualización la realiza `SessionMetricsService` (`src/2-services/session-metrics.service.ts`):
 
-1. Lee `session-metrics.json` (`ENOENT` o parse error → `{ models: {} }`).
-2. Suma los `totals` del step al bucket `models[modelId]` e incrementa `count` en `stepCount` (normalmente `1` por invocación per-step; `turn.stepsMeta.length` para turns huérfanos).
-3. Escribe mediante `writeJsonAtomic` (escribe a `.tmp` + `rename`), garantizando que lectores concurrentes nunca ven un archivo parcialmente escrito.
+1. Se invoca desde `AuditWorkflowClosureHandler` al cerrar un workflow **`kind: 'main'`** (invariante G16). Los sub-workflows no escriben `session-metrics.json` (su consumo ya está en el rollup del padre).
+2. Agrupa steps cerrados con `aggregateWorkflowUsageByModel` (L1).
+3. Hace merge incremental en `session-metrics.json`, recalcula `session_totals` y `cache_efficiency` por modelo.
+4. Escribe con `writeJsonAtomic` del `IAuditWriter` y serializa actualizaciones con cola interna (`writeQueue`) para evitar races.
 
-#### Puntos de invocación (per-step + 2 callers legacy)
+Ya **no** hay actualización per-step en los handlers wire; el cierre nominal del turno vía hooks (`Stop` / `SubagentStop` / `StopFailure`) dispara la proyección y, para workflows main, la métrica de sesión.
 
-La invocación principal ocurre per-step, justo después de `pushStepMetaByDir`, sujeta a una guarda dual:
+| Componente | Rol |
+| ---------- | --- |
+| `AuditHookEventHandler` | `close()` en el correlador |
+| `AuditWorkflowClosureHandler` | `meta.json` + `SessionMetricsService` (solo main) |
+| Handlers wire | `registerStep` / `closeStep` en correlador; sin `updateSessionMetrics` |
 
-```
-currentTurn?.modelId
-```
-
-| Punto de invocación                      | Archivo                                               | `stepCount`             |
-| ---------------------------------------- | ----------------------------------------------------- | ----------------------- |
-| Después de `pushStepMetaByDir` (SSE)     | `src/3-operations/audit-sse-response.handler.ts`      | `1`                     |
-| Después de `pushStepMetaByDir` (non-SSE) | `src/3-operations/audit-standard-response.handler.ts` | `1`                     |
-| `execute` (error upstream)               | `src/3-operations/audit-upstream-error.handler.ts`    | `stepsMeta.length`      |
-| `closeOrphanTurn`                        | `src/3-operations/audit-interaction.handler.ts`       | `turn.stepsMeta.length` |
-
-Los `client-preflight` están explícitamente excluidos porque no generan tokens de usuario.
+Los `client-preflight` no actualizan métricas de sesión.
 
 #### Lectura en el statusline (`scripting/router-status.ts`)
 
-`aggregateInteractionMetrics` fue reescrita de O(N) a O(1):
+`aggregateInteractionMetrics` lee `session-metrics.json` en O(1):
 
 ```
 session-metrics.json → classifyModelWithEnv(modelId, settingsEnv) → acumular en lite / standard / reasoning
 ```
 
-Si el archivo no existe (sesión anterior a la feature, o sesión vacía), retorna métricas en cero. No hay fallback a escaneo de `interactions/*/meta.json`: las sesiones anteriores simplemente no muestran métricas de Tabla 2. Al leer `session-metrics.json`, el agregador del statusline normaliza valores `null` o no numéricos a `0` antes de sumar (véase §10 de [`router-statusline.md`](./router-statusline.md), incluidas reglas de `used_percentage` y caché de contexto).
+Acepta contadores en **snake_case** (G4) o **camelCase** (sesiones antiguas). Si el archivo no existe, retorna métricas en cero. No hay fallback a escaneo de `interactions/*/meta.json`. Al leer, normaliza `null` o no numéricos a `0` (véase §10 de [`router-statusline.md`](./router-statusline.md)).
 
-Para el layout de sesión e interacciones, véase [`session-audit-model.md`](./session-audit-model.md) (§5 y §6.1).
+Para el layout de sesión e interacciones, véase [`session-audit-model.md`](./session-audit-model.md) (§5, §6.1 y §8.3 G4).
 
 #### Contabilización de subagentes
 
-Cada turno (padre y subagente) contribuye a `session-metrics.json` exclusivamente con su propio consumo de API. `computeTokenTotals` opera sobre `turn.stepsMeta`, que se puebla mediante `pushStepMetaByDir(context.auditInteractionDir, ...)` — donde `auditInteractionDir` es el directorio propio del turno. Los steps del subagente nunca se registran en el `stepsMeta` del padre, y viceversa.
+Solo el workflow **main** escribe en `session-metrics.json` al cierre (G16). Los sub-workflows consumen API en sus propios turnos, pero su uso agregado entra en el `WorkflowResult` del padre vía `aggregateWorkflowUsage`; no se duplica en el archivo de sesión al cerrar un subagente.
 
-El resultado es agregación correcta del costo real de API de la sesión:
-
-```
-step1 padre (fresh)          → inputTokens: X
-step1 subagente              → inputTokens: Y   (llamada HTTP independiente)
-step1 padre (Agent continuation coalesced) → inputTokens: Z
-─────────────────────────────────────────────
-session-metrics.json total                  → X + Y + Z
-```
-
-No existe doble conteo. Sumar todos los turnos da el costo total efectivo de la sesión.
+Cada turno sigue teniendo su propio `meta.json` y `stepsMeta`; la agregación de sesión refleja los cierres de workflows main con steps registrados en el correlador.
 
 #### Semántica de los totales
 
-`session-metrics.json` acumula contadores `usage` **por step/llamada HTTP** (cada invocación que actualiza métricas suma su propio `totals` al bucket del modelo). Es **consumo facturado acumulado** en la sesión, equivalente en intención a `WorkflowResult.usage` en el [diseño unificado del gateway](./proposals/gateway-design.md#1571-semántica-facturado-por-hop-vs-cardinalidad-de-contexto) (§15.7.1).
-
-No uses los totales de sesión como «tamaño del contexto en un solo request»: para eso conviene el último step del turno o su `usage` individual, no la suma de toda la sesión.
+`session-metrics.json` acumula consumo **facturado por hop** al cerrar workflows main (steps cerrados en el correlador), alineado con [§15.7.1 del gateway](./proposals/gateway-design.md#1571-agregación-a-nivel-session). No representa el tamaño de contexto de un único request.
 
 #### Validez multi-proveedor
 
-El sistema funciona para cualquier proveedor configurado en Smart Code Proxy (Anthropic, OpenRouter, etc.) porque depende únicamente del campo `"model"` del request body JSON, no de APIs ni formatos de respuesta propietarios. La clasificación lite/standard/reasoning en el statusline (`classifyModelWithEnv` en `scripting/router-status.ts`) compara el `modelId` de cada entrada de `session-metrics.json` solo con las variables `ANTHROPIC_DEFAULT_*_MODEL` del entorno de **Claude Code** (`~/.claude/settings.json`); si no hay coincidencia, el registro no se suma a ningún nivel (véase §5 de [`router-statusline.md`](./router-statusline.md)). El resaltado entre invocaciones usa la caché `.statusline-state.json` (§4.4 del statusline).
+El sistema depende del campo `"model"` del request body, no de APIs propietarias. La clasificación lite/standard/reasoning en el statusline (`classifyModelWithEnv`) usa las variables `ANTHROPIC_DEFAULT_*_MODEL` del entorno de Claude Code; registros sin coincidencia no se suman (véase [`router-statusline.md`](./router-statusline.md)).
 
 ---

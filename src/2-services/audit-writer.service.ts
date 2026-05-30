@@ -7,8 +7,6 @@ import {
   InteractionState,
   InteractionMetadata,
   MarkdownRenderContext,
-  SessionMetrics,
-  SessionModelMetrics,
   SseLine,
   SubagentSummary,
   SubagentsSummary,
@@ -815,41 +813,4 @@ export class AuditWriterService implements IAuditWriter {
     }
   }
 
-  public async updateSessionMetrics(
-    sessionDir: string,
-    modelId: string,
-    totals: Pick<
-      SessionModelMetrics,
-      'inputTokens' | 'cacheReadInputTokens' | 'cacheCreationInputTokens' | 'outputTokens'
-    >,
-    stepCount: number,
-  ): Promise<void> {
-    const filePath = path.join(sessionDir, 'session-metrics.json');
-
-    let data: SessionMetrics = { models: {} };
-    try {
-      const raw = await fs.readFile(filePath, 'utf8');
-      data = JSON.parse(raw) as SessionMetrics;
-    } catch {
-      // ENOENT o parse error → empezar desde cero
-    }
-
-    const existing = data.models[modelId] ?? {
-      count: 0,
-      inputTokens: 0,
-      cacheReadInputTokens: 0,
-      cacheCreationInputTokens: 0,
-      outputTokens: 0,
-    };
-
-    data.models[modelId] = {
-      count: existing.count + stepCount,
-      inputTokens: existing.inputTokens + totals.inputTokens,
-      cacheReadInputTokens: existing.cacheReadInputTokens + totals.cacheReadInputTokens,
-      cacheCreationInputTokens: existing.cacheCreationInputTokens + totals.cacheCreationInputTokens,
-      outputTokens: existing.outputTokens + totals.outputTokens,
-    };
-
-    await this.writeJsonAtomic(filePath, data as unknown as JsonValue);
-  }
 }

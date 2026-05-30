@@ -80,6 +80,7 @@ function makeSessionStore(overrides: Partial<ISessionStore> = {}): ISessionStore
     findStaleInteractionsAwaitingContinuation: () => [],
     getAllOpenInteractions: () => [],
     withSessionLock: async <T>(_sessionId: string, fn: () => Promise<T>): Promise<T> => fn(),
+    findInteractionForWorkflowClose: () => null,
     ...overrides,
   };
 }
@@ -120,7 +121,6 @@ function makeAuditWriter(overrides: Partial<IAuditWriter> = {}): IAuditWriter {
     writeCoalescedAgentStepResponse: async () => {},
     writeStepThought: async () => {},
     writeTopLevelMultiStepResponse: async () => ({ written: true }),
-    updateSessionMetrics: async () => {},
     ...overrides,
   };
 }
@@ -954,10 +954,9 @@ describe('AuditInteractionHandler', () => {
     expect(subCalled).toBe(false);
   });
 
-  it('closeOrphanInteraction invoca updateSessionMetrics dentro de withSessionLock', async () => {
+  it('closeOrphanInteraction escribe meta sin SessionMetricsService per-step', async () => {
     const config = makeConfig();
-    let lockSessionId: string | null = null;
-    let metricsCalled = false;
+    let metaWritten = false;
 
     const orphanInteraction: ActiveInteraction = {
       interactionDir: '/tmp/sessions/test/interactions/000001_orphan',
@@ -978,18 +977,14 @@ describe('AuditInteractionHandler', () => {
 
     const store = makeSessionStore({
       findStaleInteractionsAwaitingContinuation: () => [orphanInteraction],
-      withSessionLock: async <T>(sessionId: string, fn: () => Promise<T>): Promise<T> => {
-        lockSessionId = sessionId;
-        return fn();
-      },
     });
 
     const handler = new AuditInteractionHandler(
       new SessionResolverService(),
       store,
       makeAuditWriter({
-        updateSessionMetrics: async () => {
-          metricsCalled = true;
+        writeInteractionMeta: async () => {
+          metaWritten = true;
         },
       }),
       config,
@@ -1001,8 +996,7 @@ describe('AuditInteractionHandler', () => {
       requestId: 'req-new',
     });
 
-    expect(lockSessionId).toBe('test-session');
-    expect(metricsCalled).toBe(true);
+    expect(metaWritten).toBe(true);
   });
 
   it('fresh interaction debe cerrar orphan interactions stale de la misma sesión', async () => {

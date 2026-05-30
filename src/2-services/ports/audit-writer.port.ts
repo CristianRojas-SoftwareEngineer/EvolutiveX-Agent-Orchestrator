@@ -2,7 +2,6 @@ import {
   InteractionState,
   InteractionMetadata,
   MarkdownRenderContext,
-  SessionModelMetrics,
   SseLine,
 } from '../../1-domain/types/audit.types.js';
 import { JsonValue } from '../../1-domain/types/json.types.js';
@@ -106,15 +105,6 @@ export interface IAuditWriter {
    */
   writeStepThought(stepDir: string, thinkingBlocks: string[]): Promise<void>;
   writeInteractionMeta(interactionDir: string, meta: InteractionMetadata): Promise<void>;
-  updateSessionMetrics(
-    sessionDir: string,
-    modelId: string,
-    totals: Pick<
-      SessionModelMetrics,
-      'inputTokens' | 'cacheReadInputTokens' | 'cacheCreationInputTokens' | 'outputTokens'
-    >,
-    stepCount: number,
-  ): Promise<void>;
   appendSseLine(interactionDir: string, lineObj: SseLine): void;
   /**
    * Apéndice síncrono del raw dump `sse.txt`. Síncrono para preservar el

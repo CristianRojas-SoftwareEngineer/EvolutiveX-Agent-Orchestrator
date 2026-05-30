@@ -657,7 +657,7 @@ Estas herramientas no crean subagentes anidados; sus continuaciones se rutean al
 | Término conceptual | Tipo TypeScript (runtime) | Archivo/directorio en disco | Campo clave |
 | ---------------- | ------------------------- | --------------------------- | ----------- |
 | Sesión | `AuditSession` | `sessions/<session-id>/` | `sessionId` |
-| Métricas de sesión | `SessionMetrics` | `session-metrics.json` | `models[modelId]` |
+| Métricas de sesión | `ISessionMetrics` (G4) | `session-metrics.json` | `models[modelId]` + `session_totals` + `cache_efficiency` |
 | Interacción agéntica | `ActiveInteraction` | `main-agent/interactions/NN/` | `interactionType: "agentic"` |
 | Interacción de preflight/side | `ActiveInteraction` | `side-interactions/NN/` | `interactionType: "client-preflight"/"side-request"` |
 | Input | — | `input/` | — |
@@ -676,7 +676,7 @@ Estas herramientas no crean subagentes anidados; sus continuaciones se rutean al
 
 ### 8.1 Estado activo del correlador (G2)
 
-A partir de la fase G2, el correlador en memoria para el lifecycle de cierre es `IWorkflowRepository` (`src/1-domain/repositories/IWorkflowRepository.ts`). Corre **en paralelo** al pipeline legacy `ISessionStore`/`ActiveInteraction` hasta que G4 complete la migración.
+A partir de G4, el correlador (`IWorkflowRepository`) es la fuente de verdad para cierre de turno; `ISessionStore`/`ActiveInteraction` siguen alimentando `StepMeta` forense y campos que aún no viven en `IWorkflowResult`.
 
 **Entidades del correlador G2:**
 
@@ -700,9 +700,24 @@ Stop/SubagentStop → readyToClose(workflowId, hook)
                                  → IWorkflowResult { outcome, finalText, usage, stepCount }
                                  → IWorkflow { status: 'completed' | 'failed' }
 StopFailure      → close(workflowId, hook) directo (sin readyToClose — §15.4)
+                 → AuditWorkflowClosureHandler → meta.json + session-metrics (main)
 ```
 
-`close` es idempotente (§28): si `workflow.result != null`, devuelve el resultado existente sin mutar el estado. La proyección del `IWorkflowResult` a disco (`sessions/`) es responsabilidad de G4.
+`close` es idempotente (§28): si `workflow.result != null`, devuelve el resultado existente sin mutar el estado.
+
+### 8.3 Proyección a disco y métricas de sesión (G4)
+
+Tras `close()`, `AuditHookEventHandler` delega en `AuditWorkflowClosureHandler` (`src/3-operations/audit-workflow-closure.handler.ts`):
+
+1. `projectWorkflowResultToInteractionMetadata` (`src/2-services/workflow-result-projector.service.ts`) — `IWorkflowResult` + `ActiveInteraction` → shape legacy de `meta.json`.
+2. `IAuditWriter.writeInteractionMeta` — layout flat sin cambios.
+3. Si `workflow.kind === 'main'`, `SessionMetricsService` (`src/2-services/session-metrics.service.ts`) actualiza `session-metrics.json` (§33.2: `models`, `session_totals`, `cache_efficiency`; sin `duration_ms` ni `outcome`).
+
+**Wire → correlador (G4):** `AuditSseResponseHandler` y `AuditStandardResponseHandler` llaman `registerStep`/`closeStep` al completar cada inferencia (`gateway-wire-step.util.ts`). Con `stop_reason: tool_use` el step queda abierto; con `end_turn` se cierra en el correlador.
+
+**Cierre nominal vs fallback:** si el workflow está abierto en el correlador, el wire **no** escribe `meta.json` al terminar el stream (espera hook `Stop`). La ruta `@deprecated-fallback` conserva `writeInteractionMeta` inline cuando no hay workflow en memoria.
+
+**Invariante G16:** solo workflows `kind: 'main'` escriben `session-metrics.json`; sub-workflows no duplican consumo (rollup en el padre vía `aggregateWorkflowUsage`).
 
 ### 8.2 StepAssembler y propagación de modelo (G3)
 
@@ -722,7 +737,7 @@ Por cada evento SSE parseado, el handler invoca `assembler.onEvent(evt)` en para
 - Workflow main: `workflowId = sessionId`
 - Subagente: `workflowId = parentContext.wireAgentId` cuando existe
 
-La operación es idempotente (primer modelo observado) y no-op si el workflow aún no fue abierto en el correlador (p. ej. hooks deshabilitados). Este campo es prerequisito de `SessionMetricsService` en G4; el registro de Steps en el correlador desde el wire se difiere a G4.
+La operación es idempotente (primer modelo observado) y no-op si el workflow aún no fue abierto en el correlador (p. ej. hooks deshabilitados). G4 registra cada inferencia como `IStep` en el correlador y agrega métricas de sesión al cierre main vía `aggregateWorkflowUsageByModel`.
 
 ---
 

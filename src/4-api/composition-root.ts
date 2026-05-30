@@ -8,6 +8,8 @@ import { SseReconstructService } from '../2-services/sse-reconstruct.service.js'
 import { StreamTeeService } from '../2-services/stream-tee.service.js';
 import { WorkflowRepositoryService } from '../2-services/workflow-repository.service.js';
 import { StepAssemblerService } from '../2-services/step-assembler.service.js';
+import { SessionMetricsService } from '../2-services/session-metrics.service.js';
+import { AuditWorkflowClosureHandler } from '../3-operations/audit-workflow-closure.handler.js';
 import { AuditHookEventHandler } from '../3-operations/audit-hook-event.handler.js';
 import { AuditInteractionHandler } from '../3-operations/audit-interaction.handler.js';
 import { AuditSseResponseHandler } from '../3-operations/audit-sse-response.handler.js';
@@ -63,10 +65,17 @@ export async function createProxyDependencies(
     workflowRepo,
     logger,
   );
+  const sessionMetrics = new SessionMetricsService(auditWriter);
+  const auditWorkflowClosureHandler = new AuditWorkflowClosureHandler(
+    auditWriter,
+    sessionMetrics,
+    config,
+  );
   const auditStandardResponseHandler = new AuditStandardResponseHandler(
     auditWriter,
     config,
     sessionStore,
+    workflowRepo,
   );
   const auditUpstreamErrorHandler = new AuditUpstreamErrorHandler(
     auditWriter,
@@ -74,7 +83,12 @@ export async function createProxyDependencies(
     sessionStore,
   );
   const filterToolsHandler = new FilterToolsHandler(config);
-  const hookEventHandler = new AuditHookEventHandler(workflowRepo, logger);
+  const hookEventHandler = new AuditHookEventHandler(
+    workflowRepo,
+    sessionStore,
+    auditWorkflowClosureHandler,
+    logger,
+  );
 
   return {
     auditInteractionHandler,

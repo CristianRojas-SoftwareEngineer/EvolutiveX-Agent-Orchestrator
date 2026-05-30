@@ -2886,7 +2886,7 @@ src/1-domain/
 
 **Tipos Interaction* deprecados (G1):** `InteractionType`, `InteractionOutcome`, `InteractionMetadata`, `ActiveInteraction`, `InteractionState`, `AuditInteractionContext` en `audit.types.ts` marcados `@deprecated`. Retirada planificada en fase G4/P (al migrar el último consumidor).
 
-**Pendiente G4:** `aggregate-workflow-usage-by-model.ts` (función pura L1: agrupa `Step.usage` por `step.inferenceRequest.model`; retorna `Record<modelId, { usage: AnthropicUsage; stepCount: number }>`). Tipo `ISessionMetrics` en `types/gateway/` migrado desde `audit.types.ts`.
+**Implementado G4:** `aggregate-workflow-usage-by-model.ts` (L1), `ISessionMetrics` en `types/gateway/session-metrics.types.ts`, `SessionMetricsService`, `AuditWorkflowClosureHandler` y projector `WorkflowResult` → `meta.json`. Layout `causal-workflows-v1` sigue pendiente (fases P).
 
 ---
 

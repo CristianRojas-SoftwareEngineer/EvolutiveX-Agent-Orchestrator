@@ -3,6 +3,7 @@ import { PassThrough } from 'node:stream';
 import { AuditStandardResponseHandler } from '../../src/3-operations/audit-standard-response.handler.js';
 import type { IAuditWriter } from '../../src/2-services/ports/audit-writer.port.js';
 import type { ISessionStore } from '../../src/2-services/ports/session-store.port.js';
+import type { IWorkflowRepository } from '../../src/1-domain/repositories/IWorkflowRepository.js';
 import {
   AuditInteractionContext,
   ActiveInteraction,
@@ -103,6 +104,7 @@ function makeSessionStore(
     findStaleInteractionsAwaitingContinuation: () => [],
     getAllOpenInteractions: () => [],
     withSessionLock: async <T>(_sessionId: string, fn: () => Promise<T>): Promise<T> => fn(),
+    findInteractionForWorkflowClose: () => null,
     ...overrides,
   };
 }
@@ -137,7 +139,24 @@ function makeAuditWriter(overrides: Partial<IAuditWriter> = {}): IAuditWriter {
     writeCoalescedAgentStepResponse: async () => {},
     writeStepThought: async () => {},
     writeTopLevelMultiStepResponse: async () => ({ written: true }),
-    updateSessionMetrics: async () => {},
+    ...overrides,
+  };
+}
+
+function makeWorkflowRepo(overrides: Partial<IWorkflowRepository> = {}): IWorkflowRepository {
+  return {
+    openSubagentFromWire: vi.fn(),
+    getWorkflowByAgentId: vi.fn(),
+    confirmSubagentFromHook: vi.fn(),
+    openWorkflow: vi.fn(),
+    openSubagentWorkflow: vi.fn(),
+    getWorkflow: vi.fn(),
+    registerStep: vi.fn(),
+    closeStep: vi.fn(),
+    registerToolUse: vi.fn(),
+    readyToClose: vi.fn(),
+    close: vi.fn(),
+    setWorkflowModel: vi.fn(),
     ...overrides,
   };
 }
@@ -174,6 +193,7 @@ describe('AuditStandardResponseHandler', () => {
           interactionCleared = true;
         },
       }),
+      makeWorkflowRepo(),
     );
 
     const stream = new PassThrough();
@@ -213,6 +233,7 @@ describe('AuditStandardResponseHandler', () => {
       }),
       config,
       makeSessionStore(),
+      makeWorkflowRepo(),
     );
 
     const stream = new PassThrough();
@@ -245,6 +266,7 @@ describe('AuditStandardResponseHandler', () => {
       }),
       config,
       makeSessionStore(),
+      makeWorkflowRepo(),
     );
 
     const stream = new PassThrough();
@@ -279,6 +301,7 @@ describe('AuditStandardResponseHandler', () => {
           interactionClosed = true;
         },
       }),
+      makeWorkflowRepo(),
     );
 
     const stream = new PassThrough();
@@ -301,11 +324,9 @@ describe('AuditStandardResponseHandler', () => {
     expect(stepMetaPushed!.label).toBe('quota-check');
   });
 
-  it('debería invocar updateSessionMetrics dentro de withSessionLock al cerrar interacción agentic', async () => {
+  it('debería invocar registerStep al completar inferencia standard con workflow abierto', async () => {
     const config = makeConfig();
-    let lockSessionId: string | null = null;
-    let metricsCalled = false;
-
+    const registerStep = vi.fn();
     const interaction = makeActiveInteraction({
       modelId: 'claude-opus-4-5',
       stepsMeta: [{ stepIndex: 1, sse: false, statusCode: 200, inputTokens: 10, outputTokens: 5 }],
@@ -318,27 +339,34 @@ describe('AuditStandardResponseHandler', () => {
           responseTruncatedByProxyBuffer: false,
           responseTruncatedByAuditLimit: false,
         }),
-        updateSessionMetrics: async () => {
-          metricsCalled = true;
-        },
       }),
       config,
-      makeSessionStore(interaction, {
-        withSessionLock: async <T>(sessionId: string, fn: () => Promise<T>): Promise<T> => {
-          lockSessionId = sessionId;
-          return fn();
-        },
+      makeSessionStore(interaction),
+      makeWorkflowRepo({
+        getWorkflow: vi.fn().mockReturnValue({
+          id: 'test',
+          sessionId: 'test',
+          kind: 'main',
+          status: 'running',
+          steps: [],
+          startedAt: new Date(),
+        }),
+        registerStep,
+        closeStep: vi.fn(),
       }),
     );
 
     const stream = new PassThrough();
     handler.execute(stream, makeContext(), 'application/json');
-    stream.write(Buffer.from('{"id":"msg_1","stop_reason":"end_turn"}'));
+    stream.write(
+      Buffer.from(
+        '{"id":"msg_1","stop_reason":"end_turn","usage":{"input_tokens":10,"output_tokens":5}}',
+      ),
+    );
     stream.end();
 
     await new Promise((r) => setTimeout(r, 100));
-    expect(lockSessionId).toBe('test');
-    expect(metricsCalled).toBe(true);
+    expect(registerStep).toHaveBeenCalled();
   });
 
   it('debería propagar parentContext al meta.json si el interaction es subagente', async () => {
@@ -361,6 +389,7 @@ describe('AuditStandardResponseHandler', () => {
       }),
       config,
       makeSessionStore(subInteraction),
+      makeWorkflowRepo(),
     );
 
     const stream = new PassThrough();

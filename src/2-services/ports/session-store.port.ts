@@ -149,4 +149,12 @@ export interface ISessionStore {
    * paralelos sin colisiones de directorio.
    */
   withSessionLock<T>(sessionId: string, fn: () => Promise<T>): Promise<T>;
+  /**
+   * Interacción activa para proyección tras `close()` del correlador.
+   */
+  findInteractionForWorkflowClose(
+    sessionId: string,
+    workflowId: string,
+    kind: 'main' | 'subagent',
+  ): ActiveInteraction | null;
 }

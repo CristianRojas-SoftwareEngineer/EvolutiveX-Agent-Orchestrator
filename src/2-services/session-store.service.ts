@@ -354,6 +354,38 @@ export class SessionStoreService implements ISessionStore {
     return [...this.interactionRegistry.values()];
   }
 
+  /**
+   * Resuelve la interacción activa para proyección al cierre del workflow.
+   * Main: primera interacción agentic de nivel raíz en la sesión.
+   * Subagente: interacción cuyo `parentContext.wireAgentId` coincide con `workflowId`.
+   */
+  public findInteractionForWorkflowClose(
+    sessionId: string,
+    workflowId: string,
+    kind: 'main' | 'subagent',
+  ): ActiveInteraction | null {
+    const dirs = this.sessionToActiveInteractions.get(sessionId);
+    if (!dirs) return null;
+
+    for (const dir of dirs) {
+      const interaction = this.interactionRegistry.get(dir);
+      if (!interaction) continue;
+
+      if (kind === 'subagent') {
+        if (interaction.parentContext?.wireAgentId === workflowId) {
+          return interaction;
+        }
+        continue;
+      }
+
+      if (interaction.interactionType === 'agentic' && !interaction.parentContext) {
+        return interaction;
+      }
+    }
+
+    return null;
+  }
+
   public withSessionLock<T>(sessionId: string, fn: () => Promise<T>): Promise<T> {
     const key = String(sessionId);
     const prev = this.sessionRequestChains.get(key) || Promise.resolve();

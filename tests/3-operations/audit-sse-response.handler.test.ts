@@ -108,6 +108,14 @@ function makeSessionStore(
     findStaleInteractionsAwaitingContinuation: () => [],
     getAllOpenInteractions: () => [],
     withSessionLock: async <T>(_sessionId: string, fn: () => Promise<T>): Promise<T> => fn(),
+    findInteractionForWorkflowClose: (sessionId, workflowId, kind) => {
+      for (const t of registry.values()) {
+        if (t.sessionId !== sessionId) continue;
+        if (kind === 'subagent' && t.parentContext?.wireAgentId === workflowId) return t;
+        if (kind === 'main' && t.interactionType === 'agentic' && !t.parentContext) return t;
+      }
+      return null;
+    },
     ...overrides,
   };
 }
@@ -142,7 +150,24 @@ function makeAuditWriter(overrides: Partial<IAuditWriter> = {}): IAuditWriter {
     writeStepResponseMarkdown: async () => {},
     writeCoalescedAgentStepResponse: async () => {},
     writeTopLevelMultiStepResponse: async () => ({ written: true }),
-    updateSessionMetrics: async () => {},
+    ...overrides,
+  };
+}
+
+function makeWorkflowRepo(overrides: Partial<IWorkflowRepository> = {}): IWorkflowRepository {
+  return {
+    openSubagentFromWire: vi.fn(),
+    getWorkflowByAgentId: vi.fn(),
+    confirmSubagentFromHook: vi.fn(),
+    openWorkflow: vi.fn(),
+    openSubagentWorkflow: vi.fn(),
+    getWorkflow: vi.fn(),
+    registerStep: vi.fn(),
+    closeStep: vi.fn(),
+    registerToolUse: vi.fn(),
+    readyToClose: vi.fn(),
+    close: vi.fn(),
+    setWorkflowModel: vi.fn(),
     ...overrides,
   };
 }
@@ -737,10 +762,9 @@ describe('AuditSseResponseHandler', () => {
     expect(captured!.lostPendingAgents).toBeUndefined();
   });
 
-  it('debería invocar updateSessionMetrics dentro de withSessionLock al cerrar la interacción agentic', async () => {
+  it('debería invocar registerStep al completar inferencia SSE con workflow abierto', async () => {
     const config = makeConfig();
-    let lockSessionId: string | null = null;
-    let metricsCalled = false;
+    const registerStep = vi.fn();
 
     const interaction = makeActiveInteraction({
       modelId: 'claude-opus-4-5',
@@ -751,18 +775,21 @@ describe('AuditSseResponseHandler', () => {
       'event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"end_turn"}}\n\n';
 
     const handler = makeSseHandler(
-      makeAuditWriter({
-        updateSessionMetrics: async () => {
-          metricsCalled = true;
-        },
-      }),
+      makeAuditWriter(),
       makeSseReconstructor(),
       config,
-      makeSessionStore(interaction, {
-        withSessionLock: async <T>(sessionId: string, fn: () => Promise<T>): Promise<T> => {
-          lockSessionId = sessionId;
-          return fn();
-        },
+      makeSessionStore(interaction),
+      makeWorkflowRepo({
+        getWorkflow: vi.fn().mockReturnValue({
+          id: 'test',
+          sessionId: 'test',
+          kind: 'main',
+          status: 'running',
+          steps: [],
+          startedAt: new Date(),
+        }),
+        registerStep,
+        closeStep: vi.fn(),
       }),
     );
 
@@ -772,8 +799,7 @@ describe('AuditSseResponseHandler', () => {
     stream.end();
 
     await new Promise((r) => setTimeout(r, 100));
-    expect(lockSessionId).toBe('test');
-    expect(metricsCalled).toBe(true);
+    expect(registerStep).toHaveBeenCalled();
   });
 
   it('debería propagar parentContext al meta.json si la interacción es subagente', async () => {

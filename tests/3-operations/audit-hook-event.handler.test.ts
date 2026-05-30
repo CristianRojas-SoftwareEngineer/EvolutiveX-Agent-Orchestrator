@@ -2,6 +2,9 @@ import { describe, it, expect, vi } from 'vitest';
 import { AuditHookEventHandler } from '../../src/3-operations/audit-hook-event.handler.js';
 import type { IWorkflowRepository } from '../../src/1-domain/repositories/IWorkflowRepository.js';
 import type { IWorkflow } from '../../src/1-domain/interfaces/gateway/IWorkflow.js';
+import type { ISessionStore } from '../../src/2-services/ports/session-store.port.js';
+import type { AuditWorkflowClosureHandler } from '../../src/3-operations/audit-workflow-closure.handler.js';
+import type { ActiveInteraction } from '../../src/1-domain/types/audit.types.js';
 
 function makeRepo(overrides: Partial<IWorkflowRepository> = {}): IWorkflowRepository {
   return {
@@ -25,12 +28,58 @@ function stubWorkflow(id = 'session-1'): IWorkflow {
   return { id, sessionId: id, kind: 'main', status: 'running', steps: [], startedAt: new Date() };
 }
 
-describe('AuditHookEventHandler', () => {
-  // ── SubagentStart (C3, sin cambio) ───────────────────────────────────────
+function makeSessionStore(interaction: ActiveInteraction | null = null): ISessionStore {
+  return {
+    getBaseDir: () => '/tmp/sessions',
+    ensureAuditSessionsRoot: async () => {},
+    nextMainAgentSequence: async () => 1,
+    nextSideInteractionSequence: async () => 1,
+    registerInteraction: () => {},
+    registerToolUseId: () => {},
+    getInteractionByToolUseId: () => null,
+    getInteractionByDir: async () => interaction,
+    getInteractionByDirSync: () => interaction,
+    incrementStepCountByDir: () => 1,
+    pushStepMetaByDir: async () => {},
+    closeInteraction: vi.fn(),
+    registerPendingAgentToolUse: () => {},
+    findInteractionWithPendingAgents: () => null,
+    consumePendingAgentToolUse: () => {},
+    registerPendingWebSearchToolUse: vi.fn(),
+    findInteractionWithPendingWebSearch: vi.fn().mockReturnValue(null),
+    consumeWebSearchPending: vi.fn().mockReturnValue(null),
+    registerPendingWebFetchToolUse: vi.fn(),
+    findInteractionWithPendingWebFetch: vi.fn().mockReturnValue(null),
+    consumeWebFetchPending: vi.fn().mockReturnValue(null),
+    consumeWebSearchPendingByToolUseId: vi.fn().mockReturnValue(null),
+    consumeWebFetchPendingByToolUseId: vi.fn().mockReturnValue(null),
+    registerResolvedInternalTool: vi.fn(),
+    findStaleInteractionsAwaitingContinuation: () => [],
+    getAllOpenInteractions: () => (interaction ? [interaction] : []),
+    withSessionLock: async <T>(_s: string, fn: () => Promise<T>) => fn(),
+    findInteractionForWorkflowClose: () => interaction,
+  };
+}
 
+function makeClosureHandler(): AuditWorkflowClosureHandler {
+  return {
+    execute: vi.fn().mockResolvedValue(undefined),
+    executeWireFallback: vi.fn().mockResolvedValue(undefined),
+  } as unknown as AuditWorkflowClosureHandler;
+}
+
+function makeHandler(
+  repo: IWorkflowRepository,
+  sessionStore: ISessionStore,
+  closure = makeClosureHandler(),
+): AuditHookEventHandler {
+  return new AuditHookEventHandler(repo, sessionStore, closure);
+}
+
+describe('AuditHookEventHandler', () => {
   it('SubagentStart → confirmSubagentFromHook llamado con agentId y toolUseId', () => {
     const repo = makeRepo();
-    const handler = new AuditHookEventHandler(repo);
+    const handler = makeHandler(repo, makeSessionStore());
 
     handler.execute({
       eventName: 'SubagentStart',
@@ -43,11 +92,9 @@ describe('AuditHookEventHandler', () => {
     expect(repo.confirmSubagentFromHook).toHaveBeenCalledWith('agent-child', 'tu-abc');
   });
 
-  // ── PreToolUse (stub) ─────────────────────────────────────────────────────
-
   it('PreToolUse → completa sin excepción; close no llamado', () => {
     const repo = makeRepo();
-    const handler = new AuditHookEventHandler(repo);
+    const handler = makeHandler(repo, makeSessionStore());
 
     expect(() =>
       handler.execute({ eventName: 'PreToolUse', sessionId: 'session-1', toolUseId: 'tu-xyz' }),
@@ -56,19 +103,41 @@ describe('AuditHookEventHandler', () => {
     expect(repo.close).not.toHaveBeenCalled();
   });
 
-  // ── Stop ──────────────────────────────────────────────────────────────────
-
-  it('Stop con workflow activo y readyToClose:true → close invocado', () => {
+  it('Stop con workflow activo y readyToClose:true → close y delegación al closure handler', async () => {
     const readyToClose = vi.fn().mockReturnValue(true);
-    const close = vi.fn();
+    const close = vi.fn().mockReturnValue({
+      outcome: 'success',
+      stepCount: 1,
+      closedByEvent: 'Stop',
+      sessionId: 'session-1',
+    });
     const getWorkflow = vi.fn().mockReturnValue(stubWorkflow());
     const repo = makeRepo({ getWorkflow, readyToClose, close });
-    const handler = new AuditHookEventHandler(repo);
+    const turn = {
+      interactionDir: '/tmp/i',
+      interactionType: 'agentic' as const,
+      stepCount: 1,
+      requestSequence: 1,
+      startedAt: Date.now(),
+      requestBodyOmitted: false,
+      requestBodyBytes: 0,
+      stepsMeta: [],
+      sessionId: 'session-1',
+      pendingAgentToolUses: [],
+      pendingWebSearchToolUses: [],
+      pendingWebFetchToolUses: [],
+      resolvedInternalTools: [],
+    };
+    const closure = makeClosureHandler();
+    const handler = makeHandler(repo, makeSessionStore(turn), closure);
 
     handler.execute({ eventName: 'Stop', sessionId: 'session-1', stopHookActive: false, backgroundTasks: 0 });
 
+    await new Promise((r) => setTimeout(r, 50));
+
     expect(readyToClose).toHaveBeenCalledWith('session-1', expect.objectContaining({ eventName: 'Stop' }));
     expect(close).toHaveBeenCalledWith('session-1', expect.objectContaining({ eventName: 'Stop' }));
+    expect(closure.execute).toHaveBeenCalled();
   });
 
   it('Stop con stopHookActive:true → readyToClose:false, close no invocado', () => {
@@ -76,7 +145,7 @@ describe('AuditHookEventHandler', () => {
     const close = vi.fn();
     const getWorkflow = vi.fn().mockReturnValue(stubWorkflow());
     const repo = makeRepo({ getWorkflow, readyToClose, close });
-    const handler = new AuditHookEventHandler(repo);
+    const handler = makeHandler(repo, makeSessionStore());
 
     handler.execute({ eventName: 'Stop', sessionId: 'session-1', stopHookActive: true });
 
@@ -88,7 +157,7 @@ describe('AuditHookEventHandler', () => {
     const close = vi.fn();
     const getWorkflow = vi.fn().mockReturnValue(undefined);
     const repo = makeRepo({ getWorkflow, close });
-    const handler = new AuditHookEventHandler(repo);
+    const handler = makeHandler(repo, makeSessionStore());
 
     expect(() =>
       handler.execute({ eventName: 'Stop', sessionId: 'session-1' }),
@@ -97,27 +166,46 @@ describe('AuditHookEventHandler', () => {
     expect(close).not.toHaveBeenCalled();
   });
 
-  // ── StopFailure ───────────────────────────────────────────────────────────
-
-  it('StopFailure → close directo sin readyToClose', () => {
+  it('StopFailure → close directo sin readyToClose', async () => {
     const readyToClose = vi.fn();
-    const close = vi.fn();
+    const close = vi.fn().mockReturnValue({
+      outcome: 'api_error',
+      stepCount: 0,
+      closedByEvent: 'StopFailure',
+      sessionId: 'session-1',
+    });
     const getWorkflow = vi.fn().mockReturnValue(stubWorkflow());
     const repo = makeRepo({ getWorkflow, readyToClose, close });
-    const handler = new AuditHookEventHandler(repo);
+    const closure = makeClosureHandler();
+    const handler = makeHandler(repo, makeSessionStore({
+      interactionDir: '/tmp/i',
+      interactionType: 'agentic',
+      stepCount: 0,
+      requestSequence: 1,
+      startedAt: Date.now(),
+      requestBodyOmitted: false,
+      requestBodyBytes: 0,
+      stepsMeta: [],
+      sessionId: 'session-1',
+      pendingAgentToolUses: [],
+      pendingWebSearchToolUses: [],
+      pendingWebFetchToolUses: [],
+      resolvedInternalTools: [],
+    }), closure);
 
     handler.execute({ eventName: 'StopFailure', sessionId: 'session-1' });
 
+    await new Promise((r) => setTimeout(r, 50));
+
     expect(readyToClose).not.toHaveBeenCalled();
     expect(close).toHaveBeenCalledWith('session-1', expect.objectContaining({ eventName: 'StopFailure' }));
+    expect(closure.execute).toHaveBeenCalled();
   });
-
-  // ── UserPromptSubmit ──────────────────────────────────────────────────────
 
   it('UserPromptSubmit → openWorkflow invocado con sessionId', () => {
     const openWorkflow = vi.fn();
     const repo = makeRepo({ openWorkflow });
-    const handler = new AuditHookEventHandler(repo);
+    const handler = makeHandler(repo, makeSessionStore());
 
     handler.execute({ eventName: 'UserPromptSubmit', sessionId: 'session-1', agentId: 'agent-root' });
 

@@ -481,19 +481,15 @@ export interface InteractionMetadata {
   resolvedInternalTools?: ResolvedInternalTool[];
 }
 
-/** Métricas agregadas de tokens por modelo dentro de una sesión. */
-export interface SessionModelMetrics {
-  count: number;
-  inputTokens: number;
-  cacheReadInputTokens: number;
-  cacheCreationInputTokens: number;
-  outputTokens: number;
-}
+/**
+ * @deprecated Usar `IModelSessionMetrics` en `types/gateway/session-metrics.types.ts` (G4).
+ */
+export type { IModelSessionMetrics as SessionModelMetrics } from './gateway/session-metrics.types.js';
 
-/** Resumen de métricas de sesión escrito en session-metrics.json. */
-export interface SessionMetrics {
-  models: Record<string, SessionModelMetrics>;
-}
+/**
+ * @deprecated Usar `ISessionMetrics` en `types/gateway/session-metrics.types.ts` (G4).
+ */
+export type { ISessionMetrics as SessionMetrics } from './gateway/session-metrics.types.js';
 
 /**
  * Estado persistente de una interacción en curso, escrito como state.json

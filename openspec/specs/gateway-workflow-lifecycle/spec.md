@@ -82,7 +82,6 @@ El sistema SHALL implementar `close(workflowId, hook)` en `IWorkflowRepository`:
 - SHALL invocar `buildWorkflowResult(workflow, closedSteps, childResults, hook)` de G1 para obtener el `IWorkflowResult`.
 - SHALL adjuntar el resultado a `workflow.result` y marcar `workflow.status` como `'completed'` (si `outcome === 'success'`) o `'failed'` (si `outcome === 'api_error'`) y asignar `completedAt`.
 - SHALL ser **idempotente**: si el workflow ya está cerrado (`result != null`), SHALL ignorar la llamada y devolver el resultado existente sin mutar el estado.
-- El resultado `IWorkflowResult` devuelto SHALL tener `totalCostUsd: undefined` (cálculo de pricing diferido a G4).
 
 Referencia: idempotencia en [§28 gateway-design.md](../../../../../docs/proposals/gateway-design.md#28-integración-wire--hooks-carreras-y-estados).
 

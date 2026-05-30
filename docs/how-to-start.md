@@ -234,6 +234,4 @@ Cabeceras de sesión, compresión hacia upstream (`identity` fijo) y ajustes fin
 - [Modelo de auditoría de sesiones (`session-audit-model.md`)](./session-audit-model.md) — referencia canónica del layout en `sessions/`.
 - [Archivos de auditoría (resumen)](../README.md#archivos-auditoria).
 - Entornos con **inspección SSL** (certificados corporativos): párrafo `NODE_EXTRA_CA_CERTS` en el [README](../README.md#configuracion).
-- [Estimación de Costos Anthropic](./how-to-calculate-anthropic-api-costs.md) (Ecuación y JSON local de precios).
-- [Estimación de Costos OpenRouter](./how-to-calculate-openrouter-api-costs.md) (Esquema ResponseUsage y agregación).
 - [Peticiones sin sesión (pre-sesión)](./health-check-handling.md) (por qué algunas peticiones no escriben en `sessions/`).

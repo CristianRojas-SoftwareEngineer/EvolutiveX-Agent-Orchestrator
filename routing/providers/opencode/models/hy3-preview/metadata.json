@@ -1,13 +1,4 @@
 {
   "modelId": "hy3-preview-free",
-  "displayName": "HY3 Preview",
-  "costs": {
-    "input": {
-      "base": 0.0,
-      "cacheWrite5m": 0.0,
-      "cacheWrite1h": 0.0,
-      "cacheRead": 0.0
-    },
-    "output": 0.0
-  }
+  "displayName": "HY3 Preview"
 }

@@ -1,13 +1,4 @@
 {
   "modelId": "mimo-v2-omni",
-  "displayName": "MiMo 2 Omni",
-  "costs": {
-    "input": {
-      "base": null,
-      "cacheWrite5m": null,
-      "cacheWrite1h": null,
-      "cacheRead": null
-    },
-    "output": null
-  }
+  "displayName": "MiMo 2 Omni"
 }

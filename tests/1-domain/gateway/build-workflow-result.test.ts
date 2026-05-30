@@ -50,7 +50,6 @@ describe('buildWorkflowResult', () => {
     expect(result.sessionId).toBe('sess1');
     expect(result.usage?.input_tokens).toBe(100);
     expect(result.usage?.output_tokens).toBe(50);
-    expect(result.totalCostUsd).toBeUndefined();
   });
 
   it('devuelve outcome api_error para StopFailure', () => {

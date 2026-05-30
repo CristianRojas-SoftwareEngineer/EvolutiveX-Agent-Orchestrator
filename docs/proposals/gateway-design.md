@@ -342,7 +342,7 @@ sequenceDiagram
 | ---- | ---------------- |
 | `1-domain/types/audit.types.ts` | Modelo de turno en memoria y en `meta.json`: `ActiveInteraction`, `StepMeta`, `InteractionMetadata`, pending tools (`PendingAgentToolUse`, `PendingWebFetchToolUse`, `PendingWebSearchToolUse` — extensiones SCP), `computeTokenTotals()`. |
 | `1-domain/types/anthropic.types.ts` | Contratos wire Anthropic. |
-| `1-domain/types/config.types.ts`, `logger.types.ts`, `json.types.ts`, `pricing.types.ts` | Config, logging, JSON, pricing. |
+| `1-domain/types/config.types.ts`, `logger.types.ts`, `json.types.ts` | Config, logging, JSON. |
 | `1-domain/constants/audit-paths.ts`, `audit-limits.ts`, `session-headers.ts` | Layout lógico, límites, nombres de cabeceras. |
 | `1-domain/services/request-classifier.service.ts` | `fresh` / `continuation` / `preflight-quota` / `preflight-warmup` / `side-request`. |
 | `1-domain/services/session-resolver.service.ts` | ID de sesión audit desde headers. |
@@ -396,7 +396,6 @@ sequenceDiagram
 | 1 | `src/1-domain/types/config.types.ts` | Tipos de configuración |
 | 1 | `src/1-domain/types/logger.types.ts` | Contrato logger |
 | 1 | `src/1-domain/types/json.types.ts` | Utilidades JSON tipadas |
-| 1 | `src/1-domain/types/pricing.types.ts` | Tipos de pricing |
 | 1 | `src/1-domain/constants/audit-paths.ts` | Layout lógico de paths |
 | 1 | `src/1-domain/constants/audit-limits.ts` | Límites de auditoría |
 | 1 | `src/1-domain/constants/session-headers.ts` | Nombres de cabeceras |
@@ -768,7 +767,6 @@ Responde: *¿cómo terminó la ejecución E2E del workflow?* — resultado globa
 | `outcome` | `WorkflowOutcome` | Hook + reglas de cierre (§15.4) | Resultado global: `'success' \| 'api_error' \| 'aborted' \| 'unknown'` |
 | `finalText?` | `string` | Hook de cierre | Texto plano E2E; passthrough de `last_assistant_message` (**hook**, no StepBuffer). Fuentes primarias: `Stop`, `SubagentStop`; `StopFailure` solo si el campo viene. Ver **§15.7** |
 | `usage?` | `IAnthropicUsage` | Agregación | Suma **por categoría** de `Step.usage` cerrados (+ rollup hijos). **Consumo facturado E2E** del workflow; no cardinalidad única de contexto. Ver **§15.6**. |
-| `totalCostUsd?` | `number` | Cálculo gateway | Coste estimado con tarifas propias; no viene del wire Anthropic |
 | `stepCount` | `number` | Agregación | Cantidad de Steps **cerrados** al momento del cierre |
 | `closedByEvent` | `WorkflowClosedByEvent` | Hook | Evento que disparó el cierre: `'Stop' \| 'SubagentStop' \| 'StopFailure'` |
 | `sessionId` | `string` | Hook | `session_id` del hook de cierre |
@@ -781,7 +779,6 @@ interface WorkflowResult {
   finalText?: string;
   /** Consumo facturado por hop agregado; no tamaño único de contexto. §15.6 */
   usage?: IAnthropicUsage;
-  totalCostUsd?: number;
   stepCount: number;
   closedByEvent: WorkflowClosedByEvent;
   sessionId: string;
@@ -825,7 +822,6 @@ const result: WorkflowResult = {
   sessionId: hook.session_id,             // ← hook
   stepCount: closedSteps.length,          // ← agregación
   usage: aggregateWorkflowUsage(closedSteps, completedChildWorkflows), // ← §15.6
-  totalCostUsd: pricingService.estimate(closedSteps, completedChildWorkflows), // ← gateway
 };
 ```
 
@@ -855,11 +851,11 @@ Cuando la inferencia falla antes de consolidar un Step completo:
 
 | Pregunta | Fuente recomendada |
 |----------|-------------------|
-| ¿Cuánto me cobraron en este workflow/turno? | `WorkflowResult.usage` (+ `totalCostUsd`) |
+| ¿Cuánto me cobraron en este workflow/turno? | `WorkflowResult.usage` |
 | ¿Cuánto midió el prompt en la última inferencia? | Último `Step.usage` / último `inferenceRequest` |
 | Detalle forense por hop | `Workflow.steps[]` |
 
-Los campos `cache_read_input_tokens` y `cache_creation_input_tokens` son **categorías de facturación** del mismo hop (ver [how-to-calculate-anthropic-api-costs.md](../how-to-calculate-anthropic-api-costs.md) §4 y skill `anthropic-api-protocol`). Al agregar entre hops, se suman **por categoría** para la ecuación de coste (§15.7, separación con `totalCostUsd`), no para un único número «tamaño del prompt». No trates `input_tokens + cache_*` agregados como cardinalidad única del contexto.
+Los campos `cache_read_input_tokens` y `cache_creation_input_tokens` son **categorías de facturación** del mismo hop (ver skill `anthropic-api-protocol`). Al agregar entre hops, se suman **por categoría**, no para un único número «tamaño del prompt». No trates `input_tokens + cache_*` agregados como cardinalidad única del contexto.
 
 **Tabla comparativa**
 
@@ -933,11 +929,6 @@ Main workflow
 **Métricas a nivel Session**
 
 Sumar todos los `WorkflowResult.usage` de una Session (main + sub) **contaría dos veces** los tokens del subagente (aparecen en hijo y en rollup del padre). Regla v1: **Session = Σ `WorkflowResult.usage` de workflows `kind: 'main'`** (ya incluyen rollup). Ver **G16**.
-
-**Separación con `totalCostUsd`**
-
-- `usage` = contadores **facturados** del wire, sumados por hop y **por categoría** (§15.7.1).
-- `totalCostUsd` = cálculo gateway con tarifas propias desde los mismos Steps cerrados (+ hijos en rollup), **no** derivado únicamente del agregado final de tokens ni como `input_tokens × un solo precio`. Ver **§15.3** y **§15.5**.
 
 ### 15.8 Semántica de `finalText`
 
@@ -1539,13 +1530,12 @@ buildWorkflowResult(workflow, closedSteps, hookPayload) → {
   sessionId: hookPayload.session_id,
   usage: aggregateWorkflowUsage(closedSteps, childWorkflows),
   stepCount: closedSteps.length,
-  totalCostUsd?: calculateCost(usage),
 }
 ```
 
 **Notas normativas sobre la interacción Hooks ↔ dominio:**
 
-> **`WorkflowResult` desde hooks:** Al cerrar, el correlador construye el snapshot. Del hook provienen `closedByEvent`, `sessionId`, `finalText` (`last_assistant_message` — voz del orquestador; **no** derivar de wire) y la base para `outcome`. De Steps **cerrados** provienen `stepCount` y la base de `usage` (consumo facturado por hop); el rollup de sub-workflows al padre se aplica en `aggregateWorkflowUsage`. `totalCostUsd` es cálculo gateway.
+> **`WorkflowResult` desde hooks:** Al cerrar, el correlador construye el snapshot. Del hook provienen `closedByEvent`, `sessionId`, `finalText` (`last_assistant_message` — voz del orquestador; **no** derivar de wire) y la base para `outcome`. De Steps **cerrados** provienen `stepCount` y la base de `usage` (consumo facturado por hop); el rollup de sub-workflows al padre se aplica en `aggregateWorkflowUsage`.
 
 > **`finalText` y subagentes:** El `finalText` del workflow **main** proviene del hook `Stop` (texto final del agente main). El del sub-workflow hijo proviene de `SubagentStop` (texto final del subagente). El resumen del hijo **no** se denormaliza en el `finalText` del padre; el padre lo observa vía `ToolUse` / `tool_result` en sus Steps.
 
@@ -2835,8 +2825,7 @@ flowchart TB
 
 > **Estado G1 (implementado 2026-05-29):** tipos primitivos, interfaces DTO, modelos de clase y
 > servicios puros de cierre están implementados. El hook de cierre usa `ClaudeHookEvent` de
-> `hook.types.ts` (no `ClosureHookPayload`). `totalCostUsd` queda `undefined` en G1 (cálculo
-> de coste depende de pricing — diferido a fase posterior). Tests en `tests/1-domain/gateway/`.
+> `hook.types.ts` (no `ClosureHookPayload`). Tests en `tests/1-domain/gateway/`.
 
 Estructura implementada en `1-domain/`:
 
@@ -2867,7 +2856,7 @@ src/1-domain/
 ├── services/
 │   ├── gateway/                # IMPLEMENTADO (G1) — funciones puras
 │   │   ├── aggregate-workflow-usage.ts   # AnthropicUsage|undefined; undefined si sin datos
-│   │   ├── build-workflow-result.ts      # compone IWorkflowResult; totalCostUsd=undefined en G1
+│   │   ├── build-workflow-result.ts      # compone IWorkflowResult
 │   │   ├── derive-outcome.ts             # eventName → WorkflowOutcome
 │   │   ├── derive-final-text.ts          # passthrough lastAssistantMessage
 │   │   └── validate-workflow-invariants.ts  # invariante G5
@@ -3029,7 +3018,6 @@ En todas las fases C y G: **mismo layout `sessions/`** salvo campos adicionales 
 | session-audit-model.md | `docs/session-audit-model.md` |
 | README PKA del repo | `README.md` § Diseño PKA |
 | Capa 4 en SCP | `src/4-api/README.md` |
-| Coste / usage por hop | `docs/how-to-calculate-anthropic-api-costs.md` |
 | workflow-persistence design | `docs/external-references/workflow-persistence-refactor-phase/design.md` |
 | Diseño unificado gateway (este documento) | `docs/proposals/gateway-design.md` |
 
@@ -3134,7 +3122,6 @@ server_tool_use?: {
 };
 ```
 2. En agregación de `WorkflowResult.usage`, sumar `web_search_requests` y `web_fetch_requests` entre Steps.
-3. Incluir en `totalCostUsd` el coste de búsquedas ($0.01/búsqueda).
 
 #### 46.5.4 `cache_creation.ephemeral_5m` / `ephemeral_1h`
 

@@ -1,13 +1,4 @@
 {
   "modelId": "atlas-cloud/deepseek/deepseek-v4-pro",
-  "displayName": "DeepSeek V4 Pro",
-  "costs": {
-    "input": {
-      "base": 1.70,
-      "cacheWrite5m": 1.70,
-      "cacheWrite1h": 1.70,
-      "cacheRead": 0.14
-    },
-    "output": 3.40
-  }
+  "displayName": "DeepSeek V4 Pro"
 }

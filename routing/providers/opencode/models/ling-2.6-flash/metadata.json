@@ -1,13 +1,4 @@
 {
   "modelId": "ling-2.6-flash-free",
-  "displayName": "Ling 2.6 Flash",
-  "costs": {
-    "input": {
-      "base": 0.0,
-      "cacheWrite5m": 0.0,
-      "cacheWrite1h": 0.0,
-      "cacheRead": 0.0
-    },
-    "output": 0.0
-  }
+  "displayName": "Ling 2.6 Flash"
 }

@@ -15,8 +15,6 @@ export interface IWorkflowResult {
    * más rollup de hijos completados). `undefined` si ningún step aportó usage. Ver §15.7.
    */
   usage?: AnthropicUsage;
-  /** Coste estimado en USD con tarifas propias del gateway. Diferido a fase posterior. */
-  totalCostUsd?: number;
   /** Cantidad de steps cerrados al momento del cierre. */
   stepCount: number;
   /** Evento del hook que disparó el cierre. */

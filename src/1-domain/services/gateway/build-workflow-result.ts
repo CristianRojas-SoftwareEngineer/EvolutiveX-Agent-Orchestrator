@@ -12,7 +12,6 @@ const VALID_CLOSED_BY: ReadonlySet<string> = new Set(['Stop', 'SubagentStop', 'S
 /**
  * Construye el IWorkflowResult al cierre del workflow.
  * Función pura invocada desde el handler de capa 3 en lugar de un método con efectos.
- * `totalCostUsd` queda `undefined` en G1 (cálculo de coste diferido a fase posterior).
  */
 export function buildWorkflowResult(
   workflow: IWorkflow,
@@ -28,7 +27,6 @@ export function buildWorkflowResult(
     outcome: deriveOutcome(hook),
     finalText: deriveFinalText(hook),
     usage: aggregateWorkflowUsage(closedSteps, childResults),
-    totalCostUsd: undefined,
     stepCount: closedSteps.length,
     closedByEvent,
     sessionId: hook.sessionId,

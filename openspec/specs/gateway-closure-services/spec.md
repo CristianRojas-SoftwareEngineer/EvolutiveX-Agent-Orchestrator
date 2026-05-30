@@ -58,8 +58,7 @@ Contrato:
 - Devuelve `IWorkflowResult` con: `outcome` (via `deriveOutcome`), `finalText` (via `deriveFinalText`),
   `closedByEvent` (mapeo de `hook.eventName` a `WorkflowClosedByEvent`; fallback conservador si no
   es uno de los tres valores válidos), `sessionId: hook.sessionId`, `stepCount: closedSteps.length`,
-  `usage` (via `aggregateWorkflowUsage`). `totalCostUsd` queda `undefined` en G1 (cálculo de coste
-  depende de pricing — diferido a fase posterior).
+  `usage` (via `aggregateWorkflowUsage`).
 - La función SHALL ser pura: sin I/O, sin efectos secundarios, sin mutación de argumentos.
 - El cierre del workflow SHALL expresarse como llamada a esta función desde el handler de capa 3,
   NO como un método `Workflow.complete()` con efectos.

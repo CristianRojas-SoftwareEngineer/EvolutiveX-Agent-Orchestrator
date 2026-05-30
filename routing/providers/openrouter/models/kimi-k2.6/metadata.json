@@ -1,13 +1,4 @@
 {
   "modelId": "moonshotai/kimi-k2.6:free",
-  "displayName": "Kimi K2.6",
-  "costs": {
-    "input": {
-      "base": 0,
-      "cacheWrite5m": 0,
-      "cacheWrite1h": 0,
-      "cacheRead": 0
-    },
-    "output": 0
-  }
+  "displayName": "Kimi K2.6"
 }

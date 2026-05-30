@@ -16,62 +16,62 @@
 
 ## C1 — Wire: cabeceras `agent-id` + `resolveAgentContext` + `IWorkflowRepository` mínimo
 
-- [ ] Verificar dependencias §43: ninguna (dependencia `—`)
+- [x] Verificar dependencias §43: ninguna (dependencia `—`)
   - _Criterio: no aplica; puede iniciarse en cualquier momento_
 - [x] Crear change de segundo nivel `gateway-c1-wire-agent-headers` (skill `openspec-propose`)
   - _Criterio: directorio `openspec/changes/gateway-c1-wire-agent-headers/` con `.openspec.yaml` creado_
 - [x] El `proposal.md` del change hijo incluye back-reference `Orquestador: gateway-migration | Fase: c1 (C)`
   - _Criterio: línea de back-reference presente en `proposal.md`_
 - [x] Actualizar estado de C1 a `en-curso` en el registro del orquestador
-- [ ] Seguimiento de implementación del change hijo (`openspec-apply`)
+- [x] Seguimiento de implementación del change hijo (`openspec-apply`)
   - _Criterio: todos los tasks.md del change hijo marcados como completados_
-- [ ] Gate superado: pruebas de correlación identidad/cabeceras E2E pasan
+- [x] Gate superado: pruebas de correlación identidad/cabeceras E2E pasan
   - _Criterio: `npm run test:quick` sin errores (lint + typecheck + suite Vitest completa)_
-- [ ] Documentación actualizada: `README.md`, `docs/session-audit-model.md`
+- [x] Documentación actualizada: `README.md`, `docs/session-audit-model.md`
   - _Criterio: descripción de cabeceras `agent-id` y `resolveAgentContext` reflejada en docs_
-- [ ] Legacy retirado: lógica heurística de correlación de agente eliminada o deprecada
+- [x] Legacy retirado: lógica heurística de correlación de agente eliminada o deprecada
   - _Criterio: `npm run lint` pasa sin imports huérfanos; no hay código duplicado_
-- [ ] Sync de specs si C1 modifica comportamiento acordado (`openspec-sync`)
+- [x] Sync de specs si C1 modifica comportamiento acordado (`openspec-sync`)
   - _Criterio: ejecutado si aplica; no ejecutado si no hay delta de specs_
-- [ ] Marcar C1 como `validada` en el registro y archivar el change hijo (`openspec-archive`)
+- [x] Marcar C1 como `validada` en el registro y archivar el change hijo (`openspec-archive`)
   - _Criterio: columna Estado de C1 = `archivada`; change hijo en `openspec/changes/archive/`_
 
 ---
 
 ## C2 — Wire: join SSE `tool_use_id` ↔ subagente + fallback legacy
 
-- [ ] Verificar dependencias §43: C1 en estado `validada` o `archivada`
+- [x] Verificar dependencias §43: C1 en estado `validada` o `archivada`
   - _Criterio: columna Estado de C1 = `validada` o `archivada` en el registro_
-- [ ] Crear change de segundo nivel `gateway-c2-sse-subagent-join` (skill `openspec-propose`)
+- [x] Crear change de segundo nivel `gateway-c2-sse-subagent-join` (skill `openspec-propose`)
   - _Criterio: directorio `openspec/changes/gateway-c2-sse-subagent-join/` con `.openspec.yaml` creado_
-- [ ] El `proposal.md` del change hijo incluye back-reference al orquestador
-- [ ] Actualizar estado de C2 a `en-curso` en el registro del orquestador
-- [ ] Seguimiento de implementación del change hijo (`openspec-apply`)
-- [ ] Gate superado: pruebas de join `tool_use_id`↔subagente + fallback legacy E2E
+- [x] El `proposal.md` del change hijo incluye back-reference al orquestador
+- [x] Actualizar estado de C2 a `en-curso` en el registro del orquestador
+- [x] Seguimiento de implementación del change hijo (`openspec-apply`)
+- [x] Gate superado: pruebas de join `tool_use_id`↔subagente + fallback legacy E2E
   - _Criterio: `npm run test` sin errores; cobertura de join out-of-order y fallback sin cabeceras_
-- [ ] Documentación actualizada: `docs/session-audit-model.md`
+- [x] Documentación actualizada: `docs/session-audit-model.md`
   - _Criterio: correlación plano B (§23) descrita como implementada_
-- [ ] Legacy retirado: correlación pending heurística de subagente eliminada o deprecada
-- [ ] Sync de specs si aplica (`openspec-sync`)
-- [ ] Marcar C2 como `validada` y archivar el change hijo (`openspec-archive`)
+- [x] Legacy retirado: correlación pending heurística de subagente eliminada o deprecada
+- [x] Sync de specs si aplica (`openspec-sync`)
+- [x] Marcar C2 como `validada` y archivar el change hijo (`openspec-archive`)
 
 ---
 
 ## C3 — Hooks: endpoint `POST /hooks` + `AuditHookEventHandler`
 
-- [ ] Verificar dependencias §43: C1 en estado `validada` o `archivada`
+- [x] Verificar dependencias §43: C1 en estado `validada` o `archivada`
   - _Criterio: columna Estado de C1 = `validada` o `archivada` en el registro_
-- [ ] Crear change de segundo nivel `gateway-c3-hooks-endpoint` (skill `openspec-propose`)
+- [x] Crear change de segundo nivel `gateway-c3-hooks-endpoint` (skill `openspec-propose`)
   - _Criterio: directorio `openspec/changes/gateway-c3-hooks-endpoint/` con `.openspec.yaml` creado_
-- [ ] El `proposal.md` del change hijo incluye back-reference al orquestador
-- [ ] Actualizar estado de C3 a `en-curso` en el registro del orquestador
-- [ ] Seguimiento de implementación del change hijo (`openspec-apply`)
-- [ ] Gate superado: pruebas de `POST /hooks` y `AuditHookEventHandler` E2E
+- [x] El `proposal.md` del change hijo incluye back-reference al orquestador
+- [x] Actualizar estado de C3 a `en-curso` en el registro del orquestador
+- [x] Seguimiento de implementación del change hijo (`openspec-apply`)
+- [x] Gate superado: pruebas de `POST /hooks` y `AuditHookEventHandler` E2E
   - _Criterio: `npm run test` sin errores; hook `UserPromptSubmit`, `Stop`, `PreToolUse`, `PostToolUse` procesados_
-- [ ] Documentación actualizada: `README.md`, `docs/proposals/gateway-design.md`
+- [x] Documentación actualizada: `README.md`, `docs/proposals/gateway-design.md`
   - _Criterio: endpoint `POST /hooks` y bus de eventos §28b descritos como implementados_
-- [ ] Sync de specs si aplica (`openspec-sync`)
-- [ ] Marcar C3 como `validada` y archivar el change hijo (`openspec-archive`)
+- [x] Sync de specs si aplica (`openspec-sync`)
+- [x] Marcar C3 como `validada` y archivar el change hijo (`openspec-archive`)
 
 ---
 
@@ -79,26 +79,26 @@
 
 > Puede iniciarse en paralelo con las fases C (dependencia `—` en §43).
 
-- [ ] Verificar dependencias §43: ninguna (dependencia `—`)
-- [ ] Crear change de segundo nivel `gateway-g1-domain-types-services` (skill `openspec-propose`)
+- [x] Verificar dependencias §43: ninguna (dependencia `—`)
+- [x] Crear change de segundo nivel `gateway-g1-domain-types-services` (skill `openspec-propose`)
   - _Criterio: directorio `openspec/changes/gateway-g1-domain-types-services/` con `.openspec.yaml` creado_
-- [ ] El `proposal.md` del change hijo incluye back-reference al orquestador
-- [ ] Actualizar estado de G1 a `en-curso` en el registro del orquestador
-- [ ] Seguimiento de implementación del change hijo (`openspec-apply`)
+- [x] El `proposal.md` del change hijo incluye back-reference al orquestador
+- [x] Actualizar estado de G1 a `en-curso` en el registro del orquestador
+- [x] Seguimiento de implementación del change hijo (`openspec-apply`)
   - _Criterio: implementación respeta PKA — nuevos tipos y servicios en capa 1_
-- [ ] Domain services de cierre implementados en capa 1: `aggregateWorkflowUsage`, `buildWorkflowResult`, `deriveOutcome`, `deriveFinalText`
+- [x] Domain services de cierre implementados en capa 1: `aggregateWorkflowUsage`, `buildWorkflowResult`, `deriveOutcome`, `deriveFinalText`
   - _Criterio: tipos `WorkflowResult`, `Workflow`, `Step`, `ToolUse` definidos; servicios puros sin dependencias de infraestructura_
-- [ ] Gate superado: `npm run test:quick` (lint + typecheck + unit) sin errores
-- [ ] Documentación actualizada: `docs/proposals/gateway-design.md` §39
+- [x] Gate superado: `npm run test:quick` (lint + typecheck + unit) sin errores
+- [x] Documentación actualizada: `docs/proposals/gateway-design.md` §39
   - _Criterio: tipos `Workflow`, `Step`, `ToolUse`, `WorkflowResult` y servicios de cierre descritos como implementados_
-- [ ] Legacy retirado: tipos `Interaction*` en capa 1 reemplazados
+- [x] Legacy retirado: tipos `Interaction*` en capa 1 reemplazados
   - _Criterio: `npm run lint` pasa; no hay referencias huérfanas a `Interaction*` en capa 1_
   - _Nota (diferido G1): `InteractionType`, `InteractionOutcome`, `InteractionMetadata`,
     `ActiveInteraction`, `InteractionState`, `AuditInteractionContext` marcados `@deprecated`
     en `audit.types.ts` (2026-05-29). Eliminación efectiva diferida a la fase que migre el último
     consumidor en capas 2-5 (G4 o P, a confirmar al implementar G4)._
-- [ ] Sync de specs si aplica (`openspec-sync`)
-- [ ] Marcar G1 como `validada` y archivar el change hijo (`openspec-archive`)
+- [x] Sync de specs si aplica (`openspec-sync`)
+- [x] Marcar G1 como `validada` y archivar el change hijo (`openspec-archive`)
 
 ---
 
@@ -179,7 +179,7 @@
 - [x] Documentación actualizada: `docs/proposals/gateway-design.md` §39 — bloque Estado G5 añadido
 - [x] Legacy retirado: no existía `ProviderCatalog` inline en `src/`; item diferido a P0+ (anotado en registro)
 - [x] Sync de specs si aplica (`openspec-sync`) — no aplica (comportamiento nuevo, no modifica specs existentes)
-- [ ] Marcar G5 como `validada` y archivar el change hijo (`openspec-archive`)
+- [x] Marcar G5 como `validada` y archivar el change hijo (`openspec-archive`)
 
 ---
 

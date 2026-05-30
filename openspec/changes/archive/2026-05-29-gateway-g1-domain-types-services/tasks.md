@@ -87,16 +87,16 @@
 
 ## 9. Gobernanza OpenSpec
 
-- [ ] 9.1 Ejecutar `npx openspec validate --changes gateway-g1-domain-types-services` y resolver
+- [x] 9.1 Ejecutar `npx openspec validate --changes gateway-g1-domain-types-services` y resolver
   cualquier advertencia. Criterio: validación pasa sin errores.
-- [ ] 9.2 Ejecutar la skill `migration-phase-gate` para verificar trazabilidad 1:1 a G1/§43,
+- [x] 9.2 Ejecutar la skill `migration-phase-gate` para verificar trazabilidad 1:1 a G1/§43,
   back-reference al orquestador, dependencias satisfechas y DoD cubierta. Criterio: sin hallazgos
   CRITICAL.
-- [ ] 9.3 Actualizar el estado de G1 en la tabla del orquestador
+- [x] 9.3 Actualizar el estado de G1 en la tabla del orquestador
   (`openspec/changes/gateway-migration/design.md`) de `pendiente` a `validada`. Criterio: la fila
   G1 del registro muestra estado `validada`.
-- [ ] 9.4 Ejecutar `openspec-sync` si hay specs de esta fase que deban promoverse a
+- [x] 9.4 Ejecutar `openspec-sync` si hay specs de esta fase que deban promoverse a
   `openspec/specs/`. Criterio: `openspec/specs/gateway-domain-types/` y
   `openspec/specs/gateway-closure-services/` reflejan el estado final de la fase.
-- [ ] 9.5 Archivar el change con `openspec-archive`. Criterio: el change se mueve a
+- [x] 9.5 Archivar el change con `openspec-archive`. Criterio: el change se mueve a
   `openspec/changes/archive/` con prefijo de fecha; estado del registro actualizado a `archivada`.

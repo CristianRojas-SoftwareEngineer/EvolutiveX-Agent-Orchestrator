@@ -46,4 +46,4 @@
 - [x] 10.2 Ejecutar `migration-phase-gate` para la fase C3: verificar trazabilidad, DoD del orquestador y dependencia C1 satisfecha (archivada).
 - [x] 10.3 Actualizar el estado de la fase C3 a `validada` en la tabla de `openspec/changes/gateway-migration/design.md`.
 - [x] 10.4 Ejecutar `openspec-sync` para sincronizar los deltas de `specs/hooks-lifecycle-correlation/spec.md` sobre la spec maestra en `openspec/specs/hooks-lifecycle-correlation/spec.md`.
-- [ ] 10.5 Ejecutar `openspec-archive` para archivar el change `gateway-c3-hooks-endpoint`.
+- [x] 10.5 Ejecutar `openspec-archive` para archivar el change `gateway-c3-hooks-endpoint`.

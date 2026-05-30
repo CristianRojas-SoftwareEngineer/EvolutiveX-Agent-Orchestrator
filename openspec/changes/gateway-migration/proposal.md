@@ -36,4 +36,4 @@ _(ninguna — este change no modifica comportamiento acordado existente en `open
 - **Capas PKA implicadas por bloque:**
   - Bloque C (correlación Wire+Hooks, C1–C3): capas 2 (adapters/ports), 3 (handlers), 5 (HTTP delivery — nueva ruta `POST /hooks`).
   - Bloque G (refactor dominio **incluido el cierre E2E**): capas 1→2→3→4 en cadena; domain services de cierre en G1 (capa 1), lifecycle de cierre en G2 (capas 1+2), `AuditWorkflowClosureHandler` y proyección `WorkflowResult` en G4 (capas 2+3).
-  - Bloque P (persistencia/layout): capa 2 (`SessionPersistence`) + disco `sessions/`.
+  - Bloque P (persistencia/layout): capa 1 (`IEventBus` port) + capa 2 (`EventBus`, `SessionPersistence`, correlador con emisión al bus) + disco `sessions/`.

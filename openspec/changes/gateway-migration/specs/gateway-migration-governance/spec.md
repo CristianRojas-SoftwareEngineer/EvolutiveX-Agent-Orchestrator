@@ -47,10 +47,17 @@ Una fase SHALL considerarse completa si y solo si se cumplen las tres condicione
 - **THEN** lint, typecheck y tests unitarios SHALL pasar sin errores
 - **AND** la fase G1 NO SHALL marcarse como validada hasta que este comando pase
 
-#### Scenario: Gate técnico — bloque P
+#### Scenario: Gate técnico — bloque P (P1, subconjunto estructural)
 
-- **GIVEN** una fase del bloque P completada (p. ej. P1)
-- **WHEN** se ejecuta `npm run test` y el checklist §37b (20 casos)
+- **GIVEN** la fase P1 completada
+- **WHEN** se ejecuta `npm run test` y el subconjunto estructural del checklist §37b (casos 3–7, 16, 19)
+- **THEN** build, lint, typecheck y tests SHALL pasar
+- **AND** los casos estructurales del [checklist E2E §37b](../../../../docs/proposals/gateway-design.md#37b-checklist-de-aceptación-e2e-del-layout) SHALL estar verificados (casos 1, 2 y 15 excluidos: 1 y 15 son artefactos de P2; 2 ya verde en G4)
+
+#### Scenario: Gate técnico — bloque P (P2, checklist completo)
+
+- **GIVEN** la fase P2 completada
+- **WHEN** se ejecuta `npm run test` y el checklist §37b completo (20 casos)
 - **THEN** build, lint, typecheck y tests SHALL pasar
 - **AND** los 20 casos del [checklist E2E §37b](../../../../docs/proposals/gateway-design.md#37b-checklist-de-aceptación-e2e-del-layout) SHALL estar verificados
 

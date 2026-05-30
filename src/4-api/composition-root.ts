@@ -7,6 +7,7 @@ import { AuditWriterService } from '../2-services/audit-writer.service.js';
 import { SseReconstructService } from '../2-services/sse-reconstruct.service.js';
 import { StreamTeeService } from '../2-services/stream-tee.service.js';
 import { WorkflowRepositoryService } from '../2-services/workflow-repository.service.js';
+import { ProviderCatalogService } from '../2-services/provider-catalog.service.js';
 import { StepAssemblerService } from '../2-services/step-assembler.service.js';
 import { SessionMetricsService } from '../2-services/session-metrics.service.js';
 import { AuditWorkflowClosureHandler } from '../3-operations/audit-workflow-closure.handler.js';
@@ -44,6 +45,7 @@ export async function createProxyDependencies(
   const sseReconstruct = new SseReconstructService(auditWriter);
   const streamTee = new StreamTeeService();
   const workflowRepo = new WorkflowRepositoryService();
+  const providerCatalog = new ProviderCatalogService(config.UPSTREAM_ORIGIN);
 
   await sessionStore.ensureAuditSessionsRoot();
 
@@ -99,6 +101,7 @@ export async function createProxyDependencies(
     hookEventHandler,
     streamTee,
     sessionStore,
+    providerCatalog,
     config,
   };
 }

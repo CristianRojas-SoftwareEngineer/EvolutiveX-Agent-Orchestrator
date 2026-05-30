@@ -169,16 +169,16 @@
 
 > Puede iniciarse en paralelo con las fases C y G1 (dependencia `—` en §43).
 
-- [ ] Verificar dependencias §43: ninguna (dependencia `—`)
-- [ ] Crear change de segundo nivel `gateway-g5-provider-catalog` (skill `openspec-propose`)
-- [ ] El `proposal.md` del change hijo incluye back-reference al orquestador
-- [ ] Actualizar estado de G5 a `en-curso` en el registro del orquestador
-- [ ] Seguimiento de implementación del change hijo (`openspec-apply`)
-  - _Criterio: `ProviderCatalog` como entidad de capa 1; cargado desde `routing/providers/`_
-- [ ] Gate superado: `npm run test:quick` sin errores
-- [ ] Documentación actualizada: `docs/proposals/gateway-design.md` §39
-- [ ] Legacy retirado: `ProviderCatalog` inline en `routing/` eliminado o consolidado
-- [ ] Sync de specs si aplica (`openspec-sync`)
+- [x] Verificar dependencias §43: ninguna (dependencia `—`)
+- [x] Crear change de segundo nivel `gateway-g5-provider-catalog` (skill `openspec-propose`)
+- [x] El `proposal.md` del change hijo incluye back-reference al orquestador
+- [x] Actualizar estado de G5 a `en-curso` en el registro del orquestador
+- [x] Seguimiento de implementación del change hijo (`openspec-apply`)
+  - _Criterio: `IProviderCatalog` en capa 1; `ProviderCatalogService` en capa 2; cableado en composition root_
+- [x] Gate superado: `npm run test:quick` sin errores (37 archivos, 367 tests — 2026-05-30)
+- [x] Documentación actualizada: `docs/proposals/gateway-design.md` §39 — bloque Estado G5 añadido
+- [x] Legacy retirado: no existía `ProviderCatalog` inline en `src/`; item diferido a P0+ (anotado en registro)
+- [x] Sync de specs si aplica (`openspec-sync`) — no aplica (comportamiento nuevo, no modifica specs existentes)
 - [ ] Marcar G5 como `validada` y archivar el change hijo (`openspec-archive`)
 
 ---

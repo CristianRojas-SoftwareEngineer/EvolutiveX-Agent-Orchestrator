@@ -2888,6 +2888,16 @@ src/1-domain/
 
 **Implementado G4:** `aggregate-workflow-usage-by-model.ts` (L1), `ISessionMetrics` en `types/gateway/session-metrics.types.ts`, `SessionMetricsService`, `AuditWorkflowClosureHandler` y projector `WorkflowResult` → `meta.json`. Layout `causal-workflows-v1` sigue pendiente (fases P).
 
+> **Estado G5 (implementado 2026-05-30):** port `IProviderCatalog` añadido en capa 1
+> (`src/1-domain/interfaces/gateway/IProviderCatalog.ts`). Adapter `ProviderCatalogService`
+> implementado en capa 2 (`src/2-services/provider-catalog.service.ts`): deriva un único proveedor
+> desde `UPSTREAM_ORIGIN` (`kind: 'anthropic'` si la URL contiene `api.anthropic.com`,
+> `kind: 'custom'` con `baseUrl` en otro caso) y expone `getLanguageModel` en modo pass-through
+> con cache por identidad referencial. Cableado aditivo en composition root (`providerCatalog`
+> expuesto en `ProxyDependencies`). Ningún handler existente modificado. Tests en
+> `tests/2-services/provider-catalog.service.test.ts` (5 casos). `npm run test:quick` → 37 archivos,
+> 367 tests, 0 errores.
+
 ---
 
 ## 40. Capa 2 objetivo

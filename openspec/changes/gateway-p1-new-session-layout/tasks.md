@@ -9,13 +9,13 @@
 
 ## 2. Adaptadores de infraestructura (capa 2)
 
-- [ ] 2.1 Crear `EventBus` adapter en `src/2-services/event-bus.service.ts`: pub/sub async in-process, fire-and-forget, pattern matching, `SubscriptionRef` para desuscripción
+- [x] 2.1 Crear `EventBus` adapter en `src/2-services/event-bus.service.ts`: pub/sub async in-process, fire-and-forget, pattern matching, `SubscriptionRef` para desuscripción
   - _Criterio: `npm run test:quick` pasa; escenarios de publish/subscribe/unsubscribe/error-handling cubiertos_
-- [ ] 2.2 Crear utilidades async en `src/2-services/utils/async.utils.ts`: `fireAndForget(fn)`, `withTimeout(fn, ms)`
+- [x] 2.2 Crear utilidades async en `src/2-services/utils/async.utils.ts`: `fireAndForget(fn)`, `withTimeout(fn, ms)`
   - _Criterio: `npm run typecheck` pasa; funciones exportadas_
-- [ ] 2.3 Crear funciones de routing en `src/2-services/session-routing.ts`: `getWorkflowDir`, `getStepDir`, `getToolsDir`, `getToolDir` con normalización de slug
+- [x] 2.3 Crear funciones de routing en `src/2-services/session-routing.ts`: `getWorkflowDir`, `getStepDir`, `getToolsDir`, `getToolDir` con normalización de slug
   - _Criterio: `npm run test:quick` pasa; escenarios de routing y slug del spec `session-routing` cubiertos_
-- [ ] 2.4 Crear `SessionPersistence` en `src/2-services/session-persistence.service.ts`:
+- [x] 2.4 Crear `SessionPersistence` en `src/2-services/session-persistence.service.ts`:
   - Suscribirse a eventos del bus en constructor: `workflow_start`, `workflow_spawn`, `step_request`, `step_response`, `tool_call`, `tool_result`, `workflow_complete`, `workflow_cancel`
   - Proyectar a disco: `meta.json` (atómico, write temp + rename, serializado con `writeQueue`), `output/result.json` + `result.parsed.md`, `request/body.json`, `response/body.json`, `response/headers.json`, `response/parsed.md`, `tools/KK-slug/{input,result,meta}.json`
   - Directorios lazy (§31): solo crear cuando hay contenido

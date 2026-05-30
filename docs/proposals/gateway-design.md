@@ -1343,7 +1343,7 @@ src/1. domain/
 | Estado | Responsable | Descripción |
 | ------ | ----------- | ----------- |
 | `activeWorkflowBySession` | Correlador | Workflow main/sub activo por sesión; indexado por `session_id`. |
-| `openStepBySession` | Correlador | Step abierto (esperando `message_stop` o cierre de tools). |
+| `activeStepBySession` | Correlador | Step abierto (esperando `message_stop` o cierre de tools). |
 | `pendingToolUses` | Correlador | `tool_use` blocks observados en SSE pendientes de `PostToolUse` hook. |
 | `stepBufferByRequestId` | StepBuffer | Una instancia por POST stream activo; ensambla deltas SSE → `assistantMessage`. |
 
@@ -1373,7 +1373,7 @@ sequenceDiagram
   CC->>Hook: SubagentStart
   Hook->>Repo: confirmSubagentFromHook(agentId, toolUseId)
   CC->>Hook: SubagentStop (last_assistant_message)
-  Hook->>Close: closeWorkflow(agentId)
+  Hook->>Close: close(workflowId)
   Close->>Repo: buildWorkflowResult
   Close->>Disk: meta.json + output/result.json (IWorkflowResult + steps[])
 ```
@@ -3031,7 +3031,7 @@ Consideraciones para `POST /hooks`:
 | **G5** | `ProviderCatalog` derivado de `UPSTREAM_ORIGIN` (env var); lectura de `routing/providers/` diferida a P0+ | Refactor gateway | — |
 | **P0** | Spike: confirmar ubicaciones de código en `src/` para los componentes de §28b/§40 (Opción A ratificada), puntos de emisión del correlador (§28b.3), ownership del timer (§24.1/G19), cableado en composition root (§42) y estrategia de corte limpio. El diseño del layout objetivo (naming, schemas, fusión `state.json`→`meta.json`) está fijado en §29/§30/§33 y no es trabajo del spike. Las sesiones anteriores se eliminan (no se migran) | Persistencia | G4 |
 | **P1** | Crear pila `IEventBus` (L1) → `EventBus` (L2) → `SessionPersistence` (L2, suscriptor); conectar correlador al bus (emite eventos §28b.3 en cada mutación de estado); `SessionPersistence` escribe árbol `causal-workflows-v1`: `workflows/NN/meta.json` (estado fusionado, sin `state.json`), `output/result.json` (IWorkflowResult + steps[]), `steps/MM/`, `tools/KK/`. Retirar layout flat: `audit-writer.service.ts`, `session-store.service.ts`, `workflow-result-projector.service.ts`, constantes flat de `audit-paths.ts`, tipos `ActiveInteraction`/`InteractionMetadata` | Persistencia | P0, G4 |
-| **P2** | Artefactos nuevos como suscripciones adicionales de `SessionPersistence` (la pila de bus creada en P1 los habilita): wildcard `*` → `events.ndjson`, `stream_chunk` → `streaming/NNNN-chunk.ndjson` + reconstrucción de `body.json`, `workflow-sequence.json`. Retirar escritura de `sse.jsonl` | Persistencia | P1 |
+| **P2** | Artefactos nuevos como suscripciones adicionales de `SessionPersistence` (la pila de bus creada en P1 los habilita): wildcard `*` → `events.ndjson`, `stream_chunk` → `streaming/NNNN-chunk.ndjson` + reconstrucción de `response/body.json`, `workflow-sequence.json`. Retirar escritura de `sse.jsonl` | Persistencia | P1 |
 
 **Nomenclatura de bloques:**
 

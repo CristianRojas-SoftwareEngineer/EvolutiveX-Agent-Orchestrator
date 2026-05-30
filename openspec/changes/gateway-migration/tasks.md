@@ -192,19 +192,19 @@
 > P0 solo confirma las preguntas de implementación: ubicaciones de código en `src/`,
 > puntos de emisión, timer y composition root.
 
-- [ ] Verificar dependencias §43: G4 en estado `validada` o `archivada`
-- [ ] Crear change de segundo nivel `gateway-p0-layout-diff-spike` (skill `openspec-propose`)
+- [x] Verificar dependencias §43: G4 en estado `validada` o `archivada`
+- [x] Crear change de segundo nivel `gateway-p0-layout-diff-spike` (skill `openspec-propose`)
   - _Criterio: spike documentado; no requiere gate de tests_
-- [ ] El `proposal.md` del change hijo incluye back-reference al orquestador
-- [ ] Actualizar estado de P0 a `en-curso` en el registro del orquestador
-- [ ] Spike completado: los cinco entregables del documento de spike están cubiertos
+- [x] El `proposal.md` del change hijo incluye back-reference al orquestador
+- [x] Actualizar estado de P0 a `validada` en el registro del orquestador
+- [x] Spike completado: los cinco entregables del documento de spike están cubiertos
   - _Criterio 1 — Inventario de componentes:_ documento en `docs/` lista cada componente de §28b/§40 con su archivo destino propuesto en `src/` y su fase (P1 o P2)
-  - _Criterio 2 — Puntos de emisión del correlador:_ para cada método de mutación de `WorkflowRepositoryService` se especifica qué evento de §28b.3 emite (`openWorkflow → workflow_start`, `openSubagentWorkflow → workflow_spawn`, `openStep → step_request`, `registerToolUse → tool_call`, `completeToolUse → tool_result`, `closeWorkflow → workflow_complete | workflow_cancel`)
+  - _Criterio 2 — Puntos de emisión del correlador:_ para cada método de mutación de `WorkflowRepositoryService` se especifica qué evento de §28b.3 emite (`openWorkflow → workflow_start`, `openSubagentWorkflow → workflow_spawn`, `registerStep → step_request`, `registerToolUse → tool_call`, `completeToolUse → tool_result`, `close → workflow_complete | workflow_cancel`)
   - _Criterio 3 — Ownership del timer:_ confirmado que el timer de timeout permanece en el correlador (§24.1/G19); `SessionPersistence` no implementa timer propio
   - _Criterio 4 — Composition root:_ estrategia de cableado (dónde crear `EventBus`, inyectarlo en el correlador y en `SessionPersistence`) documentada para capa 4 (§42)
   - _Criterio 5 — Corte limpio:_ estrategia de eliminación de `sessions/` anterior especificada
-- [ ] Documentación actualizada: `docs/proposals/gateway-design.md` §28b, §40, §42 refleja el estado real
-- [ ] Marcar P0 como `validada` y archivar el change hijo (`openspec-archive`)
+- [x] Documentación actualizada: `docs/proposals/gateway-design.md` §28b, §40, §42 refleja el estado real
+- [x] Marcar P0 como `validada` y archivar el change hijo (`openspec-archive`)
   - _Criterio: no requiere gate técnico; validación = spike documentado y revisado_
 
 ---

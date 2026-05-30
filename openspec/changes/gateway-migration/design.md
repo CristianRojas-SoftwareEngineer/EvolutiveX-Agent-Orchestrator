@@ -35,7 +35,7 @@ La relación padre→hijo entre este orquestador y los changes de segundo nivel 
 | G3 | `gateway-g3-step-assembler` | Refactor gateway | G2 | `npm run test:quick` | `docs/session-audit-model.md` | Lógica de ensamblaje incrustada en `audit-sse-response.handler` | archivada |
 | G4 | `gateway-g4-audit-projection` | Refactor gateway | G3 | `npm run test:quick` (si toca persistencia: `npm run test`) + subset §37b | `docs/session-audit-model.md`, `docs/proposals/gateway-design.md` §33.2, §40 | `InteractionMetadata` generado directamente (reemplazado por `WorkflowResult`); cierre wire-only como ruta principal; `updateSessionMetrics()` en `audit-writer.service.ts` (reemplazado por `SessionMetricsService`); tipo `SessionMetrics` en `audit.types.ts` (migrado a tipos gateway) | archivada |
 | G5 | `gateway-g5-provider-catalog` | Refactor gateway | — | `npm run test:quick` | `docs/proposals/gateway-design.md` §39 | `ProviderCatalog` inline en `routing/` (no existía en src/; diferido a P0+) | archivada |
-| P0 | `gateway-p0-layout-diff-spike` | Persistencia | G4 | Spike documentado — sin gate de tests | `docs/proposals/gateway-design.md` §28b, §40, §42 | — (spike de análisis, no retira código) | pendiente |
+| P0 | `gateway-p0-layout-diff-spike` | Persistencia | G4 | Spike documentado — sin gate de tests | `docs/proposals/gateway-design.md` §28b, §40, §42 | — (spike de análisis, no retira código) | validada |
 | P1 | `gateway-p1-new-session-layout` | Persistencia | P0, G4 | `npm run test` + casos 3–7, 16, 19 (estructurales) del checklist [§37b](../../../docs/proposals/gateway-design.md#37b-checklist-de-aceptación-e2e-del-layout) | `docs/session-audit-model.md`, `README.md`, `docs/proposals/gateway-design.md` §29, §30, §33, §37b, §40, §46.4 | `audit-writer.service.ts`, `session-store.service.ts`, `workflow-result-projector.service.ts`, constantes flat de `audit-paths.ts` (`DIR_MAIN_AGENT`, `DIR_INTERACTIONS`, `PREFIX_SUB_AGENT`), tipos `ActiveInteraction`/`InteractionMetadata` | pendiente |
 | P2 | `gateway-p2-new-artifacts` | Persistencia | P1 | `npm run test` + checklist [§37b](../../../docs/proposals/gateway-design.md#37b-checklist-de-aceptación-e2e-del-layout) completo (20 casos) | `docs/session-audit-model.md`, `docs/proposals/gateway-design.md` §33 | Escritura de `sse.jsonl` (reemplazada por `streaming/NNNN-chunk.ndjson`) | pendiente |
 
@@ -69,10 +69,10 @@ Componentes a crear, alineados con §28b.1 y §40. Los destinos siguen las conve
 
 - `openWorkflow()` → `workflow_start`
 - `openSubagentWorkflow()` → `workflow_spawn`
-- `openStep()` → `step_request`
+- `registerStep()` → `step_request`
 - `registerToolUse()` → `tool_call`
-- `completeToolUse()` → `tool_result` *(timer de timeout permanece en el correlador, §24.1/G19; `SessionPersistence` no lleva timer propio)*
-- `closeWorkflow()` → `workflow_complete` | `workflow_cancel`
+- `completeToolUse()` → `tool_result` *(timer de timeout permanece en el correlador, §24.1/G19; `SessionPersistence` no lleva timer propio)* — **No existe aún; P1 crea este método**
+- `close()` → `workflow_complete` | `workflow_cancel`
 - `AuditSseResponseHandler` emite `stream_chunk` al bus por cada evento SSE (consumido por `SessionPersistence` en P2)
 
 **Legacy a retirar (detalle):**

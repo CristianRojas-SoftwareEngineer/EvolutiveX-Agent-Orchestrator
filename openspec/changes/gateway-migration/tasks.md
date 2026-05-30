@@ -214,11 +214,11 @@
 
 > Objetivo: crear la pila `IEventBus` → `EventBus` → `SessionPersistence`, conectar el correlador al bus y que las sesiones nuevas produzcan el árbol `causal-workflows-v1`. Retirar el layout flat completo. No se transforman sesiones anteriores.
 
-- [ ] Verificar dependencias §43: P0 y G4 en estado `validada` o `archivada`
+- [x] Verificar dependencias §43: P0 y G4 en estado `validada` o `archivada`
   - _Criterio: columnas Estado de P0 y G4 = `validada` o `archivada`_
-- [ ] Crear change de segundo nivel `gateway-p1-new-session-layout` (skill `openspec-propose`)
-- [ ] El `proposal.md` del change hijo incluye back-reference al orquestador
-- [ ] Actualizar estado de P1 a `en-curso` en el registro del orquestador
+- [x] Crear change de segundo nivel `gateway-p1-new-session-layout` (skill `openspec-propose`)
+- [x] El `proposal.md` del change hijo incluye back-reference al orquestador
+- [x] Actualizar estado de P1 a `en-curso` en el registro del orquestador
 - [ ] Seguimiento de implementación del change hijo (`openspec-apply`)
 - [ ] Componentes de infraestructura creados (capa 1):
   - _`IEventBus` port en `src/1-domain/repositories/IEventBus.ts`_

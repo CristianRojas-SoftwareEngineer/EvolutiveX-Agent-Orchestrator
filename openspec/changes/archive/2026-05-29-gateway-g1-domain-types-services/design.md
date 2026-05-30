@@ -92,7 +92,7 @@ las fases que los reemplazan.
 
 **Rationale:** El `src/1-domain/repositories/IWorkflowRepository.ts` actual cubre exclusivamente
 la correlación de subagentes wire (fases C1-C3). El repositorio de workflow completo con lifecycle
-de cierre (`readyToClose`, `openWorkflow`, `closeWorkflow`) es responsabilidad de G2, según §43
+de cierre (`readyToClose`, `openWorkflow`, `close`) es responsabilidad de G2, según §43
 y el registro del orquestador. Modificarlo en G1 adelantaría dependencias de G2 sin tener aún
 los contratos de dominio necesarios (tipos y servicios de G1).
 

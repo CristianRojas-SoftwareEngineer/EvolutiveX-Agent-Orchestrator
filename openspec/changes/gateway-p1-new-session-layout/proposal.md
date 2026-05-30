@@ -1,0 +1,42 @@
+## Why
+
+> **Orquestador:** `gateway-migration` | **Fase:** p1 (P)
+
+El gateway proyecta datos de auditoría a disco mediante escritura directa desde handlers de capa 3 (`AuditWriterService`, `SessionStoreService`), generando un layout flat (interacciones, pasos, sub-agentes anidados). Este diseño viola §28b.4 regla 1 — los handlers no deben escribir disco directamente — y genera acoplamiento entre lógica de negocio y persistencia.
+
+La fase G4 ya proyecta `WorkflowResult` a disco, pero lo hace a través del layout flat heredado. P1 reemplaza toda la pila de persistencia por la arquitectura EventBus + SessionPersistence (Opción A ratificada, §28b/§40), donde el correlador emite eventos a un bus y `SessionPersistence` los consume como suscriptor independiente para producir el layout `causal-workflows-v1` (`workflows/NN/steps/MM/tools/KK/`).
+
+## What Changes
+
+- **Nueva pila de persistencia (Opción A):** crear `IEventBus` (port L1), `EventBus` (adapter L2), `SessionPersistence` (suscriptor L2) y conectar el correlador al bus para que cada mutación de estado emita el evento §28b.3 correspondiente.
+- **Nuevo método `completeToolUse()`** en el correlador: completa `ToolUse` (por timeout §24.1 o por hook `PostToolUse`/`PostToolUseFailure`) y emite `tool_result` al bus.
+- **Layout `causal-workflows-v1`:** las sesiones nuevas adoptan la estructura `workflows/NN/steps/MM/tools/KK/` con `meta.json` (identidad+estado fusionado, sin `state.json` separado — decisión D2) y `output/result.json` (IWorkflowResult + steps[] — decisión D1/D3).
+- **Corte limpio:** sesiones anteriores al layout se eliminan al arranque; no hay migración de datos en reposo.
+- **Retiro de legacy flat:** se eliminan `audit-writer.service.ts`, `session-store.service.ts`, `workflow-result-projector.service.ts`, constantes flat de `audit-paths.ts` y tipos `ActiveInteraction`/`InteractionMetadata`.
+
+## No objetivos
+
+- Artefactos nuevos (`events.ndjson`, streaming chunks, `workflow-sequence.json`) — pertenecen a P2.
+- Escritura de `sse.jsonl` (se retira en P2).
+- Transformación de sesiones anteriores al nuevo layout.
+
+## Capabilities
+
+### New Capabilities
+
+- `event-bus`: Bus de eventos async in-process (IEventBus port + EventBus adapter) con pattern matching de suscripciones (`*`, `prefix_*`, `*_suffix`).
+- `session-persistence`: Suscriptor del bus que proyecta eventos a disco bajo la estructura `causal-workflows-v1` (meta.json, output/result.json, steps/, tools/).
+- `session-routing`: Funciones de mapeo de eventos a rutas de directorio (`getWorkflowDir`, `getStepDir`, `getToolsDir`).
+
+### Modified Capabilities
+
+- `gateway-workflow-lifecycle`: El correlador (`WorkflowRepositoryService`) emite eventos al bus en cada mutación de estado; se crea el método `completeToolUse()`.
+- `gateway-audit-projection`: La proyección de `WorkflowResult` a disco se delega a `SessionPersistence` en lugar de `AuditProjectionFs` directo.
+
+## Impact
+
+- **Capas PKA afectadas:** L1 (nuevos ports y tipos), L2 (nuevos adapters + modificación del correlador), L4 (cableado en composition root).
+- **Archivos nuevos:** `IEventBus.ts`, `telemetry.types.ts`, `event-pattern-match.service.ts`, `event-bus.service.ts`, `session-persistence.service.ts`, `session-routing.ts`, `async.utils.ts`.
+- **Archivos modificados:** `workflow-repository.service.ts` (emisión al bus + `completeToolUse()`), `composition-root.ts` (cableado EventBus).
+- **Archivos eliminados:** `audit-writer.service.ts`, `session-store.service.ts`, `workflow-result-projector.service.ts`, constantes flat de `audit-paths.ts`, tipos `ActiveInteraction`/`InteractionMetadata`.
+- **Documentación:** `docs/session-audit-model.md`, `README.md`, `docs/proposals/gateway-design.md` §29, §30, §33, §37b, §40, §46.4.

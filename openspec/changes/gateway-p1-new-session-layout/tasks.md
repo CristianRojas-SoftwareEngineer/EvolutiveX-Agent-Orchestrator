@@ -24,13 +24,13 @@
 
 ## 3. Correlador: emisión al bus + completeToolUse + lookup (capa 2)
 
-- [ ] 3.1 Modificar `WorkflowRepositoryService` para recibir `IEventBus` en constructor
+- [x] 3.1 Modificar `WorkflowRepositoryService` para recibir `IEventBus` en constructor
   - _Criterio: `npm run typecheck` pasa; constructor acepta `eventBus: IEventBus`_
-- [ ] 3.2 Añadir emisiones de eventos en cada método de mutación: `openWorkflow → workflow_start`, `openSubagentWorkflow → workflow_spawn`, `registerStep → step_request`, `registerToolUse → tool_call`, `close → workflow_complete|workflow_cancel`
+- [x] 3.2 Añadir emisiones de eventos en cada método de mutación: `openWorkflow → workflow_start`, `openSubagentWorkflow → workflow_spawn`, `registerStep → step_request`, `registerToolUse → tool_call`, `close → workflow_complete|workflow_cancel`
   - _Criterio: `npm run test:quick` pasa; 5 emisiones verificadas en tests_
-- [ ] 3.3 Crear método `completeToolUse(workflowId, toolUseId, result)` en correlador: actualizar `toolUse.result` y `toolUse.status`, emitir `tool_result` al bus. Si `toolUseId` no existe, no-op
+- [x] 3.3 Crear método `completeToolUse(workflowId, toolUseId, result)` en correlador: actualizar `toolUse.result` y `toolUse.status`, emitir `tool_result` al bus. Si `toolUseId` no existe, no-op
   - _Criterio: `npm run test:quick` pasa; escenarios de completeToolUse exitoso, error y no-op cubiertos_
-- [ ] 3.4 Añadir métodos de lookup al correlador: `getWorkflowBySessionId`, `findWorkflowWithPendingToolUse`, `registerPendingToolUse`, `consumePendingToolUse`, `findStaleWorkflows`, `nextSequence`, `withSessionLock`
+- [x] 3.4 Añadir métodos de lookup al correlador: `getWorkflowBySessionId`, `findWorkflowWithPendingToolUse`, `registerPendingToolUse`, `consumePendingToolUse`, `findStaleWorkflows`, `nextSequence`, `withSessionLock`
   - _Criterio: `npm run test:quick` pasa; 7 escenarios de lookup del spec `gateway-workflow-lifecycle` cubiertos_
 
 ## 4. Composition root (capa 4)

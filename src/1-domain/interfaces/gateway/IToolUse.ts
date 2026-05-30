@@ -17,6 +17,8 @@ export interface IToolUse {
   toolUseBlock: AnthropicContentBlock;
   /** Bloque `type: 'tool_result'` con el resultado. Ausente hasta completar. */
   toolResultBlock?: AnthropicContentBlock;
+  /** Resultado normalizado del tool (de hook `PostToolUse`/`PostToolUseFailure` o timeout). */
+  result?: { isError: boolean; result: unknown };
   /** ID del sub-workflow hijo. Solo si `name === 'Agent'` y se correlacionó. */
   childWorkflowId?: string;
   /** Momento en que se inició la ejecución. */

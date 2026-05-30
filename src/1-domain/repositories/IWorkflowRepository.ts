@@ -58,6 +58,17 @@ export interface IWorkflowRepository {
   /** Registra un tool_use en el step correspondiente del workflow. */
   registerToolUse(workflowId: string, toolUse: IToolUse): void;
 
+  /**
+   * Completa un `ToolUse` existente (por timeout §24.1 o por hook
+   * `PostToolUse`/`PostToolUseFailure`). Actualiza `toolUse.result` y
+   * `toolUse.status` y emite `tool_result` al bus. No-op si el `toolUseId` no existe.
+   */
+  completeToolUse(
+    workflowId: string,
+    toolUseId: string,
+    result: { isError: boolean; result: unknown },
+  ): void;
+
   /** Evalúa si el workflow puede cerrarse según §15.4. Sin efectos secundarios. */
   readyToClose(workflowId: string, hook: ClaudeHookEvent): boolean;
 
@@ -69,4 +80,36 @@ export interface IWorkflowRepository {
    * No-op si el workflowId no existe.
    */
   setWorkflowModel(workflowId: string, modelId: string): void;
+
+  // ── Métodos de lookup (migración de handlers L3) ──────────────────────────
+
+  /** Recupera el workflow principal (`kind: 'main'`) de una sesión. */
+  getWorkflowBySessionId(sessionId: string): IWorkflow | undefined;
+
+  /**
+   * Busca un tool_use pendiente por su ID en todos los workflows de la sesión.
+   * Devuelve el workflow y el tool_use, o `undefined` si no existe.
+   */
+  findWorkflowWithPendingToolUse(
+    sessionId: string,
+    toolUseId: string,
+  ): { workflow: IWorkflow; toolUse: IToolUse } | undefined;
+
+  /** Registra un tool_use pendiente (agent, web_search, web_fetch) en el step indicado. */
+  registerPendingToolUse(workflowId: string, stepId: string, toolUse: IToolUse): void;
+
+  /**
+   * Consume (elimina de pendientes) un tool_use por su ID.
+   * Devuelve el tool_use consumido o `undefined`.
+   */
+  consumePendingToolUse(workflowId: string, toolUseId: string): IToolUse | undefined;
+
+  /** Busca workflows `running` cuya antigüedad (`startedAt`) supera `maxAgeMs`. */
+  findStaleWorkflows(sessionId: string, maxAgeMs: number): IWorkflow[];
+
+  /** Asigna el siguiente número de secuencia para la sesión. */
+  nextSequence(sessionId: string): Promise<number>;
+
+  /** Ejecuta `fn` serializado por sesión. */
+  withSessionLock<T>(sessionId: string, fn: () => Promise<T>): Promise<T>;
 }

@@ -5,6 +5,7 @@ import type { IWorkflow } from '../1-domain/interfaces/gateway/IWorkflow.js';
 import type { IStep } from '../1-domain/interfaces/gateway/IStep.js';
 import type { IToolUse } from '../1-domain/interfaces/gateway/IToolUse.js';
 import type { IWorkflowResult } from '../1-domain/interfaces/gateway/IWorkflowResult.js';
+import type { IEventBus } from '../1-domain/repositories/IEventBus.js';
 import { Workflow } from '../1-domain/models/gateway/Workflow.js';
 import { buildWorkflowResult } from '../1-domain/services/gateway/build-workflow-result.js';
 
@@ -13,6 +14,27 @@ export class WorkflowRepositoryService implements IWorkflowRepository {
   private readonly index = new Map<string, WireSubagentEntry>();
   // Índice de lifecycle (G2): workflowId → Workflow
   private readonly workflows = new Map<string, Workflow>();
+  // Pendientes de correlación: workflowId → (toolUseId → { stepId, toolUse })
+  private readonly pendingToolUses = new Map<string, Map<string, { stepId: string; toolUse: IToolUse }>>();
+  // Secuencias por sesión.
+  private readonly sequences = new Map<string, number>();
+  // Locks por sesión (cadena de promesas).
+  private readonly sessionLocks = new Map<string, Promise<unknown>>();
+
+  constructor(private readonly eventBus?: IEventBus) {}
+
+  /** Construye y publica un evento al bus, resolviendo `sessionId` desde el workflow. */
+  private emit(type: string, workflowId: string, payload: Record<string, unknown>): void {
+    if (!this.eventBus) return;
+    const sessionId = this.workflows.get(workflowId)?.sessionId ?? '';
+    this.eventBus.publish({
+      type,
+      sessionId,
+      workflowId,
+      timestamp: new Date().toISOString(),
+      payload: { workflowId, ...payload },
+    });
+  }
 
   // ── Métodos wire (C1/C2/C3) ──────────────────────────────────────────────
 
@@ -70,6 +92,7 @@ export class WorkflowRepositoryService implements IWorkflowRepository {
       startedAt: new Date(),
     });
     this.workflows.set(sessionId, workflow);
+    this.emit('workflow_start', workflow.id, { kind: 'main' });
     return workflow;
   }
 
@@ -92,6 +115,7 @@ export class WorkflowRepositoryService implements IWorkflowRepository {
       startedAt: new Date(),
     });
     this.workflows.set(workflowId, workflow);
+    this.emit('workflow_spawn', workflow.id, { parentWorkflowId, parentToolUseId });
     return workflow;
   }
 
@@ -103,6 +127,11 @@ export class WorkflowRepositoryService implements IWorkflowRepository {
     const workflow = this.workflows.get(workflowId);
     if (!workflow) return;
     workflow.steps.push(step);
+    this.emit('step_request', workflowId, {
+      stepIndex: step.index,
+      step,
+      request: step.inferenceRequest,
+    });
   }
 
   public closeStep(workflowId: string, stepId: string): void {
@@ -116,7 +145,37 @@ export class WorkflowRepositoryService implements IWorkflowRepository {
     const workflow = this.workflows.get(workflowId);
     if (!workflow) return;
     const step = workflow.steps.find((s) => s.id === toolUse.stepId);
-    if (step) step.toolUses.push(toolUse);
+    if (!step) return;
+    step.toolUses.push(toolUse);
+    this.emit('tool_call', workflowId, {
+      stepIndex: step.index,
+      toolUseId: toolUse.id,
+      toolName: toolUse.name,
+      input: toolUse.arguments,
+    });
+  }
+
+  public completeToolUse(
+    workflowId: string,
+    toolUseId: string,
+    result: { isError: boolean; result: unknown },
+  ): void {
+    const workflow = this.workflows.get(workflowId);
+    if (!workflow) return;
+    let toolUse: IToolUse | undefined;
+    for (const step of workflow.steps) {
+      toolUse = step.toolUses.find((t) => t.id === toolUseId);
+      if (toolUse) break;
+    }
+    // También puede estar registrado como pendiente.
+    if (!toolUse) {
+      toolUse = this.pendingToolUses.get(workflowId)?.get(toolUseId)?.toolUse;
+    }
+    if (!toolUse) return; // no-op defensivo
+    toolUse.result = result;
+    toolUse.status = result.isError ? 'error' : 'completed';
+    toolUse.completedAt = new Date();
+    this.emit('tool_result', workflowId, { toolUseId, result });
   }
 
   public readyToClose(workflowId: string, hook: ClaudeHookEvent): boolean {
@@ -150,6 +209,87 @@ export class WorkflowRepositoryService implements IWorkflowRepository {
     workflow.result = result;
     workflow.completedAt = new Date();
     workflow.status = result.outcome === 'success' ? 'completed' : 'failed';
+    // `aborted` → cancelación; cualquier otro outcome → cierre completo.
+    if (result.outcome === 'aborted') {
+      this.emit('workflow_cancel', workflowId, { result, cancellationReason: result.outcome });
+    } else {
+      this.emit('workflow_complete', workflowId, { result, outcome: result.outcome });
+    }
     return result;
+  }
+
+  // ── Métodos de lookup (migración de handlers L3) ──────────────────────────
+
+  public getWorkflowBySessionId(sessionId: string): IWorkflow | undefined {
+    const direct = this.workflows.get(sessionId);
+    if (direct && direct.kind === 'main') return direct;
+    for (const wf of this.workflows.values()) {
+      if (wf.kind === 'main' && wf.sessionId === sessionId) return wf;
+    }
+    return undefined;
+  }
+
+  public findWorkflowWithPendingToolUse(
+    sessionId: string,
+    toolUseId: string,
+  ): { workflow: IWorkflow; toolUse: IToolUse } | undefined {
+    for (const [workflowId, pendings] of this.pendingToolUses) {
+      const workflow = this.workflows.get(workflowId);
+      if (!workflow || workflow.sessionId !== sessionId) continue;
+      const entry = pendings.get(toolUseId);
+      if (entry) return { workflow, toolUse: entry.toolUse };
+    }
+    return undefined;
+  }
+
+  public registerPendingToolUse(workflowId: string, stepId: string, toolUse: IToolUse): void {
+    if (!this.workflows.has(workflowId)) return;
+    let pendings = this.pendingToolUses.get(workflowId);
+    if (!pendings) {
+      pendings = new Map();
+      this.pendingToolUses.set(workflowId, pendings);
+    }
+    pendings.set(toolUse.id, { stepId, toolUse });
+  }
+
+  public consumePendingToolUse(workflowId: string, toolUseId: string): IToolUse | undefined {
+    const pendings = this.pendingToolUses.get(workflowId);
+    if (!pendings) return undefined;
+    const entry = pendings.get(toolUseId);
+    if (!entry) return undefined;
+    pendings.delete(toolUseId);
+    return entry.toolUse;
+  }
+
+  public findStaleWorkflows(sessionId: string, maxAgeMs: number): IWorkflow[] {
+    const now = Date.now();
+    const stale: IWorkflow[] = [];
+    for (const wf of this.workflows.values()) {
+      if (wf.sessionId !== sessionId) continue;
+      if (wf.status !== 'running') continue;
+      if (now - wf.startedAt.getTime() > maxAgeMs) stale.push(wf);
+    }
+    return stale;
+  }
+
+  public async nextSequence(sessionId: string): Promise<number> {
+    return this.withSessionLock(sessionId, async () => {
+      const current = this.sequences.get(sessionId) ?? 0;
+      this.sequences.set(sessionId, current + 1);
+      return current;
+    });
+  }
+
+  public withSessionLock<T>(sessionId: string, fn: () => Promise<T>): Promise<T> {
+    const prev = this.sessionLocks.get(sessionId) ?? Promise.resolve();
+    const next = prev.then(() => fn(), () => fn());
+    this.sessionLocks.set(
+      sessionId,
+      next.then(
+        () => undefined,
+        () => undefined,
+      ),
+    );
+    return next;
   }
 }

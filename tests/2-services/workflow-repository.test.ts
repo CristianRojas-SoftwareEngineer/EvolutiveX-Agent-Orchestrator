@@ -2,6 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { WorkflowRepositoryService } from '../../src/2-services/workflow-repository.service.js';
 import type { ClaudeHookEvent } from '../../src/1-domain/types/hook.types.js';
 import type { IStep } from '../../src/1-domain/interfaces/gateway/IStep.js';
+import type { IToolUse } from '../../src/1-domain/interfaces/gateway/IToolUse.js';
+import type { IEventBus } from '../../src/1-domain/repositories/IEventBus.js';
+import type { TelemetryEvent, SubscriptionRef } from '../../src/1-domain/types/telemetry.types.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -9,17 +12,45 @@ function makeStopHook(overrides: Partial<ClaudeHookEvent> = {}): ClaudeHookEvent
   return { eventName: 'Stop', sessionId: 'session-1', stopHookActive: false, backgroundTasks: 0, ...overrides };
 }
 
-function makeStep(id: string, workflowId: string, closed = false): IStep {
+function makeStep(id: string, workflowId: string, closed = false, index = 0): IStep {
   return {
     id,
     workflowId,
-    index: 0,
+    index,
     inferenceRequest: { model: 'm', messages: [], max_tokens: 1 },
     assistantMessage: { role: 'assistant', content: [] },
     toolUses: [],
     startedAt: new Date(),
     ...(closed ? { closedAt: new Date() } : {}),
   };
+}
+
+function makeToolUse(id: string, stepId: string, name = 'Read'): IToolUse {
+  return {
+    id,
+    stepId,
+    name,
+    arguments: { a: 1 },
+    status: 'running',
+    toolUseBlock: { type: 'tool_use', id, name, input: { a: 1 } } as never,
+  };
+}
+
+/** EventBus espía que captura los eventos publicados. */
+class SpyBus implements IEventBus {
+  public readonly events: TelemetryEvent[] = [];
+  publish(event: TelemetryEvent): void {
+    this.events.push(event);
+  }
+  subscribe(): SubscriptionRef {
+    return { id: 'noop', pattern: '*' };
+  }
+  unsubscribe(): void {
+    /* no-op */
+  }
+  ofType(type: string): TelemetryEvent[] {
+    return this.events.filter((e) => e.type === type);
+  }
 }
 
 // ── Wire methods (C1/C2/C3) ───────────────────────────────────────────────────
@@ -228,5 +259,142 @@ describe('WorkflowRepositoryService — lifecycle: close', () => {
 
     expect(result2).toBe(result1);
     expect(result2.finalText).toBe('primera');
+  });
+});
+
+// ── Emisión de eventos al bus ──────────────────────────────────────────────────
+
+describe('WorkflowRepositoryService — emisión al EventBus', () => {
+  it('openWorkflow emite workflow_start con kind main', () => {
+    const bus = new SpyBus();
+    const repo = new WorkflowRepositoryService(bus);
+    repo.openWorkflow('session-1', { agentId: 'agent-root', isSubagentRequest: false });
+    const ev = bus.ofType('workflow_start');
+    expect(ev).toHaveLength(1);
+    expect(ev[0].sessionId).toBe('session-1');
+    expect((ev[0].payload as Record<string, unknown>).kind).toBe('main');
+  });
+
+  it('openSubagentWorkflow emite workflow_spawn', () => {
+    const bus = new SpyBus();
+    const repo = new WorkflowRepositoryService(bus);
+    repo.openSubagentWorkflow('s1', { agentId: 'child', isSubagentRequest: true }, 'wf-main', 'tu-1');
+    const ev = bus.ofType('workflow_spawn');
+    expect(ev).toHaveLength(1);
+    expect((ev[0].payload as Record<string, unknown>).parentToolUseId).toBe('tu-1');
+  });
+
+  it('registerStep emite step_request con stepIndex y request', () => {
+    const bus = new SpyBus();
+    const repo = new WorkflowRepositoryService(bus);
+    const wf = repo.openWorkflow('s1', { agentId: 'a', isSubagentRequest: false });
+    repo.registerStep(wf.id, makeStep('step-1', wf.id, false, 0));
+    const ev = bus.ofType('step_request');
+    expect(ev).toHaveLength(1);
+    expect((ev[0].payload as Record<string, unknown>).stepIndex).toBe(0);
+    expect((ev[0].payload as Record<string, unknown>).request).toBeDefined();
+  });
+
+  it('registerToolUse emite tool_call', () => {
+    const bus = new SpyBus();
+    const repo = new WorkflowRepositoryService(bus);
+    const wf = repo.openWorkflow('s1', { agentId: 'a', isSubagentRequest: false });
+    repo.registerStep(wf.id, makeStep('step-1', wf.id));
+    repo.registerToolUse(wf.id, makeToolUse('tu-1', 'step-1', 'Read'));
+    const ev = bus.ofType('tool_call');
+    expect(ev).toHaveLength(1);
+    expect((ev[0].payload as Record<string, unknown>).toolName).toBe('Read');
+  });
+
+  it('close con outcome success emite workflow_complete', () => {
+    const bus = new SpyBus();
+    const repo = new WorkflowRepositoryService(bus);
+    repo.openWorkflow('s1', { agentId: 'a', isSubagentRequest: false });
+    repo.close('s1', makeStopHook({ sessionId: 's1' }));
+    expect(bus.ofType('workflow_complete')).toHaveLength(1);
+    expect(bus.ofType('workflow_cancel')).toHaveLength(0);
+  });
+});
+
+// ── completeToolUse ─────────────────────────────────────────────────────────────
+
+describe('WorkflowRepositoryService — completeToolUse', () => {
+  it('completa tool y emite tool_result (success)', () => {
+    const bus = new SpyBus();
+    const repo = new WorkflowRepositoryService(bus);
+    const wf = repo.openWorkflow('s1', { agentId: 'a', isSubagentRequest: false });
+    repo.registerStep(wf.id, makeStep('step-1', wf.id));
+    repo.registerToolUse(wf.id, makeToolUse('tu-1', 'step-1'));
+
+    repo.completeToolUse(wf.id, 'tu-1', { isError: false, result: 'ok' });
+
+    const step = repo.getWorkflow(wf.id)!.steps[0];
+    expect(step.toolUses[0].status).toBe('completed');
+    expect(step.toolUses[0].result).toEqual({ isError: false, result: 'ok' });
+    expect(bus.ofType('tool_result')).toHaveLength(1);
+  });
+
+  it('isError true deja el tool en status error', () => {
+    const bus = new SpyBus();
+    const repo = new WorkflowRepositoryService(bus);
+    const wf = repo.openWorkflow('s1', { agentId: 'a', isSubagentRequest: false });
+    repo.registerStep(wf.id, makeStep('step-1', wf.id));
+    repo.registerToolUse(wf.id, makeToolUse('tu-1', 'step-1'));
+    repo.completeToolUse(wf.id, 'tu-1', { isError: true, result: 'boom' });
+    expect(repo.getWorkflow(wf.id)!.steps[0].toolUses[0].status).toBe('error');
+  });
+
+  it('tool inexistente es no-op (sin emisión)', () => {
+    const bus = new SpyBus();
+    const repo = new WorkflowRepositoryService(bus);
+    const wf = repo.openWorkflow('s1', { agentId: 'a', isSubagentRequest: false });
+    repo.completeToolUse(wf.id, 'tu-999', { isError: false, result: 'ok' });
+    expect(bus.ofType('tool_result')).toHaveLength(0);
+  });
+});
+
+// ── Lookups ──────────────────────────────────────────────────────────────────────
+
+describe('WorkflowRepositoryService — lookups', () => {
+  it('getWorkflowBySessionId devuelve el workflow principal', () => {
+    const repo = new WorkflowRepositoryService();
+    repo.openWorkflow('s1', { agentId: 'a', isSubagentRequest: false });
+    expect(repo.getWorkflowBySessionId('s1')?.kind).toBe('main');
+  });
+
+  it('registerPendingToolUse + findWorkflowWithPendingToolUse + consumePendingToolUse', () => {
+    const repo = new WorkflowRepositoryService();
+    const wf = repo.openWorkflow('s1', { agentId: 'a', isSubagentRequest: false });
+    repo.registerStep(wf.id, makeStep('step-1', wf.id));
+    const tu = makeToolUse('tu-1', 'step-1', 'Agent');
+    repo.registerPendingToolUse(wf.id, 'step-1', tu);
+
+    const found = repo.findWorkflowWithPendingToolUse('s1', 'tu-1');
+    expect(found?.toolUse.id).toBe('tu-1');
+
+    const consumed = repo.consumePendingToolUse(wf.id, 'tu-1');
+    expect(consumed?.id).toBe('tu-1');
+    expect(repo.findWorkflowWithPendingToolUse('s1', 'tu-1')).toBeUndefined();
+  });
+
+  it('nextSequence asigna secuencias crecientes por sesión', async () => {
+    const repo = new WorkflowRepositoryService();
+    expect(await repo.nextSequence('s1')).toBe(0);
+    expect(await repo.nextSequence('s1')).toBe(1);
+    expect(await repo.nextSequence('s2')).toBe(0);
+  });
+
+  it('withSessionLock serializa operaciones concurrentes', async () => {
+    const repo = new WorkflowRepositoryService();
+    const order: string[] = [];
+    const a = repo.withSessionLock('s1', async () => {
+      await new Promise((r) => setTimeout(r, 20));
+      order.push('a');
+    });
+    const b = repo.withSessionLock('s1', async () => {
+      order.push('b');
+    });
+    await Promise.all([a, b]);
+    expect(order).toEqual(['a', 'b']);
   });
 });

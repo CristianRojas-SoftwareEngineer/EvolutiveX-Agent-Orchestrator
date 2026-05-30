@@ -20,6 +20,14 @@ function makeRepo(overrides: Partial<IWorkflowRepository> = {}): IWorkflowReposi
     readyToClose: vi.fn(),
     close: vi.fn(),
     setWorkflowModel: vi.fn(),
+    completeToolUse: vi.fn(),
+    getWorkflowBySessionId: vi.fn(),
+    findWorkflowWithPendingToolUse: vi.fn(),
+    registerPendingToolUse: vi.fn(),
+    consumePendingToolUse: vi.fn(),
+    findStaleWorkflows: vi.fn(() => []),
+    nextSequence: vi.fn(async () => 0),
+    withSessionLock: vi.fn(async (_s, fn) => fn()),
     ...overrides,
   };
 }

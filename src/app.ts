@@ -48,21 +48,21 @@ export function buildApp(deps: ProxyDependencies, logger: Logger) {
   // Graceful shutdown: cerrar todas las interacciones abiertas como orphans para que
   // la auditoría en disco quede completa (meta.json + eliminación de state.json).
   app.addHook('onClose', async () => {
-    const openInteractions = deps.sessionStore.getAllOpenInteractions();
-    for (const interaction of openInteractions) {
+    const openWorkflows = deps.auditInteractionHandler.getOpenWorkflowsForShutdown();
+    for (const workflow of openWorkflows) {
       try {
-        await deps.auditInteractionHandler.closeOrphanInteraction(interaction);
+        await deps.auditInteractionHandler.closeOrphanInteraction(workflow);
       } catch (err) {
         app.log.error(
-          { err, dir: interaction.interactionDir },
-          'Error cerrando interacción orphan en shutdown',
+          { err, workflowId: workflow.id },
+          'Error cerrando workflow orphan en shutdown',
         );
       }
     }
-    if (openInteractions.length > 0) {
+    if (openWorkflows.length > 0) {
       app.log.info(
-        { count: openInteractions.length },
-        'Interacciones orphan cerradas en graceful shutdown',
+        { count: openWorkflows.length },
+        'Workflows orphan cerrados en graceful shutdown',
       );
     }
   });

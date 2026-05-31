@@ -165,7 +165,7 @@ describe('Test E2E - Fallback FIFO para N pendings sin cabeceras de agente (plan
 
     // Verificar que existe una sub-interacción con correlationMethod: 'fifo-pending'.
     // Se busca en meta.json porque state.json se elimina al cerrar la interacción.
-    const sessionDir = path.join(tempSessionsDir, sessionId);
+    const sessionDir = path.join(path.dirname(tempSessionsDir), 'sessions', sessionId);
     const metaFiles = await findJsonFiles(sessionDir, 'meta.json');
 
     const metas = await Promise.all(

@@ -2,7 +2,7 @@
 
 Smart Code Proxy **no audita en disco** las peticiones que llegan sin cabecera de sesión válida. El proxy las reenvía al upstream con normalidad, pero no crea carpetas bajo `sessions/`.
 
-Modelo de sesión y resolución de `session-id`: [`session-audit-model.md` §6.1](./session-audit-model.md#61-sesión).
+Modelo de sesión y resolución de `session-id`: [`session-audit-model.md` §6](./session-audit-model.md#6-sesión-e-identificadores).
 
 ## Motivación
 
@@ -48,8 +48,9 @@ Ambos resuelven a `_unknown` si no envían cabeceras de sesión y **no generan a
 
 Solo las peticiones con sesión identificada (cabecera override o fallback presente y no vacía) crean o actualizan árboles bajo:
 
-- `sessions/<sessionId>/main-agent/interactions/NN/` — turnos agénticos
-- `sessions/<sessionId>/side-interactions/NN/` — preflights y side-requests
+- `sessions/<sessionId>/workflows/NN/` — cada ciclo auditado (turno `agentic`, preflight o `side-request` como workflow hermano)
+
+`AuditInteractionHandler` abre o continúa workflows vía `IWorkflowRepository.openWorkflow()`; no existe un “directorio de interacción” flat separado. Ver [`session-audit-model.md` §0](./session-audit-model.md#0-layout-vigente-causal-workflows-v1).
 
 No se crea `sessions/_unknown/`.
 

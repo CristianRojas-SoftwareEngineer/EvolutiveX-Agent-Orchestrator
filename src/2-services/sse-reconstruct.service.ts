@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
-import { AuditWriterService } from './audit-writer.service.js';
+import type { ISseAuditWriter } from './ports/sse-audit-writer.port.js';
 import {
   SseReconstructOptions,
   SseReconstructResult,
@@ -29,7 +29,7 @@ const REPLAY_MODEL = 'claude-sse-replay';
  * `interactionDir/response/body.*`.
  */
 export class SseReconstructService implements ISseReconstructor {
-  constructor(private auditWriterService: AuditWriterService) {}
+  constructor(private auditWriterService: ISseAuditWriter) {}
 
   /**
    * Reconstruye un mensaje Anthropic desde el sse.jsonl de un step individual.

@@ -2025,6 +2025,8 @@ flowchart TB
 
 ## 29. Terminología de entradas y salidas
 
+> **Estado P1:** Terminología `workflow` / `step` / `tool` aplicada en tipos gateway y rutas `workflows/NN/…` para sesiones nuevas.
+
 ### 29.1. Confirmación de la terminología
 
 La implementación target utiliza **tres pares de conceptos distintos** según el nivel de anidamiento:
@@ -2101,6 +2103,8 @@ La terminología target es **óptima y deliberadamente no homogénea**. Cada par
 ---
 
 ## 30. Estructura de directorios target
+
+> **Estado P1 (2026-05-30):** Implementado para sesiones nuevas vía `SessionPersistence` + `EventBus`. `events.ndjson` y chunks SSE bajo `streaming/` quedan para P2.
 
 ### 30.1. Árbol canónico (`causal-workflows-v1`)
 
@@ -2423,6 +2427,8 @@ El artefacto de disco (`result.json`) es idéntico al de un error normal; la dif
 ---
 
 ## 33. Artefactos de persistencia
+
+> **Estado P1:** `meta.json`, `request/body.json`, `steps/MM/response/*`, `tools/KK/*`, `output/result.json` proyectados por `SessionPersistence`. `events.ndjson` y `streaming/` → P2.
 
 ### 33.1. `events.ndjson` (raíz de sesión)
 
@@ -2758,6 +2764,8 @@ Este artefacto proporciona:
 
 ## 37b. Checklist de aceptación E2E del layout
 
+> **Estado P1:** Subconjunto estructural verificado en tests (`session-persistence.test.ts`, E2E en `tests/5-user-interfaces/`): casos 3–7, 16 (parcial vía `meta.json`), 19. Casos 1–2, 8–15, 17–18, 20 → P2 o ya cubiertos en otras fases.
+
 Criterios de verificación para validar la convergencia de SCP al layout `causal-workflows-v1`. Derivados del test suite de referencia (`session-persistence-e2e.test.ts`, 159/159 tests):
 
 | # | Caso de test | Qué valida |
@@ -2959,6 +2967,8 @@ src/1-domain/
 
 ## 40. Capa 2 objetivo
 
+> **Estado P1:** `EventBus`, `SessionPersistence`, `WorkflowRepositoryService` (con emisión al bus), `session-routing.ts` implementados; `SessionStoreService` retirado; `AuditWriterService` reducido a shim `ISseAuditWriter`.
+
 | Componente | Rol | Referencia interna |
 | ---------- | --- | ------------------ |
 | `WorkflowRepository` (memoria) | `Session`, workflows activos, steps abiertos, índices `tool_use_id` | Correlador §20 |
@@ -3103,6 +3113,8 @@ En todas las fases C y G: **mismo layout `sessions/`** salvo campos adicionales 
 | Hooks reference Claude Code | [https://code.claude.com/docs/en/hooks](https://code.claude.com/docs/en/hooks) |
 
 ### 46.4 Proyección a disco: campos nuevos al implementar
+
+> **Estado P1:** Proyección estructural vía `SessionPersistence` (tabla siguiente parcialmente vigente; `events.ndjson` y chunks SSE en P2).
 
 | Archivo disco | Campos | Origen |
 | ------------- | ------ | ------ |

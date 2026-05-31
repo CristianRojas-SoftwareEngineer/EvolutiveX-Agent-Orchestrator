@@ -2,7 +2,7 @@ import * as path from 'node:path';
 import { StringDecoder } from 'node:string_decoder';
 import type { IWorkflowRepository } from '../1-domain/repositories/IWorkflowRepository.js';
 import type { IEventBus } from '../1-domain/repositories/IEventBus.js';
-import type { IAuditWriter } from '../2-services/ports/audit-writer.port.js';
+import type { ISseAuditWriter } from '../2-services/ports/sse-audit-writer.port.js';
 import type { ISseReconstructor } from '../2-services/ports/sse-reconstructor.port.js';
 import type { AssembledInference, IStepAssembler } from '../2-services/ports/step-assembler.port.js';
 import { ProxyEnvironmentConfig } from '../1-domain/types/config.types.js';
@@ -30,7 +30,7 @@ import {
 export class AuditSseResponseHandler {
   constructor(
     /** @deprecated-p2 Escrituras SSE inline: sse.jsonl, sse.txt, thought/content.md */
-    private auditWriter: IAuditWriter,
+    private auditWriter: ISseAuditWriter,
     private sseReconstruct: ISseReconstructor,
     private config: ProxyEnvironmentConfig,
     private createStepAssembler: () => IStepAssembler,

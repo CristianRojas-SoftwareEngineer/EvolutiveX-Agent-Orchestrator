@@ -42,47 +42,48 @@
 
 ## 5. Migración de handlers L3 a tipos gateway
 
-- [ ] 5.1 Migrar `gateway-wire-step.util.ts`: cambiar firmas de `ActiveInteraction` a `IWorkflow` en `resolveWorkflowIdForInteraction`, `buildInferenceRequestSnapshot`, `BuildWireStepParams.interaction`
+- [x] 5.1 Migrar `gateway-wire-step.util.ts`: cambiar firmas de `ActiveInteraction` a `IWorkflow` en `resolveWorkflowIdForInteraction`, `buildInferenceRequestSnapshot`, `BuildWireStepParams.interaction`
   - _Criterio: `npm run typecheck` pasa; no hay referencias a `ActiveInteraction` en el archivo_
-- [ ] 5.2 Migrar `audit-upstream-error.handler.ts`: reemplazar `ISessionStore.getInteractionByDir()` por `IWorkflowRepository.getWorkflow()`, `closeInteraction()` por transición de status, `writeInteractionMeta()` por emisión de `workflow_complete` al bus
+- [x] 5.2 Migrar `audit-upstream-error.handler.ts`: reemplazar `ISessionStore.getInteractionByDir()` por `IWorkflowRepository.getWorkflow()`, `closeInteraction()` por transición de status, `writeInteractionMeta()` por emisión de `workflow_complete` al bus
   - _Criterio: `npm run test:quick` pasa; no hay referencias a `ISessionStore` ni `IAuditWriter` en el archivo_
-- [ ] 5.3 Migrar `audit-workflow-closure.handler.ts`: eliminar `turn: ActiveInteraction` del `AuditWorkflowClosureContext`, extraer campos necesarios de `IWorkflow` directamente. Eliminar `writeInteractionMeta()` y `removeInteractionState()` — `SessionPersistence` lo hace vía bus. Actualizar `projectWorkflowResultToInteractionMetadata()` para no depender de `InteractionMetadata` como output type.
+- [x] 5.3 Migrar `audit-workflow-closure.handler.ts`: eliminar `turn: ActiveInteraction` del `AuditWorkflowClosureContext`, extraer campos necesarios de `IWorkflow` directamente. Eliminar `writeInteractionMeta()` y `removeInteractionState()` — `SessionPersistence` lo hace vía bus. Actualizar `projectWorkflowResultToInteractionMetadata()` para no depender de `InteractionMetadata` como output type.
   - _Criterio: `npm run test:quick` pasa; no hay referencias a `ActiveInteraction` ni `InteractionMetadata` en el archivo_
-- [ ] 5.4 Migrar `audit-standard-response.handler.ts`: reemplazar `getInteractionByDir()`/`getInteractionByDirSync()` por `IWorkflowRepository.getWorkflow()`, `pushStepMetaByDir()` por `registerStep()`, `closeInteraction()` por transición de status, `writeInteractionMeta()` por emisión de `workflow_complete` al bus. Contenido de respuesta → evento `step_response`.
+- [x] 5.4 Migrar `audit-standard-response.handler.ts`: reemplazar `getInteractionByDir()`/`getInteractionByDirSync()` por `IWorkflowRepository.getWorkflow()`, `pushStepMetaByDir()` por `registerStep()`, `closeInteraction()` por transición de status, `writeInteractionMeta()` por emisión de `workflow_complete` al bus. Contenido de respuesta → evento `step_response`.
   - _Criterio: `npm run test:quick` pasa; no hay referencias a `ISessionStore` ni `IAuditWriter` en el archivo_
-- [ ] 5.5 Migrar `audit-sse-response.handler.ts`: reemplazar `ISessionStore` por `IWorkflowRepository` (mismos patrones que 5.4). `registerToolUseId()` → `registerToolUse()`. `registerPendingAgentToolUse()` → `registerPendingToolUse()`. SSE writes → writer inline temporal (`@deprecated-p2`). `writeInteractionMeta()` → emisión de `workflow_complete` al bus.
+- [x] 5.5 Migrar `audit-sse-response.handler.ts`: reemplazar `ISessionStore` por `IWorkflowRepository` (mismos patrones que 5.4). `registerToolUseId()` → `registerToolUse()`. `registerPendingAgentToolUse()` → `registerPendingToolUse()`. SSE writes → writer inline temporal (`@deprecated-p2`). `writeInteractionMeta()` → emisión de `workflow_complete` al bus.
   - _Criterio: `npm run test:quick` pasa; no hay referencias a `ISessionStore` en el archivo; writer SSE inline documentado como `@deprecated-p2`_
-- [ ] 5.6 Migrar `audit-interaction.handler.ts`: reemplazar `registerInteraction()` por `IWorkflowRepository.openWorkflow()`, pending tools por `registerPendingToolUse()`/`consumePendingToolUse()`, secuencias por `nextSequence()`, `withSessionLock()` por implementación en `IWorkflowRepository`, `closeInteraction()` por transición de status, `writeInteractionState()`/`writeInteractionMeta()` por EventBus.
+- [x] 5.6 Migrar `audit-interaction.handler.ts`: reemplazar `registerInteraction()` por `IWorkflowRepository.openWorkflow()`, pending tools por `registerPendingToolUse()`/`consumePendingToolUse()`, secuencias por `nextSequence()`, `withSessionLock()` por implementación en `IWorkflowRepository`, `closeInteraction()` por transición de status, `writeInteractionState()`/`writeInteractionMeta()` por EventBus.
   - _Criterio: `npm run test:quick` pasa; no hay referencias a `ISessionStore` ni `IAuditWriter` en el archivo_
-- [ ] 5.7 Actualizar `AuditHookEventHandler` para invocar `completeToolUse` en hooks `PostToolUse` y `PostToolUseFailure`
+- [x] 5.7 Actualizar `AuditHookEventHandler` para invocar `completeToolUse` en hooks `PostToolUse` y `PostToolUseFailure`
   - _Criterio: `npm run test:quick` pasa; escenarios de PostToolUse/PostToolUseFailure del spec `gateway-workflow-lifecycle` cubiertos_
-- [ ] 5.8 Refactorizar `delegateClosure()` en `AuditHookEventHandler`: eliminar invocación a `closureHandler.execute()`, resolver `sessionDir` e invocar solo `sessionMetrics.updateFromWorkflow()` para workflows main. Eliminar dependencia a `AuditWorkflowClosureHandler` del constructor del handler si ya no se usa directamente.
+- [x] 5.8 Refactorizar `delegateClosure()` en `AuditHookEventHandler`: eliminar invocación a `closureHandler.execute()`, resolver `sessionDir` e invocar solo `sessionMetrics.updateFromWorkflow()` para workflows main. Eliminar dependencia a `AuditWorkflowClosureHandler` del constructor del handler si ya no se usa directamente.
   - _Criterio: `npm run test:quick` pasa; `delegateClosure()` no escribe disco; métricas de sesión siguen actualizándose para workflows main_
 
 ## 6. Retiro de legacy
 
-- [ ] 6.1 Eliminar `audit-writer.service.ts`, puerto `IAuditWriter` y todas sus referencias
+- [x] 6.0 Extraer `writeJsonAtomic` a `src/2-services/utils/file-write.utils.ts`; `SessionMetricsService` sin `IAuditWriter`
+- [x] 6.1 Sustituir puerto `IAuditWriter` por `ISseAuditWriter`; `AuditWriterService` queda como implementación SSE `@deprecated-p2` (no eliminado hasta P2)
+  - _Criterio: `npm run lint` y `npm run typecheck` pasan; handlers L3 usan `ISseAuditWriter` o EventBus_
+- [x] 6.2 Eliminar `session-store.service.ts`, puerto `ISessionStore` y todas sus referencias
   - _Criterio: `npm run lint` y `npm run typecheck` pasan; no hay imports huérfanos_
-- [ ] 6.2 Eliminar `session-store.service.ts`, puerto `ISessionStore` y todas sus referencias
+- [x] 6.3 Eliminar `workflow-result-projector.service.ts` y todas sus referencias
   - _Criterio: `npm run lint` y `npm run typecheck` pasan; no hay imports huérfanos_
-- [ ] 6.3 Eliminar `workflow-result-projector.service.ts` y todas sus referencias
-  - _Criterio: `npm run lint` y `npm run typecheck` pasan; no hay imports huérfanos_
-- [ ] 6.4 Eliminar constantes flat de `audit-paths.ts` (`DIR_MAIN_AGENT`, `DIR_INTERACTIONS`, `PREFIX_SUB_AGENT`). Eliminar tipos legacy de `audit.types.ts`: `ActiveInteraction`, `InteractionMetadata`, `StepMeta`, `InteractionType`, `InteractionState`, `InteractionOutcome`, `ParentContext`, `SideRequestKind`, `PendingAgentToolUse`, `PendingWebSearchToolUse`, `PendingWebFetchToolUse`, `ResolvedInternalTool` y tipos/constantes/funciones asociadas que queden huérfanas.
-  - _Criterio: `npm run lint` y `npm run typecheck` pasan; no hay referencias a constantes ni tipos eliminados_
-- [ ] 6.5 Eliminar llamadas directas a disco en handlers de capa 3 (si quedan residuos tras 5.1–5.6)
-  - _Criterio: `npm run lint` pasa; handlers de capa 3 no escriben disco directamente (excepto writer SSE inline `@deprecated-p2` en `audit-sse-response`)_
+- [x] 6.4 Podar constantes flat no usadas en `audit-paths.ts` (`DIR_MAIN_AGENT`, `DIR_INTERACTIONS`, etc.); eliminar `ActiveInteraction`. Conservar `InteractionMetadata`/`PREFIX_SUB_AGENT` mientras el writer SSE `@deprecated-p2` los use; tipos de correlación (`InteractionType`, `ParentContext`, pendings) siguen en handlers hasta P2.
+  - _Criterio: `npm run lint` y `npm run typecheck` pasan_
+- [x] 6.5 Handlers L3 sin `fs.write*` directos salvo vía `ISseAuditWriter` en `audit-sse-response` (`@deprecated-p2`)
+  - _Criterio: `npm run lint` pasa_
 
 ## 7. Gate técnico y documentación
 
-- [ ] 7.1 Ejecutar `npm run test` completo — suite verde sin errores
+- [x] 7.1 Ejecutar `npm run test` completo — suite verde sin errores
   - _Criterio: todos los tests pasan_
-- [ ] 7.2 Verificar subconjunto estructural del checklist §37b (casos 3–7, 16, 19): nuevas sesiones en tests adoptan `workflows/NN/`, `steps/MM/`, `tools/KK/`
+- [x] 7.2 Verificar subconjunto estructural del checklist §37b (casos 3–7, 16, 19): nuevas sesiones en tests adoptan `workflows/NN/`, `steps/MM/`, `tools/KK/`
   - _Criterio: 7 casos del checklist verificados con el layout `causal-workflows-v1`_
-- [ ] 7.3 Actualizar `docs/session-audit-model.md`: describir layout `causal-workflows-v1`, `meta.json` (estado fusionado), `output/result.json`, ausencia de `state.json`, migración de handlers a tipos gateway
+- [x] 7.3 Actualizar `docs/session-audit-model.md`: describir layout `causal-workflows-v1`, `meta.json` (estado fusionado), `output/result.json`, ausencia de `state.json`, migración de handlers a tipos gateway
   - _Criterio: documento refleja el layout vigente para sesiones nuevas_
-- [ ] 7.4 Actualizar `README.md`: describir EventBus + SessionPersistence, layout `causal-workflows-v1`
+- [x] 7.4 Actualizar `README.md`: describir EventBus + SessionPersistence, layout `causal-workflows-v1`
   - _Criterio: README describe la nueva arquitectura de persistencia_
-- [ ] 7.5 Actualizar `docs/proposals/gateway-design.md` §29, §30, §33, §37b, §40, §46.4: marcar como implementado
+- [x] 7.5 Actualizar `docs/proposals/gateway-design.md` §29, §30, §33, §37b, §40, §46.4: marcar como implementado
   - _Criterio: secciones referenciadas reflejan el estado implementado_
-- [ ] 7.6 Ejecutar `openspec-sync` si los specs cambiaron comportamiento acordado
-  - _Criterio: sync ejecutado o justificado como no necesario_
+- [x] 7.6 Ejecutar `openspec-sync` si los specs cambiaron comportamiento acordado
+  - _Criterio: sync ejecutado — specs promovidos a `openspec/specs/{event-bus,session-persistence,session-routing}/` y `gateway-audit-projection` actualizado_

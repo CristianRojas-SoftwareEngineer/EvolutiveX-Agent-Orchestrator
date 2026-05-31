@@ -3,9 +3,6 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { SessionMetricsService, computeCacheEfficiency } from '../../src/2-services/session-metrics.service.js';
-import { AuditWriterService } from '../../src/2-services/audit-writer.service.js';
-import { RedactService } from '../../src/1-domain/services/redact.service.js';
-import { MarkdownRendererService } from '../../src/1-domain/services/markdown-renderer.service.js';
 import type { IStep } from '../../src/1-domain/interfaces/gateway/IStep.js';
 
 function makeStep(model: string, usage: IStep['usage']): IStep {
@@ -38,8 +35,7 @@ describe('SessionMetricsService', () => {
 
   beforeEach(async () => {
     tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'session-metrics-'));
-    const writer = new AuditWriterService(new RedactService(), new MarkdownRendererService());
-    service = new SessionMetricsService(writer);
+    service = new SessionMetricsService();
   });
 
   afterEach(async () => {

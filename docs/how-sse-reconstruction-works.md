@@ -2,6 +2,8 @@
 
 Esta nota técnica explica por qué y cómo Smart Code Proxy reconstruye el mensaje final del asistente a partir de un stream SSE grabado, documenta la **fuente de bytes** (`sse.jsonl`, no `sse.txt`) y la constante `REPLAY_MODEL` para que nadie la "mejore" confundiéndola con una configuración real.
 
+**Persistencia P1:** las líneas SSE se escriben bajo `sessions/<id>/workflows/NN/steps/MM/response/` vía `ISseAuditWriter` (`AuditWriterService`, `@deprecated-p2`). La migración a eventos `stream_chunk` en el **EventBus** está planificada para **P2**. El resto del árbol causal (`request/`, `body.json`, `output/result.json`) lo materializa `SessionPersistence` desde el bus.
+
 ## Por qué reusar el SDK oficial
 
 Los streams SSE de la API Messages de Anthropic emiten una secuencia de eventos tipados (`message_start`, `content_block_start`, `content_block_delta`, `message_delta`, `message_stop`, `ping`, etc.) que, fusionados, equivalen a la respuesta JSON que devolvería una llamada no-streaming. Implementar y mantener un parser propio implicaría replicar toda la lógica del SDK oficial para cada variación de `content_block` (texto, `tool_use`, `thinking`, imágenes), cada actualización de `usage`, y cada evento beta.

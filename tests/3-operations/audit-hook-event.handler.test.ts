@@ -2,9 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { AuditHookEventHandler } from '../../src/3-operations/audit-hook-event.handler.js';
 import type { IWorkflowRepository } from '../../src/1-domain/repositories/IWorkflowRepository.js';
 import type { IWorkflow } from '../../src/1-domain/interfaces/gateway/IWorkflow.js';
-import type { ISessionStore } from '../../src/2-services/ports/session-store.port.js';
-import type { AuditWorkflowClosureHandler } from '../../src/3-operations/audit-workflow-closure.handler.js';
-import type { ActiveInteraction } from '../../src/1-domain/types/audit.types.js';
+import type { SessionMetricsService } from '../../src/2-services/session-metrics.service.js';
 
 function makeRepo(overrides: Partial<IWorkflowRepository> = {}): IWorkflowRepository {
   return {
@@ -26,6 +24,14 @@ function makeRepo(overrides: Partial<IWorkflowRepository> = {}): IWorkflowReposi
     registerPendingToolUse: vi.fn(),
     consumePendingToolUse: vi.fn(),
     findStaleWorkflows: vi.fn(() => []),
+    findStaleWorkflowsAwaitingContinuation: vi.fn(() => []),
+    getAllRunningWorkflows: vi.fn(() => []),
+    findWorkflowWithPendingTools: vi.fn(),
+    findWorkflowByToolUseId: vi.fn(),
+    consumeFirstPendingToolUseByName: vi.fn(),
+    getWireMeta: vi.fn(),
+    patchWireMeta: vi.fn(),
+    allocLayoutIndex: vi.fn(async () => 0),
     nextSequence: vi.fn(async () => 0),
     withSessionLock: vi.fn(async (_s, fn) => fn()),
     forceClose: vi.fn(),
@@ -34,61 +40,33 @@ function makeRepo(overrides: Partial<IWorkflowRepository> = {}): IWorkflowReposi
 }
 
 function stubWorkflow(id = 'session-1'): IWorkflow {
-  return { id, sessionId: id, kind: 'main', status: 'running', steps: [], startedAt: new Date() };
-}
-
-function makeSessionStore(interaction: ActiveInteraction | null = null): ISessionStore {
   return {
-    getBaseDir: () => '/tmp/sessions',
-    ensureAuditSessionsRoot: async () => {},
-    nextMainAgentSequence: async () => 1,
-    nextSideInteractionSequence: async () => 1,
-    registerInteraction: () => {},
-    registerToolUseId: () => {},
-    getInteractionByToolUseId: () => null,
-    getInteractionByDir: async () => interaction,
-    getInteractionByDirSync: () => interaction,
-    incrementStepCountByDir: () => 1,
-    pushStepMetaByDir: async () => {},
-    closeInteraction: vi.fn(),
-    registerPendingAgentToolUse: () => {},
-    findInteractionWithPendingAgents: () => null,
-    consumePendingAgentToolUse: () => {},
-    registerPendingWebSearchToolUse: vi.fn(),
-    findInteractionWithPendingWebSearch: vi.fn().mockReturnValue(null),
-    consumeWebSearchPending: vi.fn().mockReturnValue(null),
-    registerPendingWebFetchToolUse: vi.fn(),
-    findInteractionWithPendingWebFetch: vi.fn().mockReturnValue(null),
-    consumeWebFetchPending: vi.fn().mockReturnValue(null),
-    consumeWebSearchPendingByToolUseId: vi.fn().mockReturnValue(null),
-    consumeWebFetchPendingByToolUseId: vi.fn().mockReturnValue(null),
-    registerResolvedInternalTool: vi.fn(),
-    findStaleInteractionsAwaitingContinuation: () => [],
-    getAllOpenInteractions: () => (interaction ? [interaction] : []),
-    withSessionLock: async <T>(_s: string, fn: () => Promise<T>) => fn(),
-    findInteractionForWorkflowClose: () => interaction,
+    id,
+    sessionId: id,
+    kind: 'main',
+    status: 'running',
+    steps: [{ id: 's1', workflowId: id, index: 0, inferenceRequest: { model: 'm', messages: [], max_tokens: 1 }, assistantMessage: { role: 'assistant', content: [] }, toolUses: [], usage: { input_tokens: 0, output_tokens: 0 }, startedAt: new Date(), closedAt: new Date() }],
+    startedAt: new Date(),
   };
 }
 
-function makeClosureHandler(): AuditWorkflowClosureHandler {
+function makeSessionMetrics(): SessionMetricsService {
   return {
-    execute: vi.fn().mockResolvedValue(undefined),
-    executeWireFallback: vi.fn().mockResolvedValue(undefined),
-  } as unknown as AuditWorkflowClosureHandler;
+    updateFromWorkflow: vi.fn().mockResolvedValue(undefined),
+  } as unknown as SessionMetricsService;
 }
 
 function makeHandler(
   repo: IWorkflowRepository,
-  sessionStore: ISessionStore,
-  closure = makeClosureHandler(),
+  sessionMetrics = makeSessionMetrics(),
 ): AuditHookEventHandler {
-  return new AuditHookEventHandler(repo, sessionStore, closure);
+  return new AuditHookEventHandler(repo, '/tmp/sessions', sessionMetrics);
 }
 
 describe('AuditHookEventHandler', () => {
   it('SubagentStart → confirmSubagentFromHook llamado con agentId y toolUseId', () => {
     const repo = makeRepo();
-    const handler = makeHandler(repo, makeSessionStore());
+    const handler = makeHandler(repo);
 
     handler.execute({
       eventName: 'SubagentStart',
@@ -103,7 +81,7 @@ describe('AuditHookEventHandler', () => {
 
   it('PreToolUse → completa sin excepción; close no llamado', () => {
     const repo = makeRepo();
-    const handler = makeHandler(repo, makeSessionStore());
+    const handler = makeHandler(repo);
 
     expect(() =>
       handler.execute({ eventName: 'PreToolUse', sessionId: 'session-1', toolUseId: 'tu-xyz' }),
@@ -112,7 +90,7 @@ describe('AuditHookEventHandler', () => {
     expect(repo.close).not.toHaveBeenCalled();
   });
 
-  it('Stop con workflow activo y readyToClose:true → close y delegación al closure handler', async () => {
+  it('Stop con workflow activo y readyToClose:true → close y métricas de sesión', async () => {
     const readyToClose = vi.fn().mockReturnValue(true);
     const close = vi.fn().mockReturnValue({
       outcome: 'success',
@@ -122,23 +100,8 @@ describe('AuditHookEventHandler', () => {
     });
     const getWorkflow = vi.fn().mockReturnValue(stubWorkflow());
     const repo = makeRepo({ getWorkflow, readyToClose, close });
-    const turn = {
-      interactionDir: '/tmp/i',
-      interactionType: 'agentic' as const,
-      stepCount: 1,
-      requestSequence: 1,
-      startedAt: Date.now(),
-      requestBodyOmitted: false,
-      requestBodyBytes: 0,
-      stepsMeta: [],
-      sessionId: 'session-1',
-      pendingAgentToolUses: [],
-      pendingWebSearchToolUses: [],
-      pendingWebFetchToolUses: [],
-      resolvedInternalTools: [],
-    };
-    const closure = makeClosureHandler();
-    const handler = makeHandler(repo, makeSessionStore(turn), closure);
+    const sessionMetrics = makeSessionMetrics();
+    const handler = makeHandler(repo, sessionMetrics);
 
     handler.execute({ eventName: 'Stop', sessionId: 'session-1', stopHookActive: false, backgroundTasks: 0 });
 
@@ -146,7 +109,7 @@ describe('AuditHookEventHandler', () => {
 
     expect(readyToClose).toHaveBeenCalledWith('session-1', expect.objectContaining({ eventName: 'Stop' }));
     expect(close).toHaveBeenCalledWith('session-1', expect.objectContaining({ eventName: 'Stop' }));
-    expect(closure.execute).toHaveBeenCalled();
+    expect(sessionMetrics.updateFromWorkflow).toHaveBeenCalled();
   });
 
   it('Stop con stopHookActive:true → readyToClose:false, close no invocado', () => {
@@ -154,7 +117,7 @@ describe('AuditHookEventHandler', () => {
     const close = vi.fn();
     const getWorkflow = vi.fn().mockReturnValue(stubWorkflow());
     const repo = makeRepo({ getWorkflow, readyToClose, close });
-    const handler = makeHandler(repo, makeSessionStore());
+    const handler = makeHandler(repo);
 
     handler.execute({ eventName: 'Stop', sessionId: 'session-1', stopHookActive: true });
 
@@ -166,11 +129,9 @@ describe('AuditHookEventHandler', () => {
     const close = vi.fn();
     const getWorkflow = vi.fn().mockReturnValue(undefined);
     const repo = makeRepo({ getWorkflow, close });
-    const handler = makeHandler(repo, makeSessionStore());
+    const handler = makeHandler(repo);
 
-    expect(() =>
-      handler.execute({ eventName: 'Stop', sessionId: 'session-1' }),
-    ).not.toThrow();
+    expect(() => handler.execute({ eventName: 'Stop', sessionId: 'session-1' })).not.toThrow();
 
     expect(close).not.toHaveBeenCalled();
   });
@@ -185,22 +146,8 @@ describe('AuditHookEventHandler', () => {
     });
     const getWorkflow = vi.fn().mockReturnValue(stubWorkflow());
     const repo = makeRepo({ getWorkflow, readyToClose, close });
-    const closure = makeClosureHandler();
-    const handler = makeHandler(repo, makeSessionStore({
-      interactionDir: '/tmp/i',
-      interactionType: 'agentic',
-      stepCount: 0,
-      requestSequence: 1,
-      startedAt: Date.now(),
-      requestBodyOmitted: false,
-      requestBodyBytes: 0,
-      stepsMeta: [],
-      sessionId: 'session-1',
-      pendingAgentToolUses: [],
-      pendingWebSearchToolUses: [],
-      pendingWebFetchToolUses: [],
-      resolvedInternalTools: [],
-    }), closure);
+    const sessionMetrics = makeSessionMetrics();
+    const handler = makeHandler(repo, sessionMetrics);
 
     handler.execute({ eventName: 'StopFailure', sessionId: 'session-1' });
 
@@ -208,16 +155,56 @@ describe('AuditHookEventHandler', () => {
 
     expect(readyToClose).not.toHaveBeenCalled();
     expect(close).toHaveBeenCalledWith('session-1', expect.objectContaining({ eventName: 'StopFailure' }));
-    expect(closure.execute).toHaveBeenCalled();
+    expect(sessionMetrics.updateFromWorkflow).toHaveBeenCalled();
   });
 
   it('UserPromptSubmit → openWorkflow invocado con sessionId', () => {
     const openWorkflow = vi.fn();
     const repo = makeRepo({ openWorkflow });
-    const handler = makeHandler(repo, makeSessionStore());
+    const handler = makeHandler(repo);
 
     handler.execute({ eventName: 'UserPromptSubmit', sessionId: 'session-1', agentId: 'agent-root' });
 
     expect(openWorkflow).toHaveBeenCalledWith('session-1', expect.objectContaining({ isSubagentRequest: false }));
+  });
+
+  it('PostToolUse → completeToolUse con isError false', () => {
+    const wf = stubWorkflow();
+    const completeToolUse = vi.fn();
+    const findWorkflowByToolUseId = vi.fn().mockReturnValue(wf);
+    const repo = makeRepo({ findWorkflowByToolUseId, completeToolUse });
+    const handler = makeHandler(repo);
+
+    handler.execute({
+      eventName: 'PostToolUse',
+      sessionId: 'session-1',
+      toolUseId: 'tu-1',
+      lastAssistantMessage: 'ok',
+    });
+
+    expect(completeToolUse).toHaveBeenCalledWith('session-1', 'tu-1', {
+      isError: false,
+      result: 'ok',
+    });
+  });
+
+  it('PostToolUseFailure → completeToolUse con isError true', () => {
+    const wf = stubWorkflow();
+    const completeToolUse = vi.fn();
+    const findWorkflowWithPendingToolUse = vi.fn().mockReturnValue({ workflow: wf, toolUse: { id: 'tu-1' } });
+    const repo = makeRepo({ findWorkflowWithPendingToolUse, completeToolUse });
+    const handler = makeHandler(repo);
+
+    handler.execute({
+      eventName: 'PostToolUseFailure',
+      sessionId: 'session-1',
+      toolUseId: 'tu-1',
+      lastAssistantMessage: 'falló',
+    });
+
+    expect(completeToolUse).toHaveBeenCalledWith('session-1', 'tu-1', {
+      isError: true,
+      result: 'falló',
+    });
   });
 });

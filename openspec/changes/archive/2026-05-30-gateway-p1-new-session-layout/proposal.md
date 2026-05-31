@@ -16,7 +16,7 @@ Adicionalmente, P1 migra los 6 handlers de capa 3 que aún dependen de los tipos
 - **Corte limpio:** sesiones anteriores al layout se eliminan al arranque; no hay migración de datos en reposo.
 - **Migración de handlers L3 a tipos gateway:** los 6 handlers (`audit-interaction`, `audit-standard-response`, `audit-sse-response`, `audit-upstream-error`, `audit-workflow-closure`, `gateway-wire-step`) migran de `ActiveInteraction`/`InteractionMetadata`/`ISessionStore`/`IAuditWriter` a `IWorkflow`/`IStep`/`IToolUse`/`IWorkflowResult`/`IWorkflowRepository`/`EventBus`.
 - **Ampliación del catálogo de eventos:** nuevos eventos para escrituras de contenido (`step_request`, `step_response`, `tool_call`, `tool_result`) que `SessionPersistence` consume para escribir a disco.
-- **Retiro completo del modelo legacy:** eliminación de `ISessionStore`, `IAuditWriter`, `SessionStoreService`, `AuditWriterService`, `ActiveInteraction`, `InteractionMetadata`, `workflow-result-projector.service.ts`, constantes flat de `audit-paths.ts` y tipos/constantes asociados.
+- **Retiro del modelo legacy (alcance P1):** eliminación de `ISessionStore`, `SessionStoreService`, `IAuditWriter` (puerto completo), `WorkflowResultProjector`, `ActiveInteraction`, constantes flat de `audit-paths.ts` y tipos asociados retirados. `AuditWriterService` **permanece** como implementación del shim `ISseAuditWriter` (`@deprecated-p2`) para SSE hasta P2. Tipos `Interaction*` restantes solo donde el shim o wire metadata los requieren.
 
 ## No objetivos
 
@@ -42,7 +42,7 @@ Adicionalmente, P1 migra los 6 handlers de capa 3 que aún dependen de los tipos
 ### Removed Capabilities
 
 - `session-store` (ISessionStore + SessionStoreService): reemplazado por `IWorkflowRepository` ampliado + `EventBus`.
-- `audit-writer` (IAuditWriter + AuditWriterService): reemplazado por `SessionPersistence` (vía EventBus).
+- `audit-writer` (puerto `IAuditWriter` completo): reemplazado por `SessionPersistence` (vía EventBus) para el árbol causal; escrituras SSE vía `ISseAuditWriter` (`AuditWriterService`, `@deprecated-p2`) hasta P2.
 - Model types legacy (`ActiveInteraction`, `InteractionMetadata`, `StepMeta`, `InteractionType`, `InteractionState`, `InteractionOutcome`, `ParentContext`, `SideRequestKind`, `PendingAgentToolUse`, `PendingWebSearchToolUse`, `PendingWebFetchToolUse`, `ResolvedInternalTool`): reemplazados por tipos gateway.
 
 ## Impact
@@ -50,5 +50,6 @@ Adicionalmente, P1 migra los 6 handlers de capa 3 que aún dependen de los tipos
 - **Capas PKA afectadas:** L1 (nuevos ports y tipos), L2 (nuevos adapters + modificación del correlador), L3 (migración de 6 handlers), L4 (cableado en composition root).
 - **Archivos nuevos:** `IEventBus.ts`, `telemetry.types.ts`, `event-pattern-match.service.ts`, `event-bus.service.ts`, `session-persistence.service.ts`, `session-routing.ts`, `async.utils.ts`.
 - **Archivos modificados:** `workflow-repository.service.ts` (emisión al bus + `completeToolUse()` + métodos de lookup), `audit-hook-event.handler.ts` (completeToolUse en hooks + simplificación de `delegateClosure()`), `audit-interaction.handler.ts`, `audit-standard-response.handler.ts`, `audit-sse-response.handler.ts`, `audit-upstream-error.handler.ts`, `audit-workflow-closure.handler.ts`, `gateway-wire-step.util.ts`, `composition-root.ts` (cableado EventBus).
-- **Archivos eliminados:** `audit-writer.service.ts`, `session-store.service.ts`, `workflow-result-projector.service.ts`, constantes flat de `audit-paths.ts`, puertos `ISessionStore` e `IAuditWriter`, tipos `ActiveInteraction`/`InteractionMetadata`/`StepMeta`/`InteractionType`/`InteractionState`/`InteractionOutcome`/`ParentContext`/`SideRequestKind`/`PendingAgentToolUse`/`PendingWebSearchToolUse`/`PendingWebFetchToolUse`/`ResolvedInternalTool` y constantes/funciones asociadas de `audit.types.ts`.
+- **Archivos eliminados:** `session-store.service.ts`, `workflow-result-projector.service.ts`, puertos `ISessionStore` e `IAuditWriter`, constantes flat retiradas de `audit-paths.ts`, tipos `ActiveInteraction` y asociados retirados de `audit.types.ts`.
+- **Archivos conservados (shim P1):** `audit-writer.service.ts` implementa `ISseAuditWriter` (`sse-audit-writer.port.ts`), no el puerto `IAuditWriter` histórico.
 - **Documentación:** `docs/session-audit-model.md`, `README.md`, `docs/proposals/gateway-design.md` §29, §30, §33, §37b, §40, §46.4.

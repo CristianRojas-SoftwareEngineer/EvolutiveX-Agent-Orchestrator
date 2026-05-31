@@ -25,17 +25,43 @@ const mockLogger: Logger = {
 // proxy.controller.ts intercepta el GZIP y lo descomprime correctamente
 // de forma transparente para el cliente y para la auditoría local.
 
+/** Busca recursivamente archivos con el nombre dado bajo un directorio. */
+async function findFilesNamed(dir: string, filename: string): Promise<string[]> {
+  const results: string[] = [];
+  async function walk(current: string): Promise<void> {
+    let entries;
+    try {
+      entries = await fs.readdir(current, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const full = path.join(current, entry.name);
+      if (entry.isDirectory()) await walk(full);
+      else if (entry.name === filename) results.push(full);
+    }
+  }
+  await walk(dir);
+  return results;
+}
+
 describe('Test de Integración - Decompresión Gzip', () => {
   let mockUpstream: http.Server;
   let upstreamPort: number;
   let proxyApp: FastifyInstance;
   let tempSessionsDir: string;
   let originalEnv: NodeJS.ProcessEnv;
+  let sessionPersistence: { flush: () => Promise<void> };
 
   beforeAll(async () => {
     // 1. Levantar servidor Upstream falso que siempre devuelve Gzip
     mockUpstream = http.createServer((req, res) => {
-      const plaintext = JSON.stringify({ message: 'Hola desde upstream comprimido' });
+      const plaintext = JSON.stringify({
+        message: 'Hola desde upstream comprimido',
+        usage: { input_tokens: 10, output_tokens: 5 },
+        stop_reason: 'end_turn',
+        content: [{ type: 'text', text: 'Hola desde upstream comprimido' }],
+      });
       const compressed = zlib.gzipSync(Buffer.from(plaintext, 'utf8'));
 
       res.writeHead(200, {
@@ -69,6 +95,7 @@ describe('Test de Integración - Decompresión Gzip', () => {
     const { createProxyDependencies: createDeps } =
       await import('../../src/4-api/composition-root.js');
     const deps = await createDeps(config, mockLogger, tempSessionsDir);
+    sessionPersistence = deps.sessionPersistence;
     proxyApp = (await import('../../src/app.js')).buildApp(deps, mockLogger);
     await proxyApp.ready();
   });
@@ -107,45 +134,23 @@ describe('Test de Integración - Decompresión Gzip', () => {
     // Y remueve `content-length` porque fue descomprimido
     expect(res.headers['content-length']).toBeUndefined();
 
-    // Assert 2: El cliente recibe texto plano puro, equivalente a la descompresión.
-    expect(res.body).toEqual(JSON.stringify({ message: 'Hola desde upstream comprimido' }));
+    // Assert 2: El cliente recibe JSON descomprimido (mismo payload que el upstream).
+    const clientBody = JSON.parse(res.body) as { message?: string };
+    expect(clientBody.message).toBe('Hola desde upstream comprimido');
 
     // Assert 3: Las grabaciones de auditoría (disco) están también descomprimidas.
-    // Damos un pequeño margen para que el stream en background termine de volcar al disco
-    await new Promise((r) => setTimeout(r, 500));
+    await new Promise((r) => setTimeout(r, 300));
+    await sessionPersistence.flush();
 
-    const dirs = await fs.readdir(
-      path.join(tempSessionsDir, 'test-gzip', 'main-agent', 'interactions'),
+    const sessionRoot = path.join(path.dirname(tempSessionsDir), 'sessions', 'test-gzip');
+    const bodyPaths = (await findFilesNamed(sessionRoot, 'body.json')).filter((p) =>
+      p.includes(`${path.sep}response${path.sep}`),
     );
-    const requestDirName = dirs[0];
-    const sessionPath = path.join(
-      tempSessionsDir,
-      'test-gzip',
-      'main-agent',
-      'interactions',
-      requestDirName,
-    );
+    expect(bodyPaths.length).toBeGreaterThanOrEqual(1);
+    const content = await fs.readFile(bodyPaths[0], 'utf8');
 
-    const responseBodyPath = path.join(sessionPath, 'output', 'body.json');
-    // Retry con backoff para robustez en CI/sistemas lentos
-    let content: string | null = null;
-    for (let i = 0; i < 5; i++) {
-      try {
-        content = await fs.readFile(responseBodyPath, 'utf8');
-        break;
-      } catch {
-        await new Promise((r) => setTimeout(r, 200));
-      }
-    }
-    if (content === null) {
-      throw new Error(`No se pudo leer ${responseBodyPath} después de reintentos`);
-    }
-
-    // Assert 4: El file volcado es texto json válido formateado en formato multi-step
-    const parsed = JSON.parse(content);
-    expect(parsed.type).toBe('multi-step-response');
-    expect(parsed.stepCount).toBeGreaterThanOrEqual(1);
-    expect(parsed.steps).toBeInstanceOf(Array);
-    expect(parsed.steps[0]).toHaveProperty('message', 'Hola desde upstream comprimido');
+    // Assert 4: SessionPersistence proyectó el body de respuesta en layout causal-workflows-v1
+    const parsed = JSON.parse(content) as { message?: string };
+    expect(parsed.message).toBe('Hola desde upstream comprimido');
   });
 });

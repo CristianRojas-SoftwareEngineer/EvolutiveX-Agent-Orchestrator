@@ -219,34 +219,33 @@
 - [x] Crear change de segundo nivel `gateway-p1-new-session-layout` (skill `openspec-propose`)
 - [x] El `proposal.md` del change hijo incluye back-reference al orquestador
 - [x] Actualizar estado de P1 a `en-curso` en el registro del orquestador
-- [ ] Seguimiento de implementación del change hijo (`openspec-apply`)
-- [ ] Componentes de infraestructura creados (capa 1):
+- [x] Seguimiento de implementación del change hijo (`openspec-apply`)
+- [x] Componentes de infraestructura creados (capa 1):
   - _`IEventBus` port en `src/1-domain/repositories/IEventBus.ts`_
   - _Tipos de telemetría (`TelemetryEvent`, `EventCallback`, `SubscriptionRef`) en `src/1-domain/types/telemetry.types.ts`_
   - _Matcher de patrones (`*`, `prefix_*`, `*_suffix`) en `src/1-domain/services/gateway/`_
-- [ ] Componentes de infraestructura creados (capa 2):
+- [x] Componentes de infraestructura creados (capa 2):
   - _`EventBus` adapter (pub/sub async in-process, fire-and-forget) en `src/2-services/event-bus.service.ts`_
   - _Funciones de rutas de sesión (`getWorkflowDir`, `getStepDir`, `getToolsDir`) para layout `causal-workflows-v1`_
   - _Utilidades de aislamiento async (`fireAndForget`, `withTimeout`) en `src/2-services/utils/`_
   - _`SessionPersistence` (parte estructural): suscriptores `session_start`, `workflow_start`, `workflow_spawn`, `workflow_complete`, `workflow_cancel`, `step_request`, `tool_call`, `tool_result` → escribe `meta.json` (estado fusionado, sin `state.json`), `output/result.json` + `output/result.parsed.md` (en `workflow_complete`), `request/body.json`, `tools/NN-name/{input,result,meta}.json` en `src/2-services/session-persistence.service.ts`_
-- [ ] Correlador conectado al bus:
+- [x] Correlador conectado al bus:
   - _`WorkflowRepositoryService` recibe `IEventBus` en constructor y emite el evento correspondiente (§28b.3) en cada método de mutación de estado_
   - _Criterio: los seis puntos de emisión del mapa de adaptación están implementados_
-- [ ] Composition root cableado: `EventBus` creado e inyectado en correlador y `SessionPersistence` (capa 4, §42)
-- [ ] Gate superado: `npm run test` + subconjunto estructural del checklist §37b (casos 3–7, 16, 19)
+- [x] Composition root cableado: `EventBus` creado e inyectado en correlador y `SessionPersistence` (capa 4, §42)
+- [x] Gate superado: `npm run test` + subconjunto estructural del checklist §37b (casos 3–7, 16, 19)
   - _Criterio: nuevas sesiones generadas en tests adoptan la estructura `workflows/NN/`, `steps/MM/`, `tools/KK/`; todos los casos del subconjunto verificados. Casos 1 y 15 excluidos (artefactos nuevos, pertenecen a P2); caso 2 excluido (ya verde en G4)_
-- [ ] Documentación actualizada: `docs/session-audit-model.md`, `README.md`, `docs/proposals/gateway-design.md` §29, §30, §33, §37b, §40, §46.4
+- [x] Documentación actualizada: `docs/session-audit-model.md`, `README.md`, `docs/proposals/gateway-design.md` §29, §30, §33, §37b, §40, §46.4
   - _Criterio: estructura `workflows/NN/`, `tools/KK/`, `output/result.json` descrita como el layout vigente para sesiones nuevas_
-- [ ] Legacy retirado:
-  - _`audit-writer.service.ts` eliminado de `src/`_
-  - _`session-store.service.ts` eliminado de `src/`_
-  - _`workflow-result-projector.service.ts` eliminado de `src/`_
-  - _Constantes flat de `audit-paths.ts` (`DIR_MAIN_AGENT`, `DIR_INTERACTIONS`, `PREFIX_SUB_AGENT`) eliminadas_
-  - _Tipos `ActiveInteraction` e `InteractionMetadata` eliminados_
-  - _Llamadas directas a disco en handlers de capa 3 eliminadas_
-  - _Criterio: `npm run lint` y `npm run typecheck` pasan; no quedan referencias a los artefactos retirados_
-- [ ] Sync de specs si aplica (`openspec-sync`)
-- [ ] Marcar P1 como `validada` y archivar el change hijo (`openspec-archive`)
+- [x] Legacy retirado:
+  - _`session-store.service.ts` y `workflow-result-projector.service.ts` eliminados; `ISessionStore` / `IAuditWriter` retirados_
+  - _`AuditWriterService` reducido a shim `ISseAuditWriter` (`@deprecated-p2`)_
+  - _Constantes flat no usadas eliminadas de `audit-paths.ts`; `ActiveInteraction` eliminado_
+  - _Handlers L3 sin `fs.write*` directos salvo SSE inline_
+  - _Criterio: `npm run lint`, `npm run typecheck` y `npm run test` pasan_
+- [x] Sync de specs (`openspec-sync` → `openspec/specs/event-bus`, `session-persistence`, `session-routing`, `gateway-audit-projection`)
+- [x] Marcar P1 como `validada` y archivar el change hijo (`openspec-archive`)
+  - _Archivado 2026-05-30 → `openspec/changes/archive/2026-05-30-gateway-p1-new-session-layout`; documentación causal reescrita_
 
 ---
 

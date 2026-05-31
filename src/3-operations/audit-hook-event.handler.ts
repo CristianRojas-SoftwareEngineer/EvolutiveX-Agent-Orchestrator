@@ -1,17 +1,14 @@
 import type { IWorkflowRepository } from '../1-domain/repositories/IWorkflowRepository.js';
 import type { Logger } from '../1-domain/types/logger.types.js';
 import type { ClaudeHookEvent } from '../1-domain/types/hook.types.js';
-import type { ISessionStore } from '../2-services/ports/session-store.port.js';
-import {
-  AuditWorkflowClosureHandler,
-  resolveSessionDir,
-} from './audit-workflow-closure.handler.js';
+import { SessionMetricsService } from '../2-services/session-metrics.service.js';
+import { resolveSessionDir } from './audit-workflow-closure.handler.js';
 
 export class AuditHookEventHandler {
   constructor(
     private readonly workflowRepo: IWorkflowRepository,
-    private readonly sessionStore: ISessionStore,
-    private readonly closureHandler: AuditWorkflowClosureHandler,
+    private readonly auditBaseDir: string,
+    private readonly sessionMetrics: SessionMetricsService,
     private readonly logger?: Logger,
   ) {}
 
@@ -37,7 +34,10 @@ export class AuditHookEventHandler {
       case 'Stop': {
         const wf = this.workflowRepo.getWorkflow(event.sessionId);
         if (!wf) {
-          this.logger?.info({ eventName: event.eventName, sessionId: event.sessionId }, 'workflow no encontrado — evento ignorado');
+          this.logger?.info(
+            { eventName: event.eventName, sessionId: event.sessionId },
+            'workflow no encontrado — evento ignorado',
+          );
           break;
         }
         if (this.workflowRepo.readyToClose(event.sessionId, event)) {
@@ -52,7 +52,10 @@ export class AuditHookEventHandler {
         if (!agentId) break;
         const wf = this.workflowRepo.getWorkflow(agentId);
         if (!wf) {
-          this.logger?.info({ eventName: event.eventName, agentId }, 'sub-workflow no encontrado — evento ignorado');
+          this.logger?.info(
+            { eventName: event.eventName, agentId },
+            'sub-workflow no encontrado — evento ignorado',
+          );
           break;
         }
         if (this.workflowRepo.readyToClose(agentId, event)) {
@@ -65,7 +68,10 @@ export class AuditHookEventHandler {
       case 'StopFailure': {
         const wf = this.workflowRepo.getWorkflow(event.sessionId);
         if (!wf) {
-          this.logger?.info({ eventName: event.eventName, sessionId: event.sessionId }, 'workflow no encontrado — evento ignorado');
+          this.logger?.info(
+            { eventName: event.eventName, sessionId: event.sessionId },
+            'workflow no encontrado — evento ignorado',
+          );
           break;
         }
         this.workflowRepo.close(event.sessionId, event);
@@ -74,15 +80,15 @@ export class AuditHookEventHandler {
       }
 
       case 'PreToolUse':
-        this.logger?.info({ eventName: event.eventName }, 'hook recibido — ToolUse.status = running diferido a G4');
+        this.logger?.info({ eventName: event.eventName }, 'hook PreToolUse recibido');
         break;
 
       case 'PostToolUse':
-        this.logger?.info({ eventName: event.eventName }, 'hook recibido — ToolUse.status = completed diferido a G4');
+        this.handlePostToolUse(event, false);
         break;
 
       case 'PostToolUseFailure':
-        this.logger?.info({ eventName: event.eventName }, 'hook recibido — ToolUse.status = error diferido a G4');
+        this.handlePostToolUse(event, true);
         break;
 
       default:
@@ -91,11 +97,35 @@ export class AuditHookEventHandler {
     }
   }
 
-  private async delegateClosure(sessionId: string, workflowId: string): Promise<void> {
-    const workflow = this.workflowRepo.getWorkflow(workflowId);
+  private handlePostToolUse(event: ClaudeHookEvent, isError: boolean): void {
+    const toolUseId = event.toolUseId;
+    if (!toolUseId) return;
+
+    const match = this.workflowRepo.findWorkflowWithPendingToolUse(event.sessionId, toolUseId);
+    const workflow =
+      match?.workflow ??
+      this.workflowRepo.findWorkflowByToolUseId(event.sessionId, toolUseId);
     if (!workflow) return;
 
-    const sessionDir = resolveSessionDir(this.sessionStore.getBaseDir(), sessionId);
-    await this.closureHandler.execute({ sessionDir, workflow });
+    const resultPayload =
+      event.lastAssistantMessage != null && event.lastAssistantMessage !== ''
+        ? event.lastAssistantMessage
+        : isError
+          ? { error: 'PostToolUseFailure' }
+          : null;
+
+    this.workflowRepo.completeToolUse(workflow.id, toolUseId, {
+      isError,
+      result: resultPayload,
+    });
+  }
+
+  private async delegateClosure(sessionId: string, workflowId: string): Promise<void> {
+    const workflow = this.workflowRepo.getWorkflow(workflowId);
+    if (!workflow || workflow.kind !== 'main') return;
+
+    const sessionDir = resolveSessionDir(this.auditBaseDir, sessionId);
+    const closedSteps = workflow.steps.filter((s) => s.closedAt != null);
+    await this.sessionMetrics.updateFromWorkflow(sessionDir, closedSteps);
   }
 }

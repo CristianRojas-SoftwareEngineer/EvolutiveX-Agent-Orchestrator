@@ -91,7 +91,7 @@ describe('Test E2E - Correlación por cabeceras de agente (plano A)', () => {
     await new Promise((r) => setTimeout(r, 500));
 
     // La sesión debe haberse creado en disco
-    const sessionDir = path.join(tempSessionsDir, 'test-agent-headers');
+    const sessionDir = path.join(path.dirname(tempSessionsDir), 'sessions', 'test-agent-headers');
     let sessionExists: boolean;
     try {
       await fs.access(sessionDir);

@@ -13,7 +13,7 @@ import {
   CoalescedAgentStepResponse,
 } from '../1-domain/types/audit.types.js';
 import { JsonValue } from '../1-domain/types/json.types.js';
-import type { IAuditWriter } from './ports/audit-writer.port.js';
+import type { ISseAuditWriter } from './ports/sse-audit-writer.port.js';
 import {
   DIR_INPUT,
   DIR_OUTPUT,
@@ -29,7 +29,8 @@ import {
 /**
  * Servicio encargado de la persistencia física de los logs de auditoría.
  */
-export class AuditWriterService implements IAuditWriter {
+/** @deprecated-p2 Escrituras SSE y reconstrucción; reemplazar por suscripción a `stream_chunk` en P2. */
+export class AuditWriterService implements ISseAuditWriter {
   constructor(
     private redactService: RedactService,
     private markdownRendererService: MarkdownRendererService,

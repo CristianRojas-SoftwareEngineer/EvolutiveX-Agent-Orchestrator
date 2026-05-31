@@ -3,7 +3,6 @@ import * as fs from 'node:fs/promises';
 import { SessionResolverService } from '../1-domain/services/session-resolver.service.js';
 import { RedactService } from '../1-domain/services/redact.service.js';
 import { MarkdownRendererService } from '../1-domain/services/markdown-renderer.service.js';
-import { SessionStoreService } from '../2-services/session-store.service.js';
 import { AuditWriterService } from '../2-services/audit-writer.service.js';
 import { SseReconstructService } from '../2-services/sse-reconstruct.service.js';
 import { StreamTeeService } from '../2-services/stream-tee.service.js';
@@ -13,7 +12,6 @@ import { SessionPersistence } from '../2-services/session-persistence.service.js
 import { ProviderCatalogService } from '../2-services/provider-catalog.service.js';
 import { StepAssemblerService } from '../2-services/step-assembler.service.js';
 import { SessionMetricsService } from '../2-services/session-metrics.service.js';
-import { AuditWorkflowClosureHandler } from '../3-operations/audit-workflow-closure.handler.js';
 import { AuditHookEventHandler } from '../3-operations/audit-hook-event.handler.js';
 import { AuditInteractionHandler } from '../3-operations/audit-interaction.handler.js';
 import { AuditSseResponseHandler } from '../3-operations/audit-sse-response.handler.js';
@@ -43,9 +41,8 @@ export async function createProxyDependencies(
   // Capa 2 — Adapters
   const redactService = new RedactService();
   const markdownRenderer = new MarkdownRendererService();
-  const sessionStore = new SessionStoreService(auditBaseDir, logger);
-  const auditWriter = new AuditWriterService(redactService, markdownRenderer);
-  const sseReconstruct = new SseReconstructService(auditWriter);
+  const sseAuditWriter = new AuditWriterService(redactService, markdownRenderer);
+  const sseReconstruct = new SseReconstructService(sseAuditWriter);
   const streamTee = new StreamTeeService();
   // EventBus único por arranque; SessionPersistence se auto-suscribe en su constructor
   // y el correlador publica sus mutaciones al mismo bus (Opción A, §28b/§40).
@@ -57,20 +54,20 @@ export async function createProxyDependencies(
   const workflowRepo = new WorkflowRepositoryService(eventBus);
   const providerCatalog = new ProviderCatalogService(config.UPSTREAM_ORIGIN);
 
-  await sessionStore.ensureAuditSessionsRoot();
+  await ensureAuditSessionsRoot(auditBaseDir);
   await cleanCutLegacySessions(auditBaseDir, logger);
 
   // Capa 3 — Handlers
   const auditInteractionHandler = new AuditInteractionHandler(
     sessionResolver,
-    sessionStore,
-    auditWriter,
+    auditBaseDir,
+    workflowRepo,
+    eventBus,
     config,
     logger,
-    workflowRepo,
   );
   const auditSseResponseHandler = new AuditSseResponseHandler(
-    auditWriter,
+    sseAuditWriter,
     sseReconstruct,
     config,
     () => new StepAssemblerService(),
@@ -78,8 +75,7 @@ export async function createProxyDependencies(
     eventBus,
     logger,
   );
-  const sessionMetrics = new SessionMetricsService(auditWriter);
-  const auditWorkflowClosureHandler = new AuditWorkflowClosureHandler(sessionMetrics);
+  const sessionMetrics = new SessionMetricsService();
   const auditStandardResponseHandler = new AuditStandardResponseHandler(
     eventBus,
     config,
@@ -89,8 +85,8 @@ export async function createProxyDependencies(
   const filterToolsHandler = new FilterToolsHandler(config);
   const hookEventHandler = new AuditHookEventHandler(
     workflowRepo,
-    sessionStore,
-    auditWorkflowClosureHandler,
+    auditBaseDir,
+    sessionMetrics,
     logger,
   );
 
@@ -102,7 +98,6 @@ export async function createProxyDependencies(
     filterToolsHandler,
     hookEventHandler,
     streamTee,
-    sessionStore,
     providerCatalog,
     eventBus,
     sessionPersistence,
@@ -111,6 +106,17 @@ export async function createProxyDependencies(
 }
 
 export type ProxyDependencies = Awaited<ReturnType<typeof createProxyDependencies>>;
+
+/** Crea el directorio raíz de sesiones auditadas y `.gitkeep` si no existen. */
+async function ensureAuditSessionsRoot(auditBaseDir: string): Promise<void> {
+  await fs.mkdir(auditBaseDir, { recursive: true });
+  const keep = path.join(auditBaseDir, '.gitkeep');
+  try {
+    await fs.access(keep);
+  } catch {
+    await fs.writeFile(keep, '', 'utf8');
+  }
+}
 
 /**
  * Corte limpio (§D-5): si `sessionsDir` contiene sesiones con el layout flat

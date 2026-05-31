@@ -74,8 +74,10 @@ export class SessionPersistence {
       workflowId: string;
       kind?: string;
       request?: unknown;
+      layoutIndex?: number;
     };
-    const index = this.allocWorkflowIndex(event.sessionId);
+    const index =
+      typeof p.layoutIndex === 'number' ? p.layoutIndex : this.allocWorkflowIndex(event.sessionId);
     const baseDir = getWorkflowDir(event.sessionId, index);
     const meta: Record<string, unknown> = {
       workflowId: p.workflowId,
@@ -103,6 +105,9 @@ export class SessionPersistence {
       workflowId: string;
       parentWorkflowId: string;
       parentToolUseId: string;
+      layoutIndex?: number;
+      parentContext?: Record<string, unknown>;
+      request?: unknown;
     };
     const baseDir = this.resolveSpawnBaseDir(event.sessionId, p.parentWorkflowId, p.parentToolUseId);
     const meta: Record<string, unknown> = {
@@ -114,6 +119,7 @@ export class SessionPersistence {
       status: 'running',
       layoutVersion: LAYOUT_VERSION,
       startedAt: event.timestamp,
+      ...(p.parentContext ? { parentContext: p.parentContext } : {}),
     };
     this.workflows.set(p.workflowId, {
       sessionId: event.sessionId,
@@ -123,6 +129,9 @@ export class SessionPersistence {
       meta,
     });
     this.writeMeta(baseDir, meta);
+    if (p.request !== undefined) {
+      this.writeJson(`${baseDir}request/body.json`, p.request);
+    }
   }
 
   private onStepRequest(event: TelemetryEvent): void {
@@ -190,11 +199,25 @@ export class SessionPersistence {
   }
 
   private onWorkflowComplete(event: TelemetryEvent): void {
-    const p = event.payload as { workflowId: string; result: unknown };
+    const p = event.payload as {
+      workflowId: string;
+      result: unknown;
+      outcome?: string;
+      lostPendingAgents?: unknown;
+      lostPendingWebSearch?: unknown;
+      lostPendingWebFetch?: unknown;
+      continuationOrphan?: boolean;
+    };
     const entry = this.workflows.get(p.workflowId);
     if (!entry) return;
-    entry.meta.status = 'completed';
+    const auditOutcome = p.outcome ?? (p.result as Record<string, unknown>)?.outcome;
+    entry.meta.status = auditOutcome === 'orphaned' ? 'orphaned' : 'completed';
     entry.meta.completedAt = event.timestamp;
+    if (auditOutcome !== undefined) entry.meta.outcome = auditOutcome;
+    if (p.lostPendingAgents !== undefined) entry.meta.lostPendingAgents = p.lostPendingAgents;
+    if (p.lostPendingWebSearch !== undefined) entry.meta.lostPendingWebSearch = p.lostPendingWebSearch;
+    if (p.lostPendingWebFetch !== undefined) entry.meta.lostPendingWebFetch = p.lostPendingWebFetch;
+    if (p.continuationOrphan !== undefined) entry.meta.continuationOrphan = p.continuationOrphan;
     this.writeMeta(entry.baseDir, entry.meta);
     this.writeJson(`${entry.baseDir}output/result.json`, p.result);
     this.writeText(`${entry.baseDir}output/result.parsed.md`, this.renderResultMarkdown(p.result));

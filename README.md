@@ -19,7 +19,7 @@ El proxy utiliza **Progressive Kernel Architecture (PKA)** — un modelo arquite
 | Capa                           | Ubicación                | Responsabilidad                                                                   | Componentes Clave                                                                                                                                                   |
 | ------------------------------ | ------------------------ | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **1 - Dominio**                | `src/1-domain/`          | Tipos puros (entidades) y lógica de dominio sin dependencias externas             | `SessionResolverService`, `RequestClassifierService`, `RedactService`, `MarkdownRendererService`, `SseSimulatorService`, Tipos de auditoría                         |
-| **2 - Servicios (Adapters)**   | `src/2-services/`        | Implementaciones concretas con I/O (filesystem, streams) y **ports** (interfaces) | `SessionStoreService`, `AuditWriterService`, `SseReconstructService`, `StreamTeeService`, Ports: `IAuditWriter`, `ISessionStore`, `ISseReconstructor`, `IStreamTee` |
+| **2 - Servicios (Adapters)**   | `src/2-services/`        | Implementaciones concretas con I/O (filesystem, streams) y **ports** (interfaces) | `EventBus`, `SessionPersistence`, `WorkflowRepositoryService`, `SseReconstructService`, `StreamTeeService`, Ports: `IEventBus`, `IWorkflowRepository`, `ISseAuditWriter`, `ISseReconstructor`, `IStreamTee` |
 | **3 - Operaciones (Handlers)** | `src/3-operations/`      | Orquestación de casos de uso (Command Handlers)                                   | `AuditInteractionHandler`, `AuditSseResponseHandler`, `AuditStandardResponseHandler`, `AuditUpstreamErrorHandler`, `FilterToolsHandler`                             |
 | **4 - API (Composition Root)** | `src/4-api/`             | Wiring de dependencias y configuración                                            | `createProxyDependencies()`, Configuración de entorno                                                                                                               |
 | **5 - Interfaces de Usuario**  | `src/5-user-interfaces/` | Adaptadores HTTP (reciben deps inyectadas via options)                            | `ProxyController`, `proxyRoutes`, `fastify.augments.d.ts`                                                                                                           |
@@ -37,6 +37,10 @@ Las capas internas **nunca** importan de capas externas. Esta regla garantiza qu
 - Los servicios (Capa 2) pueden ser reemplazados sin afectar la lógica de negocio
 - La UI (Capa 5) es un detalle de implementación desechable
 
+### Persistencia causal (P1)
+
+Los handlers de capa 3 **no escriben disco** salvo el writer SSE temporal (`ISseAuditWriter`, `@deprecated-p2`). El correlador publica eventos (`workflow_start`, `step_request`, `step_response`, `tool_call`, `tool_result`, `workflow_complete`, …) en un **EventBus** in-process; **SessionPersistence** es el único suscriptor que proyecta el layout `causal-workflows-v1` bajo `sessions/<id>/workflows/NN/`. Ver [`docs/session-audit-model.md`](docs/session-audit-model.md#0-layout-vigente-causal-workflows-v1-sesiones-nuevas).
+
 ---
 
 ## 🔄 Flujo de Datos (Arquitectura de Intercepción)
@@ -44,19 +48,20 @@ Las capas internas **nunca** importan de capas externas. Esta regla garantiza qu
 ```mermaid
 graph TD
     A[Cliente: Claude Code] -->|Request + Audit Session Header| B(Fastify Proxy)
-    B -->|Hook: preHandler| C{SessionService + TurnClassifier}
-    C -->|Turno clasificado| D[AuditInteractionHandler\nfresh / continuation / preflight / side-request]
-    D -->|Guardar Request Body| E[AuditWriter]
+    B -->|Hook: preHandler| C{SessionResolver + TurnClassifier}
+    C -->|Turno clasificado| D[AuditInteractionHandler]
+    D -->|publish| EB[EventBus]
+    EB --> SP[SessionPersistence]
+    SP --> W["workflows/NN/… en disco"]
     B -->|Transmisión| F[Upstream: API Anthropic]
     F -->|Response Stream| G{ProxyController: Interceptor}
-    G -->|Clonación de Stream| H[Transmisión al Cliente]
-    G -->|Clonación de Stream| I[Handler de Auditoría]
-    I -->|Si SSE| J[steps/NN/response/sse.jsonl]
-    I -->|Si SSE, detecta stop_reason| K[SSEReconstructService\nagrupa steps, reconstruye]
-    K -->|Reconstrucción| L[output/body.json]
-    I -->|Si no-SSE, heurística terminal| M[steps/NN/response/body.json]
-    L --> N[meta.json InteractionMetadata + Markdown]
-    M --> N
+    G -->|Clonación| H[Transmisión al Cliente]
+    G -->|Clonación| I[AuditSseResponse / AuditStandardResponse]
+    I -->|publish step_response| EB
+    I -->|SSE inline @deprecated-p2| SSEW[ISseAuditWriter]
+    SSEW --> J["steps/MM/response/sse.jsonl"]
+    I -->|terminal SSE| K[SseReconstructService]
+    K --> L["output/result.json + meta.json"]
 ```
 
 ---
@@ -78,16 +83,16 @@ El diseño garantiza que nunca se filtren API Keys a los logs de servidor ni a l
 
 Ideal para depurar comportamientos erráticos en herramientas de CLI (como `claude`):
 
-- Agrupa las peticiones de un turno completo (prompt → respuesta final) bajo una interacción con subdirectorios `steps/`.
-- Tres tipos de interacción: `agentic` (turno del usuario con prompt y respuesta), `client-preflight` (quota check + cache warm-up) y `side-request` (peticiones con `"tools": []`, ej. count_tokens, generación de títulos).
-- Los `side-request` se auditan en su propia interacción sin desplazar al turno activo principal, evitando corrupción de metadata por race conditions.
-- Los turnos se indexan por `interactionDir` (único por request) permitiendo múltiples turnos concurrentes en la misma sesión (parallel subagents).
+- Agrupa cada ciclo E2E bajo `workflows/NN/` con subdirectorios `steps/MM/` y `tools/KK-slug/`.
+- Tres tipos semánticos (`agentic`, `client-preflight`, `side-request`) se materializan como workflows hermanos bajo el mismo árbol `workflows/` (no hay `side-interactions/` en disco).
+- Los `side-request` abren un workflow propio sin desplazar el workflow `main` activo.
+- Varios workflows pueden coexistir en la misma sesión (subagentes paralelos, preflights, side-requests).
 - Las continuaciones (`tool_result`) se rutean al turno padre mediante correlación por `tool_use_id`, eliminando la misatribución de steps. Las continuaciones de `Agent`/subagentes se coalescen en el `response` del step que emitió los subagentes; las demás tools conservan steps separados.
 - **Correlación de subagentes (plano A):** Claude Code ≥ 2.1.139 emite cabeceras `X-Claude-Code-Agent-Id` y `X-Claude-Code-Parent-Agent-Id` en cada request. Cuando están presentes, la correlación es **determinista** (`correlationMethod: 'agent-headers'`), con mayor autoridad que los métodos heurísticos anteriores. Para clientes sin estas cabeceras el fallback heurístico (`prompt` / `unique-pending`) sigue operativo.
 - **Borde hooks (plano C, activo desde C3):** El proxy expone `POST /hooks` para recibir eventos del lifecycle de Claude Code (hooks). El evento `SubagentStart` confirma subagentes en el correlador (`confirmSubagentFromHook`); los demás eventos (`UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`, etc.) son stubs con log diferidos a G2/C4. El endpoint responde HTTP 202 inmediatamente y nunca reenvía al upstream.
 - Los preflights (`client-preflight`) se cierran inmediatamente al recibir su respuesta, evitando turnos zombie que bloquean la sesión.
-- Cada step en `meta.json` puede incluir `toolUseIds: string[]` — los IDs de tool_use emitidos en ese step, usados para correlacionar con futuras continuaciones.
-- `meta.json` resume el turno completo: steps individuales, tokens agregados en `totals`, duración y `outcome`.
+- El correlador (`IWorkflowRepository`) mantiene tools pendientes y steps en memoria; al cierre, `output/result.json` expone `IWorkflowResult` (outcome, usage agregado, `stepCount`).
+- `meta.json` en cada workflow fusiona identidad y estado (`status`, timestamps, outcome); no hay `state.json` separado.
 
 <a name="riesgos-seguridad"></a>
 
@@ -100,18 +105,16 @@ Ideal para depurar comportamientos erráticos en herramientas de CLI (como `clau
 
 ## 📂 Referencia de Archivos de Auditoría
 
-La sesión se divide en dos árboles independientes bajo `./sessions/<session-id>/`:
+Layout vigente (`causal-workflows-v1`) bajo `./sessions/<session-id>/`:
 
 ```
 sessions/<session-id>/
   session-metrics.json
-  main-agent/interactions/
-    interaction-sequence.json
-    NN/                    # meta.json, state.json, input/, output/, steps/NN/
-  side-interactions/
-    interaction-sequence.json
-    NN/                    # meta.json, state.json; input/ y output/ solo en side-request
+  workflows/
+    NN/                    # meta.json, request/, output/result.json, steps/MM/, tools/KK-slug/
 ```
+
+Preflights y side-requests usan el mismo árbol `workflows/` con otro índice `NN` (véase [`docs/session-audit-model.md`](docs/session-audit-model.md)).
 
 > **Referencia completa:** modelo conceptual, layout detallado, tipos de interacción, protocolo HTTP, subagentes, `meta.json` y correlación con logs — [`docs/session-audit-model.md`](docs/session-audit-model.md).
 
@@ -143,7 +146,7 @@ Personaliza el comportamiento ajustando estas variables en tu entorno o en un ar
 | **Filtrado** | `FILTERED_TOOLS`          | Tool names a excluir del request (coma-separado). Omitir la variable = default abajo. Desactivar filtrado: `FILTERED_TOOLS=""`. | `ScheduleWakeup,NotebookEdit,ExitWorktree,EnterWorktree,CronList,CronDelete,CronCreate` |
 |   **Logs**   | `LOG_LEVEL`               | Nivel de log de Pino (consola y `server/logs.jsonl`).                                                                           | `info`                                                                                  |
 
-> **Auditoría por defecto.** El proxy escribe en `./sessions` para `agentic`, `client-preflight` y `side-request`. En side-request SSE auditados: (a) `steps/NNN/response/sse.jsonl` es la **fuente de verdad**; (b) `steps/NNN/response/sse.txt` es raw dump acotado por `MAX_AUDIT_BYTES`; (c) `response/body.json` top-level se reconstruye desde `sse.jsonl`. Detalle en [`docs/how-sse-reconstruction-works.md`](docs/how-sse-reconstruction-works.md).
+> **Auditoría por defecto.** El árbol causal se escribe vía **EventBus → SessionPersistence**. Para SSE, `steps/MM/response/sse.jsonl` se escribe aún vía `ISseAuditWriter` (`@deprecated-p2` hasta P2): (a) `sse.jsonl` es la **fuente de verdad** de reconstrucción; (b) `sse.txt` es raw dump opcional acotado por `MAX_AUDIT_BYTES`; (c) el cierre del workflow persiste `output/result.json`. Detalle en [`docs/how-sse-reconstruction-works.md`](docs/how-sse-reconstruction-works.md).
 
 <a name="correlación-de-sesión-sessionid"></a>
 
@@ -265,13 +268,13 @@ Para más detalles y comandos alternativos, consulta `docs/dockerization.md`.
 
 ### Interpretación de Auditoría
 
-Tras cada turno, se genera una estructura bajo `./sessions/<session-id>/main-agent/interactions/NN/` (agentic) o `./sessions/<session-id>/side-interactions/NN/` (preflights y side-requests), documentada en la [§ Referencia de Archivos de Auditoría](#archivos-auditoria).
+Tras cada ciclo auditado, se genera (o actualiza) `./sessions/<session-id>/workflows/NN/`, documentado en la [§ Referencia de Archivos de Auditoría](#archivos-auditoria) y en [`docs/session-audit-model.md`](docs/session-audit-model.md).
 
 ### Fix de Colisión de Steps y Reconstrucción SSE
 
 El proxy incluye validaciones defensivas para prevenir errores de reconstrucción SSE causados por colisiones de concurrencia en requests internas (WebSearch/WebFetch):
 
-- **Contrato inmutable de stepIndex**: Cada step auditado tiene un `assignedStepIndex` asignado durante el request audit que se transporta inmutablemente hasta el response audit. Esto garantiza que el handler de response use el índice correcto del step, incluso si `activeInteraction.stepCount` ha avanzado debido a otras requests concurrentes.
+- **Contrato inmutable de stepIndex**: Cada step auditado tiene un `assignedStepIndex` asignado durante el request audit que se transporta inmutablemente hasta el response audit. Esto garantiza que el handler de response use el índice correcto del step, incluso si el workflow en el correlador ha avanzado por requests concurrentes.
   - Fresh agentic y side-request: `assignedStepIndex = 1`
   - Client-preflight: `assignedStepIndex = 1`
   - Continuation no-coalesced: `assignedStepIndex = stepCount` incrementado

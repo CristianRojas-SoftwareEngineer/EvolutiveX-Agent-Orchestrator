@@ -1,4 +1,10 @@
-import type { AgentContext } from '../types/audit.types.js';
+import type {
+  AgentContext,
+  InteractionType,
+  ParentContext,
+  SideRequestKind,
+} from '../types/audit.types.js';
+import type { JsonValue } from '../types/json.types.js';
 import type { ClaudeHookEvent } from '../types/hook.types.js';
 import type { IWorkflow } from '../interfaces/gateway/IWorkflow.js';
 import type { IStep } from '../interfaces/gateway/IStep.js';
@@ -12,6 +18,48 @@ export interface WireSubagentEntry {
   parentAgentId?: string;
   confirmed?: boolean;
   triggeringToolUseId?: string;
+}
+
+/** Opciones de apertura de workflow wire (audit-interaction). */
+export interface OpenWorkflowOptions {
+  /** Crea un workflow nuevo aunque exista el main de hooks (idempotencia solo sin esto). */
+  forceNew?: boolean;
+  /** Índice NN del layout causal; si no se indica, se asigna por sesión. */
+  layoutIndex?: number;
+  /** Body parseado para `request/body.json` (workflow_start / step_request). */
+  request?: unknown;
+  /** Omite `request/body.json` a nivel workflow (preflights). */
+  skipWorkflowRequest?: boolean;
+  interactionType?: InteractionType;
+  sideRequestKind?: SideRequestKind;
+}
+
+/** Opciones de apertura de sub-workflow wire. */
+export interface OpenSubagentWorkflowOptions {
+  layoutIndex?: number;
+  request?: unknown;
+  parentContext?: ParentContext;
+}
+
+/** Estado en memoria del turno wire asociado a un workflow. */
+export interface WireWorkflowMeta {
+  layoutIndex: number;
+  requestSequence: number;
+  requestBodyOmitted: boolean;
+  requestBodyBytes: number;
+  interactionType: InteractionType;
+  sideRequestKind?: SideRequestKind;
+  awaitingContinuation?: boolean;
+  awaitingSince?: number;
+  modelId?: string;
+  parentContext?: ParentContext;
+  continuationOrphan?: boolean;
+  coalescedAgentContinuation?: {
+    targetStepIndex: number;
+    toolUseIds: string[];
+    continuationRequest?: JsonValue;
+    continuationHeaders?: Record<string, string | string[] | undefined>;
+  };
 }
 
 export interface IWorkflowRepository {
@@ -36,8 +84,8 @@ export interface IWorkflowRepository {
 
   // ── Métodos de lifecycle (G2) ─────────────────────────────────────────────
 
-  /** Abre el workflow principal de la sesión; idempotente si ya existe. */
-  openWorkflow(sessionId: string, agentCtx: AgentContext): IWorkflow;
+  /** Abre el workflow principal de la sesión; idempotente si ya existe (hooks). */
+  openWorkflow(sessionId: string, agentCtx: AgentContext, options?: OpenWorkflowOptions): IWorkflow;
 
   /** Abre un sub-workflow enlazado a un workflow padre y a un tool_use. */
   openSubagentWorkflow(
@@ -45,6 +93,7 @@ export interface IWorkflowRepository {
     agentCtx: AgentContext,
     parentWorkflowId: string,
     parentToolUseId: string,
+    options?: OpenSubagentWorkflowOptions,
   ): IWorkflow;
 
   /** Recupera un workflow por su id. */
@@ -80,7 +129,11 @@ export interface IWorkflowRepository {
    * Cierra forzosamente el workflow con el outcome indicado (sin hook event).
    * Usado para errores upstream donde no hay evento de hook disponible. Idempotente.
    */
-  forceClose(workflowId: string, outcome: WorkflowOutcome): void;
+  forceClose(
+    workflowId: string,
+    outcome: WorkflowOutcome,
+    resultExtras?: Record<string, unknown>,
+  ): void;
 
   /**
    * Fija `languageModelId` con el primer modelo observado (idempotente).
@@ -114,8 +167,40 @@ export interface IWorkflowRepository {
   /** Busca workflows `running` cuya antigüedad (`startedAt`) supera `maxAgeMs`. */
   findStaleWorkflows(sessionId: string, maxAgeMs: number): IWorkflow[];
 
+  /**
+   * Workflows en espera de continuation cuyo `awaitingSince` supera `maxAgeMs`.
+   */
+  findStaleWorkflowsAwaitingContinuation(sessionId: string, maxAgeMs: number): IWorkflow[];
+
+  /** Todos los workflows con `status === 'running'`. */
+  getAllRunningWorkflows(): IWorkflow[];
+
+  /**
+   * Busca el primer workflow de la sesión con tool_uses pendientes que cumplan el predicado.
+   */
+  findWorkflowWithPendingTools(
+    sessionId: string,
+    predicate: (toolUse: IToolUse) => boolean,
+    options?: { excludeSubagents?: boolean },
+  ): { workflow: IWorkflow; pendings: IToolUse[] } | undefined;
+
+  /** Resuelve workflow por tool_use_id (pendiente o índice wire). */
+  findWorkflowByToolUseId(sessionId: string, toolUseId: string): IWorkflow | undefined;
+
+  /** Consume el primer pending FIFO cuyo nombre de tool coincide (web_search / web_fetch). */
+  consumeFirstPendingToolUseByName(workflowId: string, toolName: string): IToolUse | undefined;
+
+  /** Metadatos del turno wire en memoria. */
+  getWireMeta(workflowId: string): WireWorkflowMeta | undefined;
+
+  /** Actualiza metadatos wire (merge superficial). */
+  patchWireMeta(workflowId: string, patch: Partial<WireWorkflowMeta>): void;
+
   /** Asigna el siguiente número de secuencia para la sesión. */
   nextSequence(sessionId: string): Promise<number>;
+
+  /** Asigna el siguiente índice de layout NN por sesión (empieza en 0). */
+  allocLayoutIndex(sessionId: string): Promise<number>;
 
   /** Ejecuta `fn` serializado por sesión. */
   withSessionLock<T>(sessionId: string, fn: () => Promise<T>): Promise<T>;

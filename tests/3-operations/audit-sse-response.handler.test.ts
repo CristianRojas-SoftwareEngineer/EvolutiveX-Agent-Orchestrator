@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { PassThrough } from 'node:stream';
 import { AuditSseResponseHandler } from '../../src/3-operations/audit-sse-response.handler.js';
-import type { IAuditWriter } from '../../src/2-services/ports/audit-writer.port.js';
+import type { ISseAuditWriter } from '../../src/2-services/ports/sse-audit-writer.port.js';
 import type { ISseReconstructor } from '../../src/2-services/ports/sse-reconstructor.port.js';
 import type { IWorkflowRepository } from '../../src/1-domain/repositories/IWorkflowRepository.js';
 import type { IEventBus } from '../../src/1-domain/repositories/IEventBus.js';
@@ -40,6 +40,14 @@ function makeWorkflowRepo(overrides: Partial<IWorkflowRepository> = {}): IWorkfl
     registerPendingToolUse: vi.fn(),
     consumePendingToolUse: vi.fn(),
     findStaleWorkflows: vi.fn(() => []),
+    findStaleWorkflowsAwaitingContinuation: vi.fn(() => []),
+    getAllRunningWorkflows: vi.fn(() => []),
+    findWorkflowWithPendingTools: vi.fn(),
+    findWorkflowByToolUseId: vi.fn(),
+    consumeFirstPendingToolUseByName: vi.fn(),
+    getWireMeta: vi.fn(),
+    patchWireMeta: vi.fn(),
+    allocLayoutIndex: vi.fn(async () => 0),
     nextSequence: vi.fn(async () => 0),
     withSessionLock: vi.fn(async (_s, fn) => fn()),
     forceClose: vi.fn(),
@@ -47,36 +55,17 @@ function makeWorkflowRepo(overrides: Partial<IWorkflowRepository> = {}): IWorkfl
   };
 }
 
-function makeAuditWriter(overrides: Partial<IAuditWriter> = {}): IAuditWriter {
+function makeAuditWriter(overrides: Partial<ISseAuditWriter> = {}): ISseAuditWriter {
   return {
-    writeFileAtomic: async () => {},
-    writeJsonAtomic: async () => {},
-    writeFormattedAndMarkdown: async () => {},
-    writeInteractionRequest: async () => ({ dir: '', requestBodyOmitted: false }),
-    writeSubInteractionRequest: async () => ({ dir: '', requestBodyOmitted: false }),
-    nextSubInteractionSequence: async () => 1,
-    writeStepRequest: async () => {},
-    finalizeNonSseResponseAudit: async () => ({
-      responseBodyBytesAudited: 0,
-      responseTruncatedByProxyBuffer: false,
-      responseTruncatedByAuditLimit: false,
-    }),
-    finalizeNonSseResponseAuditOnStreamError: async () => ({
-      responseBodyBytesAudited: 0,
-      responseTruncatedByProxyBuffer: false,
-      responseTruncatedByAuditLimit: false,
-    }),
-    writeResponseHeadersAudit: async () => {},
-    writeTopLevelResponseHeaders: async () => {},
-    writeInteractionMeta: async () => {},
     appendSseLine: vi.fn(),
     appendSseRawChunk: vi.fn(),
-    writeInteractionState: async () => {},
-    removeInteractionState: async () => {},
+    writeResponseHeadersAudit: async () => {},
+    writeTopLevelResponseHeaders: async () => {},
+    writeStepThought: async () => {},
     writeStepResponseMarkdown: async () => {},
     writeCoalescedAgentStepResponse: async () => {},
-    writeStepThought: async () => {},
     writeTopLevelMultiStepResponse: async () => ({ written: true }),
+    extractFinalTextFromJson: () => null,
     ...overrides,
   };
 }
@@ -118,7 +107,7 @@ function makeContext(overrides: Partial<AuditInteractionContext> = {}): AuditInt
 }
 
 function makeSseHandler(
-  auditWriter: IAuditWriter = makeAuditWriter(),
+  auditWriter: ISseAuditWriter = makeAuditWriter(),
   sseReconstruct: ISseReconstructor = makeSseReconstructor(),
   repo: IWorkflowRepository = makeWorkflowRepo(),
   eventBus: IEventBus = makeEventBus(),

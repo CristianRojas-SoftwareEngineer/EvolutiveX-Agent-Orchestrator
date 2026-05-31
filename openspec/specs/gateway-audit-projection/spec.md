@@ -2,41 +2,40 @@
 
 ## Purpose
 
-Proyección hook-driven de `IWorkflowResult` al layout flat actual (`meta.json` en `sessions/{session}/{interaction}/`)
-mediante `AuditWorkflowClosureHandler` y mapper L2 desde `WorkflowResult`. Implementado en fase G4 (2026-05-29).
+Proyección de auditoría vía `EventBus` + `SessionPersistence` al layout `causal-workflows-v1` (`sessions/{sessionId}/workflows/NN/`).
+Los handlers L3 publican eventos; `SessionPersistence` escribe `meta.json`, steps, tools y `output/result.json`.
+`AuditWorkflowClosureHandler` conserva métricas de sesión sin escribir disco. Actualizado en fase P1 (2026-05-30).
 
 ## Requirements
 
 ### Requirement: AuditWorkflowClosureHandler — proyección de WorkflowResult a disco
 
-El sistema SHALL proveer `AuditWorkflowClosureHandler` en `src/3-operations/audit-workflow-closure.handler.ts` (capa 3) que reciba el `IWorkflowResult` producido por `IWorkflowRepository.close()` junto con el contexto de persistencia (`sessionDir`, `interactionDir`, hook de cierre) y proyecte el resultado a disco. El handler SHALL separar la responsabilidad de **qué escribir** del **cuándo cerrar** (que permanece en `AuditHookEventHandler`). La proyección de `meta.json` SHALL producir un artefacto equivalente al layout flat actual (`sessions/{sessionId}/{interactionId}/meta.json`) derivado de `WorkflowResult` mediante un mapper dedicado, no construyendo `InteractionMetadata` directamente en los handlers wire como fuente primaria. El layout de directorios bajo `sessions/` NO SHALL cambiar en G4.
+`AuditWorkflowClosureHandler` SHALL delegar la escritura de `meta.json` y `output/result.json` a `SessionPersistence` a través del `EventBus`. El handler SHALL seguir existiendo como orquestador de capa 3 que coordina el cierre y las métricas de sesión, pero NO SHALL escribir archivos directamente. La secuencia es:
 
-Referencia: [§28b](../../docs/proposals/gateway-design.md#28b-integración-correlador--bus-de-eventos--persistencia), [§40](../../docs/proposals/gateway-design.md#40-capa-2-objetivo).
+1. `AuditHookEventHandler` invoca `close()` en el correlador.
+2. El correlador emite `workflow_complete` (o `workflow_cancel`) al `EventBus`.
+3. `SessionPersistence` recibe el evento y proyecta `meta.json` + `output/result.json` a disco.
 
-#### Scenario: Hook Stop cierra workflow y dispara proyección
+El layout bajo `sessions/` SHALL ser `causal-workflows-v1` (`sessions/{sessionId}/workflows/NN/`).
+
+#### Scenario: Hook Stop cierra workflow y persistencia proyecta vía bus
 
 - **GIVEN** un workflow main con steps cerrados en el correlador
 - **WHEN** `AuditHookEventHandler` procesa un hook `Stop` que invoca `close()` y obtiene `IWorkflowResult`
-- **THEN** SHALL invocarse `AuditWorkflowClosureHandler` con ese resultado
-- **AND** `meta.json` en el directorio de interacción SHALL reflejar `outcome`, `stepCount`, `usage` y campos alineados al mapper desde `WorkflowResult`
+- **THEN** el correlador SHALL emitir `workflow_complete` al bus
+- **AND** `SessionPersistence` SHALL recibir el evento y escribir `meta.json` y `output/result.json` en `workflows/NN/`
+- **AND** `AuditWorkflowClosureHandler` NO SHALL escribir archivos directamente
 
-#### Scenario: Separación cuándo cerrar vs qué escribir
+#### Scenario: Separación cuándo cerrar vs qué escribir se mantiene
 
 - **GIVEN** un hook de cierre que pasa `readyToClose` y ejecuta `close()`
-- **WHEN** el closure handler proyecta a disco
+- **WHEN** el correlador emite el evento al bus
 - **THEN** `AuditHookEventHandler` NO SHALL escribir `meta.json` directamente
-- **AND** toda escritura de cierre del turno SHALL pasar por `AuditWorkflowClosureHandler`
+- **AND** `SessionPersistence` SHALL ser el único componente que escribe a disco
 
-### Requirement: Delegación del hook handler al closure handler tras close
+### Requirement: Delegación del hook handler — métricas sin escritura directa
 
-`AuditHookEventHandler` (capa 3) SHALL, tras invocar `close(workflowId, hook)` con éxito en eventos `Stop`, `SubagentStop` y `StopFailure`, delegar la proyección a disco en `AuditWorkflowClosureHandler`. El handler de hooks SHALL resolver `sessionDir` e `interactionDir` desde el contexto del workflow/interacción activa. Si `close()` no produce un workflow cerrado (workflow ausente), la delegación NO SHALL ejecutarse.
-
-#### Scenario: SubagentStop proyecta resultado del sub-workflow
-
-- **GIVEN** un sub-workflow activo identificado por `agentId`
-- **WHEN** `AuditHookEventHandler` procesa `SubagentStop` y cierra el sub-workflow
-- **THEN** `AuditWorkflowClosureHandler` SHALL recibir el `IWorkflowResult` del sub-workflow
-- **AND** SHALL proyectar `meta.json` en el directorio de interacción del subagente
+`delegateClosure()` en `AuditHookEventHandler` SHALL invocar solo `sessionMetrics.updateFromWorkflow()` cuando el workflow sea de kind `main`. NO SHALL invocar `AuditWorkflowClosureHandler.execute()` ni resolver rutas flat legacy.
 
 ### Requirement: Cierre wire-only degradado a fallback
 
@@ -59,3 +58,19 @@ Los handlers wire (`AuditSseResponseHandler`, `AuditStandardResponseHandler`) NO
 - **WHEN** el turno finaliza y `AuditWorkflowClosureHandler` proyecta el resultado a disco
 - **THEN** `meta.json` SHALL derivarse de `IWorkflowResult` mediante el mapper dedicado
 - **AND** los handlers wire (`AuditSseResponseHandler`, `AuditStandardResponseHandler`) NO SHALL escribir `meta.json` como fuente primaria en ese flujo
+
+### Requirement: Retiro de componentes legacy (P1)
+
+El sistema SHALL retirar `SessionStoreService`, `WorkflowResultProjector`, el puerto `ISessionStore` y el puerto `IAuditWriter`. Los handlers L3 SHALL usar `IWorkflowRepository` + `EventBus`. Las escrituras SSE inline SHALL usar `ISseAuditWriter` (`AuditWriterService`, `@deprecated-p2`) hasta P2.
+
+#### Scenario: Sesiones nuevas usan layout causal-workflows-v1
+
+- **GIVEN** un proxy con P1 implementado
+- **WHEN** se procesa una solicitud completa (workflow + steps + tools)
+- **THEN** los archivos de sesión SHALL crearse bajo `sessions/<id>/workflows/NN/steps/MM/tools/KK/`
+- **AND** NO SHALL crearse archivos bajo el layout flat (`main-agent/interactions/`)
+
+#### Scenario: No existen referencias a ISessionStore en producción
+
+- **WHEN** se ejecuta `npm run typecheck`
+- **THEN** NO SHALL existir referencias a `ISessionStore` ni `SessionStoreService` en `src/`

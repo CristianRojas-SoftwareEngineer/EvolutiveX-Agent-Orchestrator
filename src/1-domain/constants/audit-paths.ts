@@ -1,11 +1,4 @@
-// Contenedores de primer nivel (bajo sessionDir)
-export const DIR_MAIN_AGENT = 'main-agent';
-export const DIR_SIDE_INTERACTIONS = 'side-interactions';
-
-// Subdirectorio de interacciones bajo main-agent
-export const DIR_INTERACTIONS = 'interactions';
-
-// Subdirectorios de una interacción (top-level)
+// Subdirectorios de una interacción o step (layout flat residual en escrituras SSE @deprecated-p2)
 export const DIR_INPUT = 'input';
 export const DIR_OUTPUT = 'output';
 export const DIR_STEPS = 'steps';
@@ -19,10 +12,8 @@ export const DIR_STEP_THOUGHT = 'thought';
 export const PREFIX_SUB_AGENT = 'sub-agent';
 
 // Archivos de metadata
-export const FILE_INTERACTION_SEQUENCE = 'interaction-sequence.json';
 export const FILE_SESSION_METRICS = 'session-metrics.json';
 export const FILE_META = 'meta.json';
-export const FILE_STATE = 'state.json';
 
 // Padding (cantidad de dígitos)
 export const PAD_INTERACTION = 2;

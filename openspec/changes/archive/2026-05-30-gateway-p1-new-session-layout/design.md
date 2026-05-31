@@ -162,11 +162,11 @@ findStaleWorkflows(sessionId: string, maxAgeMs: number): IWorkflow[]
 
 | Componente retirado | Archivo | Reemplazado por |
 |---|---|---|
-| `AuditWriterService` | `src/2-services/audit-writer.service.ts` | `SessionPersistence` (vía EventBus) |
+| Puerto `IAuditWriter` (escritura causal completa) | `src/2-services/ports/audit-writer.port.ts` (eliminado) | `SessionPersistence` (vía EventBus) |
+| `AuditWriterService` (solo SSE) | `src/2-services/audit-writer.service.ts` | Shim `ISseAuditWriter` (`@deprecated-p2`; retiro en P2) |
 | `SessionStoreService` | `src/2-services/session-store.service.ts` | `WorkflowRepositoryService` (métodos de lookup) + `EventBus` |
 | `WorkflowResultProjector` | `src/2-services/workflow-result-projector.service.ts` | `SessionPersistence` (proyecta `output/result.json`) |
 | Puerto `ISessionStore` | `src/2-services/ports/session-store.port.ts` | `IWorkflowRepository` ampliado |
-| Puerto `IAuditWriter` | `src/2-services/ports/audit-writer.port.ts` | `SessionPersistence` (vía EventBus) |
 | Constantes flat | `src/1-domain/constants/audit-paths.ts` | Constantes del layout `causal-workflows-v1` en `session-routing.ts` |
 | Tipos `ActiveInteraction`, `InteractionMetadata`, `StepMeta`, `InteractionType`, `InteractionState`, `InteractionOutcome`, `ParentContext`, `SideRequestKind`, `PendingAgentToolUse`, `PendingWebSearchToolUse`, `PendingWebFetchToolUse`, `ResolvedInternalTool` | `src/1-domain/types/audit.types.ts` | Tipos gateway (`IWorkflow`, `IStep`, `IToolUse`, `IWorkflowResult`, `WorkflowKind`, `WorkflowStatus`, `WorkflowOutcome`) |
 | `AuditWorkflowClosureHandler` (escritura a disco) | `src/3-operations/audit-workflow-closure.handler.ts` | `SessionPersistence` (proyecta vía bus). Handler se conserva como coordinador de métricas de sesión. |
@@ -248,7 +248,7 @@ Los métodos `appendSseLine()` y `appendSseRawChunk()` de `IAuditWriter` son usa
 5. Migrar handlers L3 (orden D-8): `gateway-wire-step` → `audit-upstream-error` → `audit-workflow-closure` → `audit-standard-response` → `audit-sse-response` → `audit-interaction`.
 6. Actualizar `AuditHookEventHandler`: invocar `completeToolUse()` en hooks, simplificar `delegateClosure()`.
 7. Implementar corte limpio.
-8. Retirar legacy completo: `ISessionStore`, `IAuditWriter`, `SessionStoreService`, `AuditWriterService`, tipos `ActiveInteraction`/`InteractionMetadata`/`StepMeta` y constantes flat.
+8. Retirar legacy P1: `ISessionStore`, `SessionStoreService`, `IAuditWriter`, `WorkflowResultProjector`, `ActiveInteraction`, constantes flat; conservar `AuditWriterService` como `ISseAuditWriter` hasta P2.
 9. Verificar: `npm run test` + subset §37b (casos 3–7, 16, 19).
 10. Actualizar documentación.
 

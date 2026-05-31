@@ -186,12 +186,12 @@ Abre tu flujo habitual (proyecto, chat, lo que use la API). Las peticiones pasar
 | Qué quieres ver                                         | Dónde está                                                                              | Qué es                                                                                                                                                                                                                   |
 | ------------------------------------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **Actividad en vivo** (peticiones, respuestas, errores) | Terminal de `npm run dev` y archivo **`server/logs.jsonl`** (relativo al CWD)          | Consola: Pino Pretty (legible). Archivo: JSON línea a línea en `server/logs.jsonl` para revisar o filtrar después. Nivel configurable con `LOG_LEVEL` (por defecto `info`). |
-| **Copias en disco** por turno                           | Carpeta **`sessions/`** en el ordenador (relativa al CWD desde donde arrancas el proxy) | Árbol por sesión: turnos del chat en `main-agent/interactions/NN/`; preflights y side-requests en `side-interactions/NN/`. Referencia completa en [`session-audit-model.md`](./session-audit-model.md). |
+| **Copias en disco** por turno                           | Carpeta **`sessions/`** en el ordenador (relativa al CWD desde donde arrancas el proxy) | Árbol por sesión: `workflows/NN/` (layout `causal-workflows-v1`). Turnos `agentic`, preflights y side-requests son workflows hermanos bajo el mismo árbol. Referencia en [`session-audit-model.md` §0](./session-audit-model.md#0-layout-vigente-causal-workflows-v1). |
 
-**Dos árboles bajo cada sesión**
+**Estructura bajo cada sesión (P1)**
 
-- **`main-agent/interactions/`** — Turnos del chat principal: prompts del usuario, continuaciones con `tool_result` y respuestas SSE del agente.
-- **`side-interactions/`** — Preflights (`client-preflight`) y side-requests (p. ej. `count_tokens`). Contador de numeración independiente del agente principal.
+- **`workflows/NN/`** — Cada ciclo auditado: `meta.json`, `steps/MM/`, `tools/KK-slug/`, `output/result.json` al cerrar.
+- El tipo semántico (`agentic`, `client-preflight`, `side-request`) queda en metadatos del workflow, no en carpetas `main-agent/` / `side-interactions/` (layout flat retirado; ver Apéndice A del modelo de auditoría).
 
 **`session-metrics.json`** (en la raíz de `sessions/<sessionId>/`) agrega tokens por modelo a medida que se cierran turnos; sirve para consultas rápidas (p. ej. statusline) sin reescanear todos los `meta.json`. Esquema y motivación en [`session-metrics-system.md`](./session-metrics-system.md).
 
@@ -217,7 +217,7 @@ No hace falta leer la tabla entera del README el primer día:
 
 La carpeta de salida es siempre `./sessions`, relativa al directorio desde donde ejecutas el proxy.
 
-**Streaming (SSE) en disco:** `steps/NN/response/sse.jsonl` es la fuente de verdad; al cerrar el turno se escribe `output/body.json`. Layout completo en [`session-audit-model.md` §6.6](./session-audit-model.md#66-output); reconstrucción técnica en [`how-sse-reconstruction-works.md`](./how-sse-reconstruction-works.md).
+**Streaming (SSE) en disco:** `workflows/NN/steps/MM/response/sse.jsonl` es la fuente de verdad (escritura vía `ISseAuditWriter` hasta P2); al cerrar el workflow se escribe `output/result.json`. Layout en [`session-audit-model.md` §0](./session-audit-model.md#0-layout-vigente-causal-workflows-v1); reconstrucción en [`how-sse-reconstruction-works.md`](./how-sse-reconstruction-works.md).
 
 Cabeceras de sesión, compresión hacia upstream (`identity` fijo) y ajustes finos de buffer en memoria no son variables de entorno: véase [`advanced-configuration.md`](./advanced-configuration.md). Matriz completa en el [README](../README.md#configuracion).
 

@@ -7,7 +7,7 @@ import type {
   ISessionTotals,
 } from '../1-domain/types/gateway/session-metrics.types.js';
 import { aggregateWorkflowUsageByModel } from '../1-domain/services/gateway/aggregate-workflow-usage-by-model.js';
-import type { IAuditWriter } from './ports/audit-writer.port.js';
+import { writeJsonAtomic } from './utils/file-write.utils.js';
 
 /** Calcula cache_efficiency según §33.2. */
 export function computeCacheEfficiency(
@@ -62,7 +62,7 @@ function recalcSessionTotals(models: Record<string, IModelSessionMetrics>): ISes
 export class SessionMetricsService {
   private writeQueue: Promise<void> = Promise.resolve();
 
-  constructor(private readonly auditWriter: IAuditWriter) {}
+  constructor() {}
 
   /** Serializa escrituras para evitar races en concurrencia. */
   public updateFromWorkflow(sessionDir: string, closedSteps: IStep[]): Promise<void> {
@@ -113,7 +113,7 @@ export class SessionMetricsService {
       }
 
       data.session_totals = recalcSessionTotals(data.models);
-      await this.auditWriter.writeJsonAtomic(filePath, data as unknown as import('../1-domain/types/json.types.js').JsonValue);
+      await writeJsonAtomic(filePath, data as unknown as import('../1-domain/types/json.types.js').JsonValue);
     };
 
     this.writeQueue = this.writeQueue.then(run, run);

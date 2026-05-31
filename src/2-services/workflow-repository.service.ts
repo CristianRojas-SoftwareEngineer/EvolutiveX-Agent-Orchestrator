@@ -1,6 +1,12 @@
 import type { AgentContext } from '../1-domain/types/audit.types.js';
 import type { ClaudeHookEvent } from '../1-domain/types/hook.types.js';
-import type { IWorkflowRepository, WireSubagentEntry } from '../1-domain/repositories/IWorkflowRepository.js';
+import type {
+  IWorkflowRepository,
+  OpenSubagentWorkflowOptions,
+  OpenWorkflowOptions,
+  WireSubagentEntry,
+  WireWorkflowMeta,
+} from '../1-domain/repositories/IWorkflowRepository.js';
 import type { IWorkflow } from '../1-domain/interfaces/gateway/IWorkflow.js';
 import type { IStep } from '../1-domain/interfaces/gateway/IStep.js';
 import type { IToolUse } from '../1-domain/interfaces/gateway/IToolUse.js';
@@ -19,6 +25,12 @@ export class WorkflowRepositoryService implements IWorkflowRepository {
   private readonly pendingToolUses = new Map<string, Map<string, { stepId: string; toolUse: IToolUse }>>();
   // Secuencias por sesión.
   private readonly sequences = new Map<string, number>();
+  // Índice de layout NN por sesión (wire audit).
+  private readonly layoutIndices = new Map<string, number>();
+  // Metadatos wire por workflowId.
+  private readonly wireMeta = new Map<string, WireWorkflowMeta>();
+  // tool_use_id → workflowId (correlación continuation).
+  private readonly toolUseIdToWorkflowId = new Map<string, string>();
   // Locks por sesión (cadena de promesas).
   private readonly sessionLocks = new Map<string, Promise<unknown>>();
 
@@ -80,11 +92,27 @@ export class WorkflowRepositoryService implements IWorkflowRepository {
 
   // ── Métodos de lifecycle (G2) ─────────────────────────────────────────────
 
-  public openWorkflow(sessionId: string, agentCtx: AgentContext): IWorkflow {
-    const existing = this.workflows.get(sessionId);
-    if (existing) return existing;
+  public openWorkflow(
+    sessionId: string,
+    agentCtx: AgentContext,
+    options: OpenWorkflowOptions = {},
+  ): IWorkflow {
+    if (!options.forceNew) {
+      const existing = this.workflows.get(sessionId);
+      if (existing) return existing;
+    }
+
+    const layoutIndex =
+      options.layoutIndex ??
+      (() => {
+        const next = this.layoutIndices.get(sessionId) ?? 0;
+        this.layoutIndices.set(sessionId, next + 1);
+        return next;
+      })();
+
+    const workflowId = options.forceNew ? `${sessionId}-wire-${layoutIndex}` : sessionId;
     const workflow = new Workflow({
-      id: sessionId,
+      id: workflowId,
       sessionId,
       kind: 'main',
       agentId: agentCtx.agentId,
@@ -92,8 +120,25 @@ export class WorkflowRepositoryService implements IWorkflowRepository {
       steps: [],
       startedAt: new Date(),
     });
-    this.workflows.set(sessionId, workflow);
-    this.emit('workflow_start', workflow.id, { kind: 'main' });
+    this.workflows.set(workflowId, workflow);
+    if (options.interactionType) {
+      this.wireMeta.set(workflowId, {
+        layoutIndex,
+        requestSequence: 0,
+        requestBodyOmitted: false,
+        requestBodyBytes: 0,
+        interactionType: options.interactionType,
+        ...(options.sideRequestKind ? { sideRequestKind: options.sideRequestKind } : {}),
+      });
+    }
+    this.emit('workflow_start', workflow.id, {
+      kind: 'main',
+      layoutIndex,
+      ...(options.request !== undefined && !options.skipWorkflowRequest
+        ? { request: options.request }
+        : {}),
+      ...(options.interactionType ? { interactionType: options.interactionType } : {}),
+    });
     return workflow;
   }
 
@@ -102,8 +147,17 @@ export class WorkflowRepositoryService implements IWorkflowRepository {
     agentCtx: AgentContext,
     parentWorkflowId: string,
     parentToolUseId: string,
+    options: OpenSubagentWorkflowOptions = {},
   ): IWorkflow {
-    const workflowId = agentCtx.agentId ?? sessionId;
+    const layoutIndex =
+      options.layoutIndex ??
+      (() => {
+        const next = this.layoutIndices.get(sessionId) ?? 0;
+        this.layoutIndices.set(sessionId, next + 1);
+        return next;
+      })();
+
+    const workflowId = agentCtx.agentId ?? `${sessionId}-sub-${layoutIndex}`;
     const workflow = new Workflow({
       id: workflowId,
       sessionId,
@@ -116,7 +170,20 @@ export class WorkflowRepositoryService implements IWorkflowRepository {
       startedAt: new Date(),
     });
     this.workflows.set(workflowId, workflow);
-    this.emit('workflow_spawn', workflow.id, { parentWorkflowId, parentToolUseId });
+    this.wireMeta.set(workflowId, {
+      layoutIndex,
+      requestSequence: 0,
+      requestBodyOmitted: false,
+      requestBodyBytes: 0,
+      interactionType: 'agentic',
+      ...(options.parentContext ? { parentContext: options.parentContext } : {}),
+    });
+    this.emit('workflow_spawn', workflow.id, {
+      parentWorkflowId,
+      parentToolUseId,
+      ...(options.request !== undefined ? { request: options.request } : {}),
+      ...(options.parentContext ? { parentContext: options.parentContext } : {}),
+    });
     return workflow;
   }
 
@@ -219,7 +286,11 @@ export class WorkflowRepositoryService implements IWorkflowRepository {
     return result;
   }
 
-  public forceClose(workflowId: string, outcome: WorkflowOutcome): void {
+  public forceClose(
+    workflowId: string,
+    outcome: WorkflowOutcome,
+    resultExtras?: Record<string, unknown>,
+  ): void {
     const workflow = this.workflows.get(workflowId);
     if (!workflow || workflow.result != null) return;
     const closedSteps = workflow.steps.filter((s) => s.closedAt != null);
@@ -228,11 +299,16 @@ export class WorkflowRepositoryService implements IWorkflowRepository {
       stepCount: closedSteps.length,
       closedByEvent: 'StopFailure',
       sessionId: workflow.sessionId,
+      ...(resultExtras ?? {}),
     };
     workflow.result = result;
     workflow.completedAt = new Date();
-    workflow.status = 'failed';
-    this.emit('workflow_complete', workflowId, { result, outcome });
+    workflow.status = outcome === 'orphaned' || outcome === 'upstream-error' ? 'failed' : 'failed';
+    this.emit('workflow_complete', workflowId, { result, outcome, ...(resultExtras ?? {}) });
+    this.wireMeta.delete(workflowId);
+    for (const [toolId, wfId] of this.toolUseIdToWorkflowId) {
+      if (wfId === workflowId) this.toolUseIdToWorkflowId.delete(toolId);
+    }
   }
 
   // ── Métodos de lookup (migración de handlers L3) ──────────────────────────
@@ -267,6 +343,7 @@ export class WorkflowRepositoryService implements IWorkflowRepository {
       this.pendingToolUses.set(workflowId, pendings);
     }
     pendings.set(toolUse.id, { stepId, toolUse });
+    this.toolUseIdToWorkflowId.set(toolUse.id, workflowId);
   }
 
   public consumePendingToolUse(workflowId: string, toolUseId: string): IToolUse | undefined {
@@ -289,12 +366,89 @@ export class WorkflowRepositoryService implements IWorkflowRepository {
     return stale;
   }
 
+  public findStaleWorkflowsAwaitingContinuation(sessionId: string, maxAgeMs: number): IWorkflow[] {
+    const now = Date.now();
+    const stale: IWorkflow[] = [];
+    for (const wf of this.workflows.values()) {
+      if (wf.sessionId !== sessionId || wf.status !== 'running') continue;
+      const meta = this.wireMeta.get(wf.id);
+      if (
+        meta?.awaitingContinuation === true &&
+        typeof meta.awaitingSince === 'number' &&
+        now - meta.awaitingSince > maxAgeMs
+      ) {
+        stale.push(wf);
+      }
+    }
+    return stale;
+  }
+
+  public getAllRunningWorkflows(): IWorkflow[] {
+    return [...this.workflows.values()].filter((wf) => wf.status === 'running');
+  }
+
+  public findWorkflowWithPendingTools(
+    sessionId: string,
+    predicate: (toolUse: IToolUse) => boolean,
+    options?: { excludeSubagents?: boolean },
+  ): { workflow: IWorkflow; pendings: IToolUse[] } | undefined {
+    for (const [workflowId, pendings] of this.pendingToolUses) {
+      const workflow = this.workflows.get(workflowId);
+      if (!workflow || workflow.sessionId !== sessionId) continue;
+      if (options?.excludeSubagents && workflow.kind === 'subagent') continue;
+      if (options?.excludeSubagents && workflow.parentWorkflowId) continue;
+      const matches: IToolUse[] = [];
+      for (const entry of pendings.values()) {
+        if (predicate(entry.toolUse)) matches.push(entry.toolUse);
+      }
+      if (matches.length > 0) return { workflow, pendings: matches };
+    }
+    return undefined;
+  }
+
+  public findWorkflowByToolUseId(sessionId: string, toolUseId: string): IWorkflow | undefined {
+    const wfId = this.toolUseIdToWorkflowId.get(toolUseId);
+    if (wfId) {
+      const wf = this.workflows.get(wfId);
+      if (wf?.sessionId === sessionId) return wf;
+    }
+    return this.findWorkflowWithPendingToolUse(sessionId, toolUseId)?.workflow;
+  }
+
+  public consumeFirstPendingToolUseByName(workflowId: string, toolName: string): IToolUse | undefined {
+    const pendings = this.pendingToolUses.get(workflowId);
+    if (!pendings) return undefined;
+    const normalized = toolName.toLowerCase().replace(/_/g, '');
+    for (const [id, entry] of pendings) {
+      const name = entry.toolUse.name.toLowerCase().replace(/_/g, '');
+      if (name === normalized || name === `${normalized}tool`) {
+        pendings.delete(id);
+        return entry.toolUse;
+      }
+    }
+    return undefined;
+  }
+
+  public getWireMeta(workflowId: string): WireWorkflowMeta | undefined {
+    return this.wireMeta.get(workflowId);
+  }
+
+  public patchWireMeta(workflowId: string, patch: Partial<WireWorkflowMeta>): void {
+    const existing = this.wireMeta.get(workflowId);
+    if (!existing) return;
+    this.wireMeta.set(workflowId, { ...existing, ...patch });
+  }
+
+  public async allocLayoutIndex(sessionId: string): Promise<number> {
+    const next = this.layoutIndices.get(sessionId) ?? 0;
+    this.layoutIndices.set(sessionId, next + 1);
+    return next;
+  }
+
   public async nextSequence(sessionId: string): Promise<number> {
-    return this.withSessionLock(sessionId, async () => {
-      const current = this.sequences.get(sessionId) ?? 0;
-      this.sequences.set(sessionId, current + 1);
-      return current;
-    });
+    const current = this.sequences.get(sessionId) ?? 0;
+    this.sequences.set(sessionId, current + 1);
+    return current;
   }
 
   public withSessionLock<T>(sessionId: string, fn: () => Promise<T>): Promise<T> {

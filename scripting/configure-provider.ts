@@ -365,7 +365,7 @@ const program = new Command();
 program
   .name('configure-provider')
   .description(
-    'Configura el proveedor de Claude Code para usar Anthropic, Ollama, OpenRouter o Xiaomi.',
+    'Configura el proveedor de Claude Code para usar Anthropic, MiniMax, Ollama, OpenCode, OpenRouter o Xiaomi.',
   )
   .argument('[provider]', 'Proveedor a configurar', 'default')
   .option('--show-current', 'Muestra las variables de entorno actuales y sale')
@@ -378,7 +378,15 @@ program
       return;
     }
 
-    const validProviders = ['default', 'anthropic', 'ollama', 'openrouter', 'xiaomi', 'opencode'];
+    const validProviders = [
+      'default',
+      'anthropic',
+      'minimax',
+      'ollama',
+      'openrouter',
+      'xiaomi',
+      'opencode',
+    ];
     if (!validProviders.includes(provider)) {
       console.error(
         chalk.red(`Proveedor inválido: "${provider}". Opciones: ${validProviders.join(', ')}`),

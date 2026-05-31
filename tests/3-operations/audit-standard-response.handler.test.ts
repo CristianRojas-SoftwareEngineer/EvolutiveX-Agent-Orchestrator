@@ -1,144 +1,17 @@
 import { describe, it, expect, vi } from 'vitest';
 import { PassThrough } from 'node:stream';
 import { AuditStandardResponseHandler } from '../../src/3-operations/audit-standard-response.handler.js';
-import type { IAuditWriter } from '../../src/2-services/ports/audit-writer.port.js';
-import type { ISessionStore } from '../../src/2-services/ports/session-store.port.js';
+import type { IEventBus } from '../../src/1-domain/repositories/IEventBus.js';
 import type { IWorkflowRepository } from '../../src/1-domain/repositories/IWorkflowRepository.js';
-import {
-  AuditInteractionContext,
-  ActiveInteraction,
-  StepMeta,
-  InteractionMetadata,
-} from '../../src/1-domain/types/audit.types.js';
-
+import type { IWorkflow } from '../../src/1-domain/interfaces/gateway/IWorkflow.js';
+import { AuditInteractionContext } from '../../src/1-domain/types/audit.types.js';
 import { makeTestConfig as makeConfig } from '../helpers/test-config.js';
 
-function makeActiveInteraction(overrides: Partial<ActiveInteraction> = {}): ActiveInteraction {
+function makeEventBus(overrides: Partial<IEventBus> = {}): IEventBus {
   return {
-    interactionDir: '/tmp/sessions/test/interactions/000001_req-1',
-    interactionType: 'agentic',
-    stepCount: 1,
-    requestSequence: 1,
-    startedAt: Date.now(),
-    sessionId: 'test',
-    pendingAgentToolUses: [],
-    pendingWebSearchToolUses: [],
-    pendingWebFetchToolUses: [],
-    resolvedInternalTools: [],
-    requestBodyOmitted: false,
-    requestBodyBytes: 100,
-    stepsMeta: [],
-    ...overrides,
-  };
-}
-
-function makeContext(overrides: Partial<AuditInteractionContext> = {}): AuditInteractionContext {
-  return {
-    requestId: 'req-1',
-    requestSequence: 1,
-    auditSessionId: 'test-session',
-    method: 'POST',
-    url: '/v1/messages',
-    upstream: 'https://api.anthropic.com',
-    requestStartTime: Date.now(),
-    requestBodyBytes: 100,
-    requestBodyOmitted: false,
-    auditInteractionDir: '/tmp/sessions/test/interactions/000001_req-1',
-    responseStatusCode: 200,
-    interactionType: 'agentic',
-    assignedStepIndex: 1,
-    ...overrides,
-  };
-}
-
-function makeSessionStore(
-  interaction: ActiveInteraction | null = makeActiveInteraction(),
-  overrides: Partial<ISessionStore> = {},
-): ISessionStore {
-  const registry = new Map<string, ActiveInteraction>();
-  const toolUseIndex = new Map<string, string>();
-  if (interaction) registry.set(interaction.interactionDir, interaction);
-  return {
-    getBaseDir: () => '/tmp/sessions',
-    ensureAuditSessionsRoot: async () => {},
-    nextMainAgentSequence: async () => 1,
-    nextSideInteractionSequence: async () => 1,
-    registerInteraction: (t: ActiveInteraction) => {
-      registry.set(t.interactionDir, t);
-    },
-    registerToolUseId: (id: string, dir: string) => {
-      toolUseIndex.set(id, dir);
-    },
-    getInteractionByToolUseId: (id: string) => {
-      const dir = toolUseIndex.get(id);
-      return dir ? (registry.get(dir) ?? null) : null;
-    },
-    getInteractionByDir: async (dir: string) => registry.get(dir) || null,
-    getInteractionByDirSync: (dir: string) => registry.get(dir) || null,
-    incrementStepCountByDir: (dir: string) => {
-      const t = registry.get(dir);
-      if (t) t.stepCount += 1;
-      return t?.stepCount ?? 1;
-    },
-    pushStepMetaByDir: async (dir: string, meta: StepMeta) => {
-      registry.get(dir)?.stepsMeta.push(meta);
-    },
-    closeInteraction: (dir: string) => {
-      registry.delete(dir);
-      for (const [id, d] of toolUseIndex) {
-        if (d === dir) toolUseIndex.delete(id);
-      }
-    },
-    registerPendingAgentToolUse: () => {},
-    findInteractionWithPendingAgents: () => null,
-    consumePendingAgentToolUse: () => {},
-    registerPendingWebSearchToolUse: vi.fn(),
-    findInteractionWithPendingWebSearch: vi.fn().mockReturnValue(null),
-    consumeWebSearchPending: vi.fn().mockReturnValue(null),
-    registerPendingWebFetchToolUse: vi.fn(),
-    findInteractionWithPendingWebFetch: vi.fn().mockReturnValue(null),
-    consumeWebFetchPending: vi.fn().mockReturnValue(null),
-    consumeWebSearchPendingByToolUseId: vi.fn().mockReturnValue(null),
-    consumeWebFetchPendingByToolUseId: vi.fn().mockReturnValue(null),
-    registerResolvedInternalTool: vi.fn(),
-    findStaleInteractionsAwaitingContinuation: () => [],
-    getAllOpenInteractions: () => [],
-    withSessionLock: async <T>(_sessionId: string, fn: () => Promise<T>): Promise<T> => fn(),
-    findInteractionForWorkflowClose: () => null,
-    ...overrides,
-  };
-}
-
-function makeAuditWriter(overrides: Partial<IAuditWriter> = {}): IAuditWriter {
-  return {
-    writeFileAtomic: async () => {},
-    writeJsonAtomic: async () => {},
-    writeFormattedAndMarkdown: async () => {},
-    writeInteractionRequest: async () => ({ dir: '', requestBodyOmitted: false }),
-    writeSubInteractionRequest: async () => ({ dir: '', requestBodyOmitted: false }),
-    nextSubInteractionSequence: async () => 1,
-    writeStepRequest: async () => {},
-    finalizeNonSseResponseAudit: async () => ({
-      responseBodyBytesAudited: 0,
-      responseTruncatedByProxyBuffer: false,
-      responseTruncatedByAuditLimit: false,
-    }),
-    finalizeNonSseResponseAuditOnStreamError: async () => ({
-      responseBodyBytesAudited: 0,
-      responseTruncatedByProxyBuffer: false,
-      responseTruncatedByAuditLimit: false,
-    }),
-    writeResponseHeadersAudit: async () => {},
-    writeTopLevelResponseHeaders: async () => {},
-    writeInteractionMeta: async () => {},
-    appendSseLine: () => {},
-    appendSseRawChunk: () => {},
-    writeInteractionState: async () => {},
-    removeInteractionState: async () => {},
-    writeStepResponseMarkdown: async () => {},
-    writeCoalescedAgentStepResponse: async () => {},
-    writeStepThought: async () => {},
-    writeTopLevelMultiStepResponse: async () => ({ written: true }),
+    publish: vi.fn(),
+    subscribe: vi.fn(() => ({ id: 'sub-1', pattern: '*' })),
+    unsubscribe: vi.fn(),
     ...overrides,
   };
 }
@@ -165,248 +38,177 @@ function makeWorkflowRepo(overrides: Partial<IWorkflowRepository> = {}): IWorkfl
     findStaleWorkflows: vi.fn(() => []),
     nextSequence: vi.fn(async () => 0),
     withSessionLock: vi.fn(async (_s, fn) => fn()),
+    forceClose: vi.fn(),
     ...overrides,
   };
 }
 
+function stubWorkflow(id = 'session-1'): IWorkflow {
+  return { id, sessionId: id, kind: 'main', status: 'running', steps: [], startedAt: new Date() };
+}
+
+function makeContext(overrides: Partial<AuditInteractionContext> = {}): AuditInteractionContext {
+  return {
+    requestId: 'req-1',
+    requestSequence: 1,
+    auditSessionId: 'session-1',
+    method: 'POST',
+    url: '/v1/messages',
+    upstream: 'https://api.anthropic.com',
+    requestStartTime: Date.now(),
+    requestBodyBytes: 100,
+    requestBodyOmitted: false,
+    auditInteractionDir: '/tmp/sessions/session-1/interactions/000001_req-1',
+    responseStatusCode: 200,
+    interactionType: 'agentic',
+    assignedStepIndex: 1,
+    ...overrides,
+  };
+}
+
+const BODY_WITH_USAGE = JSON.stringify({
+  id: 'msg_1',
+  stop_reason: 'end_turn',
+  usage: { input_tokens: 10, output_tokens: 5 },
+  content: [],
+});
+
+function wait(ms = 50) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
 describe('AuditStandardResponseHandler', () => {
-  it('debería escribir en step dir (finalizeNonSseResponseAudit) y top-level (writeTopLevelMultiStepResponse), y cerrar interacción (terminal)', async () => {
-    const config = makeConfig();
-    const finalizedDirs: string[] = [];
-    let topLevelCalls = 0;
-    let interactionMetaWritten = false;
-    let interactionCleared = false;
-
-    const handler = new AuditStandardResponseHandler(
-      makeAuditWriter({
-        finalizeNonSseResponseAudit: async (params) => {
-          finalizedDirs.push(params.interactionDir);
-          return {
-            responseBodyBytesAudited: params.bodyBuffer.length,
-            responseTruncatedByProxyBuffer: false,
-            responseTruncatedByAuditLimit: false,
-          };
-        },
-        writeTopLevelMultiStepResponse: async () => {
-          topLevelCalls++;
-          return { written: true };
-        },
-        writeInteractionMeta: async () => {
-          interactionMetaWritten = true;
-        },
-      }),
-      config,
-      makeSessionStore(makeActiveInteraction(), {
-        closeInteraction: (_dir: string) => {
-          interactionCleared = true;
-        },
-      }),
-      makeWorkflowRepo(),
-    );
-
-    const stream = new PassThrough();
-    handler.execute(stream, makeContext(), 'application/json');
-    stream.write(Buffer.from('{"message":"hello"}'));
-    stream.end();
-
-    await new Promise((r) => setTimeout(r, 100));
-
-    // Step dir: finalizeNonSseResponseAudit llamado 1 vez
-    expect(finalizedDirs).toHaveLength(1);
-    expect(finalizedDirs[0]).toMatch(/steps[/\\]01/);
-    // Top-level: writeTopLevelMultiStepResponse llamado 1 vez
-    expect(topLevelCalls).toBe(1);
-    expect(interactionMetaWritten).toBe(true);
-    expect(interactionCleared).toBe(true);
-  });
-
-  it('debería truncar el buffer en memoria al acumular chunks', async () => {
-    const config = makeConfig({ MAX_RESPONSE_BUFFER_BYTES: 10 });
-    let capturedTotalBytes: number | null = null;
-    let capturedBufferLength: number | null = null;
-
-    const handler = new AuditStandardResponseHandler(
-      makeAuditWriter({
-        finalizeNonSseResponseAudit: async (params) => {
-          if (capturedTotalBytes === null) {
-            capturedTotalBytes = params.totalBytes;
-            capturedBufferLength = params.bodyBuffer.length;
-          }
-          return {
-            responseBodyBytesAudited: params.bodyBuffer.length,
-            responseTruncatedByProxyBuffer: true,
-            responseTruncatedByAuditLimit: false,
-          };
-        },
-      }),
-      config,
-      makeSessionStore(),
-      makeWorkflowRepo(),
-    );
-
-    const stream = new PassThrough();
-    handler.execute(stream, makeContext(), 'application/json');
-    stream.write(Buffer.alloc(5, 'a'));
-    stream.write(Buffer.alloc(5, 'b'));
-    stream.write(Buffer.alloc(20, 'c'));
-    stream.end();
-
-    await new Promise((r) => setTimeout(r, 100));
-
-    expect(capturedTotalBytes).toBe(30);
-    expect(capturedBufferLength).toBe(10);
-  });
-
-  it('debería llamar removeInteractionState al cerrar interacción agentic terminal', async () => {
-    const config = makeConfig();
-    let removeCalled = false;
-
-    const handler = new AuditStandardResponseHandler(
-      makeAuditWriter({
-        finalizeNonSseResponseAudit: async () => ({
-          responseBodyBytesAudited: 10,
-          responseTruncatedByProxyBuffer: false,
-          responseTruncatedByAuditLimit: false,
-        }),
-        removeInteractionState: async () => {
-          removeCalled = true;
-        },
-      }),
-      config,
-      makeSessionStore(),
-      makeWorkflowRepo(),
-    );
-
-    const stream = new PassThrough();
-    handler.execute(stream, makeContext(), 'application/json');
-    stream.write(Buffer.from('{"message":"hello"}'));
-    stream.end();
-
-    await new Promise((r) => setTimeout(r, 100));
-    expect(removeCalled).toBe(true);
-  });
-
-  it('debería cerrar interacción preflight inmediatamente y escribir interactionMeta', async () => {
-    const config = makeConfig();
-    let interactionMetaWritten = false;
-    let interactionClosed = false;
-    let stepMetaPushed: StepMeta | null = null;
-    const preflightInteraction = makeActiveInteraction({ interactionType: 'client-preflight' });
-
-    const handler = new AuditStandardResponseHandler(
-      makeAuditWriter({
-        writeInteractionMeta: async () => {
-          interactionMetaWritten = true;
-        },
-      }),
-      config,
-      makeSessionStore(preflightInteraction, {
-        pushStepMetaByDir: async (_dir, meta) => {
-          stepMetaPushed = meta;
-          preflightInteraction.stepsMeta.push(meta);
-        },
-        closeInteraction: () => {
-          interactionClosed = true;
-        },
-      }),
-      makeWorkflowRepo(),
-    );
-
-    const stream = new PassThrough();
-    handler.execute(
-      stream,
-      makeContext({
-        interactionType: 'client-preflight',
-        requestClassification: { type: 'preflight-quota' },
-      }),
-      'application/json',
-    );
-    stream.write('{"ok":true}');
-    stream.end();
-
-    await new Promise((r) => setTimeout(r, 100));
-
-    expect(interactionMetaWritten).toBe(true);
-    expect(interactionClosed).toBe(true);
-    expect(stepMetaPushed).not.toBeNull();
-    expect(stepMetaPushed!.label).toBe('quota-check');
-  });
-
-  it('debería invocar registerStep al completar inferencia standard con workflow abierto', async () => {
-    const config = makeConfig();
+  it('registra wire step y emite step_response cuando hay usage', async () => {
+    const wf = stubWorkflow();
+    const publish = vi.fn();
     const registerStep = vi.fn();
-    const interaction = makeActiveInteraction({
-      modelId: 'claude-opus-4-5',
-      stepsMeta: [{ stepIndex: 1, sse: false, statusCode: 200, inputTokens: 10, outputTokens: 5 }],
+    const repo = makeWorkflowRepo({
+      getWorkflowBySessionId: vi.fn(() => wf),
+      registerStep,
+      getWorkflow: vi.fn(() => wf),
+      closeStep: vi.fn(),
     });
-
     const handler = new AuditStandardResponseHandler(
-      makeAuditWriter({
-        finalizeNonSseResponseAudit: async () => ({
-          responseBodyBytesAudited: 10,
-          responseTruncatedByProxyBuffer: false,
-          responseTruncatedByAuditLimit: false,
-        }),
-      }),
-      config,
-      makeSessionStore(interaction),
-      makeWorkflowRepo({
-        getWorkflow: vi.fn().mockReturnValue({
-          id: 'test',
-          sessionId: 'test',
-          kind: 'main',
-          status: 'running',
-          steps: [],
-          startedAt: new Date(),
-        }),
-        registerStep,
-        closeStep: vi.fn(),
-      }),
+      makeEventBus({ publish }),
+      makeConfig(),
+      repo,
     );
 
     const stream = new PassThrough();
     handler.execute(stream, makeContext(), 'application/json');
-    stream.write(
-      Buffer.from(
-        '{"id":"msg_1","stop_reason":"end_turn","usage":{"input_tokens":10,"output_tokens":5}}',
-      ),
-    );
+    stream.write(Buffer.from(BODY_WITH_USAGE));
     stream.end();
+    await wait();
 
-    await new Promise((r) => setTimeout(r, 100));
     expect(registerStep).toHaveBeenCalled();
+    expect(publish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'step_response',
+        workflowId: 'session-1',
+        payload: expect.objectContaining({ workflowId: 'session-1', response: expect.any(Object) }),
+      }),
+    );
   });
 
-  it('debería propagar parentContext al meta.json si el interaction es subagente', async () => {
-    const config = makeConfig();
-    let captured: InteractionMetadata | null = null;
-    const subInteraction = makeActiveInteraction({
-      parentContext: {
-        parentInteractionDir: '/tmp/parent',
-        parentStepIndex: 2,
-        triggeringToolUseId: 'toolu_zzz',
-        subagentType: 'general-purpose',
-      },
+  it('incluye headers en step_response cuando se proporcionan', async () => {
+    const wf = stubWorkflow();
+    const publish = vi.fn();
+    const repo = makeWorkflowRepo({
+      getWorkflowBySessionId: vi.fn(() => wf),
+      getWorkflow: vi.fn(() => wf),
+      closeStep: vi.fn(),
     });
-
     const handler = new AuditStandardResponseHandler(
-      makeAuditWriter({
-        writeInteractionMeta: async (_dir, meta) => {
-          captured = meta;
-        },
-      }),
-      config,
-      makeSessionStore(subInteraction),
-      makeWorkflowRepo(),
+      makeEventBus({ publish }),
+      makeConfig(),
+      repo,
     );
+
+    const stream = new PassThrough();
+    const headers = { 'x-request-id': 'abc' };
+    handler.execute(stream, makeContext(), 'application/json', headers);
+    stream.write(Buffer.from(BODY_WITH_USAGE));
+    stream.end();
+    await wait();
+
+    expect(publish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: expect.objectContaining({ headers }),
+      }),
+    );
+  });
+
+  it('es no-op si no hay workflow para la sesión', async () => {
+    const publish = vi.fn();
+    const registerStep = vi.fn();
+    const repo = makeWorkflowRepo({
+      getWorkflowBySessionId: vi.fn(() => undefined),
+      registerStep,
+    });
+    const handler = new AuditStandardResponseHandler(makeEventBus({ publish }), makeConfig(), repo);
+
+    const stream = new PassThrough();
+    handler.execute(stream, makeContext(), 'application/json');
+    stream.write(Buffer.from(BODY_WITH_USAGE));
+    stream.end();
+    await wait();
+
+    expect(registerStep).not.toHaveBeenCalled();
+    expect(publish).not.toHaveBeenCalled();
+  });
+
+  it('no emite step_response si el body no tiene usage', async () => {
+    const wf = stubWorkflow();
+    const publish = vi.fn();
+    const repo = makeWorkflowRepo({ getWorkflowBySessionId: vi.fn(() => wf) });
+    const handler = new AuditStandardResponseHandler(makeEventBus({ publish }), makeConfig(), repo);
 
     const stream = new PassThrough();
     handler.execute(stream, makeContext(), 'application/json');
     stream.write(Buffer.from('{"id":"msg_1","stop_reason":"end_turn"}'));
     stream.end();
+    await wait();
 
-    await new Promise((r) => setTimeout(r, 100));
-    expect(captured).not.toBeNull();
-    expect(captured!.parentContext).toEqual(subInteraction.parentContext);
+    expect(publish).not.toHaveBeenCalled();
+  });
+
+  it('trunca el buffer en memoria al superar MAX_RESPONSE_BUFFER_BYTES', async () => {
+    const wf = stubWorkflow();
+    const repo = makeWorkflowRepo({
+      getWorkflowBySessionId: vi.fn(() => wf),
+      getWorkflow: vi.fn(() => wf),
+      closeStep: vi.fn(),
+    });
+    const config = makeConfig({ MAX_RESPONSE_BUFFER_BYTES: 5 });
+    const publish = vi.fn();
+    const handler = new AuditStandardResponseHandler(makeEventBus({ publish }), config, repo);
+
+    const stream = new PassThrough();
+    handler.execute(stream, makeContext(), 'application/json');
+    // Después de 5 bytes el buffer deja de acumular
+    stream.write(Buffer.from('{"us'));
+    stream.write(Buffer.from('age":{"input_tokens":1,"output_tokens":2}}'));
+    stream.end();
+    await wait();
+
+    // El body truncado no es JSON válido → sin usage → sin emit
+    expect(publish).not.toHaveBeenCalled();
+  });
+
+  it('llama forceClose con api_error cuando el stream emite error', async () => {
+    const wf = stubWorkflow();
+    const forceClose = vi.fn();
+    const repo = makeWorkflowRepo({
+      getWorkflowBySessionId: vi.fn(() => wf),
+      forceClose,
+    });
+    const handler = new AuditStandardResponseHandler(makeEventBus(), makeConfig(), repo);
+
+    const stream = new PassThrough();
+    handler.execute(stream, makeContext(), 'application/json');
+    stream.destroy(new Error('stream broken'));
+    await wait();
+
+    expect(forceClose).toHaveBeenCalledWith('session-1', 'api_error');
   });
 });

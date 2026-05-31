@@ -6,13 +6,17 @@ El gateway proyecta datos de auditoría a disco mediante escritura directa desde
 
 La fase G4 ya proyecta `WorkflowResult` a disco, pero lo hace a través del layout flat heredado. P1 reemplaza toda la pila de persistencia por la arquitectura EventBus + SessionPersistence (Opción A ratificada, §28b/§40), donde el correlador emite eventos a un bus y `SessionPersistence` los consume como suscriptor independiente para producir el layout `causal-workflows-v1` (`workflows/NN/steps/MM/tools/KK/`).
 
+Adicionalmente, P1 migra los 6 handlers de capa 3 que aún dependen de los tipos legacy (`ActiveInteraction`, `InteractionMetadata`) y los puertos legacy (`ISessionStore`, `IAuditWriter`) a los tipos gateway (`IWorkflow`, `IStep`, `IToolUse`, `IWorkflowResult`) y al patrón EventBus. Esto permite la eliminación completa del modelo `Interaction` legacy.
+
 ## What Changes
 
 - **Nueva pila de persistencia (Opción A):** crear `IEventBus` (port L1), `EventBus` (adapter L2), `SessionPersistence` (suscriptor L2) y conectar el correlador al bus para que cada mutación de estado emita el evento §28b.3 correspondiente.
 - **Nuevo método `completeToolUse()`** en el correlador: completa `ToolUse` (por timeout §24.1 o por hook `PostToolUse`/`PostToolUseFailure`) y emite `tool_result` al bus.
 - **Layout `causal-workflows-v1`:** las sesiones nuevas adoptan la estructura `workflows/NN/steps/MM/tools/KK/` con `meta.json` (identidad+estado fusionado, sin `state.json` separado — decisión D2) y `output/result.json` (IWorkflowResult + steps[] — decisión D1/D3).
 - **Corte limpio:** sesiones anteriores al layout se eliminan al arranque; no hay migración de datos en reposo.
-- **Retiro de legacy flat:** se eliminan `audit-writer.service.ts`, `session-store.service.ts`, `workflow-result-projector.service.ts`, constantes flat de `audit-paths.ts` y tipos `ActiveInteraction`/`InteractionMetadata`.
+- **Migración de handlers L3 a tipos gateway:** los 6 handlers (`audit-interaction`, `audit-standard-response`, `audit-sse-response`, `audit-upstream-error`, `audit-workflow-closure`, `gateway-wire-step`) migran de `ActiveInteraction`/`InteractionMetadata`/`ISessionStore`/`IAuditWriter` a `IWorkflow`/`IStep`/`IToolUse`/`IWorkflowResult`/`IWorkflowRepository`/`EventBus`.
+- **Ampliación del catálogo de eventos:** nuevos eventos para escrituras de contenido (`step_request`, `step_response`, `tool_call`, `tool_result`) que `SessionPersistence` consume para escribir a disco.
+- **Retiro completo del modelo legacy:** eliminación de `ISessionStore`, `IAuditWriter`, `SessionStoreService`, `AuditWriterService`, `ActiveInteraction`, `InteractionMetadata`, `workflow-result-projector.service.ts`, constantes flat de `audit-paths.ts` y tipos/constantes asociados.
 
 ## No objetivos
 
@@ -30,13 +34,21 @@ La fase G4 ya proyecta `WorkflowResult` a disco, pero lo hace a través del layo
 
 ### Modified Capabilities
 
-- `gateway-workflow-lifecycle`: El correlador (`WorkflowRepositoryService`) emite eventos al bus en cada mutación de estado; se crea el método `completeToolUse()`.
-- `gateway-audit-projection`: La proyección de `WorkflowResult` a disco se delega a `SessionPersistence` en lugar de `AuditProjectionFs` directo.
+- `gateway-workflow-lifecycle`: El correlador (`WorkflowRepositoryService`) emite eventos al bus en cada mutación de estado; se crea el método `completeToolUse()`; se amplía con métodos de lookup y gestión de pending tool uses.
+- `gateway-audit-projection`: La proyección de `WorkflowResult` a disco se delega a `SessionPersistence` en lugar de escritura directa desde handlers. `AuditWorkflowClosureHandler` se conserva como coordinador de métricas. Handlers L3 migran a tipos gateway.
+- `gateway-wire-step`: Funciones utilitarias migran de `ActiveInteraction` a `IWorkflow`.
+- L3 handlers (`audit-interaction`, `audit-standard-response`, `audit-sse-response`, `audit-upstream-error`): migran a tipos gateway + EventBus.
+
+### Removed Capabilities
+
+- `session-store` (ISessionStore + SessionStoreService): reemplazado por `IWorkflowRepository` ampliado + `EventBus`.
+- `audit-writer` (IAuditWriter + AuditWriterService): reemplazado por `SessionPersistence` (vía EventBus).
+- Model types legacy (`ActiveInteraction`, `InteractionMetadata`, `StepMeta`, `InteractionType`, `InteractionState`, `InteractionOutcome`, `ParentContext`, `SideRequestKind`, `PendingAgentToolUse`, `PendingWebSearchToolUse`, `PendingWebFetchToolUse`, `ResolvedInternalTool`): reemplazados por tipos gateway.
 
 ## Impact
 
-- **Capas PKA afectadas:** L1 (nuevos ports y tipos), L2 (nuevos adapters + modificación del correlador), L4 (cableado en composition root).
+- **Capas PKA afectadas:** L1 (nuevos ports y tipos), L2 (nuevos adapters + modificación del correlador), L3 (migración de 6 handlers), L4 (cableado en composition root).
 - **Archivos nuevos:** `IEventBus.ts`, `telemetry.types.ts`, `event-pattern-match.service.ts`, `event-bus.service.ts`, `session-persistence.service.ts`, `session-routing.ts`, `async.utils.ts`.
-- **Archivos modificados:** `workflow-repository.service.ts` (emisión al bus + `completeToolUse()`), `composition-root.ts` (cableado EventBus).
-- **Archivos eliminados:** `audit-writer.service.ts`, `session-store.service.ts`, `workflow-result-projector.service.ts`, constantes flat de `audit-paths.ts`, tipos `ActiveInteraction`/`InteractionMetadata`.
+- **Archivos modificados:** `workflow-repository.service.ts` (emisión al bus + `completeToolUse()` + métodos de lookup), `audit-hook-event.handler.ts` (completeToolUse en hooks + simplificación de `delegateClosure()`), `audit-interaction.handler.ts`, `audit-standard-response.handler.ts`, `audit-sse-response.handler.ts`, `audit-upstream-error.handler.ts`, `audit-workflow-closure.handler.ts`, `gateway-wire-step.util.ts`, `composition-root.ts` (cableado EventBus).
+- **Archivos eliminados:** `audit-writer.service.ts`, `session-store.service.ts`, `workflow-result-projector.service.ts`, constantes flat de `audit-paths.ts`, puertos `ISessionStore` e `IAuditWriter`, tipos `ActiveInteraction`/`InteractionMetadata`/`StepMeta`/`InteractionType`/`InteractionState`/`InteractionOutcome`/`ParentContext`/`SideRequestKind`/`PendingAgentToolUse`/`PendingWebSearchToolUse`/`PendingWebFetchToolUse`/`ResolvedInternalTool` y constantes/funciones asociadas de `audit.types.ts`.
 - **Documentación:** `docs/session-audit-model.md`, `README.md`, `docs/proposals/gateway-design.md` §29, §30, §33, §37b, §40, §46.4.

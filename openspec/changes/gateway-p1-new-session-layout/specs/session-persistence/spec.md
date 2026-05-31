@@ -2,21 +2,22 @@
 
 ## Purpose
 
-Suscriptor del `EventBus` que proyecta eventos del correlador a disco bajo la estructura `causal-workflows-v1` (`workflows/NN/steps/MM/tools/KK/`). Reemplaza la escritura directa desde handlers de capa 3 (`AuditWriterService`, `SessionStoreService`, `WorkflowResultProjector`).
+Suscriptor del `EventBus` que proyecta eventos del correlador y handlers a disco bajo la estructura `causal-workflows-v1` (`workflows/NN/steps/MM/tools/KK/`). Reemplaza la escritura directa desde handlers de capa 3 (`AuditWriterService`, `SessionStoreService`, `WorkflowResultProjector`).
 
 ## ADDED Requirements
 
 ### Requirement: SessionPersistence — suscripción al bus y proyección a disco
 
-El sistema SHALL proveer `SessionPersistence` en `src/2-services/session-persistence.service.ts` como suscriptor del `EventBus` que, al recibir eventos del correlador, proyecta la estructura de directorios y archivos del layout `causal-workflows-v1` bajo `sessions/`.
+El sistema SHALL proveer `SessionPersistence` en `src/2-services/session-persistence.service.ts` como suscriptor del `EventBus` que, al recibir eventos del correlador y handlers, proyecta la estructura de directorios y archivos del layout `causal-workflows-v1` bajo `sessions/`.
 
 `SessionPersistence` SHALL suscribirse a los siguientes eventos en su constructor:
 
 | Evento | Acción |
 |---|---|
-| `workflow_start` | Crear `workflows/NN/`; escribir `meta.json` inicial (status: `running`) |
+| `workflow_start` | Crear `workflows/NN/`; escribir `meta.json` inicial (status: `running`). Si `request` presente, escribir `request/body.json`. |
 | `workflow_spawn` | Crear `workflows/NN/tools/KK-sub-agent/sub-agent/workflow/`; escribir `meta.json` del sub-workflow |
-| `step_request` | Crear `steps/MM/`; escribir `request/body.json` |
+| `step_request` | Crear `steps/MM/`; si `request` presente, escribir `request/body.json` |
+| `step_response` | Escribir `response/body.json`, `response/headers.json`, `response/parsed.md` según campos presentes en payload |
 | `tool_call` | Crear `tools/KK-slug/`; escribir `input.json` y `meta.json` |
 | `tool_result` | Escribir `result.json` en `tools/KK-slug/`; actualizar `meta.json` del tool |
 | `workflow_complete` | Actualizar `meta.json` (status: `completed`); escribir `output/result.json` + `output/result.parsed.md` |
@@ -29,12 +30,26 @@ El sistema SHALL proveer `SessionPersistence` en `src/2-services/session-persist
 - **THEN** SHALL crearse el directorio `sessions/sess-1/workflows/00/`
 - **AND** SHALL escribirse `meta.json` con `status: 'running'`, `workflowKind: 'main'`, `layoutVersion: 'causal-workflows-v1'`
 
+#### Scenario: workflow_start con request escribe request/body.json
+
+- **GIVEN** una sesión `'sess-1'`
+- **WHEN** `SessionPersistence` recibe `{ type: 'workflow_start', sessionId: 'sess-1', payload: { workflowId: 'wf-1', kind: 'main', request: { model: 'claude-sonnet-4-6', messages: [...] } } }`
+- **THEN** SHALL escribirse `request/body.json` con el contenido del request
+
 #### Scenario: step_request crea directorio y request/body.json
 
 - **GIVEN** un workflow `'wf-1'` en sesión `'sess-1'`
-- **WHEN** `SessionPersistence` recibe un evento `{ type: 'step_request', payload: { workflowId: 'wf-1', stepIndex: 0, body: { model: 'claude-sonnet-4-6', messages: [...] } } }`
+- **WHEN** `SessionPersistence` recibe un evento `{ type: 'step_request', payload: { workflowId: 'wf-1', stepIndex: 0, step: {...}, request: { model: 'claude-sonnet-4-6', messages: [...] } } }`
 - **THEN** SHALL crearse el directorio `sessions/sess-1/workflows/00/steps/00/request/`
-- **AND** SHALL escribirse `request/body.json` con el contenido del payload
+- **AND** SHALL escribirse `request/body.json` con el contenido del request
+
+#### Scenario: step_response escribe contenido de respuesta
+
+- **GIVEN** un step en workflow `'wf-1'`
+- **WHEN** `SessionPersistence` recibe `{ type: 'step_response', payload: { workflowId: 'wf-1', stepIndex: 0, response: { body: {...} }, headers: { 'content-type': '...' }, markdown: '...' } }`
+- **THEN** SHALL escribirse `response/body.json` si `response` está presente
+- **AND** SHALL escribirse `response/headers.json` si `headers` está presente
+- **AND** SHALL escribirse `response/parsed.md` si `markdown` está presente
 
 #### Scenario: tool_call crea directorio con slug y archivos input/meta
 

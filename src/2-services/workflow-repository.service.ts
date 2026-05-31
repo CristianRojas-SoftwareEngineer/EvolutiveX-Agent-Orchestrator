@@ -6,6 +6,7 @@ import type { IStep } from '../1-domain/interfaces/gateway/IStep.js';
 import type { IToolUse } from '../1-domain/interfaces/gateway/IToolUse.js';
 import type { IWorkflowResult } from '../1-domain/interfaces/gateway/IWorkflowResult.js';
 import type { IEventBus } from '../1-domain/repositories/IEventBus.js';
+import type { WorkflowOutcome } from '../1-domain/types/gateway/workflow.types.js';
 import { Workflow } from '../1-domain/models/gateway/Workflow.js';
 import { buildWorkflowResult } from '../1-domain/services/gateway/build-workflow-result.js';
 
@@ -216,6 +217,22 @@ export class WorkflowRepositoryService implements IWorkflowRepository {
       this.emit('workflow_complete', workflowId, { result, outcome: result.outcome });
     }
     return result;
+  }
+
+  public forceClose(workflowId: string, outcome: WorkflowOutcome): void {
+    const workflow = this.workflows.get(workflowId);
+    if (!workflow || workflow.result != null) return;
+    const closedSteps = workflow.steps.filter((s) => s.closedAt != null);
+    const result: IWorkflowResult = {
+      outcome,
+      stepCount: closedSteps.length,
+      closedByEvent: 'StopFailure',
+      sessionId: workflow.sessionId,
+    };
+    workflow.result = result;
+    workflow.completedAt = new Date();
+    workflow.status = 'failed';
+    this.emit('workflow_complete', workflowId, { result, outcome });
   }
 
   // ── Métodos de lookup (migración de handlers L3) ──────────────────────────

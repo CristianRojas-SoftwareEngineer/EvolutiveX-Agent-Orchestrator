@@ -28,6 +28,7 @@ function makeRepo(overrides: Partial<IWorkflowRepository> = {}): IWorkflowReposi
     findStaleWorkflows: vi.fn(() => []),
     nextSequence: vi.fn(async () => 0),
     withSessionLock: vi.fn(async (_s, fn) => fn()),
+    forceClose: vi.fn(),
     ...overrides,
   };
 }

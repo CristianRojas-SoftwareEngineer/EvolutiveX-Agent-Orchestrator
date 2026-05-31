@@ -4,6 +4,7 @@ import type { IWorkflow } from '../interfaces/gateway/IWorkflow.js';
 import type { IStep } from '../interfaces/gateway/IStep.js';
 import type { IToolUse } from '../interfaces/gateway/IToolUse.js';
 import type { IWorkflowResult } from '../interfaces/gateway/IWorkflowResult.js';
+import type { WorkflowOutcome } from '../types/gateway/workflow.types.js';
 
 export interface WireSubagentEntry {
   sessionId: string;
@@ -74,6 +75,12 @@ export interface IWorkflowRepository {
 
   /** Cierra el workflow invocando `buildWorkflowResult`; idempotente si ya está cerrado. */
   close(workflowId: string, hook: ClaudeHookEvent): IWorkflowResult;
+
+  /**
+   * Cierra forzosamente el workflow con el outcome indicado (sin hook event).
+   * Usado para errores upstream donde no hay evento de hook disponible. Idempotente.
+   */
+  forceClose(workflowId: string, outcome: WorkflowOutcome): void;
 
   /**
    * Fija `languageModelId` con el primer modelo observado (idempotente).

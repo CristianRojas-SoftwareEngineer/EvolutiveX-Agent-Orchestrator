@@ -10,7 +10,7 @@ export type WorkflowStatus =
   | 'aborted';
 
 /** Resultado global al cierre del workflow. */
-export type WorkflowOutcome = 'success' | 'api_error' | 'aborted' | 'unknown';
+export type WorkflowOutcome = 'success' | 'api_error' | 'aborted' | 'unknown' | 'upstream-error';
 
 /** Evento del hook de Claude Code que disparó el cierre del workflow. */
 export type WorkflowClosedByEvent = 'Stop' | 'SubagentStop' | 'StopFailure';

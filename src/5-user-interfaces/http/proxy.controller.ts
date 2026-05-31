@@ -66,24 +66,16 @@ export class ProxyController {
     reply: FastifyReply,
     error: Error & { code?: string },
   ): Promise<void> {
-    const auditDir = request.auditInteractionDir;
+    const sessionId = request.auditSessionId;
 
-    if (auditDir) {
+    if (sessionId) {
       try {
-        await this.deps.auditUpstreamErrorHandler.execute({
-          auditInteractionDir: auditDir,
-          requestId: request.id,
-          requestSequence: request.requestSequence || 0,
-          auditSessionId: request.auditSessionId || '',
-          method: request.method,
-          url: request.url,
-          requestStartTime: request.requestStartTime || Date.now(),
-          requestBodyBytes: request.rawBodyBytes ?? 0,
-          requestBodyOmitted: !!request.requestBodyOmitted,
+        this.deps.auditUpstreamErrorHandler.execute({
+          auditSessionId: sessionId,
           error,
         });
       } catch (metaErr: unknown) {
-        request.log.error(metaErr as Error, 'Error al escribir meta de fallo de upstream');
+        request.log.error(metaErr as Error, 'Error al cerrar workflow en fallo de upstream');
       }
     }
 

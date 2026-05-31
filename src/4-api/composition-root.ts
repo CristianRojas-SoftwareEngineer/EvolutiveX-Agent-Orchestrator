@@ -73,28 +73,19 @@ export async function createProxyDependencies(
     auditWriter,
     sseReconstruct,
     config,
-    sessionStore,
     () => new StepAssemblerService(),
     workflowRepo,
+    eventBus,
     logger,
   );
   const sessionMetrics = new SessionMetricsService(auditWriter);
-  const auditWorkflowClosureHandler = new AuditWorkflowClosureHandler(
-    auditWriter,
-    sessionMetrics,
-    config,
-  );
+  const auditWorkflowClosureHandler = new AuditWorkflowClosureHandler(sessionMetrics);
   const auditStandardResponseHandler = new AuditStandardResponseHandler(
-    auditWriter,
+    eventBus,
     config,
-    sessionStore,
     workflowRepo,
   );
-  const auditUpstreamErrorHandler = new AuditUpstreamErrorHandler(
-    auditWriter,
-    config,
-    sessionStore,
-  );
+  const auditUpstreamErrorHandler = new AuditUpstreamErrorHandler(workflowRepo);
   const filterToolsHandler = new FilterToolsHandler(config);
   const hookEventHandler = new AuditHookEventHandler(
     workflowRepo,

@@ -1,12 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import type { IWorkflowRepository } from '../1-domain/repositories/IWorkflowRepository.js';
 import type { IStep } from '../1-domain/interfaces/gateway/IStep.js';
-import type { ActiveInteraction } from '../1-domain/types/audit.types.js';
+import type { IWorkflow } from '../1-domain/interfaces/gateway/IWorkflow.js';
 import type { AnthropicMessage, AnthropicRequest, AnthropicUsage } from '../1-domain/types/anthropic.types.js';
 import type { AssembledInference } from '../2-services/ports/step-assembler.port.js';
 
 export interface BuildWireStepParams {
-  interaction: ActiveInteraction;
+  workflow: IWorkflow;
   inferenceRequest: AnthropicRequest;
   assistantMessage: AnthropicMessage;
   usage: AnthropicUsage;
@@ -16,16 +16,16 @@ export interface BuildWireStepParams {
 }
 
 /** Resuelve el workflowId para correlación wire (main o subagente). */
-export function resolveWorkflowIdForInteraction(interaction: ActiveInteraction): string {
-  return interaction.parentContext?.wireAgentId ?? interaction.sessionId;
+export function resolveWorkflowIdForInteraction(workflow: IWorkflow): string {
+  return workflow.id;
 }
 
 /** Snapshot mínimo del request para el correlador (modelo desde ensamblaje o turno). */
 export function buildInferenceRequestSnapshot(
-  interaction: ActiveInteraction,
+  workflow: IWorkflow,
   assembled?: Pick<AssembledInference, 'model'>,
 ): AnthropicRequest {
-  const model = assembled?.model ?? interaction.modelId ?? 'unknown';
+  const model = assembled?.model ?? workflow.languageModelId ?? 'unknown';
   return {
     model,
     messages: [],
@@ -35,7 +35,7 @@ export function buildInferenceRequestSnapshot(
 
 /** Construye un `IStep` desde el resultado de inferencia wire. */
 export function buildWireStep(params: BuildWireStepParams): IStep {
-  const workflowId = resolveWorkflowIdForInteraction(params.interaction);
+  const workflowId = resolveWorkflowIdForInteraction(params.workflow);
   return {
     id: randomUUID(),
     workflowId,

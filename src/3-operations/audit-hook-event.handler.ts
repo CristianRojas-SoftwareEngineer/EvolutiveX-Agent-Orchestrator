@@ -1,5 +1,4 @@
 import type { IWorkflowRepository } from '../1-domain/repositories/IWorkflowRepository.js';
-import type { IWorkflowResult } from '../1-domain/interfaces/gateway/IWorkflowResult.js';
 import type { Logger } from '../1-domain/types/logger.types.js';
 import type { ClaudeHookEvent } from '../1-domain/types/hook.types.js';
 import type { ISessionStore } from '../2-services/ports/session-store.port.js';
@@ -42,8 +41,8 @@ export class AuditHookEventHandler {
           break;
         }
         if (this.workflowRepo.readyToClose(event.sessionId, event)) {
-          const result = this.workflowRepo.close(event.sessionId, event);
-          await this.delegateClosure(event.sessionId, event.sessionId, 'main', result, event);
+          this.workflowRepo.close(event.sessionId, event);
+          await this.delegateClosure(event.sessionId, event.sessionId);
         }
         break;
       }
@@ -57,8 +56,8 @@ export class AuditHookEventHandler {
           break;
         }
         if (this.workflowRepo.readyToClose(agentId, event)) {
-          const result = this.workflowRepo.close(agentId, event);
-          await this.delegateClosure(event.sessionId, agentId, 'subagent', result, event);
+          this.workflowRepo.close(agentId, event);
+          await this.delegateClosure(event.sessionId, agentId);
         }
         break;
       }
@@ -69,8 +68,8 @@ export class AuditHookEventHandler {
           this.logger?.info({ eventName: event.eventName, sessionId: event.sessionId }, 'workflow no encontrado — evento ignorado');
           break;
         }
-        const result = this.workflowRepo.close(event.sessionId, event);
-        await this.delegateClosure(event.sessionId, event.sessionId, 'main', result, event);
+        this.workflowRepo.close(event.sessionId, event);
+        await this.delegateClosure(event.sessionId, event.sessionId);
         break;
       }
 
@@ -92,32 +91,11 @@ export class AuditHookEventHandler {
     }
   }
 
-  private async delegateClosure(
-    sessionId: string,
-    workflowId: string,
-    kind: 'main' | 'subagent',
-    result: IWorkflowResult,
-    hook: ClaudeHookEvent,
-  ): Promise<void> {
+  private async delegateClosure(sessionId: string, workflowId: string): Promise<void> {
     const workflow = this.workflowRepo.getWorkflow(workflowId);
     if (!workflow) return;
 
-    const turn = this.sessionStore.findInteractionForWorkflowClose(sessionId, workflowId, kind);
-    if (!turn) {
-      this.logger?.info({ sessionId, workflowId, kind }, 'interacción activa no encontrada — proyección omitida');
-      return;
-    }
-
     const sessionDir = resolveSessionDir(this.sessionStore.getBaseDir(), sessionId);
-    await this.closureHandler.execute({
-      sessionDir,
-      interactionDir: turn.interactionDir,
-      workflow,
-      result,
-      hook,
-      turn,
-    });
-
-    this.sessionStore.closeInteraction(turn.interactionDir);
+    await this.closureHandler.execute({ sessionDir, workflow });
   }
 }

@@ -52,4 +52,4 @@ El sistema SHALL proveer un componente de infraestructura `StepAssembler` (capa 
 #### Scenario: Side-effects de correlación legacy preservados
 
 - **WHEN** el stream contiene bloques `tool_use` de tipo `Agent`, `WebSearch` o `WebFetch`
-- **THEN** el handler sigue registrando los pending correspondientes en `ISessionStore` con la misma información (incluido `subagent_type`/`description`/`prompt` para `Agent`)
+- **THEN** el handler sigue registrando los pending correspondientes en `IWorkflowRepository` (`registerPendingToolUse` / correlador) con la misma información (incluido `subagent_type`/`description`/`prompt` para `Agent`)

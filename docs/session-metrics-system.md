@@ -45,7 +45,7 @@ Sesiones creadas antes de G4 pueden conservar entradas en **camelCase** (`inputT
 - **Canónico (G4):** `ISessionMetrics` e `IModelSessionMetrics` en `src/1-domain/types/gateway/session-metrics.types.ts`.
 - **Legacy:** `SessionMetrics` / `SessionModelMetrics` en `audit.types.ts` son alias `@deprecated` hacia los tipos gateway.
 
-`ActiveInteraction` y `InteractionMetadata` siguen llevando `modelId?: string` para inspección offline por turno.
+`InteractionMetadata` (y tipos `@deprecated` en `audit.types.ts`) conservan `modelId?: string` solo para proyección offline / shim SSE; **no** hay `ActiveInteraction` en memoria tras P1 (`IWorkflow` en `IWorkflowRepository`).
 
 #### Escritura (`SessionMetricsService`, G4)
 
@@ -54,7 +54,7 @@ Sesiones creadas antes de G4 pueden conservar entradas en **camelCase** (`inputT
 1. Se invoca desde `AuditWorkflowClosureHandler` al cerrar un workflow **`kind: 'main'`** (invariante G16). Los sub-workflows no escriben `session-metrics.json` (su consumo ya está en el rollup del padre).
 2. Agrupa steps cerrados con `aggregateWorkflowUsageByModel` (L1).
 3. Hace merge incremental en `session-metrics.json`, recalcula `session_totals` y `cache_efficiency` por modelo.
-4. Escribe con `writeJsonAtomic` del `IAuditWriter` y serializa actualizaciones con cola interna (`writeQueue`) para evitar races.
+4. Escribe `session-metrics.json` con escritura atómica propia (`writeJsonAtomic` interno) y serializa actualizaciones con cola interna (`writeQueue`) para evitar races.
 
 Ya **no** hay actualización per-step en los handlers wire; el cierre nominal del turno vía hooks (`Stop` / `SubagentStop` / `StopFailure`) dispara la proyección y, para workflows main, la métrica de sesión.
 

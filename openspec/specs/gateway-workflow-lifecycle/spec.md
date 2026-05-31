@@ -125,7 +125,7 @@ El sistema SHALL actualizar `AuditHookEventHandler` en `src/3-operations/audit-h
 | `PostToolUse` | Stub diferido (ToolUse.status = completed → fase posterior) |
 | `PostToolUseFailure` | Stub diferido (ToolUse.status = error → fase posterior) |
 
-Tras `close()` exitoso en `Stop`, `SubagentStop` y `StopFailure`, el handler SHALL delegar la proyección a disco en `AuditWorkflowClosureHandler` (G4), resolviendo `sessionDir` e `interactionDir` desde `ISessionStore.findInteractionForWorkflowClose`.
+Tras `close()` exitoso en `Stop`, `SubagentStop` y `StopFailure`, el handler SHALL delegar la proyección a disco en `AuditWorkflowClosureHandler` (G4), resolviendo rutas de workflow desde `IWorkflowRepository` (wire meta / `layoutIndex`) y dejando que `SessionPersistence` proyecte `meta.json` y `output/result.json` bajo `sessions/<sessionId>/workflows/NN/`.
 
 El handler SHALL resolver el `workflowId` a partir del `sessionId` y `agentId` del hook usando `getWorkflowByAgentId` o un índice de sesión. Si no encuentra el workflow, SHALL registrar el evento en log sin lanzar excepción.
 

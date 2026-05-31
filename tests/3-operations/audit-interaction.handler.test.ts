@@ -250,8 +250,7 @@ describe('AuditInteractionHandler', () => {
       requestId: 'sub-req-1',
     });
     expect(result).not.toBeNull();
-    expect(result!.auditInteractionDir).toContain('sub-agent');
-    expect(result!.auditInteractionDir.replace(/\\/g, '/')).toContain('steps/02');
+    expect(result!.auditInteractionDir.replace(/\\/g, '/')).toMatch(/workflows\/\d{2}$/);
     const parentCtx = lastSubWorkflowMeta(workflowRepo);
     expect(parentCtx).toMatchObject({
       triggeringToolUseId: 'toolu_unique',

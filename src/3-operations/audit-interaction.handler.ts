@@ -25,8 +25,6 @@ import type { JsonValue } from '../1-domain/types/json.types.js';
 import type { AnthropicRequest } from '../1-domain/types/anthropic.types.js';
 import { ProxyEnvironmentConfig } from '../1-domain/types/config.types.js';
 import type { Logger } from '../1-domain/types/logger.types.js';
-import { PAD_STEP } from '../1-domain/constants/audit-paths.js';
-
 export interface AuditInteractionResult {
   /** Ruta absoluta al directorio base del workflow (`sessions/<id>/workflows/NN`). */
   auditInteractionDir: string;
@@ -446,15 +444,8 @@ export class AuditInteractionHandler {
 
       this.registerWireStepRequest(subWorkflow, 1, headersForAudit, params.rawBody, 'agentic');
 
-      const subDir = path.join(
-        parentInteractionDir,
-        'steps',
-        String(parentStepIndex).padStart(PAD_STEP, '0'),
-        `sub-agent-${String(subSeq).padStart(2, '0')}`,
-      );
-
       return {
-        auditInteractionDir: subDir,
+        auditInteractionDir: this.workflowDirAbs(auditSessionId, subLayoutIndex),
         workflowId: subWorkflow.id,
         requestBodyOmitted: omitted,
         requestSequence: subSeq,

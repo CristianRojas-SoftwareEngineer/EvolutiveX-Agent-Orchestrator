@@ -303,6 +303,8 @@ flowchart TB
 
 ### 7.1 Diagrama de secuencia (proxy + auditoría)
 
+> **Estado post-P1 (2026-05-30):** correlación en `IWorkflowRepository`; proyección causal en `SessionPersistence` vía `EventBus`; SSE inline en `ISseAuditWriter` (`@deprecated-p2`). `ISessionStore` / `IAuditWriter` retirados.
+
 ```mermaid
 sequenceDiagram
   participant CC as Claude Code
@@ -315,21 +317,20 @@ sequenceDiagram
   CC->>L5: POST /v1/messages
   L5->>L3: filter-tools + audit-interaction
   L3->>L1: classifyRequestBody, resolve session
-  L3->>L2: ISessionStore, IAuditWriter (request, dirs)
+  L3->>L2: IWorkflowRepository, EventBus
   L5->>UP: reenvío body filtrado
   UP-->>L5: SSE o JSON
   L5->>L2: streamTee
   L2->>L3: audit-sse-response o audit-standard-response
-  L3->>L1: StepMeta, computeTokenTotals
-  L3->>L2: sse.jsonl, reconstruct, meta.json
+  L3->>L2: ISseAuditWriter (sse.jsonl), SessionPersistence (bus)
   L5-->>CC: stream transparente
 ```
 
 ### 7.2 Puntos clave del flujo actual
 
 1. **Capa 5** no escribe disco; delega en handlers.
-2. **Capa 3** decide tipo de interacción y cuándo cerrar según `stop_reason` (wire), no según hook `Stop`.
-3. **Capa 2** persiste artefactos; `SessionStoreService` también mantiene correlación en RAM (deuda).
+2. **Capa 3** orquesta workflows en `IWorkflowRepository` y emite eventos al bus; cierre nominal vía hooks (`AuditHookEventHandler`).
+3. **Capa 2** proyecta artefactos bajo `workflows/NN/` (`SessionPersistence`); SSE sigue en shim `ISseAuditWriter` hasta P2.
 4. **Capa 1** no conoce Fastify ni rutas de `sessions/`.
 
 ---
@@ -340,7 +341,7 @@ sequenceDiagram
 
 | Ruta | Responsabilidad |
 | ---- | ---------------- |
-| `1-domain/types/audit.types.ts` | Modelo de turno en memoria y en `meta.json`: `ActiveInteraction`, `StepMeta`, `InteractionMetadata`, pending tools (`PendingAgentToolUse`, `PendingWebFetchToolUse`, `PendingWebSearchToolUse` — extensiones SCP), `computeTokenTotals()`. |
+| `1-domain/types/audit.types.ts` | Tipos wire/legacy (`InteractionMetadata`, `StepMeta`, pending tools) y tipos gateway (`IWorkflow`, `IStep`, `IToolUse` en interfaces gateway). `ActiveInteraction` retirado de memoria en P1. |
 | `1-domain/types/anthropic.types.ts` | Contratos wire Anthropic. |
 | `1-domain/types/config.types.ts`, `logger.types.ts`, `json.types.ts` | Config, logging, JSON. |
 | `1-domain/constants/audit-paths.ts`, `audit-limits.ts`, `session-headers.ts` | Layout lógico, límites, nombres de cabeceras. |
@@ -355,12 +356,14 @@ sequenceDiagram
 
 | Port | Adapter | Función |
 | ---- | ------- | ------- |
-| `ISessionStore` | `SessionStoreService` | Estado en memoria, secuencias `interaction-sequence.json`, pending agents/web tools, índice por `tool_use_id`. |
-| `IAuditWriter` | `AuditWriterService` | Escritura bajo `sessions/…` (input, steps, meta, state). |
+| `IWorkflowRepository` | `WorkflowRepositoryService` | Estado en memoria de workflows/steps/tools; emite al `EventBus`. |
+| `IEventBus` | `EventBusService` | Pub/sub in-process de telemetría. |
+| — | `SessionPersistence` | Suscriptor del bus; layout `causal-workflows-v1` en disco. |
+| `ISseAuditWriter` | `AuditWriterService` | Shim SSE/reconstrucción (`@deprecated-p2` hasta P2). |
 | `ISseReconstructor` | `SseReconstructService` | Leer `sse.jsonl` → `body.json` / `output/`. |
 | `IStreamTee` | `StreamTeeService` | Duplicar stream respuesta hacia cliente y auditoría. |
 
-**Deuda:** `SessionStoreService` mezcla **adapter de memoria** con **lógica de correlación de aplicación** que PKA ubicaría en capa 3 + contratos en capa 1.
+**Histórico (pre-P1):** `ISessionStore` / `IAuditWriter` retirados; ver archivos archivados en `openspec/changes/archive/`.
 
 ### 8.3 Capa 3 — Operations (implementación actual)
 
@@ -440,11 +443,13 @@ sequenceDiagram
 
 ## 9. Modelo de auditoría en disco actual
 
-Jerarquía documentada en [session-audit-model.md](../session-audit-model.md):
+**Vigente (post-P1):** layout `causal-workflows-v1` en [session-audit-model.md](../session-audit-model.md) (`workflows/NN/steps/MM/tools/KK-slug/…`).
+
+**Histórico (flat pre-P1):**
 
 ```text
 Sesión (sessions/<session-id>/)
-├── main-agent/interactions/NN/     ← turno agéntico del usuario
+├── main-agent/interactions/NN/     ← turno agéntico del usuario (retirado en P1)
 │     ├── input/   (prompt fresh)
 │     ├── steps/YY/  ← una llamada HTTP a Anthropic por step
 │     │     ├── request/, response/ (sse.jsonl = fuente de verdad)
@@ -2709,12 +2714,12 @@ Todos usan `resolveWorkflowLocation(sessionId, workflowId)` para obtener el `wor
 
 ### 37.1. Mapeo de entidades
 
-| Entidad | Ruta `causal-workflows-v1` | Ruta SCP actual | Cambio en código generador |
+| Entidad | Ruta `causal-workflows-v1` (actual post-P1) | Ruta flat pre-P1 | Pendiente post-P1 |
 |---|---|---|---|
-| Session | `sessions/<id>/` | `sessions/<id>/` | Sin cambio (raíz compatible) |
-| Workflow main | `workflows/NN/` | `main-agent/interactions/NN/` | Reescribir ruta de escritura en proyección |
-| Workflow subagent | `tools/KK-agent/sub-agent/workflow/` | `steps/YY/sub-agent-TT/` | Reescribir ruta de escritura en proyección |
-| Step | `workflows/NN/steps/MM/` | `main-agent/interactions/NN/steps/YY/` | Reescribir ruta de escritura en proyección |
+| Session | `sessions/<id>/` | `sessions/<id>/` | — |
+| Workflow main | `workflows/NN/` | `main-agent/interactions/NN/` | Implementado (P1) |
+| Workflow subagent | `tools/KK-agent/sub-agent/workflow/` | `steps/YY/sub-agent-TT/` | Implementado (P1) |
+| Step | `workflows/NN/steps/MM/` | `main-agent/interactions/NN/steps/YY/` | Implementado (P1) |
 | ToolUse | `steps/MM/tools/KK-slug/` | (no existe como entidad hoy, inline en SSE) | Nuevo: añadir escritura en proyección |
 | `events.ndjson` | `sessions/<id>/events.ndjson` | (no existe) | Nuevo: añadir escritura en proyección |
 | `session-metrics.json` | `sessions/<id>/session-metrics.json` | `sessions/<id>/session-metrics.json` | Sin cambio (ruta compatible) |
@@ -3068,7 +3073,7 @@ En todas las fases C y G: **mismo layout `sessions/`** salvo campos adicionales 
 | Multi-proveedor | Solo en `routing/` + statusline | `Provider` / `LanguageModel` en dominio capa 1 |
 | SSE en dominio | `SseLine[]` en audit | Snapshots `Step`; deltas solo en proyección capa 2 |
 | Handlers | Monolíticos, alta línea | Orquestación explícita: wire + hooks → correlador compartido |
-| Layout disco | `sessions/{session}/{interaction}/` flat | `causal-workflows-v1`: `workflows/NN/`, `tools/KK/`, artefactos tipados — generado por código nuevo (fases P); sesiones anteriores eliminadas en el corte |
+| Layout disco | `causal-workflows-v1`: `workflows/NN/`, `tools/KK/` (P1); SSE aún en `sse.jsonl` hasta P2 | Mismo layout + `streaming/*.ndjson`, `events.ndjson` (fases P2+) |
 
 ---
 

@@ -152,47 +152,6 @@ export interface StepMeta {
 }
 
 /**
- * Computa los totales de tokens sumando los campos de todos los StepMeta.
- * Función pura de dominio, independiente de infraestructura.
- */
-export function computeTokenTotals(steps: StepMeta[]): {
-  cacheCreationInputTokens: number;
-  cacheReadInputTokens: number;
-  inputTokens: number;
-  outputTokens: number;
-} {
-  return steps.reduce(
-    (acc, s) => {
-      const continuation = s.coalescedAgentContinuation;
-      return {
-        cacheCreationInputTokens:
-          acc.cacheCreationInputTokens +
-          (s.cacheCreationInputTokens ?? 0) +
-          (continuation?.cacheCreationInputTokens ?? 0),
-        cacheReadInputTokens:
-          acc.cacheReadInputTokens +
-          (s.cacheReadInputTokens ?? 0) +
-          (continuation?.cacheReadInputTokens ?? 0),
-        inputTokens: acc.inputTokens + (s.inputTokens ?? 0) + (continuation?.inputTokens ?? 0),
-        outputTokens: acc.outputTokens + (s.outputTokens ?? 0) + (continuation?.outputTokens ?? 0),
-      };
-    },
-    { cacheCreationInputTokens: 0, cacheReadInputTokens: 0, inputTokens: 0, outputTokens: 0 },
-  );
-}
-
-/**
- * Computa la suma de bytes crudos SSE escritos a lo largo de todos los steps.
- */
-export function computeSseRawBytesTotal(steps: StepMeta[]): number {
-  return steps.reduce(
-    (acc, s) =>
-      acc + (s.sseRawBytesWritten ?? 0) + (s.coalescedAgentContinuation?.sseRawBytesWritten ?? 0),
-    0,
-  );
-}
-
-/**
  * Estado en memoria de un turno activo en una sesión.
  * @deprecated Reemplazado por los tipos gateway de G1 (`WorkflowKind`, `WorkflowStatus`, etc.)
  * en `src/1-domain/types/gateway/`. Retirada planificada en la fase que migre el último consumidor
@@ -423,24 +382,6 @@ export type { IModelSessionMetrics as SessionModelMetrics } from './gateway/sess
  * @deprecated Usar `ISessionMetrics` en `types/gateway/session-metrics.types.ts` (G4).
  */
 export type { ISessionMetrics as SessionMetrics } from './gateway/session-metrics.types.js';
-
-/**
- * Estado persistente de una interacción en curso, escrito como state.json
- * al crear la interacción y eliminado al cerrar el turno.
- * Permite a herramientas externas detectar interacciones huérfanas por crash.
- * @deprecated Reemplazado por `WorkflowStatus` en `src/1-domain/types/gateway/workflow.types.ts`
- * (fase G1). Retirada planificada en la fase que migre el último consumidor (G4 o P, a confirmar
- * al implementar G4). Fecha de deprecación: 2026-05-29.
- */
-export interface InteractionState {
-  state: 'in-progress';
-  startedAt: string;
-  interactionType: InteractionType;
-  /** Presente cuando la continuation no encontró su turno padre vía tool_use_id (degradación). */
-  continuationOrphan?: boolean;
-  /** Presente sólo en interacciones de subagentes anidadas bajo el step padre. */
-  parentContext?: ParentContext;
-}
 
 /**
  * Opciones para la reconstrucción del cuerpo de respuesta desde bytes SSE.

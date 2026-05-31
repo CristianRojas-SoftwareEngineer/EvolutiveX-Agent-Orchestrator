@@ -118,164 +118,6 @@ describe('AuditWriterService - writeStepRequest', () => {
   });
 });
 
-describe('AuditWriterService - writeInteractionMeta', () => {
-  let tempDir: string;
-  let service: AuditWriterService;
-
-  beforeEach(async () => {
-    tempDir = path.join(os.tmpdir(), `scp-test-turn-${Date.now()}`);
-    await fs.mkdir(tempDir, { recursive: true });
-    service = new AuditWriterService(new RedactService(), new MarkdownRendererService());
-  });
-
-  afterEach(async () => {
-    await fs.rm(tempDir, { recursive: true, force: true });
-  });
-
-  it('debería escribir meta.json con InteractionMetadata', async () => {
-    const interactionDir = path.join(tempDir, 'interactions', '000001_req');
-    await fs.mkdir(interactionDir, { recursive: true });
-
-    await service.writeInteractionMeta(interactionDir, {
-      interactionType: 'agentic',
-      outcome: 'completed',
-      stepCount: 2,
-      startedAt: '2026-01-01T00:00:00.000Z',
-      endedAt: '2026-01-01T00:00:10.000Z',
-      durationMs: 10000,
-      statusCode: 200,
-      sse: true,
-      steps: [
-        { stepIndex: 1, sse: true, statusCode: 200, stopReason: 'tool_use', toolCalls: ['Read'] },
-        { stepIndex: 2, sse: true, statusCode: 200, stopReason: 'end_turn' },
-      ],
-      totals: {
-        cacheCreationInputTokens: 100,
-        cacheReadInputTokens: 200,
-        inputTokens: 10,
-        outputTokens: 50,
-      },
-      sseResponseBodyAttempted: true,
-      sseResponseBodyWritten: true,
-      sseResponseBodyError: null,
-      sseResponseBodySource: 'file',
-      errorMessage: null,
-      errorCode: null,
-      truncation: {
-        requestBodyOmitted: false,
-        responseBodyBytesTotal: null,
-        responseBodyBytesAudited: null,
-        responseTruncatedByProxyBuffer: false,
-        responseTruncatedByAuditLimit: false,
-        sseRawBytesAudited: null,
-        sseRawBytesLimit: null,
-        sseRawTruncatedByLimit: false,
-        sseRawWriteError: false,
-      },
-    });
-
-    const meta = JSON.parse(await fs.readFile(path.join(interactionDir, 'meta.json'), 'utf8'));
-    expect(meta.interactionType).toBe('agentic');
-    expect(meta.outcome).toBe('completed');
-    expect(meta.stepCount).toBe(2);
-    expect(meta.steps).toHaveLength(2);
-    expect(meta.totals.inputTokens).toBe(10);
-  });
-});
-
-describe('AuditWriterService - writeInteractionState / removeInteractionState', () => {
-  let tempDir: string;
-  let service: AuditWriterService;
-
-  beforeEach(async () => {
-    tempDir = path.join(os.tmpdir(), `scp-test-state-${Date.now()}`);
-    await fs.mkdir(tempDir, { recursive: true });
-    service = new AuditWriterService(new RedactService(), new MarkdownRendererService());
-  });
-
-  afterEach(async () => {
-    await fs.rm(tempDir, { recursive: true, force: true });
-  });
-
-  it('debería escribir state.json con el estado in-progress', async () => {
-    const interactionDir = path.join(tempDir, 'interactions', '000001_req');
-    await service.writeInteractionState(interactionDir, {
-      state: 'in-progress',
-      startedAt: '2026-01-01T00:00:00.000Z',
-      interactionType: 'agentic',
-    });
-    const content = JSON.parse(await fs.readFile(path.join(interactionDir, 'state.json'), 'utf8'));
-    expect(content.state).toBe('in-progress');
-    expect(content.interactionType).toBe('agentic');
-    expect(content.startedAt).toBe('2026-01-01T00:00:00.000Z');
-  });
-
-  it('debería eliminar state.json al llamar removeInteractionState', async () => {
-    const interactionDir = path.join(tempDir, 'interactions', '000002_req');
-    await service.writeInteractionState(interactionDir, {
-      state: 'in-progress',
-      startedAt: '2026-01-01T00:00:00.000Z',
-      interactionType: 'side-request',
-    });
-    await service.removeInteractionState(interactionDir);
-    await expect(fs.access(path.join(interactionDir, 'state.json'))).rejects.toThrow();
-  });
-
-  it('removeInteractionState debería ser idempotente (no lanza si no existe)', async () => {
-    const interactionDir = path.join(tempDir, 'interactions', 'nonexistent');
-    await fs.mkdir(interactionDir, { recursive: true });
-    await expect(service.removeInteractionState(interactionDir)).resolves.toBeUndefined();
-  });
-});
-
-describe('AuditWriterService - nextSubInteractionSequence', () => {
-  let tempDir: string;
-  let service: AuditWriterService;
-
-  beforeEach(async () => {
-    tempDir = path.join(os.tmpdir(), `scp-test-subseq-${Date.now()}`);
-    await fs.mkdir(tempDir, { recursive: true });
-    service = new AuditWriterService(new RedactService(), new MarkdownRendererService());
-  });
-
-  afterEach(async () => {
-    await fs.rm(tempDir, { recursive: true, force: true });
-  });
-
-  it('retorna 1 cuando no existen sub-interacciones previas', async () => {
-    const seq = await service.nextSubInteractionSequence(tempDir, 1);
-    expect(seq).toBe(1);
-  });
-
-  it('retorna max+1 con sub-agentes de 2 dígitos existentes', async () => {
-    const stepDir = path.join(tempDir, 'steps', '01');
-    await fs.mkdir(path.join(stepDir, 'sub-agent-01'), { recursive: true });
-    await fs.mkdir(path.join(stepDir, 'sub-agent-03'), { recursive: true });
-
-    const seq = await service.nextSubInteractionSequence(tempDir, 1);
-    expect(seq).toBe(4);
-  });
-
-  it('ignora nombres de directorio malformados (sin prefijo sub-agent-NN)', async () => {
-    const stepDir = path.join(tempDir, 'steps', '01');
-    await fs.mkdir(path.join(stepDir, 'abc_invalid'), { recursive: true });
-    await fs.mkdir(path.join(stepDir, 'sub-agent'), { recursive: true });
-    await fs.mkdir(path.join(stepDir, 'sub-agent-02'), { recursive: true });
-
-    const seq = await service.nextSubInteractionSequence(tempDir, 1);
-    expect(seq).toBe(3);
-  });
-
-  it('ignora archivos (no directorios) en sub-interactions', async () => {
-    const subDir = path.join(tempDir, 'steps', '001', 'sub-interactions');
-    await fs.mkdir(subDir, { recursive: true });
-    await fs.writeFile(path.join(subDir, '000005_not-a-dir'), 'file content');
-
-    const seq = await service.nextSubInteractionSequence(tempDir, 1);
-    expect(seq).toBe(1);
-  });
-});
-
 describe('AuditWriterService - writeFormattedAndMarkdown semántico', () => {
   let tempDir: string;
   let service: AuditWriterService;
@@ -371,5 +213,80 @@ describe('AuditWriterService - extractFinalTextFromJson', () => {
     expect(service.extractFinalTextFromJson(null)).toBeNull();
     expect(service.extractFinalTextFromJson('texto')).toBeNull();
     expect(service.extractFinalTextFromJson([])).toBeNull();
+  });
+});
+
+describe('AuditWriterService - writeCoalescedAgentStepResponse (subagentes causal)', () => {
+  let tempDir: string;
+  let service: AuditWriterService;
+
+  beforeEach(async () => {
+    tempDir = path.join(os.tmpdir(), `scp-test-coalesced-${Date.now()}`);
+    await fs.mkdir(tempDir, { recursive: true });
+    service = new AuditWriterService(new RedactService(), new MarkdownRendererService());
+  });
+
+  afterEach(async () => {
+    await fs.rm(tempDir, { recursive: true, force: true });
+  });
+
+  it('incluye subagents desde tools/*/sub-agent/workflow cuando no se pasa subagentsSummary', async () => {
+    const stepDir = path.join(tempDir, 'workflows', '01', 'steps', '01');
+    const subWorkflowDir = path.join(stepDir, 'tools', '01-Agent', 'sub-agent', 'workflow');
+    await fs.mkdir(path.join(subWorkflowDir, 'output'), { recursive: true });
+    await fs.writeFile(
+      path.join(subWorkflowDir, 'meta.json'),
+      JSON.stringify({
+        workflowKind: 'subagent',
+        parentToolUseId: 'toolu_agent_1',
+        outcome: 'success',
+        startedAt: '2026-01-01T00:00:00.000Z',
+        completedAt: '2026-01-01T00:00:05.000Z',
+      }),
+      'utf8',
+    );
+    await fs.writeFile(
+      path.join(subWorkflowDir, 'output', 'result.json'),
+      JSON.stringify({
+        outcome: 'success',
+        stepCount: 1,
+        finalText: 'Resultado del subagente causal',
+        closedByEvent: 'SubagentStop',
+        sessionId: 'sess-1',
+      }),
+      'utf8',
+    );
+
+    const initialMessage = {
+      content: [
+        {
+          type: 'tool_use',
+          id: 'toolu_agent_1',
+          name: 'Agent',
+          input: {
+            description: 'Explorar repo',
+            prompt: 'Lista archivos',
+            subagent_type: 'Explore',
+          },
+        },
+      ],
+    };
+
+    await service.writeCoalescedAgentStepResponse({
+      stepDir,
+      initialMessage,
+      continuationRequest: null,
+      finalMessage: { content: [{ type: 'text', text: 'Listo' }] },
+      toolUseIds: ['toolu_agent_1'],
+    });
+
+    const body = JSON.parse(
+      await fs.readFile(path.join(stepDir, 'response', 'body.json'), 'utf8'),
+    );
+    expect(body.subagents).toBeDefined();
+    expect(body.subagents.count).toBe(1);
+    expect(body.subagents.items[0].toolUseId).toBe('toolu_agent_1');
+    expect(body.subagents.items[0].outcome).toBe('completed');
+    expect(body.subagents.items[0].finalResponsePreview).toContain('Resultado del subagente');
   });
 });

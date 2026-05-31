@@ -4,9 +4,9 @@ import * as fsSync from 'node:fs';
 import { RedactService } from '../1-domain/services/redact.service.js';
 import { MarkdownRendererService } from '../1-domain/services/markdown-renderer.service.js';
 import {
-  InteractionState,
   InteractionMetadata,
   MarkdownRenderContext,
+  ParentContext,
   SseLine,
   SubagentSummary,
   SubagentsSummary,
@@ -15,15 +15,12 @@ import {
 import { JsonValue } from '../1-domain/types/json.types.js';
 import type { ISseAuditWriter } from './ports/sse-audit-writer.port.js';
 import {
-  DIR_INPUT,
   DIR_OUTPUT,
   DIR_STEPS,
   DIR_STEP_REQUEST,
   DIR_STEP_RESPONSE,
   DIR_STEP_THOUGHT,
-  PREFIX_SUB_AGENT,
   PAD_STEP,
-  PAD_SUB_AGENT,
 } from '../1-domain/constants/audit-paths.js';
 
 /**
@@ -71,127 +68,6 @@ export class AuditWriterService implements ISseAuditWriter {
   }
 
   /**
-   * Inicializa el directorio de auditoría de la interacción y guarda los archivos del request top-level.
-   * Con skipTopLevelRequest=true solo crea el directorio base (para preflights).
-   */
-  public async writeInteractionRequest(params: {
-    interactionDir: string;
-    headers: Record<string, string | string[] | undefined>;
-    bodyBuffer: Buffer | null;
-    maxAuditRequestBytes: number;
-    skipTopLevelRequest?: boolean;
-    context?: MarkdownRenderContext;
-  }): Promise<{ requestBodyOmitted: boolean }> {
-    if (params.skipTopLevelRequest) {
-      await fs.mkdir(params.interactionDir, { recursive: true });
-      return { requestBodyOmitted: false };
-    }
-
-    const requestBodyOmitted = await this.writeRequestPayload(
-      params.interactionDir,
-      params.headers,
-      params.bodyBuffer,
-      params.maxAuditRequestBytes,
-      params.context,
-    );
-    return { requestBodyOmitted };
-  }
-
-  public async writeSubInteractionRequest(params: {
-    parentInteractionDir: string;
-    parentStepIndex: number;
-    folderName: string;
-    headers: Record<string, string | string[] | undefined>;
-    bodyBuffer: Buffer | null;
-    maxAuditRequestBytes: number;
-    context?: MarkdownRenderContext;
-  }): Promise<{ dir: string; requestBodyOmitted: boolean }> {
-    const dir = path.join(
-      params.parentInteractionDir,
-      DIR_STEPS,
-      String(params.parentStepIndex).padStart(PAD_STEP, '0'),
-      params.folderName,
-    );
-    const requestBodyOmitted = await this.writeRequestPayload(
-      dir,
-      params.headers,
-      params.bodyBuffer,
-      params.maxAuditRequestBytes,
-      params.context,
-    );
-    return { dir, requestBodyOmitted };
-  }
-
-  public async nextSubInteractionSequence(
-    parentInteractionDir: string,
-    parentStepIndex: number,
-  ): Promise<number> {
-    const stepDir = path.join(
-      parentInteractionDir,
-      DIR_STEPS,
-      String(parentStepIndex).padStart(PAD_STEP, '0'),
-    );
-    let max = 0;
-    try {
-      const entries = await fs.readdir(stepDir, { withFileTypes: true });
-      for (const e of entries) {
-        if (!e.isDirectory()) continue;
-        const m = new RegExp(`^${PREFIX_SUB_AGENT}-(\\d{${PAD_SUB_AGENT}})$`).exec(e.name);
-        if (m) {
-          const n = parseInt(m[1], 10);
-          if (!Number.isNaN(n)) max = Math.max(max, n);
-        }
-      }
-    } catch {
-      /* directorio inexistente: secuencia arranca en 1 */
-    }
-    return max + 1;
-  }
-
-  /**
-   * Helper interno: escribe `request/headers.json`, `request/body.bin` y los
-   * derivados markdown si el body cabe en el límite. Devuelve si el body fue
-   * omitido por exceder el tamaño máximo.
-   */
-  private async writeRequestPayload(
-    interactionDir: string,
-    headers: Record<string, string | string[] | undefined>,
-    bodyBuffer: Buffer | null,
-    maxAuditRequestBytes: number,
-    context?: MarkdownRenderContext,
-  ): Promise<boolean> {
-    const requestDir = path.join(interactionDir, DIR_INPUT);
-    await fs.mkdir(requestDir, { recursive: true });
-    await this.writeJsonAtomic(
-      path.join(requestDir, 'headers.json'),
-      headers as unknown as JsonValue,
-    );
-
-    const size = Buffer.isBuffer(bodyBuffer) ? bodyBuffer.length : 0;
-    if (size === 0 || !bodyBuffer) {
-      return false;
-    }
-
-    if (size <= maxAuditRequestBytes) {
-      await this.writeFileAtomic(path.join(requestDir, 'body.bin'), bodyBuffer);
-      const parsed = this.redactService.tryParseJson(bodyBuffer);
-      if (parsed !== null) {
-        await this.writeFormattedAndMarkdown(requestDir, 'body', parsed, 'request', context);
-      }
-      return false;
-    }
-
-    await this.writeFileAtomic(
-      path.join(requestDir, 'body.omitted.txt'),
-      Buffer.from(
-        `Omitted: request body is ${size} bytes (limit MAX_AUDIT_BYTES=${maxAuditRequestBytes}).`,
-        'utf8',
-      ),
-    );
-    return true;
-  }
-
-  /**
    * Escribe el body del request en el directorio de un step específico.
    */
   public async writeStepRequest(params: {
@@ -229,124 +105,6 @@ export class AuditWriterService implements ISseAuditWriter {
     );
   }
 
-  public async finalizeNonSseResponseAudit(params: {
-    interactionDir: string;
-    bodyBuffer: Buffer;
-    totalBytes: number;
-    maxAuditResponseBytes: number;
-    maxBufferBytes: number;
-    contentType: string;
-  }): Promise<{
-    responseBodyBytesAudited: number;
-    responseTruncatedByProxyBuffer: boolean;
-    responseTruncatedByAuditLimit: boolean;
-  }> {
-    const responseDir = path.join(params.interactionDir, DIR_STEP_RESPONSE);
-    await fs.mkdir(responseDir, { recursive: true });
-
-    const slice = params.bodyBuffer.subarray(0, params.maxAuditResponseBytes);
-    const lostInProxyBuffer = params.totalBytes > params.bodyBuffer.length;
-    const truncatedAudit =
-      params.totalBytes > params.maxAuditResponseBytes || slice.length < params.totalBytes;
-    const ext = String(params.contentType || '').includes('json') ? 'json' : 'bin';
-
-    if (slice.length > 0) {
-      await this.writeFileAtomic(path.join(responseDir, `body.${ext}`), slice);
-      if (ext === 'json') {
-        const parsed = this.redactService.tryParseJson(slice);
-        if (parsed !== null) {
-          await this.writeFormattedAndMarkdown(responseDir, 'body', parsed, 'response');
-        }
-      }
-    }
-
-    if (truncatedAudit || lostInProxyBuffer) {
-      await this.writeFileAtomic(
-        path.join(responseDir, 'body.omitted.txt'),
-        Buffer.from(
-          [
-            `Total bytes received from upstream: ${params.totalBytes}.`,
-            `Bytes available in proxy buffer: ${params.bodyBuffer.length}.`,
-            lostInProxyBuffer
-              ? `Proxy buffer cap MAX_RESPONSE_BUFFER_BYTES=${params.maxBufferBytes}.`
-              : '',
-            truncatedAudit
-              ? `Audit stored up to MAX_AUDIT_BYTES=${params.maxAuditResponseBytes}.`
-              : '',
-          ]
-            .filter(Boolean)
-            .join(' '),
-          'utf8',
-        ),
-      );
-    }
-
-    return {
-      responseBodyBytesAudited: slice.length,
-      responseTruncatedByProxyBuffer: lostInProxyBuffer,
-      responseTruncatedByAuditLimit: !lostInProxyBuffer && slice.length < params.totalBytes,
-    };
-  }
-
-  public async finalizeNonSseResponseAuditOnStreamError(params: {
-    interactionDir: string;
-    bodyBuffer: Buffer;
-    totalBytes: number;
-    maxAuditResponseBytes: number;
-    maxBufferBytes: number;
-    contentType: string;
-    streamErrorMessage: string;
-  }): Promise<{
-    responseBodyBytesAudited: number;
-    responseTruncatedByProxyBuffer: boolean;
-    responseTruncatedByAuditLimit: boolean;
-  }> {
-    const responseDir = path.join(params.interactionDir, DIR_STEP_RESPONSE);
-    await fs.mkdir(responseDir, { recursive: true });
-
-    const slice = params.bodyBuffer.subarray(0, params.maxAuditResponseBytes);
-    const lostInProxyBuffer = params.totalBytes > params.bodyBuffer.length;
-    const truncatedAudit =
-      params.totalBytes > params.maxAuditResponseBytes || slice.length < params.totalBytes;
-    const ext = String(params.contentType || '').includes('json') ? 'json' : 'bin';
-
-    if (slice.length > 0) {
-      await this.writeFileAtomic(path.join(responseDir, `body.${ext}`), slice);
-      if (ext === 'json') {
-        const parsed = this.redactService.tryParseJson(slice);
-        if (parsed !== null) {
-          await this.writeFormattedAndMarkdown(responseDir, 'body', parsed, 'response');
-        }
-      }
-    }
-
-    await this.writeFileAtomic(
-      path.join(responseDir, 'body.omitted.txt'),
-      Buffer.from(
-        [
-          `Stream error: ${params.streamErrorMessage}`,
-          `Total bytes received from upstream before error: ${params.totalBytes}.`,
-          `Bytes available in proxy buffer: ${params.bodyBuffer.length}.`,
-          lostInProxyBuffer
-            ? `Proxy buffer cap MAX_RESPONSE_BUFFER_BYTES=${params.maxBufferBytes}.`
-            : '',
-          truncatedAudit
-            ? `Audit stored up to MAX_AUDIT_BYTES=${params.maxAuditResponseBytes}.`
-            : '',
-        ]
-          .filter(Boolean)
-          .join(' '),
-        'utf8',
-      ),
-    );
-
-    return {
-      responseBodyBytesAudited: slice.length,
-      responseTruncatedByProxyBuffer: lostInProxyBuffer,
-      responseTruncatedByAuditLimit: !lostInProxyBuffer && slice.length < params.totalBytes,
-    };
-  }
-
   public async writeTopLevelResponseHeaders(
     interactionDir: string,
     headers: Record<string, string | string[] | undefined>,
@@ -382,16 +140,6 @@ export class AuditWriterService implements ISseAuditWriter {
     );
   }
 
-  public async writeInteractionMeta(
-    interactionDir: string,
-    meta: InteractionMetadata,
-  ): Promise<void> {
-    await this.writeJsonAtomic(
-      path.join(interactionDir, 'meta.json'),
-      meta as unknown as JsonValue,
-    );
-  }
-
   public appendSseLine(stepDir: string, lineObj: SseLine): void {
     const p = stepDir.endsWith('.jsonl')
       ? stepDir
@@ -415,29 +163,6 @@ export class AuditWriterService implements ISseAuditWriter {
     const p = stepDir.endsWith('.txt') ? stepDir : path.join(stepDir, DIR_STEP_RESPONSE, 'sse.txt');
     fsSync.mkdirSync(path.dirname(p), { recursive: true });
     fsSync.appendFileSync(p, chunk);
-  }
-
-  public async writeInteractionState(
-    interactionDir: string,
-    state: InteractionState,
-  ): Promise<void> {
-    await fs.mkdir(interactionDir, { recursive: true });
-    await this.writeJsonAtomic(
-      path.join(interactionDir, 'state.json'),
-      state as unknown as JsonValue,
-    );
-  }
-
-  public async removeInteractionState(interactionDir: string): Promise<void> {
-    const p = path.join(interactionDir, 'state.json');
-    try {
-      await fs.unlink(p);
-    } catch (err: unknown) {
-      const code = (err as NodeJS.ErrnoException)?.code;
-      if (code !== 'ENOENT') {
-        throw err;
-      }
-    }
   }
 
   /**
@@ -505,9 +230,8 @@ export class AuditWriterService implements ISseAuditWriter {
   }
 
   /**
-   * Extrae resúmenes de subagentes desde los directorios sub-agent-NN bajo el step padre.
-   * Usa `parentContext.correlationStatus` para determinar si la correlación está resuelta.
-   * Si `correlationStatus` es 'unresolved', no infiere por orden y deja toolUseId null.
+   * Extrae resúmenes de subagentes bajo stepDir/tools/…/sub-agent/workflow/ (layout causal).
+   * Prefiere parentToolUseId / parentContext del meta sobre correlación FIFO por orden.
    */
   private async extractSubagentsSummary(
     stepDir: string,
@@ -515,17 +239,32 @@ export class AuditWriterService implements ISseAuditWriter {
     _toolUseIds: string[],
   ): Promise<SubagentsSummary | null> {
     try {
-      // Listar directorios sub-agent-NN directamente desde stepDir
-      const entries = await fs.readdir(stepDir, { withFileTypes: true });
-      const subAgentDirs = entries
-        .filter((e) => e.isDirectory() && e.name.startsWith(PREFIX_SUB_AGENT))
-        .sort((a, b) => a.name.localeCompare(b.name));
-
-      if (subAgentDirs.length === 0) {
+      const toolsDir = path.join(stepDir, 'tools');
+      let toolDirNames: string[] = [];
+      try {
+        const entries = await fs.readdir(toolsDir, { withFileTypes: true });
+        toolDirNames = entries.filter((e) => e.isDirectory()).map((e) => e.name).sort();
+      } catch {
         return null;
       }
 
-      // Extraer tool_use Agent del mensaje de delegación
+      const subWorkflows: Array<{ toolDirName: string; workflowDir: string }> = [];
+      for (const toolDirName of toolDirNames) {
+        const workflowDir = path.join(toolsDir, toolDirName, 'sub-agent', 'workflow');
+        try {
+          const st = await fs.stat(workflowDir);
+          if (st.isDirectory()) {
+            subWorkflows.push({ toolDirName, workflowDir });
+          }
+        } catch {
+          /* sin sub-workflow en este tool */
+        }
+      }
+
+      if (subWorkflows.length === 0) {
+        return null;
+      }
+
       const agentToolUses: Array<{
         id: string;
         description: string;
@@ -564,92 +303,90 @@ export class AuditWriterService implements ISseAuditWriter {
       let totalInputTokens = 0;
       let totalOutputTokens = 0;
 
-      for (let i = 0; i < subAgentDirs.length; i++) {
-        const dirName = subAgentDirs[i].name;
-        const subAgentDir = path.join(stepDir, dirName);
-        const metaPath = path.join(subAgentDir, 'meta.json');
-        const outputPath = path.join(dirName, 'output', 'body.parsed.md');
+      for (let i = 0; i < subWorkflows.length; i++) {
+        const { toolDirName, workflowDir } = subWorkflows[i];
+        const dirName = path.join('tools', toolDirName, 'sub-agent', 'workflow');
+        const metaPath = path.join(workflowDir, 'meta.json');
+        const resultPath = path.join(workflowDir, 'output', 'result.json');
+        const outputPath = path.join(dirName, 'output', 'result.json');
 
-        // Leer meta.json del subagente
-        let meta: InteractionMetadata | null = null;
+        let meta: Record<string, unknown> | null = null;
         try {
           const raw = await fs.readFile(metaPath, 'utf8');
-          meta = JSON.parse(raw) as InteractionMetadata;
+          meta = JSON.parse(raw) as Record<string, unknown>;
         } catch {
-          // Si falla la lectura, marcar como unknown
+          /* meta ausente */
         }
 
-        // Determinar outcome
-        let outcome: SubagentSummary['outcome'] = 'unknown';
-        if (meta) {
-          if (meta.outcome === 'completed') outcome = 'completed';
-          else if (
-            meta.outcome === 'client-error' ||
-            meta.outcome === 'upstream-error' ||
-            meta.outcome === 'truncated'
-          )
-            outcome = 'client-error';
-          else if (meta.outcome === 'orphaned') outcome = 'orphaned';
+        let result: Record<string, unknown> | null = null;
+        try {
+          const raw = await fs.readFile(resultPath, 'utf8');
+          result = JSON.parse(raw) as Record<string, unknown>;
+        } catch {
+          /* result ausente */
         }
 
-        // Correlacionar con tool_use Agent usando correlationStatus
+        const legacyMeta = meta as InteractionMetadata | null;
+        const parentCtx = (meta?.parentContext ?? legacyMeta?.parentContext) as
+          | ParentContext
+          | undefined;
+
+        const outcome = this.mapSubagentOutcome(meta, result);
+
         let toolUseId: string | null = null;
         let inferredByOrder = false;
-        if (meta?.parentContext?.triggeringToolUseId) {
-          toolUseId = meta.parentContext.triggeringToolUseId;
-          // No marcar inferredByOrder cuando correlationStatus es 'resolved'
-          inferredByOrder = false;
-        } else if (meta?.parentContext?.correlationStatus === 'unresolved') {
-          // No inferir por orden cuando la correlación está explícitamente no resuelta
+        const parentToolUseId =
+          typeof meta?.parentToolUseId === 'string' ? meta.parentToolUseId : null;
+        if (parentToolUseId) {
+          toolUseId = parentToolUseId;
+        } else if (parentCtx?.triggeringToolUseId) {
+          toolUseId = parentCtx.triggeringToolUseId;
+        } else if (parentCtx?.correlationStatus === 'unresolved') {
           toolUseId = null;
-          inferredByOrder = false;
         } else if (i < agentToolUses.length) {
-          // Correlación por orden solo para legacy sin correlationStatus
           toolUseId = agentToolUses[i].id;
           inferredByOrder = true;
         }
 
-        // Obtener datos del tool_use Agent
         const agentToolUse = toolUseId
           ? agentToolUses.find((t) => t.id === toolUseId) ||
             (i < agentToolUses.length ? agentToolUses[i] : null)
           : null;
 
-        // Extraer métricas
-        const durationMs = meta?.durationMs || 0;
-        const stepCount = meta?.stepCount || 0;
-        const toolCalls = meta?.steps?.flatMap((s) => s.toolCalls || []) || [];
-        const inputTokens = meta?.totals?.inputTokens || 0;
-        const outputTokens = meta?.totals?.outputTokens || 0;
-        const finalStopReason = meta?.steps?.[meta.steps.length - 1]?.stopReason || null;
+        const durationMs = this.durationMsFromMeta(meta);
+        const stepCount =
+          typeof result?.stepCount === 'number'
+            ? result.stepCount
+            : legacyMeta?.stepCount || 0;
+        const toolCalls = legacyMeta?.steps?.flatMap((s) => s.toolCalls || []) || [];
+        const usage = (result?.usage ?? {}) as Record<string, number | undefined>;
+        const inputTokens = usage.input_tokens ?? legacyMeta?.totals?.inputTokens ?? 0;
+        const outputTokens = usage.output_tokens ?? legacyMeta?.totals?.outputTokens ?? 0;
+        const finalStopReason = legacyMeta?.steps?.[legacyMeta.steps.length - 1]?.stopReason ?? null;
 
-        // Extraer preview de respuesta final desde JSON semántico
         let finalResponsePreview: string | null = null;
-        if (meta?.outcome === 'completed') {
-          try {
-            const outputJsonPath = path.join(subAgentDir, 'output', 'body.json');
-            const outputRaw = await fs.readFile(outputJsonPath, 'utf8');
-            const outputParsed = JSON.parse(outputRaw) as JsonValue;
-            const finalText = this.extractFinalTextFromJson(outputParsed);
-            if (finalText) {
-              // Tomar primeras 200 caracteres del texto final real
-              finalResponsePreview = finalText.slice(0, 200).trim();
-              if (finalText.length > 200) finalResponsePreview += '...';
-            }
-          } catch {
-            // Fallback a body.parsed.md si JSON no está disponible
+        if (outcome === 'completed') {
+          const finalText =
+            typeof result?.finalText === 'string'
+              ? result.finalText
+              : result
+                ? this.extractFinalTextFromJson(result as JsonValue)
+                : null;
+          if (finalText) {
+            finalResponsePreview = finalText.slice(0, 200).trim();
+            if (finalText.length > 200) finalResponsePreview += '...';
+          } else {
             try {
-              const outputParsedPath = path.join(subAgentDir, 'output', 'body.parsed.md');
-              const outputRaw = await fs.readFile(outputParsedPath, 'utf8');
-              finalResponsePreview = outputRaw.slice(0, 200).trim();
-              if (outputRaw.length > 200) finalResponsePreview += '...';
+              const mdPath = path.join(workflowDir, 'output', 'result.parsed.md');
+              const mdRaw = await fs.readFile(mdPath, 'utf8');
+              finalResponsePreview = mdRaw.slice(0, 200).trim();
+              if (mdRaw.length > 200) finalResponsePreview += '...';
             } catch {
               finalResponsePreview = null;
             }
           }
         }
 
-        // Acumular totales
         if (outcome === 'completed') completedCount++;
         else if (outcome === 'client-error') failedCount++;
         else if (outcome === 'orphaned') orphanedCount++;
@@ -688,9 +425,38 @@ export class AuditWriterService implements ISseAuditWriter {
         totalOutputTokens,
       };
     } catch {
-      // Best-effort: si falla la extracción, retornar null en vez de romper la reconstrucción
       return null;
     }
+  }
+
+  private mapSubagentOutcome(
+    meta: Record<string, unknown> | null,
+    result: Record<string, unknown> | null,
+  ): SubagentSummary['outcome'] {
+    const raw = String(meta?.outcome ?? result?.outcome ?? meta?.status ?? '');
+    if (raw === 'completed' || raw === 'success') return 'completed';
+    if (raw === 'orphaned') return 'orphaned';
+    if (
+      raw === 'client-error' ||
+      raw === 'upstream-error' ||
+      raw === 'truncated' ||
+      raw === 'api_error' ||
+      raw === 'failed'
+    ) {
+      return 'client-error';
+    }
+    return 'unknown';
+  }
+
+  private durationMsFromMeta(meta: Record<string, unknown> | null): number {
+    if (!meta) return 0;
+    if (typeof meta.durationMs === 'number') return meta.durationMs;
+    const started = typeof meta.startedAt === 'string' ? Date.parse(meta.startedAt) : NaN;
+    const ended = typeof meta.completedAt === 'string' ? Date.parse(meta.completedAt) : NaN;
+    if (!Number.isNaN(started) && !Number.isNaN(ended) && ended >= started) {
+      return ended - started;
+    }
+    return 0;
   }
 
   public async writeCoalescedAgentStepResponse(params: {

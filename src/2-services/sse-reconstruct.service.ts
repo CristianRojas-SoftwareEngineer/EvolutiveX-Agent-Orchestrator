@@ -1,13 +1,15 @@
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
-import type { ISseAuditWriter } from './ports/sse-audit-writer.port.js';
 import {
   SseReconstructOptions,
   SseReconstructResult,
   SsePhase,
+  MarkdownRenderContext,
 } from '../1-domain/types/audit.types.js';
+import type { JsonValue } from '../1-domain/types/json.types.js';
 import type Anthropic from '@anthropic-ai/sdk';
 import type { ISseReconstructor } from './ports/sse-reconstructor.port.js';
+import type { MarkdownRendererService } from '../1-domain/services/markdown-renderer.service.js';
 
 const REPLAY_BASE_URL = 'https://api.anthropic.com';
 
@@ -23,24 +25,79 @@ const REPLAY_BASE_URL = 'https://api.anthropic.com';
 const REPLAY_MODEL = 'claude-sse-replay';
 
 /**
- * Servicio para reconstruir el mensaje final de respuesta a partir del volcado
- * SSE grabado en disco. Lee `sse.jsonl` (orden determinista, escritura
- * síncrona) desde `stepDir/response/` y escribe el resultado en
- * `interactionDir/response/body.*`.
+ * Servicio para reconstruir mensajes Anthropic desde chunks SSE persistidos.
+ * Lee `stepDir/response/streaming/*.ndjson` como fuente canónica (P2+).
  */
 export class SseReconstructService implements ISseReconstructor {
-  constructor(private auditWriterService: ISseAuditWriter) {}
+  constructor(private readonly markdownRenderer?: MarkdownRendererService) {}
 
   /**
-   * Reconstruye un mensaje Anthropic desde el sse.jsonl de un step individual.
-   * Usa el SDK oficial para parsear eventos SSE y ensamblar el mensaje.
+   * Reconstruye un mensaje Anthropic desde los chunks streaming/ de un step.
+   * Lee `stepDir/response/streaming/*.ndjson` ordenados por nombre como fuente
+   * canónica. Mantiene compatibilidad de firma con la interfaz `ISseReconstructor`.
    */
   public async reconstructStepMessage(
     stepDir: string,
   ): Promise<Anthropic.Message | Anthropic.Beta.Messages.BetaMessage> {
-    const jsonlPath = path.join(stepDir, 'response', 'sse.jsonl');
-    const headersPath = path.join(stepDir, 'response', 'headers.json');
-    return this.reconstructSseJsonlFile(jsonlPath, headersPath);
+    const responseDir = path.join(stepDir, 'response');
+    const headersPath = path.join(responseDir, 'headers.json');
+    const jsonlBuffer = await this.readChunksAsJsonl(responseDir);
+    if (!jsonlBuffer.length) {
+      throw new Error('streaming/ vacío o no encontrado en ' + responseDir);
+    }
+    this.validateCompleteSseJsonl(jsonlBuffer);
+    const sseBuffer = this.reassembleSseBytesFromJsonl(jsonlBuffer);
+    if (!sseBuffer.length) {
+      throw new Error('no SSE bytes to reconstruct');
+    }
+    let useBeta = false;
+    try {
+      const headersRaw = await fs.readFile(headersPath, 'utf8');
+      const headers = JSON.parse(headersRaw) as Record<string, unknown>;
+      useBeta = headers['anthropic-beta'] !== undefined;
+    } catch { /* default false */ }
+    return this.reconstructMessageFromSseBytes(sseBuffer, useBeta);
+  }
+
+  /**
+   * Reconstruye un mensaje Anthropic filtrando por fase desde los chunks
+   * streaming/ de un step. Fuente: `stepDir/response/streaming/*.ndjson`.
+   */
+  public async reconstructStepPhaseMessage(
+    stepDir: string,
+    phase: SsePhase,
+  ): Promise<Anthropic.Message> {
+    const responseDir = path.join(stepDir, 'response');
+    const jsonlBuffer = await this.readChunksAsJsonl(responseDir);
+    if (!jsonlBuffer.length) {
+      throw new Error('streaming/ vacío o no encontrado en ' + responseDir);
+    }
+    return this.reconstructMessageFromSseJsonlPhase(jsonlBuffer, phase);
+  }
+
+  /** Lee todos los archivos `streaming/*.ndjson` ordenados y los concatena en un buffer JSONL. */
+  private async readChunksAsJsonl(responseDir: string): Promise<Buffer> {
+    const streamingDir = path.join(responseDir, 'streaming');
+    let fileNames: string[];
+    try {
+      const entries = await fs.readdir(streamingDir, { withFileTypes: true });
+      fileNames = entries
+        .filter((e) => e.isFile() && e.name.endsWith('.ndjson'))
+        .map((e) => e.name)
+        .sort();
+    } catch {
+      return Buffer.alloc(0);
+    }
+    const lines: string[] = [];
+    for (const name of fileNames) {
+      try {
+        const content = await fs.readFile(path.join(streamingDir, name), 'utf8');
+        const trimmed = content.trim();
+        if (trimmed) lines.push(trimmed);
+      } catch { /* ignorar archivo ilegible */ }
+    }
+    if (lines.length === 0) return Buffer.alloc(0);
+    return Buffer.from(`${lines.join('\n')}\n`, 'utf8');
   }
 
   public async reconstructSseJsonlFile(
@@ -51,11 +108,11 @@ export class SseReconstructService implements ISseReconstructor {
     try {
       jsonlBuffer = await fs.readFile(jsonlPath);
     } catch {
-      throw new Error('response/sse.jsonl missing or unreadable');
+      throw new Error('JSONL source missing or unreadable');
     }
 
     if (!jsonlBuffer.length) {
-      throw new Error('sse.jsonl empty');
+      throw new Error('JSONL source empty');
     }
 
     // Validar que el archivo contenga exactamente un mensaje completo
@@ -95,45 +152,24 @@ export class SseReconstructService implements ISseReconstructor {
     try {
       jsonlBuffer = await fs.readFile(jsonlPath);
     } catch {
-      throw new Error('response/sse.jsonl missing or unreadable');
+      throw new Error('JSONL source missing or unreadable');
     }
 
     if (!jsonlBuffer.length) {
-      throw new Error('sse.jsonl empty');
+      throw new Error('JSONL source empty');
     }
 
     return this.reconstructMessageFromSseJsonlPhase(jsonlBuffer, phase);
   }
 
   /**
-   * Ejecuta la reconstrucción del cuerpo de respuesta a partir del volcado SSE
-   * en disco.
-   *
-   * Lee desde `stepDir/response/sse.jsonl` — fuente de verdad ordenada, escrita
-   * síncronamente por `AuditWriterService.appendSseLine`. NO se usa `sse.txt`
-   * porque su captura es asíncrona y bajo ráfagas puede quedar con eventos
-   * desordenados (ver `docs/how-sse-reconstruction-works.md`).
-   *
-   * Los flags `sseRawBytesWritten`/`sseRawTruncatedByLimit`/`sseRawWriteError`
-   * de `opts` describen el estado de `sse.txt` (raw dump) y son puramente
-   * informativos: no abortan la reconstrucción.
+   * Agrega los body.json de cada step y escribe la vista multi-step-response en
+   * `interactionDir/output/body.json` y `.parsed.md`.
    */
   public async runReconstruction(opts: SseReconstructOptions): Promise<SseReconstructResult> {
-    const { stepDir, interactionDir, stepCount, originalUrl, headers } = opts;
-
-    const useBeta = this.computeUseBeta(originalUrl, headers);
-
-    // Escribir headers.json en el step para uso futuro de reconstructStepMessage
-    const headersPath = path.join(stepDir, 'response', 'headers.json');
-    await fs.mkdir(path.dirname(headersPath), { recursive: true });
-    await fs.writeFile(
-      headersPath,
-      JSON.stringify({ 'anthropic-beta': useBeta ? 'true' : undefined }),
-      'utf8',
-    );
-
+    const { interactionDir, stepCount } = opts;
     try {
-      const result = await this.auditWriterService.writeTopLevelMultiStepResponse(
+      const result = await this.writeTopLevelMultiStepResponse(
         interactionDir,
         stepCount,
         opts.context,
@@ -154,8 +190,68 @@ export class SseReconstructService implements ISseReconstructor {
     }
   }
 
+  /** Lee los body.json de cada step (1-based) y escribe la vista top-level. */
+  private async writeTopLevelMultiStepResponse(
+    interactionDir: string,
+    stepCount: number,
+    context?: MarkdownRenderContext,
+  ): Promise<{ written: boolean; error?: string }> {
+    const steps: Array<{ stepIndex: number; parsed: JsonValue }> = [];
+
+    for (let i = 1; i <= stepCount; i++) {
+      const stepBodyPath = path.join(
+        interactionDir,
+        'steps',
+        String(i).padStart(2, '0'),
+        'response',
+        'body.json',
+      );
+      try {
+        const raw = await fs.readFile(stepBodyPath, 'utf8');
+        steps.push({ stepIndex: i, parsed: JSON.parse(raw) as JsonValue });
+      } catch {
+        // step body ausente — best-effort
+      }
+    }
+
+    if (steps.length === 0) {
+      return { written: false, error: 'no step bodies found' };
+    }
+
+    const outputDir = path.join(interactionDir, 'output');
+    await fs.mkdir(outputDir, { recursive: true });
+
+    const multiStepObj: JsonValue = {
+      type: 'multi-step-response',
+      stepCount,
+      steps: steps.map((s) => ({
+        stepIndex: s.stepIndex,
+        ...(s.parsed as Record<string, JsonValue>),
+      })),
+    };
+
+    const bodyPath = path.join(outputDir, 'body.json');
+    const tmp = `${bodyPath}.${process.pid}.${Date.now()}.tmp`;
+    await fs.writeFile(tmp, JSON.stringify(multiStepObj, null, 2), 'utf8');
+    await fs.rename(tmp, bodyPath);
+
+    if (this.markdownRenderer) {
+      try {
+        const md = this.markdownRenderer.renderMultiStepResponseMarkdown(steps, context);
+        const mdPath = path.join(outputDir, 'body.parsed.md');
+        const mdTmp = `${mdPath}.${process.pid}.${Date.now()}.tmp`;
+        await fs.writeFile(mdTmp, `${md}\n`, 'utf8');
+        await fs.rename(mdTmp, mdPath);
+      } catch {
+        /* ignorar error de markdown */
+      }
+    }
+
+    return { written: true };
+  }
+
   /**
-   * Valida que el archivo sse.jsonl contenga exactamente un mensaje completo
+   * Valida que el buffer JSONL contenga exactamente un mensaje completo
    * (un message_start y un message_stop). Lanza error si detecta múltiples
    * mensajes o un stream incompleto. Esta validación previene que el SDK de
    * Anthropic reciba streams multi-mensaje concatenados por colisiones de
@@ -192,21 +288,21 @@ export class SseReconstructService implements ISseReconstructor {
     }
 
     if (messageStartCount > 1) {
-      throw new Error('sse.jsonl contiene múltiples mensajes completos (múltiples message_start)');
+      throw new Error('JSONL contiene múltiples mensajes completos (múltiples message_start)');
     }
 
     if (messageStartCount === 0) {
-      throw new Error('sse.jsonl no contiene message_start');
+      throw new Error('JSONL no contiene message_start');
     }
 
     if (messageStopCount === 0) {
-      throw new Error('sse.jsonl incompleto: falta message_stop');
+      throw new Error('JSONL incompleto: falta message_stop');
     }
   }
 
   /**
-   * Reensambla el wire-format SSE a partir de las líneas capturadas en
-   * `sse.jsonl`. Cada entrada `{i, ts, line, phase?}` aporta una línea SSE ya trimada
+   * Reensambla el wire-format SSE a partir de un buffer JSONL.
+   * Cada entrada `{i, ts, line, phase?}` aporta una línea SSE ya trimada
    * (sin `\r` final, sin trailing newline). El SDK de Anthropic exige que los
    * eventos estén delimitados por línea en blanco (`\n\n`).
    *

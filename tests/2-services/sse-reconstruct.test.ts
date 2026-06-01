@@ -3,8 +3,6 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { AuditWriterService } from '../../src/2-services/audit-writer.service.js';
-import { RedactService } from '../../src/1-domain/services/redact.service.js';
 import { MarkdownRendererService } from '../../src/1-domain/services/markdown-renderer.service.js';
 import { SseReconstructService } from '../../src/2-services/sse-reconstruct.service.js';
 
@@ -25,7 +23,6 @@ describe('Test de Integración - SseReconstructService (fuente: sse.jsonl)', () 
   let interactionDir: string;
   let stepDir: string;
   let sseReconstructService: SseReconstructService;
-  let auditWriterService: AuditWriterService;
 
   beforeAll(async () => {
     tempSessionsDir = path.join(os.tmpdir(), `scp-sse-${Date.now()}`);
@@ -35,10 +32,8 @@ describe('Test de Integración - SseReconstructService (fuente: sse.jsonl)', () 
     await fs.mkdir(stepResponseDir, { recursive: true });
     await fs.mkdir(path.join(interactionDir, 'response'), { recursive: true });
 
-    const redactService = new RedactService();
     const markdownRenderer = new MarkdownRendererService();
-    auditWriterService = new AuditWriterService(redactService, markdownRenderer);
-    sseReconstructService = new SseReconstructService(auditWriterService);
+    sseReconstructService = new SseReconstructService(markdownRenderer);
 
     // Crear step body.json para que writeTopLevelMultiStepResponse lo encuentre
     const stepBody = {
@@ -132,10 +127,8 @@ describe('SseReconstructService - resiliencia frente a sse.txt corrupto', () => 
     await fs.mkdir(path.join(stepDir, 'response'), { recursive: true });
     await fs.mkdir(path.join(interactionDir, 'response'), { recursive: true });
 
-    const redactService = new RedactService();
     const markdownRenderer = new MarkdownRendererService();
-    const writer = new AuditWriterService(redactService, markdownRenderer);
-    service = new SseReconstructService(writer);
+    service = new SseReconstructService(markdownRenderer);
 
     // Crear step body.json para que writeTopLevelMultiStepResponse lo encuentre
     const stepBody = {
@@ -242,10 +235,8 @@ describe('SseReconstructService - fixture real (sessions/ histórico)', () => {
     await fs.mkdir(path.join(stepDir, 'response'), { recursive: true });
     await fs.mkdir(path.join(interactionDir, 'response'), { recursive: true });
 
-    const redactService = new RedactService();
     const markdownRenderer = new MarkdownRendererService();
-    const writer = new AuditWriterService(redactService, markdownRenderer);
-    service = new SseReconstructService(writer);
+    service = new SseReconstructService(markdownRenderer);
 
     const here = path.dirname(fileURLToPath(import.meta.url));
     const fixturePath = path.resolve(here, '../fixtures/sse-reconstruct/real-title-gen-step.jsonl');
@@ -311,10 +302,8 @@ describe('SseReconstructService - reconstrucción por fase (coalesced)', () => {
     await fs.mkdir(tempDir, { recursive: true });
     jsonlPath = path.join(tempDir, 'sse.jsonl');
 
-    const redactService = new RedactService();
     const markdownRenderer = new MarkdownRendererService();
-    const writer = new AuditWriterService(redactService, markdownRenderer);
-    service = new SseReconstructService(writer);
+    service = new SseReconstructService(markdownRenderer);
   });
 
   afterAll(async () => {
@@ -461,10 +450,8 @@ describe('SseReconstructService - validación de SSE completo', () => {
     await fs.mkdir(tempDir, { recursive: true });
     jsonlPath = path.join(tempDir, 'sse.jsonl');
 
-    const redactService = new RedactService();
     const markdownRenderer = new MarkdownRendererService();
-    const writer = new AuditWriterService(redactService, markdownRenderer);
-    service = new SseReconstructService(writer);
+    service = new SseReconstructService(markdownRenderer);
   });
 
   afterAll(async () => {
@@ -498,7 +485,7 @@ describe('SseReconstructService - validación de SSE completo', () => {
     await fs.writeFile(jsonlPath, toJsonl(multiMessageLines), 'utf8');
 
     await expect(service.reconstructSseJsonlFile(jsonlPath)).rejects.toThrow(
-      'sse.jsonl contiene múltiples mensajes completos (múltiples message_start)',
+      'JSONL contiene múltiples mensajes completos (múltiples message_start)',
     );
   });
 
@@ -517,7 +504,7 @@ describe('SseReconstructService - validación de SSE completo', () => {
     await fs.writeFile(jsonlPath, toJsonl(incompleteLines), 'utf8');
 
     await expect(service.reconstructSseJsonlFile(jsonlPath)).rejects.toThrow(
-      'sse.jsonl incompleto: falta message_stop',
+      'JSONL incompleto: falta message_stop',
     );
   });
 
@@ -558,7 +545,88 @@ describe('SseReconstructService - validación de SSE completo', () => {
     await fs.writeFile(jsonlPath, toJsonl(noStartLines), 'utf8');
 
     await expect(service.reconstructSseJsonlFile(jsonlPath)).rejects.toThrow(
-      'sse.jsonl no contiene message_start',
+      'JSONL no contiene message_start',
     );
+  });
+});
+
+// ── P2-f: reconstructStepMessage / reconstructStepPhaseMessage desde streaming/ ──
+
+describe('SseReconstructService — P2-f: lectura desde streaming/*.ndjson', () => {
+  let tempDir: string;
+  let stepDir: string;
+  let service: SseReconstructService;
+
+  /** Escribe un array de líneas SSE como archivos NNNN-chunk.ndjson en streaming/ (limpia antes). */
+  async function writeChunks(lines: Array<{ line: string; phase?: string }>): Promise<void> {
+    const streamingDir = path.join(stepDir, 'response', 'streaming');
+    await fs.rm(streamingDir, { recursive: true, force: true });
+    await fs.mkdir(streamingDir, { recursive: true });
+    for (let i = 0; i < lines.length; i++) {
+      const entry = lines[i];
+      const chunkObj: Record<string, unknown> = {
+        i: i + 1,
+        ts: '2026-01-01T00:00:00Z',
+        line: entry.line,
+        ...(entry.phase ? { phase: entry.phase } : {}),
+      };
+      const filename = String(i + 1).padStart(4, '0') + '-chunk.ndjson';
+      await fs.writeFile(
+        path.join(streamingDir, filename),
+        JSON.stringify(chunkObj) + '\n',
+        'utf8',
+      );
+    }
+  }
+
+  beforeAll(async () => {
+    tempDir = path.join(os.tmpdir(), `scp-sse-p2f-${Date.now()}`);
+    stepDir = path.join(tempDir, 'step');
+    await fs.mkdir(path.join(stepDir, 'response'), { recursive: true });
+
+    const markdownRenderer = new MarkdownRendererService();
+    service = new SseReconstructService(markdownRenderer);
+  });
+
+  afterAll(async () => {
+    await fs.rm(tempDir, { recursive: true, force: true });
+  });
+
+  it('§37b #12: reconstructStepMessage reconstruye desde streaming/*.ndjson', async () => {
+    await writeChunks([
+      { line: 'event: message_start' },
+      { line: 'data: {"type":"message_start","message":{"id":"msg_p2f","type":"message","role":"assistant","content":[],"model":"claude-sonnet","stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":5,"output_tokens":0}}}' },
+      { line: 'event: content_block_start' },
+      { line: 'data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}' },
+      { line: 'event: content_block_delta' },
+      { line: 'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hola P2"}}' },
+      { line: 'event: content_block_stop' },
+      { line: 'data: {"type":"content_block_stop","index":0}' },
+      { line: 'event: message_delta' },
+      { line: 'data: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null},"usage":{"output_tokens":5}}' },
+      { line: 'event: message_stop' },
+      { line: 'data: {"type":"message_stop"}' },
+    ]);
+
+    const msg = await service.reconstructStepMessage(stepDir);
+    expect(msg.id).toBe('msg_p2f');
+    expect((msg as { stop_reason: string }).stop_reason).toBe('end_turn');
+  });
+
+  it('§37b #14: reconstructStepPhaseMessage reconstruye fase delegation', async () => {
+    await writeChunks([
+      { line: 'event: message_start', phase: 'delegation' },
+      { line: 'data: {"type":"message_start","message":{"id":"msg_deleg","model":"claude","role":"assistant","content":[],"stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":5,"output_tokens":0}}}', phase: 'delegation' },
+      { line: 'event: content_block_start', phase: 'delegation' },
+      { line: 'data: {"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"tu_01","name":"Agent","input":{}}}', phase: 'delegation' },
+      { line: 'event: content_block_stop', phase: 'delegation' },
+      { line: 'data: {"type":"content_block_stop","index":0}', phase: 'delegation' },
+      { line: 'event: message_delta', phase: 'delegation' },
+      { line: 'data: {"type":"message_delta","delta":{"stop_reason":"tool_use"}}', phase: 'delegation' },
+    ]);
+
+    const msg = await service.reconstructStepPhaseMessage(stepDir, 'delegation');
+    expect(msg.id).toBe('msg_deleg');
+    expect(msg.stop_reason).toBe('tool_use');
   });
 });

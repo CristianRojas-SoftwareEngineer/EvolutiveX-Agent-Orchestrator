@@ -3,7 +3,6 @@ import * as fs from 'node:fs/promises';
 import { SessionResolverService } from '../1-domain/services/session-resolver.service.js';
 import { RedactService } from '../1-domain/services/redact.service.js';
 import { MarkdownRendererService } from '../1-domain/services/markdown-renderer.service.js';
-import { AuditWriterService } from '../2-services/audit-writer.service.js';
 import { SseReconstructService } from '../2-services/sse-reconstruct.service.js';
 import { StreamTeeService } from '../2-services/stream-tee.service.js';
 import { WorkflowRepositoryService } from '../2-services/workflow-repository.service.js';
@@ -41,8 +40,7 @@ export async function createProxyDependencies(
   // Capa 2 — Adapters
   const redactService = new RedactService();
   const markdownRenderer = new MarkdownRendererService();
-  const sseAuditWriter = new AuditWriterService(redactService, markdownRenderer);
-  const sseReconstruct = new SseReconstructService(sseAuditWriter);
+  const sseReconstruct = new SseReconstructService(markdownRenderer);
   const streamTee = new StreamTeeService();
   // EventBus único por arranque; SessionPersistence se auto-suscribe en su constructor
   // y el correlador publica sus mutaciones al mismo bus (Opción A, §28b/§40).
@@ -50,6 +48,8 @@ export async function createProxyDependencies(
   const sessionPersistence = new SessionPersistence(eventBus, {
     rootDir: path.dirname(auditBaseDir),
     logger,
+    sseReconstruct,
+    markdownRenderer,
   });
   const workflowRepo = new WorkflowRepositoryService(eventBus);
   const providerCatalog = new ProviderCatalogService(config.UPSTREAM_ORIGIN);
@@ -67,8 +67,6 @@ export async function createProxyDependencies(
     logger,
   );
   const auditSseResponseHandler = new AuditSseResponseHandler(
-    sseAuditWriter,
-    sseReconstruct,
     config,
     () => new StepAssemblerService(),
     workflowRepo,

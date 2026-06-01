@@ -3,10 +3,20 @@ import * as fs from 'node:fs/promises';
 import type { IEventBus } from '../1-domain/repositories/IEventBus.js';
 import type { TelemetryEvent } from '../1-domain/types/telemetry.types.js';
 import type { Logger } from '../1-domain/types/logger.types.js';
+import type { ISseReconstructor } from './ports/sse-reconstructor.port.js';
+import type { MarkdownRendererService } from '../1-domain/services/markdown-renderer.service.js';
 import { getWorkflowDir, slugifyToolName } from './session-routing.js';
 
 /** Versión del layout de directorios proyectado por este servicio. */
 const LAYOUT_VERSION = 'causal-workflows-v1';
+
+/** Tope máximo de chunks por step (§33.8). */
+const MAX_STREAMING_CHUNKS = 10_000;
+
+/** Índice con zero-padding a 4 dígitos (para nombres de archivos de chunks). */
+function pad4(n: number): string {
+  return String(n).padStart(4, '0');
+}
 
 /** Estado en disco que `SessionPersistence` mantiene por tool_use. */
 interface ToolEntry {
@@ -14,9 +24,20 @@ interface ToolEntry {
   meta: Record<string, unknown>;
 }
 
+/** Entrada en el índice workflow-sequence.json de una sesión. */
+interface WorkflowSequenceEntry {
+  workflowIndex: number;
+  workflowId: string;
+  startedAt: string;
+  completedAt?: string;
+  status: string;
+}
+
 /** Estado en disco que `SessionPersistence` mantiene por workflow. */
 interface WorkflowEntry {
   sessionId: string;
+  /** Índice numérico del workflow (para workflow-sequence.json). */
+  workflowIndex: number;
   /** Directorio base del workflow (con `/` final). */
   baseDir: string;
   /** Contador local de tool_uses para asignar el índice KK. */
@@ -40,6 +61,8 @@ export class SessionPersistence {
   private readonly nextWorkflowIndex = new Map<string, number>();
   /** workflowId → estado del workflow. */
   private readonly workflows = new Map<string, WorkflowEntry>();
+  /** sessionId → array de entradas del índice de workflows (mantenido en memoria). */
+  private readonly workflowSequences = new Map<string, WorkflowSequenceEntry[]>();
   /** Cola de escritura por ruta de archivo (serialización). */
   private readonly writeQueue = new Map<string, Promise<void>>();
   /** Conjunto de escrituras en curso (para `flush()` en tests). */
@@ -48,10 +71,22 @@ export class SessionPersistence {
   /** Raíz bajo la cual se resuelven las rutas relativas `sessions/...`. */
   private readonly rootDir: string;
   private readonly logger?: Logger;
+  private readonly sseReconstruct?: ISseReconstructor;
+  private readonly markdownRenderer?: MarkdownRendererService;
 
-  constructor(eventBus: IEventBus, opts: { rootDir?: string; logger?: Logger } = {}) {
+  constructor(
+    eventBus: IEventBus,
+    opts: {
+      rootDir?: string;
+      logger?: Logger;
+      sseReconstruct?: ISseReconstructor;
+      markdownRenderer?: MarkdownRendererService;
+    } = {},
+  ) {
     this.rootDir = opts.rootDir ?? process.cwd();
     this.logger = opts.logger;
+    this.sseReconstruct = opts.sseReconstruct;
+    this.markdownRenderer = opts.markdownRenderer;
     eventBus.subscribe('workflow_start', (e) => this.onWorkflowStart(e));
     eventBus.subscribe('workflow_spawn', (e) => this.onWorkflowSpawn(e));
     eventBus.subscribe('step_request', (e) => this.onStepRequest(e));
@@ -60,6 +95,8 @@ export class SessionPersistence {
     eventBus.subscribe('tool_result', (e) => this.onToolResult(e));
     eventBus.subscribe('workflow_complete', (e) => this.onWorkflowComplete(e));
     eventBus.subscribe('workflow_cancel', (e) => this.onWorkflowCancel(e));
+    eventBus.subscribe('stream_chunk', (e) => this.onStreamChunk(e));
+    eventBus.subscribe('*', (e) => this.onAnyEvent(e));
   }
 
   /** Espera a que todas las escrituras encoladas terminen (uso en tests). */
@@ -79,16 +116,18 @@ export class SessionPersistence {
     const index =
       typeof p.layoutIndex === 'number' ? p.layoutIndex : this.allocWorkflowIndex(event.sessionId);
     const baseDir = getWorkflowDir(event.sessionId, index);
+    const workflowKind = p.kind ?? 'main';
     const meta: Record<string, unknown> = {
       workflowId: p.workflowId,
       sessionId: event.sessionId,
-      workflowKind: p.kind ?? 'main',
+      workflowKind,
       status: 'running',
       layoutVersion: LAYOUT_VERSION,
       startedAt: event.timestamp,
     };
     this.workflows.set(p.workflowId, {
       sessionId: event.sessionId,
+      workflowIndex: index,
       baseDir,
       toolCounter: 0,
       tools: new Map(),
@@ -97,6 +136,13 @@ export class SessionPersistence {
     this.writeMeta(baseDir, meta);
     if (p.request !== undefined) {
       this.writeJson(`${baseDir}request/body.json`, p.request);
+    }
+    // Actualizar workflow-sequence.json solo para workflows main
+    if (workflowKind === 'main') {
+      this.upsertWorkflowSequence(event.sessionId, p.workflowId, index, {
+        startedAt: event.timestamp,
+        status: 'running',
+      });
     }
   }
 
@@ -123,6 +169,7 @@ export class SessionPersistence {
     };
     this.workflows.set(p.workflowId, {
       sessionId: event.sessionId,
+      workflowIndex: -1,
       baseDir,
       toolCounter: 0,
       tools: new Map(),
@@ -151,6 +198,7 @@ export class SessionPersistence {
       response?: unknown;
       headers?: unknown;
       markdown?: string;
+      coalescedDelegationStepIndex?: number;
     };
     const entry = this.workflows.get(p.workflowId);
     if (!entry) return;
@@ -158,6 +206,59 @@ export class SessionPersistence {
     if (p.response !== undefined) this.writeJson(`${responseDir}body.json`, p.response);
     if (p.headers !== undefined) this.writeJson(`${responseDir}headers.json`, p.headers);
     if (p.markdown !== undefined) this.writeText(`${responseDir}parsed.md`, p.markdown);
+
+    // P2-g: generar vistas coalesced si el step es una continuation
+    if (
+      typeof p.coalescedDelegationStepIndex === 'number' &&
+      this.sseReconstruct &&
+      this.markdownRenderer
+    ) {
+      const contStepDir = this.stepDir(entry, p.stepIndex);
+      const delegStepDir = this.stepDir(entry, p.coalescedDelegationStepIndex);
+      const coalescedPromise = this.generateCoalescedView(
+        contStepDir,
+        delegStepDir,
+        this.sseReconstruct,
+        this.markdownRenderer,
+      );
+      this.pending.add(coalescedPromise);
+      void coalescedPromise.finally(() => this.pending.delete(coalescedPromise));
+    }
+  }
+
+  private async generateCoalescedView(
+    contStepDir: string,
+    delegStepDir: string,
+    sseReconstruct: ISseReconstructor,
+    markdownRenderer: MarkdownRendererService,
+  ): Promise<void> {
+    try {
+      const delegMsg = await sseReconstruct.reconstructStepPhaseMessage(delegStepDir, 'delegation');
+      const contMsg = await sseReconstruct.reconstructStepPhaseMessage(contStepDir, 'continuation');
+
+      const body = {
+        type: 'coalesced-agent-step-response',
+        delegation: { message: delegMsg },
+        continuation: { response: { message: contMsg } },
+      };
+
+      const responseDir = `${contStepDir}response/`;
+      const bodyJson = Buffer.from(`${JSON.stringify(body, null, 2)}\n`, 'utf8');
+      await this.atomicWrite(`${responseDir}body.coalesced.json`, bodyJson);
+
+      const md = markdownRenderer.renderCoalescedAgentStepResponseMarkdown(
+        delegMsg as unknown as import('../1-domain/types/json.types.js').JsonValue,
+        null,
+        contMsg as unknown as import('../1-domain/types/json.types.js').JsonValue,
+        undefined,
+      );
+      await this.atomicWrite(
+        `${responseDir}body.coalesced.parsed.md`,
+        Buffer.from(`${md}\n`, 'utf8'),
+      );
+    } catch (err) {
+      this.logger?.error({ err }, 'SessionPersistence: error generando vista coalesced');
+    }
   }
 
   private onToolCall(event: TelemetryEvent): void {
@@ -211,7 +312,8 @@ export class SessionPersistence {
     const entry = this.workflows.get(p.workflowId);
     if (!entry) return;
     const auditOutcome = p.outcome ?? (p.result as Record<string, unknown>)?.outcome;
-    entry.meta.status = auditOutcome === 'orphaned' ? 'orphaned' : 'completed';
+    const finalStatus = auditOutcome === 'orphaned' ? 'orphaned' : 'completed';
+    entry.meta.status = finalStatus;
     entry.meta.completedAt = event.timestamp;
     if (auditOutcome !== undefined) entry.meta.outcome = auditOutcome;
     if (p.lostPendingAgents !== undefined) entry.meta.lostPendingAgents = p.lostPendingAgents;
@@ -221,6 +323,12 @@ export class SessionPersistence {
     this.writeMeta(entry.baseDir, entry.meta);
     this.writeJson(`${entry.baseDir}output/result.json`, p.result);
     this.writeText(`${entry.baseDir}output/result.parsed.md`, this.renderResultMarkdown(p.result));
+    if (entry.workflowIndex >= 0) {
+      this.upsertWorkflowSequence(entry.sessionId, p.workflowId, entry.workflowIndex, {
+        completedAt: event.timestamp,
+        status: finalStatus,
+      });
+    }
   }
 
   private onWorkflowCancel(event: TelemetryEvent): void {
@@ -231,6 +339,46 @@ export class SessionPersistence {
     entry.meta.completedAt = event.timestamp;
     if (p.cancellationReason !== undefined) entry.meta.cancellationReason = p.cancellationReason;
     this.writeMeta(entry.baseDir, entry.meta);
+    if (entry.workflowIndex >= 0) {
+      this.upsertWorkflowSequence(entry.sessionId, p.workflowId, entry.workflowIndex, {
+        completedAt: event.timestamp,
+        status: 'cancelled',
+      });
+    }
+  }
+
+  private onStreamChunk(event: TelemetryEvent): void {
+    const p = event.payload as {
+      seq: number;
+      stepIndex: number;
+      workflowId: string;
+      chunk: { i: number; ts: string; line: string; phase?: string };
+    };
+    const entry = this.workflows.get(p.workflowId);
+    if (!entry) return;
+    if (p.seq > MAX_STREAMING_CHUNKS) return;
+
+    // Filtrar pings: línea comentario SSE o evento de tipo ping
+    const line = p.chunk.line;
+    if (line.startsWith(': ping') || line.startsWith(':ping')) return;
+    if (line.startsWith('data: ')) {
+      try {
+        const evt = JSON.parse(line.slice(6)) as Record<string, unknown>;
+        if (evt.type === 'ping') return;
+      } catch {
+        /* no es JSON válido, no es ping */
+      }
+    }
+
+    const chunkFile = `${this.stepDir(entry, p.stepIndex)}response/streaming/${pad4(p.seq)}-chunk.ndjson`;
+    const lineData = JSON.stringify(p.chunk);
+    this.enqueue(chunkFile, () => this.atomicWrite(chunkFile, Buffer.from(`${lineData}\n`, 'utf8')));
+  }
+
+  private onAnyEvent(event: TelemetryEvent): void {
+    const eventsPath = `sessions/${event.sessionId}/events.ndjson`;
+    const line = JSON.stringify(event);
+    this.enqueue(eventsPath, () => this.appendLine(eventsPath, line));
   }
 
   // ── Helpers de routing ──────────────────────────────────────────────────────
@@ -259,6 +407,35 @@ export class SessionPersistence {
     const tool = parent?.tools.get(parentToolUseId);
     if (tool) return `${tool.dir}sub-agent/workflow/`;
     return getWorkflowDir(sessionId, this.allocWorkflowIndex(sessionId));
+  }
+
+  // ── workflow-sequence.json ──────────────────────────────────────────────────
+
+  private upsertWorkflowSequence(
+    sessionId: string,
+    workflowId: string,
+    workflowIndex: number,
+    patch: Partial<WorkflowSequenceEntry>,
+  ): void {
+    let seq = this.workflowSequences.get(sessionId);
+    if (!seq) {
+      seq = [];
+      this.workflowSequences.set(sessionId, seq);
+    }
+    const existing = seq.find((e) => e.workflowId === workflowId);
+    if (existing) {
+      Object.assign(existing, patch);
+    } else {
+      seq.push({
+        workflowIndex,
+        workflowId,
+        startedAt: patch.startedAt ?? '',
+        status: patch.status ?? 'running',
+        ...(patch.completedAt ? { completedAt: patch.completedAt } : {}),
+      });
+    }
+    const seqPath = `sessions/${sessionId}/workflows/workflow-sequence.json`;
+    this.writeJson(seqPath, seq);
   }
 
   // ── Escritura serializada y atómica ─────────────────────────────────────────
@@ -299,6 +476,13 @@ export class SessionPersistence {
     const tmp = `${abs}.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2)}.tmp`;
     await fs.writeFile(tmp, data);
     await fs.rename(tmp, abs);
+  }
+
+  /** Append serializado de una línea JSON a un archivo NDJSON (no atómico). */
+  private async appendLine(filePath: string, line: string): Promise<void> {
+    const abs = path.resolve(this.rootDir, filePath);
+    await fs.mkdir(path.dirname(abs), { recursive: true });
+    await fs.appendFile(abs, `${line}\n`, 'utf8');
   }
 
   // ── Formateadores ───────────────────────────────────────────────────────────

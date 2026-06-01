@@ -1,8 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { PassThrough } from 'node:stream';
 import { AuditSseResponseHandler } from '../../src/3-operations/audit-sse-response.handler.js';
-import type { ISseAuditWriter } from '../../src/2-services/ports/sse-audit-writer.port.js';
-import type { ISseReconstructor } from '../../src/2-services/ports/sse-reconstructor.port.js';
 import type { IWorkflowRepository } from '../../src/1-domain/repositories/IWorkflowRepository.js';
 import type { IEventBus } from '../../src/1-domain/repositories/IEventBus.js';
 import type { IWorkflow } from '../../src/1-domain/interfaces/gateway/IWorkflow.js';
@@ -55,33 +53,6 @@ function makeWorkflowRepo(overrides: Partial<IWorkflowRepository> = {}): IWorkfl
   };
 }
 
-function makeAuditWriter(overrides: Partial<ISseAuditWriter> = {}): ISseAuditWriter {
-  return {
-    appendSseLine: vi.fn(),
-    appendSseRawChunk: vi.fn(),
-    writeResponseHeadersAudit: async () => {},
-    writeTopLevelResponseHeaders: async () => {},
-    writeStepThought: async () => {},
-    writeStepResponseMarkdown: async () => {},
-    writeCoalescedAgentStepResponse: async () => {},
-    writeTopLevelMultiStepResponse: async () => ({ written: true }),
-    extractFinalTextFromJson: () => null,
-    ...overrides,
-  };
-}
-
-function makeSseReconstructor(overrides: Partial<ISseReconstructor> = {}): ISseReconstructor {
-  return {
-    reconstructStepMessage: async () => ({}) as never,
-    reconstructSseJsonlFile: async () => ({}) as never,
-    reconstructSseJsonlPhaseMessage: async () => ({}) as never,
-    runReconstruction: async () => ({
-      sseResponseBodyAttempted: false,
-      sseResponseBodyWritten: false,
-    }),
-    ...overrides,
-  };
-}
 
 function stubWorkflow(id = 'session-1'): IWorkflow {
   return { id, sessionId: id, kind: 'main', status: 'running', steps: [], startedAt: new Date() };
@@ -107,14 +78,12 @@ function makeContext(overrides: Partial<AuditInteractionContext> = {}): AuditInt
 }
 
 function makeSseHandler(
-  auditWriter: ISseAuditWriter = makeAuditWriter(),
-  sseReconstruct: ISseReconstructor = makeSseReconstructor(),
+  _unused1?: unknown,
+  _unused2?: unknown,
   repo: IWorkflowRepository = makeWorkflowRepo(),
   eventBus: IEventBus = makeEventBus(),
 ): AuditSseResponseHandler {
   return new AuditSseResponseHandler(
-    auditWriter,
-    sseReconstruct,
     makeConfig(),
     () => new StepAssemblerService(),
     repo,
@@ -140,9 +109,9 @@ function wait(ms = 80) {
 
 describe('AuditSseResponseHandler', () => {
   it('es no-op si no existe workflow para la sesión', async () => {
-    const appendSseLine = vi.fn();
+    const publish = vi.fn();
     const repo = makeWorkflowRepo({ getWorkflowBySessionId: vi.fn(() => undefined) });
-    const handler = makeSseHandler(makeAuditWriter({ appendSseLine }), undefined, repo);
+    const handler = makeSseHandler(undefined, undefined, repo, makeEventBus({ publish }));
 
     const stream = new PassThrough();
     handler.execute(stream, makeContext(), {});
@@ -150,18 +119,21 @@ describe('AuditSseResponseHandler', () => {
     stream.end();
     await wait();
 
-    expect(appendSseLine).not.toHaveBeenCalled();
+    const chunkCalls = (publish as ReturnType<typeof vi.fn>).mock.calls.filter(
+      ([e]) => e.type === 'stream_chunk',
+    );
+    expect(chunkCalls.length).toBe(0);
   });
 
-  it('captura líneas SSE vía appendSseLine cuando existe workflow', async () => {
-    const appendSseLine = vi.fn();
+  it('publica stream_chunk por cada línea SSE no vacía', async () => {
+    const publish = vi.fn();
     const wf = stubWorkflow();
     const repo = makeWorkflowRepo({
       getWorkflowBySessionId: vi.fn(() => wf),
       getWorkflow: vi.fn(() => wf),
       closeStep: vi.fn(),
     });
-    const handler = makeSseHandler(makeAuditWriter({ appendSseLine }), undefined, repo);
+    const handler = makeSseHandler(undefined, undefined, repo, makeEventBus({ publish }));
 
     const stream = new PassThrough();
     handler.execute(stream, makeContext(), {});
@@ -169,29 +141,15 @@ describe('AuditSseResponseHandler', () => {
     stream.end();
     await wait();
 
-    expect(appendSseLine).toHaveBeenCalled();
-    const firstCall = (appendSseLine as ReturnType<typeof vi.fn>).mock.calls[0][1];
-    expect(firstCall).toHaveProperty('line');
+    const chunkCalls = (publish as ReturnType<typeof vi.fn>).mock.calls.filter(
+      ([e]) => e.type === 'stream_chunk',
+    );
+    expect(chunkCalls.length).toBeGreaterThan(0);
+    const firstChunk = chunkCalls[0][0];
+    expect(firstChunk.payload.chunk).toHaveProperty('line');
+    expect(firstChunk.payload).toHaveProperty('stepIndex', 0);
   });
 
-  it('captura chunks SSE raw vía appendSseRawChunk', async () => {
-    const appendSseRawChunk = vi.fn();
-    const wf = stubWorkflow();
-    const repo = makeWorkflowRepo({
-      getWorkflowBySessionId: vi.fn(() => wf),
-      getWorkflow: vi.fn(() => wf),
-      closeStep: vi.fn(),
-    });
-    const handler = makeSseHandler(makeAuditWriter({ appendSseRawChunk }), undefined, repo);
-
-    const stream = new PassThrough();
-    handler.execute(stream, makeContext(), {});
-    stream.write(Buffer.from('data: test\n\n'));
-    stream.end();
-    await wait();
-
-    expect(appendSseRawChunk).toHaveBeenCalled();
-  });
 
   it('registra wire step en correlador al final del stream', async () => {
     const registerStep = vi.fn();

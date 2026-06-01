@@ -37,7 +37,7 @@ La relación padre→hijo entre este orquestador y los changes de segundo nivel 
 | G5 | `gateway-g5-provider-catalog` | Refactor gateway | — | `npm run test:quick` | `docs/proposals/gateway-design.md` §39 | `ProviderCatalog` inline en `routing/` (no existía en src/; diferido a P0+) | archivada |
 | P0 | `gateway-p0-layout-diff-spike` | Persistencia | G4 | Spike documentado — sin gate de tests | `docs/proposals/gateway-design.md` §28b, §40, §42 | — (spike de análisis, no retira código) | archivada |
 | P1 | `gateway-p1-new-session-layout` | Persistencia | P0, G4 | `npm run test` + casos 3–7, 16, 19 (estructurales) del checklist [§37b](../../../docs/proposals/gateway-design.md#37b-checklist-de-aceptación-e2e-del-layout) | `docs/session-audit-model.md`, `README.md`, `docs/proposals/gateway-design.md` §29, §30, §33, §37b, §40, §46.4 | `session-store.service.ts`, `workflow-result-projector.service.ts`, `ISessionStore`; shim `ISseAuditWriter` hasta P2 | archivada |
-| P2 | `gateway-p2-new-artifacts` | Persistencia | P1 | `npm run test` + checklist [§37b](../../../docs/proposals/gateway-design.md#37b-checklist-de-aceptación-e2e-del-layout) completo (20 casos) | `docs/session-audit-model.md`, `docs/proposals/gateway-design.md` §33 | Escritura de `sse.jsonl` (reemplazada por `streaming/NNNN-chunk.ndjson`) | pendiente |
+| P2 | `gateway-p2-new-artifacts` | Persistencia | P1 | `npm run test` + **P2-core** §37b casos **1, 12–15, 18** | `docs/session-audit-model.md`, `docs/proposals/gateway-design.md` §33 | `ISseAuditWriter`, `AuditWriterService`, `SseReconstructService` sobre `sse.jsonl`, escrituras SSE inline en handler (sustituidas por `stream_chunk` + persistencia) | **validada** |
 
 ## Decisión técnica del bloque P
 
@@ -78,7 +78,16 @@ Componentes a crear, alineados con §28b.1 y §40. Los destinos siguen las conve
 **Legacy a retirar (detalle):**
 
 - **P1:** `audit-writer.service.ts` · `session-store.service.ts` · `workflow-result-projector.service.ts` · constantes flat de `audit-paths.ts` (`DIR_MAIN_AGENT`, `DIR_INTERACTIONS`, `PREFIX_SUB_AGENT`) · tipos `ActiveInteraction`/`InteractionMetadata` · llamadas directas a disco en handlers de capa 3
-- **P2:** escritura de `sse.jsonl` (reemplazada por `streaming/NNNN-chunk.ndjson`)
+- **P2:** `ISseAuditWriter` / `AuditWriterService`; lectura/escritura de `sse.jsonl` y `sse.txt` inline; `SseReconstructService` acoplado a `sse.jsonl` (sustituido por `streaming/NNNN-chunk.ndjson` y reconstrucción vía persistencia)
+
+### Gate P2-core vs cierre de migración
+
+| Momento | Comando | Casos §37b |
+| --- | --- | --- |
+| Archivar P2 | `npm run test` | **1, 12, 13, 14, 15, 18** (P2-core) |
+| Archivar orquestador | `npm run test` | Todos los casos con fase asignada verificados; casos «fuera v1» explícitos en [§45](../../../docs/proposals/gateway-design.md#45-fuera-de-alcance-v1) no bloquean |
+
+P1 requiere el subconjunto estructural de §37b (casos 3–7, 16, 19). P2 requiere **P2-core** únicamente. El checklist §37b completo (20 filas) es meta del **cierre del orquestador**, con reparto por fase documentado en §37b de `gateway-design.md`.
 
 ## Convención de nombres de changes hijos
 
@@ -128,10 +137,10 @@ Gate de aceptación del layout `causal-workflows-v1`:
 
 ```bash
 npm run test   # lint + typecheck + unit + build
-# + verificación manual del checklist §37b (20 casos)
+# + verificación del subconjunto §37b según fase (P1 estructural; P2-core: 1, 12–15, 18)
 ```
 
-P1 requiere el subconjunto de §37b relativo a estructura de directorios. P2 requiere el checklist completo.
+P1 requiere el subconjunto de §37b relativo a estructura de directorios (casos 3–7, 16, 19). P2 requiere **P2-core** (casos 1, 12–15, 18). El cierre del orquestador valida la matriz §37b completa con casos fuera v1 documentados en §45.
 
 ## Mantenimiento documental por fase
 

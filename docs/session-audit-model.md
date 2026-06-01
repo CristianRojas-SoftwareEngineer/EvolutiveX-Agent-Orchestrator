@@ -27,8 +27,10 @@ sessions/<session-id>/
                 │   ├── body.json
                 │   ├── headers.json
                 │   ├── parsed.md
-                │   ├── sse.jsonl        # @deprecated-p2 — escritura directa ISseAuditWriter
-                │   └── sse.txt          # raw dump opcional (@deprecated-p2)
+                │   ├── streaming/       # P2: NNNN-chunk.ndjson por stream_chunk
+                │   ├── body.coalesced.json   # P2: step coalesced (sin sse.jsonl)
+                │   └── body.coalesced.parsed.md
+                # Pre-P2 (retirado en P2): sse.jsonl, sse.txt vía ISseAuditWriter
                 └── tools/
                     └── KK-<slug>/
                         ├── meta.json
@@ -50,17 +52,19 @@ sessions/<session-id>/
 | `tool_result` | Correlador / hooks | `tools/KK-slug/result.json`; actualiza `meta.json` |
 | `workflow_complete` | Cierre de workflow | `output/result.json`, `output/result.parsed.md`; `meta.json` final |
 | `workflow_cancel` | Timeout / cancelación | `meta.json` con `status: cancelled` |
-
-**Excepción SSE (hasta P2):** `audit-sse-response` escribe `sse.jsonl` y `sse.txt` vía `ISseAuditWriter` (`AuditWriterService`), no vía el bus. La reconstrucción y `output/` del step siguen documentadas en [`how-sse-reconstruction-works.md`](./how-sse-reconstruction-works.md).
+| `stream_chunk` | `AuditSseResponseHandler` | `steps/MM/response/streaming/NNNN-chunk.ndjson`; pings filtrados; tope 10 000 chunks |
+| `step_response` (con `coalescedDelegationStepIndex`) | `AuditSseResponseHandler` | además: `body.coalesced.json` + `body.coalesced.parsed.md` en el step continuation |
+| `*` (wildcard) | cualquier evento | `sessions/<id>/events.ndjson` (append-only) |
+| `workflow_start` / `workflow_complete` / `workflow_cancel` (kind=main) | Correlador / cierre | `sessions/<id>/workflows/workflow-sequence.json` (array) |
 
 ### Componentes de persistencia
 
 | Componente | Capa | Rol |
 | ---------- | ---- | --- |
 | `IEventBus` / `EventBus` | L1 / L2 | Pub/sub in-process; correlador y handlers publican telemetría |
-| `SessionPersistence` | L2 | Único suscriptor que materializa el árbol anterior |
+| `SessionPersistence` | L2 | Suscriptor que materializa el árbol en disco |
 | `IWorkflowRepository` / `WorkflowRepositoryService` | L1 / L2 | Estado en memoria; emite eventos en cada mutación |
-| `ISseAuditWriter` | L2 port | Escrituras SSE inline (`@deprecated-p2`; retiro en P2) |
+| `SseReconstructService` | L2 | Lee `streaming/*.ndjson` para reconstrucción y vistas coalesced |
 
 Índices `NN`, `MM`, `KK` usan zero-padding a 2 dígitos (`01`, `02`, …). El slug del tool se deriva de `slugifyToolName()` en `session-routing.ts`.
 
@@ -84,7 +88,7 @@ sessions/<session-id>/
 | `meta.json` | Workflow, tool o sub-workflow | Estado fusionado (`status`, `workflowKind`, timestamps, outcome, …) — **no** hay `state.json` |
 | `output/result.json` | Workflow | `IWorkflowResult` inmutable al cierre |
 
-**P2 (no generado en P1):** `events.ndjson`, `workflow-sequence.json`, directorio `streaming/` por step.
+**P2 (pendiente de implementación; especificado en `gateway-p2-new-artifacts`):** `events.ndjson` (raíz de sesión), `workflows/workflow-sequence.json`, `streaming/` por step, vistas coalesced sin `sse.jsonl`.
 
 ### Qué delega a otros documentos
 

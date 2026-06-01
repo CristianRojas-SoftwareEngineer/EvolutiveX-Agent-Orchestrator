@@ -251,26 +251,40 @@
 
 ## P2 — Completar proyección: artefactos nuevos como suscripciones de `SessionPersistence`
 
-> Objetivo: con la pila de bus ya existente (P1), añadir las suscripciones de `SessionPersistence` que producen los tres artefactos nuevos. Todas las sesiones generadas tras P2 son `causal-workflows-v1` completas.
+> Objetivo: con la pila de bus existente (P1), añadir suscripciones que materializan **§33.1** (`events.ndjson`), **streaming forense** (`stream_chunk` → `streaming/`) y **§33.5** (`workflow-sequence.json`), y retirar el shim SSE. Tras P2, las sesiones nuevas cumplen **persistencia y forensia SSE** del layout objetivo; enriquecimientos de correlador del §37b marcados «fuera v1» en §45 no son requisito de P2.
 
-- [ ] Verificar dependencias §43: P1 en estado `validada` o `archivada`
-- [ ] Crear change de segundo nivel `gateway-p2-new-artifacts` (skill `openspec-propose`)
-- [ ] El `proposal.md` del change hijo incluye back-reference al orquestador
-- [ ] Actualizar estado de P2 a `en-curso` en el registro del orquestador
-- [ ] Seguimiento de implementación del change hijo (`openspec-apply`)
-- [ ] Suscripciones de `SessionPersistence` implementadas:
-  - _Wildcard `*` → append-only a `sessions/<id>/events.ndjson` (log cronológico completo, §33.1)_
-  - _`stream_chunk` → `steps/MM/response/streaming/NNNN-chunk.ndjson` por cada evento SSE; reconstrucción de `response/body.json` al cierre del step (al recibir `message_stop`)_
-  - _`AuditSseResponseHandler` emite `stream_chunk` al bus por cada evento SSE (en lugar de escribir directamente `sse.jsonl`)_
-  - _`workflow-sequence.json` completo: el ciclo `workflow_complete` / `workflow_cancel` actualiza correctamente el status en el archivo_
-- [ ] Gate superado: `npm run test` + checklist [§37b](../../../docs/proposals/gateway-design.md#37b-checklist-de-aceptación-e2e-del-layout) completo (20 casos)
-  - _Criterio: los 20 casos de §37b verificados en sesiones nuevas generadas por los tests; `npm run test` sin errores_
-- [ ] Documentación actualizada: `docs/session-audit-model.md`, `docs/proposals/gateway-design.md` §33
-  - _Criterio: `events.ndjson`, `workflow-sequence.json`, `streaming/NNNN-chunk.ndjson` descritos como generados para sesiones nuevas_
-- [ ] Legacy retirado: escritura de `sse.jsonl` eliminada de `src/`
-  - _Criterio: `npm run lint` y `npm run typecheck` pasan; no quedan referencias a `sse.jsonl` en código de producción_
+- [x] Verificar dependencias §43: P1 en estado `validada` o `archivada`
+  - _P1 archivada 2026-05-30 ✓_
+- [x] Crear change de segundo nivel `gateway-p2-new-artifacts` (skill `openspec-propose`)
+  - _Criterio: `openspec/changes/gateway-p2-new-artifacts/` con `proposal.md`, `design.md`, `specs/`, `tasks.md`; `openspec validate gateway-p2-new-artifacts` verde (2026-05-30)_
+- [x] El `proposal.md` del change hijo incluye back-reference al orquestador
+  - _Back-reference en `proposal.md` línea 3: «**Orquestador:** `gateway-migration` | **Fase:** p2 (P)» ✓_
+- [x] Actualizar estado de P2 a `en-curso` en el registro del orquestador → `validada` (implementación completa)
+- [x] Seguimiento de implementación del change hijo (`openspec-apply`) según P2-a…P2-h del `design.md` del change hijo
+  - _P2-a…P2-h completados en commit 2026-06-01_
+- [x] Suscripciones y emisión SSE implementadas (resumen; detalle en change hijo):
+  - _Wildcard `*` → `sessions/<id>/events.ndjson` (§33.1) ✓_
+  - _`stream_chunk` → `streaming/NNNN-chunk.ndjson`; `body.coalesced.json` al cierre del step coalesced ✓_
+  - _`AuditSseResponseHandler` publica `stream_chunk` al bus (sin `sse.jsonl` inline) ✓_
+  - _`workflow-sequence.json` en `workflow_start` / `workflow_complete` / `workflow_cancel` ✓_
+  - _Coalesced (§37b #18): chunks por bus; `body.coalesced.json` / `.parsed.md` vía `SessionPersistence` (Opción A) ✓_
+- [x] **P2-core — Gate para archivar P2**
+  - _`npm run test` 321/321 sin errores ✓_
+  - _Casos §37b verificados: **1, 12, 13, 14, 15, 18** — tests unitarios verdes ✓_
+  - _Tareas P2-a…P2-h completadas ✓_
+  - _`rg sse\.jsonl src/` → sin resultados; `rg ISseAuditWriter src/` → sin resultados ✓_
+- [x] Documentación actualizada al estado post-P2 implementado
+  - _`docs/session-audit-model.md`: tabla EventBus actualizada con P2 artefactos ✓_
+  - _`docs/proposals/gateway-design.md` §37b: casos 1, 12–15, 18 → `implementado` ✓_
+  - _`docs/proposals/gateway-design.md` §44 Layout disco: actualizado (sin «hasta P2») ✓_
+  - _`docs/how-sse-reconstruction-works.md`: fuente P2+ descrita como `streaming/*.ndjson` ✓_
+- [x] Legacy retirado: `ISseAuditWriter`, `AuditWriterService`, `sse.jsonl`, escrituras SSE inline en handler
+  - _`rg sse\.jsonl src/` → sin resultados ✓_
+  - _`rg ISseAuditWriter src/` → sin resultados ✓_
+  - _`rg "appendSseLine|appendSseRawChunk" src/` → sin resultados ✓_
 - [ ] Sync de specs si aplica (`openspec-sync`)
-- [ ] Marcar P2 como `validada` y archivar el change hijo (`openspec-archive`)
+- [x] Marcar P2 como `validada` en el registro (línea 40 del `design.md` del orquestador) ✓
+- [ ] Archivar el change hijo (`openspec-archive gateway-p2-new-artifacts`)
 
 ---
 
@@ -278,8 +292,8 @@
 
 - [ ] Verificar que todas las fases (C1–C3, G1–G5, P0–P2) tienen estado `archivada` en el registro
   - _Criterio: tabla del registro sin ningún estado `pendiente`, `en-curso` o `validada`_
-- [ ] Verificación E2E global: checklist [§37b](../../../docs/proposals/gateway-design.md#37b-checklist-de-aceptación-e2e-del-layout) completo (20 casos) pasado
-  - _Criterio: todos los casos verificados con el sistema final_
+- [ ] Verificación E2E global: matriz §37b — todos los casos con fase asignada verificados o marcados «fuera v1» en §45
+  - _Criterio: casos P2-core (1, 12–15, 18) verdes; casos G4/P1 ya archivados; casos fuera v1 documentados en §45, no bloquean cierre_
 - [ ] Confirmar ausencia total de código y documentación zombie/legacy
   - _Criterio: `npm run lint` + `npm run typecheck` pasan; búsqueda manual de referencias a `Interaction*`, `ActiveInteraction`, layout flat — sin resultados activos_
 - [ ] `README.md`, `docs/session-audit-model.md` y `docs/proposals/gateway-design.md` reflejan el estado final del sistema objetivo

@@ -11,16 +11,15 @@ import type Anthropic from '@anthropic-ai/sdk';
  */
 export interface ISseReconstructor {
   /**
-   * Reconstruye un mensaje Anthropic desde el sse.jsonl de un step individual.
-   * Usa el SDK oficial para parsear eventos SSE y ensamblar el mensaje.
+   * Reconstruye un mensaje Anthropic desde los chunks streaming/ de un step.
+   * Lee `stepDir/response/streaming/*.ndjson` como fuente canónica (P2+).
    */
   reconstructStepMessage(
     stepDir: string,
   ): Promise<Anthropic.Message | Anthropic.Beta.Messages.BetaMessage>;
 
   /**
-   * Reconstruye un mensaje Anthropic desde un archivo sse.jsonl.
-   * Usa el SDK oficial para parsear eventos SSE y ensamblar el mensaje.
+   * Reconstruye un mensaje Anthropic desde un buffer JSONL serializado.
    * Para streams completos (no coalesced o coalesced completo).
    */
   reconstructSseJsonlFile(
@@ -29,12 +28,17 @@ export interface ISseReconstructor {
   ): Promise<Anthropic.Message | Anthropic.Beta.Messages.BetaMessage>;
 
   /**
-   * Reconstruye un mensaje Anthropic desde una fase específica de un sse.jsonl coalesced.
-   * Parsea eventos SSE directamente desde el archivo sin usar el SDK,
-   * permitiendo reconstruir fases parciales (delegation/continuation) que no
-   * necesariamente contienen message_stop.
+   * Reconstruye un mensaje Anthropic desde una fase específica de un buffer JSONL.
+   * Parsea eventos SSE directamente sin el SDK, permitiendo reconstruir fases
+   * parciales (delegation/continuation) sin message_stop.
    */
   reconstructSseJsonlPhaseMessage(jsonlPath: string, phase: SsePhase): Promise<Anthropic.Message>;
+
+  /**
+   * Reconstruye un mensaje Anthropic filtrando por fase desde los chunks
+   * `stepDir/response/streaming/*.ndjson`. Fuente canónica P2+.
+   */
+  reconstructStepPhaseMessage(stepDir: string, phase: SsePhase): Promise<Anthropic.Message>;
 
   /**
    * Reconstruye mensaje del turno completo.

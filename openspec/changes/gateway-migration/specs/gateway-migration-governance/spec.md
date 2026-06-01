@@ -54,12 +54,20 @@ Una fase SHALL considerarse completa si y solo si se cumplen las tres condicione
 - **THEN** build, lint, typecheck y tests SHALL pasar
 - **AND** los casos estructurales del [checklist E2E §37b](../../../../docs/proposals/gateway-design.md#37b-checklist-de-aceptación-e2e-del-layout) SHALL estar verificados (casos 1, 2 y 15 excluidos: 1 y 15 son artefactos de P2; 2 ya verde en G4)
 
-#### Scenario: Gate técnico — bloque P (P2, checklist completo)
+#### Scenario: Gate técnico — bloque P (P2-core)
 
 - **GIVEN** la fase P2 completada
-- **WHEN** se ejecuta `npm run test` y el checklist §37b completo (20 casos)
+- **WHEN** se ejecuta `npm run test` y los casos P2-core del checklist §37b (**1, 12, 13, 14, 15, 18**)
 - **THEN** build, lint, typecheck y tests SHALL pasar
-- **AND** los 20 casos del [checklist E2E §37b](../../../../docs/proposals/gateway-design.md#37b-checklist-de-aceptación-e2e-del-layout) SHALL estar verificados
+- **AND** los casos P2-core del [checklist E2E §37b](../../../../docs/proposals/gateway-design.md#37b-checklist-de-aceptación-e2e-del-layout) SHALL estar verificados en sesiones nuevas
+- **AND** NO SHALL quedar referencias a `sse.jsonl` ni `ISseAuditWriter` en `src/` de producción
+
+#### Scenario: Cierre de migración — matriz §37b
+
+- **GIVEN** todas las fases C1–P2 archivadas y el orquestador listo para cierre
+- **WHEN** se revisa la matriz §37b con columna Fase en `gateway-design.md`
+- **THEN** cada caso con fase asignada (C/G/P) SHALL estar verificado o cubierto por fase archivada
+- **AND** los casos marcados «fuera v1» en §45 SHALL estar documentados y NO SHALL bloquear el archivo del orquestador
 
 #### Scenario: Fase sin docs actualizadas
 

@@ -1,10 +1,4 @@
-# session-persistence Specification
-
-## Purpose
-
-Suscriptor del `EventBus` que proyecta eventos del correlador y handlers a disco bajo la estructura `causal-workflows-v1` (`workflows/NN/steps/MM/tools/KK/`). Reemplaza la escritura directa desde handlers de capa 3 (`SessionStoreService`, `WorkflowResultProjector`). P1 (2026-05-30): árbol causal estructural. P2 (2026-06-01): chunks SSE (`streaming/`), `events.ndjson`, `workflow-sequence.json`, vistas coalesced; retiro de `ISseAuditWriter`.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: SessionPersistence — suscripción al bus y proyección a disco
 
@@ -22,7 +16,7 @@ El sistema SHALL proveer `SessionPersistence` en `src/2-services/session-persist
 | `tool_result` | Escribir `result.json` en `tools/KK-slug/`; actualizar `meta.json` del tool |
 | `workflow_complete` | Actualizar `meta.json` (status: `completed`); escribir `output/result.json` + `output/result.parsed.md`; actualizar `workflow-sequence.json` |
 | `workflow_cancel` | Actualizar `meta.json` (status: `cancelled`, `cancellationReason`); actualizar `workflow-sequence.json` |
-| `stream_chunk` | Escribir `steps/MM/response/streaming/NNNN-chunk.ndjson`; al cierre del step con `coalescedDelegationStepIndex`, generar `body.coalesced.json` y `body.coalesced.parsed.md` |
+| `stream_chunk` | Escribir `steps/MM/response/streaming/NNNN-chunk.ndjson`; al cierre del step reconstruir `response/body.json` y `response/parsed.md` |
 | `*` (wildcard) | Append-only a `sessions/<sessionId>/events.ndjson` por cada evento recibido |
 
 #### Scenario: workflow_start crea directorio y meta.json inicial
@@ -82,57 +76,6 @@ El sistema SHALL proveer `SessionPersistence` en `src/2-services/session-persist
 - **WHEN** `SessionPersistence` recibe un evento `{ type: 'workflow_cancel', payload: { workflowId: 'wf-1', cancellationReason: 'user_abort' } }`
 - **THEN** `meta.json` SHALL actualizarse con `status: 'cancelled'` y `cancellationReason: 'user_abort'`
 
----
-
-### Requirement: Escritura atómica de meta.json
-
-`SessionPersistence` SHALL escribir `meta.json` de forma atómica: escribir en un archivo temporal y renombrar (write temp + rename). Las escrituras de `meta.json` para un mismo workflow SHALL serializarse mediante un `writeQueue` por archivo para evitar condiciones de carrera.
-
-#### Scenario: Escrituras concurrentes a meta.json se serializan
-
-- **GIVEN** dos eventos que afectan el mismo `meta.json` llegan en rápida sucesión
-- **WHEN** `SessionPersistence` procesa ambos eventos
-- **THEN** las escrituras SHALL ejecutarse secuencialmente (no en paralelo)
-- **AND** el archivo final SHALL reflejar el estado del último evento procesado
-
----
-
-### Requirement: Directorio causal-workflows-v1 con naming correcto
-
-`SessionPersistence` SHALL crear directorios siguiendo la convención de §30:
-
-- `workflows/NN/` — NN = índice de workflow (00, 01, ...)
-- `steps/MM/` — MM = índice de step local al workflow (00, 01, ...)
-- `tools/KK-slug/` — KK = índice global de tool_use; slug = nombre del tool normalizado
-- `sub-agent/workflow/` — anidado bajo `tools/KK-slug/` solo si la tool dispara sub-agente
-
-Los directorios SHALL crearse lazy (§31): solo cuando hay contenido real que justifique su existencia.
-
-#### Scenario: Step sin tools no crea directorio tools/
-
-- **GIVEN** un step que no invoca ninguna tool
-- **WHEN** `SessionPersistence` procesa el `step_request`
-- **THEN** SHALL crearse `steps/MM/request/`
-- **AND** NO SHALL crearse `steps/MM/tools/`
-
-#### Scenario: Sub-agente se anida bajo tool invocador
-
-- **GIVEN** un tool `'tu-1'` de nombre `'Task'` que dispara un sub-agente
-- **WHEN** `SessionPersistence` recibe `workflow_spawn` para el sub-workflow
-- **THEN** SHALL crearse `tools/00-Task/sub-agent/workflow/` con su propio `meta.json`, `input/`, `output/`, `steps/`
-
----
-
-### Requirement: SessionPersistence no conoce el correlador
-
-`SessionPersistence` SHALL ser un suscriptor independiente del `EventBus`. NO SHALL tener referencia directa al correlador (`IWorkflowRepository`). Toda la información necesaria para proyectar a disco SHALL provenir exclusivamente del payload de los eventos recibidos.
-
-#### Scenario: SessionPersistence opera sin dependencia del correlador
-
-- **GIVEN** un `EventBus` y un `SessionPersistence` instanciados
-- **WHEN** se publican eventos en el bus
-- **THEN** `SessionPersistence` SHALL proyectar a disco sin invocar ningún método del correlador
-
 #### Scenario: Suscripciones P2 registradas en constructor
 
 - **GIVEN** un `EventBus` y un `SessionPersistence` instanciados
@@ -140,7 +83,7 @@ Los directorios SHALL crearse lazy (§31): solo cuando hay contenido real que ju
 - **THEN** SHALL existir handlers para `stream_chunk` y patrón `*`
 - **AND** las suscripciones P1 (`workflow_start`, `tool_call`, etc.) SHALL permanecer activas
 
----
+## ADDED Requirements
 
 ### Requirement: events.ndjson — log cronológico de sesión
 
@@ -152,11 +95,11 @@ Los directorios SHALL crearse lazy (§31): solo cuando hay contenido real que ju
 - **WHEN** se publica `workflow_start` al bus
 - **THEN** `sessions/sess-p2/events.ndjson` SHALL contener una línea con `type: 'workflow_start'`
 
----
-
-### Requirement: stream_chunk — chunks forenses
+### Requirement: stream_chunk — chunks forenses y reconstrucción de body
 
 `SessionPersistence` SHALL persistir cada evento `stream_chunk` como `steps/MM/response/streaming/NNNN-chunk.ndjson` (numeración de 4 dígitos por step). Los eventos SSE de tipo `ping` SHALL NOT persistirse como chunks.
+
+Al recibir el cierre del step (último chunk que indica `message_stop` o señal equivalente en payload), `SessionPersistence` SHALL reconstruir y escribir `response/body.json` y `response/parsed.md` a partir de los chunks ordenados del step.
 
 #### Scenario: ping no genera chunk en disco
 
@@ -164,7 +107,11 @@ Los directorios SHALL crearse lazy (§31): solo cuando hay contenido real que ju
 - **WHEN** llega un chunk cuyo evento SSE es `ping`
 - **THEN** NO SHALL crearse un nuevo archivo bajo `response/streaming/`
 
----
+#### Scenario: body reconstruido equivale al body directo
+
+- **GIVEN** un step con chunks persistidos y un body de referencia escrito por `step_response`
+- **WHEN** se completa la reconstrucción al cierre del step
+- **THEN** el contenido de `response/body.json` reconstruido SHALL ser equivalente al body de referencia (§37b #14)
 
 ### Requirement: workflow-sequence.json
 
@@ -176,11 +123,9 @@ Los directorios SHALL crearse lazy (§31): solo cuando hay contenido real que ju
 - **WHEN** llega `workflow_complete`
 - **THEN** la entrada del workflow SHALL reflejar status `completed`
 
----
-
 ### Requirement: Vistas coalesced desde streaming
 
-Para steps con flujo coalesced (multi-fase SSE), `SessionPersistence` SHALL generar `response/body.coalesced.json` y `response/body.coalesced.parsed.md` al cierre del step a partir de los chunks persistidos, sin depender de `ISseAuditWriter`.
+Para steps con flujo coalesced (multi-fase SSE), `SessionPersistence` SHALL generar `response/body.coalesced.json` y `response/body.coalesced.parsed.md` al cierre del step a partir de los chunks persistidos, integrando sub-agentes según el diseño §37b #18, sin depender de `ISseAuditWriter`.
 
 #### Scenario: Step coalesced sin sse.jsonl
 

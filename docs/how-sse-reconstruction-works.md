@@ -1,8 +1,8 @@
 # Cómo funciona la reconstrucción SSE en Smart Code Proxy
 
-Esta nota técnica explica por qué y cómo Smart Code Proxy reconstruye el mensaje final del asistente a partir de un stream SSE grabado, documenta la **fuente de bytes** (`sse.jsonl`, no `sse.txt`) y la constante `REPLAY_MODEL` para que nadie la "mejore" confundiéndola con una configuración real.
+Esta nota técnica explica por qué y cómo Smart Code Proxy reconstruye el mensaje final del asistente a partir de un stream SSE grabado, documenta la **fuente de bytes** y la constante `REPLAY_MODEL` para que nadie la "mejore" confundiéndola con una configuración real.
 
-**Persistencia P1:** las líneas SSE se escriben bajo `sessions/<id>/workflows/NN/steps/MM/response/` vía `ISseAuditWriter` (`AuditWriterService`, `@deprecated-p2`). La migración a eventos `stream_chunk` en el **EventBus** está planificada para **P2**. El resto del árbol causal (`request/`, `body.json`, `output/result.json`) lo materializa `SessionPersistence` desde el bus.
+**Estado P2 (implementado):** cada chunk SSE se publica como `stream_chunk` al **EventBus**; `SessionPersistence` escribe `response/streaming/NNNN-chunk.ndjson` por step. `SseReconstructService.reconstructStepMessage(stepDir)` lee esos archivos ordenados por nombre. `sse.jsonl` y `sse.txt` ya no se generan; `ISseAuditWriter` y `AuditWriterService` han sido retirados.
 
 ## Por qué reusar el SDK oficial
 
@@ -10,15 +10,13 @@ Los streams SSE de la API Messages de Anthropic emiten una secuencia de eventos 
 
 Smart Code Proxy toma un atajo: **reusa `@anthropic-ai/sdk` como parser**. El SDK ya sabe fusionar eventos SSE y exponer el mensaje final vía `stream.finalMessage()`.
 
-## Fuente de bytes SSE: `sse.jsonl`, no `sse.txt`
+## Fuente de bytes SSE (P2+)
 
-La reconstrucción **siempre** lee `steps/NNN/response/sse.jsonl`, nunca `sse.txt`. Razones:
+### `streaming/NNNN-chunk.ndjson`
 
-1. **`sse.jsonl` es determinista.** Se escribe vía `AuditWriterService.appendSseLine`, que usa `fsSync.appendFileSync` en el mismo callback `stream.on('data')`. El orden de líneas coincide 1:1 con el orden en que los chunks llegaron del upstream.
-2. **`sse.txt` es un raw dump de depuración.** Se escribe vía `AuditWriterService.appendSseRawChunk` (también síncrono, pero semánticamente opcional: está sujeto a `MAX_AUDIT_BYTES`, puede truncarse y no afecta a la reconstrucción).
-3. **Desacoplamiento de fuentes.** Ambos writers usan `appendFileSync`; la diferencia es semántica: `sse.txt` es volcado raw opcional sujeto a `MAX_AUDIT_BYTES` (puede truncarse) y **no** alimenta la reconstrucción. Solo `sse.jsonl` es fuente de verdad para el parser del SDK, que requiere eventos en orden estricto.
+La reconstrucción lee `steps/MM/response/streaming/*.ndjson` ordenados alfabéticamente. Cada archivo contiene una línea JSON `{i, ts, line, phase?}` escrita atómicamente por `SessionPersistence.onStreamChunk`. Los pings (`data: {"type":"ping"}`) se filtran antes de escribir.
 
-### Reensamblado del wire-format desde `sse.jsonl`
+### Reensamblado del wire-format
 
 `SseReconstructService.reassembleSseBytesFromJsonl` convierte las entradas `{i, ts, line}` en un stream SSE válido:
 

@@ -90,7 +90,7 @@ export interface SseLine {
   /**
    * Fase del step coalesced. Presente solo en steps que invocan subagentes Agent.
    * Permite reconstruir separadamente la delegación inicial y la respuesta final
-   * desde un único sse.jsonl multi-fase.
+   * desde los chunks streaming/ del step.
    */
   phase?: SsePhase;
 }
@@ -388,10 +388,8 @@ export type { ISessionMetrics as SessionMetrics } from './gateway/session-metric
  */
 export interface SseReconstructOptions {
   /**
-   * Directorio del step que contiene el archivo `sse.jsonl` (fuente de verdad
-   * para la reconstrucción, escrito de forma síncrona y por tanto con orden
-   * garantizado). El `sse.txt` del mismo directorio es solo raw dump de
-   * depuración y NO se lee aquí.
+   * Directorio del step. La implementación P2+ lee de
+   * `stepDir/response/streaming/*.ndjson` como fuente canónica.
    */
   stepDir: string;
   /** Directorio de la interacción donde se escribe el resultado (response/body.*). */
@@ -402,20 +400,11 @@ export interface SseReconstructOptions {
   originalUrl?: string;
   /** Cabeceras originales de la petición (para detectar anthropic-beta). */
   headers?: Record<string, string | string[] | undefined>;
-  /**
-   * Bytes crudos SSE escritos en `sse.txt` (raw dump).
-   * Informativo: NO afecta a la reconstrucción (que lee `sse.jsonl`).
-   */
+  /** @deprecated Informativo: campo legacy retenido para compatibilidad de llamada. */
   sseRawBytesWritten: number;
-  /**
-   * Si el raw dump `sse.txt` fue truncado por `MAX_AUDIT_BYTES`.
-   * Informativo: NO aborta la reconstrucción (fuente es `sse.jsonl`).
-   */
+  /** @deprecated Informativo: campo legacy retenido para compatibilidad de llamada. */
   sseRawTruncatedByLimit: boolean;
-  /**
-   * Si hubo un error de escritura durante la captura cruda del raw dump.
-   * Informativo: NO aborta la reconstrucción (fuente es `sse.jsonl`).
-   */
+  /** @deprecated Informativo: campo legacy retenido para compatibilidad de llamada. */
   sseRawWriteError: boolean;
   /** Contexto posicional para enriquecer el body.parsed.md generado. */
   context?: MarkdownRenderContext;

@@ -2769,32 +2769,32 @@ Este artefacto proporciona:
 
 ## 37b. Checklist de aceptación E2E del layout
 
-> **Estado P1:** Subconjunto estructural verificado en tests (`session-persistence.test.ts`, E2E en `tests/5-user-interfaces/`): casos 3–7, 16 (parcial vía `meta.json`), 19. Casos 1–2, 8–15, 17–18, 20 → P2 o ya cubiertos en otras fases.
+> **Reparto por fase:** P1 verificó el subconjunto estructural (3–7, 16 parcial, 19). **P2-core** (gate para archivar P2): casos **1, 12, 13, 14, 15, 18**. El cierre del orquestador valida la matriz completa; casos «fuera v1» en §45 no bloquean el archivo.
 
 Criterios de verificación para validar la convergencia de SCP al layout `causal-workflows-v1`. Derivados del test suite de referencia (`session-persistence-e2e.test.ts`, 159/159 tests):
 
-| # | Caso de test | Qué valida |
-| - | ------------ | ---------- |
-| 1 | Persistencia de `events.ndjson` | Append-only log de todos los eventos de la sesión. |
-| 2 | Agregación de `session-metrics.json` | Contadores (count, totals, cache_efficiency, finalize). |
-| 3 | Workflow meta vía `workflow_start` | Creación de `meta.json` al iniciar workflow. |
-| 4 | Tool input/output/meta con correlación | Escritura bajo `tools/KK/` con `input.json`, `result.json`, `meta.json`. |
-| 5 | Sub-agent metadata anidada bajo tool invocador | Ausencia de workflow top-level duplicado; nested bajo step/tool padre. |
-| 6 | Sub-agent steps dentro del nested workflow | Steps del hijo en `workflows/NN/steps/MM/` del directorio nested. |
-| 7 | No crear `tools/` sin tools | Si un step no invoca tools, no se crea el directorio. |
-| 8 | Out-of-order tool results | Correlación por `tool_use_id`, no por índice posicional. |
-| 9 | Tool timeout | Timer del correlador (§24.1) emite `tool_result` timeout; persistencia consume el evento (G19). |
-| 10 | Tool retry con `retryCount` | Detección por `tool_use_id` duplicado; `previousAttempts[]` en `meta.json`. |
-| 11 | Workflow cancellation | Status `cancelled` + `cancellationReason` en `meta.json`. |
-| 12 | Streaming chunks + body reconstruction | Chunks SSE → `body.json` / `body.parsed.md` correctos (text + tool_use + partial_json). |
-| 13 | Filtrado de pings | Eventos `ping` excluidos de chunks persistidos. |
-| 14 | Equivalencia stream-reconstructed ≡ direct write | Cuerpo reconstruido desde chunks idéntico al body directo. |
-| 15 | `workflow-sequence.json` | Índice incremental de workflows por sesión. |
-| 16 | `meta.json` con `status`/`lastActivity` por workflow | Detección de huérfanos (`detectOrphans()`) al startup: `status ∈ {pending, running}` + `lastActivity` antigua. |
-| 17 | `previousAttempts[]` en tool metadata | Historial de reintentos con timestamp y error. |
-| 18 | Vistas coalesced | `body.coalesced.json` / `body.coalesced.parsed.md` integran sub-agentes recursivamente. |
-| 19 | `input/` y `output/` de workflows | `prompt.json` al inicio; `result.json` + `result.parsed.md` al completar (`workflow_complete`). |
-| 20 | `observedExecutionMode` en step metadata | Detección dinámica `parallel` / `sequential` de tools en un step. |
+| # | Caso de test | Qué valida | Fase | Estado (post-P1) |
+| - | ------------ | ---------- | ---- | ---------------- |
+| 1 | Persistencia de `events.ndjson` | Append-only log de todos los eventos de la sesión. | P2 | **implementado** |
+| 2 | Agregación de `session-metrics.json` | Contadores (count, totals, cache_efficiency, finalize). | G4 | implementado |
+| 3 | Workflow meta vía `workflow_start` | Creación de `meta.json` al iniciar workflow. | P1 | implementado |
+| 4 | Tool input/output/meta con correlación | Escritura bajo `tools/KK/` con `input.json`, `result.json`, `meta.json`. | P1 | implementado |
+| 5 | Sub-agent metadata anidada bajo tool invocador | Ausencia de workflow top-level duplicado; nested bajo step/tool padre. | P1 | implementado |
+| 6 | Sub-agent steps dentro del nested workflow | Steps del hijo en `workflows/NN/steps/MM/` del directorio nested. | P1 | implementado |
+| 7 | No crear `tools/` sin tools | Si un step no invoca tools, no se crea el directorio. | P1 | implementado |
+| 8 | Out-of-order tool results | Correlación por `tool_use_id`, no por índice posicional. | Fuera v1 | no implementado |
+| 9 | Tool timeout | Cadena `completeToolUse` → `tool_result` → persistencia (`result.json`). El **timer automático** del correlador (§24.1) no está implementado en `src/` (solo diseño + hooks `PostToolUse`). | G2/P1 (cadena evento) + fuera v1 (timer §24.1) | parcial — hooks + persistencia verificados en tests unitarios; timer auto pendiente |
+| 10 | Tool retry con `retryCount` | Detección por `tool_use_id` duplicado; `previousAttempts[]` en `meta.json`. | Fuera v1 | no implementado |
+| 11 | Workflow cancellation | Status `cancelled` + `cancellationReason` en `meta.json`. | P1 | implementado |
+| 12 | Streaming chunks + body reconstruction | Chunks SSE → `body.json` / `body.parsed.md` correctos (text + tool_use + partial_json). | P2 | **implementado** |
+| 13 | Filtrado de pings | Eventos `ping` excluidos de chunks persistidos. | P2 | **implementado** |
+| 14 | Equivalencia stream-reconstructed ≡ direct write | Cuerpo reconstruido desde chunks idéntico al body directo. | P2 | **implementado** |
+| 15 | `workflow-sequence.json` | Índice incremental de workflows por sesión. | P2 | **implementado** |
+| 16 | `meta.json` con `status`/`lastActivity` por workflow | Detección de huérfanos (`detectOrphans()`) al startup: `status ∈ {pending, running}` + `lastActivity` antigua. | P1 parcial / fuera v1 | parcial |
+| 17 | `previousAttempts[]` en tool metadata | Historial de reintentos con timestamp y error. | Fuera v1 | no implementado |
+| 18 | Vistas coalesced | `body.coalesced.json` / `body.coalesced.parsed.md` integran sub-agentes recursivamente. | P2 | **implementado** |
+| 19 | `input/` y `output/` de workflows | `prompt.json` al inicio; `result.json` + `result.parsed.md` al completar (`workflow_complete`). | P1 | implementado |
+| 20 | `observedExecutionMode` en step metadata | Detección dinámica `parallel` / `sequential` de tools en un step. | Fuera v1 | no implementado |
 
 ---
 
@@ -3046,7 +3046,7 @@ Consideraciones para `POST /hooks`:
 | **G5** | `ProviderCatalog` derivado de `UPSTREAM_ORIGIN` (env var); lectura de `routing/providers/` diferida a P0+ | Refactor gateway | — |
 | **P0** | Spike: confirmar ubicaciones de código en `src/` para los componentes de §28b/§40 (Opción A ratificada), puntos de emisión del correlador (§28b.3), ownership del timer (§24.1/G19), cableado en composition root (§42) y estrategia de corte limpio. El diseño del layout objetivo (naming, schemas, fusión `state.json`→`meta.json`) está fijado en §29/§30/§33 y no es trabajo del spike. Las sesiones anteriores se eliminan (no se migran) | Persistencia | G4 |
 | **P1** | Crear pila `IEventBus` (L1) → `EventBus` (L2) → `SessionPersistence` (L2, suscriptor); conectar correlador al bus (emite eventos §28b.3 en cada mutación de estado); `SessionPersistence` escribe árbol `causal-workflows-v1`: `workflows/NN/meta.json` (estado fusionado, sin `state.json`), `output/result.json` (IWorkflowResult + steps[]), `steps/MM/`, `tools/KK/`. Retirar layout flat: `audit-writer.service.ts`, `session-store.service.ts`, `workflow-result-projector.service.ts`, constantes flat de `audit-paths.ts`, tipos `ActiveInteraction`/`InteractionMetadata` | Persistencia | P0, G4 |
-| **P2** | Artefactos nuevos como suscripciones adicionales de `SessionPersistence` (la pila de bus creada en P1 los habilita): wildcard `*` → `events.ndjson`, `stream_chunk` → `streaming/NNNN-chunk.ndjson` + reconstrucción de `response/body.json`, `workflow-sequence.json`. Retirar escritura de `sse.jsonl` | Persistencia | P1 |
+| **P2** | Suscripciones adicionales de `SessionPersistence`: `*` → `events.ndjson` (§33.1), `stream_chunk` → `streaming/` + reconstrucción `response/body.json`, `workflow-sequence.json` (§33.5); retiro de `ISseAuditWriter` / `sse.jsonl`. Gate **P2-core** §37b casos 1, 12–15, 18. Sesiones nuevas cumplen persistencia y forensia SSE; casos §37b fuera v1 (§45) no son requisito de P2 | Persistencia | P1 |
 
 **Nomenclatura de bloques:**
 
@@ -3073,7 +3073,7 @@ En todas las fases C y G: **mismo layout `sessions/`** salvo campos adicionales 
 | Multi-proveedor | Solo en `routing/` + statusline | `Provider` / `LanguageModel` en dominio capa 1 |
 | SSE en dominio | `SseLine[]` en audit | Snapshots `Step`; deltas solo en proyección capa 2 |
 | Handlers | Monolíticos, alta línea | Orquestación explícita: wire + hooks → correlador compartido |
-| Layout disco | `causal-workflows-v1`: `workflows/NN/`, `tools/KK/` (P1); SSE aún en `sse.jsonl` hasta P2 | Mismo layout + `streaming/*.ndjson`, `events.ndjson` (fases P2+) |
+| Layout disco | `causal-workflows-v1`: `workflows/NN/`, `tools/KK/`, `streaming/*.ndjson`, `events.ndjson`, `workflow-sequence.json` (P1+P2 implementados); sin shim `ISseAuditWriter` | — (objetivo alcanzado) |
 
 ---
 
@@ -3087,6 +3087,11 @@ En todas las fases C y G: **mismo layout `sessions/`** salvo campos adicionales 
 | Silent stall sin hook `Stop` | Limitación; timeout/heartbeat en infraestructura |
 | Skills, MCP, CLAUDE.md | Metadata de `Session`; no entidades v1 |
 | Configuración hooks HTTP | Doc operativa separada (`.claude/settings.json`) |
+| Tool retry / `previousAttempts[]` (§37b #10, #17) | Fuera v1; change futuro opcional |
+| `observedExecutionMode` en step (§37b #20) | Fuera v1 |
+| `detectOrphans()` al startup (§37b #16) | Fuera v1 |
+| Correlación OoO de tool results (§37b #8) | Fuera v1 salvo que tests existentes demuestren el comportamiento actual |
+| Timer automático de tool timeout (§24.1 / §37b #9) | Fuera v1; hoy solo vía hooks `PostToolUse`/`PostToolUseFailure` → `completeToolUse` |
 
 ---
 

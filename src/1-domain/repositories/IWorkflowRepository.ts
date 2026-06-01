@@ -1,6 +1,6 @@
 import type {
   AgentContext,
-  InteractionType,
+  WorkflowRequestKind,
   ParentContext,
   SideRequestKind,
 } from '../types/audit.types.js';
@@ -30,7 +30,7 @@ export interface OpenWorkflowOptions {
   request?: unknown;
   /** Omite `request/body.json` a nivel workflow (preflights). */
   skipWorkflowRequest?: boolean;
-  interactionType?: InteractionType;
+  workflowKind?: WorkflowRequestKind;
   sideRequestKind?: SideRequestKind;
 }
 
@@ -47,7 +47,7 @@ export interface WireWorkflowMeta {
   requestSequence: number;
   requestBodyOmitted: boolean;
   requestBodyBytes: number;
-  interactionType: InteractionType;
+  workflowKind: WorkflowRequestKind;
   sideRequestKind?: SideRequestKind;
   awaitingContinuation?: boolean;
   awaitingSince?: number;

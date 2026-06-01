@@ -167,10 +167,10 @@ export class SseReconstructService implements ISseReconstructor {
    * `interactionDir/output/body.json` y `.parsed.md`.
    */
   public async runReconstruction(opts: SseReconstructOptions): Promise<SseReconstructResult> {
-    const { interactionDir, stepCount } = opts;
+    const { workflowDir, stepCount } = opts;
     try {
       const result = await this.writeTopLevelMultiStepResponse(
-        interactionDir,
+        workflowDir,
         stepCount,
         opts.context,
       );
@@ -192,7 +192,7 @@ export class SseReconstructService implements ISseReconstructor {
 
   /** Lee los body.json de cada step (1-based) y escribe la vista top-level. */
   private async writeTopLevelMultiStepResponse(
-    interactionDir: string,
+    workflowDir: string,
     stepCount: number,
     context?: MarkdownRenderContext,
   ): Promise<{ written: boolean; error?: string }> {
@@ -200,7 +200,7 @@ export class SseReconstructService implements ISseReconstructor {
 
     for (let i = 1; i <= stepCount; i++) {
       const stepBodyPath = path.join(
-        interactionDir,
+        workflowDir,
         'steps',
         String(i).padStart(2, '0'),
         'response',
@@ -218,7 +218,7 @@ export class SseReconstructService implements ISseReconstructor {
       return { written: false, error: 'no step bodies found' };
     }
 
-    const outputDir = path.join(interactionDir, 'output');
+    const outputDir = path.join(workflowDir, 'output');
     await fs.mkdir(outputDir, { recursive: true });
 
     const multiStepObj: JsonValue = {

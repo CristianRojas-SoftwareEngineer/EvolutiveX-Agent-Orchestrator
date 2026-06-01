@@ -7,7 +7,7 @@ import {
   registerWireStepInCorrelator,
 } from './gateway-wire-step.util.js';
 import { ProxyEnvironmentConfig } from '../1-domain/types/config.types.js';
-import { AuditInteractionContext } from '../1-domain/types/audit.types.js';
+import { AuditWorkflowContext } from '../1-domain/types/audit.types.js';
 
 /**
  * Handler para orquestar la auditoría de respuestas estándar (no-SSE).
@@ -24,7 +24,7 @@ export class AuditStandardResponseHandler {
 
   public execute(
     stream: NodeJS.ReadableStream,
-    context: AuditInteractionContext,
+    context: AuditWorkflowContext,
     _contentType: string,
     responseHeaders?: Record<string, string | string[] | undefined>,
   ): void {

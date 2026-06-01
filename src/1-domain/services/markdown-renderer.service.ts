@@ -574,28 +574,28 @@ export class MarkdownRendererService {
    * Genera el heading raíz del documento según el tipo de interacción.
    */
   private buildRootHeading(type: 'request' | 'response', context?: MarkdownRenderContext): string {
-    const interactionType = context?.interactionType;
+    const workflowKind = context?.workflowKind;
     const subagentType = context?.subagentType;
     const sideRequestKind = context?.sideRequestKind;
 
     if (type === 'request') {
-      if (interactionType === 'side-request') {
+      if (workflowKind === 'side-request') {
         if (sideRequestKind === 'session-naming')
           return this.heading(1, 'Prompt del Side-request — session-naming');
         return this.heading(1, 'Prompt del Side-request');
       }
-      if (interactionType === 'client-preflight') return this.heading(1, 'Prompt del Preflight');
+      if (workflowKind === 'client-preflight') return this.heading(1, 'Prompt del Preflight');
       if (subagentType) return this.heading(1, `Prompt del Subagente (\`${subagentType}\`)`);
       return this.heading(1, 'Prompt del Usuario');
     }
 
     // response
-    if (interactionType === 'side-request') {
+    if (workflowKind === 'side-request') {
       if (sideRequestKind === 'session-naming')
         return this.heading(1, 'Respuesta del Side-request — session-naming');
       return this.heading(1, 'Respuesta del Side-request');
     }
-    if (interactionType === 'client-preflight') return this.heading(1, 'Respuesta del Preflight');
+    if (workflowKind === 'client-preflight') return this.heading(1, 'Respuesta del Preflight');
     if (subagentType) return this.heading(1, `Respuesta del Subagente (\`${subagentType}\`)`);
     return this.heading(1, 'Respuesta del Asistente');
   }
@@ -610,11 +610,11 @@ export class MarkdownRendererService {
 
     if (context.stepIndex !== undefined && context.stepCount !== undefined) {
       const interactionLabel =
-        context.interactionType === 'side-request'
+        context.workflowKind === 'side-request'
           ? context.sideRequestKind === 'session-naming'
             ? 'Side-request — session-naming'
             : 'Side-request'
-          : context.interactionType === 'client-preflight'
+          : context.workflowKind === 'client-preflight'
             ? 'Preflight'
             : context.subagentType
               ? `Subagente (\`${context.subagentType}\`)`

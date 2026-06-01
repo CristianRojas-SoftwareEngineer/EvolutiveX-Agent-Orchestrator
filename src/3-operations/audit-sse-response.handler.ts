@@ -4,7 +4,7 @@ import type { IEventBus } from '../1-domain/repositories/IEventBus.js';
 import type { AssembledInference, IStepAssembler } from '../2-services/ports/step-assembler.port.js';
 import { ProxyEnvironmentConfig } from '../1-domain/types/config.types.js';
 import {
-  AuditInteractionContext,
+  AuditWorkflowContext,
   SsePhase,
 } from '../1-domain/types/audit.types.js';
 import type { IWorkflow } from '../1-domain/interfaces/gateway/IWorkflow.js';
@@ -35,7 +35,7 @@ export class AuditSseResponseHandler {
 
   public execute(
     stream: NodeJS.ReadableStream,
-    context: AuditInteractionContext,
+    context: AuditWorkflowContext,
     _responseHeaders: Record<string, string | string[] | undefined>,
   ): void {
     const workflow = this.workflowRepo.getWorkflowBySessionId(context.auditSessionId);

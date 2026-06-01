@@ -17,6 +17,9 @@
 - [x] 3.1 Eliminar la clave `"costs"` de los 17 archivos `routing/providers/*/models/*/metadata.json`, conservando `modelId` y `displayName`
   - Archivos: `anthropic/claude-haiku-4-5`, `anthropic/claude-sonnet-4-6`, `anthropic/claude-opus-4-6`, `openrouter/deepseek-v4-flash`, `openrouter/deepseek-v4-pro`, `openrouter/ring-2.6`, `openrouter/kimi-k2.6`, `openrouter/owl-alpha`, `xiaomi/mimo-v2-omni`, `xiaomi/mimo-v2-5`, `xiaomi/mimo-v2-5-pro`, `ollama/gemini-3-flash-preview`, `ollama/minimax-m2.5`, `ollama/minimax-m2.7`, `opencode/minimax-m2.5`, `opencode/ling-2.6-flash`, `opencode/hy3-preview`
   - Criterio: ningún `metadata.json` contiene la clave `"costs"`; `npm run typecheck` pasa.
+- [x] 3.2 Eliminar la clave `"pricing_rules"` de `routing/providers/*/config.json`
+  - Proveedores: `anthropic`, `minimax`, `ollama`, `openrouter`, `opencode`, `xiaomi`
+  - Criterio: ningún `config.json` de proveedor contiene `"pricing_rules"`; `grep -rn pricing_rules routing/providers` sin resultados.
 
 ## 4. Sincronización de specs activos
 
@@ -45,3 +48,4 @@
 - [x] 6.1 `npm run test:quick` pasa sin errores (lint + typecheck + unit)
 - [x] 6.2 `grep -rn "totalCostUsd\|pricing\.types" src tests` sin resultados
 - [x] 6.3 Ningún `metadata.json` contiene la clave `"costs"`
+- [x] 6.4 Ningún `routing/providers/*/config.json` contiene la clave `"pricing_rules"`

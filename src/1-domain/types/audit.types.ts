@@ -1,4 +1,5 @@
 import type { JsonValue } from './json.types.js';
+import type { WorkflowOutcome } from './gateway/workflow.types.js';
 
 /**
  * Representa una sesión de auditoría resuelta.
@@ -35,8 +36,8 @@ export interface SubagentSummary {
   prompt: string;
   /** Tipo de subagente (general-purpose, Explore, Plan, etc.) */
   subagentType: string | null;
-  /** Estado final del subagente */
-  outcome: InteractionOutcome | 'unknown';
+  /** Estado final del subagente (valores WorkflowOutcome). */
+  outcome: WorkflowOutcome;
   /** Duración total en milisegundos */
   durationMs: number;
   /** Número de steps ejecutados por el subagente */
@@ -152,38 +153,18 @@ export interface StepMeta {
 }
 
 /**
- * Estado en memoria de un turno activo en una sesión.
- * @deprecated Reemplazado por los tipos gateway de G1 (`WorkflowKind`, `WorkflowStatus`, etc.)
- * en `src/1-domain/types/gateway/`. Retirada planificada en la fase que migre el último consumidor
- * (G4 o P, a confirmar al implementar G4). Fecha de deprecación: 2026-05-29.
+ * Clasificación del tipo de request HTTP según el contenido del body.
+ * Tipo canónico para la clasificación semántica del request en el proxy.
  */
-export type InteractionType = 'client-preflight' | 'agentic' | 'side-request';
-
-/**
- * Resultado posible de una interacción.
- * - completed: Interacción completada exitosamente (2xx)
- * - client-error: Error del cliente (4xx)
- * - upstream-error: Error del servidor upstream (5xx o fallo de conexión)
- * - truncated: Truncado por max_tokens
- * - orphaned: Interacción cerrada por cleanup (continuation nunca llegó, graceful shutdown, etc.)
- * @deprecated Reemplazado por `WorkflowOutcome` en `src/1-domain/types/gateway/workflow.types.ts`
- * (fase G1). Retirada planificada en la fase que migre el último consumidor (G4 o P, a confirmar
- * al implementar G4). Fecha de deprecación: 2026-05-29.
- */
-export type InteractionOutcome =
-  | 'completed'
-  | 'client-error'
-  | 'upstream-error'
-  | 'truncated'
-  | 'orphaned';
+export type WorkflowRequestKind = 'client-preflight' | 'agentic' | 'side-request';
 
 /**
  * Referencia de parentezco entre una interacción de subagente y el step del
  * turno padre que la originó vía un tool_use `Agent`.
  */
 export interface ParentContext {
-  /** Directorio absoluto del turno padre. */
-  parentInteractionDir: string;
+  /** Directorio absoluto del workflow padre (step padre). */
+  parentWorkflowDir: string;
   /** Índice del step del padre (1-indexado) donde se emitió el tool_use `Agent`. */
   parentStepIndex: number;
   /**
@@ -333,8 +314,8 @@ export interface SseReconstructOptions {
    * `stepDir/response/streaming/*.ndjson` como fuente canónica.
    */
   stepDir: string;
-  /** Directorio de la interacción donde se escribe el resultado (response/body.*). */
-  interactionDir: string;
+  /** Directorio del workflow donde se escribe el resultado (response/body.*). */
+  workflowDir: string;
   /** Total de steps en el turno al momento del cierre. */
   stepCount: number;
   /** URL original de la petición (para detectar beta). */
@@ -390,12 +371,10 @@ export interface AuditTruncationMeta {
 }
 
 /**
- * Contexto de interacción que los handlers de Capa 3 reciben del controller.
+ * Contexto que los handlers de Capa 3 reciben del controller.
  * Desacopla los handlers de Fastify.
- * @deprecated Reemplazado por los contratos gateway de G1. Retirada planificada en la fase que
- * migre el último consumidor (G4 o P, a confirmar al implementar G4). Fecha de deprecación: 2026-05-29.
  */
-export interface AuditInteractionContext {
+export interface AuditWorkflowContext {
   requestId: string;
   requestSequence: number;
   auditSessionId: string;
@@ -405,9 +384,9 @@ export interface AuditInteractionContext {
   requestStartTime: number;
   requestBodyBytes: number;
   requestBodyOmitted: boolean;
-  auditInteractionDir: string;
+  auditWorkflowDir: string;
   responseStatusCode: number | null;
-  interactionType?: InteractionType;
+  workflowKind?: WorkflowRequestKind;
   requestClassification?: RequestClassification;
   /** Índice del step asignado durante request audit, inmutable hasta response audit. */
   assignedStepIndex: number;
@@ -432,8 +411,8 @@ export interface AuditInteractionContext {
  * para enriquecer los body.parsed.md generados con información de ubicación en el flujo global.
  */
 export interface MarkdownRenderContext {
-  /** Tipo de interacción para etiquetas de display */
-  interactionType?: InteractionType;
+  /** Tipo de workflow para etiquetas de display */
+  workflowKind?: WorkflowRequestKind;
   /** Índice del step actual (1-indexado) */
   stepIndex?: number;
   /** Total de steps en la interacción */
@@ -444,7 +423,7 @@ export interface MarkdownRenderContext {
   modelId?: string;
   /** Path relativo a thought/content.md para referencia cruzada */
   thoughtContentPath?: string;
-  /** Subtipo de side-request (solo para interactionType='side-request') */
+  /** Subtipo de side-request (solo para workflowKind='side-request') */
   sideRequestKind?: SideRequestKind;
 }
 

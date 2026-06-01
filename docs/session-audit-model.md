@@ -163,7 +163,7 @@ flowchart LR
 
 ## 4. Protocolo HTTP y clasificación
 
-La clasificación la realiza `RequestClassifierService` (dominio); `AuditInteractionHandler` abre o continúa workflows en `IWorkflowRepository` y publica eventos.
+La clasificación la realiza `RequestClassifierService` (dominio); `AuditWorkflowHandler` abre o continúa workflows en `IWorkflowRepository` y publica eventos.
 
 | Clasificación | Comportamiento resumido | Workflow en disco |
 | ------------- | ------------------------ | ----------------- |
@@ -253,7 +253,7 @@ Todo lo demás (incluido SSE vía `stream_chunk`): `eventBus.publish(...)` → `
 
 | Handler | Rol |
 | ------- | --- |
-| `AuditInteractionHandler` | Clasificación, apertura/continuación de workflows, wire steps |
+| `AuditWorkflowHandler` | Clasificación, apertura/continuación de workflows, wire steps |
 | `AuditSseResponseHandler` | Stream SSE + reconstrucción; publica `step_response` / cierre |
 | `AuditStandardResponseHandler` | Respuestas no-SSE |
 | `AuditWorkflowClosureHandler` | Coordinación de cierre + métricas; delega proyección al bus |

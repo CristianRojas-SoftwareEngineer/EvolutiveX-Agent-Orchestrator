@@ -53,10 +53,10 @@ export class SessionResolverService {
   }
 
   /**
-   * Formatea el nombre de un directorio de interacción a partir del número de secuencia.
+   * Formatea el nombre de un directorio de workflow a partir del número de secuencia.
    * Ejemplo: '01'
    */
-  public formatAuditInteractionDirName(sequence: number): string {
+  public formatWorkflowDirName(sequence: number): string {
     return String(Math.max(0, Math.floor(sequence)) || 0).padStart(2, '0');
   }
 

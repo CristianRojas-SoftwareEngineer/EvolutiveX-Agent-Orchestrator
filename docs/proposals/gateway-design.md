@@ -1968,7 +1968,7 @@ flowchart TB
   end
 
   subgraph L3["Capa 3 — Operations"]
-    H_IN[AuditInteractionHandler]
+    H_IN[AuditWorkflowHandler]
     H_SSE[AuditSseResponseHandler]
     H_HOOK[AuditHookEventHandler]
     H_CLOSE[AuditWorkflowClosureHandler]
@@ -2814,7 +2814,7 @@ flowchart TB
   end
 
   subgraph L3["Capa 3 — Operations"]
-    H_IN[AuditInteractionHandler]
+    H_IN[AuditWorkflowHandler]
     H_SSE[AuditSseResponseHandler]
     H_CLOSE[AuditWorkflowClosureHandler]
     H_HOOK[AuditHookEventHandler]
@@ -2860,7 +2860,7 @@ flowchart TB
     R2["POST /hooks"]
   end
   subgraph L3h ["Capa 3 — Operations"]
-    H1[AuditInteractionHandler]
+    H1[AuditWorkflowHandler]
     H2[AuditSseResponseHandler]
     H3[AuditHookEventHandler]
     H4[AuditWorkflowClosureHandler]
@@ -2895,7 +2895,7 @@ flowchart TB
 | ---- | -------------------- |
 | **1** | `resolveAgentContext`, `joinToolUseToSubagent`, `buildWorkflowResult`, `deriveOutcome`, `deriveFinalText`, `IWorkflowRepository`, `IEventBus` (port abstracto §28b), tipos hook (`ClaudeHookEvent`), extensión `ParentContext` (`agentId`, `parentAgentId`), `CorrelationMethod` extendido. |
 | **2** | `InMemoryWorkflowRepository` (índices: `sessionId+agentId`, `interactionDir`, `tool_use_id`), `EventBus` (adapter §28b), `SessionPersistence` (suscriptor §28b), `AuditProjection` (`WorkflowResult` → `meta.json` / `output/result.json`), `StepAssembler`, `ProviderCatalog`. |
-| **3** | `AuditInteractionHandler` (clasificación + routing), `AuditSseResponseHandler`, `AuditHookEventHandler` (mapa hooks), `AuditWorkflowClosureHandler` (cierre + resultado). |
+| **3** | `AuditWorkflowHandler` (clasificación + routing), `AuditSseResponseHandler`, `AuditHookEventHandler` (mapa hooks), `AuditWorkflowClosureHandler` (cierre + resultado). |
 | **5** | `POST /v1/messages` (proxy), `POST /hooks` (excluida de side-interactions, respuesta rápida 2xx). |
 
 ---
@@ -3003,7 +3003,7 @@ src/1-domain/
 
 | Handler | Borde | Orquestación |
 | ------- | ----- | ------------ |
-| `AuditInteractionHandler` | Wire | Clasificar → `resolveAgentContext(headers)` → abrir workflow/step en repo → `auditProjection.writeRequest`. |
+| `AuditWorkflowHandler` | Wire | Clasificar → `resolveAgentContext(headers)` → abrir workflow/step en repo → `auditProjection.writeRequest`. |
 | `AuditSseResponseHandler` | Wire | `tee` → `stepAssembler.onEvent` → al `message_stop`: completar step en repo → `projection.writeSse` → registrar pending tools. |
 | `AuditWorkflowClosureHandler` | Wire + Hooks | Invocar `buildWorkflowResult` → persistir snapshot → marcar workflow cerrado. Fase transitoria: cierre por wire `stop_reason`; fase objetivo: cierre por hook `Stop`/`SubagentStop`. |
 | `AuditHookEventHandler` | Hooks | `UserPromptSubmit` / `Stop` / `SubagentStart` / `SubagentStop` / `PreToolUse` / `PostToolUse` → mutar repo → delegar cierre a `WorkflowClosureHandler`. |

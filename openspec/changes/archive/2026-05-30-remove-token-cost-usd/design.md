@@ -4,8 +4,9 @@ El gateway registra métricas de consumo de tokens (input / output / caché) cor
 `IWorkflowResult.usage`, `session-metrics.json` y los servicios de agregación por modelo. Sin embargo,
 el diseño histórico también preveía una característica de **costo en USD por uso de tokens** que nunca
 llegó a implementarse: es un esqueleto inerte compuesto por tipos TypeScript sin importadores,
-un campo `totalCostUsd` siempre `undefined`, datos de precio en archivos `metadata.json` que ningún
-servicio lee, y documentación de referencia que describe la fórmula de cálculo.
+un campo `totalCostUsd` siempre `undefined`, datos de precio en archivos `metadata.json` y
+`pricing_rules` en `config.json` que ningún servicio lee, y documentación de referencia que describe
+la fórmula de cálculo.
 
 Esta característica no aporta valor real porque el gateway se usa con proveedores de pago por uso,
 planes de tokens y proveedores gratuitos, y el mismo modelo puede costar distinto (o nada) según el
@@ -40,11 +41,14 @@ La eliminación del esqueleto de costo no pertenece a ninguna fase de la migraci
 (bloques C/G/P). Es un change de limpieza que libera el terreno antes del bloque P. No se inscribe
 en el registro de fases del orquestador, aunque su `proposal.md` menciona la coordinación.
 
-### Conservar `metadata.json`, eliminar solo la clave `"costs"`
+### Conservar `metadata.json` y `config.json`, eliminar solo claves de precio
 
 Los archivos `routing/providers/*/models/*/metadata.json` contienen `modelId` y `displayName`, útiles
-para routing y presentación de statusline. Solo la clave `"costs"` (datos de precio) es el objetivo;
-los archivos se conservan sin ella.
+para routing y presentación de statusline. Solo la clave `"costs"` (datos de precio por modelo) es el
+objetivo; los archivos se conservan sin ella.
+
+Los `routing/providers/*/config.json` conservan URL, `AUTH_METHOD` y modelos por defecto; se elimina
+`pricing_rules` (espejo del esquema de `pricing.types.ts`, sin consumidores en scripts ni gateway).
 
 ## Inventario de eliminación
 
@@ -55,6 +59,7 @@ los archivos se conservan sin ella.
 | `build-workflow-result.ts:31` | Eliminar propiedad + comentario | Inicialización del campo eliminado |
 | `build-workflow-result.test.ts:53` | Eliminar aserción | Test del campo eliminado |
 | `routing/**/metadata.json` (17 archivos) | Eliminar clave `"costs"` | Ningún servicio la consume |
+| `routing/providers/*/config.json` (6 proveedores) | Eliminar clave `"pricing_rules"` | Esqueleto de precio; sin importadores |
 | `docs/how-to-calculate-anthropic-api-costs.md` | Borrar archivo | Trata exclusivamente de costo en USD |
 | `docs/how-to-calculate-openrouter-api-costs.md` | Borrar archivo | Trata exclusivamente de costo en USD |
 | `docs/proposals/gateway-design.md` | Limpiar referencias a costo | `totalCostUsd`, `pricingService.estimate`, `calculateCost`, enlaces a docs de cálculo, mención de `pricing.types.ts`; preservar semántica de `usage` |

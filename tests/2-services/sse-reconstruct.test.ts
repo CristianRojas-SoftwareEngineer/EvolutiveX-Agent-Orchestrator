@@ -75,7 +75,7 @@ describe('Test de Integración - SseReconstructService (fuente: sse.jsonl)', () 
   it('debería reconstruir response/body.* desde sse.jsonl usando el SDK', async () => {
     const result = await sseReconstructService.runReconstruction({
       stepDir,
-      interactionDir,
+      workflowDir: interactionDir,
       stepCount: 1,
       originalUrl: 'https://api.anthropic.com/v1/messages',
       headers: {},
@@ -184,7 +184,7 @@ describe('SseReconstructService - resiliencia frente a sse.txt corrupto', () => 
   it('reconstruye correctamente ignorando un sse.txt desordenado', async () => {
     const result = await service.runReconstruction({
       stepDir,
-      interactionDir,
+      workflowDir: interactionDir,
       stepCount: 1,
       sseRawBytesWritten: 1,
       sseRawTruncatedByLimit: false,
@@ -209,7 +209,7 @@ describe('SseReconstructService - resiliencia frente a sse.txt corrupto', () => 
   it('reconstruye aunque sse.txt haya sido truncado o haya fallado escritura', async () => {
     const result = await service.runReconstruction({
       stepDir,
-      interactionDir,
+      workflowDir: interactionDir,
       stepCount: 1,
       sseRawBytesWritten: 0,
       sseRawTruncatedByLimit: true,
@@ -265,7 +265,7 @@ describe('SseReconstructService - fixture real (sessions/ histórico)', () => {
   it('reconstruye el step real "title-gen" (side-request con end_turn)', async () => {
     const result = await service.runReconstruction({
       stepDir,
-      interactionDir,
+      workflowDir: interactionDir,
       stepCount: 1,
       sseRawBytesWritten: 1349,
       sseRawTruncatedByLimit: false,

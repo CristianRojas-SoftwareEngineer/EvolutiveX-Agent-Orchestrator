@@ -7,6 +7,7 @@ El gateway se usa con proveedores de pago por uso, planes de tokens y proveedore
 - Se elimina el campo `totalCostUsd?: number` de `IWorkflowResult` y su inicialización `undefined` en `buildWorkflowResult`.
 - Se borra `src/1-domain/types/pricing.types.ts` (tipos `ModelCosts`, `PricingModelDefinition`, `ModelPricingConfig`, `PricingDefaultModifiers`); no tenía importadores en `src/`.
 - Se elimina la clave `"costs"` de los 17 archivos `routing/providers/*/models/*/metadata.json`, conservando `modelId` y `displayName`.
+- Se elimina la clave `"pricing_rules"` de los `routing/providers/*/config.json` (metadatos de precio no consumidos en runtime; mismo esqueleto que `pricing.types.ts`).
 - Se borran `docs/how-to-calculate-anthropic-api-costs.md` y `docs/how-to-calculate-openrouter-api-costs.md`.
 - Se limpian en `docs/proposals/gateway-design.md` todas las referencias a `totalCostUsd`, `pricingService.estimate`, `calculateCost`, los enlaces a los docs de cálculo y la mención a `pricing.types.ts`, preservando la semántica de consumo de tokens (`usage`, agregación por hop).
 - Se elimina de los tests la aserción `expect(result.totalCostUsd).toBeUndefined()`.
@@ -36,5 +37,6 @@ _(ninguna)_
 - **`src/1-domain/services/gateway`** (capa 1): `build-workflow-result.ts` (propiedad + comentario).
 - **`tests/1-domain/gateway`**: `build-workflow-result.test.ts` (una aserción).
 - **`routing/providers/*/models/*/metadata.json`** (17 archivos): clave `"costs"` eliminada.
+- **`routing/providers/*/config.json`**: clave `"pricing_rules"` eliminada.
 - **`docs/`**: borrado de dos archivos `how-to-calculate-*.md`; limpieza de referencias en `gateway-design.md`.
 - **`openspec/specs/`**: deltas MODIFIED en `gateway-closure-services` y `gateway-workflow-lifecycle`.

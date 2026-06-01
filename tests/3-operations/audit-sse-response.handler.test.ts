@@ -6,7 +6,7 @@ import type { IEventBus } from '../../src/1-domain/repositories/IEventBus.js';
 import type { IWorkflow } from '../../src/1-domain/interfaces/gateway/IWorkflow.js';
 import { StepAssemblerService } from '../../src/2-services/step-assembler.service.js';
 import { WorkflowRepositoryService } from '../../src/2-services/workflow-repository.service.js';
-import { AuditInteractionContext } from '../../src/1-domain/types/audit.types.js';
+import { AuditWorkflowContext } from '../../src/1-domain/types/audit.types.js';
 import { makeTestConfig as makeConfig } from '../helpers/test-config.js';
 
 function makeEventBus(overrides: Partial<IEventBus> = {}): IEventBus {
@@ -58,7 +58,7 @@ function stubWorkflow(id = 'session-1'): IWorkflow {
   return { id, sessionId: id, kind: 'main', status: 'running', steps: [], startedAt: new Date() };
 }
 
-function makeContext(overrides: Partial<AuditInteractionContext> = {}): AuditInteractionContext {
+function makeContext(overrides: Partial<AuditWorkflowContext> = {}): AuditWorkflowContext {
   return {
     requestId: 'req-1',
     requestSequence: 1,
@@ -69,9 +69,9 @@ function makeContext(overrides: Partial<AuditInteractionContext> = {}): AuditInt
     requestStartTime: Date.now(),
     requestBodyBytes: 100,
     requestBodyOmitted: false,
-    auditInteractionDir: '/tmp/sessions/session-1/interactions/000001_req-1',
+    auditWorkflowDir: '/tmp/sessions/session-1/interactions/000001_req-1',
     responseStatusCode: 200,
-    interactionType: 'agentic',
+    workflowKind: 'agentic',
     assignedStepIndex: 1,
     ...overrides,
   };

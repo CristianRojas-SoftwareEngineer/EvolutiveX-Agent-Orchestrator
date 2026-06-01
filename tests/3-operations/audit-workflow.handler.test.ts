@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { AuditInteractionHandler } from '../../src/3-operations/audit-interaction.handler.js';
+import { AuditWorkflowHandler } from '../../src/3-operations/audit-workflow.handler.js';
 import { SessionResolverService } from '../../src/1-domain/services/session-resolver.service.js';
 import { WorkflowRepositoryService } from '../../src/2-services/workflow-repository.service.js';
 import type { IEventBus } from '../../src/1-domain/repositories/IEventBus.js';
@@ -29,7 +29,7 @@ function createTestStack(init?: (repo: WorkflowRepositoryService) => void) {
   const workflowRepo = new WorkflowRepositoryService(eventBus);
   init?.(workflowRepo);
   const config = makeConfig();
-  const handler = new AuditInteractionHandler(
+  const handler = new AuditWorkflowHandler(
     new SessionResolverService(),
     AUDIT_BASE,
     workflowRepo,
@@ -49,7 +49,7 @@ function seedParentWithAgentPending(
   const wf = repo.openWorkflow(
     sessionId,
     { isSubagentRequest: false, agentId: undefined },
-    { forceNew: true, layoutIndex: 0, interactionType: 'agentic' },
+    { forceNew: true, layoutIndex: 0, workflowKind: 'agentic' },
   );
   let stepId = 'step-parent-1';
   for (let i = 0; i < parentStepIndex; i++) {
@@ -69,7 +69,7 @@ function seedParentWithAgentPending(
     requestSequence: 1,
     requestBodyOmitted: false,
     requestBodyBytes: 100,
-    interactionType: 'agentic',
+    workflowKind: 'agentic',
   });
   const toolUse: IToolUse = {
     id: toolUseId,
@@ -125,7 +125,7 @@ const SIDE_REQUEST_BODY = Buffer.from(
   }),
 );
 
-describe('AuditInteractionHandler', () => {
+describe('AuditWorkflowHandler', () => {
   it('debería clasificar fresh: abrir workflow y registrar step', async () => {
     const { handler, workflowRepo, eventBus } = createTestStack();
     const result = await handler.execute({
@@ -134,9 +134,9 @@ describe('AuditInteractionHandler', () => {
       requestId: 'req-1',
     });
     expect(result).not.toBeNull();
-    expect(result!.interactionType).toBe('agentic');
+    expect(result!.workflowKind).toBe('agentic');
     expect(result!.requestClassification).toEqual({ type: 'fresh' });
-    expect(result!.auditInteractionDir).toContain('workflows');
+    expect(result!.auditWorkflowDir).toContain('workflows');
     expect(result!.workflowId).toContain('my-session-wire');
     expect(workflowRepo.getWorkflow(result!.workflowId)?.steps.length).toBe(1);
     expect(eventBus.events.some((e) => e.type === 'workflow_start')).toBe(true);
@@ -158,7 +158,7 @@ describe('AuditInteractionHandler', () => {
       }),
     ]);
     expect(r1!.workflowId).not.toBe(r2!.workflowId);
-    expect(r1!.auditInteractionDir).not.toBe(r2!.auditInteractionDir);
+    expect(r1!.auditWorkflowDir).not.toBe(r2!.auditWorkflowDir);
     const running = workflowRepo.getAllRunningWorkflows().filter((w) => w.sessionId === 's');
     expect(running.length).toBeGreaterThanOrEqual(2);
   });
@@ -175,9 +175,9 @@ describe('AuditInteractionHandler', () => {
       requestId: 'req-2',
     });
     expect(result).not.toBeNull();
-    expect(result!.interactionType).toBe('agentic');
+    expect(result!.workflowKind).toBe('agentic');
     expect(result!.requestClassification).toEqual({ type: 'continuation' });
-    expect(result!.auditInteractionDir.replace(/\\/g, '/')).toContain('workflows/01');
+    expect(result!.auditWorkflowDir.replace(/\\/g, '/')).toContain('workflows/01');
     expect(eventBus.events.filter((e) => e.type === 'step_request').length).toBeGreaterThanOrEqual(1);
   });
 
@@ -200,7 +200,7 @@ describe('AuditInteractionHandler', () => {
       rawBody: QUOTA_BODY,
       requestId: 'req-1',
     });
-    expect(result!.interactionType).toBe('client-preflight');
+    expect(result!.workflowKind).toBe('client-preflight');
     const start = eventBus.events.find((e) => e.type === 'workflow_start');
     expect((start?.payload as Record<string, unknown>).request).toBeUndefined();
   });
@@ -229,15 +229,15 @@ describe('AuditInteractionHandler', () => {
     expect(lastStep.stepIndex).toBeGreaterThanOrEqual(1);
   });
 
-  it('debería clasificar side-request con interactionType side-request', async () => {
+  it('debería clasificar side-request con workflowKind side-request', async () => {
     const { handler, workflowRepo } = createTestStack();
     const result = await handler.execute({
       headers: { 'x-cc-audit-session': 'test' },
       rawBody: SIDE_REQUEST_BODY,
       requestId: 'req-side',
     });
-    expect(result!.interactionType).toBe('side-request');
-    expect(workflowRepo.getWireMeta(result!.workflowId)?.interactionType).toBe('side-request');
+    expect(result!.workflowKind).toBe('side-request');
+    expect(workflowRepo.getWireMeta(result!.workflowId)?.workflowKind).toBe('side-request');
   });
 
   it('fresh con pending Agent único → unique-pending y consume pending', async () => {
@@ -250,7 +250,7 @@ describe('AuditInteractionHandler', () => {
       requestId: 'sub-req-1',
     });
     expect(result).not.toBeNull();
-    expect(result!.auditInteractionDir.replace(/\\/g, '/')).toMatch(/workflows\/\d{2}$/);
+    expect(result!.auditWorkflowDir.replace(/\\/g, '/')).toMatch(/workflows\/\d{2}$/);
     const parentCtx = lastSubWorkflowMeta(workflowRepo);
     expect(parentCtx).toMatchObject({
       triggeringToolUseId: 'toolu_unique',
@@ -294,10 +294,10 @@ describe('AuditInteractionHandler', () => {
     });
     const stale = workflowRepo.findStaleWorkflowsAwaitingContinuation(
       's',
-      AuditInteractionHandler.ORPHAN_MAX_AGE_MS,
+      AuditWorkflowHandler.ORPHAN_MAX_AGE_MS,
     );
     expect(stale.length).toBe(1);
-    await handler.closeOrphanInteraction(stale[0]);
+    await handler.closeOrphanWorkflow(stale[0]);
     expect(workflowRepo.getWorkflow(stale[0].id)?.result?.outcome).toBe('orphaned');
   });
 
@@ -316,7 +316,7 @@ describe('AuditInteractionHandler', () => {
     });
     const stale = workflowRepo.findStaleWorkflowsAwaitingContinuation(
       'test-session',
-      AuditInteractionHandler.ORPHAN_MAX_AGE_MS,
+      AuditWorkflowHandler.ORPHAN_MAX_AGE_MS,
     );
     expect(stale.length).toBe(0);
   });

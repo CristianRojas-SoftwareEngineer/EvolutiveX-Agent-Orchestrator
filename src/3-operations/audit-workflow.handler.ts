@@ -16,7 +16,7 @@ import {
 import {
   AgentContext,
   CorrelationMethod,
-  InteractionType,
+  WorkflowRequestKind,
   ParentContext,
   RequestClassification,
 } from '../1-domain/types/audit.types.js';
@@ -25,14 +25,14 @@ import type { JsonValue } from '../1-domain/types/json.types.js';
 import type { AnthropicRequest } from '../1-domain/types/anthropic.types.js';
 import { ProxyEnvironmentConfig } from '../1-domain/types/config.types.js';
 import type { Logger } from '../1-domain/types/logger.types.js';
-export interface AuditInteractionResult {
+export interface AuditWorkflowResult {
   /** Ruta absoluta al directorio base del workflow (`sessions/<id>/workflows/NN`). */
-  auditInteractionDir: string;
+  auditWorkflowDir: string;
   workflowId: string;
   requestBodyOmitted: boolean;
   requestSequence: number;
   auditSessionId: string;
-  interactionType: InteractionType;
+  workflowKind: WorkflowRequestKind;
   requestClassification: RequestClassification;
   /** Índice del step asignado durante request audit, inmutable hasta response audit. */
   assignedStepIndex: number;
@@ -47,7 +47,7 @@ export interface AuditInteractionResult {
  * Handler para orquestar la auditoría de la interacción entrante.
  * Clasifica el request, abre workflows en el correlador y emite eventos al bus.
  */
-export class AuditInteractionHandler {
+export class AuditWorkflowHandler {
   /** Umbral de antigüedad (ms) para considerar un workflow awaiting como orphan. */
   static readonly ORPHAN_MAX_AGE_MS = 60_000;
 
@@ -64,7 +64,7 @@ export class AuditInteractionHandler {
     headers: Record<string, string | string[] | undefined>;
     rawBody: Buffer;
     requestId: string;
-  }): Promise<AuditInteractionResult | null> {
+  }): Promise<AuditWorkflowResult | null> {
     const auditSession = this.sessionResolver.getAuditSessionId(params.headers);
     const auditSessionId = auditSession.sessionId;
 
@@ -101,7 +101,7 @@ export class AuditInteractionHandler {
     }
 
     if (classification.type === 'fresh') {
-      await this.closeOrphanInteractions(auditSessionId);
+      await this.closeOrphanWorkflows(auditSessionId);
 
       const webSearchPending = this.findPendingWebSearch(auditSessionId);
       if (webSearchPending) {
@@ -188,7 +188,7 @@ export class AuditInteractionHandler {
     stepIndex: number,
     headersForAudit: Record<string, string | string[] | undefined>,
     rawBody: Buffer,
-    _interactionType: InteractionType,
+    _interactionType: WorkflowRequestKind,
   ): { step: IStep; omitted: boolean } {
     const { parsed, omitted } = this.parseRequestPayload(rawBody);
     const step: IStep = {
@@ -219,7 +219,7 @@ export class AuditInteractionHandler {
 
   private async openWireWorkflow(
     auditSessionId: string,
-    interactionType: InteractionType,
+    workflowKind: WorkflowRequestKind,
     rawBody: Buffer,
     headersForAudit: Record<string, string | string[] | undefined>,
     options: {
@@ -235,7 +235,7 @@ export class AuditInteractionHandler {
     const workflow = this.workflowRepo.openWorkflow(auditSessionId, agentCtx, {
       forceNew: true,
       layoutIndex,
-      interactionType,
+      workflowKind,
       request: options.skipWorkflowRequest ? undefined : (parsed ?? undefined),
       skipWorkflowRequest: options.skipWorkflowRequest,
       ...(options.sideRequestKind ? { sideRequestKind: options.sideRequestKind } : {}),
@@ -246,7 +246,7 @@ export class AuditInteractionHandler {
       requestSequence: seq,
       requestBodyOmitted: omitted,
       requestBodyBytes: rawBody.length,
-      interactionType,
+      workflowKind,
       modelId: extractModelFromRequestBody(rawBody) ?? undefined,
       ...(options.sideRequestKind ? { sideRequestKind: options.sideRequestKind } : {}),
     });
@@ -256,7 +256,7 @@ export class AuditInteractionHandler {
       1,
       headersForAudit,
       rawBody,
-      interactionType,
+      workflowKind,
     );
 
     return {
@@ -273,17 +273,17 @@ export class AuditInteractionHandler {
     seq: number,
     omitted: boolean,
     classification: RequestClassification,
-    interactionType: InteractionType,
+    workflowKind: WorkflowRequestKind,
     assignedStepIndex: number,
-    extras: Partial<AuditInteractionResult> = {},
-  ): AuditInteractionResult {
+    extras: Partial<AuditWorkflowResult> = {},
+  ): AuditWorkflowResult {
     return {
-      auditInteractionDir: this.workflowDirAbs(workflow.sessionId, layoutIndex),
+      auditWorkflowDir: this.workflowDirAbs(workflow.sessionId, layoutIndex),
       workflowId: workflow.id,
       requestBodyOmitted: omitted,
       requestSequence: seq,
       auditSessionId: workflow.sessionId,
-      interactionType,
+      workflowKind: workflowKind,
       requestClassification: classification,
       assignedStepIndex,
       ...extras,
@@ -295,7 +295,7 @@ export class AuditInteractionHandler {
     headersForAudit: Record<string, string | string[] | undefined>,
     auditSessionId: string,
     classification: RequestClassification,
-  ): Promise<AuditInteractionResult> {
+  ): Promise<AuditWorkflowResult> {
     const { workflow, layoutIndex, seq, omitted } = await this.openWireWorkflow(
       auditSessionId,
       'agentic',
@@ -364,12 +364,12 @@ export class AuditInteractionHandler {
     classification: RequestClassification,
     match: { workflow: IWorkflow; pendings: IToolUse[] },
     agentCtx?: AgentContext,
-  ): Promise<AuditInteractionResult> {
+  ): Promise<AuditWorkflowResult> {
     return this.workflowRepo.withSessionLock(auditSessionId, async () => {
       const parentWorkflow = match.workflow;
       const parentMeta = this.workflowRepo.getWireMeta(parentWorkflow.id);
       const parentLayoutIndex = parentMeta?.layoutIndex ?? 0;
-      const parentInteractionDir = this.workflowDirAbs(auditSessionId, parentLayoutIndex);
+      const parentWorkflowDir = this.workflowDirAbs(auditSessionId, parentLayoutIndex);
 
       const parentStepIndex = match.pendings.reduce(
         (min, p) => Math.min(min, this.stepIndexForToolUse(parentWorkflow, p)),
@@ -406,7 +406,7 @@ export class AuditInteractionHandler {
       const { parsed, omitted } = this.parseRequestPayload(params.rawBody);
 
       const parentContext: ParentContext = {
-        parentInteractionDir,
+        parentWorkflowDir,
         parentStepIndex,
         triggeringToolUseId,
         correlationStatus,
@@ -437,7 +437,7 @@ export class AuditInteractionHandler {
         requestSequence: subSeq,
         requestBodyOmitted: omitted,
         requestBodyBytes: params.rawBody.length,
-        interactionType: 'agentic',
+        workflowKind: 'agentic',
         parentContext,
         modelId: extractModelFromRequestBody(params.rawBody) ?? undefined,
       });
@@ -445,12 +445,12 @@ export class AuditInteractionHandler {
       this.registerWireStepRequest(subWorkflow, 1, headersForAudit, params.rawBody, 'agentic');
 
       return {
-        auditInteractionDir: this.workflowDirAbs(auditSessionId, subLayoutIndex),
+        auditWorkflowDir: this.workflowDirAbs(auditSessionId, subLayoutIndex),
         workflowId: subWorkflow.id,
         requestBodyOmitted: omitted,
         requestSequence: subSeq,
         auditSessionId,
-        interactionType: 'agentic',
+        workflowKind: 'agentic',
         requestClassification: classification,
         assignedStepIndex: 1,
       };
@@ -476,7 +476,7 @@ export class AuditInteractionHandler {
     parentWorkflow: IWorkflow;
     consumePending: () => IToolUse | undefined;
     onConsumed?: (toolUse: IToolUse, stepIndex: number) => void;
-  }): Promise<AuditInteractionResult> {
+  }): Promise<AuditWorkflowResult> {
     return this.workflowRepo.withSessionLock(params.auditSessionId, async () => {
       const pending = params.consumePending();
       const parentMeta = this.workflowRepo.getWireMeta(params.parentWorkflow.id);
@@ -516,7 +516,7 @@ export class AuditInteractionHandler {
     parentWorkflow: IWorkflow;
     consumePending: () => IToolUse | undefined;
     onConsumed?: (toolUse: IToolUse, stepIndex: number) => void;
-  }): Promise<AuditInteractionResult | null> {
+  }): Promise<AuditWorkflowResult | null> {
     return this.workflowRepo.withSessionLock(params.auditSessionId, async () => {
       const pending = params.consumePending();
       if (!pending) {
@@ -557,7 +557,7 @@ export class AuditInteractionHandler {
     auditSessionId: string,
     classification: RequestClassification,
     match: { workflow: IWorkflow; pendings: IToolUse[] },
-  ): Promise<AuditInteractionResult> {
+  ): Promise<AuditWorkflowResult> {
     return this.handleInternalToolStep({
       rawBody: params.rawBody,
       headersForAudit,
@@ -575,7 +575,7 @@ export class AuditInteractionHandler {
     auditSessionId: string,
     classification: RequestClassification,
     match: { workflow: IWorkflow; pendings: IToolUse[] },
-  ): Promise<AuditInteractionResult | null> {
+  ): Promise<AuditWorkflowResult | null> {
     return this.tryHandleInternalToolStep({
       rawBody: params.rawBody,
       headersForAudit,
@@ -592,7 +592,7 @@ export class AuditInteractionHandler {
     headersForAudit: Record<string, string | string[] | undefined>,
     auditSessionId: string,
     classification: RequestClassification,
-  ): Promise<AuditInteractionResult> {
+  ): Promise<AuditWorkflowResult> {
     const toolUseIds = this.extractToolUseIdsFromBody(params.rawBody);
     const parentWorkflow = toolUseIds.length
       ? this.workflowRepo.findWorkflowByToolUseId(auditSessionId, toolUseIds[0])
@@ -663,7 +663,7 @@ export class AuditInteractionHandler {
         parentMeta?.requestSequence ?? 0,
         parentMeta?.requestBodyOmitted ?? false,
         classification,
-        parentMeta?.interactionType ?? 'agentic',
+        parentMeta?.workflowKind ?? 'agentic',
         agentContinuationTarget.targetStepIndex,
         { coalescedAgentContinuation: agentContinuationTarget },
       );
@@ -675,7 +675,7 @@ export class AuditInteractionHandler {
       stepIndex,
       headersForAudit,
       params.rawBody,
-      parentMeta?.interactionType ?? 'agentic',
+      parentMeta?.workflowKind ?? 'agentic',
     );
 
     for (const toolUseId of toolUseIds) {
@@ -688,7 +688,7 @@ export class AuditInteractionHandler {
       parentMeta?.requestSequence ?? 0,
       parentMeta?.requestBodyOmitted ?? false,
       classification,
-      parentMeta?.interactionType ?? 'agentic',
+      parentMeta?.workflowKind ?? 'agentic',
       stepIndex,
     );
   }
@@ -724,7 +724,7 @@ export class AuditInteractionHandler {
     headersForAudit: Record<string, string | string[] | undefined>,
     auditSessionId: string,
     classification: RequestClassification,
-  ): Promise<AuditInteractionResult> {
+  ): Promise<AuditWorkflowResult> {
     const { workflow, layoutIndex, seq, omitted } = await this.openWireWorkflow(
       auditSessionId,
       'client-preflight',
@@ -748,7 +748,7 @@ export class AuditInteractionHandler {
     headersForAudit: Record<string, string | string[] | undefined>,
     auditSessionId: string,
     classification: RequestClassification,
-  ): Promise<AuditInteractionResult> {
+  ): Promise<AuditWorkflowResult> {
     const isSessionNaming = await this.detectSessionNamingSideRequest(auditSessionId, params.rawBody);
     const { workflow, layoutIndex, seq, omitted } = await this.openWireWorkflow(
       auditSessionId,
@@ -791,7 +791,7 @@ export class AuditInteractionHandler {
     headersForAudit: Record<string, string | string[] | undefined>,
     auditSessionId: string,
     classification: RequestClassification,
-  ): Promise<AuditInteractionResult> {
+  ): Promise<AuditWorkflowResult> {
     const { workflow, layoutIndex, seq, omitted } = await this.openWireWorkflow(
       auditSessionId,
       'client-preflight',
@@ -831,13 +831,13 @@ export class AuditInteractionHandler {
     }
   }
 
-  private async closeOrphanInteractions(sessionId: string): Promise<void> {
+  private async closeOrphanWorkflows(sessionId: string): Promise<void> {
     const stale = this.workflowRepo.findStaleWorkflowsAwaitingContinuation(
       sessionId,
-      AuditInteractionHandler.ORPHAN_MAX_AGE_MS,
+      AuditWorkflowHandler.ORPHAN_MAX_AGE_MS,
     );
     for (const workflow of stale) {
-      await this.closeOrphanInteraction(workflow);
+      await this.closeOrphanWorkflow(workflow);
     }
   }
 
@@ -850,7 +850,7 @@ export class AuditInteractionHandler {
     return this.workflowRepo.getAllRunningWorkflows();
   }
 
-  public async closeOrphanInteraction(workflow: IWorkflow): Promise<void> {
+  public async closeOrphanWorkflow(workflow: IWorkflow): Promise<void> {
     const meta = this.workflowRepo.getWireMeta(workflow.id);
     const lostPendings = this.collectLostAgentPendings(workflow.id);
     const lostWebSearch = this.collectLostPendingsByName(workflow.id, 'web_search');

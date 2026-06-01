@@ -121,13 +121,13 @@ export class WorkflowRepositoryService implements IWorkflowRepository {
       startedAt: new Date(),
     });
     this.workflows.set(workflowId, workflow);
-    if (options.interactionType) {
+    if (options.workflowKind) {
       this.wireMeta.set(workflowId, {
         layoutIndex,
         requestSequence: 0,
         requestBodyOmitted: false,
         requestBodyBytes: 0,
-        interactionType: options.interactionType,
+        workflowKind: options.workflowKind,
         ...(options.sideRequestKind ? { sideRequestKind: options.sideRequestKind } : {}),
       });
     }
@@ -137,7 +137,7 @@ export class WorkflowRepositoryService implements IWorkflowRepository {
       ...(options.request !== undefined && !options.skipWorkflowRequest
         ? { request: options.request }
         : {}),
-      ...(options.interactionType ? { interactionType: options.interactionType } : {}),
+      ...(options.workflowKind ? { workflowKind: options.workflowKind } : {}),
     });
     return workflow;
   }
@@ -175,7 +175,7 @@ export class WorkflowRepositoryService implements IWorkflowRepository {
       requestSequence: 0,
       requestBodyOmitted: false,
       requestBodyBytes: 0,
-      interactionType: 'agentic',
+      workflowKind: 'agentic',
       ...(options.parentContext ? { parentContext: options.parentContext } : {}),
     });
     this.emit('workflow_spawn', workflow.id, {

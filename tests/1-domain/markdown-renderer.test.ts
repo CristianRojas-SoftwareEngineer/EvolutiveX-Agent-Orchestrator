@@ -383,7 +383,7 @@ describe('MarkdownRendererService', () => {
     it('debería renderizar heading de side-request con context', () => {
       const parsed = { stop_reason: 'end_turn', content: [{ type: 'text', text: 'OK' }] };
       const md = renderer.renderResponseConversationMarkdown(parsed, {
-        interactionType: 'side-request',
+        workflowKind: 'side-request',
       });
       expect(md).toContain('# Respuesta del Side-request');
     });
@@ -391,7 +391,7 @@ describe('MarkdownRendererService', () => {
     it('debería renderizar heading de preflight con context', () => {
       const parsed = { stop_reason: 'end_turn', content: [{ type: 'text', text: 'OK' }] };
       const md = renderer.renderResponseConversationMarkdown(parsed, {
-        interactionType: 'client-preflight',
+        workflowKind: 'client-preflight',
       });
       expect(md).toContain('# Respuesta del Preflight');
     });
@@ -399,7 +399,7 @@ describe('MarkdownRendererService', () => {
     it('debería incluir stepIndex y stepCount en header', () => {
       const parsed = { stop_reason: 'end_turn', content: [{ type: 'text', text: 'OK' }] };
       const md = renderer.renderResponseConversationMarkdown(parsed, {
-        interactionType: 'agentic',
+        workflowKind: 'agentic',
         stepIndex: 2,
         stepCount: 5,
         modelId: 'claude-3-5-sonnet-20241022',

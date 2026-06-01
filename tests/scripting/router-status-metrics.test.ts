@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
   coerceMetricNumber,
-  aggregateInteractionMetrics,
+  aggregateSessionMetrics,
   type ClaudeSettingsEnv,
 } from '../../scripting/router-status.js';
 
@@ -29,7 +29,7 @@ describe('coerceMetricNumber', () => {
   });
 });
 
-describe('aggregateInteractionMetrics', () => {
+describe('aggregateSessionMetrics', () => {
   let tempDir: string;
 
   afterEach(() => {
@@ -43,7 +43,7 @@ describe('aggregateInteractionMetrics', () => {
 
   it('retorna ceros si session-metrics.json no existe', () => {
     const dir = sessionDir();
-    const m = aggregateInteractionMetrics(dir, configuredEnv, routingPath);
+    const m = aggregateSessionMetrics(dir, configuredEnv, routingPath);
     expect(m.lite.count).toBe(0);
     expect(m.standard.inputTokens).toBe(0);
     expect(m.reasoning.outputTokens).toBe(0);
@@ -52,7 +52,7 @@ describe('aggregateInteractionMetrics', () => {
   it('retorna ceros si session-metrics.json está malformado', () => {
     const dir = sessionDir();
     writeFileSync(join(dir, 'session-metrics.json'), '{ invalid', 'utf-8');
-    const m = aggregateInteractionMetrics(dir, configuredEnv, routingPath);
+    const m = aggregateSessionMetrics(dir, configuredEnv, routingPath);
     expect(m.lite.count).toBe(0);
   });
 
@@ -73,7 +73,7 @@ describe('aggregateInteractionMetrics', () => {
       }),
       'utf-8',
     );
-    const m = aggregateInteractionMetrics(dir, configuredEnv, routingPath);
+    const m = aggregateSessionMetrics(dir, configuredEnv, routingPath);
     expect(m.lite.count + m.standard.count + m.reasoning.count).toBe(0);
   });
 
@@ -94,7 +94,7 @@ describe('aggregateInteractionMetrics', () => {
       }),
       'utf-8',
     );
-    const m = aggregateInteractionMetrics(dir, configuredEnv, routingPath);
+    const m = aggregateSessionMetrics(dir, configuredEnv, routingPath);
     expect(m.lite.cacheReadInputTokens).toBe(0);
     expect(m.lite.inputTokens).toBe(100);
     expect(Number.isNaN(m.lite.cacheReadInputTokens)).toBe(false);
@@ -117,7 +117,7 @@ describe('aggregateInteractionMetrics', () => {
       }),
       'utf-8',
     );
-    const m = aggregateInteractionMetrics(dir, configuredEnv, routingPath);
+    const m = aggregateSessionMetrics(dir, configuredEnv, routingPath);
     expect(m.lite.count).toBe(2);
     expect(m.lite.inputTokens).toBe(300);
     expect(m.lite.cacheReadInputTokens).toBe(50);
@@ -141,7 +141,7 @@ describe('aggregateInteractionMetrics', () => {
       }),
       'utf-8',
     );
-    const m = aggregateInteractionMetrics(dir, configuredEnv, routingPath);
+    const m = aggregateSessionMetrics(dir, configuredEnv, routingPath);
     expect(m.standard.count).toBe(3);
     expect(m.standard.inputTokens).toBe(200);
     expect(m.standard.cacheReadInputTokens).toBe(10);
@@ -151,7 +151,7 @@ describe('aggregateInteractionMetrics', () => {
     tempDir = mkdtempSync(join(tmpdir(), 'router-status-metrics-empty-'));
     const missingSession = join(tempDir, 'no-such-session');
     mkdirSync(tempDir, { recursive: true });
-    const m = aggregateInteractionMetrics(missingSession, configuredEnv, routingPath);
+    const m = aggregateSessionMetrics(missingSession, configuredEnv, routingPath);
     expect(m.lite.count).toBe(0);
   });
 });

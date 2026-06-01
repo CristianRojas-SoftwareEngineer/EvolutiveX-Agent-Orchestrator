@@ -1,7 +1,7 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { Readable } from 'node:stream';
 import type { ProxyDependencies } from '../../4-api/composition-root.js';
-import { AuditInteractionContext } from '../../1-domain/types/audit.types.js';
+import { AuditWorkflowContext } from '../../1-domain/types/audit.types.js';
 
 /**
  * Controlador delgado que actúa como traductor entre Fastify (Capa 5) y los handlers (Capa 3).
@@ -41,7 +41,7 @@ export class ProxyController {
 
     request.rawBodyBytes = filteredBody.length;
 
-    const result = await this.deps.auditInteractionHandler.execute({
+    const result = await this.deps.auditWorkflowHandler.execute({
       headers: request.headers,
       rawBody: filteredBody,
       requestId: request.id,
@@ -51,9 +51,9 @@ export class ProxyController {
       request.auditSessionId = result.auditSessionId;
       request.requestSequence = result.requestSequence;
       request.requestStartTime = Date.now();
-      request.auditInteractionDir = result.auditInteractionDir;
+      request.auditWorkflowDir = result.auditWorkflowDir;
       request.requestBodyOmitted = result.requestBodyOmitted;
-      request.interactionType = result.interactionType;
+      request.workflowKind = result.workflowKind;
       request.requestClassification = result.requestClassification;
       request.auditStepIndex = result.assignedStepIndex;
       request.isInternalToolStep = result.isInternalToolStep;
@@ -128,7 +128,7 @@ export class ProxyController {
       isGzip,
     );
 
-    const context: AuditInteractionContext = {
+    const context: AuditWorkflowContext = {
       requestId: request.id,
       requestSequence: request.requestSequence || 0,
       auditSessionId: request.auditSessionId || '',
@@ -138,9 +138,9 @@ export class ProxyController {
       requestStartTime: request.requestStartTime || Date.now(),
       requestBodyBytes: request.rawBodyBytes ?? 0,
       requestBodyOmitted: !!request.requestBodyOmitted,
-      auditInteractionDir: request.auditInteractionDir || '',
+      auditWorkflowDir: request.auditWorkflowDir || '',
       responseStatusCode: res.statusCode,
-      interactionType: request.interactionType,
+      workflowKind: request.workflowKind,
       requestClassification: request.requestClassification,
       assignedStepIndex: request.auditStepIndex ?? 1,
       isInternalToolStep: request.isInternalToolStep,

@@ -617,7 +617,7 @@ function createEmptyMetrics(
   };
 }
 
-export function aggregateInteractionMetrics(
+export function aggregateSessionMetrics(
   sessionPath: string,
   settingsEnv: ClaudeSettingsEnv,
   routingPath: string,
@@ -1000,7 +1000,7 @@ export function buildStatuslineOutput(
 
   let table2: { lines: string[]; width: number };
   if (sessionPath) {
-    const metrics = aggregateInteractionMetrics(sessionPath, settingsEnv, paths.routingPath);
+    const metrics = aggregateSessionMetrics(sessionPath, settingsEnv, paths.routingPath);
     const cache = readStatuslineCache(sessionPath);
     const previous = cache.metricsSnapshot || null;
     table2 = renderTokenTable(metrics, previous);

@@ -20,7 +20,7 @@ La resolución de sesión sigue esta prioridad (véase también [README — Corr
 2. Cabecera `x-claude-code-session-id` (fallback Claude Code)
 3. Si ninguna está presente o está vacía → el resolver devuelve `sessionId: "_unknown"`
 
-En `AuditInteractionHandler.execute()`, si `auditSessionId === '_unknown'`, el handler **retorna `null` inmediatamente**:
+En `AuditWorkflowHandler.execute()`, si `auditSessionId === '_unknown'`, el handler **retorna `null` inmediatamente**:
 
 - No se crea directorio de interacción
 - No se escribe ningún archivo de auditoría
@@ -50,7 +50,7 @@ Solo las peticiones con sesión identificada (cabecera override o fallback prese
 
 - `sessions/<sessionId>/workflows/NN/` — cada ciclo auditado (turno `agentic`, preflight o `side-request` como workflow hermano)
 
-`AuditInteractionHandler` abre o continúa workflows vía `IWorkflowRepository.openWorkflow()`; no existe un “directorio de interacción” flat separado. Ver [`session-audit-model.md` §0](./session-audit-model.md#0-layout-vigente-causal-workflows-v1).
+`AuditWorkflowHandler` abre o continúa workflows vía `IWorkflowRepository.openWorkflow()`; no existe un “directorio de interacción” flat separado. Ver [`session-audit-model.md` §0](./session-audit-model.md#0-layout-vigente-causal-workflows-v1).
 
 No se crea `sessions/_unknown/`.
 

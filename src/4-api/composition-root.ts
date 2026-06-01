@@ -11,7 +11,7 @@ import { ProviderCatalogService } from '../2-services/provider-catalog.service.j
 import { StepAssemblerService } from '../2-services/step-assembler.service.js';
 import { SessionMetricsService } from '../2-services/session-metrics.service.js';
 import { AuditHookEventHandler } from '../3-operations/audit-hook-event.handler.js';
-import { AuditInteractionHandler } from '../3-operations/audit-interaction.handler.js';
+import { AuditWorkflowHandler } from '../3-operations/audit-workflow.handler.js';
 import { AuditSseResponseHandler } from '../3-operations/audit-sse-response.handler.js';
 import { AuditStandardResponseHandler } from '../3-operations/audit-standard-response.handler.js';
 import { AuditUpstreamErrorHandler } from '../3-operations/audit-upstream-error.handler.js';
@@ -56,7 +56,7 @@ export async function createProxyDependencies(
   await cleanCutLegacySessions(auditBaseDir, logger);
 
   // Capa 3 — Handlers
-  const auditInteractionHandler = new AuditInteractionHandler(
+  const auditWorkflowHandler = new AuditWorkflowHandler(
     sessionResolver,
     auditBaseDir,
     workflowRepo,
@@ -87,7 +87,7 @@ export async function createProxyDependencies(
   );
 
   return {
-    auditInteractionHandler,
+    auditWorkflowHandler,
     auditSseResponseHandler,
     auditStandardResponseHandler,
     auditUpstreamErrorHandler,

@@ -2,7 +2,7 @@
 
 ### Motivación
 
-Antes de este sistema, el statusline calculaba las métricas de la Tabla 2 ("Interacciones por nivel de razonamiento") mediante un escaneo completo de todos los `meta.json` + `body.json` de la sesión en cada invocación (`aggregateInteractionMetrics`). Esto producía tres problemas:
+Antes de este sistema, el statusline calculaba las métricas de la Tabla 2 ("Interacciones por nivel de razonamiento") mediante un escaneo completo de todos los `meta.json` + `body.json` de la sesión en cada invocación (`aggregateSessionMetrics`). Esto producía tres problemas:
 
 1. **Race condition proxy/statusline**: El proxy escribe `meta.json` en un callback `stream.on('end')` posterior al último chunk SSE. Claude Code puede re-invocar el statusline antes de que `meta.json` exista — el turno recién completado era invisible.
 2. **Rescan O(N)**: La función crecía linealmente con el número de interacciones de la sesión.
@@ -68,7 +68,7 @@ Los `client-preflight` no actualizan métricas de sesión.
 
 #### Lectura en el statusline (`scripting/router-status.ts`)
 
-`aggregateInteractionMetrics` lee `session-metrics.json` en O(1):
+`aggregateSessionMetrics` lee `session-metrics.json` en O(1):
 
 ```
 session-metrics.json → classifyModelWithEnv(modelId, settingsEnv) → acumular en lite / standard / reasoning

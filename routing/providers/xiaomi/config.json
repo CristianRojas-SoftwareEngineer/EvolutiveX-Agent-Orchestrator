@@ -4,13 +4,5 @@
   "ANTHROPIC_DEFAULT_HAIKU_MODEL": "models/mimo-v2-omni",
   "ANTHROPIC_DEFAULT_SONNET_MODEL": "models/mimo-v2-5",
   "ANTHROPIC_DEFAULT_OPUS_MODEL": "models/mimo-v2-5-pro",
-  "CLAUDE_CODE_SUBAGENT_MODEL": "models/mimo-v2-5",
-  "pricing_rules": {
-    "schemaVersion": 1,
-    "updatedAt": "2026-04-30T00:00:00.000Z",
-    "pricingSourceUrl": "https://platform.xiaomimimo.com/docs/en-US/tokenplan/subscription",
-    "currency": "USD",
-    "unit": "per_million_tokens",
-    "defaultModifiers": {}
-  }
+  "CLAUDE_CODE_SUBAGENT_MODEL": "models/mimo-v2-5"
 }

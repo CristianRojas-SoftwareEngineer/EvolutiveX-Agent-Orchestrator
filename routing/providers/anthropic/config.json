@@ -4,15 +4,5 @@
   "ANTHROPIC_DEFAULT_HAIKU_MODEL": "models/claude-haiku-4-5",
   "ANTHROPIC_DEFAULT_SONNET_MODEL": "models/claude-sonnet-4-6",
   "ANTHROPIC_DEFAULT_OPUS_MODEL": "models/claude-opus-4-6",
-  "CLAUDE_CODE_SUBAGENT_MODEL": "models/claude-sonnet-4-6",
-  "pricing_rules": {
-    "schemaVersion": 1,
-    "updatedAt": "2026-04-30T00:00:00.000Z",
-    "pricingSourceUrl": "https://platform.claude.com/docs/en/about-claude/pricing",
-    "currency": "USD",
-    "unit": "per_million_tokens",
-    "defaultModifiers": {
-      "inferenceGeoUs": 1.1
-    }
-  }
+  "CLAUDE_CODE_SUBAGENT_MODEL": "models/claude-sonnet-4-6"
 }

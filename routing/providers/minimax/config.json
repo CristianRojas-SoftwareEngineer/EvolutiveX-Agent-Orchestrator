@@ -1,16 +1,8 @@
 {
   "AUTH_METHOD": "bearer",
   "ANTHROPIC_BASE_URL": "https://api.minimax.io/anthropic",
-  "ANTHROPIC_DEFAULT_HAIKU_MODEL": "models/minimax-m2.7",
-  "ANTHROPIC_DEFAULT_SONNET_MODEL": "models/minimax-m2.7",
-  "ANTHROPIC_DEFAULT_OPUS_MODEL": "models/minimax-m2.7",
-  "CLAUDE_CODE_SUBAGENT_MODEL": "models/minimax-m2.7",
-  "pricing_rules": {
-    "schemaVersion": 1,
-    "updatedAt": "2026-05-30T00:00:00.000Z",
-    "pricingSourceUrl": "https://platform.minimax.io/docs/guides/pricing-paygo",
-    "currency": "USD",
-    "unit": "per_million_tokens",
-    "defaultModifiers": {}
-  }
+  "ANTHROPIC_DEFAULT_HAIKU_MODEL": "models/minimax-m3",
+  "ANTHROPIC_DEFAULT_SONNET_MODEL": "models/minimax-m3",
+  "ANTHROPIC_DEFAULT_OPUS_MODEL": "models/minimax-m3",
+  "CLAUDE_CODE_SUBAGENT_MODEL": "models/minimax-m3"
 }

@@ -33,6 +33,13 @@ El layout bajo `sessions/` SHALL ser `causal-workflows-v1` (`sessions/{sessionId
 - **THEN** `AuditHookEventHandler` NO SHALL escribir `meta.json` directamente
 - **AND** `SessionPersistence` SHALL ser el único componente que escribe a disco
 
+#### Scenario: Nombres canónicos en código
+
+- **WHEN** se ejecuta `npm run typecheck` tras el rename
+- **THEN** NO SHALL existir referencias a `AuditInteractionHandler`, `AuditInteractionContext`,
+  `auditInteractionDir` ni `interactionType` en `src/`
+- **AND** NO SHALL existir referencias a `InteractionType` ni `InteractionOutcome` en `src/`
+
 ### Requirement: Delegación del hook handler — métricas sin escritura directa
 
 `delegateClosure()` en `AuditHookEventHandler` SHALL invocar solo `sessionMetrics.updateFromWorkflow()` cuando el workflow sea de kind `main`. NO SHALL invocar `AuditWorkflowClosureHandler.execute()` ni resolver rutas flat legacy.
@@ -92,3 +99,25 @@ Tras P2, el sistema SHALL NOT exponer ni usar `ISseAuditWriter` ni `AuditWriterS
 
 - **WHEN** se buscan referencias a `sse.jsonl` bajo `src/`
 - **THEN** NO SHALL existir rutas de escritura de producción que creen `response/sse.jsonl`
+
+---
+
+### Requirement: AuditWorkflowContext — contexto de handlers L3
+
+La interfaz que desacopla los handlers L3 de Fastify SHALL llamarse `AuditWorkflowContext`
+(renombrada desde `AuditInteractionContext`). Sus campos SHALL ser:
+
+- `auditWorkflowDir` (renombrado desde `auditInteractionDir`): ruta al directorio `workflows/NN/`
+- `workflowKind` (renombrado desde `interactionType`): tipo `WorkflowRequestKind` (`'client-preflight' | 'agentic' | 'side-request'`)
+
+Los augments de Fastify (`fastify.augments.d.ts`) SHALL usar los nombres canónicos
+`request.auditWorkflowDir` y `request.workflowKind`.
+
+Referencia técnica: [§28b gateway-design.md](../../docs/proposals/gateway-design.md#28b-contratos-de-paso).
+
+#### Scenario: AuditWorkflowHandler usa AuditWorkflowContext
+
+- **GIVEN** `AuditWorkflowHandler` y `AuditSseResponseHandler` activos
+- **WHEN** se construye `AuditWorkflowContext` en `ProxyController`
+- **THEN** los campos `auditWorkflowDir` y `workflowKind` SHALL estar presentes
+- **AND** el tipo SHALL estar importado desde `audit.types.ts` (no desde `types/gateway/`)

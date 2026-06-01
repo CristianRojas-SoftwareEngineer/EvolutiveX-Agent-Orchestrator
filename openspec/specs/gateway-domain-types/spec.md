@@ -16,6 +16,10 @@ de string, sin comportamiento ni I/O:
 - `WorkflowClosedByEvent` — evento que disparó el cierre (`'Stop' | 'SubagentStop' | 'StopFailure'`).
 - `ToolUseStatus` — estado de resolución de un tool_use (`'pending' | 'running' | 'completed' | 'rejected' | 'error'`).
 
+`WorkflowRequestKind` SHALL definirse en `src/1-domain/types/audit.types.ts` (no en `types/gateway/`)
+porque clasifica el request HTTP entrante, no la topología del workflow. Sus valores son
+`'client-preflight' | 'agentic' | 'side-request'`. Este tipo no es `@deprecated`.
+
 Referencia técnica: [§19 gateway-design.md](../../docs/proposals/gateway-design.md#tipos-primitivos-y-estructura-de-archivos).
 
 #### Scenario: Tipos sin comportamiento
@@ -109,3 +113,34 @@ Referencia técnica: [§39 gateway-design.md](../../docs/proposals/gateway-desig
 - **WHEN** se ejecuta `npm run test:unit`
 - **THEN** el test SHALL ejecutarse sin instanciar ningún adaptador de infraestructura
 - **AND** el tiempo de ejecución del test SHALL ser inferior a 100 ms por archivo
+
+---
+
+### Requirement: WorkflowRequestKind — clasificación canónica del request HTTP
+
+El sistema SHALL definir en `src/1-domain/types/audit.types.ts` el tipo `WorkflowRequestKind`
+como unión de literales que clasifica el tipo de request HTTP procesado por el proxy:
+
+```
+WorkflowRequestKind = 'client-preflight' | 'agentic' | 'side-request'
+```
+
+Este tipo NO SHALL ser marcado `@deprecated`. Es el nombre canónico permanente para la
+clasificación de request en la capa 1 del dominio.
+
+`WorkflowRequestKind` se diferencia de `WorkflowKind` (que clasifica la estructura del workflow:
+`'main' | 'subagent'`); el primero clasifica el request HTTP, el segundo la topología del workflow.
+
+Referencia técnica: [§19 gateway-design.md](../../docs/proposals/gateway-design.md#tipos-primitivos-y-estructura-de-archivos).
+
+#### Scenario: Asignación de valores canónicos
+
+- **GIVEN** que el módulo `audit.types.ts` exporta `WorkflowRequestKind`
+- **WHEN** se asigna `'agentic'`, `'client-preflight'` o `'side-request'` a un campo de tipo `WorkflowRequestKind`
+- **THEN** TypeScript SHALL aceptar la asignación sin error de typecheck
+
+#### Scenario: Rechazo de valores fuera del conjunto
+
+- **GIVEN** que existe un campo de tipo `WorkflowRequestKind`
+- **WHEN** se intenta asignar un string fuera del conjunto (`'main'`, `'subagent'`, etc.)
+- **THEN** `tsc` SHALL reportar error de tipo en compilación

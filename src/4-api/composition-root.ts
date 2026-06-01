@@ -1,7 +1,6 @@
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import { SessionResolverService } from '../1-domain/services/session-resolver.service.js';
-import { RedactService } from '../1-domain/services/redact.service.js';
 import { MarkdownRendererService } from '../1-domain/services/markdown-renderer.service.js';
 import { SseReconstructService } from '../2-services/sse-reconstruct.service.js';
 import { StreamTeeService } from '../2-services/stream-tee.service.js';
@@ -38,7 +37,6 @@ export async function createProxyDependencies(
   const sessionResolver = new SessionResolverService();
 
   // Capa 2 — Adapters
-  const redactService = new RedactService();
   const markdownRenderer = new MarkdownRendererService();
   const sseReconstruct = new SseReconstructService(markdownRenderer);
   const streamTee = new StreamTeeService();

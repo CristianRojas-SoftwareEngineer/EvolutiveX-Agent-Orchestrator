@@ -26,7 +26,7 @@ La relación padre→hijo entre este orquestador y los changes de segundo nivel 
 
 | Fase | Change hijo | Bloque | Dependencia (§43) | Gate de validación | Docs a actualizar | Legacy a retirar | Estado |
 |------|-------------|--------|-------------------|--------------------|-------------------|------------------|--------|
-| C0 | *(sin change hijo — es este documento)* | Documentación | — | Artefactos del orquestador completos | `docs/proposals/gateway-design.md` | — | validada |
+| C0 | *(sin change hijo — es este documento)* | Documentación | — | Artefactos del orquestador completos | `docs/proposals/gateway-design.md` | — | archivada |
 | C1 | `gateway-c1-wire-agent-headers` | Correlación wire | — | `npm run test:quick` + test E2E Fastify con cabeceras | `README.md`, `docs/session-audit-model.md` | Lógica heurística de correlación de agente (degradada a `@deprecated-fallback` en C1; eliminación efectiva diferida a G3/G4) | archivada |
 | C2 | `gateway-c2-sse-subagent-join` | Correlación wire | C1 | Pruebas de join `tool_use_id`↔subagente + fallback legacy E2E | `docs/session-audit-model.md` | Correlación pending heurística de subagente | archivada |
 | C3 | `gateway-c3-hooks-endpoint` | Borde hooks | C1 | Pruebas de endpoint `POST /hooks` + `AuditHookEventHandler` E2E | `README.md`, `docs/proposals/gateway-design.md` | — | archivada |
@@ -37,7 +37,7 @@ La relación padre→hijo entre este orquestador y los changes de segundo nivel 
 | G5 | `gateway-g5-provider-catalog` | Refactor gateway | — | `npm run test:quick` | `docs/proposals/gateway-design.md` §39 | `ProviderCatalog` inline en `routing/` (no existía en src/; diferido a P0+) | archivada |
 | P0 | `gateway-p0-layout-diff-spike` | Persistencia | G4 | Spike documentado — sin gate de tests | `docs/proposals/gateway-design.md` §28b, §40, §42 | — (spike de análisis, no retira código) | archivada |
 | P1 | `gateway-p1-new-session-layout` | Persistencia | P0, G4 | `npm run test` + casos 3–7, 16, 19 (estructurales) del checklist [§37b](../../../docs/proposals/gateway-design.md#37b-checklist-de-aceptación-e2e-del-layout) | `docs/session-audit-model.md`, `README.md`, `docs/proposals/gateway-design.md` §29, §30, §33, §37b, §40, §46.4 | `session-store.service.ts`, `workflow-result-projector.service.ts`, `ISessionStore`; shim `ISseAuditWriter` hasta P2 | archivada |
-| P2 | `gateway-p2-new-artifacts` | Persistencia | P1 | `npm run test` + **P2-core** §37b casos **1, 12–15, 18** | `docs/session-audit-model.md`, `docs/proposals/gateway-design.md` §33 | `ISseAuditWriter`, `AuditWriterService`, `SseReconstructService` sobre `sse.jsonl`, escrituras SSE inline en handler (sustituidas por `stream_chunk` + persistencia) | **validada** |
+| P2 | `gateway-p2-new-artifacts` | Persistencia | P1 | `npm run test` + **P2-core** §37b casos **1, 12–15, 18** | `docs/session-audit-model.md`, `docs/proposals/gateway-design.md` §33 | `ISseAuditWriter`, `AuditWriterService`, `SseReconstructService` sobre `sse.jsonl`, escrituras SSE inline en handler (sustituidas por `stream_chunk` + persistencia) | archivada |
 
 ## Decisión técnica del bloque P
 

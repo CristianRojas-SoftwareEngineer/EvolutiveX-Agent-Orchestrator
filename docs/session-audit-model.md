@@ -88,7 +88,7 @@ sessions/<session-id>/
 | `meta.json` | Workflow, tool o sub-workflow | Estado fusionado (`status`, `workflowKind`, timestamps, outcome, …) — **no** hay `state.json` |
 | `output/result.json` | Workflow | `IWorkflowResult` inmutable al cierre |
 
-**P2 (pendiente de implementación; especificado en `gateway-p2-new-artifacts`):** `events.ndjson` (raíz de sesión), `workflows/workflow-sequence.json`, `streaming/` por step, vistas coalesced sin `sse.jsonl`.
+**P2 (implementado):** `events.ndjson` (raíz de sesión), `workflows/workflow-sequence.json`, `streaming/` por step, vistas coalesced; `sse.jsonl` retirado.
 
 ### Qué delega a otros documentos
 
@@ -122,7 +122,7 @@ sessions/<id>/workflows/01/          → turno principal
 | Workflow | `request/` | Cuerpo de la petición que **abrió** el workflow (fresh / side / preflight) |
 | Workflow | `output/` | Resultado del ciclo (`IWorkflowResult`), no la respuesta HTTP cruda del último hop |
 | Step | `request/` | Petición HTTP a Anthropic en ese step |
-| Step | `response/` | Respuesta HTTP (o artefactos derivados: `parsed.md`, `sse.jsonl`) |
+| Step | `response/` | Respuesta HTTP (o artefactos derivados: `parsed.md`, `streaming/*.ndjson`) |
 
 No hay `response/` en la raíz del workflow: la respuesta HTTP vive bajo `steps/MM/response/`.
 
@@ -156,7 +156,7 @@ flowchart LR
   Corr[IWorkflowRepository] -->|publish| Bus
   Bus --> SP[SessionPersistence]
   SP --> Disk["workflows/NN/…"]
-  SSE[audit-sse-response] -->|ISseAuditWriter| Disk
+  SSE[audit-sse-response] -->|publish stream_chunk| Bus
 ```
 
 ---
@@ -233,9 +233,9 @@ Al arranque, el proxy puede eliminar sesiones con layout flat legacy (**corte li
 - `outcome`, `finalText?`, `usage?`, `stepCount`, `closedByEvent`, `sessionId`
 - Construido en cierre vía `buildWorkflowResult()`; proyectado por `SessionPersistence` en `workflow_complete`
 
-### Tipos legacy (`@deprecated-p2`)
+### Tipos wire y clasificación legacy
 
-`InteractionMetadata`, `InteractionState`, `StepMeta`, `InteractionType` y relacionados en `audit.types.ts` permanecen para el shim SSE y campos wire transitorios. **No** representan el modelo en memoria activo (sustituido por `IWorkflow` / `IStep` / `IToolUse`).
+`StepMeta`, `InteractionType`, `InteractionOutcome`, `SideRequestKind`, `AuditInteractionContext` en `audit.types.ts` — **activos por diseño** (clasificación de request, campos wire transitorios). **No** representan el modelo en memoria activo (sustituido por `IWorkflow` / `IStep` / `IToolUse`). `InteractionMetadata` retirado en el cierre del orquestador (2026-06-01).
 
 ---
 
@@ -245,10 +245,9 @@ Al arranque, el proxy puede eliminar sesiones con layout flat legacy (**corte li
 
 Los handlers de capa 3 **no** llaman `fs.write*` para el árbol causal salvo:
 
-- `AuditSseResponseHandler` → `ISseAuditWriter` (SSE hasta P2)
 - Utilidades de arranque en composition root (`ensureAuditSessionsRoot`, corte limpio)
 
-Todo lo demás: `eventBus.publish(...)` → `SessionPersistence`.
+Todo lo demás (incluido SSE vía `stream_chunk`): `eventBus.publish(...)` → `SessionPersistence`.
 
 ### Handlers relevantes
 

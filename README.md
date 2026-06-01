@@ -19,7 +19,7 @@ El proxy utiliza **Progressive Kernel Architecture (PKA)** — un modelo arquite
 | Capa                           | Ubicación                | Responsabilidad                                                                   | Componentes Clave                                                                                                                                                   |
 | ------------------------------ | ------------------------ | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **1 - Dominio**                | `src/1-domain/`          | Tipos puros (entidades) y lógica de dominio sin dependencias externas             | `SessionResolverService`, `RequestClassifierService`, `RedactService`, `MarkdownRendererService`, `SseSimulatorService`, Tipos de auditoría                         |
-| **2 - Servicios (Adapters)**   | `src/2-services/`        | Implementaciones concretas con I/O (filesystem, streams) y **ports** (interfaces) | `EventBus`, `SessionPersistence`, `WorkflowRepositoryService`, `SseReconstructService`, `StreamTeeService`, Ports: `IEventBus`, `IWorkflowRepository`, `ISseAuditWriter`, `ISseReconstructor`, `IStreamTee` |
+| **2 - Servicios (Adapters)**   | `src/2-services/`        | Implementaciones concretas con I/O (filesystem, streams) y **ports** (interfaces) | `EventBus`, `SessionPersistence`, `WorkflowRepositoryService`, `SseReconstructService`, `StreamTeeService`, Ports: `IEventBus`, `IWorkflowRepository`, `ISseReconstructor`, `IStreamTee` |
 | **3 - Operaciones (Handlers)** | `src/3-operations/`      | Orquestación de casos de uso (Command Handlers)                                   | `AuditInteractionHandler`, `AuditSseResponseHandler`, `AuditStandardResponseHandler`, `AuditUpstreamErrorHandler`, `FilterToolsHandler`                             |
 | **4 - API (Composition Root)** | `src/4-api/`             | Wiring de dependencias y configuración                                            | `createProxyDependencies()`, Configuración de entorno                                                                                                               |
 | **5 - Interfaces de Usuario**  | `src/5-user-interfaces/` | Adaptadores HTTP (reciben deps inyectadas via options)                            | `ProxyController`, `proxyRoutes`, `fastify.augments.d.ts`                                                                                                           |
@@ -39,7 +39,7 @@ Las capas internas **nunca** importan de capas externas. Esta regla garantiza qu
 
 ### Persistencia causal (P1)
 
-Los handlers de capa 3 **no escriben disco** salvo el writer SSE temporal (`ISseAuditWriter`, `@deprecated-p2`). El correlador publica eventos (`workflow_start`, `step_request`, `step_response`, `tool_call`, `tool_result`, `workflow_complete`, …) en un **EventBus** in-process; **SessionPersistence** es el único suscriptor que proyecta el layout `causal-workflows-v1` bajo `sessions/<id>/workflows/NN/`. Ver [`docs/session-audit-model.md`](docs/session-audit-model.md#0-layout-vigente-causal-workflows-v1-sesiones-nuevas).
+Los handlers de capa 3 **no escriben disco** directamente. El correlador publica eventos (`workflow_start`, `step_request`, `step_response`, `stream_chunk`, `tool_call`, `tool_result`, `workflow_complete`, …) en un **EventBus** in-process; **SessionPersistence** es el único suscriptor que proyecta el layout `causal-workflows-v1` bajo `sessions/<id>/workflows/NN/`. Ver [`docs/session-audit-model.md`](docs/session-audit-model.md#0-layout-vigente-causal-workflows-v1-sesiones-nuevas).
 
 ---
 
@@ -58,8 +58,7 @@ graph TD
     G -->|Clonación| H[Transmisión al Cliente]
     G -->|Clonación| I[AuditSseResponse / AuditStandardResponse]
     I -->|publish step_response| EB
-    I -->|SSE inline @deprecated-p2| SSEW[ISseAuditWriter]
-    SSEW --> J["steps/MM/response/sse.jsonl"]
+    I -->|publish stream_chunk| EB
     I -->|terminal SSE| K[SseReconstructService]
     K --> L["output/result.json + meta.json"]
 ```
@@ -72,7 +71,7 @@ graph TD
 
 A diferencia de un proxy genérico, este sistema "entiende" los flujos binarios de Anthropic.
 
-- Extrae cada línea de datos y la convierte en una entrada con _timestamp_ en `steps/NN/response/sse.jsonl` (escrito **síncronamente**: fuente de verdad ordenada para la reconstrucción).
+- Persiste cada chunk SSE en `steps/NN/response/streaming/*.ndjson` (fuente canónica de reconstrucción; P2 implementado).
 - Mantiene un volcado binario crudo (`steps/NN/response/sse.txt`) para depuración de paridad de protocolos. **No** es la fuente de la reconstrucción y puede truncarse por `MAX_AUDIT_BYTES` sin afectar al mensaje final reconstruido.
 
 ### 🛡️ Privacidad Avanzada
@@ -146,7 +145,7 @@ Personaliza el comportamiento ajustando estas variables en tu entorno o en un ar
 | **Filtrado** | `FILTERED_TOOLS`          | Tool names a excluir del request (coma-separado). Omitir la variable = default abajo. Desactivar filtrado: `FILTERED_TOOLS=""`. | `ScheduleWakeup,NotebookEdit,ExitWorktree,EnterWorktree,CronList,CronDelete,CronCreate` |
 |   **Logs**   | `LOG_LEVEL`               | Nivel de log de Pino (consola y `server/logs.jsonl`).                                                                           | `info`                                                                                  |
 
-> **Auditoría por defecto.** El árbol causal se escribe vía **EventBus → SessionPersistence**. Para SSE, `steps/MM/response/sse.jsonl` se escribe aún vía `ISseAuditWriter` (`@deprecated-p2` hasta P2): (a) `sse.jsonl` es la **fuente de verdad** de reconstrucción; (b) `sse.txt` es raw dump opcional acotado por `MAX_AUDIT_BYTES`; (c) el cierre del workflow persiste `output/result.json`. Detalle en [`docs/how-sse-reconstruction-works.md`](docs/how-sse-reconstruction-works.md).
+> **Auditoría por defecto.** El árbol causal se escribe vía **EventBus → SessionPersistence**. Para SSE, los chunks se persisten en `steps/MM/response/streaming/*.ndjson` (fuente canónica de reconstrucción); `sse.txt` es raw dump opcional acotado por `MAX_AUDIT_BYTES`; el cierre del workflow persiste `output/result.json`. Detalle en [`docs/how-sse-reconstruction-works.md`](docs/how-sse-reconstruction-works.md).
 
 <a name="correlación-de-sesión-sessionid"></a>
 
@@ -283,7 +282,7 @@ El proxy incluye validaciones defensivas para prevenir errores de reconstrucció
 - **Asignación atómica de steps internos**: Los handlers de WebSearch y WebFetch usan `withSessionLock` para serializar la asignación de `stepCount` y escritura de step requests, evitando que dos requests concurrentes escriban en el mismo directorio de step.
 - **Correlación de WebFetch interna**: Las implementaciones WebFetch reales llegan como requests con `tools: []` y contenido `Web page content:`. El proxy las detecta antes de clasificarlas como `side-request` genérico. Si existe un pending WebFetch en el agente/subagente padre, se correlaciona como step interno del padre. Si no hay pending, se trata como side-request normal.
 - **Unicidad de metadata**: `pushStepMetaByDir` rechaza duplicados no-coalesced con el mismo `stepIndex`, lanzando un error diagnóstico si se detecta una colisión. Para steps coalesced, permite enriquecer la metadata existente en lugar de crear duplicados.
-- **Validación de SSE completo**: `reconstructSseJsonlFile` valida que el archivo `sse.jsonl` contenga exactamente un mensaje completo (un `message_start` y un `message_stop`). Si detecta múltiples mensajes o un stream incompleto, lanza un error diagnóstico antes de pasar al SDK de Anthropic.
+- **Validación de SSE completo**: `SseReconstructService` valida que el NDJSON contenga exactamente un mensaje completo (un `message_start` y un `message_stop`). Si detecta múltiples mensajes o un stream incompleto, lanza un error diagnóstico antes de pasar al SDK de Anthropic.
 - **Reconstrucción por fase**: Los steps coalesced de Agent usan `reconstructSseJsonlPhaseMessage` (que no requiere `message_stop`) para reconstruir fases parciales (delegation/continuation), manteniendo separados los caminos de reconstrucción para streams completos versus fases coalesced.
 
 ---

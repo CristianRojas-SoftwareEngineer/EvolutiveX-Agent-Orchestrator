@@ -1,4 +1,4 @@
-// Subdirectorios de una interacción o step (layout flat residual en escrituras SSE @deprecated-p2)
+// Subdirectorios comunes de workflow y step
 export const DIR_INPUT = 'input';
 export const DIR_OUTPUT = 'output';
 export const DIR_STEPS = 'steps';

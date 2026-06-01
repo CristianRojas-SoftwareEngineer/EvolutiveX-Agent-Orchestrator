@@ -322,7 +322,7 @@ sequenceDiagram
   UP-->>L5: SSE o JSON
   L5->>L2: streamTee
   L2->>L3: audit-sse-response o audit-standard-response
-  L3->>L2: ISseAuditWriter (sse.jsonl), SessionPersistence (bus)
+  L3->>L2: SessionPersistence (bus)
   L5-->>CC: stream transparente
 ```
 
@@ -330,7 +330,7 @@ sequenceDiagram
 
 1. **Capa 5** no escribe disco; delega en handlers.
 2. **Capa 3** orquesta workflows en `IWorkflowRepository` y emite eventos al bus; cierre nominal vía hooks (`AuditHookEventHandler`).
-3. **Capa 2** proyecta artefactos bajo `workflows/NN/` (`SessionPersistence`); SSE sigue en shim `ISseAuditWriter` hasta P2.
+3. **Capa 2** proyecta artefactos bajo `workflows/NN/` (`SessionPersistence`); chunks SSE persistidos en `streaming/*.ndjson` (P2 implementado).
 4. **Capa 1** no conoce Fastify ni rutas de `sessions/`.
 
 ---
@@ -341,7 +341,7 @@ sequenceDiagram
 
 | Ruta | Responsabilidad |
 | ---- | ---------------- |
-| `1-domain/types/audit.types.ts` | Tipos wire/legacy (`InteractionMetadata`, `StepMeta`, pending tools) y tipos gateway (`IWorkflow`, `IStep`, `IToolUse` en interfaces gateway). `ActiveInteraction` retirado de memoria en P1. |
+| `1-domain/types/audit.types.ts` | Tipos wire/legacy (`StepMeta`, pending tools) y tipos gateway (`IWorkflow`, `IStep`, `IToolUse` en interfaces gateway). `ActiveInteraction` retirado en P1; `InteractionMetadata` retirado en cierre del orquestador. |
 | `1-domain/types/anthropic.types.ts` | Contratos wire Anthropic. |
 | `1-domain/types/config.types.ts`, `logger.types.ts`, `json.types.ts` | Config, logging, JSON. |
 | `1-domain/constants/audit-paths.ts`, `audit-limits.ts`, `session-headers.ts` | Layout lógico, límites, nombres de cabeceras. |
@@ -359,8 +359,8 @@ sequenceDiagram
 | `IWorkflowRepository` | `WorkflowRepositoryService` | Estado en memoria de workflows/steps/tools; emite al `EventBus`. |
 | `IEventBus` | `EventBusService` | Pub/sub in-process de telemetría. |
 | — | `SessionPersistence` | Suscriptor del bus; layout `causal-workflows-v1` en disco. |
-| `ISseAuditWriter` | `AuditWriterService` | Shim SSE/reconstrucción (`@deprecated-p2` hasta P2). |
-| `ISseReconstructor` | `SseReconstructService` | Leer `sse.jsonl` → `body.json` / `output/`. |
+| ~~`ISseAuditWriter`~~ | ~~`AuditWriterService`~~ | ~~Shim SSE/reconstrucción~~ — **retirado en P2** |
+| `ISseReconstructor` | `SseReconstructService` | Leer `streaming/*.ndjson` → `body.json` / `output/` (P2: migrado de `sse.jsonl`). |
 | `IStreamTee` | `StreamTeeService` | Duplicar stream respuesta hacia cliente y auditoría. |
 
 **Histórico (pre-P1):** `ISessionStore` / `IAuditWriter` retirados; ver archivos archivados en `openspec/changes/archive/`.
@@ -370,7 +370,7 @@ sequenceDiagram
 | Handler | Caso de uso |
 | ------- | ----------- |
 | `audit-interaction.handler.ts` | Request entrante: nueva interacción, continuation, subagente, preflight, side-request. |
-| `audit-sse-response.handler.ts` | Stream SSE: líneas a `sse.jsonl`, metadata de step, coalescing Agent, cierre de turno. |
+| `audit-sse-response.handler.ts` | Stream SSE: chunks a `streaming/*.ndjson`, metadata de step, coalescing Agent, cierre de turno. |
 | `audit-standard-response.handler.ts` | Respuestas no streaming. |
 | `audit-upstream-error.handler.ts` | Errores upstream / conexión. |
 | `filter-tools.handler.ts` | Filtrar herramientas del body antes de audit/upstream. |
@@ -452,7 +452,7 @@ Sesión (sessions/<session-id>/)
 ├── main-agent/interactions/NN/     ← turno agéntico del usuario (retirado en P1)
 │     ├── input/   (prompt fresh)
 │     ├── steps/YY/  ← una llamada HTTP a Anthropic por step
-│     │     ├── request/, response/ (sse.jsonl = fuente de verdad)
+│     │     ├── request/, response/ (sse.jsonl = fuente de verdad — migrado a streaming/*.ndjson en P2)
 │     │     └── sub-agent-TT/  ← misma forma, anidada bajo el step
 │     └── output/  (mensaje reconstruido al cerrar)
 └── side-interactions/MM/           ← preflight y side-request
@@ -508,7 +508,7 @@ Definidos en `audit.types.ts`:
 | `Workflow` `kind: subagent` | Carpeta `steps/YY/sub-agent-TT/` |
 | `Step` (ciclo lógico; ver **§16.1**) | Un directorio `steps/NN/` por POST HTTP; la fase de tools no se observa hoy (se observará vía hooks). 1 Step dominio = 1 POST + tools; ver tabla de proyección en **§16.1** |
 | `ToolUse` | `Pending*ToolUse` + bloques en respuestas; sin entidad de dominio dedicada |
-| `WorkflowResult` | `InteractionMetadata` en `meta.json` + `output/` |
+| `WorkflowResult` | `IWorkflowResult` en `meta.json` + `output/result.json` |
 | `Provider` / `LanguageModel` | `routing/providers/*` (hoy consumido por statusline, no dominio) |
 | Correlador | `SessionStoreService` + handlers |
 | StepBuffer | Lógica embebida en `audit-sse-response.handler.ts` |
@@ -520,7 +520,7 @@ Funcionalidades presentes en SCP que no están en el modelo de dominio v1 pero s
 | Extensión SCP | Tratamiento en objetivo |
 | ------------- | ---------------------- |
 | `client-preflight`, `side-request` | `WorkflowKind` o ámbito equivalente + proyección a `side-interactions/`. |
-| `sse.jsonl` forense en disco | **Proyección** capa 2; el dominio no persiste deltas SSE (coherente con StepBuffer §26). Migra a `streaming/*.ndjson` en fases P. |
+| `sse.jsonl` forense en disco | **Proyección** capa 2; el dominio no persiste deltas SSE (coherente con StepBuffer §26). Migrado a `streaming/*.ndjson` en P2. |
 | Coalescing Agent (delegation + continuation en un SSE stream) | Regla de proyección/handlers; dominio puede seguir viendo steps HTTP o un step lógico según fase de refactor. |
 
 ### 11.2 Modelo conceptual en un vistazo
@@ -1645,7 +1645,7 @@ Para obtener `Step.assistantMessage` completo (texto, `tool_use`, thinking, etc.
 | **Event store SSE** | `Workflow.streamEvents: AnthropicSseEvent[]` persistido como entidad de dominio | Redundante con el Step final; alto volumen; sin valor de negocio gateway |
 | **Entidad por tipo de delta** | Modelos gateway por cada evento delta (`ContentBlockDelta`, etc.) | Duplica `IAnthropicSse*`; complejidad sin retorno |
 
-> **Nota:** SCP sí persiste `sse.jsonl` como log forense (capa 2), pero esto es una proyección de infraestructura, no una entidad de dominio. El dominio solo conoce snapshots cerrados (`Step.assistantMessage`).
+> **Nota:** SCP persiste `streaming/*.ndjson` como log forense de chunks SSE (capa 2, P2 implementado), pero esto es una proyección de infraestructura, no una entidad de dominio. El dominio solo conoce snapshots cerrados (`Step.assistantMessage`).
 
 ### 26.3 StepBuffer
 
@@ -2954,7 +2954,7 @@ src/1-domain/
 
 **Nota sobre perfil anémico:** en lugar de `Workflow.complete()` como método con efectos secundarios, SCP implementa **`buildWorkflowResult(...)`** — función pura invocada desde el handler de capa 3. Esto permite testear la lógica de cierre sin dependencias de infraestructura.
 
-**Tipos Interaction* deprecados (G1):** `InteractionType`, `InteractionOutcome`, `InteractionMetadata`, `ActiveInteraction`, `InteractionState`, `AuditInteractionContext` en `audit.types.ts` marcados `@deprecated`. Retirada planificada en fase G4/P (al migrar el último consumidor).
+**Tipos Interaction* (G1):** `InteractionType`, `InteractionOutcome`, `SideRequestKind`, `AuditInteractionContext` en `audit.types.ts` — **activos por diseño** (clasificación de request §38; consumidores en handlers y `IWorkflowRepository`). `InteractionMetadata` retirado en el cierre del orquestador (2026-06-01; 0 consumidores). `ActiveInteraction` retirado en P1.
 
 **Implementado G4:** `aggregate-workflow-usage-by-model.ts` (L1), `ISessionMetrics` en `types/gateway/session-metrics.types.ts`, `SessionMetricsService`, `AuditWorkflowClosureHandler` y projector `WorkflowResult` → `meta.json`. Layout `causal-workflows-v1` sigue pendiente (fases P).
 
@@ -3069,7 +3069,7 @@ En todas las fases C y G: **mismo layout `sessions/`** salvo campos adicionales 
 | Correlación subagente | Pending heurístico (prompt/unique) | Headers plano A + SSE join plano B + `SubagentStart` plano C |
 | Cierre E2E | Wire `stop_reason` | Hook `Stop`/`SubagentStop` + `buildWorkflowResult` (wire como respaldo transitorio) |
 | Texto final | `output/body.json` reconstruido SSE | `output/result.json` (`finalText` passthrough hook + `steps[]`); fallback SSE si hook no provee `last_assistant_message` |
-| Tokens turno | `InteractionMetadata.totals`; `session-metrics.json` por modelo (schema simple) | `WorkflowResult.usage` (hop wire en Step, facturado E2E en Result; ver §15.7); `session-metrics.json` desglosado por modelo con `session_totals` y `cache_efficiency` (§33.2, invariante G16, implementado en G4) |
+| Tokens turno | `WorkflowResult.usage` (hop wire en Step, facturado E2E en Result; ver §15.7); `session-metrics.json` desglosado por modelo con `session_totals` y `cache_efficiency` (§33.2, G4 implementado) | — (objetivo alcanzado) |
 | Multi-proveedor | Solo en `routing/` + statusline | `Provider` / `LanguageModel` en dominio capa 1 |
 | SSE en dominio | `SseLine[]` en audit | Snapshots `Step`; deltas solo en proyección capa 2 |
 | Handlers | Monolíticos, alta línea | Orquestación explícita: wire + hooks → correlador compartido |

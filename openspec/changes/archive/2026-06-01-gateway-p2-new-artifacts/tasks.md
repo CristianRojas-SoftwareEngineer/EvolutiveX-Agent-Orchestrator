@@ -49,6 +49,6 @@
 - [x] 9.2 Casos P2-core §37b verificados: **1, 12, 13, 14, 15, 18** (tests unitarios) ✓
 - [x] 9.3 Actualizar `docs/session-audit-model.md`, `docs/proposals/gateway-design.md` §33/§37b/§44, `docs/how-sse-reconstruction-works.md` ✓
 - [x] 9.4 §37b casos 1, 12–15, 18 → `implementado`; §44 Layout disco actualizado ✓
-- [ ] 9.5 `openspec-sync` → `openspec/specs/`
+- [x] 9.5 `openspec-sync` → `openspec/specs/` ✓
 - [x] 9.6 P2 marcada `validada` en registro del orquestador (`design.md` línea 40) ✓
-- [ ] `openspec-archive gateway-p2-new-artifacts`
+- [x] `openspec-archive gateway-p2-new-artifacts` ✓

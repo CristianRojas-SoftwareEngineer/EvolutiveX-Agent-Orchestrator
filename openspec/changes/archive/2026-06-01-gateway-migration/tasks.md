@@ -282,21 +282,26 @@
   - _`rg sse\.jsonl src/` → sin resultados ✓_
   - _`rg ISseAuditWriter src/` → sin resultados ✓_
   - _`rg "appendSseLine|appendSseRawChunk" src/` → sin resultados ✓_
-- [ ] Sync de specs si aplica (`openspec-sync`)
+- [x] Sync de specs si aplica (`openspec-sync`) ✓
 - [x] Marcar P2 como `validada` en el registro (línea 40 del `design.md` del orquestador) ✓
-- [ ] Archivar el change hijo (`openspec-archive gateway-p2-new-artifacts`)
+- [x] Archivar el change hijo (`openspec-archive gateway-p2-new-artifacts`) ✓
 
 ---
 
 ## Cierre de migración
 
-- [ ] Verificar que todas las fases (C1–C3, G1–G5, P0–P2) tienen estado `archivada` en el registro
+- [x] Verificar que todas las fases (C1–C3, G1–G5, P0–P2) tienen estado `archivada` en el registro ✓
   - _Criterio: tabla del registro sin ningún estado `pendiente`, `en-curso` o `validada`_
-- [ ] Verificación E2E global: matriz §37b — todos los casos con fase asignada verificados o marcados «fuera v1» en §45
+  - _C0–P2 todas `archivada` en `design.md` ✓_
+- [x] Verificación E2E global: matriz §37b — todos los casos con fase asignada verificados o marcados «fuera v1» en §45 ✓
   - _Criterio: casos P2-core (1, 12–15, 18) verdes; casos G4/P1 ya archivados; casos fuera v1 documentados en §45, no bloquean cierre_
-- [ ] Confirmar ausencia total de código y documentación zombie/legacy
+  - _P1: 3,4,5,6,7,11,16p,19 implementados; G4: 2 implementado; P2: 1,12,13,14,15,18 implementados; fuera v1 (§45): 8,9t,10,16o,17,20 documentados — cobertura completa ✓_
+- [x] Confirmar ausencia total de código y documentación zombie/legacy ✓
   - _Criterio: `npm run lint` + `npm run typecheck` pasan; búsqueda manual de referencias a `Interaction*`, `ActiveInteraction`, layout flat — sin resultados activos_
-- [ ] `README.md`, `docs/session-audit-model.md` y `docs/proposals/gateway-design.md` reflejan el estado final del sistema objetivo
+  - _`ISseAuditWriter`, `AuditWriterService`, `appendSseLine|appendSseRawChunk`, `InteractionMetadata`, `ActiveInteraction`, `main-agent/interactions` → 0 resultados en `src/` ✓_
+  - _`npm run test` → 321/321 verde; lint+typecheck limpios ✓_
+- [x] `README.md`, `docs/session-audit-model.md` y `docs/proposals/gateway-design.md` reflejan el estado final del sistema objetivo ✓
   - _Criterio: comparativa §44 refleja que todas las columnas "Objetivo" están implementadas_
-- [ ] Archivar el propio change orquestador (`openspec-archive`)
+  - _Ajuste documental quirúrgico aplicado (2026-06-01): §44 Tokens turno convergido, §8.2 shim retirado, §8.3 handler actualizado, §39 InteractionMetadata, referencias sse.jsonl actualizadas ✓_
+- [x] Archivar el propio change orquestador (`openspec-archive`) ✓
   - _Criterio: `openspec/changes/gateway-migration/` movido a `openspec/changes/archive/`_

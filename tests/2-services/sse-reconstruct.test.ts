@@ -6,10 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { MarkdownRendererService } from '../../src/1-domain/services/markdown-renderer.service.js';
 import { SseReconstructService } from '../../src/2-services/sse-reconstruct.service.js';
 
-/**
- * Helper: serializa un array de líneas SSE al formato sse.jsonl escrito por
- * `AuditWriterService.appendSseLine`.
- */
+// Helper: serializa líneas SSE al formato NDJSON de streaming/ (P2).
 function toJsonl(lines: string[]): string {
   return (
     lines

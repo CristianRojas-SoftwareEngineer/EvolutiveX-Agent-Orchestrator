@@ -315,65 +315,6 @@ export interface ResolvedInternalTool {
 export type SideRequestKind = 'session-naming' | 'generic';
 
 /**
- * Metadatos del turno completo escritos en meta.json.
- * Refleja la perspectiva de turno lógico del usuario.
- * @deprecated Reemplazado por `IWorkflowResult` + interfaces gateway de G1 en
- * `src/1-domain/interfaces/gateway/`. Retirada planificada en la fase que migre el último
- * consumidor (G4 o P, a confirmar al implementar G4). Fecha de deprecación: 2026-05-29.
- */
-export interface InteractionMetadata {
-  interactionType: InteractionType;
-  /** Modelo que procesó esta interacción. Presente en agentic y side-request. */
-  modelId?: string;
-  /** Subtipo de side-request (solo para interactionType='side-request'). */
-  sideRequestKind?: SideRequestKind;
-  outcome: InteractionOutcome;
-  stepCount: number;
-  startedAt: string;
-  endedAt: string;
-  durationMs: number;
-  statusCode: number | null;
-  sse: boolean;
-  steps: StepMeta[];
-  totals: {
-    cacheCreationInputTokens: number;
-    cacheReadInputTokens: number;
-    inputTokens: number;
-    outputTokens: number;
-  } | null;
-  truncation: AuditTruncationMeta;
-  sseResponseBodyAttempted: boolean;
-  sseResponseBodyWritten: boolean;
-  sseResponseBodyError: string | null;
-  sseResponseBodySource: string | null;
-  errorMessage: string | null;
-  errorCode: string | null;
-  /** Presente sólo en interacciones de subagentes anidadas bajo el step padre. */
-  parentContext?: ParentContext;
-  /**
-   * Presente cuando el turno se cierra habiendo registrado Agent tool_uses
-   * que no se consumieron antes del cierre (error upstream, orphan timeout,
-   * graceful shutdown). Información forense para correlación offline.
-   */
-  lostPendingAgents?: PendingAgentToolUse[];
-  /**
-   * Presente cuando el turno se cierra habiendo registrado WebSearch tool_uses
-   * que no se consumieron antes del cierre. Información forense para correlación offline.
-   */
-  lostPendingWebSearch?: PendingWebSearchToolUse[];
-  /**
-   * Presente cuando el turno se cierra habiendo registrado WebFetch tool_uses
-   * que no se consumieron antes del cierre. Información forense para correlación offline.
-   */
-  lostPendingWebFetch?: PendingWebFetchToolUse[];
-  /**
-   * Resoluciones observadas de WebSearch/WebFetch. Información forense para
-   * trazabilidad de cómo se resolvieron las herramientas internas.
-   */
-  resolvedInternalTools?: ResolvedInternalTool[];
-}
-
-/**
  * @deprecated Usar `IModelSessionMetrics` en `types/gateway/session-metrics.types.ts` (G4).
  */
 export type { IModelSessionMetrics as SessionModelMetrics } from './gateway/session-metrics.types.js';

@@ -38,7 +38,7 @@ describe('buildStatuslineOutput', () => {
   it('muestra Tabla 1 y Tabla 2 side-by-side sin session_id ni carpeta (§3.2)', () => {
     const out = buildStatuslineOutput({}, {}, { sessionsRoot: emptySessionsRoot() });
     expect(out).toContain('Sesión actual');
-    expect(out).toContain('Interacciones por nivel de razonamiento');
+    expect(out).toContain('Steps por nivel de razonamiento');
   });
 
   // api_key y bearer comparten layout; solo oauth activa Tabla 3 (§3.3).

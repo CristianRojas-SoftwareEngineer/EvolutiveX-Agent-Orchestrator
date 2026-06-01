@@ -3,7 +3,7 @@
  *
  * Renderiza 2-3 tablas Unicode con bordes redondeados y anchos calculados:
  *  - Tabla 1: Sesión y proveedor activo
- *  - Tabla 2: Métricas de interacciones por nivel de razonamiento
+ *  - Tabla 2: Métricas de steps por nivel de razonamiento
  *  - Tabla 3: Rate limits (solo si authMethod === 'oauth')
  *
  * Lee stdin como JSON con el contexto de Claude Code ($ctx).
@@ -823,7 +823,7 @@ function renderTokenTable(
   const headers = [
     'Nivel',
     'Modelo',
-    '# Interacciones',
+    '# Steps',
     'Input (tks)',
     'Cache In (tks)',
     'Output (tks)',
@@ -904,7 +904,7 @@ function renderTokenTable(
   const botLine = `${C.border}${B.bl}${botParts.join(B.mb)}${B.br}${C.reset}`;
 
   // Calcular padding para que el título tenga el mismo ancho que la tabla
-  const titleText = '╭─ Interacciones por nivel de razonamiento ';
+  const titleText = '╭─ Steps por nivel de razonamiento ';
   const titleVisLen = visibleLength(titleText);
   const titlePad = Math.max(0, width - titleVisLen - 1); // -1 para ╮ (╭ ya está en titleVisLen)
   const title = `${C.title}${titleText}${'─'.repeat(titlePad)}╮${C.reset}`;

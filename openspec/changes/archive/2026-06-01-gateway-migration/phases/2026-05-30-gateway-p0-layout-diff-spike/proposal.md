@@ -8,7 +8,7 @@ El diseño del layout objetivo (`causal-workflows-v1`) ya está fijado por las d
 
 ## What Changes
 
-- **Spike de análisis documentado** en `openspec/changes/archive/2026-05-30-gateway-p0-layout-diff-spike/design.md` que cubre 5 entregables:
+- **Spike de análisis documentado** en `openspec/changes/archive/2026-06-01-gateway-migration/phases/2026-05-30-gateway-p0-layout-diff-spike/design.md` que cubre 5 entregables:
   1. Inventario de componentes §28b/§40 con archivo destino propuesto en `src/` y fase (P1 o P2).
   2. Puntos de emisión del correlador: para cada método de mutación de `WorkflowRepositoryService`, el evento de §28b.3 que emite.
   3. Confirmación del ownership del timer de timeout en el correlador (§24.1/G19); `SessionPersistence` no implementa timer propio.
@@ -29,7 +29,7 @@ _— Ninguna. No cambia requisitos de specs existentes._
 
 ## Impact
 
-- **Affected directories:** `openspec/changes/archive/2026-05-30-gateway-p0-layout-diff-spike/` (archivado), `docs/proposals/gateway-design.md` (§28b, §40, §42 actualizados).
+- **Affected directories:** `openspec/changes/archive/2026-06-01-gateway-migration/phases/2026-05-30-gateway-p0-layout-diff-spike/` (archivado), `docs/proposals/gateway-design.md` (§28b, §40, §42 actualizados).
 - **PKA layers afectadas:** ninguna directamente (spike documental); las capas afectadas por la implementación resultante son 1-domain (IEventBus, tipos), 2-services (EventBus, SessionPersistence, correlador con emisión), 4-api (composition root).
 - **Dependencias:** G4 debe estar `validada` o `archivada` en el registro del orquestador antes de iniciar este change.
 - **Legacy:** este spike no retira código; el retiro de `audit-writer.service.ts`, `session-store.service.ts`, `workflow-result-projector.service.ts` y tipos legacy (`ActiveInteraction`, `InteractionMetadata`) es trabajo de P1.

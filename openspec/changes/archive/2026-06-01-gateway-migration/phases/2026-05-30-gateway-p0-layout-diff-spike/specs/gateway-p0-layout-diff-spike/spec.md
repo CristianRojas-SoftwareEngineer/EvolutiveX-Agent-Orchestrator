@@ -2,7 +2,7 @@
 
 ### Requirement: El spike de P0 SHALL cubrir los 5 criterios del DoD
 
-El documento de spike (`design.md` del change archivado `archive/2026-05-30-gateway-p0-layout-diff-spike`) SHALL incluir las 5 secciones que corresponden a los criterios de aceptación de P0 definidos en el bloque P0 del orquestador `gateway-migration` (`tasks.md`).
+El documento de spike (`design.md` del change archivado `archive/2026-06-01-gateway-migration/phases/2026-05-30-gateway-p0-layout-diff-spike`) SHALL incluir las 5 secciones que corresponden a los criterios de aceptación de P0 definidos en el bloque P0 del orquestador `gateway-migration` (`tasks.md`).
 
 #### Scenario: Inventario de componentes documentado
 - **WHEN** se lee el spike de P0

@@ -74,7 +74,7 @@ creada en G4. Se absorbe aquí para que el registro de la migración quede autoc
 ## 8. Legacy y gobernanza del orquestador
 
 - [x] 8.1 Confirmar retiro de `updateSessionMetrics`, fuente primaria `InteractionMetadata` en handlers wire, y degradación de cierre wire-only; sin imports huérfanos
-- [x] 8.2 Actualizar estado de G4 a `en-curso` en el registro de [`openspec/changes/gateway-migration/design.md`](../gateway-migration/design.md) al iniciar implementación
+- [x] 8.2 Actualizar estado de G4 a `en-curso` en el registro de [`openspec/changes/archive/2026-06-01-gateway-migration/design.md`](../../design.md) al iniciar implementación
 - [x] 8.3 Ejecutar skill `migration-phase-gate` antes de archivar
 - [x] 8.4 `openspec-sync` de deltas a `openspec/specs/`; corregir Purpose TBD en `gateway-workflow-lifecycle/spec.md` si aplica
 - [x] 8.5 Archivar change (`openspec-archive`); marcar G4 → `archivada` en registro del orquestador

@@ -138,7 +138,7 @@
 - [x] Sync de specs si aplica (`openspec-sync`)
   - _Criterio: `openspec/specs/gateway-step-assembly/spec.md` creado; delta G3 en `gateway-workflow-lifecycle`_
 - [x] Marcar G3 como `validada` y archivar el change hijo (`openspec-archive`)
-  - _Archivo: `openspec/changes/archive/2026-05-29-gateway-g3-step-assembler/`; registro G3 = `archivada`_
+  - _Archivo: `openspec/changes/archive/2026-06-01-gateway-migration/phases/2026-05-29-gateway-g3-step-assembler/`; registro G3 = `archivada`_
 
 ---
 
@@ -206,7 +206,7 @@
 - [x] Documentación actualizada: `docs/proposals/gateway-design.md` §28b, §40, §42 refleja el estado real
 - [x] Marcar P0 como `validada` y archivar el change hijo (`openspec-archive`)
   - _Criterio: no requiere gate técnico; validación = spike documentado y revisado_
-  - _Archivo: `openspec/changes/archive/2026-05-30-gateway-p0-layout-diff-spike/`; registro P0 = `archivada`_
+  - _Archivo: `openspec/changes/archive/2026-06-01-gateway-migration/phases/2026-05-30-gateway-p0-layout-diff-spike/`; registro P0 = `archivada`_
 
 ---
 
@@ -245,7 +245,7 @@
   - _Criterio: `npm run lint`, `npm run typecheck` y `npm run test` pasan_
 - [x] Sync de specs (`openspec-sync` → `openspec/specs/event-bus`, `session-persistence`, `session-routing`, `gateway-audit-projection`)
 - [x] Marcar P1 como `validada` y archivar el change hijo (`openspec-archive`)
-  - _Archivado 2026-05-30 → `openspec/changes/archive/2026-05-30-gateway-p1-new-session-layout`; documentación causal reescrita_
+  - _Archivado 2026-05-30 → `openspec/changes/archive/2026-06-01-gateway-migration/phases/2026-05-30-gateway-p1-new-session-layout`; documentación causal reescrita_
 
 ---
 

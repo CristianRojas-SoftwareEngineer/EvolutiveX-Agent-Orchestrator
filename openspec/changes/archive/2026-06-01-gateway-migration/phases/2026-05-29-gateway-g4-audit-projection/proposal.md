@@ -38,7 +38,7 @@ Tras G3, el correlador (`IWorkflowRepository`) acumula lifecycle en memoria y el
 
 **Documentación:** `docs/session-audit-model.md`, `docs/proposals/gateway-design.md` §33.2 y §40.
 
-**Dependencia:** G3 archivada (`gateway-g3-step-assembler`). Decisión orquestador: integración de métricas de tokens G3/G4 en [`openspec/changes/gateway-migration/design.md`](../../gateway-migration/design.md).
+**Dependencia:** G3 archivada (`gateway-g3-step-assembler`). Decisión orquestador: integración de métricas de tokens G3/G4 en [`openspec/changes/archive/2026-06-01-gateway-migration/design.md`](../../design.md).
 
 ## No objetivos
 

@@ -44,6 +44,19 @@ El layout bajo `sessions/` SHALL ser `causal-workflows-v1` (`sessions/{sessionId
 
 `delegateClosure()` en `AuditHookEventHandler` SHALL invocar solo `sessionMetrics.updateFromWorkflow()` cuando el workflow sea de kind `main`. NO SHALL invocar `AuditWorkflowClosureHandler.execute()` ni resolver rutas flat legacy.
 
+#### Scenario: Delegación de cierre actualiza métricas sin escritura directa
+
+- **GIVEN** un workflow de kind `main` cerrado en el correlador vía hook `Stop`
+- **WHEN** `AuditHookEventHandler` ejecuta `delegateClosure()`
+- **THEN** SHALL invocar `sessionMetrics.updateFromWorkflow()` para ese workflow
+- **AND** NO SHALL invocar `AuditWorkflowClosureHandler.execute()` ni resolver rutas flat legacy
+
+#### Scenario: Workflow subagente no actualiza métricas de sesión
+
+- **GIVEN** un workflow de kind `subagent` cerrado vía hook `SubagentStop`
+- **WHEN** `AuditHookEventHandler` ejecuta `delegateClosure()`
+- **THEN** NO SHALL invocar `sessionMetrics.updateFromWorkflow()` (solo workflows `main`, invariante G16)
+
 ### Requirement: Cierre wire-only degradado a fallback
 
 El cierre del turno basado únicamente en `stop_reason` del wire (sin hook `Stop`/`SubagentStop`) NO SHALL ser la ruta principal de escritura de `meta.json` en G4. El sistema SHALL conservar un fallback wire-only documentado (`@deprecated-fallback`) cuando los hooks no disparan.

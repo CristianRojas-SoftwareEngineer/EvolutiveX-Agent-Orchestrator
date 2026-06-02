@@ -12,7 +12,7 @@ Antes de este sistema, el statusline calculaba las métricas de la Tabla 2 ("Int
 
 #### Archivo `session-metrics.json`
 
-Se escribe a nivel de sesión (`sessions/<session-id>/session-metrics.json`). Desde la fase **G4** del gateway el esquema canónico sigue [§33.2 de `gateway-design.md`](./proposals/gateway-design.md#332-session-metricsjson-raíz-de-sesión):
+Se escribe a nivel de sesión (`sessions/<session-id>/session-metrics.json`). El esquema canónico sigue [§28.2 de `gateway-architecture.md`](./gateway-architecture.md#282-session-metricsjson-raíz-de-sesión):
 
 ```json
 {
@@ -86,7 +86,7 @@ Cada turno sigue teniendo su propio `meta.json` y `stepsMeta`; la agregación de
 
 #### Semántica de los totales
 
-`session-metrics.json` acumula consumo **facturado por hop** al cerrar workflows main (steps cerrados en el correlador), alineado con [§15.7.1 del gateway](./proposals/gateway-design.md#1571-agregación-a-nivel-session). No representa el tamaño de contexto de un único request.
+`session-metrics.json` acumula consumo **facturado por hop** al cerrar workflows main (steps cerrados en el correlador), alineado con [§9.6.1 del gateway](./gateway-architecture.md#961-semántica-facturado-por-hop-vs-cardinalidad-de-contexto). No representa el tamaño de contexto de un único request.
 
 #### Validez multi-proveedor
 

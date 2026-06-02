@@ -20,7 +20,7 @@ de string, sin comportamiento ni I/O:
 porque clasifica el request HTTP entrante, no la topología del workflow. Sus valores son
 `'client-preflight' | 'agentic' | 'side-request'`. Este tipo no es `@deprecated`.
 
-Referencia técnica: [§19 gateway-design.md](../../docs/proposals/gateway-design.md#tipos-primitivos-y-estructura-de-archivos).
+Referencia técnica: [§13 gateway-architecture.md](../../../docs/gateway-architecture.md#13-tipos-primitivos-y-estructura-de-archivos).
 
 #### Scenario: Tipos sin comportamiento
 
@@ -51,7 +51,7 @@ Reglas de import de capa 1 (SHALL cumplirse siempre):
 - Las interfaces de `interfaces/gateway` NO SHALL importar desde capas 2-6 (`services/`,
   `operations/`, `api/`, `user-interfaces/`).
 
-Referencia técnica: [§19 gateway-design.md](../../docs/proposals/gateway-design.md#tipos-primitivos-y-estructura-de-archivos).
+Referencia técnica: [§13 gateway-architecture.md](../../../docs/gateway-architecture.md#13-tipos-primitivos-y-estructura-de-archivos).
 
 #### Scenario: Interfaces tipadas correctamente
 
@@ -84,8 +84,8 @@ Los modelos SHALL cumplir:
 - Pueden exponer helpers de clasificación o acceso simples (sin I/O).
 - NO SHALL importar desde capas 2-6.
 
-Referencia técnica: [§19 gateway-design.md](../../docs/proposals/gateway-design.md#tipos-primitivos-y-estructura-de-archivos)
-y perfil anémico en [§39 gateway-design.md](../../docs/proposals/gateway-design.md#capa-1-objetivo).
+Referencia técnica: [§13 gateway-architecture.md](../../../docs/gateway-architecture.md#13-tipos-primitivos-y-estructura-de-archivos)
+y perfil anémico en [§36 gateway-architecture.md](../../../docs/gateway-architecture.md#36-capa-1--domain).
 
 #### Scenario: Modelos instanciables sin infraestructura
 
@@ -104,7 +104,7 @@ superiores. Ningún archivo bajo `src/1-domain/types/gateway/`, `src/1-domain/in
 con I/O (`fs`, `net`, `http`), módulos de streaming SSE ni Fastify, ni código de las capas
 2-6 (`src/2-services/`, `src/3-operations/`, `src/4-api/`, `src/5-user-interfaces/`).
 
-Referencia técnica: [§39 gateway-design.md](../../docs/proposals/gateway-design.md#capa-1-objetivo)
+Referencia técnica: [§36 gateway-architecture.md](../../../docs/gateway-architecture.md#36-capa-1--domain)
 — "Sin I/O: Ningún `fs`, `fetch`, ni parseo SSE aquí."
 
 #### Scenario: Test unitario sin infraestructura
@@ -131,7 +131,7 @@ clasificación de request en la capa 1 del dominio.
 `WorkflowRequestKind` se diferencia de `WorkflowKind` (que clasifica la estructura del workflow:
 `'main' | 'subagent'`); el primero clasifica el request HTTP, el segundo la topología del workflow.
 
-Referencia técnica: [§19 gateway-design.md](../../docs/proposals/gateway-design.md#tipos-primitivos-y-estructura-de-archivos).
+Referencia técnica: [§13 gateway-architecture.md](../../../docs/gateway-architecture.md#13-tipos-primitivos-y-estructura-de-archivos).
 
 #### Scenario: Asignación de valores canónicos
 

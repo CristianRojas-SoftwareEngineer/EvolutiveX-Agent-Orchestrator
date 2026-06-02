@@ -48,7 +48,7 @@ El sistema SHALL implementar `readyToClose(workflowId, hook)` en `IWorkflowRepos
 - SHALL devolver `false` si el workflow con `workflowId` no existe en el repo.
 - El predicado NO SHALL tener efectos secundarios en el estado del repo.
 
-Referencia: condiciones de cierre en [§15.4 gateway-design.md](../../../../../docs/proposals/gateway-design.md#154-derivación-de-outcome-y-reglas-de-cierre).
+Referencia: condiciones de cierre en [§9.4 gateway-architecture.md](../../../docs/gateway-architecture.md#94-derivación-de-outcome-y-reglas-de-cierre).
 
 #### Scenario: stop_hook_active true → no cerrar
 
@@ -83,7 +83,7 @@ El sistema SHALL implementar `close(workflowId, hook)` en `IWorkflowRepository`:
 - SHALL adjuntar el resultado a `workflow.result` y marcar `workflow.status` como `'completed'` (si `outcome === 'success'`) o `'failed'` (si `outcome === 'api_error'`) y asignar `completedAt`.
 - SHALL ser **idempotente**: si el workflow ya está cerrado (`result != null`), SHALL ignorar la llamada y devolver el resultado existente sin mutar el estado.
 
-Referencia: idempotencia en [§28 gateway-design.md](../../../../../docs/proposals/gateway-design.md#28-integración-wire--hooks-carreras-y-estados).
+Referencia: idempotencia en [§22 gateway-architecture.md](../../../docs/gateway-architecture.md#22-integración-wire--hooks-carreras-y-estados).
 
 #### Scenario: hook Stop → workflow cerrado con outcome success
 
@@ -194,7 +194,7 @@ El port `IWorkflowRepository` (capa 1) SHALL exponer una operación `setWorkflow
 
 `AuditSseResponseHandler` y `AuditStandardResponseHandler` (capa 3) SHALL, al completar cada inferencia, registrar el step en el correlador unificado (`IWorkflowRepository`) invocando `registerStep(workflowId, step)` con un `IStep` construido desde el snapshot del request de inferencia y el resultado ensamblado (`StepAssembler.result()` para SSE; respuesta parseada completa para standard). Cuando el step es terminal (`stopReason === 'end_turn'`), el handler SHALL invocar `closeStep(workflowId, stepId)` inmediatamente al finalizar la inferencia. Cuando el step termina con `tool_use`, el handler SHALL invocar `registerStep` pero NO SHALL invocar `closeStep` hasta el cierre diferido vía hooks (el step permanece abierto en el correlador). Si el workflow no existe en el correlador, las invocaciones SHALL ser no-op defensivo sin error ni interrupción del pipeline legacy.
 
-Referencia: [§41 gateway-design.md](../../docs/proposals/gateway-design.md#41-capa-3-objetivo).
+Referencia: [§38 gateway-architecture.md](../../../docs/gateway-architecture.md#38-capa-3--operations).
 
 #### Scenario: Inferencia SSE con end_turn registra y cierra el step
 

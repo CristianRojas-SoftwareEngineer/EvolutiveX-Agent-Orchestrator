@@ -9,7 +9,7 @@ Métricas agregadas de sesión en `session-metrics.json` (§33.2): tipos gateway
 
 ### Requirement: ISessionMetrics — tipo de dominio para session-metrics.json
 
-El sistema SHALL definir `ISessionMetrics` y tipos asociados en `src/1-domain/types/gateway/session-metrics.types.ts` (capa 1). El schema SHALL alinearse con [§33.2](../../docs/proposals/gateway-design.md#332-session-metricsjson-raíz-de-sesión):
+El sistema SHALL definir `ISessionMetrics` y tipos asociados en `src/1-domain/types/gateway/session-metrics.types.ts` (capa 1). El schema SHALL alinearse con [§28.2](../../../docs/gateway-architecture.md#282-session-metricsjson-raíz-de-sesión):
 
 - `models`: mapa por `modelId` con `count`, `input_tokens`, `output_tokens`, `cache_creation_input_tokens`, `cache_read_input_tokens`, `cache_efficiency`.
 - `session_totals`: agregado de la sesión.

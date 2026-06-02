@@ -22,8 +22,8 @@ Contrato:
 - La suma SHALL ser determinista: mismas entradas → mismo resultado.
 - NO SHALL tener efectos secundarios ni acceder a I/O.
 
-Referencia técnica: [§39 gateway-design.md](../../docs/proposals/gateway-design.md#capa-1-objetivo)
-y semántica en §15.6 de `docs/proposals/gateway-design.md`.
+Referencia técnica: [§36 gateway-architecture.md](../../../docs/gateway-architecture.md#36-capa-1--domain)
+y semántica en §9.6 de `docs/gateway-architecture.md`.
 
 #### Scenario: Suma de tokens de steps y child workflows
 
@@ -63,8 +63,8 @@ Contrato:
 - El cierre del workflow SHALL expresarse como llamada a esta función desde el handler de capa 3,
   NO como un método `Workflow.complete()` con efectos.
 
-Referencia técnica: [§39 gateway-design.md](../../docs/proposals/gateway-design.md#capa-1-objetivo).
-Semántica en §15.7–§15.8 de `docs/proposals/gateway-design.md`.
+Referencia técnica: [§36 gateway-architecture.md](../../../docs/gateway-architecture.md#36-capa-1--domain).
+Semántica en §9.6–§9.7 de `docs/gateway-architecture.md`.
 
 #### Scenario: Construcción correcta de WorkflowResult
 
@@ -101,8 +101,8 @@ Contrato:
   se difiere a fase posterior.
 - La función SHALL ser pura: sin I/O, determinista.
 
-Referencia técnica: [§39 gateway-design.md](../../docs/proposals/gateway-design.md#capa-1-objetivo).
-Semántica del hook de cierre en §15.7.1 de `docs/proposals/gateway-design.md`.
+Referencia técnica: [§36 gateway-architecture.md](../../../docs/gateway-architecture.md#36-capa-1--domain).
+Semántica del hook de cierre en §9.6.1 de `docs/gateway-architecture.md`.
 
 #### Scenario: Derivación de outcome success
 
@@ -135,7 +135,7 @@ Contrato:
   Si es vacío o undefined → `undefined`. Sin derivación ni join de bloques.
 - La función SHALL ser pura: sin I/O, sin efectos secundarios.
 
-Referencia técnica: semántica en §15.8 de `docs/proposals/gateway-design.md`.
+Referencia técnica: semántica en §9.7 de `docs/gateway-architecture.md`.
 
 #### Scenario: Extracción de texto presente
 
@@ -155,7 +155,7 @@ Referencia técnica: semántica en §15.8 de `docs/proposals/gateway-design.md`.
 
 El sistema SHALL proveer en `src/1-domain/services/gateway/validate-workflow-invariants.ts` las
 funciones puras de validación de invariantes del dominio gateway relevantes a G1 (subconjunto
-de los invariantes G1–G19 de [§39](../../docs/proposals/gateway-design.md#capa-1-objetivo)):
+de los invariantes G1–G19 de [§36](../../../docs/gateway-architecture.md#36-capa-1--domain)):
 
 - Un sub-workflow SHALL tener `parentWorkflowId` y `parentToolUseId` no nulos ni vacíos.
 - Un workflow raíz (`kind: 'main'`) es válido sin `parentWorkflowId`.
@@ -190,7 +190,7 @@ Contrato:
 - Omite `service_tier` e `inference_geo` (no son aditivos), coherente con `aggregateWorkflowUsage`.
 - La función SHALL ser determinista y sin efectos secundarios ni I/O.
 
-Referencia: [§33.2 gateway-design.md](../../docs/proposals/gateway-design.md#332-session-metricsjson-raíz-de-sesión).
+Referencia: [§28.2 gateway-architecture.md](../../../docs/gateway-architecture.md#282-session-metricsjson-raíz-de-sesión).
 
 #### Scenario: Agrupación de dos modelos distintos
 

@@ -85,7 +85,7 @@ El `AuditInteractionHandler` SHALL priorizar la rama de correlación por cabecer
 
 ### Requirement: Valor `'agent-headers'` en CorrelationMethod
 
-El tipo `CorrelationMethod` SHALL incluir los valores `'agent-headers'`, `'prompt'`, `'unique-pending'`, `'fifo-pending'` y `'none'` con la siguiente jerarquía de autoridad descendiente conforme a [§21](../../../docs/proposals/gateway-design.md#21-reglas-de-autoridad-por-concern):
+El tipo `CorrelationMethod` SHALL incluir los valores `'agent-headers'`, `'prompt'`, `'unique-pending'`, `'fifo-pending'` y `'none'` con la siguiente jerarquía de autoridad descendiente conforme a [§15](../../../docs/gateway-architecture.md#15-reglas-de-autoridad-por-concern):
 1. `'agent-headers'` — señal estructural de plano A; máxima autoridad.
 2. `'prompt'` — señal contextual (match de prompt); segunda autoridad.
 3. `'unique-pending'` — señal estructural (pending único); tercera autoridad.

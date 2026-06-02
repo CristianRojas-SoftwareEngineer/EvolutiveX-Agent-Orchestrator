@@ -2,7 +2,7 @@
 
 Referencia canónica del modelo de auditoría en `sessions/` para sesiones **nuevas** (layout `causal-workflows-v1`, fase P1). Describe el modelo de ejecución agéntico, el árbol en disco, la correlación HTTP y el mapeo a tipos TypeScript del gateway.
 
-Para el diseño objetivo completo del gateway (incl. artefactos P2), véase [`proposals/gateway-design.md`](./proposals/gateway-design.md) §29, §30, §33 y §46.4.
+Para la arquitectura completa del gateway, véase [`gateway-architecture.md`](./gateway-architecture.md) §24, §25, §28 y §41.4.
 
 ---
 
@@ -303,5 +303,5 @@ En memoria, el modelo legacy usaba `ActiveInteraction` → `InteractionMetadata`
 
 ## Referencias cruzadas
 
-- Diseño gateway: [`proposals/gateway-design.md`](./proposals/gateway-design.md)
+- Arquitectura del gateway: [`gateway-architecture.md`](./gateway-architecture.md)
 - OpenSpec: `openspec/specs/session-persistence/`, `event-bus/`, `session-routing/`, `gateway-audit-projection/`

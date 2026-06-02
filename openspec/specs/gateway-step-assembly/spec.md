@@ -8,7 +8,7 @@ Ensamblaje en RAM de respuestas de inferencia SSE (StepBuffer §26) mediante `St
 
 ### Requirement: Ensamblaje de inferencia en RAM (StepAssembler)
 
-El sistema SHALL proveer un componente de infraestructura `StepAssembler` (capa 2) que ensamble en memoria la respuesta de una inferencia a partir de los eventos SSE Anthropic de un único POST, según el StepBuffer de [§26](../../../docs/proposals/gateway-design.md#26-streaming-sse-y-stepbuffer). El componente SHALL exponer una operación de ingesta de eventos parseados y, al cierre del mensaje, producir el resultado ensamblado: `assistantMessage` (bloques `text`, `thinking`, `tool_use`), `usage`, `stopReason`, `model` y la lista de bloques `tool_use`. El `StepAssembler` SHALL ser efímero por inferencia: no persiste deltas SSE y descarta su estado interno tras producir el resultado.
+El sistema SHALL proveer un componente de infraestructura `StepAssembler` (capa 2) que ensamble en memoria la respuesta de una inferencia a partir de los eventos SSE Anthropic de un único POST, según el StepBuffer de [§20](../../../docs/gateway-architecture.md#20-streaming-sse-y-stepbuffer). El componente SHALL exponer una operación de ingesta de eventos parseados y, al cierre del mensaje, producir el resultado ensamblado: `assistantMessage` (bloques `text`, `thinking`, `tool_use`), `usage`, `stopReason`, `model` y la lista de bloques `tool_use`. El `StepAssembler` SHALL ser efímero por inferencia: no persiste deltas SSE y descarta su estado interno tras producir el resultado.
 
 #### Scenario: Ensamblaje de usage desde message_start y message_delta
 

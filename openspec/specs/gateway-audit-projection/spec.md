@@ -113,7 +113,7 @@ La interfaz que desacopla los handlers L3 de Fastify SHALL llamarse `AuditWorkfl
 Los augments de Fastify (`fastify.augments.d.ts`) SHALL usar los nombres canónicos
 `request.auditWorkflowDir` y `request.workflowKind`.
 
-Referencia técnica: [§28b gateway-design.md](../../docs/proposals/gateway-design.md#28b-contratos-de-paso).
+Referencia técnica: [§23 gateway-architecture.md](../../../docs/gateway-architecture.md#23-integración-correlador--bus-de-eventos--persistencia).
 
 #### Scenario: AuditWorkflowHandler usa AuditWorkflowContext
 

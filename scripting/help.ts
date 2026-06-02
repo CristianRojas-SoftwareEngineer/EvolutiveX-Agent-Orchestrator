@@ -53,6 +53,51 @@ const scripts: NpmScript[] = [
     description: 'Crea hardlink AGENTS.md → CLAUDE.md (multiplataforma)',
     category: 'local',
   },
+  {
+    name: 'install:statusline',
+    description: 'Instala statusline de Smart Code Proxy en ~/.claude',
+    category: 'local',
+  },
+  {
+    name: 'sessions:list',
+    description: 'Lista sesiones Claude Code del proyecto (--project)',
+    category: 'local',
+  },
+  {
+    name: 'sessions:archive',
+    description: 'Archiva sesión(es) a ~/.claude/archived-sessions/',
+    category: 'local',
+  },
+  {
+    name: 'sessions:delete',
+    description: 'Elimina sesión(es) permanentemente (requiere --force)',
+    category: 'local',
+  },
+  {
+    name: 'sessions:list-archived',
+    description: 'Lista sesiones archivadas',
+    category: 'local',
+  },
+  {
+    name: 'sessions:restore',
+    description: 'Restaura una sesión archivada',
+    category: 'local',
+  },
+  {
+    name: 'sessions:sanitize:scan',
+    description: 'Detecta thinking blocks con firma inválida (Smart Code Proxy)',
+    category: 'local',
+  },
+  {
+    name: 'sessions:sanitize',
+    description: 'Sanitiza una sesión por ID (npm run … -- <id>)',
+    category: 'local',
+  },
+  {
+    name: 'sessions:sanitize:all',
+    description: 'Sanitiza en lote todas las sesiones corruptas (--force)',
+    category: 'local',
+  },
 
   // Producción
   {

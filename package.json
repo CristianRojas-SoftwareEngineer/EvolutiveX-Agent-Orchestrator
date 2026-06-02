@@ -27,7 +27,15 @@
     "configure:provider": "tsx scripting/configure-provider.ts",
     "install:statusline": "tsx scripting/install-statusline.ts",
     "create:agents-reference": "tsx scripting/create-agents-reference.ts",
-    "verify:package-scripts": "tsx scripting/verify-package-scripts.ts"
+    "verify:package-scripts": "tsx scripting/verify-package-scripts.ts",
+    "sessions:list": "tsx scripting/session-manager/cli.ts list",
+    "sessions:archive": "tsx scripting/session-manager/cli.ts archive",
+    "sessions:delete": "tsx scripting/session-manager/cli.ts delete",
+    "sessions:list-archived": "tsx scripting/session-manager/cli.ts list-archived",
+    "sessions:restore": "tsx scripting/session-manager/cli.ts restore",
+    "sessions:sanitize:scan": "tsx scripting/session-manager/cli.ts sanitize scan",
+    "sessions:sanitize": "tsx scripting/session-manager/cli.ts sanitize",
+    "sessions:sanitize:all": "tsx scripting/session-manager/cli.ts sanitize all"
   },
   "keywords": [],
   "author": "",

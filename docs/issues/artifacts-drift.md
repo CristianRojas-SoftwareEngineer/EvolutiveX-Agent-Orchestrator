@@ -75,9 +75,9 @@ Tras primer arranque mínimo:
 |---------|----------------------------------|---------------|
 | `commands\ccr-multimode.md` | 8 usos | **ccr-legacy** |
 | `commands\router-clean-slate.md` | 1 uso | **ccr-legacy** |
-| `commands\delete-session.md` | 1 uso | **ccr-legacy** |
-| `commands\sanitize-session.md` | 1 uso | **ccr-legacy** |
-| `commands\archive-session.md` | (registrado) | **ccr-legacy** |
+| `commands\delete-session.md` | 1 uso | **migrado → npm** (`sessions:delete`); pendiente eliminar tras checklist |
+| `commands\sanitize-session.md` | 1 uso | **migrado → npm** (`sessions:sanitize*`); pendiente eliminar tras checklist |
+| `commands\archive-session.md` | (registrado) | **migrado → npm** (`sessions:archive` / `restore`); pendiente eliminar tras checklist |
 
 ### 4.2 Skills globales (2)
 
@@ -100,7 +100,8 @@ Tras primer arranque mínimo:
 | Hook SessionStart | `session-start-router.ps1` | **ccr-legacy** |
 | Hook SessionEnd | `session-end.ps1` | **ccr-legacy** |
 | Módulos SessionEnd | `scripts\session-end-*.ps1`, `session-manager.ps1` | **ccr-legacy** |
-| Router CCR | `scripts\router-clean-slate.ps1`, `scripts\sanitize-session.ps1` | **ccr-legacy** |
+| Router CCR | `scripts\router-clean-slate.ps1` | **ccr-legacy** |
+| Session manager (Claude Code) | `~/.claude/scripts/session-manager.ps1`, `sanitize-session.ps1` → `scripting/session-manager/` (npm `sessions:*`) | **migrado → repo**; pendiente eliminar PS1 tras checklist |
 | Notificaciones | `C:\AI\claude-notifications-enhanced.ps1` (externo) | **personal-global** |
 | Estado CCR | `last-launch-mode`, `session-tags.json`, `router-sessions.json`, `router-requests.jsonl` | **ccr-legacy** / runtime |
 
@@ -308,7 +309,7 @@ Artefactos del ecosistema **Claude Code Router** (multimode, session tagging, cl
 |-----------|------|-------|
 | `/ccr-multimode` | `~/.claude/commands/ccr-multimode.md` | Modos Low-Cost / Standard / Reasoning |
 | `/router-clean-slate` | command + `scripts/router-clean-slate.ps1` | Limpieza entorno CCR |
-| `/delete-session`, `/sanitize-session`, `/archive-session` | commands + scripts | Gestión sesiones locales |
+| `/delete-session`, `/sanitize-session`, `/archive-session` | ~~commands + PS1~~ → **npm `sessions:*`** en `scripting/session-manager/` | Migrado; eliminar legacy tras checklist en `scripting/session-manager/README.md` |
 | SessionStart hook | `session-start-router.ps1` | `launch_id` → `session_id`, `session-tags.json` |
 | SessionEnd hook | `session-end.ps1` + módulos | Rebuild index, acciones diferidas |
 | Estado | `last-launch-mode` (= `Low-Cost`), `router-sessions.json` | Runtime CCR |

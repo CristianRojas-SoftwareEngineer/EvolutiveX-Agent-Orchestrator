@@ -7,7 +7,7 @@ import type { NotificationEvent } from './types.js';
 
 const SOUND_FLAG = 'sound';
 const SILENT_FLAG = 'silent';
-const STDIN_JSON_FLAG = 'stdinJson';
+const STDIN_JSON_FLAG = 'stdin-json';
 
 interface CliOptions {
   eventType?: string;

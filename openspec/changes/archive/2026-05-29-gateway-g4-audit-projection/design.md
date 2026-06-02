@@ -167,6 +167,57 @@ sequenceDiagram
 - **[Métricas de sesión desfasadas si solo wire sin hooks]** → fallback wire debe invocar `SessionMetricsService` o mantener path legacy hasta retiro — documentar en implementación.
 - **[writeQueue compartido]** → `SessionMetricsService` reutiliza la cola de `AuditWriterService` o instancia propia serializada; evitar deadlocks.
 
+## Decisiones absorbidas — rename-interaction-to-workflow (2026-06-01)
+
+### D-1 — `InteractionType` → `WorkflowRequestKind` como nuevo tipo en `audit.types.ts`
+
+`InteractionType` no tiene equivalente directo en `types/gateway/` porque clasifica el request
+HTTP, no la topología del workflow. Se define `WorkflowRequestKind` como alias permanente (no
+deprecated) con los mismos tres literales: `'client-preflight' | 'agentic' | 'side-request'`.
+
+**Alternativa descartada:** Reutilizar `WorkflowKind` — tiene semántica diferente y cambiaría
+contratos del correlador.
+
+### D-2 — `InteractionOutcome` → retirar; `SubagentSummary.outcome` migra a `WorkflowOutcome`
+
+`InteractionOutcome` solo tiene un consumidor activo (`SubagentSummary.outcome`). Los valores del
+legacy que no existen en `WorkflowOutcome` se mapean:
+
+| InteractionOutcome (legacy)  | WorkflowOutcome (gateway)   |
+|------------------------------|-----------------------------|
+| `'completed'`                | `'success'`                 |
+| `'client-error'`             | `'api_error'`               |
+| `'upstream-error'`           | `'api_error'`               |
+| `'truncated'`                | `'aborted'`                 |
+| `'orphaned'`                 | `'unknown'`                 |
+
+El campo `SubagentSummary.outcome` cambia de `InteractionOutcome | 'unknown'` a `WorkflowOutcome`.
+
+**Alternativa descartada:** Mantener `InteractionOutcome` como alias — perpetúa la deuda sin
+reducirla y los valores no son equivalentes semánticamente.
+
+### D-3 — `AuditInteractionContext` → `AuditWorkflowContext`
+
+Rename directo de la interfaz y todos sus consumidores (3 handlers L3 + controller + augments).
+El campo `auditInteractionDir` → `auditWorkflowDir`; `interactionType` → `workflowKind` (usando
+el nuevo `WorkflowRequestKind`).
+
+### D-4 — `AuditInteractionHandler` → `AuditWorkflowHandler` (con rename de archivo)
+
+El archivo `audit-interaction.handler.ts` pasa a `audit-workflow.handler.ts`. Los tests del
+handler se mueven en paralelo (`tests/3-operations/audit-workflow.handler.test.ts`).
+
+### D-5 — Orden de ejecución: types-first
+
+Para evitar errores de compilación intermedios, el orden SHALL ser:
+1. Definir `WorkflowRequestKind` y migrar `SubagentSummary.outcome` (capa 1 — sin dependencias).
+2. Renombrar `AuditWorkflowContext` y sus campos (capa 1 — desbloquea handlers).
+3. Renombrar handlers y métodos en capa 3.
+4. Actualizar augments y controller en capa 5.
+5. Actualizar `scripting/router-status.ts`.
+6. Renombrar archivo del handler y actualizar todos los imports.
+7. Eliminar `InteractionType` e `InteractionOutcome` de `audit.types.ts`.
+
 ## Migration Plan
 
 1. Implementar L1 + tests.

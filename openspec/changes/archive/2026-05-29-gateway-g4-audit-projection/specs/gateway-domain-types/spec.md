@@ -1,3 +1,8 @@
+<!-- Absorbido desde archive/2026-06-01-rename-interaction-to-workflow (2026-06-01).
+     Orquestador: gateway-migration | Fase origen real: G1 (gateway-domain-types es capability de G1).
+     Incluido en G4 por fusión del change complementario rename-interaction-to-workflow, cuyo spec primario es gateway-audit-projection (G4).
+     Absorbido en G4 el 2026-06-02. -->
+
 ## ADDED Requirements
 
 ### Requirement: WorkflowRequestKind — clasificación canónica del request HTTP

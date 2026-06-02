@@ -65,3 +65,44 @@ Los handlers wire (`AuditSseResponseHandler`, `AuditStandardResponseHandler`) NO
 - **WHEN** se completa el ciclo de cierre
 - **THEN** `meta.json` NO SHALL generarse exclusivamente desde construcción inline de `InteractionMetadata` en `AuditSseResponseHandler`
 - **AND** la fuente canónica SHALL ser `IWorkflowResult` proyectado por el closure handler
+
+---
+
+## Delta absorbido — rename-interaction-to-workflow (2026-06-01)
+
+> Procedencia: `archive/2026-06-01-rename-interaction-to-workflow/specs/gateway-audit-projection/spec.md`.
+> Change complementario sin back-reference al orquestador; absorbido en G4 (2026-06-02).
+
+## RENAMED Requirements
+
+### Requirement: AuditInteractionContext → AuditWorkflowContext
+
+FROM: `AuditInteractionContext`
+TO: `AuditWorkflowContext`
+
+La interfaz que desacopla los handlers L3 de Fastify SHALL renombrarse a `AuditWorkflowContext`.
+Sus campos SHALL renombrarse en la misma operación:
+- `auditInteractionDir` → `auditWorkflowDir`
+- `interactionType` → `workflowKind` (tipo: `WorkflowRequestKind`)
+
+Los augments de Fastify (`fastify.augments.d.ts`) SHALL actualizar los campos del request:
+- `request.auditInteractionDir` → `request.auditWorkflowDir`
+- `request.interactionType` → `request.workflowKind`
+
+---
+
+## MODIFIED Requirements
+
+### Requirement: AuditWorkflowClosureHandler — proyección de WorkflowResult a disco (nombres canónicos)
+
+El handler L3 que orquesta la auditoría del request SHALL llamarse `AuditWorkflowHandler`
+(renombrado desde `AuditInteractionHandler`). El archivo SHALL ser `audit-workflow.handler.ts`.
+Los métodos de gestión de workflows huérfanos SHALL llamarse `closeOrphanWorkflow()` y
+`getOpenWorkflowsForShutdown()` (sin cambio de semántica).
+
+#### Scenario: Nombres canónicos en código
+
+- **WHEN** se ejecuta `npm run typecheck` tras el rename
+- **THEN** NO SHALL existir referencias a `AuditInteractionHandler`, `AuditInteractionContext`,
+  `auditInteractionDir` ni `interactionType` en `src/`
+- **AND** NO SHALL existir referencias a `InteractionType` ni `InteractionOutcome` en `src/`

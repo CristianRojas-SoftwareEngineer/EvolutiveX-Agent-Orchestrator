@@ -1,3 +1,8 @@
+<!-- Absorbido desde archive/2026-05-30-remove-token-cost-usd (2026-05-30).
+     Orquestador: gateway-migration | Fase origen real: G2/G4 (gateway-workflow-lifecycle es capability de G2/G4).
+     Incluido en G1 por fusión del change complementario remove-token-cost-usd, cuyo spec primario es gateway-closure-services (G1).
+     Absorbido en G1 el 2026-06-02. -->
+
 ## MODIFIED Requirements
 
 ### Requirement: close — cierre del workflow e idempotencia §28

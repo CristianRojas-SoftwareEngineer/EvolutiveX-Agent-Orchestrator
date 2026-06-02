@@ -49,7 +49,8 @@ de `docs/proposals/gateway-design.md`.
 
 ### Modified Capabilities
 
-*(ninguna — G1 no modifica requisitos de capabilities existentes)*
+- `gateway-closure-services` *(absorbido desde remove-token-cost-usd)*: se elimina la cláusula `totalCostUsd: undefined` del contrato de `buildWorkflowResult`; ver §Cambios absorbidos.
+- `gateway-workflow-lifecycle` *(absorbido desde remove-token-cost-usd)*: se elimina el bullet `totalCostUsd: undefined` del requirement `close`; ver §Cambios absorbidos.
 
 ## No Objetivos
 
@@ -78,3 +79,19 @@ de `docs/proposals/gateway-design.md`.
   `src/5-user-interfaces/`), `src/1-domain/repositories/IWorkflowRepository.ts`, layout
   `sessions/`, ni ningún otro archivo existente más allá del comentario de deprecación en
   `audit.types.ts`.
+
+## Cambios absorbidos
+
+### remove-token-cost-usd (2026-05-30)
+
+**Orquestador:** `gateway-migration` | **Fase de absorción:** G1 (`gateway-g1-domain-types-services`)
+
+El change standalone `2026-05-30-remove-token-cost-usd` eliminó el esqueleto de costo USD que nació
+como placeholder en G1 (`totalCostUsd` en `IWorkflowResult`, `pricing.types.ts`, claves `costs` y
+`pricing_rules`, docs de cálculo). Por ser `gateway-closure-services` la capability primaria afectada
+(capability creada en G1), se absorbe en esta fase.
+
+Artefactos eliminados: `src/1-domain/types/pricing.types.ts`; campo `IWorkflowResult.totalCostUsd`;
+inicialización en `build-workflow-result.ts`; clave `"costs"` en 17 `metadata.json`; clave
+`"pricing_rules"` en 6 `config.json`; `docs/how-to-calculate-anthropic-api-costs.md` y
+`docs/how-to-calculate-openrouter-api-costs.md`; referencias en `gateway-design.md` y `how-to-start.md`.

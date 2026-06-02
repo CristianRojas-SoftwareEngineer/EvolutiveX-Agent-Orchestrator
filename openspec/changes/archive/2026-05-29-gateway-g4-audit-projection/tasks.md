@@ -47,6 +47,30 @@
 - [x] 7.2 Actualizar `docs/proposals/gateway-design.md` §33.2 y §40 solo donde G4 implemente comportamiento (marcar `SessionMetricsService` y proyección como implementados en G4, sin afirmar layout P)
 - [x] 7.3 Revisión manual de coherencia con §28b (bus diferido) y §41
 
+## 9. Absorción post-migración — rename-interaction-to-workflow (2026-06-01)
+
+El change complementario `2026-06-01-rename-interaction-to-workflow` completó el item diferido
+explícitamente en G1 («Legacy retirado: tipos `Interaction*` reemplazados — diferido a G4/P»):
+renombró `AuditInteraction*`→`AuditWorkflow*` y eliminó los tipos `@deprecated`
+`InteractionType`/`InteractionOutcome`. Su spec primario es `gateway-audit-projection`, capability
+creada en G4. Se absorbe aquí para que el registro de la migración quede autocontenido.
+
+- [x] 9.1 Definir `WorkflowRequestKind` en `audit.types.ts` y migrar `SubagentSummary.outcome` a `WorkflowOutcome`
+- [x] 9.2 Renombrar `AuditInteractionContext` → `AuditWorkflowContext` y sus campos
+- [x] 9.3 Renombrar `ParentContext.parentInteractionDir` → `parentWorkflowDir`
+- [x] 9.4 Renombrar `SseReconstructOptions.interactionDir` → `workflowDir`
+- [x] 9.5 Renombrar `MarkdownRenderContext.interactionType` → `workflowKind: WorkflowRequestKind`
+- [x] 9.6 Renombrar `formatAuditInteractionDirName()` → `formatWorkflowDirName()` en `session-resolver.service.ts`
+- [x] 9.7 Actualizar `IWorkflowRepository.ts`: `interactionType` → `workflowKind: WorkflowRequestKind`
+- [x] 9.8 Actualizar handlers L3 (`audit-sse-response`, `audit-standard-response`, `audit-interaction`) y `gateway-wire-step.util.ts`
+- [x] 9.9 Actualizar augments Fastify y `proxy.controller.ts` en capa 5
+- [x] 9.10 Renombrar `aggregateInteractionMetrics()` → `aggregateSessionMetrics()` en `scripting/router-status.ts`
+- [x] 9.11 Renombrar archivo `audit-interaction.handler.ts` → `audit-workflow.handler.ts` y actualizar imports
+- [x] 9.12 Eliminar `InteractionType` e `InteractionOutcome` de `audit.types.ts`
+- [x] 9.13 Actualizar todos los tests afectados por los renombres
+- [x] 9.14 `npm run test` verde (321 tests); `grep -rn "InteractionType\|InteractionOutcome\|AuditInteractionHandler\|AuditInteractionContext\|auditInteractionDir\|interactionType" src/` sin resultados
+- [x] 9.15 `openspec-sync` de deltas a `openspec/specs/`; archivar change
+
 ## 8. Legacy y gobernanza del orquestador
 
 - [x] 8.1 Confirmar retiro de `updateSessionMetrics`, fuente primaria `InteractionMetadata` en handlers wire, y degradación de cierre wire-only; sin imports huérfanos

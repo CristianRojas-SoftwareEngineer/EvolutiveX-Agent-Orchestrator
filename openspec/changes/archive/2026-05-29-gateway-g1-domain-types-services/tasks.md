@@ -85,6 +85,26 @@
   efectiva de los tipos `Interaction*` como tarea diferida a la fase correspondiente. Criterio:
   la tarea de retirada existe en el orquestador y referencia la fase y el motivo del diferimiento.
 
+## 10. Absorción post-migración — remove-token-cost-usd (2026-05-30)
+
+El change complementario `2026-05-30-remove-token-cost-usd` eliminó el esqueleto de costo USD
+(`totalCostUsd` en `IWorkflowResult`/`buildWorkflowResult`, `pricing.types.ts`, claves
+`costs`/`pricing_rules`, docs de cálculo). Su spec primario es `gateway-closure-services`, capability
+creada en G1. Se absorbe aquí para que el registro de la migración quede autocontenido.
+
+- [x] 10.1 Borrar `src/1-domain/types/pricing.types.ts` (sin importadores; tipos de costo no usados)
+- [x] 10.2 Eliminar `totalCostUsd?: number` y su comentario de `IWorkflowResult.ts`
+- [x] 10.3 Eliminar `totalCostUsd: undefined` y comentario de `build-workflow-result.ts`
+- [x] 10.4 Eliminar aserción `expect(result.totalCostUsd).toBeUndefined()` de `build-workflow-result.test.ts`
+- [x] 10.5 Eliminar clave `"costs"` de los 17 `routing/providers/*/models/*/metadata.json`
+- [x] 10.6 Eliminar clave `"pricing_rules"` de `routing/providers/*/config.json` (6 proveedores)
+- [x] 10.7 Borrar `docs/how-to-calculate-anthropic-api-costs.md` y `docs/how-to-calculate-openrouter-api-costs.md`
+- [x] 10.8 Limpiar en `docs/proposals/gateway-design.md` todas las referencias a costo USD
+- [x] 10.9 Eliminar de `docs/how-to-start.md` los enlaces a los docs borrados
+- [x] 10.10 Aplicar delta MODIFIED de `gateway-closure-services` (quitar cláusula `totalCostUsd undefined`)
+- [x] 10.11 Aplicar delta MODIFIED de `gateway-workflow-lifecycle` (quitar bullet `totalCostUsd: undefined`)
+- [x] 10.12 `npm run test:quick` verde; `grep -rn "totalCostUsd\|pricing\.types" src tests` sin resultados
+
 ## 9. Gobernanza OpenSpec
 
 - [x] 9.1 Ejecutar `npx openspec validate --changes gateway-g1-domain-types-services` y resolver

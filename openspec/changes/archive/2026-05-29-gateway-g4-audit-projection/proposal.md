@@ -24,6 +24,8 @@ Tras G3, el correlador (`IWorkflowRepository`) acumula lifecycle en memoria y el
 
 - `gateway-workflow-lifecycle`: registro y cierre de steps desde handlers wire (`registerStep`/`closeStep` en SSE y standard).
 - `gateway-closure-services`: nueva función pura `aggregateWorkflowUsageByModel` para desglose de uso por modelo.
+- `gateway-audit-projection` *(absorbido desde rename-interaction-to-workflow)*: `AuditInteractionContext` → `AuditWorkflowContext`; augments Fastify actualizados; nombres canónicos en código; ver §Cambios absorbidos.
+- `gateway-domain-types` *(absorbido desde rename-interaction-to-workflow)*: `WorkflowRequestKind` como tipo canónico; `InteractionType`/`InteractionOutcome` eliminados; ver §Cambios absorbidos.
 
 ## Impact
 
@@ -48,3 +50,22 @@ Tras G3, el correlador (`IWorkflowRepository`) acumula lifecycle en memoria y el
 - Cambio del árbol de directorios bajo `sessions/` (solo cambia la fuente de datos de `meta.json` y el writer de métricas).
 
 Ver [§28b](../../../docs/proposals/gateway-design.md#28b-integración-correlador--bus-de-eventos--persistencia), [§33.2](../../../docs/proposals/gateway-design.md#332-session-metricsjson-raíz-de-sesión), [§40](../../../docs/proposals/gateway-design.md#40-capa-2-objetivo), [§41](../../../docs/proposals/gateway-design.md#41-capa-3-objetivo) y [§43](../../../docs/proposals/gateway-design.md#43-fases-de-implementación) de `docs/proposals/gateway-design.md`.
+
+## Cambios absorbidos
+
+### rename-interaction-to-workflow (2026-06-01)
+
+**Orquestador:** `gateway-migration` | **Fase de absorción:** G4 (`gateway-g4-audit-projection`)
+
+El change standalone `2026-06-01-rename-interaction-to-workflow` completó el item diferido
+explícitamente en G1 («Legacy retirado: tipos `Interaction*` reemplazados — diferido a G4/P»):
+renombró `AuditInteraction*` → `AuditWorkflow*` y eliminó los tipos `@deprecated`
+`InteractionType`/`InteractionOutcome`. Por ser `gateway-audit-projection` la capability primaria
+afectada (capability creada en G4), se absorbe en esta fase.
+
+Renombres aplicados: `AuditInteractionHandler` → `AuditWorkflowHandler`; `AuditInteractionContext` →
+`AuditWorkflowContext`; `AuditInteractionResult` → `AuditWorkflowResult`; campos `auditInteractionDir`
+→ `auditWorkflowDir`, `interactionType` → `workflowKind`; métodos `closeOrphanInteraction()` →
+`closeOrphanWorkflow()`, `formatAuditInteractionDirName()` → `formatWorkflowDirName()`,
+`resolveWorkflowIdForInteraction()` → `resolveWorkflowId()`. Tipo `WorkflowRequestKind` añadido;
+`InteractionType` e `InteractionOutcome` eliminados de `audit.types.ts`.

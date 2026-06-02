@@ -148,3 +148,33 @@ capas 2-5, `sessions/`, tests existentes.
   Mitigación: en el código, los invariantes se implementan en `validate-workflow-invariants.ts`
   sin usar el prefijo "G"; la fase de migración se referencia siempre por su nombre completo
   `gateway-g1-domain-types-services`.
+
+## Decisiones absorbidas — remove-token-cost-usd (2026-05-30)
+
+### Solo eliminación, sin deprecación
+
+La característica de costo USD nunca estuvo activa en runtime, por lo que no hay período de
+transición necesario. No se usa el patrón `@deprecated` + fecha de retirada; se borra directamente.
+Coherente con la política "cero zombie/legacy" del orquestador de migración.
+
+### Conservar `metadata.json` y `config.json`, eliminar solo claves de precio
+
+Los archivos `routing/providers/*/models/*/metadata.json` conservan `modelId` y `displayName`;
+solo la clave `"costs"` es el objetivo. Los `routing/providers/*/config.json` conservan URL,
+`AUTH_METHOD` y modelos por defecto; se elimina únicamente `pricing_rules`.
+
+### Inventario de eliminación
+
+| Artefacto | Acción | Motivo |
+|---|---|---|
+| `src/1-domain/types/pricing.types.ts` | Borrar archivo | Sin importadores; tipos de costo no usados |
+| `IWorkflowResult.totalCostUsd?: number` | Eliminar campo + comentario | Siempre `undefined`; característica retirada |
+| `build-workflow-result.ts:31` | Eliminar propiedad + comentario | Inicialización del campo eliminado |
+| `build-workflow-result.test.ts:53` | Eliminar aserción | Test del campo eliminado |
+| `routing/**/metadata.json` (17 archivos) | Eliminar clave `"costs"` | Ningún servicio la consume |
+| `routing/providers/*/config.json` (6 proveedores) | Eliminar clave `"pricing_rules"` | Esqueleto de precio; sin importadores |
+| `docs/how-to-calculate-anthropic-api-costs.md` | Borrar archivo | Trata exclusivamente de costo en USD |
+| `docs/how-to-calculate-openrouter-api-costs.md` | Borrar archivo | Trata exclusivamente de costo en USD |
+| `docs/proposals/gateway-design.md` | Limpiar referencias a costo | `totalCostUsd`, `pricingService.estimate`, `calculateCost`, enlaces a docs de cálculo, `pricing.types.ts` |
+| `openspec/specs/gateway-closure-services/spec.md` | Delta MODIFIED | Eliminar cláusula `totalCostUsd undefined` del contrato de `buildWorkflowResult` |
+| `openspec/specs/gateway-workflow-lifecycle/spec.md` | Delta MODIFIED | Eliminar bullet `totalCostUsd: undefined` del requirement `close` |

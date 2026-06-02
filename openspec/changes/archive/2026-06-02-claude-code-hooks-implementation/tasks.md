@@ -107,20 +107,20 @@
 
 ## 4. Cierre del roadmap (Roadmap close-out)
 
-- [ ] 4.1 Verificar que las 3 fases (H1, N1, N2) tienen estado `archivada` en el phase registry
+- [x] 4.1 Verificar que las 3 fases (H1, N1, N2) tienen estado `archivada` en el phase registry
   - _Criterio: tabla del registro sin ningún estado `pendiente`, `en curso` o `validada`_
-- [ ] 4.2 Verificación E2E global: 0 warnings `[audit] No se encontró workflow padre para continuation` en `server/logs.jsonl` durante una sesión de prueba completa
+- [x] 4.2 Verificación E2E global: 0 warnings `[audit] No se encontró workflow padre para continuation` en `server/logs.jsonl` durante una sesión de prueba completa
   - _Criterio: al ejecutar una sesión de Claude Code que dispare al menos 1 `SubagentStart`, 1 `SubagentStop` y 1 `PostToolUseFailure`, el log no contiene el warning_
-- [ ] 4.3 Verificar ausencia de referencias activas a `C:\AI\claude-code-notifications.ts` desde `.claude/settings.json`
+- [x] 4.3 Verificar ausencia de referencias activas a `C:\AI\claude-code-notifications.ts` desde `.claude/settings.json`
   - _Criterio: `grep -F 'C:\AI\' .claude/settings.json` retorna cero coincidencias_
-- [ ] 4.4 Verificar que `README.md`, `docs/notifications.md` y `docs/gateway-architecture.md` §18 (si aplica) reflejan el estado final del sistema
+- [x] 4.4 Verificar que `README.md`, `docs/notifications.md` y `docs/gateway-architecture.md` §18 (si aplica) reflejan el estado final del sistema
   - _Criterio: no hay afirmaciones de "done" para trabajo no construido_
   - _Criterio: las rutas mencionadas en los docs coinciden con las rutas reales en el repo_
-- [ ] 4.5 Verificación global con `openspec-verify` sobre el orquestador
+- [x] 4.5 Verificación global con `openspec-verify` sobre el orquestador
   - _Criterio: Completeness / Correctness / Coherence checks pasan sin CRITICAL_
-- [ ] 4.6 Confirmar ausencia de código y documentación zombie/legacy introducidos por el roadmap
+- [x] 4.6 Confirmar ausencia de código y documentación zombie/legacy introducidos por el roadmap
   - _Criterio: `npm run lint` + `npm run typecheck` pasan; búsqueda de referencias a `C:\AI\claude-code-notifications.ts` en código del repo retorna cero resultados activos_
-- [ ] 4.7 Archivar el propio change orquestador (`openspec-archive`)
+- [x] 4.7 Archivar el propio change orquestador (`openspec-archive`)
   - _Criterio: `openspec/changes/claude-code-hooks-implementation/` movido a `openspec/changes/archive/<fecha>-claude-code-hooks-implementation/`_
-- [ ] 4.8 Commit de cierre con mensaje en español describiendo el cierre del roadmap
+- [x] 4.8 Commit de cierre con mensaje en español describiendo el cierre del roadmap
   - _Criterio: commit con conventional-commits, mensaje en español, referencia al roadmap_

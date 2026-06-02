@@ -38,38 +38,38 @@
 
 > Fase entry. Sin dependencias del DAG; puede correr en paralelo con H1.
 
-- [ ] 2.1 Verificar dependencias del DAG: ninguna (entry)
+- [x] 2.1 Verificar dependencias del DAG: ninguna (entry)
   - _Criterio: no aplica; puede iniciarse en cualquier momento_
-- [ ] 2.2 Crear change de segundo nivel `claude-n1-migrate-notifications-service` (skill `openspec-propose`)
-  - _Criterio: directorio `openspec/changes/claude-code-hooks-implementation/phases/claude-n1-migrate-notifications-service/` con `.openspec.yaml` creado_
-- [ ] 2.3 Verificar back-reference en `proposal.md` del L2
+- [x] 2.2 Crear change de segundo nivel `claude-n1-migrate-notifications-service` (skill `openspec-propose`)
+  - _Criterio: directorio `openspec/changes/claude-n1-migrate-notifications-service/` con `.openspec.yaml` creado_
+- [x] 2.3 Verificar back-reference en `proposal.md` del L2
   - _Criterio: línea `> **Orquestador:** \`claude-code-hooks-implementation\` | **Fase:** n1 (N)` presente en las primeras 5 líneas del archivo_
-- [ ] 2.4 Actualizar estado de N1 a `en curso` en el phase registry del orquestador
+- [x] 2.4 Actualizar estado de N1 a `en curso` en el phase registry del orquestador
   - _Criterio: columna "Estado" de N1 = `en curso`_
-- [ ] 2.5 Implementar el L2 (`openspec-apply`) — crear `src/2-services/notifications/` con la estructura simplificada de v1: `INotificationService.ts` (capa 1), `DesktopNotificationAdapter.ts` (capa 2), `types.ts`, `index.ts`, entry point CLI. **Sin** `config.ts`, **sin** `builders.ts`, **sin** `sound/`, **sin** `windows-toast.ts`, **sin** JSON externo, **sin** registro SnoreToast/AUMID
+- [x] 2.5 Implementar el L2 (`openspec-apply`) — crear `src/2-services/notifications/` con la estructura simplificada de v1: `INotificationService.ts` (capa 1), `DesktopNotificationAdapter.ts` (capa 2), `types.ts`, `index.ts`, entry point CLI. **Sin** `config.ts`, **sin** `builders.ts`, **sin** `sound/`, **sin** `windows-toast.ts`, **sin** JSON externo, **sin** registro SnoreToast/AUMID
   - _Criterio: el directorio `src/2-services/notifications/` existe con los 4 archivos acordados + entry point CLI_
   - _Criterio: `package.json` lista `node-notifier` como dependencia (`commander` opcional si el CLI implementa parsing de argv manualmente)_
   - _Criterio: `INotificationService` exporta el contrato con un único método `notify(event)`_
   - _Criterio: `DesktopNotificationAdapter` implementa `INotificationService` y delega en `node-notifier.notify()`_
-- [ ] 2.6 Implementar respetando orden PKA: capa 1 → capa 2 → capa 4
+- [x] 2.6 Implementar respetando orden PKA: capa 1 → capa 2 → capa 4
   - _Criterio: `INotificationService` no depende de infraestructura (ni `node-notifier`, ni `fs`)_
   - _Criterio: `DesktopNotificationAdapter` depende solo de `INotificationService` y de `node-notifier`_
   - _Criterio: el composition root (capa 4) cablea la inyección del adaptador_
-- [ ] 2.7 Gate superado: `npm run test:quick` verde + tests unitarios de `DesktopNotificationAdapter` con `node-notifier` mockeado + smoke test del CLI entry point
+- [x] 2.7 Gate superado: `npm run test:quick` verde + tests unitarios de `DesktopNotificationAdapter` con `node-notifier` mockeado + smoke test del CLI entry point
   - _Criterio: `npm run test:quick` (lint + typecheck + unit) sin errores_
   - _Criterio: tests unitarios del adaptador pasan con `node-notifier` mockeado_
   - _Criterio: invocar el CLI entry point con un payload válido produce un toast nativo del SO con el título y mensaje del payload (sin imagen, sin icono custom, sin branding)_
   - _Criterio: el adaptador no llama a `node-notifier` con `icon`, no accede a `.lnk`, no invoca `SnoreToast`_
-- [ ] 2.8 Documentación actualizada: `README.md` (nueva sección "Notifications"), `docs/notifications.md` (nueva doc con API, entry point CLI, contrato del puerto, y nota explícita de que la primera versión no soporta personalización de imagen/icono/título ni características Windows-specific)
+- [x] 2.8 Documentación actualizada: `README.md` (nueva sección "Notifications"), `docs/notifications.md` (nueva doc con API, entry point CLI, contrato del puerto, y nota explícita de que la primera versión no soporta personalización de imagen/icono/título ni características Windows-specific)
   - _Criterio: `docs/notifications.md` existe y documenta el servicio, su entry point CLI, el contrato de `INotificationService` y las exclusiones intencionales de v1_
   - _Criterio: `docs/notifications.md` declara explícitamente que la migración descarta la lógica de personalización y las dependencias Windows-specific_
-- [ ] 2.9 Legacy retirado: no aplica en esta fase (`C:\AI\claude-code-notifications.ts` queda intacto como fallback)
+- [x] 2.9 Legacy retirado: no aplica en esta fase (`C:\AI\claude-code-notifications.ts` queda intacto como fallback)
   - _Criterio: ningún archivo retirado o deprecado en esta fase_
-- [ ] 2.10 Sync de specs si N1 introduce deltas (p. ej. nueva spec `desktop-notifications-service`) (`openspec-sync`)
+- [x] 2.10 Sync de specs si N1 introduce deltas (p. ej. nueva spec `desktop-notifications-service`) (`openspec-sync`)
   - _Criterio: ejecutado si la fase crea o modifica specs canónicas; no ejecutado si no hay delta_
-- [ ] 2.11 Marcar N1 como `validada` en el phase registry y archivar el L2 (`openspec-archive`)
+- [x] 2.11 Marcar N1 como `validada` en el phase registry y archivar el L2 (`openspec-archive`)
   - _Criterio: columna "Estado" de N1 = `archivada`_
-  - _Criterio: L2 movido a `openspec/changes/archive/<fecha>-claude-code-hooks-implementation/phases/...`_
+  - _Criterio: L2 movido a `openspec/changes/archive/<fecha>-claude-n1-migrate-notifications-service/`_
 
 ---
 

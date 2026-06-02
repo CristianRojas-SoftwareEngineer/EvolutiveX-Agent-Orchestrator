@@ -166,6 +166,10 @@ El archivo `.claude/settings.json` del proyecto registra las **8 entradas del li
 
 Cada `POST /hooks` se invoca con `curl -sS -X POST $ANTHROPIC_BASE_URL/hooks -H 'Content-Type: application/json' --data-binary @-`. La URL del proxy se resuelve vía la variable de entorno `ANTHROPIC_BASE_URL` (default `http://127.0.0.1:8787`), por lo que el comando no queda acoplado a un host:puerto literal. Los 5 hooks con doble comando (`UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`, `StopFailure`) conservan el segundo comando de notificación apuntando a `C:\AI\claude-code-notifications.ts`; la migración de ese notificador al repo y el reapuntamiento posterior se cubren en los changes `claude-n1-migrate-notifications-service` y `claude-n2-repoint-hooks-to-internal-notifications`. Detalle operativo: [`docs/gateway-architecture.md` §18](docs/gateway-architecture.md#18-plano-c--hooks-claude-code).
 
+### Notifications
+
+El servicio de notificaciones de escritorio vive bajo `src/2-services/notifications/`: un puerto `INotificationService` (capa 1) y un adaptador `DesktopNotificationAdapter` (capa 2) que delega en `node-notifier.notify()` con un subset mínimo de opciones. La primera versión es deliberadamente mínima: sin personalización visual (sin icono, sin AUMID, sin branding) y sin dependencias Windows-specific. El entry point CLI (`src/2-services/notifications/cli.ts`) acepta `--event-type`, `--message`, `--title`, `--sound`, `--silent` y `--stdin-json`. Detalle operativo y exclusiones explícitas: [`docs/notifications.md`](docs/notifications.md). Spec canónica: [`openspec/specs/desktop-notifications-service/spec.md`](openspec/specs/desktop-notifications-service/spec.md).
+
 <a name="correlación-de-sesión-sessionid"></a>
 
 ### Correlación de Sesión (SessionId)

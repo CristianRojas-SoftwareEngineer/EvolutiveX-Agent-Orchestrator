@@ -125,12 +125,41 @@ en un change posterior sin romper el contrato actual del puerto.
 
 ## Estado del script externo
 
-`C:\AI\claude-code-notifications.ts` queda intacto durante N1 (sigue
-siendo el destino de los hooks con doble comando en `.claude/settings.json`
-introducidos en H1). En N2 se reapuntarán los hooks al entry point del
-repo y se documentará el script externo como `@deprecated` con fecha de
-retirada prevista. La eliminación efectiva del script externo está fuera
-del scope de este roadmap (vive fuera del repo).
+`C:\AI\claude-code-notifications.ts` está marcado como **`@deprecated`**
+con fecha de retirada prevista **2026-09-01**. A partir de la fase N2
+del roadmap `claude-code-hooks-implementation`, los hooks con doble
+comando en `.claude/settings.json` han dejado de invocarlo: el 2º
+comando de los 5 hooks con notificación previa
+(`UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`, `StopFailure`)
+apunta al entry point CLI del servicio migrado al repositorio, no al
+script externo.
+
+**Ruta final del CLI** (relativa a la raíz del proyecto):
+
+```text
+./node_modules/tsx/dist/cli.mjs ./src/2-services/notifications/cli.ts
+```
+
+**Comando canónico por hook:**
+
+| Hook | Comando del 2º comando |
+|---|---|
+| `UserPromptSubmit` | `node "./node_modules/tsx/dist/cli.mjs" "./src/2-services/notifications/cli.ts" --event-type UserPromptSubmit` |
+| `PreToolUse` | `node "./node_modules/tsx/dist/cli.mjs" "./src/2-services/notifications/cli.ts" --event-type PreToolUse --stdin-json` |
+| `PostToolUse` | `node "./node_modules/tsx/dist/cli.mjs" "./src/2-services/notifications/cli.ts" --event-type PostToolUse --stdin-json` |
+| `Stop` | `node "./node_modules/tsx/dist/cli.mjs" "./src/2-services/notifications/cli.ts" --event-type Stop` |
+| `StopFailure` | `node "./node_modules/tsx/dist/cli.mjs" "./src/2-services/notifications/cli.ts" --event-type StopFailure --stdin-json` |
+
+Los 3 hooks sin notificación (`SubagentStart`, `SubagentStop`,
+`PostToolUseFailure`) conservan únicamente el comando `POST /hooks` (sin
+segundo comando de notificación).
+
+El script externo `C:\AI\claude-code-notifications.ts` se mantiene
+intacto en el sistema de archivos del usuario; la eliminación efectiva
+queda fuera del scope de este roadmap (vive fuera del repositorio y no
+es versionable aquí). El plazo de deprecación de **3 meses** desde N2
+(2026-06-02 → 2026-09-01) da margen para migrar cualquier llamante
+externo que aún dependa del script.
 
 ## Spec canónica
 

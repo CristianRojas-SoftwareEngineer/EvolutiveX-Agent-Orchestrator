@@ -155,7 +155,7 @@ El archivo `.claude/settings.json` del proyecto registra las **8 entradas del li
 
 | Hook | Matcher | Comandos |
 | --- | --- | --- |
-| `UserPromptSubmit` | — | `POST /hooks` + notificación (`C:\AI\claude-code-notifications.ts`) |
+| `UserPromptSubmit` | — | `POST /hooks` + notificación (entry point del servicio migrado) |
 | `PreToolUse` | `*` | `POST /hooks` + notificación |
 | `PostToolUse` | `*` | `POST /hooks` + notificación |
 | `PostToolUseFailure` | — | `POST /hooks` |
@@ -164,7 +164,7 @@ El archivo `.claude/settings.json` del proyecto registra las **8 entradas del li
 | `Stop` | — | `POST /hooks` + notificación |
 | `StopFailure` | — | `POST /hooks` + notificación |
 
-Cada `POST /hooks` se invoca con `curl -sS -X POST $ANTHROPIC_BASE_URL/hooks -H 'Content-Type: application/json' --data-binary @-`. La URL del proxy se resuelve vía la variable de entorno `ANTHROPIC_BASE_URL` (default `http://127.0.0.1:8787`), por lo que el comando no queda acoplado a un host:puerto literal. Los 5 hooks con doble comando (`UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`, `StopFailure`) conservan el segundo comando de notificación apuntando a `C:\AI\claude-code-notifications.ts`; la migración de ese notificador al repo y el reapuntamiento posterior se cubren en los changes `claude-n1-migrate-notifications-service` y `claude-n2-repoint-hooks-to-internal-notifications`. Detalle operativo: [`docs/gateway-architecture.md` §18](docs/gateway-architecture.md#18-plano-c--hooks-claude-code).
+Cada `POST /hooks` se invoca con `curl -sS -X POST $ANTHROPIC_BASE_URL/hooks -H 'Content-Type: application/json' --data-binary @-`. La URL del proxy se resuelve vía la variable de entorno `ANTHROPIC_BASE_URL` (default `http://127.0.0.1:8787`), por lo que el comando no queda acoplado a un host:puerto literal. Los 5 hooks con doble comando (`UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`, `StopFailure`) invocan como segundo comando el entry point CLI del servicio de notificaciones migrado al repositorio (`src/2-services/notifications/cli.ts`), resuelto con paths relativos a la raíz del proyecto. La cobertura de este reapuntamiento vive en el change `claude-n2-repoint-hooks-to-internal-notifications` (fase N2 del roadmap `claude-code-hooks-implementation`); la fase N1 contiene la migración del servicio de notificaciones al repo. Detalle operativo: [`docs/gateway-architecture.md` §18](docs/gateway-architecture.md#18-plano-c--hooks-claude-code).
 
 ### Notifications
 

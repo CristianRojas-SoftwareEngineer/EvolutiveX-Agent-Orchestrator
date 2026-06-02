@@ -77,29 +77,29 @@
 
 > Fase final. Depende de H1 y N1 ambas en estado `archivada`.
 
-- [ ] 3.1 Verificar dependencias del DAG: H1 y N1 en estado `archivada`
+- [x] 3.1 Verificar dependencias del DAG: H1 y N1 en estado `archivada`
   - _Criterio: columnas "Estado" de H1 y N1 = `archivada` en el phase registry del orquestador_
-- [ ] 3.2 Crear change de segundo nivel `claude-n2-repoint-hooks-to-internal-notifications` (skill `openspec-propose`)
+- [x] 3.2 Crear change de segundo nivel `claude-n2-repoint-hooks-to-internal-notifications` (skill `openspec-propose`)
   - _Criterio: directorio `openspec/changes/claude-code-hooks-implementation/phases/claude-n2-repoint-hooks-to-internal-notifications/` con `.openspec.yaml` creado_
-- [ ] 3.3 Verificar back-reference en `proposal.md` del L2
+- [x] 3.3 Verificar back-reference en `proposal.md` del L2
   - _Criterio: línea `> **Orquestador:** \`claude-code-hooks-implementation\` | **Fase:** n2 (N)` presente en las primeras 5 líneas del archivo_
-- [ ] 3.4 Actualizar estado de N2 a `en curso` en el phase registry del orquestador
+- [x] 3.4 Actualizar estado de N2 a `en curso` en el phase registry del orquestador
   - _Criterio: columna "Estado" de N2 = `en curso`_
-- [ ] 3.5 Implementar el L2 (`openspec-apply`) — reemplazar las rutas absolutas a `C:\AI\...` en los 5 comandos de notificación de `.claude/settings.json` (los de `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`, `StopFailure`, introducidos por H1) por la ruta al entry point del servicio migrado en el repo
+- [x] 3.5 Implementar el L2 (`openspec-apply`) — reemplazar las rutas absolutas a `C:\AI\...` en los 5 comandos de notificación de `.claude/settings.json` (los de `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`, `StopFailure`, introducidos por H1) por la ruta al entry point del servicio migrado en el repo
   - _Criterio: `grep -F 'C:\AI\' .claude/settings.json` retorna cero coincidencias tras el cambio_
   - _Criterio: los 5 comandos de notificación apuntan al entry point CLI bajo `src/2-services/notifications/`, resuelto relativo a la raíz del proyecto_
-- [ ] 3.6 Gate superado: `npm run test:quick` verde + verificación manual de toasts
+- [x] 3.6 Gate superado: `npm run test:quick` verde + verificación manual de toasts
   - _Criterio: `npm run test:quick` (lint + typecheck + unit) sin errores_
   - _Criterio: al ejecutar Claude Code, los toasts aparecen para los 5 hooks con doble comando (`UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`, `StopFailure`)_
   - _Criterio: `node-notifier` carga el icono desde la ruta interna del repo_
-- [ ] 3.7 Documentación actualizada: `docs/notifications.md` (ruta final del entry point), `README.md` §setup (cualquier mención residual a `C:\AI/...`)
+- [x] 3.7 Documentación actualizada: `docs/notifications.md` (ruta final del entry point), `README.md` §setup (cualquier mención residual a `C:\AI/...`)
   - _Criterio: `docs/notifications.md` indica la ruta final del entry point CLI dentro del repo_
   - _Criterio: `docs/notifications.md` marca `C:\AI\claude-code-notifications.ts` como `@deprecated` con fecha de retirada prevista_
-- [ ] 3.8 Legacy retirado: documentar `C:\AI\claude-code-notifications.ts` como `@deprecated` con fecha (no se elimina en este roadmap; la eliminación efectiva queda fuera de scope por vivir fuera del repo)
+- [x] 3.8 Legacy retirado: documentar `C:\AI\claude-code-notifications.ts` como `@deprecated` con fecha (no se elimina en este roadmap; la eliminación efectiva queda fuera de scope por vivir fuera del repo)
   - _Criterio: la deprecación queda documentada en `docs/notifications.md`_
-- [ ] 3.9 Sync de specs si N2 introduce deltas (`openspec-sync`)
+- [x] 3.9 Sync de specs si N2 introduce deltas (`openspec-sync`)
   - _Criterio: ejecutado si la fase modifica specs canónicas; no ejecutado si no hay delta_
-- [ ] 3.10 Marcar N2 como `validada` en el phase registry y archivar el L2 (`openspec-archive`)
+- [x] 3.10 Marcar N2 como `validada` en el phase registry y archivar el L2 (`openspec-archive`)
   - _Criterio: columna "Estado" de N2 = `archivada`_
   - _Criterio: L2 movido a `openspec/changes/archive/<fecha>-claude-code-hooks-implementation/phases/...`_
 

@@ -1115,17 +1115,7 @@ El registro de tools pending en SSE:
 
 **Endpoint:** `POST /hooks` en capa 5 (excluido de side-interactions).
 
-**Configuración operativa:** Claude Code hooks apuntan al proxy vía `.claude/settings.json`:
-
-```json
-{
-  "hooks": {
-    "PostToolUse": [{ "command": "curl -s http://localhost:<port>/hooks -d @-" }]
-  }
-}
-```
-
-> Nota: la forma exacta de configuración depende de la versión de Claude Code; puede ser `hooks.Command` o evento individual.
+**Configuración operativa:** Claude Code hooks apuntan al proxy vía `.claude/settings.json` del proyecto. El proyecto registra las **8 entradas del lifecycle** (`UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PostToolUseFailure`, `SubagentStart`, `SubagentStop`, `Stop`, `StopFailure`) y sobrescribe las entradas equivalentes del user-level `C:\Users\Cristian\.claude\settings.json` para esas claves (mecanismo de merge de Claude Code: el proyecto tiene precedencia). Cada entrada contiene un comando `curl -sS -X POST $ANTHROPIC_BASE_URL/hooks -H 'Content-Type: application/json' --data-binary @-` (la URL se resuelve por variable de entorno, no queda acoplada a un host:puerto literal). Los matchers de `PreToolUse` y `PostToolUse` se establecen en `*` para que el gateway reciba los eventos de todas las tools. Los 5 hooks con notificación previa en user-level (`UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`, `StopFailure`) llevan además un segundo comando apuntando a `C:\AI\claude-code-notifications.ts`; los 3 hooks nuevos (`SubagentStart`, `SubagentStop`, `PostToolUseFailure`) llevan únicamente el comando `POST /hooks`.
 
 **Mapa de eventos hook → acción en dominio:**
 

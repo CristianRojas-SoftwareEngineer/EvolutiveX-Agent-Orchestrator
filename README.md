@@ -147,6 +147,25 @@ Personaliza el comportamiento ajustando estas variables en tu entorno o en un ar
 
 > **Auditoría por defecto.** El árbol causal se escribe vía **EventBus → SessionPersistence**. Para SSE, los chunks se persisten en `steps/MM/response/streaming/*.ndjson` (fuente canónica de reconstrucción); `sse.txt` es raw dump opcional acotado por `MAX_AUDIT_BYTES`; el cierre del workflow persiste `output/result.json`. Detalle en [`docs/how-sse-reconstruction-works.md`](docs/how-sse-reconstruction-works.md).
 
+<a name="configuracion-de-hooks"></a>
+
+### Configuración de hooks
+
+El archivo `.claude/settings.json` del proyecto registra las **8 entradas del lifecycle** de hooks de Claude Code, sobrescribiendo las entradas equivalentes del user-level (`C:\Users\Cristian\.claude\settings.json`) para esas claves (mecanismo de merge de Claude Code: el proyecto tiene precedencia). Las 8 entradas son:
+
+| Hook | Matcher | Comandos |
+| --- | --- | --- |
+| `UserPromptSubmit` | — | `POST /hooks` + notificación (`C:\AI\claude-code-notifications.ts`) |
+| `PreToolUse` | `*` | `POST /hooks` + notificación |
+| `PostToolUse` | `*` | `POST /hooks` + notificación |
+| `PostToolUseFailure` | — | `POST /hooks` |
+| `SubagentStart` | — | `POST /hooks` |
+| `SubagentStop` | — | `POST /hooks` |
+| `Stop` | — | `POST /hooks` + notificación |
+| `StopFailure` | — | `POST /hooks` + notificación |
+
+Cada `POST /hooks` se invoca con `curl -sS -X POST $ANTHROPIC_BASE_URL/hooks -H 'Content-Type: application/json' --data-binary @-`. La URL del proxy se resuelve vía la variable de entorno `ANTHROPIC_BASE_URL` (default `http://127.0.0.1:8787`), por lo que el comando no queda acoplado a un host:puerto literal. Los 5 hooks con doble comando (`UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`, `StopFailure`) conservan el segundo comando de notificación apuntando a `C:\AI\claude-code-notifications.ts`; la migración de ese notificador al repo y el reapuntamiento posterior se cubren en los changes `claude-n1-migrate-notifications-service` y `claude-n2-repoint-hooks-to-internal-notifications`. Detalle operativo: [`docs/gateway-architecture.md` §18](docs/gateway-architecture.md#18-plano-c--hooks-claude-code).
+
 <a name="correlación-de-sesión-sessionid"></a>
 
 ### Correlación de Sesión (SessionId)

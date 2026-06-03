@@ -50,13 +50,15 @@ Sigue estos pasos en orden:
 
    Escribe variables como `ANTHROPIC_BASE_URL` en el entorno de Claude Code para que el tráfico pase por este proxy. Detalle de proveedores soportados en el [README](../README.md#enrutamiento-de-proveedores).
 
-5. **Opcional — statusline en Claude Code:** para ver métricas de sesión y proveedor en la barra de estado (tablas del proxy), desde la raíz del repositorio:
+5. **Opcional — instalación unificada (statusline + notificaciones + voz):** para instalar las tres integraciones con Claude Code en un solo paso:
 
    ```bash
-   npm run install:statusline
+   npm run setup
    ```
 
-   El comando escribe `statusLine` y `env.SMART_CODE_PROXY_ROOT` en `~/.claude/settings.json`. **Reinicie Claude Code** tras instalar. El diseño del statusline está en [router-statusline.md](./router-statusline.md). Para desinstalar: `npm run install:statusline -- --uninstall`.
+   Escribe `statusLine`, hooks de notificación y claves de voz en `~/.claude/settings.json`. **Reinicie Claude Code** tras instalar. Admite `--dry-run` (previsualizar sin escribir), `--uninstall` y flags de feature (`--statusline`, `--notifications`, `--voice`) para operar de forma selectiva. Para instalar solo el statusline: `npm run install:statusline`. Para instalar solo notificaciones: `npm run install:notifications`.
+
+   El diseño del statusline está en [router-statusline.md](./router-statusline.md); el servicio de notificaciones en [notifications.md](./notifications.md).
 
 6. **Opcional:** configura variables de entorno para desarrollo local usando un archivo `.env`:
 

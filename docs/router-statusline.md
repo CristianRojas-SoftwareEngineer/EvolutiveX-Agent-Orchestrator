@@ -287,13 +287,19 @@ El script usa únicamente Node.js APIs estándar (`fs`, `path`, `process.stdin`)
 
 ### Instalación recomendada
 
-Desde la raíz del repositorio del proxy:
+Desde la raíz del repositorio del proxy, puede instalar el statusline junto con notificaciones y voz en un único paso:
+
+```bash
+npm run setup
+```
+
+O solo el statusline:
 
 ```bash
 npm run install:statusline
 ```
 
-El instalador ([`scripting/install-statusline.ts`](../scripting/install-statusline.ts)) escribe en `~/.claude/settings.json`:
+Ambos usan el mismo instalador subyacente ([`scripting/install-statusline.ts`](../scripting/install-statusline.ts)) y escriben en `~/.claude/settings.json`:
 
 - `statusLine` con `type: "command"`, `padding: 0` y un comando multiplataforma `npx --prefix "<ROOT>" tsx scripting/router-status.ts`
 - `env.SMART_CODE_PROXY_ROOT` con la ruta absoluta del proxy (para resolver `sessions/`, `routing/` y `configs/.env` aunque Claude Code abra otro workspace)

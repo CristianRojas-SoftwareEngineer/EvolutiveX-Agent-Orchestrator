@@ -204,7 +204,7 @@ Todo volcado que se trunca genera un archivo `.omitted.txt` documentando la omis
 
 1.  **Instalar dependencias**: `npm install`
 2.  **Configurar proveedor** (opcional): `npm run configure:provider` (asistente interactivo para configurar API keys y modelos de diferentes proveedores).
-3.  **Notificaciones globales** (opcional): `npm run install:notifications` (registra hooks en `~/.claude` con `npx tsx src/2-services/notifications/cli.ts`; ver [`docs/notifications.md`](docs/notifications.md)).
+3.  **Integraciones Claude Code** (opcional): `npm run setup` instala statusline, notificaciones y voz en `~/.claude/settings.json` en un único paso (admite `--dry-run`, `--uninstall`, flags `--statusline`/`--notifications`/`--voice`). Instaladores individuales: `npm run install:statusline` y `npm run install:notifications`. Ver [`docs/notifications.md`](docs/notifications.md) y [`docs/router-statusline.md`](docs/router-statusline.md).
 4.  **Referencia multi-agente** (opcional): `npm run create:agents-reference` (Crea hardlink `AGENTS.md` → `CLAUDE.md` para compatibilidad con otros agentes de código).
 5.  **Modo Desarrollo**: `npm run dev` (Carga `configs/.env` mediante flag nativo de Node v22.9+; **v24 LTS recomendado**).
 6.  **Compilación**: `npm run build` (Genera `/dist` optimizado).

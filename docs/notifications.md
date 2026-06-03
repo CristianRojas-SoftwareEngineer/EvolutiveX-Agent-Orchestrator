@@ -19,13 +19,19 @@ configuración externa, y no introduce dependencias Windows-specific.
 
 ## Instalación global (`~/.claude`)
 
-Para recibir toasts en **cualquier proyecto** (no solo Smart Code Proxy), registre los hooks en el perfil de usuario con el mismo patrón que el statusline (`npx --prefix` + `tsx`):
+Para recibir toasts en **cualquier proyecto** (no solo Smart Code Proxy), registre los hooks en el perfil de usuario con el mismo patrón que el statusline (`npx --prefix` + `tsx`). Puede instalarlo junto con statusline y voz en un único paso:
+
+```bash
+npm run setup
+```
+
+O solo las notificaciones:
 
 ```bash
 npm run install:notifications
 ```
 
-Escribe 11 entradas en `~/.claude/settings.json` que invocan `src/2-services/notifications/cli.ts` (sin PowerShell). Flags: `--dry-run`, `--force` (sobrescribe hooks ajenos en esas claves), `--uninstall`, `--root <ruta-proxy>`.
+Ambos escriben 11 entradas en `~/.claude/settings.json` que invocan `src/2-services/notifications/cli.ts` (sin PowerShell). Flags: `--dry-run`, `--force` (sobrescribe hooks ajenos en esas claves), `--uninstall`, `--root <ruta-proxy>`.
 
 Requisitos: `npm install` en la raíz del proxy (para `tsx` en `node_modules`). Tras mover el repositorio, vuelva a ejecutar el instalador. En Windows, branding opcional: `npm run notifications:register -- --install`.
 

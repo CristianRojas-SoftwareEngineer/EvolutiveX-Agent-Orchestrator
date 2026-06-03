@@ -31,7 +31,8 @@ configuración externa, y no introduce dependencias Windows-specific.
 | `lnk-format.ts` | 2 (helper) | Generador/parser del formato MS-SHLLINK (escritura binaria pura del `.lnk`) |
 | `registry.ts` | 2 (helper) | Wrapper de `reg.exe` para escribir/leer/borrar `HKCU\Software\Classes\AppUserModelId\{AUMID}` |
 | `asset-paths.ts` | 2 (helper) | Constantes de las rutas ASCII-only (`%LOCALAPPDATA%\AIAssistant\`, `events/`) |
-| `event-notification-profile.ts` | 2 (catálogo) | Perfiles por `--event-type`: PNG de cuerpo + sonido por SO |
+| `event-notification-profile.ts` | 2 (catálogo) | Perfiles por `--event-type`: título, mensaje estático, PNG de cuerpo + sonido por SO |
+| `hook-payload-notification-message.ts` | 2 (helper) | **Runtime:** `resolveHookNotificationMessage` — mensaje dinámico desde payload stdin |
 | `event-image-paths.ts` | 2 (helper) | **Runtime:** `resolveEventImagePath`, `syncEventImageFromRepoIfStale` (cache estable → repo) |
 | `resolve-notification-sound.ts` | 2 (helper) | **Runtime:** `resolveNotificationSound` → `Notification.*` en win32 |
 | `toast-body-image-spec.ts` | 2 (helper) | **Mantenimiento:** `applyCircularToastFrame`, `renderToastBodyImageFromSource` (salida 128×128, `#fefefe`) |
@@ -96,26 +97,29 @@ flags (vía `commander`):
 | Flag | Descripción |
 |---|---|
 | `--event-type <type>` | Tipo de evento del lifecycle (`UserPromptSubmit`, `PreToolUse`, …) |
-| `--message <msg>` | Cuerpo del toast |
-| `--title <title>` | Título del toast (opcional; por defecto, igual a `--event-type`) |
+| `--message <msg>` | Override del cuerpo del toast |
+| `--title <title>` | Override del título del toast |
 | `--sound` | Fuerza `sound: true` genérico (no el token del perfil del evento) |
 | `--silent` | Silenciar el toast (contradice `--sound`; ignora el sonido del catálogo) |
-| `--stdin-json` | Leer payload JSON de `stdin`; derivar `title` de `hook_event_name` |
+| `--stdin-json` | Leer payload JSON de `stdin`; derivar mensaje dinámico si hay formatter |
 | `--app-id <id>` | Identificador de aplicación (AUMID Windows); default `AIAssistant.Proxy` |
 | `--icon <path>` | Override de imagen de cuerpo; default = PNG del perfil del evento o `ai-assistant.png` |
 
 ### Ejemplos
 
 ```bash
-# Toast directo con tipo y mensaje
+# Toast con copy del catálogo (solo --event-type)
+node src/2-services/notifications/cli.ts --event-type SessionStart
+
+# Override manual del cuerpo
 node src/2-services/notifications/cli.ts --event-type Stop --message "Listo"
 
-# Toast desde payload de hook por stdin
-echo '{"hook_event_name":"PostToolUse","session_id":"abc"}' \
-  | node src/2-services/notifications/cli.ts --stdin-json
+# StopFailure: mensaje dinámico desde stdin (error + último texto del asistente)
+echo '{"hook_event_name":"StopFailure","error":"rate_limit","last_assistant_message":"Detalle"}' \
+  | node src/2-services/notifications/cli.ts --event-type StopFailure --stdin-json
 
 # Toast silencioso
-node src/2-services/notifications/cli.ts --event-type UserPromptSubmit --message "Hola" --silent
+node src/2-services/notifications/cli.ts --event-type UserPromptSubmit --silent
 ```
 
 ### Códigos de salida
@@ -123,7 +127,7 @@ node src/2-services/notifications/cli.ts --event-type UserPromptSubmit --message
 | Código | Significado |
 |---|---|
 | `0` | Toast emitido correctamente |
-| `1` | Error: payload inválido, falta de flags requeridos, fallo de `node-notifier`, etc. |
+| `1` | Error: payload stdin inválido, falta `--event-type` (sin `--stdin-json`), mensaje no resoluble (sin perfil ni formatter), fallo de `node-notifier`, etc. |
 
 Los errores se imprimen en `stderr`.
 
@@ -136,8 +140,8 @@ exploración previa al L1 y formalizada en la spec
 
 - **`config.ts`** ni carga de `JSON` externo (p. ej.
   `notifications-config.json`). La configuración es por código.
-- **`builders.ts`** (sin lógica de construcción de payload específica
-  por tipo de evento).
+- **`builders.ts`** (nombre del legacy en `C:\AI\`; en el repo se usa
+  `hook-payload-notification-message.ts` en su lugar).
 - **Subdirectorio `sound/`** ni perfiles de sonido OS-specific
   (`resolve.ts`, `token-to-profile.ts`, `windows.ts`, `darwin.ts`,
   `linux.ts`).
@@ -172,25 +176,48 @@ por defecto la marca "AI Assistant" en los toasts:
   `ai-assistant.png` (misma prioridad estable/repo que antes). Si ningún
   archivo existe, se omite `icon` (degradación con gracia).
 
-### Perfiles por evento (imagen + sonido)
+### Copy del toast (catálogo + formatters stdin)
+
+Dos capas en el composition root (`buildEvent`):
+
+1. **Estático** — `title` y `message` en `event-notification-profile.ts` (marca «AI Assistant» en todos los títulos).
+2. **Dinámico** — con `--stdin-json`, `resolveHookNotificationMessage(eventKey, payload)` puede sustituir solo el **cuerpo** (paridad `C:\AI\src\notifications\builders.ts`).
+
+**Precedencia del título:** `--title` → `profile.title` (nunca `hook_event_name` por defecto).
+
+**Precedencia del mensaje:** `--message` → formatter stdin → `profile.message`.
+
+**Privacidad:** los formatters pueden incluir previews de comandos, rutas o preguntas en el Centro de actividades de Windows (mismo trade-off que el legacy). No hay redacción automática de secretos.
+
+| `eventKey` | Formatter stdin (campos principales) |
+|------------|--------------------------------------|
+| `StopFailure` | `error`, `last_assistant_message` |
+| `PermissionRequest` | `tool_name`, `tool_input` |
+| `PreToolUse` | `tool_input.questions[]` |
+| `UserPromptSubmit` | `prompt` |
+| `Stop` | `last_assistant_message` |
+
+### Perfiles por evento (copy + imagen + sonido)
 
 Los 11 hooks con toast en `.claude/settings.json` comparten el mismo
 `--event-type` que las claves del catálogo. No hace falta duplicar rutas
-en settings: el CLI aplica imagen y sonido automáticamente.
+ni `--message` en settings: el CLI aplica título, mensaje, imagen y sonido.
 
-| `--event-type` | Imagen (`events/`) | win32 (BurntToast) | darwin | linux |
-|----------------|-------------------|--------------------|--------|-------|
-| `UserPromptSubmit` | `user-prompt-submit.png` | `Reminder` | `Submarine` | `true` |
-| `PreToolUse` | `pre-tool-use-ask.png` | `SMS` | `Hero` | `true` |
-| `SubagentStart` | `subagent-start.png` | `IM` | `Ping` | `true` |
-| `SubagentStop` | `subagent-stop.png` | `Default` | `Tink` | `true` |
-| `Stop` | `stop.png` | `IM` | `Ping` | `true` |
-| `StopFailure` | `stop-failure.png` | `LoopingAlarm7` | `Basso` | `true` |
-| `SessionStart` | `session-start.png` | `Default` | `Tink` | `true` |
-| `SessionEnd` | `session-end.png` | `Default` | `Tink` | `true` |
-| `PermissionRequest` | `permission-request.png` | `SMS` | `Hero` | `true` |
-| `TaskCreated` | `task-created.png` | `Reminder` | `Submarine` | `true` |
-| `TaskCompleted` | `task-completed.png` | `Default` | `Tink` | `true` |
+| `--event-type` | Mensaje estático (catálogo) | Imagen (`events/`) | win32 | darwin | linux |
+|----------------|---------------------------|-------------------|-------|--------|-------|
+| `UserPromptSubmit` | Procesando tu solicitud... | `user-prompt-submit.png` | `Reminder` | `Submarine` | `true` |
+| `PreToolUse` | Pregunta pendiente — Responde en la ventana del cliente. | `pre-tool-use-ask.png` | `SMS` | `Hero` | `true` |
+| `SubagentStart` | Subagente iniciado | `subagent-start.png` | `IM` | `Ping` | `true` |
+| `SubagentStop` | Subagente terminado | `subagent-stop.png` | `Default` | `Tink` | `true` |
+| `Stop` | Tu turno — El asistente terminó. Escribe tu siguiente mensaje. | `stop.png` | `IM` | `Ping` | `true` |
+| `StopFailure` | Error de API — No se completó la respuesta. | `stop-failure.png` | `LoopingAlarm7` | `Basso` | `true` |
+| `SessionStart` | Sesión iniciada | `session-start.png` | `Default` | `Tink` | `true` |
+| `SessionEnd` | Sesión finalizada | `session-end.png` | `Default` | `Tink` | `true` |
+| `PermissionRequest` | Permiso requerido — Confirma la herramienta en el cliente. | `permission-request.png` | `SMS` | `Hero` | `true` |
+| `TaskCreated` | Tarea creada | `task-created.png` | `Reminder` | `Submarine` | `true` |
+| `TaskCompleted` | Tarea completada | `task-completed.png` | `Default` | `Tink` | `true` |
+
+Con `--stdin-json`, los cinco eventos con formatter (`StopFailure`, `PermissionRequest`, `PreToolUse`, `UserPromptSubmit`, `Stop`) pueden sustituir el cuerpo; el resto usa siempre el mensaje estático de la tabla.
 
 **Paridad legacy:** los tokens del catálogo (`Default`, `IM`, `SMS`, …) heredan
 `claude-notifications-enhanced.ps1` (BurntToast). El resolvedor los traduce a
@@ -484,15 +511,15 @@ más abajo).
 | `PreToolUse` | `AskUserQuestion` | `node "./node_modules/tsx/dist/cli.mjs" "./src/2-services/notifications/cli.ts" --event-type PreToolUse --stdin-json` |
 | `PostToolUse` | `*` | `POST /hooks` (sin notificación; ver justificación abajo) |
 | `PostToolUseFailure` | — | `POST /hooks` |
-| `SubagentStart` | — | `POST /hooks` + `node "./node_modules/tsx/dist/cli.mjs" "./src/2-services/notifications/cli.ts" --event-type SubagentStart --message "Subagente iniciado"` |
-| `SubagentStop` | — | `POST /hooks` + `node "./node_modules/tsx/dist/cli.mjs" "./src/2-services/notifications/cli.ts" --event-type SubagentStop --message "Subagente terminado"` |
+| `SubagentStart` | — | `POST /hooks` + `node "./node_modules/tsx/dist/cli.mjs" "./src/2-services/notifications/cli.ts" --event-type SubagentStart` |
+| `SubagentStop` | — | `POST /hooks` + `node "./node_modules/tsx/dist/cli.mjs" "./src/2-services/notifications/cli.ts" --event-type SubagentStop` |
 | `Stop` | — | `POST /hooks` + `node "./node_modules/tsx/dist/cli.mjs" "./src/2-services/notifications/cli.ts" --event-type Stop --stdin-json` |
 | `StopFailure` | — | `POST /hooks` + `node "./node_modules/tsx/dist/cli.mjs" "./src/2-services/notifications/cli.ts" --event-type StopFailure --stdin-json` |
-| `SessionStart` | `startup|resume` | `node "./node_modules/tsx/dist/cli.mjs" "./src/2-services/notifications/cli.ts" --event-type SessionStart --message "Sesión iniciada"` |
-| `SessionEnd` | — | `node "./node_modules/tsx/dist/cli.mjs" "./src/2-services/notifications/cli.ts" --event-type SessionEnd --message "Sesión finalizada"` |
+| `SessionStart` | `startup|resume` | `node "./node_modules/tsx/dist/cli.mjs" "./src/2-services/notifications/cli.ts" --event-type SessionStart` |
+| `SessionEnd` | — | `node "./node_modules/tsx/dist/cli.mjs" "./src/2-services/notifications/cli.ts" --event-type SessionEnd` |
 | `PermissionRequest` | — | `node "./node_modules/tsx/dist/cli.mjs" "./src/2-services/notifications/cli.ts" --event-type PermissionRequest --stdin-json` |
-| `TaskCreated` | — | `node "./node_modules/tsx/dist/cli.mjs" "./src/2-services/notifications/cli.ts" --event-type TaskCreated --message "Tarea creada"` |
-| `TaskCompleted` | — | `node "./node_modules/tsx/dist/cli.mjs" "./src/2-services/notifications/cli.ts" --event-type TaskCompleted --message "Tarea completada"` |
+| `TaskCreated` | — | `node "./node_modules/tsx/dist/cli.mjs" "./src/2-services/notifications/cli.ts" --event-type TaskCreated` |
+| `TaskCompleted` | — | `node "./node_modules/tsx/dist/cli.mjs" "./src/2-services/notifications/cli.ts" --event-type TaskCompleted` |
 
 **Justificación de `PreToolUse` / `PostToolUse` sin notificación:** los
 eventos de tool tienen frecuencia alta (5–50 invocaciones por turno en
@@ -526,7 +553,7 @@ desperdiciado.
 > de correlación), por lo que son puramente UX, ortogonales al gateway.
 > Estos hooks no admiten campo `matcher` (la documentación oficial indica
 > que se ignora silenciosamente para estos eventos); las entradas omiten
-> el campo. En v1 se usa texto fijo `--message "<fijo>"`. En sesiones con
+> el campo. El copy estático viene del catálogo (sin `--message` en settings). En sesiones con
 > planificación activa (p. ej. `/openspec-new`, `/openspec-apply`),
 > `TaskCreate` y `TaskUpdate(status=completed)` disparan múltiples toasts
 > por turno; el usuario asume este trade-off a cambio de feedback
@@ -538,23 +565,17 @@ desperdiciado.
 
 | Entrada | `--stdin-json` | Justificación |
 |---|---|---|
-| `UserPromptSubmit` | Sí | El payload trae `session_id` y `prompt`; el CLI deriva un `message` informativo. |
-| `SubagentStart` | No | Texto fijo `--message "Subagente iniciado"`; el payload no aporta `agent_type`/`agent_id` útil para derivar un `message` diferenciado en v1. |
-| `SubagentStop` | No | Texto fijo `--message "Subagente terminado"`; mismo razonamiento que `SubagentStart`. |
-| `PreToolUse` (matcher `AskUserQuestion`) | Sí | El payload trae `session_id`. |
-| `Stop` | No | El `eventName` viene del flag; el `--message` se omite y se deriva del payload por defecto cuando no hay flag. |
-| `StopFailure` | Sí | Útil para incluir contexto del error en el `message`. |
-| `SessionStart` | No | El `eventName` viene del flag; se pasa `--message "Sesión iniciada"` como texto fijo (el CLI exige `--message` cuando no se usa `--stdin-json`). |
-| `SessionEnd` | No | Igual que `SessionStart`; texto fijo `--message "Sesión finalizada"`. |
-| `PermissionRequest` | Sí | El payload trae `tool_name` y `tool_input`. |
-| `TaskCreated` | No | Texto fijo `--message "Tarea creada"`; los hooks `TaskCreated`/`TaskCompleted` no soportan matcher y el payload no se aprovecha en v1. |
-| `TaskCompleted` | No | Texto fijo `--message "Tarea completada"`. |
-
-> **Nota:** `Stop` se invoca sin `--stdin-json` en la configuración
-> actual del proyecto. Si en el futuro se desea derivar el `message`
-> desde el payload (p. ej. con `last_assistant_message`), añadir el
-> flag en `.claude/settings.json` y verificar que `--event-type Stop`
-> sigue presente para preservar el título del toast.
+| `UserPromptSubmit` | Sí | Formatter: preview de `prompt`. |
+| `SubagentStart` | No | Copy estático del catálogo. |
+| `SubagentStop` | No | Copy estático del catálogo. |
+| `PreToolUse` (matcher `AskUserQuestion`) | Sí | Formatter: preguntas en `tool_input.questions`. |
+| `Stop` | Sí | Formatter: `last_assistant_message`; si falta, catálogo. |
+| `StopFailure` | Sí | Formatter: `error` + `last_assistant_message`. |
+| `SessionStart` | No | Copy estático del catálogo. |
+| `SessionEnd` | No | Copy estático del catálogo. |
+| `PermissionRequest` | Sí | Formatter: `tool_name` y `tool_input`. |
+| `TaskCreated` | No | Copy estático del catálogo. |
+| `TaskCompleted` | No | Copy estático del catálogo. |
 
 ### Override del user-level
 

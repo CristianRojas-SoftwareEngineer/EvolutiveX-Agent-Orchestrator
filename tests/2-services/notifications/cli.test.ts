@@ -41,7 +41,10 @@ import {
   resolveBranding,
   resolveEventSound,
   resolveEventKey,
+  resolveNotificationTitle,
+  resolveNotificationMessage,
 } from '../../../src/2-services/notifications/cli.js';
+import { NOTIFICATION_BRAND_TITLE } from '../../../src/2-services/notifications/event-notification-profile.js';
 
 const baseOptions = {
   eventType: 'Stop',
@@ -160,11 +163,12 @@ describe('CLI - buildEvent', () => {
     expect(true).toBe(true);
   });
 
-  it('sin --message devuelve error', () => {
+  it('sin --message usa el catálogo del evento', () => {
     const result = buildEvent({ ...baseOptions, message: undefined });
-    expect('error' in result).toBe(true);
-    if ('error' in result) {
-      expect(result.error).toMatch(/--message/);
+    expect('error' in result).toBe(false);
+    if (!('error' in result)) {
+      expect(result.title).toBe(NOTIFICATION_BRAND_TITLE);
+      expect(result.message).toMatch(/terminó/i);
     }
   });
 
@@ -176,17 +180,54 @@ describe('CLI - buildEvent', () => {
     }
   });
 
-  it('con --stdin-json y payload válido deriva title y aplica appId por default', () => {
+  it('con --stdin-json usa título del catálogo y mensaje dinámico StopFailure', () => {
     const result = buildEvent(
-      { ...baseOptions, stdinJson: true, eventType: undefined, message: undefined },
+      {
+        ...baseOptions,
+        stdinJson: true,
+        eventType: 'StopFailure',
+        message: undefined,
+      },
+      {
+        hook_event_name: 'StopFailure',
+        error: 'rate_limit',
+        last_assistant_message: 'Detalle del asistente',
+      },
+    );
+    expect('error' in result).toBe(false);
+    if (!('error' in result)) {
+      expect(result.title).toBe(NOTIFICATION_BRAND_TITLE);
+      expect(result.message).toContain('Límite de tasa (API)');
+      expect(result.appId).toBe('AIAssistant.Proxy');
+    }
+  });
+
+  it('con --stdin-json y Stop sin last_assistant_message usa mensaje del catálogo', () => {
+    const result = buildEvent(
+      { ...baseOptions, stdinJson: true, eventType: 'Stop', message: undefined },
       { hook_event_name: 'Stop', session_id: 'abc' },
     );
     expect('error' in result).toBe(false);
     if (!('error' in result)) {
-      expect(result.title).toBe('Stop');
-      expect(result.message).toContain('Stop');
-      expect(result.appId).toBe('AIAssistant.Proxy');
+      expect(result.title).toBe(NOTIFICATION_BRAND_TITLE);
+      expect(result.message).toMatch(/terminó/i);
     }
+  });
+
+  it('respeta --title como override', () => {
+    expect(
+      resolveNotificationTitle({ ...baseOptions, title: 'Título custom' }, 'Stop'),
+    ).toBe('Título custom');
+  });
+
+  it('respeta --message como override frente al formatter', () => {
+    expect(
+      resolveNotificationMessage(
+        { ...baseOptions, stdinJson: true, message: 'Override' },
+        'StopFailure',
+        { error: 'rate_limit' },
+      ),
+    ).toBe('Override');
   });
 
   it('con --stdin-json y sin payload devuelve error', () => {

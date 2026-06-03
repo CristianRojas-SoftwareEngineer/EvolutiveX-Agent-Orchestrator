@@ -45,4 +45,20 @@ describe('event-notification-profile', () => {
   it('PostToolUse sin toast devuelve undefined', () => {
     expect(getProfileForEvent('PostToolUse')).toBeUndefined();
   });
+
+  it('Stop incluye title y message del catálogo', () => {
+    const profile = getProfileForEvent('Stop');
+    expect(profile?.title).toBe('AI Assistant');
+    expect(profile?.message).toMatch(/terminó/i);
+  });
+
+  it('StopFailure incluye copy estático de fallback', () => {
+    const profile = getProfileForEvent('StopFailure');
+    expect(profile?.title).toBe('AI Assistant');
+    expect(profile?.message).toMatch(/Error de API/);
+  });
+
+  it('SessionStart incluye mensaje de sesión iniciada', () => {
+    expect(getProfileForEvent('SessionStart')?.message).toBe('Sesión iniciada');
+  });
 });

@@ -8,8 +8,12 @@ import { resolve as resolvePath } from 'path';
 import { DesktopNotificationAdapter } from './DesktopNotificationAdapter.js';
 import type { NotificationEvent } from './types.js';
 import { STABLE_PNG_PATH } from './asset-paths.js';
-import { getProfileForEvent } from './event-notification-profile.js';
+import {
+  getProfileForEvent,
+  NOTIFICATION_BRAND_TITLE,
+} from './event-notification-profile.js';
 import { resolveEventImagePath } from './event-image-paths.js';
+import { resolveHookNotificationMessage } from './hook-payload-notification-message.js';
 import { resolveNotificationSound } from './resolve-notification-sound.js';
 
 const SOUND_FLAG = 'sound';
@@ -59,17 +63,6 @@ function readStdin(): Promise<string> {
     process.stdin.on('end', () => resolve(data));
     process.stdin.on('error', (err) => reject(err));
   });
-}
-
-function deriveMessageFromPayload(payload: Record<string, unknown>): string {
-  const parts: string[] = [];
-  if (typeof payload['hook_event_name'] === 'string') {
-    parts.push(String(payload['hook_event_name']));
-  }
-  if (typeof payload['session_id'] === 'string') {
-    parts.push(`session=${String(payload['session_id'])}`);
-  }
-  return parts.length > 0 ? parts.join(' ') : 'hook event';
 }
 
 export function resolveEventKey(
@@ -132,33 +125,61 @@ export function resolveEventSound(
   return resolveNotificationSound(profile?.sound, platform);
 }
 
+/** Título: override CLI → catálogo → marca por defecto. */
+export function resolveNotificationTitle(
+  options: CliOptions,
+  eventKey?: string,
+): string {
+  if (options.title !== undefined && options.title !== '') {
+    return options.title;
+  }
+  const profile = eventKey ? getProfileForEvent(eventKey) : undefined;
+  return profile?.title ?? NOTIFICATION_BRAND_TITLE;
+}
+
+/** Mensaje: override CLI → formatter stdin → catálogo. */
+export function resolveNotificationMessage(
+  options: CliOptions,
+  eventKey: string | undefined,
+  stdinPayload?: Record<string, unknown>,
+): string | undefined {
+  if (options.message !== undefined && options.message !== '') {
+    return options.message;
+  }
+  if (options.stdinJson && stdinPayload && eventKey) {
+    const dynamic = resolveHookNotificationMessage(eventKey, stdinPayload);
+    if (dynamic) return dynamic;
+  }
+  if (eventKey) {
+    return getProfileForEvent(eventKey)?.message;
+  }
+  return undefined;
+}
+
 export function buildEvent(
   options: CliOptions,
   stdinPayload?: Record<string, unknown>,
   platform: NodeJS.Platform = process.platform,
 ): NotificationEvent | { error: string } {
-  let title: string;
-  let message: string;
-
-  if (options.stdinJson) {
-    if (!stdinPayload) {
-      return { error: 'No se recibió payload por stdin con --stdin-json' };
-    }
-    const eventName = stdinPayload['hook_event_name'];
-    title = typeof eventName === 'string' && eventName.length > 0 ? eventName : options.eventType ?? 'HookEvent';
-    message = options.message ?? deriveMessageFromPayload(stdinPayload);
-  } else {
-    if (!options.eventType) {
-      return { error: 'Falta --event-type (o usa --stdin-json con payload)' };
-    }
-    if (!options.message) {
-      return { error: 'Falta --message (o usa --stdin-json con payload)' };
-    }
-    title = options.title ?? options.eventType;
-    message = options.message;
+  if (options.stdinJson && !stdinPayload) {
+    return { error: 'No se recibió payload por stdin con --stdin-json' };
   }
 
   const eventKey = resolveEventKey(options, stdinPayload);
+
+  if (!options.stdinJson && !options.eventType) {
+    return { error: 'Falta --event-type (o usa --stdin-json con payload)' };
+  }
+
+  const title = resolveNotificationTitle(options, eventKey);
+  const message = resolveNotificationMessage(options, eventKey, stdinPayload);
+
+  if (message === undefined || message === '') {
+    return {
+      error:
+        'Falta mensaje: usa --message, --event-type con perfil en catálogo, o --stdin-json con formatter aplicable',
+    };
+  }
   const branding = resolveBranding(options, eventKey);
   return {
     title,
@@ -176,11 +197,11 @@ async function main(): Promise<number> {
     .name('claude-notify')
     .description('Emite un toast nativo del SO desde un hook de Claude Code')
     .option('--event-type <type>', 'Tipo de evento del lifecycle (p. ej. Stop)')
-    .option('--message <msg>', 'Cuerpo del toast')
-    .option('--title <title>', 'Título del toast (por defecto = --event-type)')
+    .option('--message <msg>', 'Cuerpo del toast (override; por defecto catálogo o formatter stdin)')
+    .option('--title <title>', 'Título del toast (override; por defecto catálogo)')
     .addOption(new Option(`--${SOUND_FLAG}`, 'Reproducir sonido genérico').conflicts(SILENT_FLAG))
     .addOption(new Option(`--${SILENT_FLAG}`, 'Silenciar el toast').conflicts(SOUND_FLAG))
-    .option(`--${STDIN_JSON_FLAG}`, 'Leer payload JSON por stdin y derivar title/message')
+    .option(`--${STDIN_JSON_FLAG}`, 'Leer payload JSON por stdin y derivar mensaje dinámico')
     .option(`--${APP_ID_FLAG} <id>`, `Identificador de aplicación (AUMID Windows); default: ${DEFAULT_APP_ID}`)
     .option(`--${ICON_FLAG} <path>`, 'Ruta al icono de la notificación; default: perfil del evento o ai-assistant.png')
     .allowExcessArguments(false)

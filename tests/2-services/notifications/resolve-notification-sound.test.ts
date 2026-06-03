@@ -3,9 +3,14 @@ import { resolveNotificationSound } from '../../../src/2-services/notifications/
 import { getProfileForEvent } from '../../../src/2-services/notifications/event-notification-profile.js';
 
 describe('resolveNotificationSound', () => {
-  it('StopFailure en win32 devuelve LoopingAlarm7', () => {
+  it('StopFailure en win32 devuelve Notification.Looping.Alarm7', () => {
     const sound = getProfileForEvent('StopFailure')?.sound;
-    expect(resolveNotificationSound(sound, 'win32')).toBe('LoopingAlarm7');
+    expect(resolveNotificationSound(sound, 'win32')).toBe('Notification.Looping.Alarm7');
+  });
+
+  it('PreToolUse en win32 devuelve Notification.SMS (no token BurntToast crudo)', () => {
+    const sound = getProfileForEvent('PreToolUse')?.sound;
+    expect(resolveNotificationSound(sound, 'win32')).toBe('Notification.SMS');
   });
 
   it('SubagentStart en darwin devuelve Ping', () => {

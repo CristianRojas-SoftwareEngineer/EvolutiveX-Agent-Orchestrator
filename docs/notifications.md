@@ -15,6 +15,8 @@ un mensaje, opcionalmente con sonido. La primera versión (`v1`) es
 deliberadamente mínima: no admite personalización visual, no carga
 configuración externa, y no introduce dependencias Windows-specific.
 
+**Contrato normativo:** [openspec/specs/desktop-notifications-service/spec.md](../openspec/specs/desktop-notifications-service/spec.md) (requisitos SHALL/MUST). Esta guía describe operación y convenciones del repo.
+
 ## Componentes
 
 | Archivo (en `src/2-services/notifications/`) | Capa PKA | Rol |
@@ -30,8 +32,11 @@ configuración externa, y no introduce dependencias Windows-specific.
 | `registry.ts` | 2 (helper) | Wrapper de `reg.exe` para escribir/leer/borrar `HKCU\Software\Classes\AppUserModelId\{AUMID}` |
 | `asset-paths.ts` | 2 (helper) | Constantes de las rutas ASCII-only (`%LOCALAPPDATA%\AIAssistant\`, `events/`) |
 | `event-notification-profile.ts` | 2 (catálogo) | Perfiles por `--event-type`: PNG de cuerpo + sonido por SO |
-| `event-image-paths.ts` | 2 (helper) | `resolveEventImagePath` (cache estable → repo) |
-| `resolve-notification-sound.ts` | 2 (helper) | `resolveNotificationSound` (tokens/nombres/boolean por plataforma) |
+| `event-image-paths.ts` | 2 (helper) | **Runtime:** `resolveEventImagePath`, `syncEventImageFromRepoIfStale` (cache estable → repo) |
+| `resolve-notification-sound.ts` | 2 (helper) | **Runtime:** `resolveNotificationSound` → `Notification.*` en win32 |
+| `toast-body-image-spec.ts` | 2 (helper) | **Mantenimiento:** `applyCircularToastFrame`, `renderToastBodyImageFromSource` (salida 128×128, `#fefefe`) |
+| `event-image-overlays.ts` | 2 (helper) | **Mantenimiento:** SVG de overlays (compositor sharp) |
+| `event-notification-image.ts` | 2 (helper) | **Mantenimiento:** `writeAllEventNotificationImages()`, `reframeAllEventNotificationImages()` |
 
 ## Puerto: `INotificationService`
 
@@ -187,10 +192,18 @@ en settings: el CLI aplica imagen y sonido automáticamente.
 | `TaskCreated` | `task-created.png` | `Reminder` | `Submarine` | `true` |
 | `TaskCompleted` | `task-completed.png` | `Default` | `Tink` | `true` |
 
-**Paridad legacy:** los tokens `win32` heredan
-`C:\AI\claude-notifications-enhanced.ps1` (`$DefaultEventConfig`). Eventos
-nuevos (`SubagentStart`, `SubagentStop`, `TaskCreated`) usan tokens
-propuestos en el diseño del change.
+**Paridad legacy:** los tokens del catálogo (`Default`, `IM`, `SMS`, …) heredan
+`claude-notifications-enhanced.ps1` (BurntToast). El resolvedor los traduce a
+`Notification.*` porque `node-notifier`/`SnoreToast` ignoran tokens sin ese
+prefijo y usan siempre `Notification.Default`.
+
+| Catálogo (BurntToast) | Valor enviado a SnoreToast (`-s`) |
+|----------------------|-----------------------------------|
+| `Default` | `Notification.Default` |
+| `IM` | `Notification.IM` |
+| `Reminder` | `Notification.Reminder` |
+| `SMS` | `Notification.SMS` |
+| `LoopingAlarm7` | `Notification.Looping.Alarm7` |
 
 **Orden de sonido en el CLI:** `--silent` → `sound: false`; `--sound` →
 `sound: true` genérico; si no hay flags → sonido del catálogo vía
@@ -208,14 +221,66 @@ Linux solo admite `sound: true` / `false` (best-effort vía
 - En Linux, `sound: true` depende del entorno de escritorio y la
   configuración del usuario; no garantiza audio audible.
 
-Tras cambiar PNGs en el repo, en Windows ejecutar de nuevo:
+### Imagen de cuerpo del toast (`-p` / SnoreToast)
+
+En Windows, `node-notifier` pasa `icon` a SnoreToast como **`-p`**. SnoreToast no
+usa `ToastGeneric` ni `appLogoOverride` (48×48): usa la plantilla legacy
+**`ToastImageAndText02`** — imagen **cuadrada a la izquierda** del bloque de
+título y mensaje (ver `KDE/snoretoast`, `displayToast()`).
+
+| Concepto | Tamaño en shell / doc externa | Uso en este repo |
+|----------|------------------------------|------------------|
+| App logo override (`ToastGeneric`) | 48×48 | No aplica a `-p` (header usa AUMID + `.ico`) |
+| Hero image (`ToastGeneric`) | 364×180 | No usamos hero |
+| Hueco `ToastImageAndText02` | ~128×128 px (orientación) | SnoreToast escala el PNG que recibe |
+
+#### Assets versionados (estado actual del repo)
+
+Los PNG en `assets/notifications/events/*.png` y `assets/notifications/ai-assistant.png` son la **fuente de verdad** versionada:
+
+- **256×256**, **32-bit RGBA** (fondo transparente y borde claro permitidos).
+- Curación **manual** o con herramientas externas; el CLI los usa tal cual vía `resolveEventImagePath`.
+- SnoreToast puede escalar 256→hueco del toast; si el resultado visual es correcto, no hace falta redimensionar (validado en smoke test de los 11 eventos).
+
+**Cabecera vs cuerpo:** el icono redondo «AI Assistant» del header viene de `ai-assistant.ico` / registro AUMID, no del PNG del evento. Si actualizas solo `ai-assistant.png`, regenera también el `.ico` (ver nota «Regeneración de assets» más abajo) para mantener paridad.
+
+**Transparencia:** SnoreToast no mezcla bien el alpha; PNG transparentes pueden mostrar letterboxing. Es aceptable si el resultado te convence; los pipelines opcionales (siguiente subsección) ofrecen salida opaca 128×128 como remedio.
+
+#### Sincronización de caché (runtime)
+
+Tras editar PNGs en el repo, en Windows:
 
 ```bash
 npm run notifications:register -- --install
 ```
 
-Esto recopia `assets/notifications/events/*.png` a
+Esto recopia `assets/notifications/events/*.png` (y assets globales) a
 `%LOCALAPPDATA%\AIAssistant\events\` (idempotente por hash SHA-256).
+
+Además, en cada notificación el CLI llama `resolveEventImagePath`, que ejecuta
+`syncEventImageFromRepoIfStale`: si el hash del repo difiere del cache, recopia
+al cache **antes** de notificar (aunque no hayas vuelto a ejecutar `register`).
+
+Orden efectivo: comprobar repo → sync si hace falta → devolver ruta estable si existe.
+
+#### Pipelines opcionales de mantenimiento (salida 128×128, `#fefefe`)
+
+> **Advertencia:** `writeAllEventNotificationImages` y `reframeAllEventNotificationImages`
+> **sobrescriben** los PNG en `assets/notifications/events/`. No ejecutarlos tras
+> curación manual salvo que sea intencional.
+
+Herramientas en `toast-body-image-spec.ts` / `event-notification-image.ts` (no cableadas al CLI):
+
+| Pipeline | Efecto | Comando |
+|----------|--------|---------|
+| **Compositor** (`writeAllEventNotificationImages`) | Regenera los 11 iconos desde `ai-assistant.png` + overlay SVG | `node --import tsx -e "import { writeAllEventNotificationImages } from './src/2-services/notifications/event-notification-image.ts'; await writeAllEventNotificationImages();"` |
+| **Reframe** (`reframeAllEventNotificationImages`) | Conserva el arte de cada PNG; disco circular + fondo `#fefefe` (`contain`) | `node --import tsx -e "import { reframeAllEventNotificationImages } from './src/2-services/notifications/event-notification-image.ts'; await reframeAllEventNotificationImages();"` |
+
+Salida de ambos pipelines: **128×128**, fondo opaco **`#fefefe`** (sin alpha). Tras ejecutar cualquiera:
+
+```bash
+npm run notifications:register -- --install
+```
 
 ### ¿Qué es AUMID y por qué Windows lo necesita?
 

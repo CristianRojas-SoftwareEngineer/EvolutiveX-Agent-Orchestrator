@@ -102,7 +102,7 @@ describe('CLI - buildEvent', () => {
       expect(result.appId).toBe('AIAssistant.Proxy');
       expect(result.icon).toBeDefined();
       expect(result.icon as string).toMatch(/stop\.png$/);
-      expect(result.sound).toBe('IM');
+      expect(result.sound).toBe('Notification.IM');
     }
   });
 

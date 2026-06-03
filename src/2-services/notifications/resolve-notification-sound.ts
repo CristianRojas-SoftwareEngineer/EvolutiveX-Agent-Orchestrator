@@ -1,6 +1,27 @@
 // Traduce el perfil de sonido del catálogo al valor que acepta node-notifier por SO.
 import type { NotificationSoundProfile } from './event-notification-profile.js';
 
+/**
+ * Tokens del catálogo (paridad BurntToast) → sonido WinRT que SnoreToast entiende.
+ * node-notifier (`mapToWin8`) sustituye cualquier string sin prefijo `Notification.`
+ * por `Notification.Default`, por eso todos sonaban igual.
+ * @see https://learn.microsoft.com/en-us/uwp/schemas/tiles/toastschema/element-audio
+ */
+const WIN32_NOTIFICATION_SOUND: Record<string, string> = {
+  Default: 'Notification.Default',
+  IM: 'Notification.IM',
+  Reminder: 'Notification.Reminder',
+  SMS: 'Notification.SMS',
+  LoopingAlarm7: 'Notification.Looping.Alarm7',
+};
+
+export function toWin32NotificationSound(token: string): string {
+  if (token.startsWith('Notification.')) {
+    return token;
+  }
+  return WIN32_NOTIFICATION_SOUND[token] ?? 'Notification.Default';
+}
+
 export function resolveNotificationSound(
   profile: NotificationSoundProfile | undefined,
   platform: NodeJS.Platform,
@@ -13,7 +34,7 @@ export function resolveNotificationSound(
     if (token === false || token === undefined) {
       return false;
     }
-    return token;
+    return toWin32NotificationSound(token);
   }
   if (platform === 'darwin') {
     const name = profile.darwin;

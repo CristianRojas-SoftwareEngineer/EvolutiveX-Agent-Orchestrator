@@ -31,7 +31,7 @@ configuración externa, y no introduce dependencias Windows-specific.
 | `lnk-format.ts` | 2 (helper) | Generador/parser del formato MS-SHLLINK (escritura binaria pura del `.lnk`) |
 | `registry.ts` | 2 (helper) | Wrapper de `reg.exe` para escribir/leer/borrar `HKCU\Software\Classes\AppUserModelId\{AUMID}` |
 | `asset-paths.ts` | 2 (helper) | Constantes de las rutas ASCII-only (`%LOCALAPPDATA%\AIAssistant\`, `events/`) |
-| `event-notification-profile.ts` | 2 (catálogo) | Perfiles por `--event-type`: título, mensaje estático, PNG de cuerpo + sonido por SO |
+| `event-notification-profile.ts` | 2 (catálogo) | Perfiles por `--event-type`: mensaje estático, PNG de cuerpo + sonido por SO |
 | `hook-payload-notification-message.ts` | 2 (helper) | **Runtime:** `resolveHookNotificationMessage` — mensaje dinámico desde payload stdin |
 | `event-image-paths.ts` | 2 (helper) | **Runtime:** `resolveEventImagePath`, `syncEventImageFromRepoIfStale` (cache estable → repo) |
 | `resolve-notification-sound.ts` | 2 (helper) | **Runtime:** `resolveNotificationSound` → `Notification.*` en win32 |
@@ -98,7 +98,7 @@ flags (vía `commander`):
 |---|---|
 | `--event-type <type>` | Tipo de evento del lifecycle (`UserPromptSubmit`, `PreToolUse`, …) |
 | `--message <msg>` | Override del cuerpo del toast |
-| `--title <title>` | Override del título del toast |
+| `--title <title>` | Override del título del toast (por defecto: nombre del hook / `--event-type`) |
 | `--sound` | Fuerza `sound: true` genérico (no el token del perfil del evento) |
 | `--silent` | Silenciar el toast (contradice `--sound`; ignora el sonido del catálogo) |
 | `--stdin-json` | Leer payload JSON de `stdin`; derivar mensaje dinámico si hay formatter |
@@ -180,10 +180,10 @@ por defecto la marca "AI Assistant" en los toasts:
 
 Dos capas en el composition root (`buildEvent`):
 
-1. **Estático** — `title` y `message` en `event-notification-profile.ts` (marca «AI Assistant» en todos los títulos).
+1. **Estático** — `message` en `event-notification-profile.ts` (cuerpo por defecto).
 2. **Dinámico** — con `--stdin-json`, `resolveHookNotificationMessage(eventKey, payload)` puede sustituir solo el **cuerpo** (paridad `C:\AI\src\notifications\builders.ts`).
 
-**Precedencia del título:** `--title` → `profile.title` (nunca `hook_event_name` por defecto).
+**Precedencia del título:** `--title` → `eventKey` resuelto (`--event-type` o `hook_event_name` en stdin). La marca «AI Assistant» solo aparece en el **header** del toast (AUMID), no se repite en el título del cuerpo.
 
 **Precedencia del mensaje:** `--message` → formatter stdin → `profile.message`.
 
@@ -201,7 +201,7 @@ Dos capas en el composition root (`buildEvent`):
 
 Los 11 hooks con toast en `.claude/settings.json` comparten el mismo
 `--event-type` que las claves del catálogo. No hace falta duplicar rutas
-ni `--message` en settings: el CLI aplica título, mensaje, imagen y sonido.
+ni `--message` en settings: el CLI aplica título (= nombre del hook), mensaje, imagen y sonido.
 
 | `--event-type` | Mensaje estático (catálogo) | Imagen (`events/`) | win32 | darwin | linux |
 |----------------|---------------------------|-------------------|-------|--------|-------|

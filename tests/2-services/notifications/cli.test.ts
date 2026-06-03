@@ -44,7 +44,6 @@ import {
   resolveNotificationTitle,
   resolveNotificationMessage,
 } from '../../../src/2-services/notifications/cli.js';
-import { NOTIFICATION_BRAND_TITLE } from '../../../src/2-services/notifications/event-notification-profile.js';
 
 const baseOptions = {
   eventType: 'Stop',
@@ -167,7 +166,7 @@ describe('CLI - buildEvent', () => {
     const result = buildEvent({ ...baseOptions, message: undefined });
     expect('error' in result).toBe(false);
     if (!('error' in result)) {
-      expect(result.title).toBe(NOTIFICATION_BRAND_TITLE);
+      expect(result.title).toBe('Stop');
       expect(result.message).toMatch(/terminó/i);
     }
   });
@@ -196,7 +195,7 @@ describe('CLI - buildEvent', () => {
     );
     expect('error' in result).toBe(false);
     if (!('error' in result)) {
-      expect(result.title).toBe(NOTIFICATION_BRAND_TITLE);
+      expect(result.title).toBe('StopFailure');
       expect(result.message).toContain('Límite de tasa (API)');
       expect(result.appId).toBe('AIAssistant.Proxy');
     }
@@ -209,9 +208,13 @@ describe('CLI - buildEvent', () => {
     );
     expect('error' in result).toBe(false);
     if (!('error' in result)) {
-      expect(result.title).toBe(NOTIFICATION_BRAND_TITLE);
+      expect(result.title).toBe('Stop');
       expect(result.message).toMatch(/terminó/i);
     }
+  });
+
+  it('resolveNotificationTitle usa eventKey por defecto', () => {
+    expect(resolveNotificationTitle(baseOptions, 'SessionStart')).toBe('SessionStart');
   });
 
   it('respeta --title como override', () => {

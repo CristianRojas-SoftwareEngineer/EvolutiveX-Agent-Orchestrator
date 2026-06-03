@@ -41,19 +41,17 @@ El branding (campos `appId` e `icon` del evento) NO es parte del contrato del pu
 
 El sistema SHALL definir un catálogo en código en `src/2-services/notifications/event-notification-profile.ts` que mapee cada clave de evento de notificación (alineada a `--event-type` del CLI y a los hooks con toast en `.claude/settings.json`) a:
 
-- `title`: string — título del toast mostrado por defecto (marca «AI Assistant» para las 11 claves).
 - `message`: string — cuerpo del toast cuando no hay override `--message` ni mensaje dinámico desde stdin.
 - `image`: nombre de archivo bajo `assets/notifications/events/` (PNG).
 - `sound`: perfil `NotificationSoundProfile` con `win32`, `darwin`, `linux`.
 
-El catálogo SHALL exportar `EVENT_NOTIFICATION_PROFILES` y `getProfileForEvent(eventKey: string)` con exactamente las **11 claves** existentes tras `add-notification-event-profiles`. Los campos `image` y `sound` SHALL conservar los valores acordados en ese change; el copy (`title`, `message`) se añade sin alterar tokens BurntToast ni nombres de PNG.
+El catálogo SHALL exportar `EVENT_NOTIFICATION_PROFILES` y `getProfileForEvent(eventKey: string)` con exactamente las **11 claves** existentes tras `add-notification-event-profiles`. Los campos `image` y `sound` SHALL conservar los valores acordados en ese change; el campo `message` se añade sin alterar tokens BurntToast ni nombres de PNG. El título del toast **no** vive en el catálogo: lo resuelve el CLI desde el `eventKey` (ver requirement «Entry point CLI standalone»).
 
-#### Scenario: Perfil conocido devuelve título, mensaje, imagen y sonido
+#### Scenario: Perfil conocido devuelve mensaje, imagen y sonido
 
 - **GIVEN** `getProfileForEvent('StopFailure')`
 - **WHEN** se lee el perfil
-- **THEN** SHALL devolver `title` no vacío (marca «AI Assistant»)
-- **AND** SHALL devolver `message` no vacío (fallback estático de error de API)
+- **THEN** SHALL devolver `message` no vacío (fallback estático de error de API)
 - **AND** SHALL devolver `image: 'stop-failure.png'`
 - **AND** SHALL devolver `sound.win32: 'LoopingAlarm7'`
 
@@ -357,8 +355,9 @@ Cuando `--stdin-json` esté presente, el CLI SHALL leer `process.stdin` completo
 **Resolución de `title` en `buildEvent`:**
 
 1. Si `--title` está presente en CLI → usar ese valor.
-2. Si no → `profile.title` del catálogo para el `eventKey` resuelto.
-3. El CLI SHALL NOT usar `hook_event_name` como título por defecto.
+2. Si no → el `eventKey` resuelto (`options.eventType` o `stdinPayload.hook_event_name`).
+3. Si no hay `eventKey` → degradación a `'AI Assistant'` (`NOTIFICATION_BRAND_TITLE`).
+4. La marca «AI Assistant» en el header del toast proviene del AUMID; el título del cuerpo SHALL NOT repetirla por defecto.
 
 **Resolución de `message` en `buildEvent`:**
 
@@ -376,13 +375,13 @@ El CLI SHALL escribir un mensaje de error en `stderr` y terminar con código de 
 - **GIVEN** el CLI con perfil `Stop` en catálogo
 - **WHEN** se invoca con `--event-type Stop --message "Prueba manual"`
 - **THEN** el evento SHALL tener `message: 'Prueba manual'`
-- **AND** `title` SHALL ser el del catálogo salvo `--title` explícito
+- **AND** `title` SHALL ser `'Stop'` salvo `--title` explícito
 
 #### Scenario: CLI StopFailure con stdin y error rate_limit → mensaje dinámico
 
 - **GIVEN** payload stdin `{ "hook_event_name": "StopFailure", "error": "rate_limit", "last_assistant_message": "Texto del asistente" }`
 - **WHEN** se invoca con `--event-type StopFailure --stdin-json`
-- **THEN** el evento SHALL tener `title` del catálogo (no `StopFailure` como título salvo override)
+- **THEN** el evento SHALL tener `title: 'StopFailure'`
 - **AND** `message` SHALL contener una línea legible equivalente a límite de tasa (API)
 - **AND** `message` SHALL contener un fragmento del `last_assistant_message` truncado
 

@@ -125,7 +125,7 @@ export function resolveEventSound(
   return resolveNotificationSound(profile?.sound, platform);
 }
 
-/** Título: override CLI → catálogo → marca por defecto. */
+/** Título: override CLI → nombre del hook (eventKey) → marca por defecto. */
 export function resolveNotificationTitle(
   options: CliOptions,
   eventKey?: string,
@@ -133,8 +133,10 @@ export function resolveNotificationTitle(
   if (options.title !== undefined && options.title !== '') {
     return options.title;
   }
-  const profile = eventKey ? getProfileForEvent(eventKey) : undefined;
-  return profile?.title ?? NOTIFICATION_BRAND_TITLE;
+  if (eventKey) {
+    return eventKey;
+  }
+  return NOTIFICATION_BRAND_TITLE;
 }
 
 /** Mensaje: override CLI → formatter stdin → catálogo. */
@@ -198,7 +200,7 @@ async function main(): Promise<number> {
     .description('Emite un toast nativo del SO desde un hook de Claude Code')
     .option('--event-type <type>', 'Tipo de evento del lifecycle (p. ej. Stop)')
     .option('--message <msg>', 'Cuerpo del toast (override; por defecto catálogo o formatter stdin)')
-    .option('--title <title>', 'Título del toast (override; por defecto catálogo)')
+    .option('--title <title>', 'Título del toast (override; por defecto nombre del hook)')
     .addOption(new Option(`--${SOUND_FLAG}`, 'Reproducir sonido genérico').conflicts(SILENT_FLAG))
     .addOption(new Option(`--${SILENT_FLAG}`, 'Silenciar el toast').conflicts(SOUND_FLAG))
     .option(`--${STDIN_JSON_FLAG}`, 'Leer payload JSON por stdin y derivar mensaje dinámico')

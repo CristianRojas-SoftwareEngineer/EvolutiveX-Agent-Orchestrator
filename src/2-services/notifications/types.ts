@@ -3,14 +3,22 @@
 
 /**
  * Evento que el adaptador concreto recibe y traduce a un toast del SO.
- * Forma mínima: el contrato del puerto no expone personalización
- * (icono, AUMID, branding) en v1.
+ * Forma mínima: además de los campos base (`title`, `message`, `sound?`,
+ * `silent?`), admite dos campos opcionales de branding (`appId?`, `icon?`).
+ * El contrato del puerto no expone otros campos de personalización
+ * (`image`, `contentImage`, `appIdPath`, `subtitle`, `category`,
+ * `urgency`, `timeout`, `wait`, `open`, `closeLabel`, `actions`,
+ * `heroImage`) en v1.
  */
 export interface NotificationEvent {
   title: string;
   message: string;
   sound?: boolean;
   silent?: boolean;
+  /** Identificador de aplicación (AUMID en Windows). Inyectado por la CLI. */
+  appId?: string;
+  /** Ruta a un asset de imagen usado como icono cosmético del toast. */
+  icon?: string;
 }
 
 /**

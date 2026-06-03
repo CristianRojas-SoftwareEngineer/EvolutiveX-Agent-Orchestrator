@@ -127,11 +127,11 @@ describe('applyNotificationsInstall / uninstall', () => {
   it('uninstall preserva PostToolUse ajeno', () => {
     proxyRoot = createValidProxyRootForNotifications('install-notif-');
     const installed = applyNotificationsInstall({}, proxyRoot, false);
-    if ('error' in installed) throw new Error(installed.error);
+    if ('error' in installed) throw new Error(String(installed.error));
     const withPs1Guard = {
       ...installed,
       hooks: {
-        ...(installed.hooks as object),
+        ...(installed.hooks as Record<string, unknown>),
         PostToolUse: [
           {
             matcher: 'Write|Edit',
@@ -141,8 +141,9 @@ describe('applyNotificationsInstall / uninstall', () => {
       },
     };
     const next = applyNotificationsUninstall(withPs1Guard);
-    expect(next.hooks?.PostToolUse).toBeDefined();
-    expect(next.hooks?.SessionStart).toBeUndefined();
+    const hooks = next.hooks as Record<string, unknown> | undefined;
+    expect(hooks?.['PostToolUse']).toBeDefined();
+    expect(hooks?.['SessionStart']).toBeUndefined();
   });
 });
 

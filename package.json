@@ -27,6 +27,7 @@
     "configure:provider": "tsx scripting/configure-provider.ts",
     "install:statusline": "tsx scripting/install-statusline.ts",
     "install:notifications": "tsx scripting/install-notifications.ts",
+    "setup": "tsx scripting/setup.ts",
     "notifications:register": "tsx src/2-services/notifications/register.ts",
     "create:agents-reference": "tsx scripting/create-agents-reference.ts",
     "verify:package-scripts": "tsx scripting/verify-package-scripts.ts",

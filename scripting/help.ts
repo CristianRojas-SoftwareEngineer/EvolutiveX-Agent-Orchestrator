@@ -64,6 +64,11 @@ const scripts: NpmScript[] = [
     category: 'local',
   },
   {
+    name: 'setup',
+    description: 'Instala o desinstala statusline, notificaciones y voz de Claude Code (unificado)',
+    category: 'local',
+  },
+  {
     name: 'sessions:list',
     description: 'Lista sesiones Claude Code del proyecto (--project)',
     category: 'local',

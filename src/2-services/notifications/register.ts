@@ -28,16 +28,18 @@
 //   - Assets: copiados a LOCALAPPDATA (ASCII-only) vía `fs.copyFileSync`.
 import { Command } from 'commander';
 import { createHash } from 'crypto';
-import { copyFileSync, existsSync, mkdirSync, unlinkSync, readFileSync } from 'fs';
+import { copyFileSync, existsSync, mkdirSync, readdirSync, unlinkSync, readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { resolve as resolvePath, join, dirname } from 'path';
 import { readRegistry, writeRegistry, deleteRegistry } from './registry.js';
 import {
   STABLE_ICON_PATH,
   STABLE_PNG_PATH,
+  STABLE_EVENTS_DIR,
   buildStableIconLocation,
   getStableIconUriPath,
 } from './asset-paths.js';
+import { getRepoEventsDir } from './event-image-paths.js';
 import { parseIconLocation } from './lnk-format.js';
 import {
   SHORTCUT_ENGINE_SNORETOAST,
@@ -130,6 +132,27 @@ function ensureStableAssets(): { icoPath: string; pngPath: string; updated: bool
   };
 }
 
+// Copia PNGs por evento al cache ASCII-only (misma idempotencia por hash).
+function ensureStableEventAssets(): boolean {
+  const sourceDir = getRepoEventsDir();
+  if (!existsSync(sourceDir)) {
+    return false;
+  }
+  mkdirSync(STABLE_EVENTS_DIR, { recursive: true });
+  let updated = false;
+  for (const name of readdirSync(sourceDir)) {
+    if (!name.toLowerCase().endsWith('.png')) {
+      continue;
+    }
+    const source = join(sourceDir, name);
+    const dest = join(STABLE_EVENTS_DIR, name);
+    if (copyFileIfChanged(source, dest)) {
+      updated = true;
+    }
+  }
+  return updated;
+}
+
 // Resultado del check de idempotencia: ¿están ambos sitios
 // (registro y .lnk) configurados con los valores objetivo?
 interface InstallState {
@@ -184,7 +207,7 @@ export async function installAction(): Promise<number> {
   try {
     const stable = ensureStableAssets();
     stableIcoPath = stable.icoPath;
-    assetsUpdated = stable.updated;
+    assetsUpdated = stable.updated || ensureStableEventAssets();
   } catch (err) {
     process.stderr.write(`Error copiando assets a LOCALAPPDATA: ${(err as Error).message}\n`);
     return 1;

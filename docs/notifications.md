@@ -28,7 +28,10 @@ configuración externa, y no introduce dependencias Windows-specific.
 | `snoretoast-shortcut.ts` | 4 (helper de orquestación) | Invoca `snoretoast-x64.exe -install` para crear el `.lnk` con la metadata AUMID que Windows espera, y luego parchea el `IconLocation` con `patchIconLocation` de `lnk-format.ts` |
 | `lnk-format.ts` | 2 (helper) | Generador/parser del formato MS-SHLLINK (escritura binaria pura del `.lnk`) |
 | `registry.ts` | 2 (helper) | Wrapper de `reg.exe` para escribir/leer/borrar `HKCU\Software\Classes\AppUserModelId\{AUMID}` |
-| `asset-paths.ts` | 2 (helper) | Constantes de las rutas ASCII-only (`%LOCALAPPDATA%\AIAssistant\`) usadas para evitar issues con Windows shell APIs y caracteres no-ASCII |
+| `asset-paths.ts` | 2 (helper) | Constantes de las rutas ASCII-only (`%LOCALAPPDATA%\AIAssistant\`, `events/`) |
+| `event-notification-profile.ts` | 2 (catálogo) | Perfiles por `--event-type`: PNG de cuerpo + sonido por SO |
+| `event-image-paths.ts` | 2 (helper) | `resolveEventImagePath` (cache estable → repo) |
+| `resolve-notification-sound.ts` | 2 (helper) | `resolveNotificationSound` (tokens/nombres/boolean por plataforma) |
 
 ## Puerto: `INotificationService`
 
@@ -40,7 +43,7 @@ interface INotificationService {
 interface NotificationEvent {
   title: string;
   message: string;
-  sound?: boolean;    // default: false
+  sound?: boolean | string;  // default efectivo: false; string = token BurntToast (win) o nombre macOS
   silent?: boolean;   // default: false; si true, fuerza sound=false
   appId?: string;     // branding: AUMID Windows, inyectado por la CLI
   icon?: string;      // branding: ruta a asset de imagen, inyectado por la CLI
@@ -90,11 +93,11 @@ flags (vía `commander`):
 | `--event-type <type>` | Tipo de evento del lifecycle (`UserPromptSubmit`, `PreToolUse`, …) |
 | `--message <msg>` | Cuerpo del toast |
 | `--title <title>` | Título del toast (opcional; por defecto, igual a `--event-type`) |
-| `--sound` | Reproducir sonido del SO |
-| `--silent` | Silenciar el toast (contradice `--sound`) |
+| `--sound` | Fuerza `sound: true` genérico (no el token del perfil del evento) |
+| `--silent` | Silenciar el toast (contradice `--sound`; ignora el sonido del catálogo) |
 | `--stdin-json` | Leer payload JSON de `stdin`; derivar `title` de `hook_event_name` |
 | `--app-id <id>` | Identificador de aplicación (AUMID Windows); default `AIAssistant.Proxy` |
-| `--icon <path>` | Ruta al icono de la notificación; default `<repo>/assets/notifications/ai-assistant.png` (se omite si el archivo no existe) |
+| `--icon <path>` | Override de imagen de cuerpo; default = PNG del perfil del evento o `ai-assistant.png` |
 
 ### Ejemplos
 
@@ -156,13 +159,63 @@ por defecto la marca "AI Assistant" en los toasts:
   `[Compañía].[App]`, sin espacios, ≤ 129 caracteres). Lo inyecta la CLI
   en `buildEvent()` si el usuario no pasa `--app-id`. El adaptador lo
   reenvía a `node-notifier` solo si está presente.
-- **`icon` default = `ai-assistant.png`** (256×256, 32-bit RGBA). En
-  Windows se pasa a SnoreToast como `-p` (imagen del toast); sin `-p`
-  aparece el logo genérico de SnoreToast. Prioridad de ruta: copia
-  ASCII-only en `%LOCALAPPDATA%\AIAssistant\` (tras `--install`), luego
-  `<repo-root>/assets/notifications/ai-assistant.png`. Si el archivo no
-  existe, el CLI omite `icon` y continúa con `appId` (degradación con
-  gracia). Override con `--icon <path>`.
+- **`icon` por evento** (change `add-notification-event-profiles`): el CLI
+  resuelve un PNG distinto por `--event-type` desde el catálogo en
+  `event-notification-profile.ts`. Prioridad: `--icon` explícito →
+  `%LOCALAPPDATA%\AIAssistant\events\<archivo>.png` (tras `--install`) →
+  `<repo>/assets/notifications/events/<archivo>.png` → fallback global
+  `ai-assistant.png` (misma prioridad estable/repo que antes). Si ningún
+  archivo existe, se omite `icon` (degradación con gracia).
+
+### Perfiles por evento (imagen + sonido)
+
+Los 11 hooks con toast en `.claude/settings.json` comparten el mismo
+`--event-type` que las claves del catálogo. No hace falta duplicar rutas
+en settings: el CLI aplica imagen y sonido automáticamente.
+
+| `--event-type` | Imagen (`events/`) | win32 (BurntToast) | darwin | linux |
+|----------------|-------------------|--------------------|--------|-------|
+| `UserPromptSubmit` | `user-prompt-submit.png` | `Reminder` | `Submarine` | `true` |
+| `PreToolUse` | `pre-tool-use-ask.png` | `SMS` | `Hero` | `true` |
+| `SubagentStart` | `subagent-start.png` | `IM` | `Ping` | `true` |
+| `SubagentStop` | `subagent-stop.png` | `Default` | `Tink` | `true` |
+| `Stop` | `stop.png` | `IM` | `Ping` | `true` |
+| `StopFailure` | `stop-failure.png` | `LoopingAlarm7` | `Basso` | `true` |
+| `SessionStart` | `session-start.png` | `Default` | `Tink` | `true` |
+| `SessionEnd` | `session-end.png` | `Default` | `Tink` | `true` |
+| `PermissionRequest` | `permission-request.png` | `SMS` | `Hero` | `true` |
+| `TaskCreated` | `task-created.png` | `Reminder` | `Submarine` | `true` |
+| `TaskCompleted` | `task-completed.png` | `Default` | `Tink` | `true` |
+
+**Paridad legacy:** los tokens `win32` heredan
+`C:\AI\claude-notifications-enhanced.ps1` (`$DefaultEventConfig`). Eventos
+nuevos (`SubagentStart`, `SubagentStop`, `TaskCreated`) usan tokens
+propuestos en el diseño del change.
+
+**Orden de sonido en el CLI:** `--silent` → `sound: false`; `--sound` →
+`sound: true` genérico; si no hay flags → sonido del catálogo vía
+`resolveNotificationSound`; sin perfil → mudo.
+
+**Multiplataforma:** Windows y macOS usan strings (`SMS`, `Ping`, …).
+Linux solo admite `sound: true` / `false` (best-effort vía
+`notify-send`/DE; no distingue timbres por evento).
+
+**Limitaciones:**
+
+- `LoopingAlarm7` en SnoreToast puede no replicar el loop corto del
+  script BurntToast legacy; tras smoke test documentar si hace falta
+  fallback `sound: true` solo para `StopFailure`.
+- En Linux, `sound: true` depende del entorno de escritorio y la
+  configuración del usuario; no garantiza audio audible.
+
+Tras cambiar PNGs en el repo, en Windows ejecutar de nuevo:
+
+```bash
+npm run notifications:register -- --install
+```
+
+Esto recopia `assets/notifications/events/*.png` a
+`%LOCALAPPDATA%\AIAssistant\events\` (idempotente por hash SHA-256).
 
 ### ¿Qué es AUMID y por qué Windows lo necesita?
 

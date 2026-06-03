@@ -34,8 +34,10 @@ import {
 import {
   STABLE_ICON_PATH,
   STABLE_PNG_PATH,
+  STABLE_EVENTS_DIR,
   buildStableIconLocation,
 } from '../../../src/2-services/notifications/asset-paths.js';
+import { getRepoEventsDir } from '../../../src/2-services/notifications/event-image-paths.js';
 import { buildShortcutBytes } from '../../../src/2-services/notifications/lnk-format.js';
 
 const registeredState = () => ({
@@ -149,6 +151,18 @@ describe('installAction', () => {
     expect(code).toBe(0);
     expect(snoreToastMock.installSnoreToastShortcut).toHaveBeenCalledTimes(1);
     expect(registryMock.writeRegistry).not.toHaveBeenCalled();
+  });
+
+  it('--install copia PNGs de events al cache estable', async () => {
+    registryMock.readRegistry.mockResolvedValue({ exists: false });
+    const repoEvents = getRepoEventsDir();
+    const stopSrc = join(repoEvents, 'stop.png');
+    if (!existsSync(stopSrc)) {
+      return;
+    }
+    const code = await installAction();
+    expect(code).toBe(0);
+    expect(existsSync(join(STABLE_EVENTS_DIR, 'stop.png'))).toBe(true);
   });
 
   it('falla con exit 1 si writeRegistry lanza', async () => {

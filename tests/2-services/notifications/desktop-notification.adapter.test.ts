@@ -51,6 +51,12 @@ describe('DesktopNotificationAdapter', () => {
     expect(opts).toHaveProperty('sound', true);
   });
 
+  it('notify con sound string reenvía el token a node-notifier', async () => {
+    await adapter.notify({ title: 'Hola', message: 'Mundo', sound: 'SMS' });
+    const [opts] = notifyMock.mock.calls[0]!;
+    expect(opts).toHaveProperty('sound', 'SMS');
+  });
+
   it('notify con silent=true traduce a sound=false', async () => {
     await adapter.notify({ title: 'Hola', message: 'Mundo', silent: true });
     const [opts] = notifyMock.mock.calls[0]!;

@@ -36,7 +36,12 @@ vi.mock('../../../src/2-services/notifications/DesktopNotificationAdapter.js', (
   };
 });
 
-import { buildEvent, resolveBranding } from '../../../src/2-services/notifications/cli.js';
+import {
+  buildEvent,
+  resolveBranding,
+  resolveEventSound,
+  resolveEventKey,
+} from '../../../src/2-services/notifications/cli.js';
 
 const baseOptions = {
   eventType: 'Stop',
@@ -56,10 +61,10 @@ describe('CLI - resolveBranding', () => {
   });
 
   it('aplica el default AIAssistant.Proxy cuando no se pasa --app-id', () => {
-    const { appId, icon } = resolveBranding(baseOptions);
+    const { appId, icon } = resolveBranding(baseOptions, 'Stop');
     expect(appId).toBe('AIAssistant.Proxy');
     expect(icon).toBeDefined();
-    expect(icon as string).toMatch(/ai-assistant\.png$/);
+    expect(icon as string).toMatch(/stop\.png$/);
   });
 
   it('respeta el override de --app-id', () => {
@@ -90,13 +95,32 @@ describe('CLI - buildEvent', () => {
     existsSyncMock.mockReturnValue(true);
   });
 
-  it('incluye appId y icon por defecto cuando el evento los pide', () => {
-    const result = buildEvent(baseOptions);
+  it('incluye appId e icon del perfil Stop por defecto', () => {
+    const result = buildEvent(baseOptions, undefined, 'win32');
     expect('error' in result).toBe(false);
     if (!('error' in result)) {
       expect(result.appId).toBe('AIAssistant.Proxy');
       expect(result.icon).toBeDefined();
+      expect(result.icon as string).toMatch(/stop\.png$/);
+      expect(result.sound).toBe('IM');
     }
+  });
+
+  it('resolveEventSound con --silent fuerza false', () => {
+    expect(resolveEventSound({ ...baseOptions, silent: true }, 'StopFailure', 'win32')).toBe(false);
+  });
+
+  it('resolveEventSound con --sound fuerza true genérico', () => {
+    expect(resolveEventSound({ ...baseOptions, sound: true }, 'StopFailure', 'win32')).toBe(true);
+  });
+
+  it('resolveEventKey prefiere --event-type sobre stdin', () => {
+    expect(
+      resolveEventKey(
+        { ...baseOptions, eventType: 'Stop' },
+        { hook_event_name: 'Other' },
+      ),
+    ).toBe('Stop');
   });
 
   it('respeta --app-id como override', () => {
@@ -108,10 +132,22 @@ describe('CLI - buildEvent', () => {
   });
 
   it('respeta --icon como override', () => {
-    const result = buildEvent({ ...baseOptions, icon: '/tmp/custom.png' });
+    const result = buildEvent({ ...baseOptions, icon: '/tmp/custom.png' }, undefined, 'win32');
     expect('error' in result).toBe(false);
     if (!('error' in result)) {
       expect(result.icon).toBe('/tmp/custom.png');
+    }
+  });
+
+  it('StopFailure en linux usa sound boolean true', () => {
+    const result = buildEvent(
+      { ...baseOptions, eventType: 'StopFailure', message: 'fail' },
+      undefined,
+      'linux',
+    );
+    expect('error' in result).toBe(false);
+    if (!('error' in result)) {
+      expect(result.sound).toBe(true);
     }
   });
 

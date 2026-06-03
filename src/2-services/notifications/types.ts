@@ -13,7 +13,8 @@
 export interface NotificationEvent {
   title: string;
   message: string;
-  sound?: boolean;
+  /** `boolean` (Linux / flag CLI) o token/nombre del SO (`string` en Windows/macOS). */
+  sound?: boolean | string;
   silent?: boolean;
   /** Identificador de aplicación (AUMID en Windows). Inyectado por la CLI. */
   appId?: string;

@@ -25,6 +25,7 @@ const STABLE_ASSETS_DIR = join(
 
 export const STABLE_ICON_PATH = join(STABLE_ASSETS_DIR, 'ai-assistant.ico');
 export const STABLE_PNG_PATH = join(STABLE_ASSETS_DIR, 'ai-assistant.png');
+export const STABLE_EVENTS_DIR = join(STABLE_ASSETS_DIR, 'events');
 
 // Índice del frame 32×32 en `ai-assistant.ico` (orden: 0=16, 1=32, …, 5=256).
 // El header del Action Center suele tomar ~32px del .lnk; `,1` evita el 16×16.

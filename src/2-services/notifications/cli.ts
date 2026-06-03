@@ -8,6 +8,9 @@ import { resolve as resolvePath } from 'path';
 import { DesktopNotificationAdapter } from './DesktopNotificationAdapter.js';
 import type { NotificationEvent } from './types.js';
 import { STABLE_PNG_PATH } from './asset-paths.js';
+import { getProfileForEvent } from './event-notification-profile.js';
+import { resolveEventImagePath } from './event-image-paths.js';
+import { resolveNotificationSound } from './resolve-notification-sound.js';
 
 const SOUND_FLAG = 'sound';
 const SILENT_FLAG = 'silent';
@@ -18,26 +21,22 @@ const ICON_FLAG = 'icon';
 // Default de branding: AUMID Windows (Company.App, sin espacios, ≤ 129 chars).
 const DEFAULT_APP_ID = 'AIAssistant.Proxy';
 
-// Resolver el icono por defecto. Prioridad:
-//   1. `--icon <path>` (override explícito del usuario).
-//   2. Ruta estable ASCII-only (`%LOCALAPPDATA%\AIAssistant\ai-assistant.png`)
-//      si existe — esta es la ruta que `register --install` deja lista.
-//      Es ASCII-only para evitar issues con SnoreToast al pasar el path
-//      como `-p` a snoretoast.exe (caracteres como la "ó" de "Proyectos"
-//      en la ruta del repo causan problemas).
-//   3. Ruta del repo (`<repo>/assets/notifications/ai-assistant.png`)
-//      como fallback. Útil en entornos donde aún no se corrió --install.
-//
-// La existencia se evalúa una sola vez al cargar el CLI (módulo-level),
-// no en cada notificación.
-const DEFAULT_ICON_PATH = existsSync(STABLE_PNG_PATH)
-  ? STABLE_PNG_PATH
-  : resolvePath(
-      resolvePath(fileURLToPath(import.meta.url), '..'),
-      '../../..',
-      'assets/notifications/ai-assistant.png',
-    );
-const DEFAULT_ICON_EXISTS = existsSync(DEFAULT_ICON_PATH);
+const REPO_GLOBAL_PNG = resolvePath(
+  resolvePath(fileURLToPath(import.meta.url), '..'),
+  '../../..',
+  'assets/notifications/ai-assistant.png',
+);
+
+/** Ruta al PNG global de marca (estable ASCII → repo). */
+export function resolveGlobalFallbackIconPath(): string | undefined {
+  if (existsSync(STABLE_PNG_PATH)) {
+    return STABLE_PNG_PATH;
+  }
+  if (existsSync(REPO_GLOBAL_PNG)) {
+    return REPO_GLOBAL_PNG;
+  }
+  return undefined;
+}
 
 interface CliOptions {
   eventType?: string;
@@ -73,26 +72,71 @@ function deriveMessageFromPayload(payload: Record<string, unknown>): string {
   return parts.length > 0 ? parts.join(' ') : 'hook event';
 }
 
+export function resolveEventKey(
+  options: CliOptions,
+  stdinPayload?: Record<string, unknown>,
+): string | undefined {
+  if (options.eventType) {
+    return options.eventType;
+  }
+  if (options.stdinJson && stdinPayload) {
+    const name = stdinPayload['hook_event_name'];
+    if (typeof name === 'string' && name.length > 0) {
+      return name;
+    }
+  }
+  return undefined;
+}
+
 /**
- * Resuelve los defaults de branding: `appId` siempre toma `DEFAULT_APP_ID`
- * si no se proporcionó `--app-id`; `icon` toma la ruta al `.png` por defecto
- * SOLO si el archivo existe (degradación con gracia). En Windows, `icon`
- * se traduce a `-p` en SnoreToast (imagen del toast); sin él aparece el
- * logo genérico de SnoreToast. La ruta por defecto prioriza la copia
- * ASCII-only en `%LOCALAPPDATA%\AIAssistant\` tras `--install`.
+ * Resuelve branding: `appId` por defecto; `icon` según override, perfil del
+ * evento o fallback global `ai-assistant.png`.
  */
-export function resolveBranding(options: CliOptions): { appId: string; icon?: string } {
+export function resolveBranding(
+  options: CliOptions,
+  eventKey?: string,
+): { appId: string; icon?: string } {
   const appId = options.appId ?? DEFAULT_APP_ID;
   if (options.icon !== undefined) {
     return { appId, icon: options.icon };
   }
-  if (DEFAULT_ICON_EXISTS) {
-    return { appId, icon: DEFAULT_ICON_PATH };
+  const key = eventKey ?? options.eventType;
+  if (key) {
+    const profile = getProfileForEvent(key);
+    if (profile) {
+      const eventIcon = resolveEventImagePath(profile.image);
+      if (eventIcon) {
+        return { appId, icon: eventIcon };
+      }
+    }
+  }
+  const fallback = resolveGlobalFallbackIconPath();
+  if (fallback) {
+    return { appId, icon: fallback };
   }
   return { appId };
 }
 
-export function buildEvent(options: CliOptions, stdinPayload?: Record<string, unknown>): NotificationEvent | { error: string } {
+export function resolveEventSound(
+  options: CliOptions,
+  eventKey?: string,
+  platform: NodeJS.Platform = process.platform,
+): boolean | string {
+  if (options.silent) {
+    return false;
+  }
+  if (options.sound) {
+    return true;
+  }
+  const profile = eventKey ? getProfileForEvent(eventKey) : undefined;
+  return resolveNotificationSound(profile?.sound, platform);
+}
+
+export function buildEvent(
+  options: CliOptions,
+  stdinPayload?: Record<string, unknown>,
+  platform: NodeJS.Platform = process.platform,
+): NotificationEvent | { error: string } {
   let title: string;
   let message: string;
 
@@ -114,11 +158,12 @@ export function buildEvent(options: CliOptions, stdinPayload?: Record<string, un
     message = options.message;
   }
 
-  const branding = resolveBranding(options);
+  const eventKey = resolveEventKey(options, stdinPayload);
+  const branding = resolveBranding(options, eventKey);
   return {
     title,
     message,
-    sound: options.sound,
+    sound: resolveEventSound(options, eventKey, platform),
     silent: options.silent,
     appId: branding.appId,
     ...(branding.icon !== undefined ? { icon: branding.icon } : {}),
@@ -133,11 +178,11 @@ async function main(): Promise<number> {
     .option('--event-type <type>', 'Tipo de evento del lifecycle (p. ej. Stop)')
     .option('--message <msg>', 'Cuerpo del toast')
     .option('--title <title>', 'Título del toast (por defecto = --event-type)')
-    .addOption(new Option(`--${SOUND_FLAG}`, 'Reproducir sonido').conflicts(SILENT_FLAG))
+    .addOption(new Option(`--${SOUND_FLAG}`, 'Reproducir sonido genérico').conflicts(SILENT_FLAG))
     .addOption(new Option(`--${SILENT_FLAG}`, 'Silenciar el toast').conflicts(SOUND_FLAG))
     .option(`--${STDIN_JSON_FLAG}`, 'Leer payload JSON por stdin y derivar title/message')
     .option(`--${APP_ID_FLAG} <id>`, `Identificador de aplicación (AUMID Windows); default: ${DEFAULT_APP_ID}`)
-    .option(`--${ICON_FLAG} <path>`, 'Ruta al icono de la notificación; default: <repo>/assets/notifications/ai-assistant.png')
+    .option(`--${ICON_FLAG} <path>`, 'Ruta al icono de la notificación; default: perfil del evento o ai-assistant.png')
     .allowExcessArguments(false)
     .parse(process.argv);
 
@@ -186,8 +231,6 @@ async function main(): Promise<number> {
 
 // Auto-ejecutar solo cuando este módulo es el entry point (evita que
 // `import` desde tests dispare `main()` + `process.exit()`).
-// `import.meta.url` y `process.argv[1]` solo coinciden cuando Node
-// ejecuta este archivo directamente vía `node` o `tsx`.
 const isEntryPoint =
   typeof process.argv[1] === 'string' &&
   fileURLToPath(import.meta.url) === resolvePath(process.argv[1]);

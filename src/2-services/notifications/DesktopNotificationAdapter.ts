@@ -26,7 +26,7 @@ import type { NotificationEvent } from './types.js';
 interface NodeNotifierOptions {
   title: string;
   message: string;
-  sound?: boolean;
+  sound?: boolean | string;
   wait: false;
   appID?: string;
   icon?: string;

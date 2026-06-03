@@ -210,6 +210,23 @@ Todo volcado que se trunca genera un archivo `.omitted.txt` documentando la omis
 6.  **Referencia de scripts**: `npm run help` (muestra todos los scripts disponibles con descripciones).
 7.  **Limpieza**: `npm run clean:dist` (purga `dist/`), `npm run clean:modules` (purga `node_modules/`). Purga completa incluyendo auditoría y logs: `npm run clean:all`. Selectiva: `npm run clean:sessions` o `npm run clean:logs`.
 
+### Gestión de sesiones Claude Code
+
+CLI npm para el historial de **Claude Code** en `~/.claude` (listar, archivar, restaurar, eliminar y sanitizar bloques `thinking` inválidos tras usar el proxy). No confundir con `npm run clean:sessions`, que purga la carpeta `./sessions/` de **auditoría del proxy**.
+
+| Script | Descripción |
+|--------|-------------|
+| `sessions:list` | Lista sesiones del proyecto (cwd) |
+| `sessions:archive` | Archiva a `~/.claude/archived-sessions/` |
+| `sessions:restore` | Restaura una sesión archivada |
+| `sessions:delete` | Elimina permanentemente (requiere `--force`) |
+| `sessions:list-archived` | Lista archivadas |
+| `sessions:sanitize:scan` | Detecta thinking blocks con firma inválida |
+| `sessions:sanitize` | Sanitiza una sesión (`npm run … -- <id>`) |
+| `sessions:sanitize:all` | Sanitiza en lote (requiere `-- --force`) |
+
+Detalle, layout en disco y ejemplos: [scripting/session-manager/README.md](scripting/session-manager/README.md).
+
 > Para una guía detallada de onboarding, consultar [docs/how-to-start.md](docs/how-to-start.md).
 
 <a name="enrutamiento-de-proveedores"></a>

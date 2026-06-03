@@ -48,19 +48,10 @@ Este módulo elimina esos bloques (umbral: firma válida ≥ 200 caracteres). Tr
 claude --resume <session-id>
 ```
 
-## Migración desde `~/.claude/commands`
+## Migración desde `~/.claude/commands` (completada 2026-06-03)
 
-Los slash commands `/archive-session`, `/delete-session` y `/sanitize-session` (PowerShell) están sustituidos por estos scripts. Tras verificar paridad, se pueden eliminar los `.md` y `.ps1` legacy (ver checklist en `docs/issues/artifacts-drift.md`).
+Los slash commands `/archive-session`, `/delete-session` y `/sanitize-session` y los PS1 en `~/.claude/scripts/` fueron **retirados** del perfil global. El sustituto canónico son los scripts `npm run sessions:*` de este repositorio (ver también [README.md](../../README.md#gestión-de-sesiones-claude-code)).
 
-**No incluido:** `--this` ni marcadores en `pending-session-actions` (requerían hook SessionEnd).
+Copia de respaldo de los artefactos legacy: `~/.claude/_archive/2026-06-03-session-manager-legacy/`.
 
-## Checklist antes de eliminar legacy (`~/.claude`)
-
-1. `npm run sessions:list` en este repo ≈ listado esperado en `/resume`
-2. Archivar sesión inactiva → desaparece del listado; archivo en `archived-sessions/`
-3. `npm run sessions:restore -- <id>` → `.jsonl` en slug correcto; `sessions-index.json` actualizado
-4. `npm run sessions:delete -- <id> --force` → irreversible
-5. `npm run sessions:sanitize:scan` detecta sesiones con firma corta (vía Smart Code Proxy)
-6. Tras `sessions:sanitize`, `claude --resume <id>` sin error de thinking block
-
-Si todo pasa, eliminar: `commands/archive-session.md`, `delete-session.md`, `sanitize-session.md`, `scripts/session-manager.ps1`, `scripts/sanitize-session.ps1`.
+**No migrado (decisión explícita):** `--this` ni marcadores en `pending-session-actions` (requerían hook SessionEnd CCR; no instalado en el perfil actual).

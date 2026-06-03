@@ -69,15 +69,15 @@ Tras primer arranque mínimo:
 
 ## 4. Inventario perfil actual (`C:\Users\Cristian\.claude\`)
 
-### 4.1 Commands (5) — todos personalizados
+### 4.1 Commands (2) — personalizados CCR restantes
 
 | Archivo | Uso histórico (`.claude.json`) | Clasificación |
 |---------|----------------------------------|---------------|
 | `commands\ccr-multimode.md` | 8 usos | **ccr-legacy** |
 | `commands\router-clean-slate.md` | 1 uso | **ccr-legacy** |
-| `commands\delete-session.md` | 1 uso | **migrado → npm** (`sessions:delete`); pendiente eliminar tras checklist |
-| `commands\sanitize-session.md` | 1 uso | **migrado → npm** (`sessions:sanitize*`); pendiente eliminar tras checklist |
-| `commands\archive-session.md` | (registrado) | **migrado → npm** (`sessions:archive` / `restore`); pendiente eliminar tras checklist |
+| ~~`commands\delete-session.md`~~ | 1 uso | **retirado 2026-06-03** → `npm run sessions:delete` |
+| ~~`commands\sanitize-session.md`~~ | 1 uso | **retirado 2026-06-03** → `npm run sessions:sanitize*` |
+| ~~`commands\archive-session.md`~~ | (registrado) | **retirado 2026-06-03** → `npm run sessions:archive` / `restore` |
 
 ### 4.2 Skills globales (2)
 
@@ -99,9 +99,9 @@ Tras primer arranque mínimo:
 |-----------|------|---------------|
 | Hook SessionStart | `session-start-router.ps1` | **ccr-legacy** |
 | Hook SessionEnd | `session-end.ps1` | **ccr-legacy** |
-| Módulos SessionEnd | `scripts\session-end-*.ps1`, `session-manager.ps1` | **ccr-legacy** |
+| Módulos SessionEnd | `scripts\session-end-*.ps1` | **ccr-legacy** |
 | Router CCR | `scripts\router-clean-slate.ps1` | **ccr-legacy** |
-| Session manager (Claude Code) | `~/.claude/scripts/session-manager.ps1`, `sanitize-session.ps1` → `scripting/session-manager/` (npm `sessions:*`) | **migrado → repo**; pendiente eliminar PS1 tras checklist |
+| Session manager (Claude Code) | `scripting/session-manager/` + npm `sessions:*` | **canónico en repo** (PS1/slash retirados 2026-06-03; backup en `~/.claude/_archive/2026-06-03-session-manager-legacy/`) |
 | Notificaciones | `C:\AI\claude-notifications-enhanced.ps1` (externo) | **personal-global** |
 | Estado CCR | `last-launch-mode`, `session-tags.json`, `router-sessions.json`, `router-requests.jsonl` | **ccr-legacy** / runtime |
 
@@ -309,7 +309,7 @@ Artefactos del ecosistema **Claude Code Router** (multimode, session tagging, cl
 |-----------|------|-------|
 | `/ccr-multimode` | `~/.claude/commands/ccr-multimode.md` | Modos Low-Cost / Standard / Reasoning |
 | `/router-clean-slate` | command + `scripts/router-clean-slate.ps1` | Limpieza entorno CCR |
-| `/delete-session`, `/sanitize-session`, `/archive-session` | ~~commands + PS1~~ → **npm `sessions:*`** en `scripting/session-manager/` | Migrado; eliminar legacy tras checklist en `scripting/session-manager/README.md` |
+| `/delete-session`, `/sanitize-session`, `/archive-session` | **retirado 2026-06-03** → **npm `sessions:*`** en [`scripting/session-manager/`](../../scripting/session-manager/) | Cierre de migración; backup en `~/.claude/_archive/2026-06-03-session-manager-legacy/` |
 | SessionStart hook | `session-start-router.ps1` | `launch_id` → `session_id`, `session-tags.json` |
 | SessionEnd hook | `session-end.ps1` + módulos | Rebuild index, acciones diferidas |
 | Estado | `last-launch-mode` (= `Low-Cost`), `router-sessions.json` | Runtime CCR |

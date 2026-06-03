@@ -10,25 +10,22 @@ import {
   type ClaudeSettings,
 } from './shared/claude-settings.js';
 
+import { buildNpxTsxCommand } from './shared/npx-tsx-command.js';
+
 export { SMART_CODE_PROXY_ROOT_KEY };
-const ROUTER_STATUS_SEGMENT = 'router-status.ts';
+const ROUTER_STATUS_SEGMENT = 'scripting/router-status.ts';
 
 export function isSmartCodeStatusLine(command: string | undefined): boolean {
   return typeof command === 'string' && command.includes(ROUTER_STATUS_SEGMENT);
 }
 
 export function buildStatusLineCommand(proxyRoot: string): string {
-  const root = resolve(proxyRoot);
-  const isWin = process.platform === 'win32';
-  const quotedRoot = isWin
-    ? `"${root.replace(/"/g, '\\"')}"`
-    : `'${root.replace(/'/g, "'\\''")}'`;
-  return `npx --prefix ${quotedRoot} tsx scripting/router-status.ts`;
+  return buildNpxTsxCommand(proxyRoot, ROUTER_STATUS_SEGMENT);
 }
 
 export function validateProxyRoot(proxyRoot: string): void {
   const root = resolve(proxyRoot);
-  const scriptPath = join(root, 'scripting', ROUTER_STATUS_SEGMENT);
+  const scriptPath = join(root, ROUTER_STATUS_SEGMENT);
   const providersPath = join(root, 'routing', 'providers');
   if (!existsSync(scriptPath)) {
     throw new Error(`No se encontró ${scriptPath}. Ejecute el instalador desde la raíz del proxy.`);

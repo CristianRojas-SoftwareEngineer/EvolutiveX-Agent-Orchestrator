@@ -16,8 +16,18 @@ export function createValidProxyRoot(options: ValidProxyRootOptions = {}): strin
   mkdirSync(join(root, 'scripting'), { recursive: true });
   writeFileSync(join(root, 'scripting', 'router-status.ts'), '', 'utf-8');
   mkdirSync(join(root, 'routing', 'providers'), { recursive: true });
+  mkdirSync(join(root, 'src', '2-services', 'notifications'), { recursive: true });
+  writeFileSync(join(root, 'src', '2-services', 'notifications', 'cli.ts'), '', 'utf-8');
   if (options.withSessionsDir) {
     mkdirSync(join(root, 'sessions'), { recursive: true });
   }
+  return resolve(root);
+}
+
+/** Raíz válida para install-notifications (solo exige cli.ts). */
+export function createValidProxyRootForNotifications(prefix = 'scp-notif-'): string {
+  const root = mkdtempSync(join(tmpdir(), prefix));
+  mkdirSync(join(root, 'src', '2-services', 'notifications'), { recursive: true });
+  writeFileSync(join(root, 'src', '2-services', 'notifications', 'cli.ts'), '', 'utf-8');
   return resolve(root);
 }

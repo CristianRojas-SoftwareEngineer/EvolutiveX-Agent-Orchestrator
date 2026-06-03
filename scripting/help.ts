@@ -59,6 +59,11 @@ const scripts: NpmScript[] = [
     category: 'local',
   },
   {
+    name: 'install:notifications',
+    description: 'Instala hooks globales de notificación (tsx cli.ts) en ~/.claude',
+    category: 'local',
+  },
+  {
     name: 'sessions:list',
     description: 'Lista sesiones Claude Code del proyecto (--project)',
     category: 'local',

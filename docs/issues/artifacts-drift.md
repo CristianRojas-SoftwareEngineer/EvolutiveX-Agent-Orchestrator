@@ -11,7 +11,7 @@ Informe de diagnóstico para identificar qué artefactos del perfil global de Cl
 ## 1. Resumen ejecutivo
 
 - El perfil global en `C:\Users\Cristian\.claude\` contiene **38 archivos editables** (commands, skills, scripts, hooks, settings) fuera de runtime/plugins; el sandbox limpio generó **3 archivos** tras un arranque mínimo sin login.
-- **Smart Code Proxy ya versiona** 18 skills y 3 commands en `.claude/`, más los scripts `router-status.ts`, `install-statusline.ts` y `configure-provider.ts`. La configuración operativa del proxy (statusline, modelos, `ANTHROPIC_BASE_URL`) vive en **`~/.claude/settings.json`**, no en el repo.
+- **Smart Code Proxy ya versiona** 18 skills y 3 commands en `.claude/`, más los scripts `router-status.ts`, `install-statusline.ts`, `install-notifications.ts` y `configure-provider.ts`. La configuración operativa del proxy (statusline, modelos, `ANTHROPIC_BASE_URL`) vive en **`~/.claude/settings.json`**, no en el repo.
 - **Drift crítico (P0):** `.claude/settings.local.json` del repo referencia skills globales **inexistentes** (`smart-code-proxy`, `anthropic-api-cost-estimation`). El skill `anthropic-api-protocol` remite al segundo; el primero tenía 42 usos históricos pero ya no está en disco.
 - **Cohesión statusline incompleta:** el runtime funciona (statusLine apunta al repo), pero la documentación/skill operativa del statusline quedó huérfana al eliminar `~/.claude/skills/smart-code-proxy/` y `router-status.ps1`. Los docs canónicos del repo (`docs/router-statusline.md`, `docs/session-metrics-system.md`) cubren parte del vacío.
 - **OpenSpec y managers:** ya migrados al repo; no hay copias globales duplicadas.
@@ -69,12 +69,12 @@ Tras primer arranque mínimo:
 
 ## 4. Inventario perfil actual (`C:\Users\Cristian\.claude\`)
 
-### 4.1 Commands (2) — personalizados CCR restantes
+### 4.1 Commands globales — solo histórico retirado
 
 | Archivo | Uso histórico (`.claude.json`) | Clasificación |
 |---------|----------------------------------|---------------|
-| `commands\ccr-multimode.md` | 8 usos | **ccr-legacy** |
-| `commands\router-clean-slate.md` | 1 uso | **ccr-legacy** |
+| ~~`commands\ccr-multimode.md`~~ | 8 usos | **retirado 2026-06-03** (paquete CCR) |
+| ~~`commands\router-clean-slate.md`~~ | 1 uso | **retirado 2026-06-03** → `npm run clean:all` (repo) |
 | ~~`commands\delete-session.md`~~ | 1 uso | **retirado 2026-06-03** → `npm run sessions:delete` |
 | ~~`commands\sanitize-session.md`~~ | 1 uso | **retirado 2026-06-03** → `npm run sessions:sanitize*` |
 | ~~`commands\archive-session.md`~~ | (registrado) | **retirado 2026-06-03** → `npm run sessions:archive` / `restore` |
@@ -97,13 +97,11 @@ Tras primer arranque mínimo:
 
 | Artefacto | Ruta | Clasificación |
 |-----------|------|---------------|
-| Hook SessionStart | `session-start-router.ps1` | **ccr-legacy** |
-| Hook SessionEnd | `session-end.ps1` | **ccr-legacy** |
-| Módulos SessionEnd | `scripts\session-end-*.ps1` | **ccr-legacy** |
-| Router CCR | `scripts\router-clean-slate.ps1` | **ccr-legacy** |
-| Session manager (Claude Code) | `scripting/session-manager/` + npm `sessions:*` | **canónico en repo** (PS1/slash retirados 2026-06-03; backup en `~/.claude/_archive/2026-06-03-session-manager-legacy/`) |
-| Notificaciones | `C:\AI\claude-notifications-enhanced.ps1` (externo) | **personal-global** |
-| Estado CCR | `last-launch-mode`, `session-tags.json`, `router-sessions.json`, `router-requests.jsonl` | **ccr-legacy** / runtime |
+| ~~Hook SessionStart CCR~~ | ~~`session-start-router.ps1`~~ | **retirado 2026-06-03** |
+| Notificaciones | `npm run install:notifications` → `npx … cli.ts` en `~/.claude/settings.json` | **canónico** (retirado `desktop-notification-hook.ps1` 2026-06-03) |
+| ~~Router CCR~~ | ~~`scripts\router-clean-slate.ps1`~~ | **retirado 2026-06-03** |
+| Session manager (Claude Code) | `scripting/session-manager/` + npm `sessions:*` | **canónico en repo** (backup `~/.claude/_archive/2026-06-03-session-manager-legacy/`) |
+| ~~Estado CCR~~ | ~~`router-*`, `session-tags.json`, `.claude-code-router/`~~ | **retirado 2026-06-03** (backup `~/.claude/_archive/2026-06-03-ccr-legacy/`) |
 
 ### 4.5 Settings global (`settings.json`)
 
@@ -132,9 +130,7 @@ npx --prefix "<repo>" tsx scripting/router-status.ts
 
 | Evento | Destino | Clasificación |
 |--------|---------|---------------|
-| SessionStart | `session-start-router.ps1` + notificaciones | ccr-legacy + externo |
-| SessionEnd | `session-end.ps1` + notificaciones | ccr-legacy + externo |
-| UserPromptSubmit, Stop, StopFailure, PermissionRequest, PreToolUse | `C:\AI\claude-notifications-enhanced.ps1` | personal-global |
+| SessionStart, SessionEnd, UserPromptSubmit, Stop, StopFailure, PermissionRequest, PreToolUse (AskUserQuestion), Subagent*, Task* | `npx tsx …/notifications/cli.ts` vía `install:notifications` | **activo** |
 | PostToolUse (`Write\|Edit` `*.ps1`) | `powershell-syntax-guard/scripts/hook-post-tooluse.ps1` | personal-global |
 
 ### 4.6 Plugins (nativo Anthropic, no migrar)
@@ -184,6 +180,7 @@ Marketplace `claude-plugins-official` clonado bajo `plugins\` — **33 plugins**
 |-----------|-----|
 | `scripting/router-status.ts` | Renderiza statusline; lee stdin, settings, repo |
 | `scripting/install-statusline.ts` | Escribe `statusLine` + `SMART_CODE_PROXY_ROOT` en global |
+| `scripting/install-notifications.ts` | Escribe 11 hooks de notificación globales + `SMART_CODE_PROXY_ROOT` |
 | `scripting/configure-provider.ts` | Escribe `ANTHROPIC_*` en global + `configs/.env` |
 | `scripting/shared/claude-settings.ts` | I/O de `~/.claude/settings.json` |
 | `docs/router-statusline.md` | Especificación canónica del statusline |
@@ -301,21 +298,18 @@ Documentado en [docs/router-statusline.md](../router-statusline.md) y [openspec/
 
 ---
 
-## 9. Sección CCR legacy
+## 9. Sección CCR legacy (retirado 2026-06-03)
 
-Artefactos del ecosistema **Claude Code Router** (multimode, session tagging, clean-slate). **No se recomienda migración automática** al repo Smart Code Proxy; evaluación manual si alguna pieza sigue siendo necesaria con el proxy actual.
+Paquete **Claude Code Router** retirado del perfil global. Sustitutos en Smart Code Proxy:
 
-| Artefacto | Ruta | Notas |
-|-----------|------|-------|
-| `/ccr-multimode` | `~/.claude/commands/ccr-multimode.md` | Modos Low-Cost / Standard / Reasoning |
-| `/router-clean-slate` | command + `scripts/router-clean-slate.ps1` | Limpieza entorno CCR |
-| `/delete-session`, `/sanitize-session`, `/archive-session` | **retirado 2026-06-03** → **npm `sessions:*`** en [`scripting/session-manager/`](../../scripting/session-manager/) | Cierre de migración; backup en `~/.claude/_archive/2026-06-03-session-manager-legacy/` |
-| SessionStart hook | `session-start-router.ps1` | `launch_id` → `session_id`, `session-tags.json` |
-| SessionEnd hook | `session-end.ps1` + módulos | Rebuild index, acciones diferidas |
-| Estado | `last-launch-mode` (= `Low-Cost`), `router-sessions.json` | Runtime CCR |
-| Config externa | `C:\Users\Cristian\.claude-code-router\` | Fuera de `.claude` |
+| Antes (CCR) | Sustituto |
+|-------------|-----------|
+| `/router-clean-slate` | `npm run clean:all` (purga `dist/`, `node_modules/`, `./sessions/`, `./server/`) |
+| `/ccr-multimode`, servicio `ccr` | `npm run configure:provider` + `ANTHROPIC_BASE_URL` → proxy `:8787` |
+| Session tagging (`session-tags.json`, hook SessionStart CCR) | Retirado; no requerido por `router-status.ts` |
+| Gestión sesiones chat | `npm run sessions:*` — ver [`scripting/session-manager/`](../../scripting/session-manager/) |
 
-**Relación con Smart Code Proxy:** el proxy reemplaza el routing upstream vía `ANTHROPIC_BASE_URL`; los hooks CCR no alimentan `router-status.ts` ni `session-metrics.json`. Posible solapamiento conceptual con gestión de sesiones del proxy (`sessions/` audit layout), pero implementación distinta.
+Backup completo: `~/.claude/_archive/2026-06-03-ccr-legacy/`. Referencia histórica del producto CCR: [`docs/external-references/claude-code-router.md`](../external-references/claude-code-router.md) (deprecado).
 
 ---
 
@@ -339,10 +333,9 @@ Artefactos del ecosistema **Claude Code Router** (multimode, session tagging, cl
 1. **`progressive-kernel-architecture`** — versionar en `.claude/skills/` si el equipo adopta PKA como marco del proxy.
 2. **`powershell-syntax-guard`** — migrar skill + hook a repo si se desarrolla PS1 en el proyecto; hoy acoplado a global.
 
-### P3 — CCR legacy (evaluación manual)
+### ~~P3 — CCR legacy~~ (cerrado 2026-06-03)
 
-1. Inventariar si `/ccr-multimode` y hooks de sesión siguen en uso con proxy :8787.
-2. Decidir retirada, archivo o adaptación (p. ej. session tagging compatible con audit del proxy).
+Retirado del perfil; ver §9 y backup `_archive/2026-06-03-ccr-legacy/`.
 
 ---
 

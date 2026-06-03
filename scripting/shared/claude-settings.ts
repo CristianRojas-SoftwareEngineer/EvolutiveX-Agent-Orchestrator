@@ -3,7 +3,7 @@
  *
  * Claude Code inyecta el bloque `env` de ese archivo como variables de entorno en sus
  * subprocess (API, hooks, statusline). No sustituye al shell del usuario: es la fuente
- * canónica que usan `configure-provider`, `install-statusline` y `router-status`.
+ * canónica que usan `configure-provider`, `install-statusline`, `install-notifications` y `router-status`.
  *
  * Responsabilidad de este módulo: solo lectura/escritura del JSON en disco. El merge de
  * claves (`ANTHROPIC_*`, `statusLine`, `SMART_CODE_PROXY_ROOT`, etc.) lo hace cada script
@@ -12,6 +12,7 @@
  * Consumidores:
  * - `configure-provider.ts` — bloque `env` (proveedor upstream / proxy)
  * - `install-statusline.ts` — `statusLine` + `env.SMART_CODE_PROXY_ROOT`
+ * - `install-notifications.ts` — hooks globales de notificación + `env.SMART_CODE_PROXY_ROOT`
  * - `router-status.ts` — lectura de `env` (auth, modelos, resolución de rutas del proxy)
  */
 

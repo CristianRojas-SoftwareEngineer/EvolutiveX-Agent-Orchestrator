@@ -17,6 +17,20 @@ configuración externa, y no introduce dependencias Windows-specific.
 
 **Contrato normativo:** [openspec/specs/desktop-notifications-service/spec.md](../openspec/specs/desktop-notifications-service/spec.md) (requisitos SHALL/MUST). Esta guía describe operación y convenciones del repo.
 
+## Instalación global (`~/.claude`)
+
+Para recibir toasts en **cualquier proyecto** (no solo Smart Code Proxy), registre los hooks en el perfil de usuario con el mismo patrón que el statusline (`npx --prefix` + `tsx`):
+
+```bash
+npm run install:notifications
+```
+
+Escribe 11 entradas en `~/.claude/settings.json` que invocan `src/2-services/notifications/cli.ts` (sin PowerShell). Flags: `--dry-run`, `--force` (sobrescribe hooks ajenos en esas claves), `--uninstall`, `--root <ruta-proxy>`.
+
+Requisitos: `npm install` en la raíz del proxy (para `tsx` en `node_modules`). Tras mover el repositorio, vuelva a ejecutar el instalador. En Windows, branding opcional: `npm run notifications:register -- --install`.
+
+**Nota:** el [`.claude/settings.json`](../../.claude/settings.json) del **proyecto** puede definir las mismas claves de hook (p. ej. lifecycle con `POST /hooks`); el merge de Claude Code da prioridad al proyecto y puede anular toasts globales en esas claves dentro de este repo. Para toasts + gateway en Smart Code Proxy, ampliar el settings del proyecto según [hooks-lifecycle-correlation](../openspec/specs/hooks-lifecycle-correlation/spec.md).
+
 ## Componentes
 
 | Archivo (en `src/2-services/notifications/`) | Capa PKA | Rol |

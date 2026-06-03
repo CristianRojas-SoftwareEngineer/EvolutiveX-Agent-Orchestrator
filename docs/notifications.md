@@ -24,6 +24,11 @@ configuración externa, y no introduce dependencias Windows-specific.
 | `DesktopNotificationAdapter.ts` | 2 (adaptador concreto) | Implementa el puerto delegando en `node-notifier.notify()` |
 | `index.ts` | 2 (exports) | Re-exports públicos del paquete |
 | `cli.ts` | 4 (composition root standalone) | Entry point CLI invocable desde hooks de Claude Code |
+| `register.ts` | 4 (composition root standalone) | Helper de AUMID Windows (opt-in, idempotente) — orquesta `.lnk` + registro + copia de assets |
+| `snoretoast-shortcut.ts` | 4 (helper de orquestación) | Invoca `snoretoast-x64.exe -install` para crear el `.lnk` con la metadata AUMID que Windows espera, y luego parchea el `IconLocation` con `patchIconLocation` de `lnk-format.ts` |
+| `lnk-format.ts` | 2 (helper) | Generador/parser del formato MS-SHLLINK (escritura binaria pura del `.lnk`) |
+| `registry.ts` | 2 (helper) | Wrapper de `reg.exe` para escribir/leer/borrar `HKCU\Software\Classes\AppUserModelId\{AUMID}` |
+| `asset-paths.ts` | 2 (helper) | Constantes de las rutas ASCII-only (`%LOCALAPPDATA%\AIAssistant\`) usadas para evitar issues con Windows shell APIs y caracteres no-ASCII |
 
 ## Puerto: `INotificationService`
 
@@ -35,15 +40,21 @@ interface INotificationService {
 interface NotificationEvent {
   title: string;
   message: string;
-  sound?: boolean;   // default: false
-  silent?: boolean;  // default: false; si true, fuerza sound=false
+  sound?: boolean;    // default: false
+  silent?: boolean;   // default: false; si true, fuerza sound=false
+  appId?: string;     // branding: AUMID Windows, inyectado por la CLI
+  icon?: string;      // branding: ruta a asset de imagen, inyectado por la CLI
 }
 ```
 
 El puerto no expone `icon`, `image`, `appId`, `subtitle`, `category`,
 `urgency`, `timeout`, `wait`, `open`, `closeLabel`, `actions`, ni
-`heroImage`. Cualquier extensión futura al contrato del puerto se
-realizará en un change posterior.
+`heroImage`. **Excepción para branding:** el tipo `NotificationEvent`
+admite `appId?` e `icon?` como campos opcionales, pero la inyección de
+los valores por defecto se realiza en el composition root de la CLI
+(`cli.ts`) — no en el adaptador ni en el dominio. Esto preserva la
+pureza del puerto: ningún llamante de la capa 1 PKA necesita conocer
+la marca.
 
 ## Adaptador: `DesktopNotificationAdapter`
 
@@ -56,14 +67,18 @@ nodeNotifier.notify({
   message: event.message,
   sound: event.silent === true ? false : event.sound ?? false,
   wait: false,
+  // appId e icon solo se reenvían si están presentes en el evento
+  // (la CLI los aplica como defaults; ver "Branding (icon + appId)" abajo).
+  ...(event.appId !== undefined ? { appId: event.appId } : {}),
+  ...(event.icon !== undefined ? { icon: event.icon } : {}),
 });
 ```
 
-El adaptador **NO** pasa `icon`, `contentImage`, `appId`, `appIdPath`,
-`subtitle`, `category`, `urgency`, `actions`, `open`, `closeLabel`,
-`timeout` personalizados, `heroImage`, `defaultIcon`, ni `brandTitle`.
-Tampoco invoca `SnoreToast`, no accede a archivos `.lnk` y no registra
-AUMID.
+El adaptador **NO** pasa `contentImage`, `appIdPath`, `subtitle`,
+`category`, `urgency`, `actions`, `open`, `closeLabel`, `timeout`
+personalizados, `heroImage`, `defaultIcon`, ni `brandTitle`. Tampoco
+invoca `SnoreToast`, no accede a archivos `.lnk` y no registra AUMID
+(esas responsabilidades son del helper `register.ts`, ver abajo).
 
 ## Entry point CLI
 
@@ -78,6 +93,8 @@ flags (vía `commander`):
 | `--sound` | Reproducir sonido del SO |
 | `--silent` | Silenciar el toast (contradice `--sound`) |
 | `--stdin-json` | Leer payload JSON de `stdin`; derivar `title` de `hook_event_name` |
+| `--app-id <id>` | Identificador de aplicación (AUMID Windows); default `AIAssistant.Proxy` |
+| `--icon <path>` | Ruta al icono de la notificación; default `<repo>/assets/notifications/ai-assistant.png` (se omite si el archivo no existe) |
 
 ### Ejemplos
 
@@ -116,14 +133,208 @@ exploración previa al L1 y formalizada en la spec
 - **Subdirectorio `sound/`** ni perfiles de sonido OS-specific
   (`resolve.ts`, `token-to-profile.ts`, `windows.ts`, `darwin.ts`,
   `linux.ts`).
-- **`windows-toast.ts`** (sin registro de SnoreToast, sin AUMID, sin
-  `.lnk`, sin `heroImage`).
-- **Personalización visual** (sin `icon`, sin `appId`, sin
-  `defaultIcon`, sin `brandTitle`).
+- **`windows-toast.ts`** (sin registro de SnoreToast desde el adaptador,
+  sin AUMID en el flujo de `notify`, sin `heroImage`).
+- **Personalización visual más allá de `appId` + `icon`**: sin
+  `defaultIcon`, sin `brandTitle`, sin `subtitle`, sin `contentImage`.
 - **Acceso a `C:\AI/`** desde el servicio.
+
+> **Nota:** el helper `register.ts` (ver "Branding (icon + appId)" abajo)
+> **sí** accede a `%APPDATA%` y crea archivos `.lnk`, pero solo se
+> ejecuta bajo invocación explícita del usuario (`npm run
+> notifications:register`) y nunca dentro del flujo de `notify`.
 
 Si en el futuro se necesita alguna de estas capacidades, se introducirá
 en un change posterior sin romper el contrato actual del puerto.
+
+## Branding (icon + appId)
+
+A partir del change `add-notifications-branding`, el servicio aplica
+por defecto la marca "AI Assistant" en los toasts:
+
+- **`appId` default = `AIAssistant.Proxy`** (AUMID Windows; convención
+  `[Compañía].[App]`, sin espacios, ≤ 129 caracteres). Lo inyecta la CLI
+  en `buildEvent()` si el usuario no pasa `--app-id`. El adaptador lo
+  reenvía a `node-notifier` solo si está presente.
+- **`icon` default = `ai-assistant.png`** (256×256, 32-bit RGBA). En
+  Windows se pasa a SnoreToast como `-p` (imagen del toast); sin `-p`
+  aparece el logo genérico de SnoreToast. Prioridad de ruta: copia
+  ASCII-only en `%LOCALAPPDATA%\AIAssistant\` (tras `--install`), luego
+  `<repo-root>/assets/notifications/ai-assistant.png`. Si el archivo no
+  existe, el CLI omite `icon` y continúa con `appId` (degradación con
+  gracia). Override con `--icon <path>`.
+
+### ¿Qué es AUMID y por qué Windows lo necesita?
+
+Windows agrupa las notificaciones en el Action Center por **App User
+Model ID (AUMID)**. Si no se registra un AUMID, las notificaciones
+firmadas por SnoreToast (el binario por defecto de `node-notifier`)
+aparecen con la fuente "SnoreToast" en lugar de "AI Assistant". El AUMID
+se registra en DOS sitios para que el branding sea consistente:
+
+1. **Registro de Windows** (`HKCU\Software\Classes\AppUserModelId\{AUMID}`):
+   UWP/SnoreToast lee esta clave directamente. **Efecto inmediato**, sin
+   caché. Es la fuente de verdad "rápida".
+2. **Menú Inicio** (`.lnk` creado con **SnoreToast `--install`**):
+   SnoreToast registra el acceso directo vía COM (`IPropertyStore` +
+   `ToastActivatorCLSID`). Sin este paso, `shell:AppsFolder\<AUMID>` falla,
+   SnoreToast entra en "fallback mode" y el **icono del header** del toast
+   queda como placeholder (cubos blancos).
+
+Por eso el helper escribe AMBOS: registro (`Icon`, `IconUri`, …) y `.lnk`
+SnoreToast.
+
+### Helper de AUMID (`npm run notifications:register`)
+
+`src/2-services/notifications/register.ts` es un entry point CLI
+independiente con tres subcomandos (vía `commander`):
+
+```bash
+# Crear/actualizar el .lnk y la clave de registro del AUMID (idempotente).
+npm run notifications:register -- --install
+
+# Consultar el estado actual (muestra ambos: registro + .lnk).
+npm run notifications:register -- --status
+
+# Eliminar el .lnk y la clave de registro (rollback).
+npm run notifications:register -- --uninstall
+```
+
+El helper es:
+
+- **Idempotente:** `--install` es no-op si tanto el registro como el
+  `.lnk` ya tienen el AUMID, el `Icon` del registro en la ruta estable
+  (`%LOCALAPPDATA%\AIAssistant\ai-assistant.ico`) y el `IconLocation`
+  del `.lnk` apuntando al `.ico` estable (`,1` = frame 32×32). Si el
+  `.lnk` quedó con
+  una ruta obsoleta del repo (p. ej. con "ó" en `Proyectos`), `--install`
+  lo reescribe aunque el AUMID siga siendo correcto.
+- **Self-healing:** si cualquiera de los dos está corrupto o falta,
+  `--install` lo repara (no falla silenciosamente).
+- **Granular:** el `--status` distingue "registered" (ambos OK),
+  "partially registered" (uno de los dos falta) y "not registered"
+  (ninguno).
+- **No-op con mensaje informativo en macOS y Linux:** el AUMID es un
+  concepto Windows-only. En Mac/Linux el branding se aplica vía
+  `appName` en `node-notifier` (sin registro).
+- **Opt-in:** el CLI principal (`cli.ts`) **no** invoca este helper
+  automáticamente. El usuario decide cuándo correrlo.
+- **TypeScript puro, sin COM, sin PowerShell, sin librería nativa:**
+  - El `.lnk` se crea invocando `snoretoast-x64.exe -install` (módulo
+    `snoretoast-shortcut.ts`). `lnk-format.ts` se conserva para tests del
+    formato MS-SHLLINK, no para el install en producción.
+  - La clave de registro se escribe vía `reg.exe` (módulo `registry.ts`,
+    función `readRegistry`/`writeRegistry`/`deleteRegistry`). `reg.exe`
+    es un binario built-in de Windows, **no es PowerShell** ni un
+    lenguaje de scripting — es invocación de CLI con `child_process.execFile`
+    (sin shell, args pasados directamente al binario). Cada `--install`/
+    `--uninstall` invoca `reg.exe` 1-4 veces (idempotente con `/f`).
+- **AUMID configurable:** la variable de entorno `AI_ASSISTANT_AUMID`
+  permite override (validado contra `/^[A-Za-z0-9.\-]{1,129}$/`).
+  AUMID inválido → exit 1 con mensaje en `stderr`.
+
+### Comportamiento por SO
+
+| SO | Fuente del toast | Icono | Setup adicional |
+|---|---|---|---|
+| **Windows** | "SnoreToast" sin `--install`; "AI Assistant" con `--install` | AI Assistant (cosmético vía `icon` en `node-notifier`) | `npm run notifications:register -- --install` (opt-in) |
+| **macOS** | "node" (limitación: sin bundle `.app`; documentada) | AI Assistant (cosmético vía `icon` en `node-notifier`) | Ninguno |
+| **Linux** | "AI Assistant" (vía `appName` en `notify-send`) | AI Assistant (cosmético vía `icon` en `node-notifier`) | Ninguno |
+
+> **Limitación macOS:** el icono sí se muestra vía `node-notifier`, pero
+> la fuente sigue siendo "node" porque el change no aborda el bundle
+> `.app` (fuera de scope). Resolverlo requiere empaquetar la app como
+> `.app`, lo que se considera iteración futura.
+
+> **Regeneración de assets:** los archivos
+> `assets/notifications/ai-assistant.png` y `assets/notifications/ai-assistant.ico`
+> se generan desde `assets/AI Assistant Logo.png` (asset personal del
+> usuario, no versionado) usando las devDeps `sharp` (PNG) y `to-ico`
+> (ICO multi-resolución 16/32/48/64/128/256). Para regenerarlos,
+> instalar las devDeps y ejecutar la transformación. Los binarios
+> generados son los que se versionan bajo `assets/notifications/`.
+
+### Depurar el icono del header (esquina del toast)
+
+En Windows hay **dos imágenes distintas** en un toast:
+
+| Elemento | Quién lo controla | Cómo se configura en este repo |
+|---|---|---|
+| **Imagen del cuerpo** (logo grande en el toast) | SnoreToast flag `-p` | `icon` en la CLI → `ai-assistant.png` estable (`%LOCALAPPDATA%\AIAssistant\`) |
+| **Icono del header** (cuadrado junto a “AI Assistant”) | WinRT / Action Center vía AUMID | Registro `Icon` + **`IconUri`** + `IconLocation` del `.lnk` → `ai-assistant.ico` estable |
+
+Si el cuerpo se ve bien pero el header sigue “roto” (p. ej. tres cubos blancos), el fallo está en la fila del header, no en `-p`.
+
+**Checklist de diagnóstico (en orden):**
+
+1. **Estado del registro**
+
+   ```bash
+   npm run notifications:register -- --status
+   ```
+
+   Debe decir `registered`. Si falta `IconUri` o apunta mal, `--status` puede mostrar `partially registered`.
+
+2. **Valores en registro** (sustituir `AIAssistant.Proxy` si usas `AI_ASSISTANT_AUMID`):
+
+   ```bat
+   reg query "HKCU\Software\Classes\AppUserModelId\AIAssistant.Proxy"
+   ```
+
+   Esperado:
+
+   - `DisplayName` = `AI Assistant`
+   - `Icon` = `C:\Users\<tu-usuario>\AppData\Local\AIAssistant\ai-assistant.ico` (ruta **ASCII-only**, sin `Proyectos` ni `ó`)
+   - `IconUri` = ruta al **`.png` estable** (WinRT usa `IconUri` para el header; `Icon` apunta al `.ico` para el shell)
+
+3. **Acceso directo del Menú Inicio**
+
+   ```bat
+   reg query "HKCU\Software\Classes\AppUserModelId\AIAssistant.Proxy" /v Icon
+   ```
+
+   Y comprobar el `.lnk`:
+
+   ```text
+   %APPDATA%\Microsoft\Windows\Start Menu\Programs\AI Assistant.lnk
+   ```
+
+   `IconLocation` debe ser `%LOCALAPPDATA%\AIAssistant\ai-assistant.ico,1` (frame 32×32), no la ruta del repo.
+
+4. **Assets en disco**
+
+   ```bat
+   dir "%LOCALAPPDATA%\AIAssistant"
+   ```
+
+   Tras regenerar en `assets/notifications/`, ejecutar:
+
+   ```bash
+   npm run notifications:register -- --install
+   ```
+
+   (copia por hash y refresca registro + `.lnk` si cambió el contenido).
+
+5. **Caché del shell** (si el registro ya es correcto pero el header no cambia):
+
+   ```bat
+   taskkill /F /IM explorer.exe
+   ie4uinit.exe -ClearIconCache
+   start explorer
+   ```
+
+6. **Toast de prueba sin confundir capas**
+
+   ```bash
+   node --import tsx/esm src/2-services/notifications/cli.ts --event-type Stop --message "Test header icon"
+   ```
+
+   - Cuerpo correcto + header roto → seguir con pasos 2–5 (`IconUri`, `.lnk`, caché).
+   - Ambos rotos → revisar también `-p` (ruta del PNG estable).
+
+7. **Comportamiento esperado en Win32** (no es bug del repo): Microsoft aplica un **backplate** (marco con color de acento) al icono del header en apps de escritorio clásicas; el logo queda más pequeño dentro del marco. Eso es distinto del placeholder de tres cubos (recurso no cargado).
+
+Referencias: [Enable desktop toast with AppUserModelID](https://learn.microsoft.com/en-us/windows/win32/shell/enable-desktop-toast-with-appusermodelid), registros de ejemplo con `IconUri` en [BurntToast #236](https://github.com/Windos/BurntToast/issues/236).
 
 ## Estado del script externo
 

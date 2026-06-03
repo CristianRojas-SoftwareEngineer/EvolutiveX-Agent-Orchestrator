@@ -151,20 +151,26 @@ Personaliza el comportamiento ajustando estas variables en tu entorno o en un ar
 
 ### Configuración de hooks
 
-El archivo `.claude/settings.json` del proyecto registra las **8 entradas del lifecycle** de hooks de Claude Code, sobrescribiendo las entradas equivalentes del user-level (`C:\Users\Cristian\.claude\settings.json`) para esas claves (mecanismo de merge de Claude Code: el proyecto tiene precedencia). Las 8 entradas son:
+El archivo `.claude/settings.json` del proyecto registra **14 entradas** de hooks de Claude Code (**8 del lifecycle** que alimentan al gateway, más **6 entradas de UX no-lifecycle** que solo emiten toast nativo), sobrescribiendo las entradas equivalentes del user-level (`C:\Users\Cristian\.claude\settings.json`) para esas claves (mecanismo de merge de Claude Code: el proyecto tiene precedencia). Las 14 entradas son:
 
 | Hook | Matcher | Comandos |
 | --- | --- | --- |
 | `UserPromptSubmit` | — | `POST /hooks` + notificación (entry point del servicio migrado) |
-| `PreToolUse` | `*` | `POST /hooks` + notificación |
-| `PostToolUse` | `*` | `POST /hooks` + notificación |
+| `PreToolUse` | `*` | `POST /hooks` |
+| `PreToolUse` | `AskUserQuestion` | notificación |
+| `PostToolUse` | `*` | `POST /hooks` |
 | `PostToolUseFailure` | — | `POST /hooks` |
-| `SubagentStart` | — | `POST /hooks` |
-| `SubagentStop` | — | `POST /hooks` |
+| `SubagentStart` | — | `POST /hooks` + notificación |
+| `SubagentStop` | — | `POST /hooks` + notificación |
 | `Stop` | — | `POST /hooks` + notificación |
 | `StopFailure` | — | `POST /hooks` + notificación |
+| `SessionStart` | `startup|resume` | notificación |
+| `SessionEnd` | — | notificación |
+| `PermissionRequest` | — | notificación |
+| `TaskCreated` | — | notificación |
+| `TaskCompleted` | — | notificación |
 
-Cada `POST /hooks` se invoca con `curl -sS -X POST $ANTHROPIC_BASE_URL/hooks -H 'Content-Type: application/json' --data-binary @-`. La URL del proxy se resuelve vía la variable de entorno `ANTHROPIC_BASE_URL` (default `http://127.0.0.1:8787`), por lo que el comando no queda acoplado a un host:puerto literal. Los 5 hooks con doble comando (`UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`, `StopFailure`) invocan como segundo comando el entry point CLI del servicio de notificaciones migrado al repositorio (`src/2-services/notifications/cli.ts`), resuelto con paths relativos a la raíz del proyecto. La cobertura de este reapuntamiento vive en el change `claude-n2-repoint-hooks-to-internal-notifications` (fase N2 del roadmap `claude-code-hooks-implementation`); la fase N1 contiene la migración del servicio de notificaciones al repo. Detalle operativo: [`docs/gateway-architecture.md` §18](docs/gateway-architecture.md#18-plano-c--hooks-claude-code).
+Cada `POST /hooks` se invoca con `curl -sS -X POST $ANTHROPIC_BASE_URL/hooks -H 'Content-Type: application/json' --data-binary @-`. La URL del proxy se resuelve vía la variable de entorno `ANTHROPIC_BASE_URL` (default `http://127.0.0.1:8787`), por lo que el comando no queda acoplado a un host:puerto literal. Los **5 hooks de lifecycle con doble comando** (`UserPromptSubmit`, `SubagentStart`, `SubagentStop`, `Stop`, `StopFailure`) invocan como segundo comando el entry point CLI del servicio de notificaciones migrado al repositorio (`src/2-services/notifications/cli.ts`), resuelto con paths relativos a la raíz del proyecto. `PreToolUse` y `PostToolUse` con `matcher: "*"` no llevan notificación: los eventos de tool son demasiado frecuentes (5–50/turno) y un toast por invocación es ruido de UX; para notificar la pregunta interactiva se declara una **segunda entrada** bajo la misma clave `PreToolUse` con matcher `AskUserQuestion`. Las 6 entradas de UX (`SessionStart`, `SessionEnd`, `PermissionRequest`, `PreToolUse:AskUserQuestion`, `TaskCreated`, `TaskCompleted`) **no invocan** `POST /hooks`: el `AuditHookEventHandler` solo despacha los 8 `eventName` del lifecycle. Detalle operativo y tabla canónica: [`docs/notifications.md`](docs/notifications.md) y [`docs/gateway-architecture.md` §18](docs/gateway-architecture.md#18-plano-c--hooks-claude-code).
 
 ### Notifications
 

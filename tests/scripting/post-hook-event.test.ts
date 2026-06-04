@@ -28,7 +28,7 @@ describe('postHookEvent', () => {
     expect(fetchImpl).toHaveBeenCalledWith('http://127.0.0.1:8787/hooks', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body,
+      body: body.toString('utf-8'),
     });
   });
 

@@ -36,7 +36,7 @@ export async function postHookEvent(
     const res = await fetchImpl(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body,
+      body: body.toString('utf-8'),
     });
     if (!res.ok) {
       process.stderr.write(`post-hook-event: HTTP ${res.status} ${url}\n`);

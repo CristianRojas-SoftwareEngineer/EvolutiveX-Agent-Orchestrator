@@ -16,7 +16,8 @@ export { SMART_CODE_PROXY_ROOT_KEY };
 const ROUTER_STATUS_SEGMENT = 'scripting/router-status.ts';
 
 export function isSmartCodeStatusLine(command: string | undefined): boolean {
-  return typeof command === 'string' && command.includes(ROUTER_STATUS_SEGMENT);
+  if (typeof command !== 'string') return false;
+  return command.replace(/\\/g, '/').includes(ROUTER_STATUS_SEGMENT);
 }
 
 export function buildStatusLineCommand(proxyRoot: string): string {

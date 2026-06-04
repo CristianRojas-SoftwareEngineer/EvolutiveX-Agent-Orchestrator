@@ -9,6 +9,7 @@ import { applyStatuslineInstall } from '../../scripting/install-statusline.js';
 import { applyNotificationsInstall } from '../../scripting/install-notifications.js';
 import { applyVoiceInstall } from '../../scripting/install-voice.js';
 import { createValidProxyRoot } from './helpers/proxy-root-fixture.js';
+import { resolvePosixAbsolutePath } from '../../scripting/shared/npx-tsx-command.js';
 
 const DEFAULT_OPTS = {
   statusline: false,
@@ -117,7 +118,7 @@ describe('runSetup — integración', () => {
       const onDisk = JSON.parse(readFileSync(settingsPath, 'utf-8')) as Record<string, unknown>;
       expect(onDisk['statusLine']).toBeDefined();
       const sl = onDisk['statusLine'] as Record<string, unknown>;
-      expect(sl['command']).toContain(altRoot);
+      expect(sl['command']).toContain(resolvePosixAbsolutePath(altRoot));
     } finally {
       rmSync(altRoot, { recursive: true, force: true });
     }

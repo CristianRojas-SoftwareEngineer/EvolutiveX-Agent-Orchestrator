@@ -62,7 +62,8 @@ interface HookBlock {
 }
 
 export function isSmartCodeNotificationCommand(command: string | undefined): boolean {
-  return typeof command === 'string' && command.includes(NOTIFICATION_CLI_SEGMENT);
+  if (typeof command !== 'string') return false;
+  return command.replace(/\\/g, '/').includes(NOTIFICATION_CLI_SEGMENT);
 }
 
 export function isLegacyNotificationPs1(command: string | undefined): boolean {

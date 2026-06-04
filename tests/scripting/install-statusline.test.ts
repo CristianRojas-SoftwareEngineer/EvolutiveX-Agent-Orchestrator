@@ -16,6 +16,7 @@ import {
   SMART_CODE_PROXY_ROOT_KEY,
 } from '../../scripting/shared/claude-settings.js';
 import { createValidProxyRoot } from './helpers/proxy-root-fixture.js';
+import { resolvePosixAbsolutePath } from '../../scripting/shared/npx-tsx-command.js';
 
 describe('buildStatusLineCommand', () => {
   const originalPlatform = process.platform;
@@ -27,14 +28,17 @@ describe('buildStatusLineCommand', () => {
   it('cita rutas con espacios en Windows con comillas dobles', () => {
     Object.defineProperty(process, 'platform', { value: 'win32' });
     const cmd = buildStatusLineCommand('C:\\Program Files\\Smart Code Proxy');
-    expect(cmd).toContain('npx --prefix "C:\\Program Files\\Smart Code Proxy"');
-    expect(cmd).toContain('tsx scripting/router-status.ts');
+    expect(cmd).toContain('npx --prefix "C:/Program Files/Smart Code Proxy"');
+    expect(cmd).toContain(
+      '"C:/Program Files/Smart Code Proxy/scripting/router-status.ts"',
+    );
   });
 
   it('cita rutas con espacios en Unix con comillas simples', () => {
     Object.defineProperty(process, 'platform', { value: 'linux' });
     const cmd = buildStatusLineCommand('/home/user/Smart Code Proxy');
-    expect(cmd).toMatch(/^npx --prefix '.*Smart Code Proxy' tsx scripting\/router-status\.ts$/);
+    expect(cmd).toMatch(/^npx --prefix '.*Smart Code Proxy' tsx '/);
+    expect(cmd.replace(/\\/g, '/')).toContain('/scripting/router-status.ts');
     expect(cmd).not.toContain('"');
   });
 });
@@ -88,7 +92,7 @@ describe('applyStatuslineInstall / uninstall', () => {
     expect('error' in next).toBe(false);
     if ('error' in next) return;
     expect(next.env?.[SMART_CODE_PROXY_ROOT_KEY]).toBe(proxyRoot);
-    expect(next.statusLine?.command).toContain(proxyRoot);
+    expect(next.statusLine?.command).toContain(resolvePosixAbsolutePath(proxyRoot));
     rmSync(oldRoot, { recursive: true, force: true });
   });
 

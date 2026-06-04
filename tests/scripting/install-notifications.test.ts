@@ -34,8 +34,10 @@ describe('buildNotificationCommand', () => {
     const cmd = buildNotificationCommand('C:\\Program Files\\Smart Code Proxy', 'Stop', {
       stdinJson: true,
     });
-    expect(cmd).toContain('npx --prefix "C:\\Program Files\\Smart Code Proxy"');
-    expect(cmd).toContain(NOTIFICATION_CLI_SEGMENT);
+    expect(cmd).toContain('npx --prefix "C:/Program Files/Smart Code Proxy"');
+    expect(cmd).toContain(
+      '"C:/Program Files/Smart Code Proxy/src/2-services/notifications/cli.ts"',
+    );
     expect(cmd).toContain('--event-type Stop --stdin-json');
   });
 
@@ -211,7 +213,9 @@ describe('runInstallNotifications', () => {
     expect(onDisk.hooks.PostToolUse).toEqual(initialSettings.hooks.PostToolUse);
     expect(onDisk.hooks.SessionStart).toBeDefined();
     expect(
-      (onDisk.hooks.Stop as { hooks: { command: string }[] }[])[0]!.hooks[0]!.command,
-    ).toContain(NOTIFICATION_CLI_SEGMENT);
+      isSmartCodeNotificationCommand(
+        (onDisk.hooks.Stop as { hooks: { command: string }[] }[])[0]!.hooks[0]!.command,
+      ),
+    ).toBe(true);
   });
 });

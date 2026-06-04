@@ -301,8 +301,8 @@ npm run install:statusline
 
 Ambos usan el mismo instalador subyacente ([`scripting/install-statusline.ts`](../scripting/install-statusline.ts)) y escriben en `~/.claude/settings.json`:
 
-- `statusLine` con `type: "command"`, `padding: 0` y un comando multiplataforma `npx --prefix "<ROOT>" tsx scripting/router-status.ts`
-- `env.SMART_CODE_PROXY_ROOT` con la ruta absoluta del proxy (para resolver `sessions/`, `routing/` y `configs/.env` aunque Claude Code abra otro workspace)
+- `statusLine` con `type: "command"`, `padding: 0` y un comando generado por `buildNpxTsxCommand`: `npx --prefix "<ROOT>"` + `tsx "<RUTA_ABSOLUTA>/scripting/router-status.ts"` (ruta del script **absoluta**, separadores **`/`**, citada para cmd/PowerShell o shell POSIX según el SO)
+- `env.SMART_CODE_PROXY_ROOT` con la ruta absoluta nativa del proxy (para resolver `sessions/`, `routing/` y `configs/.env` aunque Claude Code abra otro workspace)
 
 Reinicie Claude Code tras instalar. Opciones: `--dry-run`, `--force` (sobrescribir un statusLine ajeno), `--uninstall`. Si mueve el clon del repo, vuelva a ejecutar el instalador.
 
@@ -313,10 +313,12 @@ Si prefiere editar a mano, el bloque equivalente es:
 ```json
 "statusLine": {
   "type": "command",
-  "command": "npx --prefix \"<RUTA_ABSOLUTA_DEL_PROXY>\" tsx scripting/router-status.ts",
+  "command": "npx --prefix \"<RUTA_ABSOLUTA_DEL_PROXY>\" tsx \"<RUTA_ABSOLUTA_DEL_PROXY>/scripting/router-status.ts\"",
   "padding": 0
 }
 ```
+
+Use `/` en la ruta del script aunque el proxy esté en Windows (p. ej. `C:/Users/.../Smart Code Proxy/scripting/router-status.ts`). Prefiera `npm run install:statusline` para no citar mal las rutas.
 
 y en `env`: `"SMART_CODE_PROXY_ROOT": "<RUTA_ABSOLUTA_DEL_PROXY>"`.
 

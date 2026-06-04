@@ -123,8 +123,10 @@ Tras primer arranque mínimo:
 **Statusline (proxy-cohesion):**
 
 ```text
-npx --prefix "<repo>" tsx scripting/router-status.ts
+npx --prefix "<repo>" tsx "<repo>/scripting/router-status.ts"
 ```
+
+(Ruta del script absoluta con `/`; ver `scripting/shared/npx-tsx-command.ts`.)
 
 **Hooks registrados:**
 

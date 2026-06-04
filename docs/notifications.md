@@ -31,7 +31,9 @@ O solo las notificaciones:
 npm run install:notifications
 ```
 
-Ambos escriben 11 entradas en `~/.claude/settings.json` que invocan `src/2-services/notifications/cli.ts` (sin PowerShell). Flags: `--dry-run`, `--force` (sobrescribe hooks ajenos en esas claves), `--uninstall`, `--root <ruta-proxy>`.
+Ambos escriben 11 entradas en `~/.claude/settings.json` que invocan el CLI del servicio (sin PowerShell). Los comandos los genera `buildNpxTsxCommand` ([`scripting/shared/npx-tsx-command.ts`](../scripting/shared/npx-tsx-command.ts)): `npx --prefix "<ROOT>"` (dependencias del proxy) y `tsx "<RUTA_ABSOLUTA>/src/2-services/notifications/cli.ts"` con separadores **`/`** en la ruta del script (válidos en Windows, macOS y Linux), citada según el shell del SO. Así el hook funciona aunque el cwd de Claude Code sea `~/.claude` y no la raíz del repo.
+
+Flags: `--dry-run`, `--force` (sobrescribe hooks ajenos en esas claves), `--uninstall`, `--root <ruta-proxy>`.
 
 Requisitos: `npm install` en la raíz del proxy (para `tsx` en `node_modules`). Tras mover el repositorio, vuelva a ejecutar el instalador. En Windows, branding opcional: `npm run notifications:register -- --install`.
 

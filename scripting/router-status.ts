@@ -610,18 +610,21 @@ function createEmptyMetrics(
     count: 0,
     modelName: '',
   };
+  const haiku = settingsEnv['ANTHROPIC_DEFAULT_HAIKU_MODEL'];
+  const sonnet = settingsEnv['ANTHROPIC_DEFAULT_SONNET_MODEL'];
+  const opus = settingsEnv['ANTHROPIC_DEFAULT_OPUS_MODEL'];
   return {
     lite: {
       ...empty,
-      modelName: loadDisplayName(settingsEnv['ANTHROPIC_DEFAULT_HAIKU_MODEL'] ?? '', routingPath),
+      modelName: haiku ? loadDisplayName(haiku, routingPath) : 'Haiku',
     },
     standard: {
       ...empty,
-      modelName: loadDisplayName(settingsEnv['ANTHROPIC_DEFAULT_SONNET_MODEL'] ?? '', routingPath),
+      modelName: sonnet ? loadDisplayName(sonnet, routingPath) : 'Sonnet',
     },
     reasoning: {
       ...empty,
-      modelName: loadDisplayName(settingsEnv['ANTHROPIC_DEFAULT_OPUS_MODEL'] ?? '', routingPath),
+      modelName: opus ? loadDisplayName(opus, routingPath) : 'Opus',
     },
   };
 }

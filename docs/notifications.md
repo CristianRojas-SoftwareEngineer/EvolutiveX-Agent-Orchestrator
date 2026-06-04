@@ -37,7 +37,53 @@ Flags: `--dry-run`, `--force` (sobrescribe hooks ajenos en esas claves), `--unin
 
 Requisitos: `npm install` en la raíz del proxy (para `tsx` en `node_modules`). Tras mover el repositorio, vuelva a ejecutar el instalador. En Windows, branding opcional: `npm run notifications:register -- --install`.
 
-**Nota:** el [`.claude/settings.json`](../../.claude/settings.json) del **proyecto** puede definir las mismas claves de hook (p. ej. lifecycle con `POST /hooks`); el merge de Claude Code da prioridad al proyecto y puede anular toasts globales en esas claves dentro de este repo. Para toasts + gateway en Smart Code Proxy, ampliar el settings del proyecto según [hooks-lifecycle-correlation](../openspec/specs/hooks-lifecycle-correlation/spec.md).
+**Nota:** el [`.claude/settings.json`](../../.claude/settings.json) del **proyecto** puede definir las mismas claves de hook (p. ej. lifecycle con `POST /hooks`); el merge de Claude Code da prioridad al proyecto y puede anular toasts globales en esas claves dentro de este repo. Para toasts + gateway en Smart Code Proxy, ampliar el settings del proyecto según [hooks-lifecycle-correlation](../openspec/specs/hooks-lifecycle-correlation/spec.md). El directorio `.claude/` está en `.gitignore`: la configuración del proyecto no se versiona; los fragmentos canónicos viven en esta guía y en el [README § Configuración de hooks](../README.md#configuracion-de-hooks).
+
+## Hook `Stop`: fin de turno y resumen con modelo
+
+En Smart Code Proxy, el evento **`Stop`** usa un relay unificado en lugar de varios comandos en paralelo.
+
+| Paso | Qué hace |
+| --- | --- |
+| 1 | Lee el payload JSON del hook **una sola vez** por stdin |
+| 2 | `POST /hooks` al proxy (misma semántica que [`post-hook-event.ts`](../scripting/post-hook-event.ts)) |
+| 3 | **1.er toast** — copy del catálogo (`Stop`: «Tu turno — El asistente terminó…») |
+| 4 | Resume el turno con **Haiku** (`ANTHROPIC_*` del entorno del hook) a partir de `last_assistant_message`, o del último bloque `text` assistant en `transcript_path` si falta el campo |
+| 5 | **2.º toast** — título «Resumen del trabajo», cuerpo = resumen (o recorte del último mensaje si falla la API) |
+
+**Scripts:** [`scripting/stop-hook-ux.ts`](../scripting/stop-hook-ux.ts) (orquestador) y [`scripting/stop-work-summary-notification.ts`](../scripting/stop-work-summary-notification.ts) (resumen + 2.º toast). El builder de comando con ruta absoluta: `buildStopHookUxCommand` en [`scripting/shared/gateway-hook-command.ts`](../scripting/shared/gateway-hook-command.ts).
+
+**Por qué un solo proceso:** si `post-hook-event.ts`, el CLI de notificaciones y un tercer script corren en paralelo, en Windows suele quedarse solo el primero con stdin; el resumen no recibe JSON y no emite el 2.º toast.
+
+**Fragmento para `.claude/settings.json` del proyecto** (sustituye la entrada `Stop` con doble comando + `--stdin-json`):
+
+```json
+"Stop": [
+  {
+    "hooks": [
+      {
+        "type": "command",
+        "command": "npx --prefix \"${CLAUDE_PROJECT_DIR}\" tsx \"${CLAUDE_PROJECT_DIR}/scripting/stop-hook-ux.ts\"",
+        "timeout": 120,
+        "statusMessage": "Notificaciones y resumen del turno…"
+      }
+    ]
+  }
+]
+```
+
+`${CLAUDE_PROJECT_DIR}` lo expande Claude Code al abrir el proyecto; evita depender del cwd del hook.
+
+**Prueba manual** (desde la raíz del repo, con `ANTHROPIC_API_KEY` o `ANTHROPIC_AUTH_TOKEN`):
+
+```bash
+echo '{"hook_event_name":"Stop","last_assistant_message":"Se documento el relay Stop y los tests pasan."}' \
+  | npx tsx scripting/stop-hook-ux.ts
+```
+
+**Depuración:** mensajes en stderr con prefijo `stop-hook-ux:` o `stop-work-summary-notification:`; canal **Hooks** en Claude Code (`/hooks`).
+
+Los **prompt hooks** (`type: "prompt"`) de Claude Code no pueden invocar toasts; el resumen con modelo va en el relay de comando anterior, no en un `type: "prompt"` aparte.
 
 ## Componentes
 
@@ -537,7 +583,7 @@ más abajo).
 | `PostToolUseFailure` | — | `npx tsx scripting/post-hook-event.ts` |
 | `SubagentStart` | — | `npx tsx scripting/post-hook-event.ts` + `node "./node_modules/tsx/dist/cli.mjs" "./src/2-services/notifications/cli.ts" --event-type SubagentStart` |
 | `SubagentStop` | — | `npx tsx scripting/post-hook-event.ts` + `node "./node_modules/tsx/dist/cli.mjs" "./src/2-services/notifications/cli.ts" --event-type SubagentStop` |
-| `Stop` | — | `npx tsx scripting/post-hook-event.ts` + `node "./node_modules/tsx/dist/cli.mjs" "./src/2-services/notifications/cli.ts" --event-type Stop --stdin-json` |
+| `Stop` | — | **Proyecto Smart Code Proxy:** un solo comando `stop-hook-ux.ts` (`POST /hooks` + 2 toasts + resumen Haiku). Ver [§ Hook Stop](#hook-stop-fin-de-turno-y-resumen-con-modelo). **Instalación global / genérica:** `post-hook-event.ts` + `cli.ts --event-type Stop --stdin-json` |
 | `StopFailure` | — | `npx tsx scripting/post-hook-event.ts` + `node "./node_modules/tsx/dist/cli.mjs" "./src/2-services/notifications/cli.ts" --event-type StopFailure --stdin-json` |
 | `SessionStart` | `startup|resume` | `node "./node_modules/tsx/dist/cli.mjs" "./src/2-services/notifications/cli.ts" --event-type SessionStart` |
 | `SessionEnd` | — | `node "./node_modules/tsx/dist/cli.mjs" "./src/2-services/notifications/cli.ts" --event-type SessionEnd` |
@@ -593,7 +639,7 @@ desperdiciado.
 | `SubagentStart` | No | Copy estático del catálogo. |
 | `SubagentStop` | No | Copy estático del catálogo. |
 | `PreToolUse` (matcher `AskUserQuestion`) | Sí | Formatter: preguntas en `tool_input.questions`. |
-| `Stop` | Sí | Formatter: `last_assistant_message`; si falta, catálogo. |
+| `Stop` | Sí (solo si el hook usa `cli.ts` directo) | Formatter: `last_assistant_message`; si falta, catálogo. En el **proyecto**, `stop-hook-ux.ts` no usa `--stdin-json` en el CLI: el 1.er toast es catálogo y el 2.º lleva resumen Haiku. |
 | `StopFailure` | Sí | Formatter: `error` + `last_assistant_message`. |
 | `SessionStart` | No | Copy estático del catálogo. |
 | `SessionEnd` | No | Copy estático del catálogo. |

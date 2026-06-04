@@ -195,6 +195,12 @@ function padCenter(str: string, len: number): string {
   return ' '.repeat(left) + str + ' '.repeat(right);
 }
 
+/** Trunca texto plano (sin ANSI) a maxLen caracteres visibles, terminando en '...' si se corta */
+function truncate(text: string, maxLen: number): string {
+  if (visibleLength(text) <= maxLen) return text;
+  return text.slice(0, maxLen - 3) + '...';
+}
+
 function formatNumber(n: number): string {
   return new Intl.NumberFormat('es').format(n);
 }
@@ -277,6 +283,7 @@ function renderTable(
   separatorAfter?: number[],
   noHeader?: boolean,
   minWidth?: number,
+  expandColumnIndex?: number,
 ): { table: string; width: number; columnWidths: number[] } {
   const colCount = headers.length;
   if (alignments.length === 0) {
@@ -288,9 +295,10 @@ function renderTable(
   // Ancho total: anchos de columnas + padding por columna + bordes + separadores
   let totalWidth = widths.reduce((sum, w) => sum + w, 0) + widths.length * 3 + 1;
 
-  // Si minWidth es mayor que el ancho natural, expandir última columna
+  // Si minWidth es mayor que el ancho natural, expandir la columna designada (por defecto la última)
   if (minWidth !== undefined && totalWidth < minWidth) {
-    widths[widths.length - 1] += minWidth - totalWidth;
+    const expandIdx = expandColumnIndex ?? widths.length - 1;
+    widths[expandIdx] += minWidth - totalWidth;
     totalWidth = minWidth;
   }
 
@@ -790,6 +798,31 @@ function renderSessionTable(
   return { lines, width };
 }
 
+/**
+ * Ancho de referencia determinista para Tabla 3 (rate limits).
+ * Se usa cuando Tabla 3 no se renderiza (api_key/bearer/OAuth sin cuotas) para mantener
+ * el ancho de Tabla 2 estable entre escenarios.
+ */
+function computeRateLimitReferenceWidth(): number {
+  const maxRows: string[][] = [
+    [
+      `${C.label}Cuota actual (5h)${C.reset}`,
+      `${renderBar(100, 8)} 100%`,
+      `${C.dim}Reinicio en${C.reset}`,
+      `${C.value}23h 59m${C.reset}`,
+    ],
+    [
+      `${C.label}Cuota semanal (7d)${C.reset}`,
+      `${renderBar(100, 8)} 100%`,
+      `${C.dim}Reinicio en${C.reset}`,
+      `${C.value}23h 59m${C.reset}`,
+    ],
+  ];
+  const maxHeaders = ['', '', '', ''];
+  const refWidths = computeColumnWidths(maxHeaders, maxRows);
+  return refWidths.reduce((sum, w) => sum + w, 0) + refWidths.length * 3 + 1;
+}
+
 function renderTokenTable(
   metrics: {
     lite: TokenMetrics;
@@ -797,6 +830,7 @@ function renderTokenTable(
     reasoning: TokenMetrics;
   },
   previous: MetricsSnapshot | null,
+  targetWidth?: number,
 ): { lines: string[]; width: number } {
   // Función local para alinear a la derecha
   function alignRight(text: string, width: number): string {
@@ -815,14 +849,21 @@ function renderTokenTable(
     { key: 'reasoning', label: 'Reasoning', color: C.reasoning },
   ];
 
-  const rows: string[][] = [];
-
   let totalInput = 0;
   let totalCacheCreation = 0;
   let totalCacheRead = 0;
   let totalOutput = 0;
   let totalCount = 0;
   let totalWorkflows = 0;
+
+  // Primera pasada: acumular totales y medir anchos naturales de columnas no-Modelo
+  let w0nat = visibleLength('Nivel');
+  let w2nat = visibleLength('# Workflows');
+  let w3nat = visibleLength('# Steps');
+  let w4nat = visibleLength('Input (tks)');
+  let w5nat = visibleLength('Caché Write (tks)');
+  let w6nat = visibleLength('Caché Read (tks)');
+  let w7nat = visibleLength('Output (tks)');
 
   for (const level of levels) {
     const m = metrics[level.key];
@@ -833,12 +874,48 @@ function renderTokenTable(
     totalCount += m.count;
     totalWorkflows += m.workflowCount;
 
+    w0nat = Math.max(w0nat, visibleLength(level.label));
+    w2nat = Math.max(w2nat, visibleLength(String(m.workflowCount)));
+    w3nat = Math.max(w3nat, visibleLength(String(m.count)));
+    w4nat = Math.max(w4nat, visibleLength(formatTokens(m.inputTokens)));
+    w5nat = Math.max(w5nat, visibleLength(formatTokens(m.cacheCreationInputTokens)));
+    w6nat = Math.max(w6nat, visibleLength(formatTokens(m.cacheReadInputTokens)));
+    w7nat = Math.max(w7nat, visibleLength(formatTokens(m.outputTokens)));
+  }
+  // Incluir totales en el cálculo de anchos de columnas numéricas
+  w2nat = Math.max(w2nat, visibleLength(String(totalWorkflows)));
+  w3nat = Math.max(w3nat, visibleLength(String(totalCount)));
+  w4nat = Math.max(w4nat, visibleLength(formatTokens(totalInput)));
+  w5nat = Math.max(w5nat, visibleLength(formatTokens(totalCacheCreation)));
+  w6nat = Math.max(w6nat, visibleLength(formatTokens(totalCacheRead)));
+  w7nat = Math.max(w7nat, visibleLength(formatTokens(totalOutput)));
+
+  // Ancho objetivo de la columna Modelo (índice 1), elástica para ajustar al targetWidth
+  // 25 = 8 columnas × 3 (espacio+│+espacio) + 1 (borde izquierdo)
+  const headerModelWidth = visibleLength('Modelo');
+  let w1Max: number | undefined;
+  if (targetWidth !== undefined) {
+    const sumOtherCols = w0nat + w2nat + w3nat + w4nat + w5nat + w6nat + w7nat;
+    let w1Target = targetWidth - 25 - sumOtherCols;
+    // Piso: "Totales de sesión" (17 chars) requiere w0 + w1 + 3 >= 17 → w1 >= 14 - w0
+    w1Target = Math.max(w1Target, 14 - w0nat, headerModelWidth);
+    w1Max = w1Target;
+  }
+
+  // Segunda pasada: construir filas con nombres de modelo truncados si aplica
+  const rows: string[][] = [];
+
+  for (const level of levels) {
+    const m = metrics[level.key];
     const cc = (field: keyof LevelMetricsSnapshot, value: number) =>
       cellColor(level.key, field, value, previous);
 
+    const rawName = m.modelName || '-';
+    const modelName = w1Max !== undefined ? truncate(rawName, w1Max) : rawName;
+
     rows.push([
       `${level.color}${level.label}${C.reset}`,
-      `${level.color}${m.modelName || '-'}${C.reset}`,
+      `${level.color}${modelName}${C.reset}`,
       `${cc('workflowCount', m.workflowCount)}${m.workflowCount}${C.reset}`,
       `${cc('count', m.count)}${m.count}${C.reset}`,
       `${cc('inputTokens', m.inputTokens)}${formatTokens(m.inputTokens)}${C.reset}`,
@@ -870,8 +947,13 @@ function renderTokenTable(
     'right',
   ];
 
-  // Renderizar tabla sin fila de total
-  const { table, width, columnWidths } = renderTable(headers, rows, alignments, [0, 1, 2]);
+  // Renderizar tabla sin fila de total; columna Modelo (índice 1) es la columna elástica
+  const { table, width, columnWidths } = renderTable(
+    headers, rows, alignments, [0, 1, 2],
+    undefined,
+    targetWidth,
+    1,
+  );
 
   // Renderizar fila de total manualmente con celdas fusionadas
   const w0 = columnWidths[0];
@@ -1053,12 +1135,18 @@ export function buildStatuslineOutput(
 
   const table1 = renderSessionTable(ctx, paths, sessionPath);
 
+  // §3.3: Tabla 3 solo con oauth; api_key y bearer comparten layout sin rate limits.
+  // Se resuelve antes de Tabla 2 para poder calcular targetWidth.
+  const table3 = authMethod === 'oauth' ? renderRateLimitTable(ctx) : null;
+  const table3Width = table3 ? table3.width : computeRateLimitReferenceWidth();
+  const targetWidth = table1.width + table3Width + 2;
+
   let table2: { lines: string[]; width: number };
   if (sessionPath) {
     const metrics = aggregateSessionMetrics(sessionPath, settingsEnv, paths.routingPath);
     const cache = readStatuslineCache(sessionPath);
     const previous = cache.metricsSnapshot || null;
-    table2 = renderTokenTable(metrics, previous);
+    table2 = renderTokenTable(metrics, previous, targetWidth);
     writeStatuslineCache(sessionPath, {
       metricsSnapshot: {
         lite: {
@@ -1088,11 +1176,8 @@ export function buildStatuslineOutput(
       },
     });
   } else {
-    table2 = renderTokenTable(createEmptyMetrics(settingsEnv, paths.routingPath), null);
+    table2 = renderTokenTable(createEmptyMetrics(settingsEnv, paths.routingPath), null, targetWidth);
   }
-
-  // §3.3: Tabla 3 solo con oauth; api_key y bearer comparten layout sin rate limits.
-  const table3 = authMethod === 'oauth' ? renderRateLimitTable(ctx) : null;
 
   if (table3) {
     output.push(renderSideBySide(table1, table3, 2));

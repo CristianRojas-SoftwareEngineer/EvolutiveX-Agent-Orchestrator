@@ -86,33 +86,36 @@ El statusline consta de **dos o tres tablas** según el método de autenticació
 
 ---
 
-### 3.2 Tabla 2 — Interacciones y consumo de tokens (común a todos los proveedores)
+### 3.2 Tabla 2 — Steps y consumo de tokens por nivel (común a todos los proveedores)
 
-Presente siempre, independientemente del método de autenticación. Se renderiza en side-by-side con la Tabla 1 incluso sin `ctx.session_id` ni carpeta en `sessions/` (métricas en cero). Permite al usuario conocer cuántos tokens consume por nivel de razonamiento en la sesión actual, tanto para providers con facturación por token (bearer) como para suscripciones (OAuth).
+Presente siempre, independientemente del método de autenticación. Se renderiza debajo del bloque Tabla 1 (± Tabla 3) incluso sin `ctx.session_id` ni carpeta en `sessions/` (métricas en cero). Permite al usuario conocer cuántos tokens consume por nivel de razonamiento en la sesión actual, tanto para providers con facturación por token (bearer) como para suscripciones (OAuth).
 
 ```
-╭─ Interacciones por nivel de razonamiento ──────────────────────────────────────────────────────────────────────╮
-│ Nivel      │ Modelo          │ # Interacciones │  Input (tks) │ Cache In (tks) │ Output (tks) │
-├────────────┼─────────────────┼─────────────────┼──────────────┼────────────────┼──────────────┤
-│ Lite       │ MiMo 2 Omni     │              12 │       45,230 │         12,000 │        8,500 │
-│ Standard   │ MiMo 2.5        │              35 │      189,400 │         67,000 │       42,100 │
-│ Reasoning  │ MiMo 2.5 Pro    │               8 │      312,000 │         95,000 │       78,000 │
-├────────────┴─────────────────┼─────────────────┼──────────────┼────────────────┼──────────────┤
-│ Totales de sesión            │              55 │      546,630 │        174,000 │      128,600 │
-╰──────────────────────────────┴─────────────────┴──────────────┴────────────────┴──────────────╯
+╭─ Steps por nivel de razonamiento ─────────────────────────────────────────────────────────────────────────────╮
+╭───────────┬─────────────────────────┬─────────────┬─────────┬─────────────┬───────────────────┬──────────────────┬──────────────╮
+│   Nivel   │         Modelo          │ # Workflows │ # Steps │ Input (tks) │ Caché Write (tks) │ Caché Read (tks) │ Output (tks) │
+├───────────┼─────────────────────────┼─────────────┼─────────┼─────────────┼───────────────────┼──────────────────┼──────────────┤
+│ Lite      │ Haiku 4.5               │           1 │       5 │        1000 │              2000 │             8000 │          500 │
+├───────────┼─────────────────────────┼─────────────┼─────────┼─────────────┼───────────────────┼──────────────────┼──────────────┤
+│ Standard  │ Sonnet 4.6              │           3 │      12 │        5000 │            10.000 │           40.000 │        2.500 │
+├───────────┼─────────────────────────┼─────────────┼─────────┼─────────────┼───────────────────┼──────────────────┼──────────────┤
+│ Reasoning │ claude-opus-4-8-lon...  │           1 │       2 │         800 │              1.600 │            6.400 │          400 │
+├───────────┴─────────────────────────┼─────────────┼─────────┼─────────────┼───────────────────┼──────────────────┼──────────────┤
+│ Totales de sesión                   │           5 │      19 │        6800 │            13.600 │           54.400 │        3.400 │
+╰─────────────────────────────────────┴─────────────┴─────────┴─────────────┴───────────────────┴──────────────────┴──────────────╯
 ```
 
 **Columnas (8):**
 
 | Columna              | Contenido                                                       | Fuente                                                                   | Alineación |
 | -------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------ | ---------- |
-| Nivel                | `Lite` / `Standard` / `Reasoning`                               | texto fijo por slot                                                       | izquierda  |
-| Modelo               | display name del modelo del nivel                               | `metadata.json → displayName` (o `modelId` si falta)                    | izquierda  |
+| Nivel                | `Lite` / `Standard` / `Reasoning`                               | texto fijo por slot                                                      | izquierda  |
+| Modelo               | display name del modelo del nivel; **columna elástica**: se expande con relleno o se trunca con `...` para anclar Tabla 2 al ancho del bloque superior (véase §4.2) | `metadata.json → displayName` (o `modelId` si falta) | izquierda  |
 | # Workflows          | workflows main cerrados que usaron este nivel en la sesión      | `session-metrics.json → models[modelId].workflow_count`                  | derecha    |
 | # Steps              | cantidad de hops de inferencia del nivel en la sesión           | `session-metrics.json → models[modelId].count`                           | derecha    |
 | Input (tks)          | suma de `input_tokens` para el nivel                            | `session-metrics.json → models[modelId].input_tokens`                    | derecha    |
-| Cache Creación (tks) | suma de `cache_creation_input_tokens` para el nivel             | `session-metrics.json → models[modelId].cache_creation_input_tokens`     | derecha    |
-| Cache Lectura (tks)  | suma de `cache_read_input_tokens` para el nivel                 | `session-metrics.json → models[modelId].cache_read_input_tokens`         | derecha    |
+| Caché Write (tks)    | suma de `cache_creation_input_tokens` para el nivel             | `session-metrics.json → models[modelId].cache_creation_input_tokens`     | derecha    |
+| Caché Read (tks)     | suma de `cache_read_input_tokens` para el nivel                 | `session-metrics.json → models[modelId].cache_read_input_tokens`         | derecha    |
 | Output (tks)         | suma de `output_tokens` para el nivel                           | `session-metrics.json → models[modelId].output_tokens`                   | derecha    |
 
 **Fila de totales:** celdas fusionadas en columnas 0+1 (texto `"Totales de sesión"`), suma de las tres filas de nivel para las columnas numéricas. Los separadores horizontales usan `┴` en la posición de la columna fusionada.
@@ -127,7 +130,7 @@ Presente siempre, independientemente del método de autenticación. Se renderiza
 
 ### 3.3 Tabla 3 — Rate Limits (solo OAuth)
 
-Se renderiza cuando `authMethod === 'oauth'` **y** `ctx.rate_limits` incluye al menos `five_hour` o `seven_day`. Si el método es OAuth pero stdin no trae datos de cuota, no se imprime Tabla 3 (el bloque Tabla 1 + Tabla 2 no cambia). Aplica al proveedor `anthropic` con suscripción PRO/Max.
+Se renderiza cuando `authMethod === 'oauth'` **y** `ctx.rate_limits` incluye al menos `five_hour` o `seven_day`. Si el método es OAuth pero stdin no trae datos de cuota, no se imprime Tabla 3, pero Tabla 2 sigue usando un **ancho de referencia determinista** (equivalente a una Tabla 3 a plena capacidad) para mantener un layout estable entre renders (véase §4.2). Aplica al proveedor `anthropic` con suscripción PRO/Max.
 
 ```
 ╭─ Límites de uso por suscripción ─────────────────────────────────────────────────────╮
@@ -194,13 +197,18 @@ Los bloques llenos (`█`) de las barras de contexto (Tabla 1) y de cuotas (Tabl
 
 ---
 
-## 4.2 Layout side-by-side
+## 4.2 Layout side-by-side y ancho uniforme de Tabla 2
 
 La Tabla 1 y la Tabla 3 se renderizan lado a lado usando `renderSideBySide()`, con un gap de 2 espacios entre ellas, cuando `authMethod === 'oauth'` y hay datos de cuota en ctx. Si la Tabla 3 tiene más líneas que la Tabla 1, las líneas sobrantes se renderizan debajo con indentación.
 
 Cuando no hay Tabla 3 (`api_key` o `bearer`, u OAuth sin datos de cuota), la Tabla 1 se imprime sola en la primera fila.
 
-La Tabla 2 (métricas) se imprime siempre **debajo** del bloque de la primera fila.
+La Tabla 2 (métricas) se imprime siempre **debajo** del bloque de la primera fila, con un ancho fijado a `anchoTabla1 + anchoTabla3 + 2` (gap):
+
+- **Tabla 3 presente:** se usa su ancho real calculado.
+- **Tabla 3 ausente:** se usa un ancho de referencia determinista equivalente al máximo posible de Tabla 3 (valores al 100%, ambas filas, tiempo `23h 59m`), de forma que el borde derecho de Tabla 2 se mantiene estable entre renders. Puede haber una diferencia de 1–2 chars respecto al ancho con Tabla 3 real cuando los valores son muy bajos o el tiempo restante es corto ("micro-temblor" aceptado, equivalente al que ya afecta a Tabla 1).
+
+La columna **Modelo** de Tabla 2 es la columna elástica: absorbe el ajuste de ancho expandiendo con espacios de relleno (nombre corto) o truncando con `...` (nombre largo). Las columnas numéricas (Input, Caché Write, Caché Read, Output) nunca se truncan; si su contenido excediera el objetivo (caso extremo improbable), Tabla 2 puede superar el ancho objetivo.
 
 ---
 

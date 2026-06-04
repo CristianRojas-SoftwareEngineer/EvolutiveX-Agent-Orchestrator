@@ -524,19 +524,21 @@ más abajo).
 ./node_modules/tsx/dist/cli.mjs ./src/2-services/notifications/cli.ts
 ```
 
+**Relay al gateway (`POST /hooks`):** en [`.claude/settings.json`](../.claude/settings.json) del proyecto, las 8 entradas del lifecycle usan `npx tsx scripting/post-hook-event.ts` ([`scripting/post-hook-event.ts`](../scripting/post-hook-event.ts)). Lee stdin (payload JSON del hook) y reenvía con `fetch` a `$ANTHROPIC_BASE_URL/hooks`. No usa `curl` ni `--data-binary @-` (sintaxis bash que **PowerShell** no interpreta). Instalación global con ruta absoluta: `buildGatewayHookRelayCommand` en [`scripting/shared/gateway-hook-command.ts`](../scripting/shared/gateway-hook-command.ts).
+
 **Comando canónico por hook (14 entradas: 8 del lifecycle + 6 de UX):**
 
 | Hook | Matcher | Comando(s) |
 |---|---|---|
-| `UserPromptSubmit` | — | `POST /hooks` + `node "./node_modules/tsx/dist/cli.mjs" "./src/2-services/notifications/cli.ts" --event-type UserPromptSubmit --stdin-json` |
-| `PreToolUse` | `*` | `POST /hooks` (sin notificación; ver justificación abajo) |
+| `UserPromptSubmit` | — | `npx tsx scripting/post-hook-event.ts` + `node "./node_modules/tsx/dist/cli.mjs" "./src/2-services/notifications/cli.ts" --event-type UserPromptSubmit --stdin-json` |
+| `PreToolUse` | `*` | `npx tsx scripting/post-hook-event.ts` (sin notificación; ver justificación abajo) |
 | `PreToolUse` | `AskUserQuestion` | `node "./node_modules/tsx/dist/cli.mjs" "./src/2-services/notifications/cli.ts" --event-type PreToolUse --stdin-json` |
-| `PostToolUse` | `*` | `POST /hooks` (sin notificación; ver justificación abajo) |
-| `PostToolUseFailure` | — | `POST /hooks` |
-| `SubagentStart` | — | `POST /hooks` + `node "./node_modules/tsx/dist/cli.mjs" "./src/2-services/notifications/cli.ts" --event-type SubagentStart` |
-| `SubagentStop` | — | `POST /hooks` + `node "./node_modules/tsx/dist/cli.mjs" "./src/2-services/notifications/cli.ts" --event-type SubagentStop` |
-| `Stop` | — | `POST /hooks` + `node "./node_modules/tsx/dist/cli.mjs" "./src/2-services/notifications/cli.ts" --event-type Stop --stdin-json` |
-| `StopFailure` | — | `POST /hooks` + `node "./node_modules/tsx/dist/cli.mjs" "./src/2-services/notifications/cli.ts" --event-type StopFailure --stdin-json` |
+| `PostToolUse` | `*` | `npx tsx scripting/post-hook-event.ts` (sin notificación; ver justificación abajo) |
+| `PostToolUseFailure` | — | `npx tsx scripting/post-hook-event.ts` |
+| `SubagentStart` | — | `npx tsx scripting/post-hook-event.ts` + `node "./node_modules/tsx/dist/cli.mjs" "./src/2-services/notifications/cli.ts" --event-type SubagentStart` |
+| `SubagentStop` | — | `npx tsx scripting/post-hook-event.ts` + `node "./node_modules/tsx/dist/cli.mjs" "./src/2-services/notifications/cli.ts" --event-type SubagentStop` |
+| `Stop` | — | `npx tsx scripting/post-hook-event.ts` + `node "./node_modules/tsx/dist/cli.mjs" "./src/2-services/notifications/cli.ts" --event-type Stop --stdin-json` |
+| `StopFailure` | — | `npx tsx scripting/post-hook-event.ts` + `node "./node_modules/tsx/dist/cli.mjs" "./src/2-services/notifications/cli.ts" --event-type StopFailure --stdin-json` |
 | `SessionStart` | `startup|resume` | `node "./node_modules/tsx/dist/cli.mjs" "./src/2-services/notifications/cli.ts" --event-type SessionStart` |
 | `SessionEnd` | — | `node "./node_modules/tsx/dist/cli.mjs" "./src/2-services/notifications/cli.ts" --event-type SessionEnd` |
 | `PermissionRequest` | — | `node "./node_modules/tsx/dist/cli.mjs" "./src/2-services/notifications/cli.ts" --event-type PermissionRequest --stdin-json` |

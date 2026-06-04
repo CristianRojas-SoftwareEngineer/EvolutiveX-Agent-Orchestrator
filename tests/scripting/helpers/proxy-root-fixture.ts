@@ -31,3 +31,23 @@ export function createValidProxyRootForNotifications(prefix = 'scp-notif-'): str
   writeFileSync(join(root, 'src', '2-services', 'notifications', 'cli.ts'), '', 'utf-8');
   return resolve(root);
 }
+
+/** Raíz válida para setup-hooks (exige configs/hooks.json + scripts + cli.ts). */
+export function createValidProxyRootForHooks(
+  prefix = 'scp-hooks-',
+  hooksJsonContent: object = { hooks: {} },
+): string {
+  const root = mkdtempSync(join(tmpdir(), prefix));
+  mkdirSync(join(root, 'configs'), { recursive: true });
+  writeFileSync(
+    join(root, 'configs', 'hooks.json'),
+    JSON.stringify(hooksJsonContent, null, 2),
+    'utf-8',
+  );
+  mkdirSync(join(root, 'scripting'), { recursive: true });
+  writeFileSync(join(root, 'scripting', 'post-hook-event.ts'), 'export {}', 'utf-8');
+  writeFileSync(join(root, 'scripting', 'stop-hook-ux.ts'), 'export {}', 'utf-8');
+  mkdirSync(join(root, 'src', '2-services', 'notifications'), { recursive: true });
+  writeFileSync(join(root, 'src', '2-services', 'notifications', 'cli.ts'), 'export {}', 'utf-8');
+  return resolve(root);
+}

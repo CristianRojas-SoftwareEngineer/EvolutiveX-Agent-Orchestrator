@@ -15,6 +15,7 @@ const DEFAULT_OPTS = {
   statusline: false,
   notifications: false,
   voice: false,
+  hooks: false,
   voiceMode: 'hold' as const,
   uninstall: false,
   dryRun: false,

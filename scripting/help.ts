@@ -65,7 +65,12 @@ const scripts: NpmScript[] = [
   },
   {
     name: 'setup',
-    description: 'Instala o desinstala statusline, notificaciones y voz de Claude Code (unificado)',
+    description: 'Instala o desinstala statusline, notificaciones, voz y hooks de Claude Code (unificado)',
+    category: 'local',
+  },
+  {
+    name: 'setup:hooks',
+    description: 'Instala los 14 hooks de SCP en ~/.claude (merge selectivo)',
     category: 'local',
   },
   {

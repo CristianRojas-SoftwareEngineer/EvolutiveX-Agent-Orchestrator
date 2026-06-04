@@ -151,7 +151,9 @@ Personaliza el comportamiento ajustando estas variables en tu entorno o en un ar
 
 ### Configuración de hooks
 
-El archivo `.claude/settings.json` del proyecto registra **14 entradas** de hooks de Claude Code (**8 del lifecycle** que alimentan al gateway, más **6 entradas de UX no-lifecycle** que solo emiten toast nativo), sobrescribiendo las entradas equivalentes del user-level (`C:\Users\Cristian\.claude\settings.json`) para esas claves (mecanismo de merge de Claude Code: el proyecto tiene precedencia). Las 14 entradas son:
+Para instalar las **14 entradas** de hooks de SCP en `~/.claude/settings.json` (user-level) con merge selectivo que preserva configs ajenas del usuario: `npm run setup -- --hooks` (o `npm run setup:hooks`). Con `--dry-run` para previsualizar, `--force` para sobrescribir configs ajenas (con backup automático), `--uninstall` para desinstalar solo los hooks de SCP. La plantilla canónica versionada vive en [`configs/hooks.json`](configs/hooks.json) y el instalador en [`scripting/setup-hooks.ts`](scripting/setup-hooks.ts).
+
+Adicionalmente, el archivo `.claude/settings.json` del proyecto registra **14 entradas** de hooks de Claude Code (**8 del lifecycle** que alimentan al gateway, más **6 entradas de UX no-lifecycle** que solo emiten toast nativo), sobrescribiendo las entradas equivalentes del user-level (`C:\Users\Cristian\.claude\settings.json`) para esas claves (mecanismo de merge de Claude Code: el proyecto tiene precedencia). Las 14 entradas son:
 
 | Hook | Matcher | Comandos |
 | --- | --- | --- |

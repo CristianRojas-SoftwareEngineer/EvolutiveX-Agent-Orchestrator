@@ -10,24 +10,86 @@ CLI unificado (`setup`) para instalar, configurar y desinstalar las característ
 
 ### Requirement: Selección de features mediante flags explícitos
 
-El sistema SHALL proporcionar un script CLI (`setup`) con flags `--statusline`, `--notifications` y `--voice` que determinen qué features participan en la operación. Cuando no se pasa ningún flag de feature, la operación SHALL aplicarse sobre las tres features. Cuando se pasan uno o más flags, la operación SHALL aplicarse únicamente sobre las features seleccionadas.
+El sistema SHALL proporcionar un script CLI (`setup`) con flags `--statusline`, `--notifications`, `--voice` y `--hooks` que determinen qué features participan en la operación. Cuando no se pasa ningún flag de feature, la operación SHALL aplicarse sobre las cuatro features. Cuando se pasan uno o más flags, la operación SHALL aplicarse únicamente sobre las features seleccionadas.
 
 #### Scenario: Sin flags de feature instala todo
 
 - **WHEN** el usuario ejecuta `npm run setup` sin flags de feature
-- **THEN** el script SHALL instalar statusline, notificaciones y voz en `~/.claude/settings.json`
+- **THEN** el script SHALL instalar statusline, notificaciones, voz y hooks en `~/.claude/settings.json`
 
 #### Scenario: Flag único restringe la operación
 
 - **WHEN** el usuario ejecuta `npm run setup -- --notifications`
 - **THEN** el script SHALL instalar únicamente las notificaciones
-- **AND** SHALL no modificar `statusLine` ni claves `voice*` existentes en `settings.json`
+- **AND** SHALL no modificar `statusLine`, claves `voice*` ni `hooks` existentes en `settings.json`
 
 #### Scenario: Combinación de flags opera solo sobre los seleccionados
 
 - **WHEN** el usuario ejecuta `npm run setup -- --statusline --voice`
 - **THEN** el script SHALL instalar statusline y voz
 - **AND** SHALL no modificar hooks de notificación existentes en `settings.json`
+
+#### Scenario: Flag --hooks opera solo sobre hooks
+
+- **WHEN** el usuario ejecuta `npm run setup -- --hooks`
+- **THEN** el script SHALL invocar únicamente `setup-hooks.ts` con los flags por defecto
+- **AND** statusline, notifications y voice NO SHALL modificarse
+
+#### Scenario: Combinación --hooks --statusline opera solo sobre esas dos features
+
+- **WHEN** el usuario ejecuta `npm run setup -- --hooks --statusline`
+- **THEN** el script SHALL invocar `setup-hooks.ts` y `applyStatuslineInstall`
+- **AND** notifications y voice NO SHALL modificarse
+
+---
+
+### Requirement: `--hooks` como fourth feature flag con delegación a setup-hooks.ts
+
+El flag `--hooks` SHALL invocar el script `scripting/setup-hooks.ts` que gestiona la instalación de las 14 entradas de hooks con merge selectivo en `~/.claude/settings.json`. Los flags `--dry-run`, `--force`, `--uninstall` y `--root` SHAL propagarse al script hijo.
+
+#### Scenario: setup --hooks sin otros flags opera solo sobre hooks
+
+- **WHEN** el usuario ejecuta `npm run setup -- --hooks`
+- **THEN** el script SHALL invocar únicamente `setup-hooks.ts` con los flags por defecto
+- **AND** statusline, notifications y voice NO SHALL modificarse
+
+#### Scenario: setup --hooks --uninstall desinstala solo hooks
+
+- **WHEN** el usuario ejecuta `npm run setup -- --hooks --uninstall`
+- **THEN** `setup-hooks.ts` SHALL ejecutar uninstall selectivo (solo comandos SCP)
+- **AND** statusline, notifications y voice SHALL permanecer sin cambios
+
+#### Scenario: setup --hooks --dry-run previsualiza sin escribir
+
+- **WHEN** el usuario ejecuta `npm run setup -- --hooks --dry-run`
+- **THEN** `setup-hooks.ts` SHALL mostrar diff de cambios sin escribir en disco
+
+#### Scenario: setup --hooks --force se propaga a setup-hooks.ts
+
+- **GIVEN** `~/.claude/settings.json` tiene hooks ajenos en algunas claves
+- **WHEN** el usuario ejecuta `npm run setup -- --hooks --force`
+- **THEN** `setup-hooks.ts` SHALL recibir `--force`
+- **AND** SHALL reemplazar hooks ajenos tras crear backup
+
+---
+
+### Requirement: Validación previa de archivos SCP para --hooks
+
+Antes de invocar `setup-hooks.ts`, el script `setup` SHALL validar que existan los archivos: `configs/hooks.json`, `scripting/post-hook-event.ts`, `scripting/stop-hook-ux.ts` y `src/2-services/notifications/cli.ts`. Si alguna validación falla, el script SHALL terminar con código de salida 1 y un mensaje de error claro. `settings.json` NO SHALL modificarse en caso de fallo.
+
+#### Scenario: Validación falla si falta configs/hooks.json
+
+- **GIVEN** la raíz del proxy no contiene `configs/hooks.json`
+- **WHEN** el usuario ejecuta `npm run setup -- --hooks`
+- **THEN** el script SHALL terminar con exit code 1
+- **AND** SHALL mostrar mensaje: "No se encontró configs/hooks.json en la raíz del proxy"
+
+#### Scenario: Validación pasa si todos los archivos existen
+
+- **GIVEN** existen `configs/hooks.json`, `scripting/post-hook-event.ts`, `scripting/stop-hook-ux.ts` y `src/2-services/notifications/cli.ts`
+- **WHEN** el usuario ejecuta `npm run setup -- --hooks`
+- **THEN** la validación SHALL pasar
+- **AND** `setup-hooks.ts` SHALL invocarse normalmente
 
 ---
 
@@ -131,6 +193,7 @@ En modo install, el script SHALL validar únicamente las features seleccionadas 
 | statusline    | `scripting/router-status.ts` y `routing/providers/` existen |
 | notifications | `src/2-services/notifications/cli.ts` existe           |
 | voice         | ninguna                                                 |
+| hooks         | `configs/hooks.json`, `scripting/post-hook-event.ts`, `scripting/stop-hook-ux.ts` y `src/2-services/notifications/cli.ts` existen |
 
 #### Scenario: Raíz inválida aborta sin escribir
 

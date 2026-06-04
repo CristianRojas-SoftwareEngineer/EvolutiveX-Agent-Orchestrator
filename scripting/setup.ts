@@ -14,12 +14,14 @@ import {
   applyNotificationsUninstall,
 } from './install-notifications.js';
 import { applyVoiceInstall, applyVoiceUninstall } from './install-voice.js';
+import { runSetupHooks, validateScpRoot } from './setup-hooks.js';
 
 export interface SetupRunOptions {
   root: string;
   statusline: boolean;
   notifications: boolean;
   voice: boolean;
+  hooks: boolean;
   voiceMode: 'hold' | 'tap';
   uninstall: boolean;
   dryRun: boolean;
@@ -29,10 +31,11 @@ export interface SetupRunOptions {
 export function runSetup(options: SetupRunOptions): number {
   const proxyRoot = resolve(options.root);
 
-  const anyFeatureFlag = options.statusline || options.notifications || options.voice;
+  const anyFeatureFlag = options.statusline || options.notifications || options.voice || options.hooks;
   const doStatusline = anyFeatureFlag ? options.statusline : true;
   const doNotifications = anyFeatureFlag ? options.notifications : true;
   const doVoice = anyFeatureFlag ? options.voice : true;
+  const doHooks = options.hooks;
 
   if (!options.uninstall) {
     try {
@@ -50,6 +53,15 @@ export function runSetup(options: SetupRunOptions): number {
     if (doStatusline) settings = applyStatuslineUninstall(settings);
     if (doNotifications) settings = applyNotificationsUninstall(settings);
     if (doVoice) settings = applyVoiceUninstall(settings);
+    if (doHooks) {
+      const hooksResult = runSetupHooks({
+        root: proxyRoot,
+        dryRun: options.dryRun,
+        force: false,
+        uninstall: true,
+      });
+      if (hooksResult !== 0) return hooksResult;
+    }
 
     if (options.dryRun) {
       console.log(chalk.yellow('[dry-run] Valores que quedarían tras desinstalar:'));
@@ -62,6 +74,7 @@ export function runSetup(options: SetupRunOptions): number {
     if (doStatusline) features.push('statusline');
     if (doNotifications) features.push('notificaciones');
     if (doVoice) features.push('voz');
+    if (doHooks) features.push('hooks');
     console.log(chalk.green(`Desinstalado: ${features.join(', ')}.`));
     return 0;
   }
@@ -90,6 +103,22 @@ export function runSetup(options: SetupRunOptions): number {
     });
   }
 
+  if (doHooks) {
+    try {
+      validateScpRoot(proxyRoot);
+    } catch (err) {
+      console.error(chalk.red(err instanceof Error ? err.message : String(err)));
+      return 1;
+    }
+    const hooksResult = runSetupHooks({
+      root: proxyRoot,
+      dryRun: options.dryRun,
+      force: options.force,
+      uninstall: options.uninstall,
+    });
+    if (hooksResult !== 0) return hooksResult;
+  }
+
   if (options.dryRun) {
     console.log(chalk.yellow('[dry-run] Valores que se escribirían:'));
     console.log(JSON.stringify(settings, null, 2));
@@ -102,6 +131,7 @@ export function runSetup(options: SetupRunOptions): number {
   if (doStatusline) features.push('statusline');
   if (doNotifications) features.push('notificaciones');
   if (doVoice) features.push('voz');
+  if (doHooks) features.push('hooks');
   console.log(chalk.green(`Instalado: ${features.join(', ')}.`));
   console.log(chalk.cyan(`  settings.json: ${CLAUDE_SETTINGS_PATH}`));
   console.log(chalk.cyan('\nReinicie Claude Code para aplicar los cambios.'));
@@ -112,10 +142,11 @@ const program = new Command();
 
 program
   .name('setup')
-  .description('Instala o desinstala statusline, notificaciones y voz de Claude Code (unificado)')
+  .description('Instala o desinstala statusline, notificaciones, voz y hooks de Claude Code (unificado)')
   .option('--statusline', 'Operar solo sobre statusline')
   .option('--notifications', 'Operar solo sobre notificaciones')
   .option('--voice', 'Operar solo sobre voz')
+  .option('--hooks', 'Operar solo sobre hooks')
   .option('--voice-mode <hold|tap>', 'Modo de activación de voz', 'hold')
   .option('--uninstall', 'Desinstalar las features seleccionadas')
   .option('--dry-run', 'Muestra los valores sin escribir en settings.json')
@@ -126,6 +157,7 @@ program
       statusline?: boolean;
       notifications?: boolean;
       voice?: boolean;
+      hooks?: boolean;
       voiceMode?: string;
       uninstall?: boolean;
       dryRun?: boolean;
@@ -137,6 +169,7 @@ program
         statusline: Boolean(opts.statusline),
         notifications: Boolean(opts.notifications),
         voice: Boolean(opts.voice),
+        hooks: Boolean(opts.hooks),
         voiceMode: (opts.voiceMode === 'tap' ? 'tap' : 'hold') as 'hold' | 'tap',
         uninstall: Boolean(opts.uninstall),
         dryRun: Boolean(opts.dryRun),

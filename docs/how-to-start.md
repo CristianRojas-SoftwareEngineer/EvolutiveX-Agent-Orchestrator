@@ -56,7 +56,7 @@ Sigue estos pasos en orden:
    npm run setup
    ```
 
-   Escribe `statusLine`, hooks de notificación y claves de voz en `~/.claude/settings.json`. **Reinicie Claude Code** tras instalar. Admite `--dry-run` (previsualizar sin escribir), `--uninstall` y flags de feature (`--statusline`, `--notifications`, `--voice`) para operar de forma selectiva. Para instalar solo el statusline: `npm run install:statusline`. Para instalar solo notificaciones: `npm run install:notifications`.
+   Escribe `statusLine`, hooks de notificación y claves de voz en `~/.claude/settings.json`. **Reinicie Claude Code** tras instalar. Admite `--dry-run` (previsualizar sin escribir), `--uninstall` y flags de feature (`--statusline`, `--notifications`, `--voice`) para operar de forma selectiva. Instaladores individuales para statusline y notificaciones: `npm run install:statusline` y `npm run install:notifications`. La voz no tiene instalador individual: usa `npm run setup --voice`.
 
    El diseño del statusline está en [router-statusline.md](./router-statusline.md); el servicio de notificaciones en [notifications.md](./notifications.md).
 

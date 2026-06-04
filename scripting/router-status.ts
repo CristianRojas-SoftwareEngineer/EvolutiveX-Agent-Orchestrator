@@ -855,8 +855,8 @@ function renderTokenTable(
     '# Workflows',
     '# Steps',
     'Input (tks)',
-    'Cache Creación (tks)',
-    'Cache Lectura (tks)',
+    'Caché Write (tks)',
+    'Caché Read (tks)',
     'Output (tks)',
   ];
   const alignments: Array<'left' | 'center' | 'right'> = [

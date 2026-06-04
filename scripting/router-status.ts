@@ -63,6 +63,7 @@ interface SessionMetrics {
 
 interface TokenMetrics {
   inputTokens: number;
+  cacheCreationInputTokens: number;
   cacheReadInputTokens: number;
   outputTokens: number;
   count: number;
@@ -411,6 +412,7 @@ function renderSideBySide(
 interface LevelMetricsSnapshot {
   count: number;
   inputTokens: number;
+  cacheCreationInputTokens: number;
   cacheReadInputTokens: number;
   outputTokens: number;
 }
@@ -605,6 +607,7 @@ function createEmptyMetrics(
 } {
   const empty: TokenMetrics = {
     inputTokens: 0,
+    cacheCreationInputTokens: 0,
     cacheReadInputTokens: 0,
     outputTokens: 0,
     count: 0,
@@ -656,6 +659,9 @@ export function aggregateSessionMetrics(
       levelMetrics.count += coerceMetricNumber(entry.count);
       // G4 escribe snake_case (§33.2); sesiones antiguas pueden usar camelCase
       levelMetrics.inputTokens += coerceMetricNumber(entry.input_tokens ?? entry.inputTokens);
+      levelMetrics.cacheCreationInputTokens += coerceMetricNumber(
+        entry.cache_creation_input_tokens ?? entry.cacheCreationInputTokens,
+      );
       levelMetrics.cacheReadInputTokens += coerceMetricNumber(
         entry.cache_read_input_tokens ?? entry.cacheReadInputTokens,
       );
@@ -807,14 +813,16 @@ function renderTokenTable(
   const rows: string[][] = [];
 
   let totalInput = 0;
-  let totalCache = 0;
+  let totalCacheCreation = 0;
+  let totalCacheRead = 0;
   let totalOutput = 0;
   let totalCount = 0;
 
   for (const level of levels) {
     const m = metrics[level.key];
     totalInput += m.inputTokens;
-    totalCache += m.cacheReadInputTokens;
+    totalCacheCreation += m.cacheCreationInputTokens;
+    totalCacheRead += m.cacheReadInputTokens;
     totalOutput += m.outputTokens;
     totalCount += m.count;
 
@@ -826,6 +834,7 @@ function renderTokenTable(
       `${level.color}${m.modelName || '-'}${C.reset}`,
       `${cc('count', m.count)}${m.count}${C.reset}`,
       `${cc('inputTokens', m.inputTokens)}${formatTokens(m.inputTokens)}${C.reset}`,
+      `${cc('cacheCreationInputTokens', m.cacheCreationInputTokens)}${formatTokens(m.cacheCreationInputTokens)}${C.reset}`,
       `${cc('cacheReadInputTokens', m.cacheReadInputTokens)}${formatTokens(m.cacheReadInputTokens)}${C.reset}`,
       `${cc('outputTokens', m.outputTokens)}${formatTokens(m.outputTokens)}${C.reset}`,
     ]);
@@ -837,12 +846,14 @@ function renderTokenTable(
     'Modelo',
     '# Steps',
     'Input (tks)',
-    'Cache In (tks)',
+    'Cache Creación (tks)',
+    'Cache Lectura (tks)',
     'Output (tks)',
   ];
   const alignments: Array<'left' | 'center' | 'right'> = [
     'left',
     'left',
+    'right',
     'right',
     'right',
     'right',
@@ -859,6 +870,7 @@ function renderTokenTable(
   const w3 = columnWidths[3];
   const w4 = columnWidths[4];
   const w5 = columnWidths[5];
+  const w6 = columnWidths[6];
 
   const totalText = `${C.total}Totales de sesión${C.reset}`;
   // Para que los │ de las columnas 3-6 estén alineados con las filas anteriores:
@@ -881,7 +893,16 @@ function renderTokenTable(
     },
     previous,
   );
-  const tcCache = totalColor(
+  const tcCacheCreation = totalColor(
+    'cacheCreationInputTokens',
+    {
+      lite: metrics.lite.cacheCreationInputTokens,
+      standard: metrics.standard.cacheCreationInputTokens,
+      reasoning: metrics.reasoning.cacheCreationInputTokens,
+    },
+    previous,
+  );
+  const tcCacheRead = totalColor(
     'cacheReadInputTokens',
     {
       lite: metrics.lite.cacheReadInputTokens,
@@ -900,7 +921,7 @@ function renderTokenTable(
     previous,
   );
 
-  const totalRow = `${C.border}${B.v}${C.reset} ${totalMerged} ${C.border}${B.v}${C.reset} ${alignRight(`${tcCount}${totalCount}${C.reset}`, w2)} ${C.border}${B.v}${C.reset} ${alignRight(`${tcInput}${formatTokens(totalInput)}${C.reset}`, w3)} ${C.border}${B.v}${C.reset} ${alignRight(`${tcCache}${formatTokens(totalCache)}${C.reset}`, w4)} ${C.border}${B.v}${C.reset} ${alignRight(`${tcOutput}${formatTokens(totalOutput)}${C.reset}`, w5)} ${C.border}${B.v}${C.reset}`;
+  const totalRow = `${C.border}${B.v}${C.reset} ${totalMerged} ${C.border}${B.v}${C.reset} ${alignRight(`${tcCount}${totalCount}${C.reset}`, w2)} ${C.border}${B.v}${C.reset} ${alignRight(`${tcInput}${formatTokens(totalInput)}${C.reset}`, w3)} ${C.border}${B.v}${C.reset} ${alignRight(`${tcCacheCreation}${formatTokens(totalCacheCreation)}${C.reset}`, w4)} ${C.border}${B.v}${C.reset} ${alignRight(`${tcCacheRead}${formatTokens(totalCacheRead)}${C.reset}`, w5)} ${C.border}${B.v}${C.reset} ${alignRight(`${tcOutput}${formatTokens(totalOutput)}${C.reset}`, w6)} ${C.border}${B.v}${C.reset}`;
 
   // Borde inferior de la tabla con columna fusionada
   // w0+2 (col0) + 1 (┴) + w1+2 (col1) = w0+w1+5
@@ -912,6 +933,7 @@ function renderTokenTable(
     B.h.repeat(w3 + 2),
     B.h.repeat(w4 + 2),
     B.h.repeat(w5 + 2),
+    B.h.repeat(w6 + 2),
   ];
   const botLine = `${C.border}${B.bl}${botParts.join(B.mb)}${B.br}${C.reset}`;
 
@@ -1021,18 +1043,21 @@ export function buildStatuslineOutput(
         lite: {
           count: metrics.lite.count,
           inputTokens: metrics.lite.inputTokens,
+          cacheCreationInputTokens: metrics.lite.cacheCreationInputTokens,
           cacheReadInputTokens: metrics.lite.cacheReadInputTokens,
           outputTokens: metrics.lite.outputTokens,
         },
         standard: {
           count: metrics.standard.count,
           inputTokens: metrics.standard.inputTokens,
+          cacheCreationInputTokens: metrics.standard.cacheCreationInputTokens,
           cacheReadInputTokens: metrics.standard.cacheReadInputTokens,
           outputTokens: metrics.standard.outputTokens,
         },
         reasoning: {
           count: metrics.reasoning.count,
           inputTokens: metrics.reasoning.inputTokens,
+          cacheCreationInputTokens: metrics.reasoning.cacheCreationInputTokens,
           cacheReadInputTokens: metrics.reasoning.cacheReadInputTokens,
           outputTokens: metrics.reasoning.outputTokens,
         },

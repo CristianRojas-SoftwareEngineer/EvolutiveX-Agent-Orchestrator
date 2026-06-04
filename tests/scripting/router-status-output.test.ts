@@ -36,7 +36,8 @@ describe('buildStatuslineOutput', () => {
   }
 
   it('muestra Tabla 1 y Tabla 2 side-by-side sin session_id ni carpeta (§3.2)', () => {
-    const out = buildStatuslineOutput({}, {}, { sessionsRoot: emptySessionsRoot() });
+    const settings: ClaudeSettingsEnv = { SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS: 'on' };
+    const out = buildStatuslineOutput({}, settings, { sessionsRoot: emptySessionsRoot() });
     expect(out).toContain('Sesión actual');
     expect(out).toContain('Steps por nivel de razonamiento');
   });
@@ -152,6 +153,7 @@ describe('buildStatuslineOutput', () => {
       ANTHROPIC_DEFAULT_HAIKU_MODEL: 'm1-haiku',
       ANTHROPIC_DEFAULT_SONNET_MODEL: 'm2-sonnet',
       ANTHROPIC_DEFAULT_OPUS_MODEL: 'm3-opus',
+      SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS: 'on',
     };
 
     const out = buildStatuslineOutput({ session_id: sessionId }, settings, {
@@ -159,5 +161,25 @@ describe('buildStatuslineOutput', () => {
     });
     expect(out).toContain('Lite');
     expect(out).toMatch(/2/);
+  });
+
+  it('oculta Tabla 2 cuando SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS está ausente', () => {
+    const out = buildStatuslineOutput({}, {}, { sessionsRoot: emptySessionsRoot() });
+    expect(out).toContain('Sesión actual');
+    expect(out).not.toContain('Steps por nivel de razonamiento');
+  });
+
+  it('muestra Tabla 2 cuando SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS = "on"', () => {
+    const settings: ClaudeSettingsEnv = { SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS: 'on' };
+    const out = buildStatuslineOutput({}, settings, { sessionsRoot: emptySessionsRoot() });
+    expect(out).toContain('Sesión actual');
+    expect(out).toContain('Steps por nivel de razonamiento');
+  });
+
+  it('oculta Tabla 2 cuando SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS = "off"', () => {
+    const settings: ClaudeSettingsEnv = { SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS: 'off' };
+    const out = buildStatuslineOutput({}, settings, { sessionsRoot: emptySessionsRoot() });
+    expect(out).toContain('Sesión actual');
+    expect(out).not.toContain('Steps por nivel de razonamiento');
   });
 });

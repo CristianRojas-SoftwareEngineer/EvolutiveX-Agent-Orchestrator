@@ -15,6 +15,7 @@ import { fileURLToPath } from 'node:url';
 import {
   readClaudeSettings,
   SMART_CODE_PROXY_ROOT_KEY,
+  STATUSLINE_ROUTER_DETAILS_KEY,
 } from './shared/claude-settings.js';
 
 // ── Tipos ───────────────────────────────────────────────────────
@@ -1141,50 +1142,55 @@ export function buildStatuslineOutput(
   const table3Width = table3 ? table3.width : computeRateLimitReferenceWidth();
   const targetWidth = table1.width + table3Width + 2;
 
-  let table2: { lines: string[]; width: number };
-  if (sessionPath) {
-    const metrics = aggregateSessionMetrics(sessionPath, settingsEnv, paths.routingPath);
-    const cache = readStatuslineCache(sessionPath);
-    const previous = cache.metricsSnapshot || null;
-    table2 = renderTokenTable(metrics, previous, targetWidth);
-    writeStatuslineCache(sessionPath, {
-      metricsSnapshot: {
-        lite: {
-          count: metrics.lite.count,
-          workflowCount: metrics.lite.workflowCount,
-          inputTokens: metrics.lite.inputTokens,
-          cacheCreationInputTokens: metrics.lite.cacheCreationInputTokens,
-          cacheReadInputTokens: metrics.lite.cacheReadInputTokens,
-          outputTokens: metrics.lite.outputTokens,
-        },
-        standard: {
-          count: metrics.standard.count,
-          workflowCount: metrics.standard.workflowCount,
-          inputTokens: metrics.standard.inputTokens,
-          cacheCreationInputTokens: metrics.standard.cacheCreationInputTokens,
-          cacheReadInputTokens: metrics.standard.cacheReadInputTokens,
-          outputTokens: metrics.standard.outputTokens,
-        },
-        reasoning: {
-          count: metrics.reasoning.count,
-          workflowCount: metrics.reasoning.workflowCount,
-          inputTokens: metrics.reasoning.inputTokens,
-          cacheCreationInputTokens: metrics.reasoning.cacheCreationInputTokens,
-          cacheReadInputTokens: metrics.reasoning.cacheReadInputTokens,
-          outputTokens: metrics.reasoning.outputTokens,
-        },
-      },
-    });
-  } else {
-    table2 = renderTokenTable(createEmptyMetrics(settingsEnv, paths.routingPath), null, targetWidth);
-  }
-
   if (table3) {
     output.push(renderSideBySide(table1, table3, 2));
   } else {
     output.push(table1.lines.join('\n'));
   }
-  output.push(table2.lines.join('\n'));
+
+  const showRouterDetails =
+    settingsEnv[STATUSLINE_ROUTER_DETAILS_KEY]?.trim().toLowerCase() === 'on';
+
+  if (showRouterDetails) {
+    let table2: { lines: string[]; width: number };
+    if (sessionPath) {
+      const metrics = aggregateSessionMetrics(sessionPath, settingsEnv, paths.routingPath);
+      const cache = readStatuslineCache(sessionPath);
+      const previous = cache.metricsSnapshot || null;
+      table2 = renderTokenTable(metrics, previous, targetWidth);
+      writeStatuslineCache(sessionPath, {
+        metricsSnapshot: {
+          lite: {
+            count: metrics.lite.count,
+            workflowCount: metrics.lite.workflowCount,
+            inputTokens: metrics.lite.inputTokens,
+            cacheCreationInputTokens: metrics.lite.cacheCreationInputTokens,
+            cacheReadInputTokens: metrics.lite.cacheReadInputTokens,
+            outputTokens: metrics.lite.outputTokens,
+          },
+          standard: {
+            count: metrics.standard.count,
+            workflowCount: metrics.standard.workflowCount,
+            inputTokens: metrics.standard.inputTokens,
+            cacheCreationInputTokens: metrics.standard.cacheCreationInputTokens,
+            cacheReadInputTokens: metrics.standard.cacheReadInputTokens,
+            outputTokens: metrics.standard.outputTokens,
+          },
+          reasoning: {
+            count: metrics.reasoning.count,
+            workflowCount: metrics.reasoning.workflowCount,
+            inputTokens: metrics.reasoning.inputTokens,
+            cacheCreationInputTokens: metrics.reasoning.cacheCreationInputTokens,
+            cacheReadInputTokens: metrics.reasoning.cacheReadInputTokens,
+            outputTokens: metrics.reasoning.outputTokens,
+          },
+        },
+      });
+    } else {
+      table2 = renderTokenTable(createEmptyMetrics(settingsEnv, paths.routingPath), null, targetWidth);
+    }
+    output.push(table2.lines.join('\n'));
+  }
 
   return output.join('\n');
 }

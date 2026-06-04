@@ -38,7 +38,10 @@
     "sessions:restore": "tsx scripting/session-manager/cli.ts restore",
     "sessions:sanitize:scan": "tsx scripting/session-manager/cli.ts sanitize scan",
     "sessions:sanitize": "tsx scripting/session-manager/cli.ts sanitize",
-    "sessions:sanitize:all": "tsx scripting/session-manager/cli.ts sanitize all"
+    "sessions:sanitize:all": "tsx scripting/session-manager/cli.ts sanitize all",
+    "statusline:router-details:on": "tsx scripting/statusline-router-details.ts on",
+    "statusline:router-details:off": "tsx scripting/statusline-router-details.ts off",
+    "statusline:router-details:toggle": "tsx scripting/statusline-router-details.ts toggle"
   },
   "keywords": [],
   "author": "",

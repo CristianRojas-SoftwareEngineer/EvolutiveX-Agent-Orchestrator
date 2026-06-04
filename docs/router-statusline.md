@@ -88,7 +88,25 @@ El statusline consta de **dos o tres tablas** según el método de autenticació
 
 ### 3.2 Tabla 2 — Steps y consumo de tokens por nivel (común a todos los proveedores)
 
-Presente siempre, independientemente del método de autenticación. Se renderiza debajo del bloque Tabla 1 (± Tabla 3) incluso sin `ctx.session_id` ni carpeta en `sessions/` (métricas en cero). Permite al usuario conocer cuántos tokens consume por nivel de razonamiento en la sesión actual, tanto para providers con facturación por token (bearer) como para suscripciones (OAuth).
+Visible de forma **condicional** según la variable `SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS` en `~/.claude/settings.json → env`. Por defecto está **oculta** (opt-in); solo se muestra cuando el valor es `'on'`.
+
+**Controlar la visibilidad:**
+
+```bash
+# Activar (mostrar Tabla 2)
+! npm run statusline:router-details:on
+
+# Desactivar (ocultar Tabla 2)
+! npm run statusline:router-details:off
+
+# Alternar (on→off, off/ausente→on)
+! npm run statusline:router-details:toggle
+
+# Ver el valor resultante sin escribir en settings.json
+! npm run statusline:router-details:toggle -- --dry-run
+```
+
+El statusline refleja el cambio en el siguiente refresh (no requiere reiniciar Claude Code). Se renderiza debajo del bloque Tabla 1 (± Tabla 3) incluso sin `ctx.session_id` ni carpeta en `sessions/` (métricas en cero). Permite al usuario conocer cuántos tokens consume por nivel de razonamiento en la sesión actual, tanto para providers con facturación por token (bearer) como para suscripciones (OAuth).
 
 ```
 ╭─ Steps por nivel de razonamiento ─────────────────────────────────────────────────────────────────────────────╮

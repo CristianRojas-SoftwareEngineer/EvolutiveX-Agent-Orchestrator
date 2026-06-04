@@ -108,6 +108,7 @@ describe('buildStatuslineOutput con ROOT en settingsEnv', () => {
     const settingsEnv: ClaudeSettingsEnv = {
       ...modelSettings,
       [SMART_CODE_PROXY_ROOT_KEY]: proxyRoot,
+      SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS: 'on',
     };
 
     const out = buildStatuslineOutput({ session_id: sessionId }, settingsEnv);

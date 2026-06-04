@@ -30,6 +30,12 @@ export const CLAUDE_SETTINGS_PATH = join(homedir(), '.claude', 'settings.json');
 export const SMART_CODE_PROXY_ROOT_KEY = 'SMART_CODE_PROXY_ROOT';
 
 /**
+ * Clave en `settings.env` que controla la visibilidad de la Tabla 2 del statusline.
+ * Valor `'on'` → visible; cualquier otro valor o ausente → oculta (opt-in).
+ */
+export const STATUSLINE_ROUTER_DETAILS_KEY = 'SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS';
+
+/**
  * Subconjunto tipado de `settings.json` que manipulan los scripts de este repo.
  * Otras claves de primer nivel (p. ej. permisos) se conservan al reescribir el objeto completo
  * solo si el caller hace spread del objeto leído antes de mutar.

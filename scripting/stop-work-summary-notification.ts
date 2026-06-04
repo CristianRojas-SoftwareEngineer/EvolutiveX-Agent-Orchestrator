@@ -125,7 +125,10 @@ export async function summarizeWorkWithModel(assistantText: string): Promise<str
       messages: [{ role: 'user', content: buildSummarizationUserMessage(assistantText) }],
     });
     const parts = response.content
-      .filter((block): block is { type: 'text'; text: string } => block.type === 'text')
+      .filter(
+        (block): block is Extract<(typeof response.content)[number], { type: 'text' }> =>
+          block.type === 'text',
+      )
       .map((block) => block.text);
     const joined = normalizeWhitespace(parts.join(' '));
     if (!joined) return undefined;

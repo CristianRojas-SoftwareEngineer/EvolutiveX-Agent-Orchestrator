@@ -64,18 +64,22 @@ export async function createProxyDependencies(
     config,
     logger,
   );
+  const sessionMetrics = new SessionMetricsService();
   const auditSseResponseHandler = new AuditSseResponseHandler(
     config,
     () => new StepAssemblerService(),
     workflowRepo,
     eventBus,
+    auditBaseDir,
+    sessionMetrics,
     logger,
   );
-  const sessionMetrics = new SessionMetricsService();
   const auditStandardResponseHandler = new AuditStandardResponseHandler(
     eventBus,
     config,
     workflowRepo,
+    auditBaseDir,
+    sessionMetrics,
   );
   const auditUpstreamErrorHandler = new AuditUpstreamErrorHandler(workflowRepo);
   const filterToolsHandler = new FilterToolsHandler(config);

@@ -126,6 +126,6 @@ export class AuditHookEventHandler {
 
     const sessionDir = resolveSessionDir(this.auditBaseDir, sessionId);
     const closedSteps = workflow.steps.filter((s) => s.closedAt != null);
-    await this.sessionMetrics.updateFromWorkflow(sessionDir, closedSteps);
+    await this.sessionMetrics.finalizeWorkflowMetrics(sessionDir, workflowId, closedSteps);
   }
 }

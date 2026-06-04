@@ -6,6 +6,16 @@ import type { IWorkflowRepository } from '../../src/1-domain/repositories/IWorkf
 import type { IWorkflow } from '../../src/1-domain/interfaces/gateway/IWorkflow.js';
 import { AuditWorkflowContext } from '../../src/1-domain/types/audit.types.js';
 import { makeTestConfig as makeConfig } from '../helpers/test-config.js';
+import type { SessionMetricsService } from '../../src/2-services/session-metrics.service.js';
+
+function makeSessionMetrics(): SessionMetricsService {
+  return {
+    updateFromStep: vi.fn().mockResolvedValue(undefined),
+    finalizeWorkflowMetrics: vi.fn().mockResolvedValue(undefined),
+  } as unknown as SessionMetricsService;
+}
+
+const AUDIT_BASE = '/tmp/sessions';
 
 function makeEventBus(overrides: Partial<IEventBus> = {}): IEventBus {
   return {
@@ -100,6 +110,8 @@ describe('AuditStandardResponseHandler', () => {
       makeEventBus({ publish }),
       makeConfig(),
       repo,
+      AUDIT_BASE,
+      makeSessionMetrics(),
     );
 
     const stream = new PassThrough();
@@ -130,6 +142,8 @@ describe('AuditStandardResponseHandler', () => {
       makeEventBus({ publish }),
       makeConfig(),
       repo,
+      AUDIT_BASE,
+      makeSessionMetrics(),
     );
 
     const stream = new PassThrough();
@@ -153,7 +167,13 @@ describe('AuditStandardResponseHandler', () => {
       getWorkflowBySessionId: vi.fn(() => undefined),
       registerStep,
     });
-    const handler = new AuditStandardResponseHandler(makeEventBus({ publish }), makeConfig(), repo);
+    const handler = new AuditStandardResponseHandler(
+      makeEventBus({ publish }),
+      makeConfig(),
+      repo,
+      AUDIT_BASE,
+      makeSessionMetrics(),
+    );
 
     const stream = new PassThrough();
     handler.execute(stream, makeContext(), 'application/json');
@@ -169,7 +189,13 @@ describe('AuditStandardResponseHandler', () => {
     const wf = stubWorkflow();
     const publish = vi.fn();
     const repo = makeWorkflowRepo({ getWorkflowBySessionId: vi.fn(() => wf) });
-    const handler = new AuditStandardResponseHandler(makeEventBus({ publish }), makeConfig(), repo);
+    const handler = new AuditStandardResponseHandler(
+      makeEventBus({ publish }),
+      makeConfig(),
+      repo,
+      AUDIT_BASE,
+      makeSessionMetrics(),
+    );
 
     const stream = new PassThrough();
     handler.execute(stream, makeContext(), 'application/json');
@@ -189,7 +215,13 @@ describe('AuditStandardResponseHandler', () => {
     });
     const config = makeConfig({ MAX_RESPONSE_BUFFER_BYTES: 5 });
     const publish = vi.fn();
-    const handler = new AuditStandardResponseHandler(makeEventBus({ publish }), config, repo);
+    const handler = new AuditStandardResponseHandler(
+      makeEventBus({ publish }),
+      config,
+      repo,
+      AUDIT_BASE,
+      makeSessionMetrics(),
+    );
 
     const stream = new PassThrough();
     handler.execute(stream, makeContext(), 'application/json');
@@ -210,7 +242,13 @@ describe('AuditStandardResponseHandler', () => {
       getWorkflowBySessionId: vi.fn(() => wf),
       forceClose,
     });
-    const handler = new AuditStandardResponseHandler(makeEventBus(), makeConfig(), repo);
+    const handler = new AuditStandardResponseHandler(
+      makeEventBus(),
+      makeConfig(),
+      repo,
+      AUDIT_BASE,
+      makeSessionMetrics(),
+    );
 
     const stream = new PassThrough();
     handler.execute(stream, makeContext(), 'application/json');

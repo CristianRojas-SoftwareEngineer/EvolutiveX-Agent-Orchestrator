@@ -108,6 +108,8 @@ Visible de forma **condicional** según la variable `SMART_CODE_PROXY__STATUSLIN
 
 El statusline refleja el cambio en el siguiente refresh (no requiere reiniciar Claude Code). Se renderiza debajo del bloque Tabla 1 (± Tabla 3) incluso sin `ctx.session_id` ni carpeta en `sessions/` (métricas en cero). Permite al usuario conocer cuántos tokens consume por nivel de razonamiento en la sesión actual, tanto para providers con facturación por token (bearer) como para suscripciones (OAuth).
 
+**Cadencia de datos:** la Tabla 2 lee `sessions/<session_id>/session-metrics.json` en cada invocación del script. El proxy actualiza ese archivo **per-step** (columna `# Steps` y tokens) tras hops main contables, y **`workflow_count`** al cierre del workflow main. La frecuencia con la que Claude Code re-invoca el statusline depende del host, no del script; no hay polling ni timers en `router-status.ts`. Véase [`session-metrics-system.md`](./session-metrics-system.md).
+
 ```
 ╭─ Trabajo por niveles de razonamiento ─────────────────────────────────────────────────────────────────────────────╮
 ╭───────────┬─────────────────────────┬─────────────┬─────────┬─────────────┬───────────────────┬──────────────────┬──────────────╮

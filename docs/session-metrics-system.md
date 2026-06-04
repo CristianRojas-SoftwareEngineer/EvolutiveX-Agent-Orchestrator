@@ -51,22 +51,30 @@ Sesiones creadas antes de G4 pueden conservar entradas en **camelCase** (`inputT
 
 `InteractionMetadata` (y tipos `@deprecated` en `audit.types.ts`) conservan `modelId?: string` solo para proyección offline / shim SSE; **no** hay `ActiveInteraction` en memoria tras P1 (`IWorkflow` en `IWorkflowRepository`).
 
-#### Escritura (`SessionMetricsService`, G4)
+#### Escritura (`SessionMetricsService`, G4 + per-step)
 
-`updateSessionMetrics()` en `AuditWriterService` fue **retirado** en G4. La actualización la realiza `SessionMetricsService` (`src/2-services/session-metrics.service.ts`):
+`updateSessionMetrics()` en `AuditWriterService` fue **retirado** en G4. La actualización la realiza `SessionMetricsService` (`src/2-services/session-metrics.service.ts`) con dos operaciones:
 
-1. Se invoca desde `AuditWorkflowClosureHandler` al cerrar un workflow **`kind: 'main'`** (invariante G16). Los sub-workflows no escriben `session-metrics.json` (su consumo ya está en el rollup del padre).
-2. Agrupa steps cerrados con `aggregateWorkflowUsageByModel` (L1).
-3. Hace merge incremental en `session-metrics.json`, recalcula `session_totals` y `cache_efficiency` por modelo.
-4. Escribe `session-metrics.json` con escritura atómica propia (`writeJsonAtomic` interno) y serializa actualizaciones con cola interna (`writeQueue`) para evitar races.
+| Método | Cuándo | Qué actualiza |
+| ------ | ------ | ------------- |
+| `updateFromStep(sessionDir, step)` | Tras hop main **contable** en wire (stop terminal + `usage`) | `count`, tokens, `cache_efficiency`, `session_totals`; **no** `workflow_count` |
+| `finalizeWorkflowMetrics(sessionDir, workflowId, closedSteps)` | Hook `Stop` / `StopFailure` en workflow **`kind: 'main'`** (G16) | `workflow_count` (+1 por modelo del workflow); tokens/count solo para steps no volcados per-step |
 
-Ya **no** hay actualización per-step en los handlers wire; el cierre nominal del turno vía hooks (`Stop` / `SubagentStop` / `StopFailure`) dispara la proyección y, para workflows main, la métrica de sesión.
+Los sub-workflows **nunca** escriben `session-metrics.json`.
+
+**Idempotencia:** sidecar `sessions/<session-id>/session-metrics-applied.json` con `applied_step_ids` y `finalized_workflow_ids` (snake_case). No modifica el schema §28.2 de `session-metrics.json`.
+
+**Steps contables:** misma condición que `closeStep` en wire (`end_turn`, `max_tokens`, `null`, `''`). Hops `tool_use` no cuentan hasta un hop terminal posterior.
+
+**Fallback en cierre:** si un workflow main cierra con steps con `usage` que no pasaron por `updateFromStep` (p. ej. brownfield o `StopFailure`), `finalizeWorkflowMetrics` hace merge de tokens/count solo para esos steps no listados en `applied_step_ids`.
+
+Ambos métodos usan cola `writeQueue`, `writeJsonAtomic` y escriben métricas + sidecar en la misma operación encolada.
 
 | Componente | Rol |
 | ---------- | --- |
-| `AuditHookEventHandler` | `close()` en el correlador |
-| `AuditWorkflowClosureHandler` | `meta.json` + `SessionMetricsService` (solo main) |
-| Handlers wire | `registerStep` / `closeStep` en correlador; sin `updateSessionMetrics` |
+| `AuditHookEventHandler` | `close()` + `finalizeWorkflowMetrics` (solo main) |
+| `AuditSseResponseHandler` / `AuditStandardResponseHandler` | `registerStep` / `closeStep` + `persistBillableStepMetricsIfNeeded` → `updateFromStep` |
+| `persist-billable-step-metrics.util.ts` | G16 + `isStepBillableForSessionMetrics` antes de `updateFromStep` |
 
 Los `client-preflight` no actualizan métricas de sesión.
 

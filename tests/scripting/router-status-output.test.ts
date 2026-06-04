@@ -176,6 +176,52 @@ describe('buildStatuslineOutput', () => {
     expect(out).toContain('Trabajo por niveles de razonamiento');
   });
 
+  it('Tabla 2 refleja count per-step con workflow_count aún en 0', () => {
+    const root = emptySessionsRoot();
+    const sessionId = 'per-step-mid';
+    const sessionDir = join(root, sessionId);
+    mkdirSync(sessionDir, { recursive: true });
+    writeFileSync(
+      join(sessionDir, 'session-metrics.json'),
+      JSON.stringify({
+        models: {
+          'p/m1-haiku': {
+            count: 1,
+            workflow_count: 0,
+            input_tokens: 42,
+            output_tokens: 7,
+            cache_creation_input_tokens: 0,
+            cache_read_input_tokens: 0,
+            cache_efficiency: 0,
+          },
+        },
+        session_totals: {
+          input_tokens: 42,
+          output_tokens: 7,
+          cache_creation_input_tokens: 0,
+          cache_read_input_tokens: 0,
+          total_steps: 1,
+          total_workflows: 0,
+        },
+      }),
+      'utf-8',
+    );
+
+    const settings: ClaudeSettingsEnv = {
+      ANTHROPIC_DEFAULT_HAIKU_MODEL: 'm1-haiku',
+      ANTHROPIC_DEFAULT_SONNET_MODEL: 'm2-sonnet',
+      ANTHROPIC_DEFAULT_OPUS_MODEL: 'm3-opus',
+      SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS: 'on',
+    };
+
+    const out = buildStatuslineOutput({ session_id: sessionId }, settings, {
+      sessionsRoot: root,
+    });
+    expect(out).toContain('# Steps');
+    expect(out).toMatch(/\b1\b/);
+    expect(out).toContain('0');
+  });
+
   it('oculta Tabla 2 cuando SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS = "off"', () => {
     const settings: ClaudeSettingsEnv = { SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS: 'off' };
     const out = buildStatuslineOutput({}, settings, { sessionsRoot: emptySessionsRoot() });

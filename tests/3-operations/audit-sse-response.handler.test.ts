@@ -8,6 +8,14 @@ import { StepAssemblerService } from '../../src/2-services/step-assembler.servic
 import { WorkflowRepositoryService } from '../../src/2-services/workflow-repository.service.js';
 import { AuditWorkflowContext } from '../../src/1-domain/types/audit.types.js';
 import { makeTestConfig as makeConfig } from '../helpers/test-config.js';
+import type { SessionMetricsService } from '../../src/2-services/session-metrics.service.js';
+
+function makeSessionMetrics(): SessionMetricsService {
+  return {
+    updateFromStep: vi.fn().mockResolvedValue(undefined),
+    finalizeWorkflowMetrics: vi.fn().mockResolvedValue(undefined),
+  } as unknown as SessionMetricsService;
+}
 
 function makeEventBus(overrides: Partial<IEventBus> = {}): IEventBus {
   return {
@@ -88,6 +96,8 @@ function makeSseHandler(
     () => new StepAssemblerService(),
     repo,
     eventBus,
+    '/tmp/sessions',
+    makeSessionMetrics(),
   );
 }
 

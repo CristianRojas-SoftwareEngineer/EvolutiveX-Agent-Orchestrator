@@ -52,7 +52,8 @@ function stubWorkflow(id = 'session-1'): IWorkflow {
 
 function makeSessionMetrics(): SessionMetricsService {
   return {
-    updateFromWorkflow: vi.fn().mockResolvedValue(undefined),
+    updateFromStep: vi.fn().mockResolvedValue(undefined),
+    finalizeWorkflowMetrics: vi.fn().mockResolvedValue(undefined),
   } as unknown as SessionMetricsService;
 }
 
@@ -111,7 +112,7 @@ describe('AuditHookEventHandler', () => {
 
     expect(readyToClose).toHaveBeenCalledWith('session-1', expect.objectContaining({ eventName: 'Stop' }));
     expect(close).toHaveBeenCalledWith('session-1', expect.objectContaining({ eventName: 'Stop' }));
-    expect(sessionMetrics.updateFromWorkflow).toHaveBeenCalled();
+    expect(sessionMetrics.finalizeWorkflowMetrics).toHaveBeenCalled();
   });
 
   it('Stop con stopHookActive:true → readyToClose:false, close no invocado', () => {
@@ -159,7 +160,7 @@ describe('AuditHookEventHandler', () => {
 
     expect(readyToClose).not.toHaveBeenCalled();
     expect(close).toHaveBeenCalledWith('session-1', expect.objectContaining({ eventName: 'StopFailure' }));
-    expect(sessionMetrics.updateFromWorkflow).toHaveBeenCalled();
+    expect(sessionMetrics.finalizeWorkflowMetrics).toHaveBeenCalled();
   });
 
   it('UserPromptSubmit → openWorkflow invocado con sessionId', () => {

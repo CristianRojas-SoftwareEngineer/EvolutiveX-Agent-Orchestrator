@@ -1,11 +1,13 @@
 import type { IWorkflowRepository } from '../1-domain/repositories/IWorkflowRepository.js';
 import type { IEventBus } from '../1-domain/repositories/IEventBus.js';
+import { SessionMetricsService } from '../2-services/session-metrics.service.js';
 import type { AnthropicMessage } from '../1-domain/types/anthropic.types.js';
 import {
   buildInferenceRequestSnapshot,
   buildWireStep,
   registerWireStepInCorrelator,
 } from './gateway-wire-step.util.js';
+import { persistBillableStepMetricsIfNeeded } from './persist-billable-step-metrics.util.js';
 import { ProxyEnvironmentConfig } from '../1-domain/types/config.types.js';
 import { AuditWorkflowContext } from '../1-domain/types/audit.types.js';
 
@@ -20,6 +22,8 @@ export class AuditStandardResponseHandler {
     private eventBus: IEventBus,
     private config: ProxyEnvironmentConfig,
     private workflowRepo: IWorkflowRepository,
+    private auditBaseDir: string,
+    private sessionMetrics: SessionMetricsService,
   ) {}
 
   public execute(
@@ -103,6 +107,13 @@ export class AuditStandardResponseHandler {
           closedAt: now,
         });
         registerWireStepInCorrelator(this.workflowRepo, wireStep, stopReason);
+        void persistBillableStepMetricsIfNeeded(
+          this.sessionMetrics,
+          this.auditBaseDir,
+          workflow,
+          wireStep,
+          stopReason,
+        );
 
         this.eventBus.publish({
           type: 'step_response',

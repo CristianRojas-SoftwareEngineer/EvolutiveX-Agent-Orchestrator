@@ -5,10 +5,15 @@ import * as os from 'node:os';
 import { SessionMetricsService, computeCacheEfficiency } from '../../src/2-services/session-metrics.service.js';
 import type { IStep } from '../../src/1-domain/interfaces/gateway/IStep.js';
 
-function makeStep(model: string, usage: IStep['usage']): IStep {
+function makeStep(
+  id: string,
+  model: string,
+  usage: IStep['usage'],
+  workflowId = 'w1',
+): IStep {
   return {
-    id: 's1',
-    workflowId: 'w1',
+    id,
+    workflowId,
     index: 0,
     inferenceRequest: { model, messages: [], max_tokens: 1 },
     assistantMessage: { role: 'assistant', content: [] },
@@ -42,31 +47,67 @@ describe('SessionMetricsService', () => {
     await fs.rm(tmpDir, { recursive: true, force: true });
   });
 
-  it('escribe session-metrics.json con schema §33.2', async () => {
-    const steps = [
-      makeStep('claude-sonnet', {
-        input_tokens: 100,
-        output_tokens: 50,
-        cache_read_input_tokens: 200,
-      }),
-    ];
-    await service.updateFromWorkflow(tmpDir, steps);
+  it('escribe session-metrics.json con schema §33.2 vía updateFromStep', async () => {
+    const step = makeStep('s1', 'claude-sonnet', {
+      input_tokens: 100,
+      output_tokens: 50,
+      cache_read_input_tokens: 200,
+    });
+    await service.updateFromStep(tmpDir, step);
 
     const raw = await fs.readFile(path.join(tmpDir, 'session-metrics.json'), 'utf8');
     const data = JSON.parse(raw);
     expect(data.models['claude-sonnet'].input_tokens).toBe(100);
     expect(data.models['claude-sonnet'].cache_efficiency).toBeDefined();
-    expect(data.models['claude-sonnet'].workflow_count).toBe(1);
+    expect(data.models['claude-sonnet'].workflow_count).toBe(0);
     expect(data.session_totals.total_steps).toBe(1);
+    expect(data.session_totals.total_workflows).toBe(0);
+  });
+
+  it('updateFromStep es idempotente por step.id', async () => {
+    const step = makeStep('s1', 'm1', { input_tokens: 10, output_tokens: 5 });
+    await service.updateFromStep(tmpDir, step);
+    await service.updateFromStep(tmpDir, step);
+
+    const raw = await fs.readFile(path.join(tmpDir, 'session-metrics.json'), 'utf8');
+    const data = JSON.parse(raw);
+    expect(data.models.m1.count).toBe(1);
+    expect(data.models.m1.input_tokens).toBe(10);
+  });
+
+  it('finalizeWorkflowMetrics incrementa workflow_count sin duplicar steps ya aplicados', async () => {
+    const step = makeStep('s1', 'm1', { input_tokens: 10, output_tokens: 5 });
+    await service.updateFromStep(tmpDir, step);
+    await service.finalizeWorkflowMetrics(tmpDir, 'w1', [step]);
+
+    const raw = await fs.readFile(path.join(tmpDir, 'session-metrics.json'), 'utf8');
+    const data = JSON.parse(raw);
+    expect(data.models.m1.count).toBe(1);
+    expect(data.models.m1.input_tokens).toBe(10);
+    expect(data.models.m1.workflow_count).toBe(1);
     expect(data.session_totals.total_workflows).toBe(1);
   });
 
-  it('merge incremental en segunda escritura', async () => {
-    await service.updateFromWorkflow(tmpDir, [
-      makeStep('m1', { input_tokens: 10, output_tokens: 5 }),
+  it('finalizeWorkflowMetrics es idempotente por workflowId', async () => {
+    const step = makeStep('s1', 'm1', { input_tokens: 10, output_tokens: 5 });
+    await service.updateFromStep(tmpDir, step);
+    await service.finalizeWorkflowMetrics(tmpDir, 'w1', [step]);
+    await service.finalizeWorkflowMetrics(tmpDir, 'w1', [step]);
+
+    const raw = await fs.readFile(path.join(tmpDir, 'session-metrics.json'), 'utf8');
+    const data = JSON.parse(raw);
+    expect(data.models.m1.workflow_count).toBe(1);
+  });
+
+  it('merge incremental: updateFromStep×2 + finalizeWorkflowMetrics×2 workflows distintos', async () => {
+    await service.updateFromStep(tmpDir, makeStep('s1', 'm1', { input_tokens: 10, output_tokens: 5 }, 'w1'));
+    await service.finalizeWorkflowMetrics(tmpDir, 'w1', [
+      makeStep('s1', 'm1', { input_tokens: 10, output_tokens: 5 }, 'w1'),
     ]);
-    await service.updateFromWorkflow(tmpDir, [
-      makeStep('m1', { input_tokens: 20, output_tokens: 10 }),
+
+    await service.updateFromStep(tmpDir, makeStep('s2', 'm1', { input_tokens: 20, output_tokens: 10 }, 'w2'));
+    await service.finalizeWorkflowMetrics(tmpDir, 'w2', [
+      makeStep('s2', 'm1', { input_tokens: 20, output_tokens: 10 }, 'w2'),
     ]);
 
     const raw = await fs.readFile(path.join(tmpDir, 'session-metrics.json'), 'utf8');
@@ -75,5 +116,16 @@ describe('SessionMetricsService', () => {
     expect(data.models.m1.count).toBe(2);
     expect(data.models.m1.workflow_count).toBe(2);
     expect(data.session_totals.total_workflows).toBe(2);
+  });
+
+  it('finalize aplica tokens de steps no aplicados per-step (fallback brownfield)', async () => {
+    const step = makeStep('s1', 'm1', { input_tokens: 15, output_tokens: 3 });
+    await service.finalizeWorkflowMetrics(tmpDir, 'w1', [step]);
+
+    const raw = await fs.readFile(path.join(tmpDir, 'session-metrics.json'), 'utf8');
+    const data = JSON.parse(raw);
+    expect(data.models.m1.count).toBe(1);
+    expect(data.models.m1.input_tokens).toBe(15);
+    expect(data.models.m1.workflow_count).toBe(1);
   });
 });

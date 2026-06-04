@@ -1,35 +1,11 @@
-# gateway-session-metrics Specification
-
-## Purpose
-
-Métricas agregadas de sesión en `session-metrics.json` (§33.2): tipos gateway `ISessionMetrics`,
-`SessionMetricsService` y invariante G16 (solo workflows `kind: 'main'`). Implementado en fase G4 (2026-05-29).
-
-## Requirements
-
-### Requirement: ISessionMetrics — tipo de dominio para session-metrics.json
-
-El sistema SHALL definir `ISessionMetrics` y tipos asociados en `src/1-domain/types/gateway/session-metrics.types.ts` (capa 1). El schema SHALL alinearse con [§28.2](../../../docs/gateway-architecture.md#282-session-metricsjson-raíz-de-sesión):
-
-- `models`: mapa por `modelId` con `count`, `workflow_count`, `input_tokens`, `output_tokens`, `cache_creation_input_tokens`, `cache_read_input_tokens`, `cache_efficiency`.
-- `session_totals`: agregado de la sesión incluyendo `total_workflows`.
-- Los campos `duration_ms` y `outcome` a nivel de archivo NO SHALL incluirse en G4 (diferidos).
-
-Los tipos legacy `SessionMetrics` y `SessionModelMetrics` en `audit.types.ts` SHALL reexportarse como alias `@deprecated` hacia los tipos gateway.
-
-#### Scenario: Tipo gateway exporta campos §33.2 obligatorios
-
-- **WHEN** se inspecciona `ISessionMetrics` en tipos gateway
-- **THEN** incluye `models` con desglose por modelo y `session_totals`
-- **AND** cada entrada de modelo incluye `cache_efficiency` y `workflow_count`
-- **AND** `session_totals` incluye `total_workflows`
+## ADDED Requirements
 
 ### Requirement: SessionMetricsService — actualización incremental por step (main)
 
 El sistema SHALL proveer en `SessionMetricsService` un método de actualización por step (p. ej. `updateFromStep`) que mergee en `session-metrics.json` el consumo de **un** step cerrado con `usage` válido, incrementando `count` y los contadores de tokens del `modelId` correspondiente, recalculando `cache_efficiency` y `session_totals`. El método SHALL:
 
 - Ejecutarse solo para workflows con `kind: 'main'`.
-- Usar la misma cola serializada (`writeQueue`) y escritura atómica que el path de cierre.
+- Usar la misma cola serializada (`writeQueue`) y escritura atómica que `updateFromWorkflow`.
 - Ser **idempotente** por `step.id`: un mismo step no SHALL incrementar contadores más de una vez aunque se reintente la invocación.
 - **NO** incrementar `workflow_count` ni `total_workflows` (reservado al cierre del workflow).
 
@@ -54,7 +30,7 @@ El sistema SHALL proveer en `SessionMetricsService` un método de actualización
 
 ### Requirement: Steps contables — stop_reason y cierre en correlador
 
-La actualización per-step SHALL aplicarse únicamente a steps del workflow **main** que el correlador trate como contables para métricas de sesión: step con `usage` válido y cuya condición de cierre coincida con la del dominio (stop terminal tras `closeStep`; hops `tool_use` no cuentan hasta un hop terminal posterior).
+La actualización per-step SHALL aplicarse únicamente a steps del workflow **main** que el correlador trate como contables para métricas de sesión: step con `usage` válido y cuya condición de cierre coincida con la del dominio (p. ej. step con `closedAt` establecido por `closeStep` tras stop terminal, o la regla documentada en diseño para hops `tool_use` si se incluyen).
 
 #### Scenario: Hop con stop_reason terminal cuenta al cerrarse el step
 
@@ -62,16 +38,18 @@ La actualización per-step SHALL aplicarse únicamente a steps del workflow **ma
 - **WHEN** finaliza el registro wire del step con `usage`
 - **THEN** la actualización per-step SHALL ejecutarse una vez para ese step
 
+## MODIFIED Requirements
+
 ### Requirement: SessionMetricsService — escritura atómica de session-metrics.json
 
 El sistema SHALL proveer `SessionMetricsService` en `src/2-services/session-metrics.service.ts` (capa 2) que mantenga `sessions/{sessionId}/session-metrics.json` como fuente agregada de la sesión. El servicio SHALL:
 
 - Actualizar contadores de steps y tokens **por step** cuando un step main contable cierra (requisito per-step).
-- Al cerrar un workflow main, invocar `finalizeWorkflowMetrics` que incremente `workflow_count` por modelo presente en ese workflow y recalcule totales, **sin volver a sumar** steps/tokens ya persistidos por step en la misma sesión/workflow.
+- Al cerrar un workflow main, invocar un path de cierre (p. ej. `finalizeWorkflowMetrics` o `updateFromWorkflow` ajustado) que incremente `workflow_count` por modelo presente en ese workflow y recalcule totales, **sin volver a sumar** steps/tokens ya persistidos por step en la misma sesión/workflow.
 - Calcular `cache_efficiency` por modelo según §33.2.
-- Escribir el archivo de forma **atómica** (archivo temporal + rename) y persistir idempotencia en sidecar `session-metrics-applied.json`.
+- Escribir el archivo de forma **atómica** (archivo temporal + rename).
 - Serializar escrituras concurrentes mediante cola serializada (`writeQueue`).
-- Invocarse desde handlers wire (vía `persistBillableStepMetricsIfNeeded`) para steps main contables y desde `AuditHookEventHandler.delegateClosure` para el cierre main.
+- Invocarse desde el wire/correlador para steps main contables y desde `AuditHookEventHandler.delegateClosure` para el cierre main.
 
 #### Scenario: Cierre de workflow main actualiza session-metrics.json
 
@@ -86,34 +64,6 @@ El sistema SHALL proveer `SessionMetricsService` en `src/2-services/session-metr
 - **WHEN** el path de cierre de workflow se invoca dos veces para workflows main distintos del mismo modelo
 - **THEN** `workflow_count` del modelo SHALL ser `2`
 - **AND** `total_workflows` SHALL ser `2`
-
-### Requirement: workflow_count en IModelSessionMetrics
-
-`IModelSessionMetrics` SHALL incluir el campo `workflow_count: number` que acumula el número de workflows main cerrados que usaron ese modelId.
-
-#### Scenario: Serialización de workflow_count en session-metrics.json
-
-- **WHEN** `SessionMetricsService` escribe `session-metrics.json` tras el cierre de un workflow main
-- **THEN** cada entrada en `models` SHALL incluir `workflow_count` con valor ≥ 1
-
-### Requirement: total_workflows en ISessionTotals
-
-`ISessionTotals` SHALL incluir el campo `total_workflows: number` igual a la suma de `workflow_count` de todos los modelos de la sesión.
-
-#### Scenario: total_workflows refleja la suma de modelos
-
-- **WHEN** `recalcSessionTotals` agrega los modelos
-- **THEN** `session_totals.total_workflows` SHALL ser igual a la suma de `workflow_count` de cada modelo
-
-### Requirement: Invariante G16 — solo workflows main actualizan métricas de sesión
-
-`SessionMetricsService` SHALL actualizar `session-metrics.json` **únicamente** cuando el workflow cerrado tiene `kind: 'main'`. Los sub-workflows (`kind: 'subagent'`) NO SHALL escribir métricas de sesión.
-
-#### Scenario: Cierre de sub-workflow no escribe session-metrics
-
-- **GIVEN** un sub-workflow `kind: 'subagent'` que cierra con `SubagentStop`
-- **WHEN** `AuditHookEventHandler` ejecuta `delegateClosure` para ese workflow
-- **THEN** `SessionMetricsService` NO SHALL modificar `session-metrics.json`
 
 ### Requirement: Retiro de updateSessionMetrics legacy
 

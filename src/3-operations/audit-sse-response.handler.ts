@@ -2,6 +2,7 @@ import { StringDecoder } from 'node:string_decoder';
 import type { IWorkflowRepository } from '../1-domain/repositories/IWorkflowRepository.js';
 import type { IEventBus } from '../1-domain/repositories/IEventBus.js';
 import type { AssembledInference, IStepAssembler } from '../2-services/ports/step-assembler.port.js';
+import { SessionMetricsService } from '../2-services/session-metrics.service.js';
 import { ProxyEnvironmentConfig } from '../1-domain/types/config.types.js';
 import {
   AuditWorkflowContext,
@@ -15,6 +16,7 @@ import {
   buildWireStep,
   registerWireStepInCorrelator,
 } from './gateway-wire-step.util.js';
+import { persistBillableStepMetricsIfNeeded } from './persist-billable-step-metrics.util.js';
 
 /** Fase de un chunk SSE según el rol en el step coalesced. */
 type ChunkPhase = SsePhase;
@@ -30,6 +32,8 @@ export class AuditSseResponseHandler {
     private createStepAssembler: () => IStepAssembler,
     private workflowRepo: IWorkflowRepository,
     private eventBus: IEventBus,
+    private auditBaseDir: string,
+    private sessionMetrics: SessionMetricsService,
     private logger?: Logger,
   ) {}
 
@@ -217,6 +221,13 @@ export class AuditSseResponseHandler {
       closedAt: now,
     });
     registerWireStepInCorrelator(this.workflowRepo, wireStep, assembled.stopReason);
+    void persistBillableStepMetricsIfNeeded(
+      this.sessionMetrics,
+      this.auditBaseDir,
+      workflow,
+      wireStep,
+      assembled.stopReason,
+    );
     return wireStep;
   }
 }

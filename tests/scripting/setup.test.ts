@@ -16,7 +16,6 @@ const DEFAULT_OPTS = {
   notifications: false,
   voice: false,
   voiceMode: 'hold' as const,
-  voiceAutoSubmit: true,
   uninstall: false,
   dryRun: false,
   force: false,
@@ -138,7 +137,7 @@ describe('runSetup — integración', () => {
     const s2 = applyNotificationsInstall(manual, proxyRoot, false);
     if ('error' in s2) throw new Error(String(s2.error));
     manual = s2;
-    manual = applyVoiceInstall(manual, { mode: 'hold', autoSubmit: true });
+    manual = applyVoiceInstall(manual, { mode: 'hold' });
 
     expect(fromSetup).toEqual(manual);
   });

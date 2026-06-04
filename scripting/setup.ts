@@ -21,7 +21,6 @@ export interface SetupRunOptions {
   notifications: boolean;
   voice: boolean;
   voiceMode: 'hold' | 'tap';
-  voiceAutoSubmit: boolean;
   uninstall: boolean;
   dryRun: boolean;
   force: boolean;
@@ -88,7 +87,6 @@ export function runSetup(options: SetupRunOptions): number {
   if (doVoice) {
     settings = applyVoiceInstall(settings, {
       mode: options.voiceMode,
-      autoSubmit: options.voiceAutoSubmit,
     });
   }
 
@@ -119,7 +117,6 @@ program
   .option('--notifications', 'Operar solo sobre notificaciones')
   .option('--voice', 'Operar solo sobre voz')
   .option('--voice-mode <hold|tap>', 'Modo de activación de voz', 'hold')
-  .option('--no-voice-auto-submit', 'Desactiva el autoSubmit de voz')
   .option('--uninstall', 'Desinstalar las features seleccionadas')
   .option('--dry-run', 'Muestra los valores sin escribir en settings.json')
   .option('--force', 'Sobrescribe configuración ajena')
@@ -130,7 +127,6 @@ program
       notifications?: boolean;
       voice?: boolean;
       voiceMode?: string;
-      voiceAutoSubmit?: boolean;
       uninstall?: boolean;
       dryRun?: boolean;
       force?: boolean;
@@ -142,7 +138,6 @@ program
         notifications: Boolean(opts.notifications),
         voice: Boolean(opts.voice),
         voiceMode: (opts.voiceMode === 'tap' ? 'tap' : 'hold') as 'hold' | 'tap',
-        voiceAutoSubmit: opts.voiceAutoSubmit !== false,
         uninstall: Boolean(opts.uninstall),
         dryRun: Boolean(opts.dryRun),
         force: Boolean(opts.force),

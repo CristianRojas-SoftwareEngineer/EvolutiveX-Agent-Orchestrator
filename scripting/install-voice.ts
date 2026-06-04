@@ -2,7 +2,6 @@ import { type ClaudeSettings } from './shared/claude-settings.js';
 
 export interface VoiceInstallOptions {
   mode: 'hold' | 'tap';
-  autoSubmit: boolean;
 }
 
 export function applyVoiceInstall(
@@ -14,7 +13,6 @@ export function applyVoiceInstall(
   (next as Record<string, unknown>)['voice'] = {
     enabled: true,
     mode: opts.mode,
-    autoSubmit: opts.autoSubmit,
   };
   return next;
 }

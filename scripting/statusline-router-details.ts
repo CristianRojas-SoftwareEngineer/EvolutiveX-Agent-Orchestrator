@@ -56,7 +56,7 @@ const program = new Command();
 
 program
   .name('statusline-router-details')
-  .description('Controla la visibilidad de la Tabla 2 del statusline (Steps por nivel de razonamiento)')
+  .description('Controla la visibilidad de la Tabla 2 del statusline (Trabajo por niveles de razonamiento)')
   .option('--dry-run', 'Muestra el valor resultante sin escribir en settings.json');
 
 program

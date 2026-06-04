@@ -39,7 +39,7 @@ describe('buildStatuslineOutput', () => {
     const settings: ClaudeSettingsEnv = { SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS: 'on' };
     const out = buildStatuslineOutput({}, settings, { sessionsRoot: emptySessionsRoot() });
     expect(out).toContain('Sesión actual');
-    expect(out).toContain('Steps por nivel de razonamiento');
+    expect(out).toContain('Trabajo por niveles de razonamiento');
   });
 
   // api_key y bearer comparten layout; solo oauth activa Tabla 3 (§3.3).
@@ -166,20 +166,20 @@ describe('buildStatuslineOutput', () => {
   it('oculta Tabla 2 cuando SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS está ausente', () => {
     const out = buildStatuslineOutput({}, {}, { sessionsRoot: emptySessionsRoot() });
     expect(out).toContain('Sesión actual');
-    expect(out).not.toContain('Steps por nivel de razonamiento');
+    expect(out).not.toContain('Trabajo por niveles de razonamiento');
   });
 
   it('muestra Tabla 2 cuando SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS = "on"', () => {
     const settings: ClaudeSettingsEnv = { SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS: 'on' };
     const out = buildStatuslineOutput({}, settings, { sessionsRoot: emptySessionsRoot() });
     expect(out).toContain('Sesión actual');
-    expect(out).toContain('Steps por nivel de razonamiento');
+    expect(out).toContain('Trabajo por niveles de razonamiento');
   });
 
   it('oculta Tabla 2 cuando SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS = "off"', () => {
     const settings: ClaudeSettingsEnv = { SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS: 'off' };
     const out = buildStatuslineOutput({}, settings, { sessionsRoot: emptySessionsRoot() });
     expect(out).toContain('Sesión actual');
-    expect(out).not.toContain('Steps por nivel de razonamiento');
+    expect(out).not.toContain('Trabajo por niveles de razonamiento');
   });
 });

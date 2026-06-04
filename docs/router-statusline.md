@@ -109,7 +109,7 @@ Visible de forma **condicional** según la variable `SMART_CODE_PROXY__STATUSLIN
 El statusline refleja el cambio en el siguiente refresh (no requiere reiniciar Claude Code). Se renderiza debajo del bloque Tabla 1 (± Tabla 3) incluso sin `ctx.session_id` ni carpeta en `sessions/` (métricas en cero). Permite al usuario conocer cuántos tokens consume por nivel de razonamiento en la sesión actual, tanto para providers con facturación por token (bearer) como para suscripciones (OAuth).
 
 ```
-╭─ Steps por nivel de razonamiento ─────────────────────────────────────────────────────────────────────────────╮
+╭─ Trabajo por niveles de razonamiento ─────────────────────────────────────────────────────────────────────────────╮
 ╭───────────┬─────────────────────────┬─────────────┬─────────┬─────────────┬───────────────────┬──────────────────┬──────────────╮
 │   Nivel   │         Modelo          │ # Workflows │ # Steps │ Input (tks) │ Caché Write (tks) │ Caché Read (tks) │ Output (tks) │
 ├───────────┼─────────────────────────┼─────────────┼─────────┼─────────────┼───────────────────┼──────────────────┼──────────────┤
@@ -189,7 +189,7 @@ buildStatuslineOutput()
   ├── si hay sessionDir: leer .statusline-state.json (caché, para Tabla 2 y fallback de % en Tabla 1)
   ├── Fila 1: Tabla 1 + Tabla 3 side-by-side (si oauth con cuotas); o solo Tabla 1 (resto de casos)
   ├── si hay sessionDir: escribir .statusline-state.json (caché: metricsSnapshot; % de contexto al renderizar Tabla 1 si stdin aportó valor usable)
-  └── Fila 2: Tabla 2 (Steps por nivel de razonamiento, siempre, debajo)
+  └── Fila 2: Tabla 2 (Trabajo por niveles de razonamiento, siempre, debajo)
 ```
 
 ---

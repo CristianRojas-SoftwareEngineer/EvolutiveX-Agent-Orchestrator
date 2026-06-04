@@ -1042,7 +1042,7 @@ function renderTokenTable(
   const botLine = `${C.border}${B.bl}${botParts.join(B.mb)}${B.br}${C.reset}`;
 
   // Calcular padding para que el título tenga el mismo ancho que la tabla
-  const titleText = '╭─ Steps por nivel de razonamiento ';
+  const titleText = '╭─ Trabajo por niveles de razonamiento ';
   const titleVisLen = visibleLength(titleText);
   const titlePad = Math.max(0, width - titleVisLen - 1); // -1 para ╮ (╭ ya está en titleVisLen)
   const title = `${C.title}${titleText}${'─'.repeat(titlePad)}╮${C.reset}`;

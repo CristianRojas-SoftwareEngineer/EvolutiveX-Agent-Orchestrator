@@ -39,7 +39,7 @@ Requisitos: `npm install` en la raíz del proxy (para `tsx` en `node_modules`). 
 
 **Nota:** el [`.claude/settings.json`](../../.claude/settings.json) del **proyecto** puede definir las mismas claves de hook (p. ej. lifecycle con `POST /hooks`); el merge de Claude Code da prioridad al proyecto y puede anular toasts globales en esas claves dentro de este repo. Para toasts + gateway en Smart Code Proxy, ampliar el settings del proyecto según [hooks-lifecycle-correlation](../openspec/specs/hooks-lifecycle-correlation/spec.md). El directorio `.claude/` está en `.gitignore`: la configuración del proyecto no se versiona; los fragmentos canónicos viven en esta guía y en el [README § Configuración de hooks](../README.md#configuracion-de-hooks).
 
-## Hook `Stop`: fin de turno y resumen con modelo
+## Hook `Stop`: mensaje de continuidad con modelo
 
 En Smart Code Proxy, el evento **`Stop`** usa un relay unificado en lugar de varios comandos en paralelo.
 
@@ -47,13 +47,14 @@ En Smart Code Proxy, el evento **`Stop`** usa un relay unificado en lugar de var
 | --- | --- |
 | 1 | Lee el payload JSON del hook **una sola vez** por stdin |
 | 2 | `POST /hooks` al proxy (misma semántica que [`post-hook-event.ts`](../scripting/post-hook-event.ts)) |
-| 3 | **1.er toast** — copy del catálogo (`Stop`: «Tu turno — El asistente terminó…») |
-| 4 | Resume el turno con **Haiku** (`ANTHROPIC_*` del entorno del hook) a partir de `last_assistant_message`, o del último bloque `text` assistant en `transcript_path` si falta el campo |
-| 5 | **2.º toast** — título «Resumen del trabajo», cuerpo = resumen (o recorte del último mensaje si falla la API) |
+| 3 | Lee el contexto del workflow desde `transcript_path` (turno previo + turno actual) |
+| 4 | Genera un **mensaje de continuidad** con **Haiku** (`ANTHROPIC_*` del entorno): qué se completó, qué está abierto, dirección del siguiente prompt. Si no hay API key o falla, usa el texto del último mensaje del asistente como fallback |
+| 5 | Persiste el mensaje completo en `sessions/.last-continuity-message.txt` (punto de integración TTS) |
+| 6 | **Toast único** — título «Stop», cuerpo = preview de hasta 250 caracteres del mensaje de continuidad (o copy del catálogo si no hay texto fuente) |
 
-**Scripts:** [`scripting/stop-hook-ux.ts`](../scripting/stop-hook-ux.ts) (orquestador) y [`scripting/stop-work-summary-notification.ts`](../scripting/stop-work-summary-notification.ts) (resumen + 2.º toast). El builder de comando con ruta absoluta: `buildStopHookUxCommand` en [`scripting/shared/gateway-hook-command.ts`](../scripting/shared/gateway-hook-command.ts).
+**Scripts:** [`scripting/stop-hook-ux.ts`](../scripting/stop-hook-ux.ts) (orquestador) y [`scripting/stop-work-summary-notification.ts`](../scripting/stop-work-summary-notification.ts) (contexto + mensaje + toast). El builder de comando con ruta absoluta: `buildStopHookUxCommand` en [`scripting/shared/gateway-hook-command.ts`](../scripting/shared/gateway-hook-command.ts).
 
-**Por qué un solo proceso:** si `post-hook-event.ts`, el CLI de notificaciones y un tercer script corren en paralelo, en Windows suele quedarse solo el primero con stdin; el resumen no recibe JSON y no emite el 2.º toast.
+**Por qué un solo proceso:** si `post-hook-event.ts`, el CLI de notificaciones y un tercer script corren en paralelo, en Windows suele quedarse solo el primero con stdin; el mensaje de continuidad no recibe JSON y no emite el toast.
 
 **Fragmento para `.claude/settings.json` del proyecto** (sustituye la entrada `Stop` con doble comando + `--stdin-json`):
 
@@ -65,7 +66,7 @@ En Smart Code Proxy, el evento **`Stop`** usa un relay unificado en lugar de var
         "type": "command",
         "command": "npx --prefix \"${CLAUDE_PROJECT_DIR}\" tsx \"${CLAUDE_PROJECT_DIR}/scripting/stop-hook-ux.ts\"",
         "timeout": 120,
-        "statusMessage": "Notificaciones y resumen del turno…"
+        "statusMessage": "Generando mensaje de continuidad…"
       }
     ]
   }
@@ -77,8 +78,22 @@ En Smart Code Proxy, el evento **`Stop`** usa un relay unificado en lugar de var
 **Prueba manual** (desde la raíz del repo, con `ANTHROPIC_API_KEY` o `ANTHROPIC_AUTH_TOKEN`):
 
 ```bash
-echo '{"hook_event_name":"Stop","last_assistant_message":"Se documento el relay Stop y los tests pasan."}' \
-  | npx tsx scripting/stop-hook-ux.ts
+echo '{"hook_event_name":"Stop","transcript_path":"<ruta al .jsonl>","last_assistant_message":"Tests en verde."}' \
+  | CLAUDE_PROJECT_DIR=. npx tsx scripting/stop-hook-ux.ts
+# Esperado: 1 toast título "Stop", archivo sessions/.last-continuity-message.txt creado
+```
+
+**Prueba sin API key** (fallback a texto truncado):
+
+```bash
+echo '{"hook_event_name":"Stop","last_assistant_message":"Refactor completo."}' \
+  | CLAUDE_PROJECT_DIR=. npx tsx scripting/stop-hook-ux.ts
+```
+
+**Prueba sin texto fuente** (copy del catálogo):
+
+```bash
+echo '{}' | CLAUDE_PROJECT_DIR=. npx tsx scripting/stop-hook-ux.ts
 ```
 
 **Depuración:** mensajes en stderr con prefijo `stop-hook-ux:` o `stop-work-summary-notification:`; canal **Hooks** en Claude Code (`/hooks`).

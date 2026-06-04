@@ -167,7 +167,7 @@ El repositorio SHALL registrar las 8 entradas del lifecycle de hooks de Claude C
 
 La entrada del proyecto MUST contener, para los **4 hooks de lifecycle con doble comando** (`UserPromptSubmit`, `SubagentStart`, `SubagentStop`, `StopFailure`), un array `hooks` con dos comandos. El primer comando invoca `POST /hooks` (definido por el requirement anterior). El segundo comando invoca el entry point CLI del servicio de notificaciones migrado al repositorio (`src/2-services/notifications/cli.ts`), con paths **relativos** a la raíz del proyecto y la flag `--event-type <EventName>` y `--message "<texto fijo>"` donde aplique (ver tabla). Los otros 3 hooks del lifecycle (`PreToolUse` con `*`, `PostToolUse` con `*`, `PostToolUseFailure`) MUST contener únicamente el comando `POST /hooks`, sin comando de notificación.
 
-El hook **`Stop`** NO entra en este requirement: su configuración SHALL cumplir el requirement «Relay unificado del hook `Stop`» (un solo proceso; doble toast + resumen con modelo).
+El hook **`Stop`** NO entra en este requirement: su configuración SHALL cumplir el requirement «Relay unificado del hook `Stop`» (un solo proceso; toast único con mensaje de continuidad generado por modelo).
 
 **Justificación de la exclusión de `PreToolUse` / `PostToolUse`:** los eventos de tool tienen frecuencia alta (5–50 invocaciones por turno en sesiones largas). El gateway necesita `matcher: "*"` para correlacionar todas las tools, pero un toast por cada invocación es ruido de UX, no señal. La notificación se mantiene en las claves de lifecycle, donde un único toast por evento aporta valor (inicio del turno, spawn de subagente, cierre de subagente, cierre del turno, error de cierre). Mismo razonamiento aplica a `PostToolUseFailure` (frecuencia ligada a la de tools).
 
@@ -221,47 +221,51 @@ El hook **`Stop`** NO entra en este requirement: su configuración SHALL cumplir
 
 ### Requirement: Relay unificado del hook `Stop` en el proyecto
 
-El hook `Stop` en `.claude/settings.json` del proyecto Smart Code Proxy SHALL declarar un **único** handler `type: "command"` que ejecute `scripting/stop-hook-ux.ts` mediante `npx` + `tsx`, con rutas resueltas con `${CLAUDE_PROJECT_DIR}` (no SHALL depender del cwd del proceso hook). El timeout del handler SHOULD ser ≥ 90 s para cubrir la llamada al modelo de resumen.
+El hook `Stop` en `.claude/settings.json` del proyecto Smart Code Proxy SHALL declarar un **único** handler `type: "command"` que ejecute `scripting/stop-hook-ux.ts` mediante `npx` + `tsx`, con rutas resueltas con `${CLAUDE_PROJECT_DIR}` (no SHALL depender del cwd del proceso hook). El timeout del handler SHOULD ser ≥ 120 s para cubrir la extracción del transcript, la llamada al modelo y la escritura en disco.
 
 Ese proceso SHALL leer el payload JSON del hook **una sola vez** por stdin y, en secuencia:
 
 1. Reenviar el cuerpo a `POST /hooks` del proxy (equivalente a `scripting/post-hook-event.ts`, URL vía `ANTHROPIC_BASE_URL`).
-2. Emitir el **primer toast** de fin de turno (copy del catálogo `Stop` en `desktop-notifications-service`).
-3. Derivar texto fuente desde `last_assistant_message`; si falta, desde el último bloque `text` de un mensaje `assistant` en `transcript_path` del payload.
-4. Invocar la API de mensajes con credenciales `ANTHROPIC_API_KEY` o `ANTHROPIC_AUTH_TOKEN` y, si aplica, `ANTHROPIC_BASE_URL` del entorno del hook; modelo por defecto Haiku (`ANTHROPIC_DEFAULT_HAIKU_MODEL` o fallback documentado en código).
-5. Emitir el **segundo toast** con título «Resumen del trabajo» y cuerpo = resumen generado; si la API falla o no hay credenciales, el cuerpo SHALL ser un recorte normalizado del texto fuente (fallback).
+2. Extraer el contexto del workflow actual y del turno previo desde `transcript_path` del payload (ver spec `stop-hook-continuity-message`, Requirement «Extracción del contexto del workflow desde el transcript»).
+3. Si `transcript_path` no está disponible o falla, usar `last_assistant_message` del payload como texto fuente de fallback.
+4. Invocar la API de mensajes con credenciales `ANTHROPIC_API_KEY` o `ANTHROPIC_AUTH_TOKEN` del entorno del hook para generar el mensaje de continuidad (`generateContinuityMessage`); modelo por defecto Haiku (`ANTHROPIC_DEFAULT_HAIKU_MODEL` o fallback documentado en código).
+5. Persistir el texto completo en `<CLAUDE_PROJECT_DIR>/sessions/.last-continuity-message.txt` (`writeContinuityMessage`).
+6. Emitir el **único toast** con título `"Stop"` y cuerpo = preview truncado del mensaje de continuidad (o fallback según jerarquía definida en spec `stop-hook-continuity-message`).
 
-El repositorio SHALL NOT configurar para `Stop` múltiples comandos en paralelo que lean stdin por separado (`post-hook-event.ts` + `cli.ts` + script de resumen), porque compiten por stdin (especialmente en Windows) y el resumen deja de emitirse.
+El proceso NO SHALL emitir un primer toast de señal de estado separado («Tu turno — El asistente terminó»). El único toast cubre tanto el aviso de fin de turno como el contenido de continuidad.
 
-**Módulos normativos:** orquestador `scripting/stop-hook-ux.ts`; resumen y 2.º toast `scripting/stop-work-summary-notification.ts`; builder `buildStopHookUxCommand` en `scripting/shared/gateway-hook-command.ts`. Los prompt hooks (`type: "prompt"`) de Claude Code NO sustituyen este relay: no pueden invocar toasts.
+El repositorio SHALL NOT configurar para `Stop` múltiples comandos en paralelo que lean stdin por separado, porque compiten por stdin (especialmente en Windows).
+
+**Módulos normativos:** orquestador `scripting/stop-hook-ux.ts`; mensaje de continuidad y toast `scripting/stop-work-summary-notification.ts` (función `runContinuityNotification`); builder `buildStopHookUxCommand` en `scripting/shared/gateway-hook-command.ts`. Los prompt hooks (`type: "prompt"`) de Claude Code NO sustituyen este relay: no pueden invocar toasts.
 
 **Documentación operativa (no normativa de comportamiento, referencia):** [`docs/notifications.md`](../../docs/notifications.md) § Hook Stop, [`README.md`](../../README.md) § Configuración de hooks. El directorio `.claude/` está en `.gitignore`; el fragmento JSON canónico vive en la guía de notificaciones.
 
-#### Scenario: `Stop` con payload válido → `POST /hooks` y dos toasts
+#### Scenario: `Stop` con payload válido → `POST /hooks` y toast único con continuidad
 
 - **GIVEN** `.claude/settings.json` del proyecto contiene la entrada `Stop` con un único comando a `stop-hook-ux.ts` y `${CLAUDE_PROJECT_DIR}` definido por Claude Code
 - **AND** el proxy escucha en `ANTHROPIC_BASE_URL`
-- **AND** el payload incluye `last_assistant_message` no vacío
+- **AND** el payload incluye `transcript_path` apuntando a un JSONL legible
+- **AND** `ANTHROPIC_API_KEY` o `ANTHROPIC_AUTH_TOKEN` presentes en el entorno
 - **WHEN** Claude Code dispara el evento `Stop`
 - **THEN** SHALL llegar una request `POST /hooks` con el payload del evento
-- **AND** SHALL emitirse un toast con el mensaje del catálogo para `Stop`
-- **AND** SHALL emitirse un segundo toast con título «Resumen del trabajo» y cuerpo no vacío
+- **AND** SHALL emitirse **exactamente un** toast con título `"Stop"` y cuerpo no vacío (mensaje de continuidad)
+- **AND** SHALL existir el archivo `sessions/.last-continuity-message.txt` con el texto completo
 
-#### Scenario: `Stop` sin `last_assistant_message` pero con `transcript_path` legible
+#### Scenario: `Stop` sin `transcript_path` pero con `last_assistant_message`
 
-- **GIVEN** el payload de `Stop` no incluye `last_assistant_message`
-- **AND** `transcript_path` apunta a un JSONL con al menos un mensaje `assistant` con bloque `text`
+- **GIVEN** el payload de `Stop` no incluye `transcript_path` o el archivo no es legible
+- **AND** el payload incluye `last_assistant_message` no vacío
 - **WHEN** se ejecuta `stop-hook-ux.ts`
-- **THEN** SHALL intentarse el resumen (o fallback) a partir del transcript
-- **AND** SHALL emitirse el segundo toast si se obtiene texto fuente no vacío
+- **THEN** SHALL intentarse el mensaje de continuidad (o fallback) a partir de `last_assistant_message`
+- **AND** SHALL emitirse **un** toast si se obtiene texto no vacío
 
-#### Scenario: `Stop` con stdin vacío por competencia de hooks → sin segundo toast
+#### Scenario: `Stop` con stdin vacío por competencia de hooks → sin toast de continuidad
 
 - **GIVEN** una configuración incorrecta con dos comandos en paralelo que leen stdin
 - **AND** el segundo proceso recibe stdin vacío
-- **WHEN** se ejecuta solo el script de resumen sin texto fuente
-- **THEN** NO SHALL emitirse el segundo toast
-- **AND** el proceso SHOULD registrar en stderr un mensaje diagnóstico (p. ej. sin `last_assistant_message` ni transcript)
+- **WHEN** se ejecuta solo el script de continuidad sin texto fuente
+- **THEN** NO SHALL emitirse el toast de continuidad
+- **AND** el proceso SHOULD registrar en stderr un mensaje diagnóstico
 
 > **Nota de conformidad:** la configuración canónica del proyecto usa un solo comando (`stop-hook-ux.ts`) para evitar este escenario.
 

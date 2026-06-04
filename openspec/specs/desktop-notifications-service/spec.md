@@ -419,42 +419,44 @@ El CLI SHALL escribir un mensaje de error en `stderr` y terminar con código de 
 
 ---
 
-### Requirement: Relay `Stop` desde scripting (doble toast + resumen con modelo)
+### Requirement: Relay `Stop` desde scripting (toast único con mensaje de continuidad)
 
-En el proyecto Smart Code Proxy, el flujo UX del hook `Stop` MAY omitir el CLI como segundo comando y SHALL delegarse en `scripting/stop-hook-ux.ts`, que importa `buildEvent` y `DesktopNotificationAdapter` desde `src/2-services/notifications/` (mismo contrato de `NotificationEvent` que el CLI).
+En el proyecto Smart Code Proxy, el flujo UX del hook `Stop` SHALL delegarse en `scripting/stop-hook-ux.ts`, que importa `buildEvent` y `DesktopNotificationAdapter` desde `src/2-services/notifications/` (mismo contrato de `NotificationEvent` que el CLI).
 
-El relay SHALL emitir **dos** notificaciones por ejecución exitosa con texto fuente disponible:
+El relay SHALL emitir **un único toast** por ejecución:
 
-| Orden | Título | Cuerpo | Sonido |
-| --- | --- | --- | --- |
-| 1 | `eventKey` `Stop` (resolución CLI) | `profile.message` del catálogo para `Stop` | Según catálogo `Stop` |
-| 2 | «Resumen del trabajo» (override `--title`) | Resumen Haiku o fallback truncado del último texto assistant | Según catálogo `Stop` (mismo `eventKey` para branding de icono) |
+| Título | Cuerpo | Sonido |
+| --- | --- | --- |
+| `"Stop"` (`eventKey` sin override) | Preview truncado (≤ 250 chars) del mensaje de continuidad; si no hay mensaje generado: fallback al texto fuente truncado; si no hay texto fuente: copy del catálogo para `Stop` | Según catálogo `Stop` |
 
-La generación del resumen SHALL vivir en `scripting/stop-work-summary-notification.ts` y MAY reutilizar `normalizeWhitespace`, `truncate` y constantes de longitud de `hook-payload-notification-message.ts`. El orquestador `scripting/stop-hook-ux.ts` SHALL invocar `POST /hooks` antes de los toasts (ver `hooks-lifecycle-correlation`).
+La lógica de generación del mensaje de continuidad SHALL vivir en `scripting/stop-work-summary-notification.ts` (función `runContinuityNotification`). La función `notifyStopTurnFinished()` SHALL ser eliminada. El orquestador `scripting/stop-hook-ux.ts` SHALL invocar `POST /hooks` antes del toast (ver `hooks-lifecycle-correlation`).
+
+El texto completo del mensaje de continuidad SHALL persistirse en `sessions/.last-continuity-message.txt` antes de emitir el toast. Ver spec `stop-hook-continuity-message` para el contrato completo de generación y persistencia.
 
 Este requirement NO modifica el contrato del CLI standalone: instalaciones globales (`install:notifications`) y otros hooks del lifecycle siguen usando `cli.ts` directamente.
 
-#### Scenario: Primer toast Stop usa catálogo sin `--stdin-json`
+#### Scenario: Toast único usa mensaje de continuidad generado
 
-- **GIVEN** `notifyStopTurnFinished()` en `stop-work-summary-notification.ts`
-- **WHEN** se construye el evento vía `buildEvent({ eventType: 'Stop', stdinJson: false })`
-- **THEN** `message` SHALL ser el copy del catálogo para `Stop` («Tu turno — El asistente terminó…»)
-- **AND** `title` SHALL ser `'Stop'` salvo override explícito
-
-#### Scenario: Segundo toast usa título de resumen y mensaje generado
-
-- **GIVEN** un resumen no vacío `"Refactor y tests en verde."`
-- **WHEN** se invoca `notifyWorkSummary` con ese texto
-- **THEN** el evento SHALL tener `title: 'Resumen del trabajo'`
-- **AND** `message` SHALL ser el resumen
+- **GIVEN** `runContinuityNotification` genera un mensaje de continuidad no vacío
+- **WHEN** se construye el evento del toast vía `buildEvent({ eventType: 'Stop', message: preview, stdinJson: false })`
+- **THEN** `title` SHALL ser `'Stop'`
+- **AND** `message` SHALL ser el preview truncado (≤ 250 chars) del mensaje de continuidad
 - **AND** el branding (`appId`, icono de perfil `Stop`) SHALL aplicarse vía `buildEvent` con `eventType: 'Stop'`
 
-#### Scenario: Relay Stop no sustituye formatter CLI con `--stdin-json`
+#### Scenario: Sin texto generado → fallback al texto fuente
 
-- **GIVEN** una invocación directa `cli.ts --event-type Stop --stdin-json` con `last_assistant_message`
-- **WHEN** se compara con el 1.er toast del relay unificado
-- **THEN** el relay 1.er toast SHALL usar siempre el catálogo (no el formatter de `last_assistant_message`)
-- **AND** el texto largo del assistant SHALL aparecer preferentemente en el 2.º toast (resumen o fallback)
+- **GIVEN** que `generateContinuityMessage` devuelve `undefined` (sin API key o fallo)
+- **AND** existe texto fuente (`last_assistant_message` o transcript)
+- **WHEN** se construye el evento del toast
+- **THEN** `message` SHALL ser `fallbackSummary(assistantText)` (texto normalizado truncado)
+- **AND** `title` SHALL ser `'Stop'`
+
+#### Scenario: Sin texto fuente → copy del catálogo
+
+- **GIVEN** que no hay texto fuente disponible (stdin vacío, sin `last_assistant_message`, sin transcript legible)
+- **WHEN** se construye el evento del toast
+- **THEN** `message` SHALL ser el copy del catálogo para `Stop` («Tu turno — El asistente terminó. Escribe tu siguiente mensaje.»)
+- **AND** `title` SHALL ser `'Stop'`
 
 #### Scenario: CLI con payload inválido → error en stderr y exit 1
 
@@ -477,23 +479,6 @@ Este requirement NO modifica el contrato del CLI standalone: instalaciones globa
 - **GIVEN** el CLI entry point del repo
 - **WHEN** se invoca con `--app-id "Custom.Id" --event-type Stop --message "Test"`
 - **THEN** el evento pasado al adaptador SHALL contener `appId: 'Custom.Id'`
-- **AND** SHALL NO contener `appId: 'AIAssistant.Proxy'` (el default fue sobrescrito)
-
-#### Scenario: CLI con `--icon` explícito override el default
-
-- **GIVEN** el CLI entry point del repo
-- **WHEN** se invoca con `--icon /ruta/custom.png --event-type Stop --message "Test"`
-- **THEN** el evento pasado al adaptador SHALL contener `icon: '/ruta/custom.png'`
-- **AND** SHALL NO contener la ruta al `.png` por default (el default fue sobrescrito)
-
-#### Scenario: CLI degrada con gracia si el icono por defecto no existe
-
-- **GIVEN** el CLI entry point del repo
-- **AND** el archivo `assets/notifications/ai-assistant.png` NO existe en disco
-- **WHEN** se invoca el CLI sin `--icon` con flags requeridos
-- **THEN** el evento pasado al adaptador SHALL contener `appId: 'AIAssistant.Proxy'`
-- **AND** SHALL NO contener la clave `icon` (campo omitido por degradación)
-- **AND** SHALL terminarse con código de salida 0 (la notificación se sigue emitiendo)
 
 ---
 

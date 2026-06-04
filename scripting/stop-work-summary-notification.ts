@@ -1,10 +1,12 @@
 /**
- * Hook Stop: resume el turno con un modelo y emite un segundo toast de escritorio.
- * Los prompt hooks de Claude Code no pueden invocar el CLI de notificaciones; este relay
- * replica el prompt configurado en `.claude/settings.json` y envía el resumen.
+ * Hook Stop: genera un mensaje de continuidad con modelo y emite un toast de escritorio.
+ * Lee el contexto completo del workflow actual + turno previo desde el transcript JSONL.
+ * El mensaje completo se persiste en sessions/.last-continuity-message.txt (Fase 2 TTS).
  */
 import { createReadStream } from 'node:fs';
+import { writeFile } from 'node:fs/promises';
 import { createInterface } from 'node:readline';
+import { join } from 'node:path';
 import { stdin } from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { resolve as resolvePath } from 'node:path';
@@ -14,13 +16,31 @@ import { buildEvent } from '../src/2-services/notifications/cli.js';
 import { truncate, normalizeWhitespace } from '../src/2-services/notifications/hook-payload-notification-message.js';
 
 const DEFAULT_HAIKU = 'claude-haiku-4-5-20251001';
-const MAX_INPUT_CHARS = 12_000;
-const MAX_SUMMARY_CHARS = 320;
+const MAX_INPUT_CHARS = 15_000;
+const MAX_TOAST_PREVIEW_CHARS = 250;
 
-export const STOP_SUMMARY_PROMPT_PREFIX =
-  'Resume en 2-4 frases, en español y para el usuario, el trabajo realizado en este turno de asistente de código. ' +
-  'Sé concreto (qué se hizo, resultado). Sin markdown ni listas. Solo el texto del resumen.\n\n' +
-  'Mensaje final del asistente:\n';
+export const CONTINUITY_PROMPT_PREFIX =
+  'Eres un asistente de continuidad para una sesión de programación con Claude Code. ' +
+  'En 3-5 frases en español, en prosa continua (sin markdown, sin listas), cubre: ' +
+  '(1) qué se completó en este turno, (2) qué está abierto, ambiguo o sin resolver, ' +
+  '(3) la dirección sugerida para el siguiente prompt o trabajo. Sé concreto.\n\n';
+
+interface WorkflowContext {
+  previous?: { userPrompt: string; lastAssistantText: string };
+  current: { userPrompt: string; messages: string[] };
+}
+
+interface TranscriptLine {
+  message?: {
+    role?: string;
+    content?: Array<{ type?: string; text?: string }>;
+  };
+}
+
+interface Segment {
+  role: string;
+  texts: string[];
+}
 
 export async function readStdinText(): Promise<string> {
   const chunks: Buffer[] = [];
@@ -37,18 +57,10 @@ export function readLastAssistantMessage(payload: Record<string, unknown>): stri
   return trimmed.length > 0 ? trimmed : undefined;
 }
 
-interface TranscriptLine {
-  message?: {
-    role?: string;
-    content?: Array<{ type?: string; text?: string }>;
-  };
-}
-
-/** Último bloque `text` de un mensaje assistant en el transcript JSONL del hook. */
-export async function readLastAssistantTextFromTranscript(
+export async function extractWorkflowContext(
   transcriptPath: string,
-): Promise<string | undefined> {
-  let lastText: string | undefined;
+): Promise<WorkflowContext | undefined> {
+  const segments: Segment[] = [];
   const rl = createInterface({
     input: createReadStream(transcriptPath, { encoding: 'utf-8' }),
   });
@@ -58,14 +70,13 @@ export async function readLastAssistantTextFromTranscript(
       if (!trimmed) continue;
       try {
         const row = JSON.parse(trimmed) as TranscriptLine;
-        if (row.message?.role !== 'assistant' || !Array.isArray(row.message.content)) {
-          continue;
-        }
-        const parts = row.message.content
+        if (!row.message?.role || !Array.isArray(row.message.content)) continue;
+        const texts = row.message.content
           .filter((b) => b.type === 'text' && typeof b.text === 'string')
-          .map((b) => b.text as string);
-        const joined = normalizeWhitespace(parts.join(' '));
-        if (joined) lastText = joined;
+          .map((b) => b.text as string)
+          .filter((t) => t.trim().length > 0);
+        if (texts.length === 0) continue;
+        segments.push({ role: row.message.role, texts });
       } catch {
         /* línea no JSON */
       }
@@ -73,31 +84,61 @@ export async function readLastAssistantTextFromTranscript(
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     process.stderr.write(`stop-work-summary-notification: transcript: ${msg}\n`);
+    return undefined;
   } finally {
     rl.close();
   }
-  return lastText;
-}
 
-export async function resolveAssistantTextForSummary(
-  payload: Record<string, unknown>,
-): Promise<string | undefined> {
-  const fromField = readLastAssistantMessage(payload);
-  if (fromField) return fromField;
+  const userIndices = segments
+    .map((s, i) => (s.role === 'user' ? i : -1))
+    .filter((i) => i !== -1);
 
-  const transcriptPath = payload['transcript_path'];
-  if (typeof transcriptPath === 'string' && transcriptPath.trim()) {
-    return readLastAssistantTextFromTranscript(transcriptPath.trim());
+  if (userIndices.length === 0) return undefined;
+
+  if (userIndices.length === 1) {
+    const userIdx = userIndices[0];
+    const userPrompt = normalizeWhitespace(segments[userIdx].texts.join(' '));
+    const messages = segments
+      .slice(userIdx + 1)
+      .filter((s) => s.role === 'assistant')
+      .map((s) => normalizeWhitespace(s.texts.join(' ')))
+      .filter(Boolean);
+    return { current: { userPrompt, messages } };
   }
-  return undefined;
+
+  const prevUserIdx = userIndices[userIndices.length - 2];
+  const lastUserIdx = userIndices[userIndices.length - 1];
+
+  const prevUserPrompt = normalizeWhitespace(segments[prevUserIdx].texts.join(' '));
+  const assistantsBetween = segments
+    .slice(prevUserIdx + 1, lastUserIdx)
+    .filter((s) => s.role === 'assistant');
+  const lastAssistantText =
+    assistantsBetween.length > 0
+      ? normalizeWhitespace(assistantsBetween[assistantsBetween.length - 1].texts.join(' '))
+      : '';
+
+  const lastUserPrompt = normalizeWhitespace(segments[lastUserIdx].texts.join(' '));
+  const currentMessages = segments
+    .slice(lastUserIdx + 1)
+    .filter((s) => s.role === 'assistant')
+    .map((s) => normalizeWhitespace(s.texts.join(' ')))
+    .filter(Boolean);
+
+  return {
+    previous: { userPrompt: prevUserPrompt, lastAssistantText },
+    current: { userPrompt: lastUserPrompt, messages: currentMessages },
+  };
 }
 
-export function buildSummarizationUserMessage(assistantText: string): string {
-  const clipped =
-    assistantText.length > MAX_INPUT_CHARS
-      ? assistantText.slice(0, MAX_INPUT_CHARS) + '…'
-      : assistantText;
-  return STOP_SUMMARY_PROMPT_PREFIX + clipped;
+export function buildContinuityUserMessage(context: WorkflowContext): string {
+  let body = '';
+  if (context.previous) {
+    body += `Turno anterior:\nUsuario: ${context.previous.userPrompt}\nAsistente: ${context.previous.lastAssistantText}\n\n`;
+  }
+  body += `Turno actual:\nUsuario: ${context.current.userPrompt}\n${context.current.messages.join('\n')}`;
+  const clipped = body.length > MAX_INPUT_CHARS ? body.slice(0, MAX_INPUT_CHARS) + '…' : body;
+  return CONTINUITY_PROMPT_PREFIX + clipped;
 }
 
 export function resolveAnthropicClient(): Anthropic | undefined {
@@ -114,15 +155,17 @@ export function resolveSummaryModel(): string {
   return process.env.ANTHROPIC_DEFAULT_HAIKU_MODEL?.trim() || DEFAULT_HAIKU;
 }
 
-export async function summarizeWorkWithModel(assistantText: string): Promise<string | undefined> {
+export async function generateContinuityMessage(
+  context: WorkflowContext,
+): Promise<string | undefined> {
   const client = resolveAnthropicClient();
   if (!client) return undefined;
 
   try {
     const response = await client.messages.create({
       model: resolveSummaryModel(),
-      max_tokens: 300,
-      messages: [{ role: 'user', content: buildSummarizationUserMessage(assistantText) }],
+      max_tokens: 600,
+      messages: [{ role: 'user', content: buildContinuityUserMessage(context) }],
     });
     const parts = response.content
       .filter(
@@ -131,8 +174,7 @@ export async function summarizeWorkWithModel(assistantText: string): Promise<str
       )
       .map((block) => block.text);
     const joined = normalizeWhitespace(parts.join(' '));
-    if (!joined) return undefined;
-    return truncate(joined, MAX_SUMMARY_CHARS);
+    return joined || undefined;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     process.stderr.write(`stop-work-summary-notification: ${msg}\n`);
@@ -140,13 +182,24 @@ export async function summarizeWorkWithModel(assistantText: string): Promise<str
   }
 }
 
+export async function writeContinuityMessage(text: string, projectDir: string): Promise<void> {
+  const filePath = join(projectDir, 'sessions', '.last-continuity-message.txt');
+  try {
+    await writeFile(filePath, text, 'utf-8');
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    process.stderr.write(`stop-work-summary-notification: write continuity message: ${msg}\n`);
+  }
+}
+
 export function fallbackSummary(assistantText: string): string {
-  return truncate(normalizeWhitespace(assistantText), MAX_SUMMARY_CHARS);
+  return normalizeWhitespace(assistantText);
 }
 
-export async function notifyStopTurnFinished(): Promise<void> {
+export async function notifyContinuityMessage(message?: string): Promise<void> {
   const built = buildEvent({
     eventType: 'Stop',
+    ...(message !== undefined ? { message } : {}),
     stdinJson: false,
     sound: false,
     silent: false,
@@ -158,58 +211,63 @@ export async function notifyStopTurnFinished(): Promise<void> {
   await adapter.notify(built);
 }
 
-export async function notifyWorkSummary(summary: string): Promise<void> {
-  const built = buildEvent({
-    eventType: 'Stop',
-    title: 'Resumen del trabajo',
-    message: summary,
-    stdinJson: false,
-    sound: false,
-    silent: false,
-  });
-  if ('error' in built) {
-    throw new Error(built.error);
-  }
-  const adapter = new DesktopNotificationAdapter();
-  await adapter.notify(built);
-}
-
-export async function runStopWorkSummaryNotification(
+export async function runContinuityNotification(
   rawStdin: string,
-  deps: {
-    summarize?: (text: string) => Promise<string | undefined>;
-    notify?: (summary: string) => Promise<void>;
-  } = {},
+  projectDir: string,
+  deps?: {
+    extract?: (path: string) => Promise<WorkflowContext | undefined>;
+    generate?: (ctx: WorkflowContext) => Promise<string | undefined>;
+    write?: (text: string, dir: string) => Promise<void>;
+    notify?: (msg?: string) => Promise<void>;
+  },
 ): Promise<number> {
+  const extract = deps?.extract ?? extractWorkflowContext;
+  const generate = deps?.generate ?? generateContinuityMessage;
+  const write = deps?.write ?? writeContinuityMessage;
+  const notify = deps?.notify ?? notifyContinuityMessage;
+
   let payload: Record<string, unknown>;
   try {
+    if (!rawStdin) throw new Error('stdin vacío');
     const parsed: unknown = JSON.parse(rawStdin);
     if (typeof parsed !== 'object' || parsed === null) {
-      process.stderr.write('stop-work-summary-notification: stdin no es un objeto JSON\n');
-      return 0;
+      throw new Error('stdin no es un objeto JSON');
     }
     payload = parsed as Record<string, unknown>;
   } catch {
-    process.stderr.write('stop-work-summary-notification: stdin no parseable como JSON\n');
+    await notify();
     return 0;
   }
 
-  const assistantText = await resolveAssistantTextForSummary(payload);
-  if (!assistantText) {
-    process.stderr.write(
-      'stop-work-summary-notification: sin last_assistant_message ni texto en transcript_path\n',
-    );
-    return 0;
+  const transcriptPath = payload['transcript_path'];
+  let context: WorkflowContext | undefined;
+  if (typeof transcriptPath === 'string' && transcriptPath.trim()) {
+    context = await extract(transcriptPath.trim());
   }
 
-  const summarize = deps.summarize ?? summarizeWorkWithModel;
-  const notify = deps.notify ?? notifyWorkSummary;
-  const summary = (await summarize(assistantText)) ?? fallbackSummary(assistantText);
+  if (context === undefined) {
+    const assistantText = readLastAssistantMessage(payload);
+    if (assistantText) {
+      context = { current: { userPrompt: '', messages: [assistantText] } };
+    } else {
+      await notify();
+      return 0;
+    }
+  }
+
+  const generated = await generate(context);
+  const fullText = generated ?? fallbackSummary(context.current.messages.at(-1) ?? '');
+
+  if (fullText && projectDir) {
+    await write(fullText, projectDir);
+  }
+
+  const preview = truncate(normalizeWhitespace(fullText), MAX_TOAST_PREVIEW_CHARS);
   try {
-    await notify(summary);
+    await notify(preview);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    process.stderr.write(`stop-work-summary-notification: toast resumen: ${msg}\n`);
+    process.stderr.write(`stop-work-summary-notification: toast: ${msg}\n`);
   }
   return 0;
 }
@@ -220,7 +278,7 @@ const isEntryPoint =
 
 if (isEntryPoint) {
   readStdinText()
-    .then((raw) => runStopWorkSummaryNotification(raw))
+    .then((raw) => runContinuityNotification(raw, process.env.CLAUDE_PROJECT_DIR ?? ''))
     .then((code) => process.exit(code))
     .catch((err: unknown) => {
       const msg = err instanceof Error ? err.message : String(err);

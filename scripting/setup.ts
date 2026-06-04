@@ -11,8 +11,9 @@
  */
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { resolve } from 'node:path';
+import { resolvePosixAbsolutePath } from './shared/npx-tsx-command.js';
 import {
   readClaudeSettings,
   writeClaudeSettings,
@@ -45,7 +46,7 @@ export interface SetupRunOptions {
 }
 
 export function runSetup(options: SetupRunOptions): number {
-  const proxyRoot = resolve(options.root);
+  const proxyRoot = resolvePosixAbsolutePath(options.root);
   const isUninstall = options.uninstall;
 
   // Determinar features activas (sin flag = las 3)

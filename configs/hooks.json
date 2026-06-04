@@ -90,7 +90,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "npx --prefix \"${CLAUDE_PROJECT_DIR}\" tsx \"${CLAUDE_PROJECT_DIR}/scripting/stop-hook-ux.ts\"",
+            "command": "npx --prefix \"${SMART_CODE_PROXY_ROOT}\" tsx \"${SMART_CODE_PROXY_ROOT}/scripting/stop-hook-ux.ts\"",
             "timeout": 120
           }
         ]

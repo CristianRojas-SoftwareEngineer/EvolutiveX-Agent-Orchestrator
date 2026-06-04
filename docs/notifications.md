@@ -64,7 +64,7 @@ En Smart Code Proxy, el evento **`Stop`** usa un relay unificado en lugar de var
     "hooks": [
       {
         "type": "command",
-        "command": "npx --prefix \"${CLAUDE_PROJECT_DIR}\" tsx \"${CLAUDE_PROJECT_DIR}/scripting/stop-hook-ux.ts\"",
+        "command": "npx --prefix \"${SMART_CODE_PROXY_ROOT}\" tsx \"${SMART_CODE_PROXY_ROOT}/scripting/stop-hook-ux.ts\"",
         "timeout": 120,
         "statusMessage": "Generando mensaje de continuidad…"
       }
@@ -73,13 +73,13 @@ En Smart Code Proxy, el evento **`Stop`** usa un relay unificado en lugar de var
 ]
 ```
 
-`${CLAUDE_PROJECT_DIR}` lo expande Claude Code al abrir el proyecto; evita depender del cwd del hook.
+`${SMART_CODE_PROXY_ROOT}` es el placeholder que el instalador sustituye por la ruta POSIX absoluta al repo en install-time. El script deriva su propia raíz de `import.meta.url`; no depende de ninguna variable de runtime de Claude Code.
 
 **Prueba manual** (desde la raíz del repo, con `ANTHROPIC_API_KEY` o `ANTHROPIC_AUTH_TOKEN`):
 
 ```bash
 echo '{"hook_event_name":"Stop","transcript_path":"<ruta al .jsonl>","last_assistant_message":"Tests en verde."}' \
-  | CLAUDE_PROJECT_DIR=. npx tsx scripting/stop-hook-ux.ts
+  | npx tsx scripting/stop-hook-ux.ts
 # Esperado: 1 toast título "Stop", archivo sessions/.last-continuity-message.txt creado
 ```
 
@@ -87,13 +87,13 @@ echo '{"hook_event_name":"Stop","transcript_path":"<ruta al .jsonl>","last_assis
 
 ```bash
 echo '{"hook_event_name":"Stop","last_assistant_message":"Refactor completo."}' \
-  | CLAUDE_PROJECT_DIR=. npx tsx scripting/stop-hook-ux.ts
+  | npx tsx scripting/stop-hook-ux.ts
 ```
 
 **Prueba sin texto fuente** (copy del catálogo):
 
 ```bash
-echo '{}' | CLAUDE_PROJECT_DIR=. npx tsx scripting/stop-hook-ux.ts
+echo '{}' | npx tsx scripting/stop-hook-ux.ts
 ```
 
 **Depuración:** mensajes en stderr con prefijo `stop-hook-ux:` o `stop-work-summary-notification:`; canal **Hooks** en Claude Code (`/hooks`).

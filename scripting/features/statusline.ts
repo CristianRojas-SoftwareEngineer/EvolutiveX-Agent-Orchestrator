@@ -8,7 +8,7 @@
 import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { SMART_CODE_PROXY_ROOT_KEY, type ClaudeSettings } from '../shared/claude-settings.js';
-import { buildNpxTsxCommand } from '../shared/npx-tsx-command.js';
+import { buildNpxTsxCommand, resolvePosixAbsolutePath } from '../shared/npx-tsx-command.js';
 
 export { SMART_CODE_PROXY_ROOT_KEY };
 
@@ -60,7 +60,7 @@ export function applyStatuslineInstall(
   const check = shouldOverwriteStatusLine(settings.statusLine?.command, force);
   if (!check.ok) return { error: check.message };
   const command = buildStatusLineCommand(proxyRoot);
-  const root = resolve(proxyRoot);
+  const root = resolvePosixAbsolutePath(proxyRoot);
   const next: ClaudeSettings = { ...settings };
   next.statusLine = buildStatusLineBlock(command);
   if (!next.env) next.env = {};

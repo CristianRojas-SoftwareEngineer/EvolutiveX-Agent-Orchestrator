@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { runSetup } from '../../scripting/setup.js';
 import { setClaudeSettingsPathForTests } from '../../scripting/shared/claude-settings.js';
@@ -172,6 +172,20 @@ describe('runSetup — integración', () => {
     }
   });
 
+  it('install --hooks produce comandos POSIX sin variables de runtime de Claude Code', () => {
+    const code = runSetup({ ...DEFAULT_OPTS, root: proxyRoot, hooks: true });
+    expect(code).toBe(0);
+    const onDisk = JSON.parse(readFileSync(settingsPath, 'utf-8')) as Record<string, unknown>;
+    const hooks = onDisk['hooks'] as Record<string, Array<{ hooks: Array<{ command?: string }> }>>;
+    const commands = Object.values(hooks).flatMap(blocks =>
+      blocks.flatMap(b => b.hooks.map(h => h.command ?? '')),
+    );
+    for (const cmd of commands) {
+      expect(cmd).not.toContain('\\');
+      expect(cmd).not.toContain('${CLAUDE_PROJECT_DIR}');
+    }
+  });
+
   it('resultado deep-equal al encadenamiento de funciones puras (S3)', () => {
     const initial = JSON.parse(readFileSync(settingsPath, 'utf-8'));
 
@@ -180,7 +194,7 @@ describe('runSetup — integración', () => {
 
     // Reconstruir manualmente aplicando las mismas funciones puras
     writeFileSync(settingsPath, JSON.stringify(initial, null, 2), 'utf-8');
-    const resolvedRoot = resolve(proxyRoot);
+    const resolvedRoot = resolvePosixAbsolutePath(proxyRoot);
     let manual = initial as Parameters<typeof applyStatuslineInstall>[0];
     const s1 = applyStatuslineInstall(manual, resolvedRoot, false);
     if ('error' in s1) throw new Error(String(s1.error));

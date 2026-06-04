@@ -59,7 +59,7 @@ Instalación: [`npm run install:statusline`](#9-integración) (véase [how-to-st
 
 ## 3. Layout general
 
-El statusline consta de **dos o tres tablas** según el método de autenticación. La Tabla 1 y la Tabla 2 se renderizan **side-by-side** (lado a lado). La Tabla 3 aparece debajo cuando aplica OAuth con datos de cuota.
+El statusline consta de **dos o tres tablas** según el método de autenticación. La Tabla 1 y la Tabla 3 se renderizan **side-by-side** (lado a lado) cuando hay OAuth con datos de cuota; si no hay Tabla 3, la Tabla 1 aparece sola en la primera fila. La Tabla 2 siempre aparece debajo.
 
 ### 3.1 Tabla 1 — Información de sesión y proveedor (común)
 
@@ -164,9 +164,9 @@ resolveAuthMethodFromEnv(settingsEnv)
 
 buildStatuslineOutput()
   ├── si hay sessionDir: leer .statusline-state.json (caché, para Tabla 2 y fallback de % en Tabla 1)
-  ├── Tabla 1 + Tabla 2: side-by-side (siempre; con o sin sessionDir)
+  ├── Fila 1: Tabla 1 + Tabla 3 side-by-side (si oauth con cuotas); o solo Tabla 1 (resto de casos)
   ├── si hay sessionDir: escribir .statusline-state.json (caché: metricsSnapshot; % de contexto al renderizar Tabla 1 si stdin aportó valor usable)
-  └── Tabla 3: Rate Limits (solo authMethod === 'oauth' y cuotas en ctx, debajo del bloque anterior)
+  └── Fila 2: Tabla 2 (Steps por nivel de razonamiento, siempre, debajo)
 ```
 
 ---
@@ -194,9 +194,11 @@ Los bloques llenos (`█`) de las barras de contexto (Tabla 1) y de cuotas (Tabl
 
 ## 4.2 Layout side-by-side
 
-La Tabla 1 y la Tabla 2 se renderizan lado a lado usando `renderSideBySide()`, con un gap de 2 espacios entre ellas. Si la Tabla 2 tiene más líneas que la Tabla 1, las líneas sobrantes se renderizan debajo con indentación.
+La Tabla 1 y la Tabla 3 se renderizan lado a lado usando `renderSideBySide()`, con un gap de 2 espacios entre ellas, cuando `authMethod === 'oauth'` y hay datos de cuota en ctx. Si la Tabla 3 tiene más líneas que la Tabla 1, las líneas sobrantes se renderizan debajo con indentación.
 
-Cuando `authMethod === 'oauth'`, la Tabla 3 (rate limits) se imprime **en líneas independientes debajo** del bloque Tabla 1 + Tabla 2, no en la misma fila que la Tabla 1.
+Cuando no hay Tabla 3 (`api_key` o `bearer`, u OAuth sin datos de cuota), la Tabla 1 se imprime sola en la primera fila.
+
+La Tabla 2 (métricas) se imprime siempre **debajo** del bloque de la primera fila.
 
 ---
 

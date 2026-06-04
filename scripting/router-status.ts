@@ -1033,10 +1033,12 @@ export function buildStatuslineOutput(
   // §3.3: Tabla 3 solo con oauth; api_key y bearer comparten layout sin rate limits.
   const table3 = authMethod === 'oauth' ? renderRateLimitTable(ctx) : null;
 
-  output.push(renderSideBySide(table1, table2, 2));
   if (table3) {
-    output.push(table3.lines.join('\n'));
+    output.push(renderSideBySide(table1, table3, 2));
+  } else {
+    output.push(table1.lines.join('\n'));
   }
+  output.push(table2.lines.join('\n'));
 
   return output.join('\n');
 }

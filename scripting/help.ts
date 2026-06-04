@@ -54,23 +54,13 @@ const scripts: NpmScript[] = [
     category: 'local',
   },
   {
-    name: 'install:statusline',
-    description: 'Instala statusline de Smart Code Proxy en ~/.claude',
+    name: 'setup:install',
+    description: 'Instala las features de SCP en ~/.claude (statusline, voz, hooks). Flags: --statusline --voice --hooks --force --dry-run --root',
     category: 'local',
   },
   {
-    name: 'install:notifications',
-    description: 'Instala hooks globales de notificación (tsx cli.ts) en ~/.claude',
-    category: 'local',
-  },
-  {
-    name: 'setup',
-    description: 'Instala o desinstala statusline, notificaciones, voz y hooks de Claude Code (unificado)',
-    category: 'local',
-  },
-  {
-    name: 'setup:hooks',
-    description: 'Instala los 14 hooks de SCP en ~/.claude (merge selectivo)',
+    name: 'setup:uninstall',
+    description: 'Desinstala las features de SCP de ~/.claude. Flags: --statusline --voice --hooks --force --dry-run --root',
     category: 'local',
   },
   {

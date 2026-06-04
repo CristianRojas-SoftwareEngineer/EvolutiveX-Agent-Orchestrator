@@ -19,21 +19,19 @@ configuración externa, y no introduce dependencias Windows-specific.
 
 ## Instalación global (`~/.claude`)
 
-Para recibir toasts en **cualquier proyecto** (no solo Smart Code Proxy), registre los hooks en el perfil de usuario con el mismo patrón que el statusline (`npx --prefix` + `tsx`). Puede instalarlo junto con statusline y voz en un único paso:
+Para recibir toasts en **cualquier proyecto** (no solo Smart Code Proxy), registre los hooks en el perfil de usuario con el mismo patrón que el statusline (`npx --prefix` + `tsx`). Para instalar las **14 entradas** (lifecycle + UX) junto con statusline y voz en un único paso:
 
 ```bash
-npm run setup
+npm run setup:install
 ```
 
-O solo las notificaciones:
+O solo los hooks (incluye todas las notificaciones):
 
 ```bash
-npm run install:notifications
+npm run setup:install -- --hooks
 ```
 
-Ambos escriben 11 entradas en `~/.claude/settings.json` que invocan el CLI del servicio (sin PowerShell). Los comandos los genera `buildNpxTsxCommand` ([`scripting/shared/npx-tsx-command.ts`](../scripting/shared/npx-tsx-command.ts)): `npx --prefix "<ROOT>"` (dependencias del proxy) y `tsx "<RUTA_ABSOLUTA>/src/2-services/notifications/cli.ts"` con separadores **`/`** en la ruta del script (válidos en Windows, macOS y Linux), citada según el shell del SO. Así el hook funciona aunque el cwd de Claude Code sea `~/.claude` y no la raíz del repo.
-
-> **Instalación completa de las 14 entradas (lifecycle + UX) con merge selectivo seguro:** `npm run setup -- --hooks` (o `npm run setup:hooks`). Reemplaza la instalación manual de 11 entradas de notificaciones y preserva hooks ajenos del usuario en `~/.claude/settings.json`.
+Ambos escriben en `~/.claude/settings.json` con merge selectivo que preserva hooks ajenos del usuario. Para desinstalar: `npm run setup:uninstall -- --hooks`. Los comandos los genera `buildNpxTsxCommand` ([`scripting/shared/npx-tsx-command.ts`](../scripting/shared/npx-tsx-command.ts)): `npx --prefix "<ROOT>"` (dependencias del proxy) y `tsx "<RUTA_ABSOLUTA>/src/2-services/notifications/cli.ts"` con separadores **`/`** en la ruta del script (válidos en Windows, macOS y Linux), citada según el shell del SO. Así el hook funciona aunque el cwd de Claude Code sea `~/.claude` y no la raíz del repo.
 
 Flags: `--dry-run`, `--force` (sobrescribe hooks ajenos en esas claves), `--uninstall`, `--root <ruta-proxy>`.
 

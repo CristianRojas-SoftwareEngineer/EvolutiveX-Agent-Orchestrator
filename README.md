@@ -151,7 +151,7 @@ Personaliza el comportamiento ajustando estas variables en tu entorno o en un ar
 
 ### Configuración de hooks
 
-Para instalar las **14 entradas** de hooks de SCP en `~/.claude/settings.json` (user-level) con merge selectivo que preserva configs ajenas del usuario: `npm run setup -- --hooks` (o `npm run setup:hooks`). Con `--dry-run` para previsualizar, `--force` para sobrescribir configs ajenas (con backup automático), `--uninstall` para desinstalar solo los hooks de SCP. La plantilla canónica versionada vive en [`configs/hooks.json`](configs/hooks.json) y el instalador en [`scripting/setup-hooks.ts`](scripting/setup-hooks.ts).
+Para instalar las **14 entradas** de hooks de SCP en `~/.claude/settings.json` (user-level) con merge selectivo que preserva configs ajenas del usuario: `npm run setup:install -- --hooks`. Con `--dry-run` para previsualizar, `--force` para sobrescribir configs ajenas (con backup automático), `npm run setup:uninstall -- --hooks` para desinstalar solo los hooks de SCP. La plantilla canónica versionada vive en [`configs/hooks.json`](configs/hooks.json).
 
 Adicionalmente, el archivo `.claude/settings.json` del proyecto registra **14 entradas** de hooks de Claude Code (**8 del lifecycle** que alimentan al gateway, más **6 entradas de UX no-lifecycle** que solo emiten toast nativo), sobrescribiendo las entradas equivalentes del user-level (`C:\Users\Cristian\.claude\settings.json`) para esas claves (mecanismo de merge de Claude Code: el proyecto tiene precedencia). Las 14 entradas son:
 
@@ -206,7 +206,7 @@ Todo volcado que se trunca genera un archivo `.omitted.txt` documentando la omis
 
 1.  **Instalar dependencias**: `npm install`
 2.  **Configurar proveedor** (opcional): `npm run configure:provider` (asistente interactivo para configurar API keys y modelos de diferentes proveedores).
-3.  **Integraciones Claude Code** (opcional): `npm run setup` instala statusline, notificaciones y voz en `~/.claude/settings.json` en un único paso (admite `--dry-run`, `--uninstall`, flags `--statusline`/`--notifications`/`--voice`). Instaladores individuales para statusline y notificaciones: `npm run install:statusline` y `npm run install:notifications`. La voz no tiene instalador individual; usa `npm run setup --voice`. Ver [`docs/notifications.md`](docs/notifications.md) y [`docs/router-statusline.md`](docs/router-statusline.md).
+3.  **Integraciones Claude Code** (opcional): `npm run setup:install` instala statusline, voz y hooks en `~/.claude/settings.json` en un único paso (admite `--dry-run`, `--force`, flags `--statusline`/`--voice`/`--hooks`). Para desinstalar: `npm run setup:uninstall`. Ver [`docs/notifications.md`](docs/notifications.md) y [`docs/router-statusline.md`](docs/router-statusline.md).
 4.  **Referencia multi-agente** (opcional): `npm run create:agents-reference` (Crea hardlink `AGENTS.md` → `CLAUDE.md` para compatibilidad con otros agentes de código).
 5.  **Modo Desarrollo**: `npm run dev` (Carga `configs/.env` mediante flag nativo de Node v22.9+; **v24 LTS recomendado**).
 6.  **Compilación**: `npm run build` (Genera `/dist` optimizado).

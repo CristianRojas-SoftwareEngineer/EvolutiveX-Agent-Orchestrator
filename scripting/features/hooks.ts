@@ -1,36 +1,34 @@
 /**
- * Instalador seguro de hooks de SCP con merge selectivo.
+ * Lógica pura de la feature "hooks" para el instalador universal.
  *
- * Instala las 14 entradas de hooks (lifecycle + UX) en `~/.claude/settings.json`
- * con política de preservación:
- * - user-only → se preserva intacto (SCP no toca salvo --force)
- * - scp-only → se reemplaza con versión canónica
- * - mixed → se preservan ajenos, se agregan faltantes de SCP
+ * Cubre el conjunto indivisible de 14 entradas declaradas en
+ * `configs/hooks.json`:
+ * - Gateway: `scripting/post-hook-event.ts`
+ * - Stop UX: `scripting/stop-hook-ux.ts`
+ * - Notificaciones: `src/2-services/notifications/cli.ts`
  *
- * Consumidores: `npm run setup -- --hooks` o `npm run setup:hooks`.
+ * Las funciones aquí definidas son puras (no escriben en disco). El
+ * orquestador `scripting/setup.ts` se encarga de la I/O (S2 backup, S3
+ * lectura/escritura única).
+ *
+ * Patrón seguro promovido desde el commit 66cc38e (proxy-hooks-safe-setup):
+ * - S1: `validateScpRoot` para validación previa.
+ * - S4: `mergeHooks` con clasificación `scp-only / user-only / mixed` y
+ *   `unmergeHooks` que solo quita comandos SCP.
+ * - S5: `isScpManagedCommand` normaliza backslashes.
  */
-import { Command } from 'commander';
-import chalk from 'chalk';
 import { existsSync, readFileSync, copyFileSync, mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { homedir } from 'node:os';
-import { fileURLToPath } from 'node:url';
-import {
-  readClaudeSettings,
-  writeClaudeSettings,
-  SMART_CODE_PROXY_ROOT_KEY,
-  type ClaudeSettings,
-} from './shared/claude-settings.js';
+import { SMART_CODE_PROXY_ROOT_KEY, type ClaudeSettings } from '../shared/claude-settings.js';
 
-// ─── Constantes ──────────────────────────────────────────────────────────────
+export { SMART_CODE_PROXY_ROOT_KEY };
 
 const HOOKS_JSON_SEGMENT = 'configs/hooks.json';
 const POST_HOOK_EVENT_SEGMENT = 'scripting/post-hook-event.ts';
 const STOP_HOOK_UX_SEGMENT = 'scripting/stop-hook-ux.ts';
 const NOTIFICATIONS_CLI_SEGMENT = 'src/2-services/notifications/cli.ts';
 const PLACEHOLDER = '${SMART_CODE_PROXY_ROOT}';
-
-// ─── Tipos ───────────────────────────────────────────────────────────────────
 
 export interface HookEntry {
   type: string;
@@ -46,20 +44,11 @@ export interface HookBlock {
 
 export type HooksBlock = Record<string, HookBlock[]>;
 
-export interface SetupHooksRunOptions {
-  root: string;
-  dryRun: boolean;
-  force: boolean;
-  uninstall: boolean;
-}
-
 export type KeyClassification = 'scp-only' | 'user-only' | 'mixed';
-
-// ─── Funciones puras ─────────────────────────────────────────────────────────
 
 /**
  * Reemplaza `${SMART_CODE_PROXY_ROOT}` por la ruta resuelta del repo.
- * Windows-safe: normaliza backslashes a forward slashes antes de comparar.
+ * Windows-safe: usa `String.split.join` (literal, no regex).
  */
 export function resolveCommandPlaceholders(command: string, scpRoot: string): string {
   return command.split(PLACEHOLDER).join(scpRoot);
@@ -241,7 +230,8 @@ export function unmergeHooks(
 }
 
 /**
- * Valida que existan todos los archivos necesarios de SCP.
+ * Valida que existan todos los archivos necesarios de SCP para la feature hooks.
+ * Lanza error si falta alguno.
  */
 export function validateScpRoot(scpRoot: string): void {
   const files = [
@@ -259,77 +249,4 @@ export function validateScpRoot(scpRoot: string): void {
   if (missing.length > 0) {
     throw new Error(`No se encontraron los siguientes archivos en la raíz del proxy: ${missing.join(', ')}`);
   }
-}
-
-// ─── Orquestador ─────────────────────────────────────────────────────────────
-
-export function runSetupHooks(options: SetupHooksRunOptions): number {
-  const scpRoot = resolve(options.root);
-  try {
-    validateScpRoot(scpRoot);
-  } catch (err) {
-    console.error(chalk.red(err instanceof Error ? err.message : String(err)));
-    return 1;
-  }
-  const canonical = readCanonicalHooks(scpRoot);
-  const settings = readClaudeSettings();
-
-  if (options.uninstall) {
-    const next = unmergeHooks(settings, canonical, scpRoot);
-    if (options.dryRun) {
-      console.log(chalk.yellow('[dry-run] Se quitarían los hooks de SCP:'));
-      console.log(JSON.stringify({ hooks: next.hooks }, null, 2));
-      return 0;
-    }
-    backupSettings(settings);
-    writeClaudeSettings(next);
-    console.log(chalk.green('Hooks de SCP desinstalados.'));
-    return 0;
-  }
-
-  const result = mergeHooks(settings, canonical, scpRoot, options.force);
-  if (options.dryRun) {
-    console.log(chalk.yellow('[dry-run] Hooks que se escribirían:'));
-    console.log(JSON.stringify({ hooks: result.hooks, env: result.env }, null, 2));
-    return 0;
-  }
-  backupSettings(settings);
-  writeClaudeSettings(result);
-  console.log(chalk.green('Hooks de SCP instalados correctamente.'));
-  console.log(chalk.cyan(`  env.${SMART_CODE_PROXY_ROOT_KEY}: ${scpRoot}`));
-  return 0;
-}
-
-// ─── CLI (commander) ─────────────────────────────────────────────────────────
-
-const program = new Command();
-
-program
-  .name('setup-hooks')
-  .description('Instala los 14 hooks de SCP en ~/.claude/settings.json (merge selectivo)')
-  .option('--root <path>', 'Raíz del repositorio del proxy', process.cwd())
-  .option('--dry-run', 'Muestra los valores sin escribir en settings.json')
-  .option('--force', 'Sobrescribe configuración ajena (incluye user-only)')
-  .option('--uninstall', 'Desinstalar solo los hooks de SCP (preserva ajenos)')
-  .action(
-    (opts: {
-      root?: string;
-      dryRun?: boolean;
-      force?: boolean;
-      uninstall?: boolean;
-    }) => {
-      const code = runSetupHooks({
-        root: opts.root ?? process.cwd(),
-        dryRun: Boolean(opts.dryRun),
-        force: Boolean(opts.force),
-        uninstall: Boolean(opts.uninstall),
-      });
-      if (code !== 0) process.exit(code);
-    },
-  );
-
-const entryPath = fileURLToPath(import.meta.url);
-const invokedPath = process.argv[1] ? resolve(process.argv[1]) : '';
-if (entryPath === invokedPath) {
-  program.parse();
 }

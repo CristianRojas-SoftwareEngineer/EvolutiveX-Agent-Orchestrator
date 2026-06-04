@@ -1,7 +1,13 @@
-import { type ClaudeSettings } from './shared/claude-settings.js';
+/**
+ * Lógica pura de la feature "voice" para el instalador universal.
+ * No requiere validación de archivos (S1 no aplica).
+ * Solo toca `voiceEnabled` y `voice`; preserva todo lo demás (S4).
+ */
+import { type ClaudeSettings } from '../shared/claude-settings.js';
 
 export interface VoiceInstallOptions {
   mode: 'hold' | 'tap';
+  autoSubmit?: boolean;
 }
 
 export function applyVoiceInstall(
@@ -13,6 +19,7 @@ export function applyVoiceInstall(
   (next as Record<string, unknown>)['voice'] = {
     enabled: true,
     mode: opts.mode,
+    autoSubmit: opts.autoSubmit ?? true,
   };
   return next;
 }

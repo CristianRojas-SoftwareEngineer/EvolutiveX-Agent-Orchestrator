@@ -2,125 +2,74 @@
 
 ## Purpose
 
-CLI unificado (`setup`) para instalar, configurar y desinstalar las características de Smart Code Proxy (statusline, notificaciones, voz) sobre `~/.claude/settings.json` en Windows, Linux y macOS.
+CLI unificado (`setup:install` / `setup:uninstall`) para instalar, configurar y desinstalar las características de Smart Code Proxy (statusline, voz, hooks) sobre `~/.claude/settings.json` en Windows, Linux y macOS mediante el orquestador `scripting/setup.ts`.
 
 ---
 ## Requirements
 ### Requirement: Selección de features mediante flags explícitos
 
-El sistema SHALL proporcionar un script CLI (`setup`) con flags `--statusline`, `--notifications`, `--voice` y `--hooks` que determinen qué features participan en la operación. Cuando no se pasa ningún flag de feature, la operación SHALL aplicarse sobre las cuatro features. Cuando se pasan uno o más flags, la operación SHALL aplicarse únicamente sobre las features seleccionadas.
+El sistema SHALL proporcionar un script CLI con flags `--statusline`, `--voice` y `--hooks` que determinen qué features participan en la operación. Cuando no se pasa ningún flag de feature, la operación SHALL aplicarse sobre las tres features. Cuando se pasan uno o más flags, la operación SHALL aplicarse únicamente sobre las features seleccionadas. El flag `--notifications` NO SHALL existir: las notificaciones viven dentro del conjunto indivisible de los 14 hooks de SCP (gateway + stop UX + notificaciones) y no pueden instalarse por separado.
 
 #### Scenario: Sin flags de feature instala todo
 
-- **WHEN** el usuario ejecuta `npm run setup` sin flags de feature
-- **THEN** el script SHALL instalar statusline, notificaciones, voz y hooks en `~/.claude/settings.json`
+- **WHEN** el usuario ejecuta `npm run setup:install` sin flags de feature
+- **THEN** el script SHALL instalar statusline, voz y hooks en `~/.claude/settings.json`
 
 #### Scenario: Flag único restringe la operación
 
-- **WHEN** el usuario ejecuta `npm run setup -- --notifications`
-- **THEN** el script SHALL instalar únicamente las notificaciones
-- **AND** SHALL no modificar `statusLine`, claves `voice*` ni `hooks` existentes en `settings.json`
+- **WHEN** el usuario ejecuta `npm run setup:install -- --statusline`
+- **THEN** el script SHALL instalar únicamente statusline
+- **AND** SHALL no modificar `voice*` ni `hooks` existentes en `settings.json`
 
 #### Scenario: Combinación de flags opera solo sobre los seleccionados
 
-- **WHEN** el usuario ejecuta `npm run setup -- --statusline --voice`
+- **WHEN** el usuario ejecuta `npm run setup:install -- --statusline --voice`
 - **THEN** el script SHALL instalar statusline y voz
-- **AND** SHALL no modificar hooks de notificación existentes en `settings.json`
+- **AND** SHALL no modificar hooks existentes en `settings.json`
 
-#### Scenario: Flag --hooks opera solo sobre hooks
+#### Scenario: Flag --hooks instala el conjunto indivisible de 14 entradas
 
-- **WHEN** el usuario ejecuta `npm run setup -- --hooks`
-- **THEN** el script SHALL invocar únicamente `setup-hooks.ts` con los flags por defecto
-- **AND** statusline, notifications y voice NO SHALL modificarse
-
-#### Scenario: Combinación --hooks --statusline opera solo sobre esas dos features
-
-- **WHEN** el usuario ejecuta `npm run setup -- --hooks --statusline`
-- **THEN** el script SHALL invocar `setup-hooks.ts` y `applyStatuslineInstall`
-- **AND** notifications y voice NO SHALL modificarse
-
----
-
-### Requirement: `--hooks` como fourth feature flag con delegación a setup-hooks.ts
-
-El flag `--hooks` SHALL invocar el script `scripting/setup-hooks.ts` que gestiona la instalación de las 14 entradas de hooks con merge selectivo en `~/.claude/settings.json`. Los flags `--dry-run`, `--force`, `--uninstall` y `--root` SHAL propagarse al script hijo.
-
-#### Scenario: setup --hooks sin otros flags opera solo sobre hooks
-
-- **WHEN** el usuario ejecuta `npm run setup -- --hooks`
-- **THEN** el script SHALL invocar únicamente `setup-hooks.ts` con los flags por defecto
-- **AND** statusline, notifications y voice NO SHALL modificarse
-
-#### Scenario: setup --hooks --uninstall desinstala solo hooks
-
-- **WHEN** el usuario ejecuta `npm run setup -- --hooks --uninstall`
-- **THEN** `setup-hooks.ts` SHALL ejecutar uninstall selectivo (solo comandos SCP)
-- **AND** statusline, notifications y voice SHALL permanecer sin cambios
-
-#### Scenario: setup --hooks --dry-run previsualiza sin escribir
-
-- **WHEN** el usuario ejecuta `npm run setup -- --hooks --dry-run`
-- **THEN** `setup-hooks.ts` SHALL mostrar diff de cambios sin escribir en disco
-
-#### Scenario: setup --hooks --force se propaga a setup-hooks.ts
-
-- **GIVEN** `~/.claude/settings.json` tiene hooks ajenos en algunas claves
-- **WHEN** el usuario ejecuta `npm run setup -- --hooks --force`
-- **THEN** `setup-hooks.ts` SHALL recibir `--force`
-- **AND** SHALL reemplazar hooks ajenos tras crear backup
-
----
-
-### Requirement: Validación previa de archivos SCP para --hooks
-
-Antes de invocar `setup-hooks.ts`, el script `setup` SHALL validar que existan los archivos: `configs/hooks.json`, `scripting/post-hook-event.ts`, `scripting/stop-hook-ux.ts` y `src/2-services/notifications/cli.ts`. Si alguna validación falla, el script SHALL terminar con código de salida 1 y un mensaje de error claro. `settings.json` NO SHALL modificarse en caso de fallo.
-
-#### Scenario: Validación falla si falta configs/hooks.json
-
-- **GIVEN** la raíz del proxy no contiene `configs/hooks.json`
-- **WHEN** el usuario ejecuta `npm run setup -- --hooks`
-- **THEN** el script SHALL terminar con exit code 1
-- **AND** SHALL mostrar mensaje: "No se encontró configs/hooks.json en la raíz del proxy"
-
-#### Scenario: Validación pasa si todos los archivos existen
-
-- **GIVEN** existen `configs/hooks.json`, `scripting/post-hook-event.ts`, `scripting/stop-hook-ux.ts` y `src/2-services/notifications/cli.ts`
-- **WHEN** el usuario ejecuta `npm run setup -- --hooks`
-- **THEN** la validación SHALL pasar
-- **AND** `setup-hooks.ts` SHALL invocarse normalmente
+- **WHEN** el usuario ejecuta `npm run setup:install -- --hooks`
+- **THEN** el script SHALL instalar el conjunto de hooks definido en `configs/hooks.json` (14 entradas: gateway, stop UX y notificaciones)
+- **AND** SHALL no modificar `statusLine` ni `voice*` existentes en `settings.json`
 
 ---
 
 ### Requirement: Modo uninstall mediante flag `--uninstall`
 
-El script SHALL admitir `--uninstall` como modificador de dirección: en lugar de instalar las features seleccionadas, las desinstala. La selección de features (flags presentes o ausentes) funciona igual que en modo install.
+El script SHALL admitir `--uninstall` como modificador de dirección: en lugar de instalar las features seleccionadas, las desinstala. La selección de features (flags presentes o ausentes) funciona igual que en modo install. Sin `--uninstall`, el default SHALL ser la dirección de instalación.
+
+#### Scenario: Default install sin flag de dirección
+
+- **WHEN** el usuario ejecuta `npm run setup:install` sin `--uninstall`
+- **THEN** el script SHALL aplicar la operación en dirección install
 
 #### Scenario: Uninstall total sin flags de feature
 
-- **WHEN** el usuario ejecuta `npm run setup -- --uninstall`
-- **THEN** el script SHALL desinstalar statusline, notificaciones y voz de `~/.claude/settings.json`
+- **WHEN** el usuario ejecuta `npm run setup:uninstall`
+- **THEN** el script SHALL desinstalar statusline, voz y hooks de `~/.claude/settings.json`
 
 #### Scenario: Uninstall selectivo con flag de feature
 
-- **WHEN** el usuario ejecuta `npm run setup -- --uninstall --voice`
+- **WHEN** el usuario ejecuta `npm run setup:uninstall -- --voice`
 - **THEN** el script SHALL eliminar `voiceEnabled` y `voice` de `settings.json`
-- **AND** SHALL conservar `statusLine` y hooks de notificación existentes
+- **AND** SHALL conservar `statusLine` y hooks existentes
 
-#### Scenario: Uninstall de statusline y notificaciones, conserva voz
+#### Scenario: Uninstall de statusline y voz, conserva hooks
 
-- **WHEN** el usuario ejecuta `npm run setup -- --uninstall --statusline --notifications`
-- **THEN** el script SHALL desinstalar statusline y notificaciones
-- **AND** SHALL conservar `voiceEnabled` y `voice` en `settings.json`
+- **WHEN** el usuario ejecuta `npm run setup:uninstall -- --statusline --voice`
+- **THEN** el script SHALL desinstalar statusline y voz
+- **AND** SHALL conservar `hooks` en `settings.json`
 
 ---
 
 ### Requirement: Instalación y desinstalación de la característica de voz
 
-El script SHALL gestionar las claves `voiceEnabled` y `voice` en `~/.claude/settings.json` mediante funciones `applyVoiceInstall` y `applyVoiceUninstall` exportadas desde `scripting/install-voice.ts`. La instalación no requiere validación de archivos en disco.
+El script SHALL gestionar las claves `voiceEnabled` y `voice` en `~/.claude/settings.json` mediante funciones `applyVoiceInstall` y `applyVoiceUninstall` exportadas desde `scripting/features/voice.ts`. La instalación no requiere validación de archivos en disco.
 
 #### Scenario: Instalación de voz con modo hold (default)
 
-- **WHEN** el usuario ejecuta `npm run setup -- --voice` sin `--voice-mode`
+- **WHEN** el usuario ejecuta `npm run setup:install -- --voice` sin `--voice-mode`
 - **THEN** `settings.voiceEnabled` SHALL ser `true`
 - **AND** `settings.voice.enabled` SHALL ser `true`
 - **AND** `settings.voice.mode` SHALL ser `"hold"`
@@ -128,32 +77,87 @@ El script SHALL gestionar las claves `voiceEnabled` y `voice` en `~/.claude/sett
 
 #### Scenario: Instalación de voz con modo tap
 
-- **WHEN** el usuario ejecuta `npm run setup -- --voice --voice-mode tap`
+- **WHEN** el usuario ejecuta `npm run setup:install -- --voice --voice-mode tap`
 - **THEN** `settings.voice.mode` SHALL ser `"tap"`
 - **AND** `settings.voice.autoSubmit` SHALL ser `true`
 
 #### Scenario: Instalación de voz sin autoSubmit
 
-- **WHEN** el usuario ejecuta `npm run setup -- --voice --no-voice-auto-submit`
+- **WHEN** el usuario ejecuta `npm run setup:install -- --voice --no-voice-auto-submit`
 - **THEN** `settings.voice.autoSubmit` SHALL ser `false`
 
 #### Scenario: Desinstalación de voz elimina ambas claves
 
-- **WHEN** el usuario ejecuta `npm run setup -- --uninstall --voice`
+- **WHEN** el usuario ejecuta `npm run setup:uninstall -- --voice`
 - **THEN** `settings.voiceEnabled` SHALL eliminarse de `settings.json`
 - **AND** `settings.voice` SHALL eliminarse de `settings.json`
 
 ---
 
+### Requirement: Promoción del patrón seguro S1-S5 a todas las features
+
+El script SHALL cumplir las 5 garantías del patrón seguro (establecido por el commit `66cc38e`) para **todas** las features, no solo para hooks:
+
+- **S1**: Validar los archivos del repo necesarios para cada feature activa, antes de cualquier escritura en `settings.json`.
+- **S2**: Crear un backup timestamped en `~/.claude/settings-backup-<ISO>.json` **una sola vez** al inicio de la fase de escritura, cubriendo todas las features en bloque.
+- **S3**: Realizar una única lectura y una única escritura de `settings.json` por invocación.
+- **S4**: Preservar la configuración ajena del usuario en install y uninstall. En install, el merge selectivo de hooks clasifica cada clave como `scp-only`, `user-only` o `mixed`; las claves `user-only` se preservan intactas salvo con `--force`. En uninstall, cada feature solo borra lo que es suyo; `--force` permite borrar ajeno.
+- **S5**: Usar `buildNpxTsxCommand` (de `scripting/shared/`) para garantizar quoting multiplataforma y normalizar backslashes antes de comparar rutas.
+
+#### Scenario: S1 aborta antes de tocar settings.json
+
+- **GIVEN** `--root` no contiene `scripting/post-hook-event.ts`
+- **WHEN** el usuario ejecuta `npm run setup:install -- --hooks`
+- **THEN** el script SHALL abortar con exit code 1 sin escribir en `settings.json`
+
+#### Scenario: S2 crea backup antes de la primera escritura
+
+- **WHEN** el usuario ejecuta `npm run setup:install`
+- **THEN** el script SHALL crear `~/.claude/settings-backup-<ISO>.json` antes de invocar `writeClaudeSettings`
+- **AND** SHALL existir exactamente un backup por invocación (no uno por feature)
+
+#### Scenario: S3 realiza una sola escritura por invocación
+
+- **WHEN** el usuario ejecuta `npm run setup:uninstall`
+- **THEN** `settings.json` SHALL escribirse exactamente una vez tras aplicar las tres features
+- **AND** SHALL no haber escrituras intermedias por feature
+
+#### Scenario: S4 install preserva ajeno sin --force
+
+- **GIVEN** `settings.hooks.UserPromptSubmit` contiene un comando ajeno a SCP
+- **WHEN** el usuario ejecuta `npm run setup:install -- --hooks` sin `--force`
+- **THEN** el comando ajeno SHALL preservarse en `UserPromptSubmit`
+- **AND** los comandos canónicos de SCP SHALL agregarse al final del bloque
+
+#### Scenario: S4 install sobrescribe ajeno con --force
+
+- **GIVEN** `settings.hooks.UserPromptSubmit` contiene un comando ajeno a SCP
+- **WHEN** el usuario ejecuta `npm run setup:install -- --hooks --force`
+- **THEN** el comando ajeno SHALL reemplazarse por los canónicos de SCP
+
+#### Scenario: S4 uninstall preserva statusLine ajeno sin --force
+
+- **GIVEN** `settings.statusLine.command` no es de Smart Code Proxy
+- **WHEN** el usuario ejecuta `npm run setup:uninstall -- --statusline` sin `--force`
+- **THEN** `statusLine` SHALL preservarse intacto
+
+#### Scenario: S4 uninstall borra statusLine ajeno con --force
+
+- **GIVEN** `settings.statusLine.command` no es de Smart Code Proxy
+- **WHEN** el usuario ejecuta `npm run setup:uninstall -- --statusline --force`
+- **THEN** `statusLine` SHALL eliminarse
+
+---
+
 ### Requirement: Lectura y escritura única de settings.json
 
-El script SHALL leer `~/.claude/settings.json` una sola vez al inicio, aplicar todas las transformaciones de features en cadena sobre el mismo objeto en memoria, y persistir el resultado con una sola escritura al final. Las funciones `applyStatuslineInstall/Uninstall`, `applyNotificationsInstall/Uninstall` y `applyVoiceInstall/Uninstall` SHALL recibir el objeto settings y devolver uno nuevo sin efectos de escritura propios cuando son invocadas desde `setup.ts`.
+El script SHALL leer `~/.claude/settings.json` una sola vez al inicio, aplicar todas las transformaciones de features en cadena sobre el mismo objeto en memoria, y persistir el resultado con una sola escritura al final. Las funciones `applyStatuslineInstall/Uninstall`, `applyVoiceInstall/Uninstall` y las funciones de `scripting/features/hooks.ts` SHALL recibir el objeto settings y devolver uno nuevo sin efectos de escritura propios cuando son invocadas desde `setup.ts`.
 
-#### Scenario: Instalación de dos features produce una sola escritura
+#### Scenario: Instalación de tres features produce una sola escritura
 
-- **WHEN** el usuario ejecuta `npm run setup -- --statusline --notifications`
+- **WHEN** el usuario ejecuta `npm run setup:install`
 - **THEN** `~/.claude/settings.json` SHALL leerse exactamente una vez
-- **AND** SHALL escribirse exactamente una vez con ambas features aplicadas
+- **AND** SHALL escribirse exactamente una vez con las tres features aplicadas
 
 ---
 
@@ -164,7 +168,7 @@ El script SHALL admitir `--dry-run` que muestre en stdout qué cambios se aplica
 #### Scenario: Dry-run no modifica settings.json
 
 - **GIVEN** un `settings.json` en estado conocido
-- **WHEN** el usuario ejecuta `npm run setup -- --dry-run`
+- **WHEN** el usuario ejecuta `npm run setup:install -- --dry-run`
 - **THEN** el script SHALL mostrar los valores que se escribirían
 - **AND** `settings.json` SHALL permanecer sin cambios
 
@@ -172,12 +176,12 @@ El script SHALL admitir `--dry-run` que muestre en stdout qué cambios se aplica
 
 ### Requirement: Soporte a `--force` para features con política de sobrescritura
 
-El script SHALL propagar `--force` a las funciones `applyStatuslineInstall` y `applyNotificationsInstall`, permitiendo sobrescribir configuración ajena. La feature de voz no tiene política de sobrescritura y SHALL ignorar `--force`.
+El script SHALL propagar `--force` a `applyStatuslineInstall` y a `mergeHooks`, permitiendo sobrescribir configuración ajena. La feature de voz no tiene política de sobrescritura y SHALL ignorar `--force`.
 
 #### Scenario: Force permite instalar sobre statusLine ajeno
 
 - **GIVEN** `settings.statusLine.command` referencia un comando que no es de Smart Code Proxy
-- **WHEN** el usuario ejecuta `npm run setup -- --statusline --force`
+- **WHEN** el usuario ejecuta `npm run setup:install -- --statusline --force`
 - **THEN** `statusLine` SHALL actualizarse al comando del proxy
 
 ---
@@ -189,143 +193,101 @@ En modo install, el script SHALL validar únicamente las features seleccionadas 
 | Feature       | Validación requerida                                    |
 |---------------|---------------------------------------------------------|
 | statusline    | `scripting/router-status.ts` y `routing/providers/` existen |
-| notifications | `src/2-services/notifications/cli.ts` existe           |
 | voice         | ninguna                                                 |
 | hooks         | `configs/hooks.json`, `scripting/post-hook-event.ts`, `scripting/stop-hook-ux.ts` y `src/2-services/notifications/cli.ts` existen |
 
 #### Scenario: Raíz inválida aborta sin escribir
 
 - **GIVEN** `--root` no contiene `scripting/router-status.ts`
-- **WHEN** el usuario ejecuta `npm run setup -- --statusline`
+- **WHEN** el usuario ejecuta `npm run setup:install -- --statusline`
 - **THEN** el script SHALL terminar con código de salida distinto de cero
 - **AND** SHALL no modificar `settings.json`
 
 #### Scenario: Validación solo aplica a las features seleccionadas
 
 - **GIVEN** `--root` no contiene `scripting/router-status.ts`
-- **WHEN** el usuario ejecuta `npm run setup -- --voice`
+- **WHEN** el usuario ejecuta `npm run setup:install -- --voice`
 - **THEN** el script SHALL instalar voz correctamente sin error de validación
+
+---
+
+### Requirement: Política de uninstall de statusline preserva ajeno
+
+La función `applyStatuslineUninstall` SHALL aceptar un parámetro `force: boolean`. Si `settings.statusLine.command` no es de Smart Code Proxy y `force` es `false`, SHALL preservar `statusLine` intacto. Si `force` es `true`, SHALL eliminar `statusLine`. Si `statusLine` no existe, SHALL no hacer nada.
+
+#### Scenario: Uninstall de statusline ajeno sin --force preserva
+
+- **GIVEN** `settings.statusLine.command` referencia un comando que no es de Smart Code Proxy
+- **WHEN** se invoca `applyStatuslineUninstall(settings, false)`
+- **THEN** el `settings` resultante SHALL tener el mismo `statusLine` que el input
+
+#### Scenario: Uninstall de statusline ajeno con --force borra
+
+- **GIVEN** `settings.statusLine.command` referencia un comando que no es de Smart Code Proxy
+- **WHEN** se invoca `applyStatuslineUninstall(settings, true)`
+- **THEN** el `settings` resultante SHALL no tener `statusLine`
+
+#### Scenario: Uninstall de statusline de SCP siempre borra
+
+- **GIVEN** `settings.statusLine.command` es de Smart Code Proxy
+- **WHEN** se invoca `applyStatuslineUninstall(settings, false)` o `(settings, true)`
+- **THEN** el `settings` resultante SHALL no tener `statusLine`
+
+---
+
+### Requirement: Indivisibilidad de --hooks
+
+El flag `--hooks` SHALL instalar el conjunto indivisible de las 14 entradas de hooks declaradas en `configs/hooks.json`. Este conjunto cubre tres dominios:
+
+- **Gateway** (`scripting/post-hook-event.ts`): dispatcher de eventos lifecycle.
+- **Stop UX** (`scripting/stop-hook-ux.ts`): relay unificado del evento `Stop` con toast y continuación.
+- **Notificaciones** (`src/2-services/notifications/cli.ts`): 11 entradas que notifican al usuario.
+
+Las entradas de `SubagentStart`, `SubagentStop` y `StopFailure` combinan gateway y notificación en la misma clave de `settings.json`, por lo que **no es posible instalar gateway, stop UX o notificaciones por separado**. El flag SHALL instalar siempre el conjunto completo.
+
+#### Scenario: --hooks instala los tres dominios en bloque
+
+- **WHEN** el usuario ejecuta `npm run setup:install -- --hooks`
+- **THEN** `settings.hooks` SHALL contener entradas para los 14 eventos definidos en `configs/hooks.json`
+- **AND** SHALL incluir comandos de `post-hook-event.ts`, `stop-hook-ux.ts` y `notifications/cli.ts` según corresponda
+
+#### Scenario: No existe flag para instalar solo notificaciones
+
+- **WHEN** el usuario ejecuta `npm run setup:install -- --notifications`
+- **THEN** el script SHALL abortar con un error de opción desconocida
 
 ---
 
 ### Requirement: Soporte multiplataforma
 
-El script SHALL ejecutarse correctamente en Windows, Linux y macOS. Los comandos generados para `statusLine.command` y los hooks de notificación SHALL delegar en `buildNpxTsxCommand` (de `scripting/shared/`) para garantizar comillas y separadores de ruta correctos en cada plataforma. La configuración de voz no tiene dependencias de plataforma y SHALL comportarse de forma idéntica en los tres sistemas operativos.
+El script SHALL ejecutarse correctamente en Windows, Linux y macOS. Los comandos generados para `statusLine.command` y los hooks SHALL delegar en `buildNpxTsxCommand` (de `scripting/shared/`) para garantizar comillas y separadores de ruta correctos en cada plataforma. La configuración de voz no tiene dependencias de plataforma y SHALL comportarse de forma idéntica en los tres sistemas operativos.
 
 #### Scenario: Instalación en Windows con ruta con espacios
 
 - **GIVEN** la raíz del proxy contiene espacios en su ruta en Windows
-- **WHEN** el usuario ejecuta `npm run setup`
+- **WHEN** el usuario ejecuta `npm run setup:install`
 - **THEN** los comandos generados para `statusLine` y hooks SHALL tener las rutas correctamente citadas para PowerShell/cmd
 - **AND** las claves de voz SHALL escribirse en `settings.json` sin diferencias respecto a otras plataformas
-
-#### Scenario: Instalación en Linux o macOS con ruta con espacios
-
-- **GIVEN** la raíz del proxy contiene espacios en su ruta en Linux o macOS
-- **WHEN** el usuario ejecuta `npm run setup`
-- **THEN** los comandos generados SHALL tener las rutas correctamente citadas para shell POSIX
 
 ---
 
 ### Requirement: Visibilidad en el panel de ayuda
 
-El script `setup` SHALL aparecer en la salida de `npm run help` dentro de la categoría `local`, con una descripción que indique su propósito como instalador unificado de las características de Smart Code Proxy.
+Los scripts `setup:install` y `setup:uninstall` SHALL aparecer en la salida de `npm run help` dentro de la categoría `local`, con descripciones que indiquen su propósito como instalador/desinstalador unificado.
 
-#### Scenario: help lista el script setup
+#### Scenario: help lista los scripts setup:install y setup:uninstall
 
 - **WHEN** el usuario ejecuta `npm run help`
-- **THEN** la salida SHALL incluir `setup` en la sección de scripts locales
-- **AND** SHALL mostrar una descripción que mencione que instala statusline, notificaciones y voz
+- **THEN** la salida SHALL incluir `setup:install` y `setup:uninstall` en la sección de scripts locales
 
 ---
 
-### Requirement: Compatibilidad con instaladores individuales
+### Requirement: Resultado equivalente al encadenamiento de funciones puras
 
-El script `setup` SHALL coexistir con `install:statusline` e `install:notifications`. Ambos grupos de scripts operan sobre `~/.claude/settings.json` usando las mismas funciones `apply*`, por lo que son intercambiables en resultado. Los instaladores individuales NO SHALL modificarse como parte de este cambio.
+El resultado de `npm run setup:install` SHALL ser deep-equal (mismas claves y valores) al producido por la composición de las funciones puras aplicadas en cadena sobre el mismo input inicial: `applyStatuslineInstall(settings, root, force)` + `applyVoiceInstall(settings, opts)` + `mergeHooks(settings, canonical, scpRoot, force)`. La comparación SHALL ser semántica (deep equality), no de orden de serialización JSON.
 
-#### Scenario: Resultado equivalente al encadenamiento de instaladores individuales
+#### Scenario: Resultado equivalente al encadenamiento de funciones puras
 
 - **GIVEN** `settings.json` en estado limpio
-- **WHEN** el usuario ejecuta `npm run setup`
-- **THEN** el objeto settings resultante SHALL ser deep-equal (mismas claves y valores) al producido por `applyStatuslineInstall` + `applyNotificationsInstall` + `applyVoiceInstall` aplicados en cadena sobre el mismo settings inicial
-- **AND** la comparación SHALL ser semántica (deep equality), no de orden de serialización JSON
-
-### Requirement: `--hooks` como fourth feature flag en setup
-
-El script `setup` SHALL admitir `--hooks` como feature flag adicional junto a `--statusline`, `--notifications` y `--voice`. Cuando `--hooks` está presente, SHALL invocar el script `setup-hooks.ts` que gestiona la instalación de las 14 entradas de hooks en `~/.claude/settings.json` con merge selectivo.
-
-El flag `--hooks` opera igual que los demás flags de feature:
-- Sin `--hooks` ni otros flags → opera sobre las 4 features (statusline, notifications, voice, hooks)
-- Con `--hooks` únicamente → opera solo sobre hooks
-- Con `--hooks` combinado con otros flags → opera solo sobre los seleccionados
-
-Los flags `--dry-run`, `--force`, `--uninstall` y `--root` SHAL propagarse a `setup-hooks.ts`.
-
-#### Scenario: setup --hooks sin otros flags opera solo sobre hooks
-
-- **WHEN** el usuario ejecuta `npm run setup -- --hooks`
-- **THEN** el script SHALL invocar únicamente `setup-hooks.ts` con los flags por defecto
-- **AND** statusline, notifications y voice NO SHALL modificarse
-
-#### Scenario: setup sin flags opera sobre las 4 features
-
-- **WHEN** el usuario ejecuta `npm run setup` sin flags de feature
-- **THEN** el script SHALL invocar statusline, notifications, voice y hooks
-
-#### Scenario: setup --hooks --uninstall desinstala solo hooks
-
-- **WHEN** el usuario ejecuta `npm run setup -- --hooks --uninstall`
-- **THEN** `setup-hooks.ts` SHALL ejecutar uninstall selectivo (solo comandos SCP)
-- **AND** statusline, notifications y voice SHALL permanecer sin cambios
-
-#### Scenario: setup --hooks --dry-run previsualiza sin escribir
-
-- **WHEN** el usuario ejecuta `npm run setup -- --hooks --dry-run`
-- **THEN** `setup-hooks.ts` SHALL mostrar diff de cambios sin escribir en disco
-
----
-
-### Requirement: Validación de archivos SCP antes de invocar setup-hooks.ts
-
-Antes de invocar `setup-hooks.ts`, el script `setup` SHALL validar que los siguientes archivos existan en el repo SCP (indicado por `--root` o `SMART_CODE_PROXY_ROOT`):
-
-- `configs/hooks.json` — plantilla canónica
-- `scripting/post-hook-event.ts` — gateway hook relay
-- `scripting/stop-hook-ux.ts` — stop hook unificado
-- `src/2-services/notifications/cli.ts` — CLI de notificaciones
-
-Si alguna validación falla, el script SHALL terminar con código de salida 1 y un mensaje de error claro indicando cuál archivo falta. `settings.json` NO SHALL modificarse en caso de fallo.
-
-#### Scenario: Validación falla si falta configs/hooks.json
-
-- **GIVEN** la raíz del proxy no contiene `configs/hooks.json`
-- **WHEN** el usuario ejecuta `npm run setup -- --hooks`
-- **THEN** el script SHALL terminar con exit code 1
-- **AND** SHALL mostrar mensaje: "No se encontró configs/hooks.json en la raíz del proxy"
-
-#### Scenario: Validación pasa si todos los archivos existen
-
-- **GIVEN** existen `configs/hooks.json`, `scripting/post-hook-event.ts`, `scripting/stop-hook-ux.ts` y `src/2-services/notifications/cli.ts`
-- **WHEN** el usuario ejecuta `npm run setup -- --hooks`
-- **THEN** la validación SHALL pasar
-- **AND** `setup-hooks.ts` SHALL invocarse normalmente
-
----
-
-### Requirement: Coexistencia de --hooks con --statusline, --notifications, --voice
-
-El flag `--hooks` SHALL coexistir con los flags de feature existentes sin conflicto. La selección de features funciona igual que antes: flags presentes = features seleccionadas; ningún flag = todas las 4 features.
-
-#### Scenario: setup --hooks --statusline opera solo sobre esas dos features
-
-- **WHEN** el usuario ejecuta `npm run setup -- --hooks --statusline`
-- **THEN** el script SHALL invocar `setup-hooks.ts` y `applyStatuslineInstall`
-- **AND** notifications y voice NO SHALL modificarse
-
-#### Scenario: setup --hooks --force se propaga a setup-hooks.ts
-
-- **GIVEN** `~/.claude/settings.json` tiene hooks ajenos en algunas claves
-- **WHEN** el usuario ejecuta `npm run setup -- --hooks --force`
-- **THEN** `setup-hooks.ts` SHALL recibir `--force`
-- **AND** SHALL reemplazar hooks ajenos tras crear backup
-
+- **WHEN** el usuario ejecuta `npm run setup:install`
+- **THEN** el objeto settings resultante SHALL ser deep-equal al producido por el encadenamiento de las funciones puras sobre el mismo input

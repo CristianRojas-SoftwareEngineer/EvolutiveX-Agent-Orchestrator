@@ -417,6 +417,45 @@ El CLI SHALL escribir un mensaje de error en `stderr` y terminar con código de 
 - **WHEN** se invoca con `--event-type Stop --stdin-json`
 - **THEN** `message` SHALL ser `profile.message` del catálogo para `Stop`
 
+---
+
+### Requirement: Relay `Stop` desde scripting (doble toast + resumen con modelo)
+
+En el proyecto Smart Code Proxy, el flujo UX del hook `Stop` MAY omitir el CLI como segundo comando y SHALL delegarse en `scripting/stop-hook-ux.ts`, que importa `buildEvent` y `DesktopNotificationAdapter` desde `src/2-services/notifications/` (mismo contrato de `NotificationEvent` que el CLI).
+
+El relay SHALL emitir **dos** notificaciones por ejecución exitosa con texto fuente disponible:
+
+| Orden | Título | Cuerpo | Sonido |
+| --- | --- | --- | --- |
+| 1 | `eventKey` `Stop` (resolución CLI) | `profile.message` del catálogo para `Stop` | Según catálogo `Stop` |
+| 2 | «Resumen del trabajo» (override `--title`) | Resumen Haiku o fallback truncado del último texto assistant | Según catálogo `Stop` (mismo `eventKey` para branding de icono) |
+
+La generación del resumen SHALL vivir en `scripting/stop-work-summary-notification.ts` y MAY reutilizar `normalizeWhitespace`, `truncate` y constantes de longitud de `hook-payload-notification-message.ts`. El orquestador `scripting/stop-hook-ux.ts` SHALL invocar `POST /hooks` antes de los toasts (ver `hooks-lifecycle-correlation`).
+
+Este requirement NO modifica el contrato del CLI standalone: instalaciones globales (`install:notifications`) y otros hooks del lifecycle siguen usando `cli.ts` directamente.
+
+#### Scenario: Primer toast Stop usa catálogo sin `--stdin-json`
+
+- **GIVEN** `notifyStopTurnFinished()` en `stop-work-summary-notification.ts`
+- **WHEN** se construye el evento vía `buildEvent({ eventType: 'Stop', stdinJson: false })`
+- **THEN** `message` SHALL ser el copy del catálogo para `Stop` («Tu turno — El asistente terminó…»)
+- **AND** `title` SHALL ser `'Stop'` salvo override explícito
+
+#### Scenario: Segundo toast usa título de resumen y mensaje generado
+
+- **GIVEN** un resumen no vacío `"Refactor y tests en verde."`
+- **WHEN** se invoca `notifyWorkSummary` con ese texto
+- **THEN** el evento SHALL tener `title: 'Resumen del trabajo'`
+- **AND** `message` SHALL ser el resumen
+- **AND** el branding (`appId`, icono de perfil `Stop`) SHALL aplicarse vía `buildEvent` con `eventType: 'Stop'`
+
+#### Scenario: Relay Stop no sustituye formatter CLI con `--stdin-json`
+
+- **GIVEN** una invocación directa `cli.ts --event-type Stop --stdin-json` con `last_assistant_message`
+- **WHEN** se compara con el 1.er toast del relay unificado
+- **THEN** el relay 1.er toast SHALL usar siempre el catálogo (no el formatter de `last_assistant_message`)
+- **AND** el texto largo del assistant SHALL aparecer preferentemente en el 2.º toast (resumen o fallback)
+
 #### Scenario: CLI con payload inválido → error en stderr y exit 1
 
 - **GIVEN** `no-json` en stdin con `--stdin-json`

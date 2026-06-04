@@ -163,9 +163,11 @@ El repositorio SHALL registrar las 8 entradas del lifecycle de hooks de Claude C
 - **WHEN** Claude Code dispara el hook `SubagentStart`
 - **THEN** SHALL ejecutarse únicamente el comando del proyecto, no el del user-level
 
-### Requirement: Doble comando en los 5 hooks de lifecycle con notificación
+### Requirement: Doble comando en los hooks de lifecycle con notificación (excepto `Stop`)
 
-La entrada del proyecto MUST contener, para los **5 hooks de lifecycle con notificación** (`UserPromptSubmit`, `SubagentStart`, `SubagentStop`, `Stop`, `StopFailure`), un array `hooks` con dos comandos. El primer comando invoca `POST /hooks` (definido por el requirement anterior). El segundo comando invoca el entry point CLI del servicio de notificaciones migrado al repositorio (`src/2-services/notifications/cli.ts`), con paths **relativos** a la raíz del proyecto y la flag `--event-type <EventName>` y `--message "<texto fijo>"` (sin `--stdin-json` en estos 5; el mensaje de toast es texto fijo y determinista por hook, no se deriva del payload). Los otros 3 hooks del lifecycle (`PreToolUse` con `*`, `PostToolUse` con `*`, `PostToolUseFailure`) MUST contener únicamente el comando `POST /hooks`, sin comando de notificación.
+La entrada del proyecto MUST contener, para los **4 hooks de lifecycle con doble comando** (`UserPromptSubmit`, `SubagentStart`, `SubagentStop`, `StopFailure`), un array `hooks` con dos comandos. El primer comando invoca `POST /hooks` (definido por el requirement anterior). El segundo comando invoca el entry point CLI del servicio de notificaciones migrado al repositorio (`src/2-services/notifications/cli.ts`), con paths **relativos** a la raíz del proyecto y la flag `--event-type <EventName>` y `--message "<texto fijo>"` donde aplique (ver tabla). Los otros 3 hooks del lifecycle (`PreToolUse` con `*`, `PostToolUse` con `*`, `PostToolUseFailure`) MUST contener únicamente el comando `POST /hooks`, sin comando de notificación.
+
+El hook **`Stop`** NO entra en este requirement: su configuración SHALL cumplir el requirement «Relay unificado del hook `Stop`» (un solo proceso; doble toast + resumen con modelo).
 
 **Justificación de la exclusión de `PreToolUse` / `PostToolUse`:** los eventos de tool tienen frecuencia alta (5–50 invocaciones por turno en sesiones largas). El gateway necesita `matcher: "*"` para correlacionar todas las tools, pero un toast por cada invocación es ruido de UX, no señal. La notificación se mantiene en las claves de lifecycle, donde un único toast por evento aporta valor (inicio del turno, spawn de subagente, cierre de subagente, cierre del turno, error de cierre). Mismo razonamiento aplica a `PostToolUseFailure` (frecuencia ligada a la de tools).
 
@@ -176,12 +178,11 @@ La entrada del proyecto MUST contener, para los **5 hooks de lifecycle con notif
 | `UserPromptSubmit` | (no se usa `--message`; la entrada usa `--stdin-json` para derivar `message` del payload) |
 | `SubagentStart` | `"Subagente iniciado"` |
 | `SubagentStop` | `"Subagente terminado"` |
-| `Stop` | (no se usa `--message`; la entrada usa `--stdin-json` para derivar `message` del payload) |
 | `StopFailure` | (no se usa `--message`; la entrada usa `--stdin-json` para derivar `message` del payload) |
 
 > **Nota sobre el message fijo en `SubagentStart` / `SubagentStop`:** estos dos hooks no exponen `last_assistant_message` ni metadatos ricos en el payload (son eventos de spawning/cierre de subagente, no de cierre de turno). Un texto fijo en español es consistente con la decisión previa para `SessionStart`/`SessionEnd` (ver Requirement de UX no-lifecycle). En v1 no se aprovecha el payload; si en una iteración futura se desea derivar `message` del `agent_type` del payload, se reemplaza `--message "<fijo>"` por `--stdin-json` en la entrada correspondiente y se documenta el cambio.
 
-#### Scenario: Los 5 hooks de lifecycle con notificación disparan dos comandos en orden
+#### Scenario: Los 4 hooks con doble comando disparan `POST /hooks` y notificación
 
 - **GIVEN** `.claude/settings.json` del proyecto contiene la entrada `UserPromptSubmit` con dos comandos en el array `hooks`
 - **WHEN** Claude Code dispara el evento `UserPromptSubmit`
@@ -215,6 +216,54 @@ La entrada del proyecto MUST contener, para los **5 hooks de lifecycle con notif
 - **WHEN** Claude Code dispara el evento `PreToolUse` para cualquier tool
 - **THEN** SHALL ejecutarse únicamente el comando que invoca `POST /hooks`
 - **AND** NO SHALL emitirse un toast del servicio de notificaciones
+
+---
+
+### Requirement: Relay unificado del hook `Stop` en el proyecto
+
+El hook `Stop` en `.claude/settings.json` del proyecto Smart Code Proxy SHALL declarar un **único** handler `type: "command"` que ejecute `scripting/stop-hook-ux.ts` mediante `npx` + `tsx`, con rutas resueltas con `${CLAUDE_PROJECT_DIR}` (no SHALL depender del cwd del proceso hook). El timeout del handler SHOULD ser ≥ 90 s para cubrir la llamada al modelo de resumen.
+
+Ese proceso SHALL leer el payload JSON del hook **una sola vez** por stdin y, en secuencia:
+
+1. Reenviar el cuerpo a `POST /hooks` del proxy (equivalente a `scripting/post-hook-event.ts`, URL vía `ANTHROPIC_BASE_URL`).
+2. Emitir el **primer toast** de fin de turno (copy del catálogo `Stop` en `desktop-notifications-service`).
+3. Derivar texto fuente desde `last_assistant_message`; si falta, desde el último bloque `text` de un mensaje `assistant` en `transcript_path` del payload.
+4. Invocar la API de mensajes con credenciales `ANTHROPIC_API_KEY` o `ANTHROPIC_AUTH_TOKEN` y, si aplica, `ANTHROPIC_BASE_URL` del entorno del hook; modelo por defecto Haiku (`ANTHROPIC_DEFAULT_HAIKU_MODEL` o fallback documentado en código).
+5. Emitir el **segundo toast** con título «Resumen del trabajo» y cuerpo = resumen generado; si la API falla o no hay credenciales, el cuerpo SHALL ser un recorte normalizado del texto fuente (fallback).
+
+El repositorio SHALL NOT configurar para `Stop` múltiples comandos en paralelo que lean stdin por separado (`post-hook-event.ts` + `cli.ts` + script de resumen), porque compiten por stdin (especialmente en Windows) y el resumen deja de emitirse.
+
+**Módulos normativos:** orquestador `scripting/stop-hook-ux.ts`; resumen y 2.º toast `scripting/stop-work-summary-notification.ts`; builder `buildStopHookUxCommand` en `scripting/shared/gateway-hook-command.ts`. Los prompt hooks (`type: "prompt"`) de Claude Code NO sustituyen este relay: no pueden invocar toasts.
+
+**Documentación operativa (no normativa de comportamiento, referencia):** [`docs/notifications.md`](../../docs/notifications.md) § Hook Stop, [`README.md`](../../README.md) § Configuración de hooks. El directorio `.claude/` está en `.gitignore`; el fragmento JSON canónico vive en la guía de notificaciones.
+
+#### Scenario: `Stop` con payload válido → `POST /hooks` y dos toasts
+
+- **GIVEN** `.claude/settings.json` del proyecto contiene la entrada `Stop` con un único comando a `stop-hook-ux.ts` y `${CLAUDE_PROJECT_DIR}` definido por Claude Code
+- **AND** el proxy escucha en `ANTHROPIC_BASE_URL`
+- **AND** el payload incluye `last_assistant_message` no vacío
+- **WHEN** Claude Code dispara el evento `Stop`
+- **THEN** SHALL llegar una request `POST /hooks` con el payload del evento
+- **AND** SHALL emitirse un toast con el mensaje del catálogo para `Stop`
+- **AND** SHALL emitirse un segundo toast con título «Resumen del trabajo» y cuerpo no vacío
+
+#### Scenario: `Stop` sin `last_assistant_message` pero con `transcript_path` legible
+
+- **GIVEN** el payload de `Stop` no incluye `last_assistant_message`
+- **AND** `transcript_path` apunta a un JSONL con al menos un mensaje `assistant` con bloque `text`
+- **WHEN** se ejecuta `stop-hook-ux.ts`
+- **THEN** SHALL intentarse el resumen (o fallback) a partir del transcript
+- **AND** SHALL emitirse el segundo toast si se obtiene texto fuente no vacío
+
+#### Scenario: `Stop` con stdin vacío por competencia de hooks → sin segundo toast
+
+- **GIVEN** una configuración incorrecta con dos comandos en paralelo que leen stdin
+- **AND** el segundo proceso recibe stdin vacío
+- **WHEN** se ejecuta solo el script de resumen sin texto fuente
+- **THEN** NO SHALL emitirse el segundo toast
+- **AND** el proceso SHOULD registrar en stderr un mensaje diagnóstico (p. ej. sin `last_assistant_message` ni transcript)
+
+> **Nota de conformidad:** la configuración canónica del proyecto usa un solo comando (`stop-hook-ux.ts`) para evitar este escenario.
 
 ---
 

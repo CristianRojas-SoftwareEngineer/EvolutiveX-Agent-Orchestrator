@@ -561,7 +561,7 @@ function loadDisplayName(modelId: string, routingPath: string): string {
       if (!existsSync(metadataPath)) continue;
       try {
         const metadata = JSON.parse(readFileSync(metadataPath, 'utf-8')) as ModelMetadata;
-        if (metadata.modelId === modelId) {
+        if (modelId.includes(metadata.modelId)) {
           return metadata.displayName || modelId;
         }
       } catch {

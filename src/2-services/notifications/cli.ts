@@ -65,6 +65,11 @@ function readStdin(): Promise<string> {
   });
 }
 
+/** Quita BOM UTF-8 y espacios (común en stdin de hooks en Windows / PowerShell). */
+export function normalizeStdinJsonText(raw: string): string {
+  return raw.replace(/^\uFEFF/, '').trim();
+}
+
 export function resolveEventKey(
   options: CliOptions,
   stdinPayload?: Record<string, unknown>,
@@ -224,7 +229,7 @@ async function main(): Promise<number> {
       return 1;
     }
     try {
-      const parsed: unknown = JSON.parse(raw);
+      const parsed: unknown = JSON.parse(normalizeStdinJsonText(raw));
       if (typeof parsed !== 'object' || parsed === null) {
         process.stderr.write('Payload de stdin inválido: no es un objeto JSON\n');
         return 1;

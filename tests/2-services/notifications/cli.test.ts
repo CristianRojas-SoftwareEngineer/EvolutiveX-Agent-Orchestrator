@@ -38,6 +38,7 @@ vi.mock('../../../src/2-services/notifications/DesktopNotificationAdapter.js', (
 
 import {
   buildEvent,
+  normalizeStdinJsonText,
   resolveBranding,
   resolveEventSound,
   resolveEventKey,
@@ -55,6 +56,14 @@ const baseOptions = {
   appId: undefined,
   icon: undefined,
 };
+
+describe('CLI - normalizeStdinJsonText', () => {
+  it('elimina BOM UTF-8 al inicio', () => {
+    const bom = '\uFEFF';
+    const normalized = normalizeStdinJsonText(`${bom}{"hook_event_name":"Stop"}\n`);
+    expect(JSON.parse(normalized)).toEqual({ hook_event_name: 'Stop' });
+  });
+});
 
 describe('CLI - resolveBranding', () => {
   beforeEach(() => {

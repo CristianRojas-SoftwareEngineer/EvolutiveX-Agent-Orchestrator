@@ -19,6 +19,7 @@ Se escribe a nivel de sesión (`sessions/<session-id>/session-metrics.json`). El
   "models": {
     "claude-opus-4-5": {
       "count": 3,
+      "workflow_count": 2,
       "input_tokens": 12400,
       "output_tokens": 950,
       "cache_creation_input_tokens": 3100,
@@ -31,10 +32,13 @@ Se escribe a nivel de sesión (`sessions/<session-id>/session-metrics.json`). El
     "output_tokens": 950,
     "cache_creation_input_tokens": 3100,
     "cache_read_input_tokens": 8200,
-    "total_steps": 3
+    "total_steps": 3,
+    "total_workflows": 2
   }
 }
 ```
+
+> **`workflow_count`:** número de workflows main cerrados (`kind: 'main'`) que usaron ese `modelId` en la sesión. Se incrementa en 1 por cada cierre de workflow main que incluya ese modelo (invariante G16). Los sub-workflows no contribuyen a este contador. Siempre se cumple `count ≥ workflow_count` (cada workflow tiene ≥ 1 step).
 
 Cada clave en `models` es el `modelId` (`step.inferenceRequest.model` en el correlador). Los valores son contadores acumulados desde el inicio de la sesión. Los campos `duration_ms` y `outcome` a nivel de archivo están diferidos (no se escriben en G4).
 

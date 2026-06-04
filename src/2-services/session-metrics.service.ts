@@ -28,6 +28,7 @@ function emptySessionMetrics(): ISessionMetrics {
       cache_creation_input_tokens: 0,
       cache_read_input_tokens: 0,
       total_steps: 0,
+      total_workflows: 0,
     },
   };
 }
@@ -38,6 +39,7 @@ function recalcSessionTotals(models: Record<string, IModelSessionMetrics>): ISes
   let cache_creation_input_tokens = 0;
   let cache_read_input_tokens = 0;
   let total_steps = 0;
+  let total_workflows = 0;
 
   for (const m of Object.values(models)) {
     input_tokens += m.input_tokens;
@@ -45,6 +47,7 @@ function recalcSessionTotals(models: Record<string, IModelSessionMetrics>): ISes
     cache_creation_input_tokens += m.cache_creation_input_tokens;
     cache_read_input_tokens += m.cache_read_input_tokens;
     total_steps += m.count;
+    total_workflows += m.workflow_count;
   }
 
   return {
@@ -53,6 +56,7 @@ function recalcSessionTotals(models: Record<string, IModelSessionMetrics>): ISes
     cache_creation_input_tokens,
     cache_read_input_tokens,
     total_steps,
+    total_workflows,
   };
 }
 
@@ -91,6 +95,7 @@ export class SessionMetricsService {
 
         const existing = data.models[modelId] ?? {
           count: 0,
+          workflow_count: 0,
           input_tokens: 0,
           output_tokens: 0,
           cache_creation_input_tokens: 0,
@@ -103,6 +108,7 @@ export class SessionMetricsService {
 
         data.models[modelId] = {
           count: existing.count + entry.stepCount,
+          workflow_count: (existing.workflow_count ?? 0) + 1,
           input_tokens: mergedInput,
           output_tokens: existing.output_tokens + output_tokens,
           cache_creation_input_tokens:

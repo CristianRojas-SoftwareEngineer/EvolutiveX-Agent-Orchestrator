@@ -32,7 +32,7 @@ export class AuditHookEventHandler {
         break;
 
       case 'Stop': {
-        const wf = this.workflowRepo.getWorkflow(event.sessionId);
+        const wf = this.workflowRepo.getWorkflowBySessionId(event.sessionId);
         if (!wf) {
           this.logger?.info(
             { eventName: event.eventName, sessionId: event.sessionId },
@@ -40,9 +40,9 @@ export class AuditHookEventHandler {
           );
           break;
         }
-        if (this.workflowRepo.readyToClose(event.sessionId, event)) {
-          this.workflowRepo.close(event.sessionId, event);
-          await this.delegateClosure(event.sessionId, event.sessionId);
+        if (this.workflowRepo.readyToClose(wf.id, event)) {
+          this.workflowRepo.close(wf.id, event);
+          await this.delegateClosure(event.sessionId, wf.id);
         }
         break;
       }
@@ -66,7 +66,7 @@ export class AuditHookEventHandler {
       }
 
       case 'StopFailure': {
-        const wf = this.workflowRepo.getWorkflow(event.sessionId);
+        const wf = this.workflowRepo.getWorkflowBySessionId(event.sessionId);
         if (!wf) {
           this.logger?.info(
             { eventName: event.eventName, sessionId: event.sessionId },
@@ -74,8 +74,8 @@ export class AuditHookEventHandler {
           );
           break;
         }
-        this.workflowRepo.close(event.sessionId, event);
-        await this.delegateClosure(event.sessionId, event.sessionId);
+        this.workflowRepo.close(wf.id, event);
+        await this.delegateClosure(event.sessionId, wf.id);
         break;
       }
 

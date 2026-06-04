@@ -56,7 +56,9 @@ describe('SessionMetricsService', () => {
     const data = JSON.parse(raw);
     expect(data.models['claude-sonnet'].input_tokens).toBe(100);
     expect(data.models['claude-sonnet'].cache_efficiency).toBeDefined();
+    expect(data.models['claude-sonnet'].workflow_count).toBe(1);
     expect(data.session_totals.total_steps).toBe(1);
+    expect(data.session_totals.total_workflows).toBe(1);
   });
 
   it('merge incremental en segunda escritura', async () => {
@@ -71,5 +73,7 @@ describe('SessionMetricsService', () => {
     const data = JSON.parse(raw);
     expect(data.models.m1.input_tokens).toBe(30);
     expect(data.models.m1.count).toBe(2);
+    expect(data.models.m1.workflow_count).toBe(2);
+    expect(data.session_totals.total_workflows).toBe(2);
   });
 });

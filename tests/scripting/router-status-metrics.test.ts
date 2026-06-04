@@ -155,6 +155,49 @@ describe('aggregateSessionMetrics', () => {
     expect(m.lite.count).toBe(0);
   });
 
+  it('lee workflow_count y lo acumula en workflowCount', () => {
+    const dir = sessionDir();
+    writeFileSync(
+      join(dir, 'session-metrics.json'),
+      JSON.stringify({
+        models: {
+          'provider/m2-sonnet': {
+            count: 4,
+            workflow_count: 2,
+            input_tokens: 500,
+            cache_read_input_tokens: 0,
+            cache_creation_input_tokens: 0,
+            output_tokens: 100,
+          },
+        },
+      }),
+      'utf-8',
+    );
+    const m = aggregateSessionMetrics(dir, configuredEnv, routingPath);
+    expect(m.standard.workflowCount).toBe(2);
+  });
+
+  it('workflow_count ausente en JSON → workflowCount === 0', () => {
+    const dir = sessionDir();
+    writeFileSync(
+      join(dir, 'session-metrics.json'),
+      JSON.stringify({
+        models: {
+          'provider/m2-sonnet': {
+            count: 3,
+            input_tokens: 200,
+            cache_read_input_tokens: 0,
+            cache_creation_input_tokens: 0,
+            output_tokens: 80,
+          },
+        },
+      }),
+      'utf-8',
+    );
+    const m = aggregateSessionMetrics(dir, configuredEnv, routingPath);
+    expect(m.standard.workflowCount).toBe(0);
+  });
+
   it('fallback heurístico: clasifica modelos estándar de Anthropic cuando vars están ausentes', () => {
     const dir = sessionDir();
     writeFileSync(

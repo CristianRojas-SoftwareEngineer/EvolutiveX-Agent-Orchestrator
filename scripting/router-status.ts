@@ -47,6 +47,7 @@ interface ModelMetadata {
 /** Entrada por modelo en session-metrics.json (camelCase legacy o snake_case G4). */
 interface SessionModelMetricsEntry {
   count: number;
+  workflow_count?: number;
   inputTokens?: number;
   cacheReadInputTokens?: number;
   cacheCreationInputTokens?: number;
@@ -67,6 +68,7 @@ interface TokenMetrics {
   cacheReadInputTokens: number;
   outputTokens: number;
   count: number;
+  workflowCount: number;
   modelName: string;
 }
 
@@ -411,6 +413,7 @@ function renderSideBySide(
 
 interface LevelMetricsSnapshot {
   count: number;
+  workflowCount: number;
   inputTokens: number;
   cacheCreationInputTokens: number;
   cacheReadInputTokens: number;
@@ -611,6 +614,7 @@ function createEmptyMetrics(
     cacheReadInputTokens: 0,
     outputTokens: 0,
     count: 0,
+    workflowCount: 0,
     modelName: '',
   };
   const haiku = settingsEnv['ANTHROPIC_DEFAULT_HAIKU_MODEL'];
@@ -657,6 +661,7 @@ export function aggregateSessionMetrics(
 
       levelMetrics.modelName = loadDisplayName(modelId, routingPath);
       levelMetrics.count += coerceMetricNumber(entry.count);
+      levelMetrics.workflowCount += coerceMetricNumber(entry.workflow_count);
       // G4 escribe snake_case (§33.2); sesiones antiguas pueden usar camelCase
       levelMetrics.inputTokens += coerceMetricNumber(entry.input_tokens ?? entry.inputTokens);
       levelMetrics.cacheCreationInputTokens += coerceMetricNumber(
@@ -817,6 +822,7 @@ function renderTokenTable(
   let totalCacheRead = 0;
   let totalOutput = 0;
   let totalCount = 0;
+  let totalWorkflows = 0;
 
   for (const level of levels) {
     const m = metrics[level.key];
@@ -825,6 +831,7 @@ function renderTokenTable(
     totalCacheRead += m.cacheReadInputTokens;
     totalOutput += m.outputTokens;
     totalCount += m.count;
+    totalWorkflows += m.workflowCount;
 
     const cc = (field: keyof LevelMetricsSnapshot, value: number) =>
       cellColor(level.key, field, value, previous);
@@ -832,6 +839,7 @@ function renderTokenTable(
     rows.push([
       `${level.color}${level.label}${C.reset}`,
       `${level.color}${m.modelName || '-'}${C.reset}`,
+      `${cc('workflowCount', m.workflowCount)}${m.workflowCount}${C.reset}`,
       `${cc('count', m.count)}${m.count}${C.reset}`,
       `${cc('inputTokens', m.inputTokens)}${formatTokens(m.inputTokens)}${C.reset}`,
       `${cc('cacheCreationInputTokens', m.cacheCreationInputTokens)}${formatTokens(m.cacheCreationInputTokens)}${C.reset}`,
@@ -844,6 +852,7 @@ function renderTokenTable(
   const headers = [
     'Nivel',
     'Modelo',
+    '# Workflows',
     '# Steps',
     'Input (tks)',
     'Cache Creación (tks)',
@@ -853,6 +862,7 @@ function renderTokenTable(
   const alignments: Array<'left' | 'center' | 'right'> = [
     'left',
     'left',
+    'right',
     'right',
     'right',
     'right',
@@ -871,13 +881,23 @@ function renderTokenTable(
   const w4 = columnWidths[4];
   const w5 = columnWidths[5];
   const w6 = columnWidths[6];
+  const w7 = columnWidths[7];
 
   const totalText = `${C.total}Totales de sesión${C.reset}`;
-  // Para que los │ de las columnas 3-6 estén alineados con las filas anteriores:
+  // Para que los │ de las columnas 3-7 estén alineados con las filas anteriores:
   // mergedContentWidth = w0 + w1 + 3 produce │ en posiciones coincidentes
   const mergedContentWidth = w0 + w1 + 3;
   const totalMerged = padRight(totalText, mergedContentWidth);
 
+  const tcWorkflows = totalColor(
+    'workflowCount',
+    {
+      lite: metrics.lite.workflowCount,
+      standard: metrics.standard.workflowCount,
+      reasoning: metrics.reasoning.workflowCount,
+    },
+    previous,
+  );
   const totals = {
     lite: metrics.lite.count,
     standard: metrics.standard.count,
@@ -921,7 +941,7 @@ function renderTokenTable(
     previous,
   );
 
-  const totalRow = `${C.border}${B.v}${C.reset} ${totalMerged} ${C.border}${B.v}${C.reset} ${alignRight(`${tcCount}${totalCount}${C.reset}`, w2)} ${C.border}${B.v}${C.reset} ${alignRight(`${tcInput}${formatTokens(totalInput)}${C.reset}`, w3)} ${C.border}${B.v}${C.reset} ${alignRight(`${tcCacheCreation}${formatTokens(totalCacheCreation)}${C.reset}`, w4)} ${C.border}${B.v}${C.reset} ${alignRight(`${tcCacheRead}${formatTokens(totalCacheRead)}${C.reset}`, w5)} ${C.border}${B.v}${C.reset} ${alignRight(`${tcOutput}${formatTokens(totalOutput)}${C.reset}`, w6)} ${C.border}${B.v}${C.reset}`;
+  const totalRow = `${C.border}${B.v}${C.reset} ${totalMerged} ${C.border}${B.v}${C.reset} ${alignRight(`${tcWorkflows}${totalWorkflows}${C.reset}`, w2)} ${C.border}${B.v}${C.reset} ${alignRight(`${tcCount}${totalCount}${C.reset}`, w3)} ${C.border}${B.v}${C.reset} ${alignRight(`${tcInput}${formatTokens(totalInput)}${C.reset}`, w4)} ${C.border}${B.v}${C.reset} ${alignRight(`${tcCacheCreation}${formatTokens(totalCacheCreation)}${C.reset}`, w5)} ${C.border}${B.v}${C.reset} ${alignRight(`${tcCacheRead}${formatTokens(totalCacheRead)}${C.reset}`, w6)} ${C.border}${B.v}${C.reset} ${alignRight(`${tcOutput}${formatTokens(totalOutput)}${C.reset}`, w7)} ${C.border}${B.v}${C.reset}`;
 
   // Borde inferior de la tabla con columna fusionada
   // w0+2 (col0) + 1 (┴) + w1+2 (col1) = w0+w1+5
@@ -934,6 +954,7 @@ function renderTokenTable(
     B.h.repeat(w4 + 2),
     B.h.repeat(w5 + 2),
     B.h.repeat(w6 + 2),
+    B.h.repeat(w7 + 2),
   ];
   const botLine = `${C.border}${B.bl}${botParts.join(B.mb)}${B.br}${C.reset}`;
 
@@ -1042,6 +1063,7 @@ export function buildStatuslineOutput(
       metricsSnapshot: {
         lite: {
           count: metrics.lite.count,
+          workflowCount: metrics.lite.workflowCount,
           inputTokens: metrics.lite.inputTokens,
           cacheCreationInputTokens: metrics.lite.cacheCreationInputTokens,
           cacheReadInputTokens: metrics.lite.cacheReadInputTokens,
@@ -1049,6 +1071,7 @@ export function buildStatuslineOutput(
         },
         standard: {
           count: metrics.standard.count,
+          workflowCount: metrics.standard.workflowCount,
           inputTokens: metrics.standard.inputTokens,
           cacheCreationInputTokens: metrics.standard.cacheCreationInputTokens,
           cacheReadInputTokens: metrics.standard.cacheReadInputTokens,
@@ -1056,6 +1079,7 @@ export function buildStatuslineOutput(
         },
         reasoning: {
           count: metrics.reasoning.count,
+          workflowCount: metrics.reasoning.workflowCount,
           inputTokens: metrics.reasoning.inputTokens,
           cacheCreationInputTokens: metrics.reasoning.cacheCreationInputTokens,
           cacheReadInputTokens: metrics.reasoning.cacheReadInputTokens,

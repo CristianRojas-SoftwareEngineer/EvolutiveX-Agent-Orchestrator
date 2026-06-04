@@ -102,16 +102,18 @@ Presente siempre, independientemente del método de autenticación. Se renderiza
 ╰──────────────────────────────┴─────────────────┴──────────────┴────────────────┴──────────────╯
 ```
 
-**Columnas (6):**
+**Columnas (8):**
 
-| Columna         | Contenido                                           | Fuente                                                    | Alineación |
-| --------------- | --------------------------------------------------- | --------------------------------------------------------- | ---------- |
-| Nivel           | `Lite` / `Standard` / `Reasoning`                   | texto fijo por slot                                    | izquierda  |
-| Modelo          | display name del modelo del nivel                   | `metadata.json → displayName` (o `modelId` si falta)  | izquierda  |
-| # Interacciones | cantidad de turnos del nivel en la sesión           | `session-metrics.json → models[modelId].count`         | derecha    |
-| Input (tks)     | suma de `inputTokens` para el nivel                 | `session-metrics.json → models[modelId].inputTokens`   | derecha    |
-| Cache In (tks)  | suma de `cacheReadInputTokens` para el nivel        | `session-metrics.json → models[modelId].cacheReadInputTokens` | derecha    |
-| Output (tks)    | suma de `outputTokens` para el nivel                | `session-metrics.json → models[modelId].outputTokens`  | derecha    |
+| Columna              | Contenido                                                       | Fuente                                                                   | Alineación |
+| -------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------ | ---------- |
+| Nivel                | `Lite` / `Standard` / `Reasoning`                               | texto fijo por slot                                                       | izquierda  |
+| Modelo               | display name del modelo del nivel                               | `metadata.json → displayName` (o `modelId` si falta)                    | izquierda  |
+| # Workflows          | workflows main cerrados que usaron este nivel en la sesión      | `session-metrics.json → models[modelId].workflow_count`                  | derecha    |
+| # Steps              | cantidad de hops de inferencia del nivel en la sesión           | `session-metrics.json → models[modelId].count`                           | derecha    |
+| Input (tks)          | suma de `input_tokens` para el nivel                            | `session-metrics.json → models[modelId].input_tokens`                    | derecha    |
+| Cache Creación (tks) | suma de `cache_creation_input_tokens` para el nivel             | `session-metrics.json → models[modelId].cache_creation_input_tokens`     | derecha    |
+| Cache Lectura (tks)  | suma de `cache_read_input_tokens` para el nivel                 | `session-metrics.json → models[modelId].cache_read_input_tokens`         | derecha    |
+| Output (tks)         | suma de `output_tokens` para el nivel                           | `session-metrics.json → models[modelId].output_tokens`                   | derecha    |
 
 **Fila de totales:** celdas fusionadas en columnas 0+1 (texto `"Totales de sesión"`), suma de las tres filas de nivel para las columnas numéricas. Los separadores horizontales usan `┴` en la posición de la columna fusionada.
 
@@ -206,7 +208,7 @@ La Tabla 2 (métricas) se imprime siempre **debajo** del bloque de la primera fi
 
 **Tabla 1 (4 columnas):** todas centradas (`center`).
 
-**Tabla 2 (6 columnas):** izquierda, izquierda, derecha, derecha, derecha, derecha (`left, left, right, right, right, right`).
+**Tabla 2 (8 columnas):** izquierda, izquierda, derecha, derecha, derecha, derecha, derecha, derecha (`left, left, right, right, right, right, right, right`).
 
 **Tabla 3 (4 columnas):** izquierda, izquierda, izquierda, derecha (`left, left, left, right`).
 

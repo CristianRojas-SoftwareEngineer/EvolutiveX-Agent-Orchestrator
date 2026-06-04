@@ -98,8 +98,10 @@ describe('AuditHookEventHandler', () => {
       closedByEvent: 'Stop',
       sessionId: 'session-1',
     });
-    const getWorkflow = vi.fn().mockReturnValue(stubWorkflow());
-    const repo = makeRepo({ getWorkflow, readyToClose, close });
+    const wf = stubWorkflow();
+    const getWorkflowBySessionId = vi.fn().mockReturnValue(wf);
+    const getWorkflow = vi.fn().mockReturnValue(wf);
+    const repo = makeRepo({ getWorkflowBySessionId, getWorkflow, readyToClose, close });
     const sessionMetrics = makeSessionMetrics();
     const handler = makeHandler(repo, sessionMetrics);
 
@@ -115,8 +117,8 @@ describe('AuditHookEventHandler', () => {
   it('Stop con stopHookActive:true → readyToClose:false, close no invocado', () => {
     const readyToClose = vi.fn().mockReturnValue(false);
     const close = vi.fn();
-    const getWorkflow = vi.fn().mockReturnValue(stubWorkflow());
-    const repo = makeRepo({ getWorkflow, readyToClose, close });
+    const getWorkflowBySessionId = vi.fn().mockReturnValue(stubWorkflow());
+    const repo = makeRepo({ getWorkflowBySessionId, readyToClose, close });
     const handler = makeHandler(repo);
 
     handler.execute({ eventName: 'Stop', sessionId: 'session-1', stopHookActive: true });
@@ -127,8 +129,8 @@ describe('AuditHookEventHandler', () => {
 
   it('Stop sin workflow en repo → no lanza excepción, close no invocado', () => {
     const close = vi.fn();
-    const getWorkflow = vi.fn().mockReturnValue(undefined);
-    const repo = makeRepo({ getWorkflow, close });
+    const getWorkflowBySessionId = vi.fn().mockReturnValue(undefined);
+    const repo = makeRepo({ getWorkflowBySessionId, close });
     const handler = makeHandler(repo);
 
     expect(() => handler.execute({ eventName: 'Stop', sessionId: 'session-1' })).not.toThrow();
@@ -144,8 +146,10 @@ describe('AuditHookEventHandler', () => {
       closedByEvent: 'StopFailure',
       sessionId: 'session-1',
     });
-    const getWorkflow = vi.fn().mockReturnValue(stubWorkflow());
-    const repo = makeRepo({ getWorkflow, readyToClose, close });
+    const wf = stubWorkflow();
+    const getWorkflowBySessionId = vi.fn().mockReturnValue(wf);
+    const getWorkflow = vi.fn().mockReturnValue(wf);
+    const repo = makeRepo({ getWorkflowBySessionId, getWorkflow, readyToClose, close });
     const sessionMetrics = makeSessionMetrics();
     const handler = makeHandler(repo, sessionMetrics);
 

@@ -31,14 +31,38 @@ describe('classifyModelWithEnv', () => {
     expect(classifyModelWithEnv('combo-m3-opus-m2-sonnet', configuredEnv)).toBe('reasoning');
   });
 
-  it('devuelve null si las variables ANTHROPIC_DEFAULT_* están vacías', () => {
+  it('devuelve null si el modelId no contiene términos conocidos y vars están vacías', () => {
     expect(classifyModelWithEnv('any-model', {})).toBeNull();
+  });
+});
+
+describe('fallback heurístico (vars ausentes)', () => {
+  it('haiku sin vars → lite', () => {
+    expect(classifyModelWithEnv('claude-haiku-4-5-20251001', {})).toBe('lite');
+  });
+
+  it('opus sin vars → reasoning', () => {
+    expect(classifyModelWithEnv('claude-opus-4-8', {})).toBe('reasoning');
+  });
+
+  it('sonnet sin vars → standard', () => {
+    expect(classifyModelWithEnv('claude-sonnet-4-6', {})).toBe('standard');
+  });
+
+  it('modelo sin término conocido sin vars → null', () => {
+    expect(classifyModelWithEnv('minimax-m2-5', {})).toBeNull();
+  });
+
+  it('no aplica si alguna var está configurada', () => {
+    // sonnet no está vacía → fallback desactivado; 'claude-haiku-4-5' no incluye 'm2'
     expect(
-      classifyModelWithEnv('haiku-like-name', {
-        ANTHROPIC_DEFAULT_HAIKU_MODEL: '',
-        ANTHROPIC_DEFAULT_SONNET_MODEL: '',
-        ANTHROPIC_DEFAULT_OPUS_MODEL: '',
+      classifyModelWithEnv('claude-haiku-4-5', {
+        ANTHROPIC_DEFAULT_SONNET_MODEL: 'm2',
       }),
     ).toBeNull();
+  });
+
+  it('prioridad opus > sonnet en fallback', () => {
+    expect(classifyModelWithEnv('claude-opus-4-sonnet', {})).toBe('reasoning');
   });
 });

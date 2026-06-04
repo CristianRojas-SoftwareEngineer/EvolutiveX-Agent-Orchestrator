@@ -58,3 +58,24 @@ Cuando `ctx.session_id` tiene carpeta coincidente bajo `<projectRoot>/sessions/`
 - **WHEN** Claude Code invoca el statusline con ese `session_id` en stdin
 - **THEN** la Tabla 2 SHALL mostrar métricas distintas de cero para niveles con actividad
 
+### Requirement: Clasificación con vars ausentes (fallback heurístico)
+
+#### Scenario: Fallback activo — modelIds estándar de Anthropic
+
+- **GIVEN** `ANTHROPIC_DEFAULT_HAIKU_MODEL`, `ANTHROPIC_DEFAULT_SONNET_MODEL` y `ANTHROPIC_DEFAULT_OPUS_MODEL` están vacías o ausentes
+- **AND** `session-metrics.json` contiene `modelId`s con `"haiku"`, `"sonnet"` u `"opus"`
+- **THEN** `classifyModelWithEnv` SHALL clasificar correctamente (Lite/Standard/Reasoning)
+- **AND** `aggregateSessionMetrics` SHALL retornar contadores `> 0` para esos niveles
+
+#### Scenario: Fallback activo — modelo sin término conocido
+
+- **GIVEN** `ANTHROPIC_DEFAULT_HAIKU_MODEL`, `ANTHROPIC_DEFAULT_SONNET_MODEL` y `ANTHROPIC_DEFAULT_OPUS_MODEL` están vacías o ausentes
+- **AND** `modelId` no contiene ninguno de los tres términos
+- **THEN** `classifyModelWithEnv` SHALL retornar `null` (el registro no se suma)
+
+#### Scenario: Fallback no activo — alguna var configurada
+
+- **GIVEN** al menos una de las tres variables tiene valor no vacío
+- **THEN** el fallback heurístico SHALL NOT activarse
+- **AND** solo SHALL aplicar la comparación por includes contra las vars configuradas
+

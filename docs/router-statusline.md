@@ -254,6 +254,8 @@ classifyModelWithEnv(modelId, settingsEnv):
 
 Orden de evaluación: haiku → opus → sonnet. Si `modelId` no coincide con ninguno de los tres modelos configurados, el registro no se suma a ningún nivel.
 
+**Fallback heurístico (vars ausentes):** si las tres variables `ANTHROPIC_DEFAULT_*_MODEL` están vacías o ausentes (situación típica con `configure-provider default` / OAuth nativo), la clasificación usa los términos `"haiku"` → Lite, `"opus"` → Reasoning, `"sonnet"` → Standard como substrings del `modelId`. El fallback no se activa si al menos una variable está configurada; en ese caso solo aplica el modo primario.
+
 ---
 
 ## 6. Resolución de sesión activa
@@ -343,6 +345,7 @@ y en `env`: `"SMART_CODE_PROXY_ROOT": "<RUTA_ABSOLUTA_DEL_PROXY>"`.
 | `ctx.session_id` sin carpeta coincidente en `sessions/` | Tabla 2 se renderiza en cero/sin datos |
 | `session-metrics.json` ausente o malformado | Tabla 2 se renderiza en cero/sin datos |
 | `modelId` de un registro no coincide con ningún modelo configurado | El registro no se suma a ningún nivel |
+| `ANTHROPIC_DEFAULT_*_MODEL` ausentes o vacías | Fallback heurístico por términos `haiku`/`opus`/`sonnet` en el `modelId`; `null` si no hay coincidencia |
 | `cacheReadInputTokens` es `null` | Se trata como `0` en la suma (`coerceMetricNumber` en el lector del statusline; mismo criterio para `count`, `inputTokens`, `outputTokens`) |
 | `displayName` ausente en `metadata.json` (Tabla 2) | Se muestra `modelId` como texto de la columna Modelo |
 | `ctx.context_window.used_percentage` ausente, no finito o `0` | Usar `contextUsagePercentage` de `.statusline-state.json` si existe; si no, barra al `0%` |

@@ -154,4 +154,36 @@ describe('aggregateSessionMetrics', () => {
     const m = aggregateSessionMetrics(missingSession, configuredEnv, routingPath);
     expect(m.lite.count).toBe(0);
   });
+
+  it('fallback heurístico: clasifica modelos estándar de Anthropic cuando vars están ausentes', () => {
+    const dir = sessionDir();
+    writeFileSync(
+      join(dir, 'session-metrics.json'),
+      JSON.stringify({
+        models: {
+          'claude-sonnet-4-6': {
+            count: 5,
+            inputTokens: 1000,
+            cacheReadInputTokens: 0,
+            cacheCreationInputTokens: 0,
+            outputTokens: 300,
+          },
+          'claude-haiku-4-5-20251001': {
+            count: 3,
+            inputTokens: 400,
+            cacheReadInputTokens: 0,
+            cacheCreationInputTokens: 0,
+            outputTokens: 100,
+          },
+        },
+      }),
+      'utf-8',
+    );
+    const m = aggregateSessionMetrics(dir, {}, routingPath);
+    expect(m.standard.count).toBe(5);
+    expect(m.lite.count).toBe(3);
+    expect(m.reasoning.count).toBe(0);
+    expect(m.standard.inputTokens).toBe(1000);
+    expect(m.lite.inputTokens).toBe(400);
+  });
 });

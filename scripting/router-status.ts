@@ -583,6 +583,15 @@ export function classifyModelWithEnv(
   if (haiku && modelId.includes(haiku)) return 'lite';
   if (opus && modelId.includes(opus)) return 'reasoning';
   if (sonnet && modelId.includes(sonnet)) return 'standard';
+
+  // Fallback heurístico cuando vars no están configuradas (ej. provider default / OAuth nativo).
+  // Solo se activa si las tres están ausentes; si alguna tiene valor, se respeta la configuración explícita.
+  if (!haiku && !opus && !sonnet) {
+    if (modelId.includes('haiku'))  return 'lite';
+    if (modelId.includes('opus'))   return 'reasoning';
+    if (modelId.includes('sonnet')) return 'standard';
+  }
+
   return null;
 }
 

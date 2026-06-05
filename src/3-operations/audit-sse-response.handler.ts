@@ -162,16 +162,22 @@ export class AuditSseResponseHandler {
 
         if (wireStep) {
           for (const block of assembled.toolUseBlocks) {
+            const toolUse: IToolUse = {
+              id: block.id,
+              stepId: wireStep.id,
+              name: block.name,
+              arguments: block.input,
+              status: 'running',
+              toolUseBlock: { type: 'tool_use', id: block.id, name: block.name, input: block.input },
+            };
             if (pendingToolUseKinds.has(block.id)) {
-              const toolUse: IToolUse = {
-                id: block.id,
-                stepId: wireStep.id,
-                name: block.name,
-                arguments: block.input,
-                status: 'running',
-                toolUseBlock: { type: 'tool_use', id: block.id, name: block.name, input: block.input },
-              };
               this.workflowRepo.registerPendingToolUse(workflow.id, wireStep.id, toolUse);
+            } else {
+              // Tool client-side (Read/Edit/Bash/…): registrar para emitir `tool_call`,
+              // poblar `step.toolUses` (que habilita `completeToolUse` del hook PostToolUse)
+              // e indexar el linkage para que la continuation con su `tool_result`
+              // encuentre el workflow padre (sin orphan ni warning).
+              this.workflowRepo.registerToolUse(workflow.id, toolUse);
             }
           }
 

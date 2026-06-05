@@ -107,6 +107,28 @@ export class AuditStandardResponseHandler {
           closedAt: now,
         });
         registerWireStepInCorrelator(this.workflowRepo, wireStep, stopReason);
+
+        // Paridad con el camino SSE: registrar los `tool_use` client-side observados
+        // en el body para emitir `tool_call` e indexar el linkage de continuation.
+        if (Array.isArray(assistantMessage.content)) {
+          for (const block of assistantMessage.content) {
+            if (
+              block.type === 'tool_use' &&
+              typeof block.id === 'string' &&
+              typeof block.name === 'string'
+            ) {
+              this.workflowRepo.registerToolUse(workflow.id, {
+                id: block.id,
+                stepId: wireStep.id,
+                name: block.name,
+                arguments: block.input,
+                status: 'running',
+                toolUseBlock: block,
+              });
+            }
+          }
+        }
+
         void persistBillableStepMetricsIfNeeded(
           this.sessionMetrics,
           this.auditBaseDir,

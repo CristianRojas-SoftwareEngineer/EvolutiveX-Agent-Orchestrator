@@ -241,6 +241,25 @@ El port `IWorkflowRepository` (capa 1) SHALL exponer una operación `setWorkflow
 
 ---
 
+### Requirement: Continuation de tool client-side enlaza como step del workflow padre
+
+Cuando `handleContinuation` procesa una request de continuation que porta un `tool_result` cuyo `tool_use_id` fue previamente registrado vía `registerToolUse` (tool client-side), `findWorkflowByToolUseId` SHALL devolver el workflow padre dueño de ese `tool_use_id`. En ese caso, `handleContinuation` SHALL registrar la nueva inferencia como un step adicional encadenado al workflow padre (`stepIndex = parentWorkflow.steps.length + 1`).
+
+En este escenario, `handleContinuation` NO SHALL crear un workflow standalone, NO SHALL invocar `forceClose(workflowId, 'orphaned', { continuationOrphan: true })`, y NO SHALL emitir el warning `[audit] No se encontró workflow padre para continuation`. El resultado es que un turno agéntico completo (delegación inicial + N round-trips de tools client-side) se proyecta como un único workflow con N steps encadenados, en lugar de N workflows orphan espurios.
+
+El warning de orphan SHALL quedar reservado para casos genuinos: continuation sin `tool_use_id` (`toolUseIds === []`) o cuyo `tool_use_id` no está indexado (p. ej. workflow padre ya cerrado y su índice limpiado).
+
+#### Scenario: continuation con tool_result client-side registrado enlaza step sin orphan
+
+- **GIVEN** un workflow `session-wire-3` que registró vía `registerToolUse` un tool client-side con `id: 'toolu-read-1'` (indexado en `toolUseIdToWorkflowId`)
+- **WHEN** el cliente envía una continuation cuyo body porta `tool_result` con `tool_use_id: 'toolu-read-1'`
+- **THEN** `findWorkflowByToolUseId(sessionId, 'toolu-read-1')` SHALL devolver `session-wire-3`
+- **AND** `handleContinuation` SHALL registrar un step nuevo contra `session-wire-3` con `stepIndex === parentWorkflow.steps.length + 1`
+- **AND** NO SHALL invocarse `forceClose` con `outcome: 'orphaned'`
+- **AND** NO SHALL emitirse el warning `[audit] No se encontró workflow padre para continuation`
+
+---
+
 ### Requirement: Registro y cierre de steps desde handlers wire
 
 `AuditSseResponseHandler` y `AuditStandardResponseHandler` (capa 3) SHALL, al completar cada inferencia, registrar el step en el correlador unificado (`IWorkflowRepository`) invocando `registerStep(workflowId, step)` con un `IStep` construido desde el snapshot del request de inferencia y el resultado ensamblado (`StepAssembler.result()` para SSE; respuesta parseada completa para standard). Cuando el step es terminal (`stopReason === 'end_turn'`), el handler SHALL invocar `closeStep(workflowId, stepId)` inmediatamente al finalizar la inferencia. Cuando el step termina con `tool_use`, el handler SHALL invocar `registerStep` pero NO SHALL invocar `closeStep` hasta el cierre diferido vía hooks (el step permanece abierto en el correlador). Si el workflow no existe en el correlador, las invocaciones SHALL ser no-op defensivo sin error ni interrupción del pipeline legacy.

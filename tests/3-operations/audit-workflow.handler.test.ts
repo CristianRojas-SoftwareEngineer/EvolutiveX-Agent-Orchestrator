@@ -24,7 +24,10 @@ class TestEventBus implements IEventBus {
   }
 }
 
-function createTestStack(init?: (repo: WorkflowRepositoryService) => void) {
+function createTestStack(
+  init?: (repo: WorkflowRepositoryService) => void,
+  logger?: import('../../src/1-domain/types/logger.types.js').Logger,
+) {
   const eventBus = new TestEventBus();
   const workflowRepo = new WorkflowRepositoryService(eventBus);
   init?.(workflowRepo);
@@ -35,6 +38,7 @@ function createTestStack(init?: (repo: WorkflowRepositoryService) => void) {
     workflowRepo,
     eventBus,
     config,
+    logger,
   );
   return { handler, workflowRepo, eventBus, config };
 }
@@ -193,6 +197,69 @@ describe('AuditWorkflowHandler', () => {
     expect(result).not.toBeNull();
     const wf = workflowRepo.getWorkflow(result!.workflowId);
     expect(wf?.result?.outcome).toBe('orphaned');
+  });
+
+  // Tool client-side (Read/Edit/…): el SSE previo lo registró vía registerToolUse,
+  // poblando toolUseIdToWorkflowId. La continuation con su tool_result debe enlazarse
+  // como step nuevo del padre, sin orphan ni warning.
+  it('continuation con tool_result client-side registrado enlaza step sin orphan ni warning', async () => {
+    const warn = vi.fn();
+    const logger = { info: vi.fn(), warn, error: vi.fn(), debug: vi.fn() } as unknown as import('../../src/1-domain/types/logger.types.js').Logger;
+    const { handler, workflowRepo, eventBus } = createTestStack((repo) => {
+      const wf = repo.openWorkflow(
+        'test-session',
+        { isSubagentRequest: false, agentId: undefined },
+        { forceNew: true, layoutIndex: 0, workflowKind: 'agentic' },
+      );
+      const stepId = 'step-parent-1';
+      wf.steps.push({
+        id: stepId,
+        workflowId: wf.id,
+        index: 0,
+        inferenceRequest: { model: 'claude-3-5-sonnet', messages: [], max_tokens: 4096 },
+        assistantMessage: { role: 'assistant', content: [] },
+        toolUses: [],
+        startedAt: new Date(),
+      });
+      repo.patchWireMeta(wf.id, {
+        layoutIndex: 0,
+        requestSequence: 1,
+        requestBodyOmitted: false,
+        requestBodyBytes: 100,
+        workflowKind: 'agentic',
+      });
+      // Tool client-side registrado (puebla toolUseIdToWorkflowId, NO pendingToolUses).
+      repo.registerToolUse(wf.id, {
+        id: 'tool-x',
+        stepId,
+        name: 'Read',
+        arguments: { file_path: 'a.ts' },
+        status: 'running',
+        toolUseBlock: { type: 'tool_use', id: 'tool-x', name: 'Read', input: {} } as never,
+      });
+    }, logger);
+
+    const parentBefore = workflowRepo.findWorkflowByToolUseId('test-session', 'tool-x');
+    expect(parentBefore).toBeDefined();
+    const stepsBefore = parentBefore!.steps.length;
+
+    const result = await handler.execute({
+      headers: { 'x-cc-audit-session': 'test-session' },
+      rawBody: CONTINUATION_BODY,
+      requestId: 'req-2',
+    });
+
+    expect(result).not.toBeNull();
+    expect(result!.requestClassification).toEqual({ type: 'continuation' });
+    // Enlazado al padre: mismo workflow, sin orphan.
+    expect(result!.workflowId).toBe(parentBefore!.id);
+    const wf = workflowRepo.getWorkflow(result!.workflowId);
+    expect(wf?.result?.outcome).not.toBe('orphaned');
+    // Step nuevo encadenado.
+    expect(result!.assignedStepIndex).toBe(stepsBefore + 1);
+    // Sin warning de orphan.
+    expect(warn).not.toHaveBeenCalled();
+    expect(eventBus.events.filter((e) => e.type === 'step_request').length).toBeGreaterThanOrEqual(1);
   });
 
   it('debería clasificar preflight-quota: workflow sin request top-level', async () => {

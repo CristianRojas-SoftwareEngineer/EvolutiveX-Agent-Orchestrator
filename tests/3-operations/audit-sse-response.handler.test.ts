@@ -239,6 +239,69 @@ describe('AuditSseResponseHandler', () => {
     expect(toolUse.name).toBe('Agent');
   });
 
+  it('registra tool client-side vía registerToolUse e indexa el linkage (no registerPendingToolUse)', async () => {
+    const registerToolUse = vi.fn();
+    const registerPendingToolUse = vi.fn();
+    const wf = stubWorkflow('session-1-wire-1');
+    wf.sessionId = 'session-1';
+    const repo = makeWorkflowRepo({
+      getWorkflow: vi.fn(() => wf),
+      closeStep: vi.fn(),
+      registerToolUse,
+      registerPendingToolUse,
+    });
+    const handler = makeSseHandler(undefined, undefined, repo);
+
+    const sse = [
+      'data: {"type":"message_start","message":{"usage":{"input_tokens":5,"output_tokens":0}}}',
+      'data: {"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"toolu_read_1","name":"Read","input":{}}}',
+      'data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{\\"file_path\\":\\"a.ts\\"}"}}',
+      'data: {"type":"content_block_stop","index":0}',
+      'data: {"type":"message_delta","delta":{"stop_reason":"tool_use"},"usage":{"output_tokens":3}}',
+      'data: {"type":"message_stop"}',
+      '',
+    ].join('\n');
+
+    const stream = new PassThrough();
+    handler.execute(stream, makeContext({ auditSessionId: 'session-1', workflowId: 'session-1-wire-1' }), {});
+    stream.write(Buffer.from(sse));
+    stream.end();
+    await wait();
+
+    expect(registerPendingToolUse).not.toHaveBeenCalled();
+    expect(registerToolUse).toHaveBeenCalled();
+    const [wfId, toolUse] = (registerToolUse as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(wfId).toBe('session-1-wire-1');
+    expect(toolUse.id).toBe('toolu_read_1');
+    expect(toolUse.name).toBe('Read');
+    expect(toolUse.status).toBe('running');
+  });
+
+  it('linkage real: continuation encuentra el workflow padre vía findWorkflowByToolUseId tras registrar tool client-side', async () => {
+    const repo = new WorkflowRepositoryService();
+    repo.openWorkflow('session-1', { agentId: undefined, isSubagentRequest: false });
+    const handler = makeSseHandler(undefined, undefined, repo);
+
+    const sse = [
+      'data: {"type":"message_start","message":{"usage":{"input_tokens":5,"output_tokens":0}}}',
+      'data: {"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"toolu_read_link","name":"Read","input":{}}}',
+      'data: {"type":"content_block_stop","index":0}',
+      'data: {"type":"message_delta","delta":{"stop_reason":"tool_use"},"usage":{"output_tokens":3}}',
+      'data: {"type":"message_stop"}',
+      '',
+    ].join('\n');
+
+    const stream = new PassThrough();
+    handler.execute(stream, makeContext({ auditSessionId: 'session-1', workflowId: 'session-1' }), {});
+    stream.write(Buffer.from(sse));
+    stream.end();
+    await wait();
+
+    const parent = repo.findWorkflowByToolUseId('session-1', 'toolu_read_link');
+    expect(parent).toBeDefined();
+    expect(parent?.id).toBe('session-1');
+  });
+
   it('usa WorkflowRepositoryService real para integración básica', async () => {
     const repo = new WorkflowRepositoryService();
     repo.openWorkflow('session-1', { agentId: undefined, isSubagentRequest: false });

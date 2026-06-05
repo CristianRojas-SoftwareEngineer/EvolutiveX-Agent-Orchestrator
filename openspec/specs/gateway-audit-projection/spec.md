@@ -148,6 +148,33 @@ Esta atribución garantiza que la proyección a disco vía `SessionPersistence` 
 
 ---
 
+### Requirement: Registro de tool_use client-side observados en respuestas wire
+
+Los bloques `tool_use` client-side (los tools de Claude Code: `Read`/`Edit`/`Bash`/`Grep`/…, esto es, todos los que NO pertenecen a `pendingToolUseKinds` = `agent`/`web_search`/`web_fetch`) observados al ensamblar una respuesta wire SHALL registrarse vía `IWorkflowRepository.registerToolUse(workflowId, toolUse)`.
+
+`registerToolUse` SHALL: (a) emitir `tool_call` (proyectado por `SessionPersistence` a `tools/KK-slug/input.json` + `meta.json`), (b) hacer push del `IToolUse` a `step.toolUses` (lo que habilita que `completeToolUse` del hook `PostToolUse` encuentre el tool y emita `tool_result`), y (c) poblar `toolUseIdToWorkflowId` mapeando el `tool_use_id` al `workflowId` dueño.
+
+Este registro NO SHALL tocar `pendingToolUses`, por lo que NO SHALL disparar el camino de coalescing server-side (`resolveAgentContinuationTarget`/`handleSubagent`). El indexado de (c) garantiza que la continuation que porte el `tool_result` de ese tool encuentre su workflow padre vía `findWorkflowByToolUseId`, reforzando el escenario de la sección anterior (hoy cubierto solo para tools server-side).
+
+Ambos caminos de respuesta SHALL mantener paridad: `AuditSseResponseHandler` (streaming) registra los `tool_use` ensamblados desde `assembled.toolUseBlocks`; `AuditStandardResponseHandler` (no-streaming) los extrae de los bloques `type === 'tool_use'` del body de respuesta.
+
+#### Scenario: tool_use client-side se registra e indexa al ensamblar el wire
+
+- **GIVEN** un `AuditSseResponseHandler` auditando el workflow `session-wire-3`
+- **WHEN** el stream SSE ensambla un bloque `tool_use` client-side (p. ej. `Read` con `id: 'toolu-read-1'`) que NO está en `pendingToolUseKinds`
+- **THEN** el handler SHALL invocar `registerToolUse('session-wire-3', toolUse)` (no `registerPendingToolUse`)
+- **AND** SHALL emitirse un evento `tool_call` para `toolu-read-1`
+- **AND** `findWorkflowByToolUseId(sessionId, 'toolu-read-1')` SHALL devolver el workflow `session-wire-3`
+
+#### Scenario: paridad en el camino no-streaming
+
+- **GIVEN** un `AuditStandardResponseHandler` auditando el workflow `session-wire-3`
+- **WHEN** el body de respuesta contiene un bloque `type: 'tool_use'` client-side con `id: 'toolu-edit-1'`
+- **THEN** el handler SHALL invocar `registerToolUse('session-wire-3', toolUse)` para ese bloque
+- **AND** `toolUseIdToWorkflowId` SHALL mapear `'toolu-edit-1'` a `'session-wire-3'`
+
+---
+
 ### Requirement: Limpieza de toolUseIdToWorkflowId en paths de error
 
 El sistema SHALL exponer en `IWorkflowRepository` un método `clearToolUseIndexFor(workflowId: string): void` que elimine todas las entradas de `toolUseIdToWorkflowId` cuyo valor sea el `workflowId` dado. Este método SHALL ser invocado desde:

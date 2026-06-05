@@ -215,6 +215,10 @@ export class WorkflowRepositoryService implements IWorkflowRepository {
     const step = workflow.steps.find((s) => s.id === toolUse.stepId);
     if (!step) return;
     step.toolUses.push(toolUse);
+    // El workflow es dueño de este tool_use → indexar para lookup de continuation
+    // (consistente con `registerPendingToolUse`). No toca `pendingToolUses`, así que
+    // no dispara el camino de coalescing server-side.
+    this.toolUseIdToWorkflowId.set(toolUse.id, workflowId);
     this.emit('tool_call', workflowId, {
       stepIndex: step.index,
       toolUseId: toolUse.id,

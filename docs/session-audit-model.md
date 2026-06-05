@@ -168,7 +168,7 @@ La clasificación la realiza `RequestClassifierService` (dominio); `AuditWorkflo
 | Clasificación | Comportamiento resumido | Workflow en disco |
 | ------------- | ------------------------ | ----------------- |
 | `fresh` | Nuevo turno con `tools` no vacíos | Nuevo `workflows/NN/`, `kind: main` |
-| `continuation` | `tool_result` hacia workflow activo | Mismo workflow; nuevo step o coalescing Agent |
+| `continuation` | `tool_result` en el **último mensaje** hacia workflow activo | Mismo workflow; nuevo step o coalescing Agent |
 | `preflight-quota` / `preflight-warmup` | `max_tokens:1` o warm-up | Nuevo workflow; cierra al responder |
 | `side-request` | `tools: []` (p. ej. `count_tokens`) | Nuevo workflow; no desplaza el main activo |
 

@@ -8,7 +8,11 @@ import { RequestClassification } from '../types/audit.types.js';
 export function classifyRequestBody(bodyBuffer: Buffer): RequestClassification {
   if (!bodyBuffer.length) return { type: 'preflight-warmup' };
   const str = bodyBuffer.toString('utf8');
-  if (str.includes('"tool_result"')) return { type: 'continuation' };
+  // Fast-path: si no hay "tool_result" en todo el buffer, no es continuation.
+  // Si hay, confirmar semánticamente que esté en el último mensaje (no en historial acumulado).
+  if (str.includes('"tool_result"') && extractToolResultIdsFromRequestBody(bodyBuffer).length > 0) {
+    return { type: 'continuation' };
+  }
   if (str.includes('"quota"') && str.includes('"max_tokens":1')) return { type: 'preflight-quota' };
   if (!str.includes('"tools"')) return { type: 'preflight-warmup' };
   if (/"tools"\s*:\s*\[\s*\]/.test(str)) return { type: 'side-request' };

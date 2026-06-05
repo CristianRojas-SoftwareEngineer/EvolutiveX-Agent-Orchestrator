@@ -99,6 +99,40 @@ describe('classifyRequestBody', () => {
     );
     expect(classifyRequestBody(body)).toEqual({ type: 'continuation' });
   });
+
+  it('tool_result en historial pero último mensaje fresh con tools → clasifica como fresh', () => {
+    // Escenario: sesión larga donde un turno anterior tiene tool_result en el historial,
+    // pero el último mensaje es un nuevo turno del usuario (sin tool_result en el último mensaje).
+    // El clasificador NO debe clasificarlo como continuation.
+    const body = Buffer.from(
+      JSON.stringify({
+        messages: [
+          { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'hist-1', content: 'ok' }] },
+          { role: 'assistant', content: [{ type: 'text', text: 'entendido' }] },
+          { role: 'user', content: 'nueva instrucción del usuario' },
+        ],
+        tools: [{ name: 'Read', description: 'lee', input_schema: { type: 'object', properties: {} } }],
+        max_tokens: 4096,
+      }),
+    );
+    expect(classifyRequestBody(body)).toEqual({ type: 'fresh' });
+  });
+
+  it('tool_result en historial y último mensaje sin tool_result ni tools → clasifica como preflight-warmup', () => {
+    // Escenario: sesión larga donde un turno anterior tiene tool_result,
+    // pero el último mensaje es texto plano sin tools en el body.
+    const body = Buffer.from(
+      JSON.stringify({
+        messages: [
+          { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'hist-2', content: 'ok' }] },
+          { role: 'assistant', content: [{ type: 'text', text: 'ok' }] },
+          { role: 'user', content: 'hola' },
+        ],
+        max_tokens: 4096,
+      }),
+    );
+    expect(classifyRequestBody(body)).toEqual({ type: 'preflight-warmup' });
+  });
 });
 
 describe('extractToolResultIdsFromRequestBody', () => {

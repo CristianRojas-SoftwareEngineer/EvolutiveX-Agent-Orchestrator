@@ -52,7 +52,7 @@ En Smart Code Proxy, el evento **`Stop`** usa un relay unificado en lugar de var
 | 5 | Persiste el mensaje completo en `sessions/.last-continuity-message.txt` (punto de integración TTS) |
 | 6 | **Toast único** — título «Stop», cuerpo = preview de hasta 250 caracteres del mensaje de continuidad (o copy del catálogo si no hay texto fuente) |
 
-**Scripts:** [`scripting/stop-hook-ux.ts`](../scripting/stop-hook-ux.ts) (orquestador) y [`scripting/stop-work-summary-notification.ts`](../scripting/stop-work-summary-notification.ts) (contexto + mensaje + toast). El builder de comando con ruta absoluta: `buildStopHookUxCommand` en [`scripting/shared/gateway-hook-command.ts`](../scripting/shared/gateway-hook-command.ts).
+**Scripts:** [`scripting/stop-hook-ux.ts`](../scripting/stop-hook-ux.ts) (orquestador, único entry point del hook) y [`scripting/stop-work-summary-notification.ts`](../scripting/stop-work-summary-notification.ts) (módulo import-only: contexto + mensaje + toast; no ejecutable directamente). El builder de comando con ruta absoluta: `buildStopHookUxCommand` en [`scripting/shared/gateway-hook-command.ts`](../scripting/shared/gateway-hook-command.ts).
 
 **Por qué un solo proceso:** si `post-hook-event.ts`, el CLI de notificaciones y un tercer script corren en paralelo, en Windows suele quedarse solo el primero con stdin; el mensaje de continuidad no recibe JSON y no emite el toast.
 

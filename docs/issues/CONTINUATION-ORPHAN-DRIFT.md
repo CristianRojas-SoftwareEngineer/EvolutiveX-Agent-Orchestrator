@@ -242,7 +242,7 @@ En `handleContinuation`, si el `toolUseId` se acaba de registrar (porque el SSE 
 - **El test existente `'debería clasificar continuation: routear al workflow padre por tool_use_id'`** sigue siendo válido: el escenario que cubre (parent con `registerPendingToolUse` ya invocado) no cambia.
 - **El test `'continuation sin tool_use_id registrado crea workflow orphan'`** pasa a representar un caso real: el response SSE nunca llegó (ej. error upstream), no un fallo de identificación.
 
-## Drift #1 (SubagentStop con getWorkflow(agentId)) — ¿es el mismo problema?
+## Drift #1 (SubagentStop con getWorkflow(agentId)) — RESUELTO
 
 `audit-hook-event.handler.ts:50-64` usa `getWorkflow(agentId)` directamente para resolver el workflow del subagente cuando llega `SubagentStop`. Esto es problemático porque:
 
@@ -253,9 +253,9 @@ En `handleContinuation`, si el `toolUseId` se acaba de registrar (porque el SSE 
 
 **No hay datos de este drift en `server/logs.jsonl`**: la sesión activa no tuvo subagentes que llegaran a `SubagentStop` (todos los subagentes están `running`, no se cerraron). El drift es latente, no activo.
 
-## Drift #2 (stop-hook-ux.ts con CLAUDE_PROJECT_DIR)
+## Drift #2 (stop-hook-ux.ts con CLAUDE_PROJECT_DIR) — RESUELTO
 
-No verificado en esta sesión porque el hook `Stop` no se disparó durante el log capturado. Sigue siendo un drift potencial.
+**Resuelto** eliminando el entry point directo de `scripting/stop-work-summary-notification.ts` (bloque `isEntryPoint` + `readStdinText` + imports huérfanos `stdin`, `fileURLToPath`, `resolvePath`). El módulo es ahora import-only: no puede ejecutarse de forma directa y ya no depende de `CLAUDE_PROJECT_DIR` para resolver `projectDir`. El único entry point del hook `Stop` es `scripting/stop-hook-ux.ts`, que deriva la raíz de SCP de `import.meta.url`, conforme a `openspec/specs/hooks-lifecycle-correlation/spec.md`.
 
 ## Archivos afectados
 

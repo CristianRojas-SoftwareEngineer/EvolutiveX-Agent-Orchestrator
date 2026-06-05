@@ -258,6 +258,8 @@ El repositorio SHALL NOT configurar para `Stop` múltiples comandos en paralelo 
 
 **Módulos normativos:** orquestador `scripting/stop-hook-ux.ts`; mensaje de continuidad y toast `scripting/stop-work-summary-notification.ts` (función `runContinuityNotification`); builder `buildStopHookUxCommand` en `scripting/shared/gateway-hook-command.ts`. Los prompt hooks (`type: "prompt"`) de Claude Code NO sustituyen este relay: no pueden invocar toasts.
 
+`scripting/stop-work-summary-notification.ts` SHALL ser un módulo import-only (sin entry point CLI propio). El único entry point del hook `Stop` SHALL ser `scripting/stop-hook-ux.ts`, que deriva la raíz de SCP de `import.meta.url` y NO SHALL usar `CLAUDE_PROJECT_DIR` ni otra variable de runtime de Claude Code para resolver `projectDir`.
+
 **Documentación operativa (no normativa de comportamiento, referencia):** [`docs/notifications.md`](../../docs/notifications.md) § Hook Stop, [`README.md`](../../README.md) § Configuración de hooks. El directorio `.claude/` está en `.gitignore`; el fragmento JSON canónico vive en la guía de notificaciones.
 
 #### Scenario: `Stop` con payload válido → `POST /hooks` y toast único con continuidad

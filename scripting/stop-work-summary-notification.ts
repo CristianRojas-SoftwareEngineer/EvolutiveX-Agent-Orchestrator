@@ -7,9 +7,6 @@ import { createReadStream } from 'node:fs';
 import { writeFile } from 'node:fs/promises';
 import { createInterface } from 'node:readline';
 import { join } from 'node:path';
-import { stdin } from 'node:process';
-import { fileURLToPath } from 'node:url';
-import { resolve as resolvePath } from 'node:path';
 import Anthropic from '@anthropic-ai/sdk';
 import { DesktopNotificationAdapter } from '../src/2-services/notifications/DesktopNotificationAdapter.js';
 import { buildEvent } from '../src/2-services/notifications/cli.js';
@@ -40,14 +37,6 @@ interface TranscriptLine {
 interface Segment {
   role: string;
   texts: string[];
-}
-
-export async function readStdinText(): Promise<string> {
-  const chunks: Buffer[] = [];
-  for await (const chunk of stdin) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-  }
-  return Buffer.concat(chunks).toString('utf-8');
 }
 
 export function readLastAssistantMessage(payload: Record<string, unknown>): string | undefined {
@@ -270,19 +259,4 @@ export async function runContinuityNotification(
     process.stderr.write(`stop-work-summary-notification: toast: ${msg}\n`);
   }
   return 0;
-}
-
-const isEntryPoint =
-  typeof process.argv[1] === 'string' &&
-  fileURLToPath(import.meta.url) === resolvePath(process.argv[1]);
-
-if (isEntryPoint) {
-  readStdinText()
-    .then((raw) => runContinuityNotification(raw, process.env.CLAUDE_PROJECT_DIR ?? ''))
-    .then((code) => process.exit(code))
-    .catch((err: unknown) => {
-      const msg = err instanceof Error ? err.message : String(err);
-      process.stderr.write(`stop-work-summary-notification: ${msg}\n`);
-      process.exit(0);
-    });
 }

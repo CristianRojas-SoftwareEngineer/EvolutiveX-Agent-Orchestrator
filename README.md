@@ -151,9 +151,9 @@ Personaliza el comportamiento ajustando estas variables en tu entorno o en un ar
 
 ### Configuración de hooks
 
-Para instalar las **13 claves** de hooks de SCP en `~/.claude/settings.json` (user-level) con merge selectivo que preserva configs ajenas del usuario: `npm run setup:install -- --hooks`. Con `--dry-run` para previsualizar, `--force` para sobrescribir configs ajenas (con backup automático), `npm run setup:uninstall -- --hooks` para desinstalar solo los hooks de SCP. La plantilla canónica versionada vive en [`configs/hooks.json`](configs/hooks.json).
+Para instalar las **14 claves** de hooks de SCP en `~/.claude/settings.json` (user-level) con merge selectivo que preserva configs ajenas del usuario: `npm run setup:install -- --hooks`. Con `--dry-run` para previsualizar, `--force` para sobrescribir configs ajenas (con backup automático), `npm run setup:uninstall -- --hooks` para desinstalar solo los hooks de SCP. La plantilla canónica versionada vive en [`configs/hooks.json`](configs/hooks.json).
 
-Adicionalmente, el archivo `.claude/settings.json` del proyecto registra **13 claves** de hooks de Claude Code (**8 del lifecycle** que alimentan al gateway, más **5 claves de UX no-lifecycle** que solo emiten toast nativo), sobrescribiendo las entradas equivalentes del user-level (`C:\Users\Cristian\.claude\settings.json`) para esas claves (mecanismo de merge de Claude Code: el proyecto tiene precedencia). Las 13 claves son:
+Adicionalmente, el archivo `.claude/settings.json` del proyecto registra **14 claves** de hooks de Claude Code (**8 del lifecycle** que alimentan al gateway, más **6 claves de UX no-lifecycle** que solo emiten toast nativo), sobrescribiendo las entradas equivalentes del user-level (`C:\Users\Cristian\.claude\settings.json`) para esas claves (mecanismo de merge de Claude Code: el proyecto tiene precedencia). Las 14 claves son:
 
 | Hook | Matcher | Comandos |
 | --- | --- | --- |
@@ -170,6 +170,7 @@ Adicionalmente, el archivo `.claude/settings.json` del proyecto registra **13 cl
 | `PermissionRequest` | — | notificación |
 | `TaskCreated` | — | notificación |
 | `TaskCompleted` | — | notificación |
+| `PostToolUse` | `TaskUpdate` | `task-in-progress-hook-ux.ts` (toast solo si `status === "in_progress"`) |
 
 Los relays TypeScript leen stdin **una vez** (UTF-8) y usan `ANTHROPIC_BASE_URL` (default `http://127.0.0.1:8787`); evitan `curl` y `@-`, que PowerShell no interpreta como bash. **`UserPromptSubmit`** y **`StopFailure`** usan [`gateway-hook-notify.ts`](scripting/gateway-hook-notify.ts); **`PreToolUse`** usa [`pre-tool-use-hook-ux.ts`](scripting/pre-tool-use-hook-ux.ts) (toast solo en `AskUserQuestion`). **`Stop`** usa un único relay [`stop-hook-ux.ts`](scripting/stop-hook-ux.ts). **`SubagentStart`** / **`SubagentStop`** siguen con doble comando (el CLI usa mensaje fijo, sin `--stdin-json`, sin carrera por stdin). Varios procesos en paralelo leyendo el mismo stdin vacían el payload en Windows; por eso no se duplica `post-hook-event` + `cli --stdin-json` en esos hooks. Detalle: [`docs/notifications.md`](docs/notifications.md) y [`docs/gateway-architecture.md` §18](docs/gateway-architecture.md#18-plano-c--hooks-claude-code).
 

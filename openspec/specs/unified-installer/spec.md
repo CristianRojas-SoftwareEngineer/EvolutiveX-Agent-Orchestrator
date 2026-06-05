@@ -27,10 +27,10 @@ El sistema SHALL proporcionar un script CLI con flags `--statusline`, `--voice` 
 - **THEN** el script SHALL instalar statusline y voz
 - **AND** SHALL no modificar hooks existentes en `settings.json`
 
-#### Scenario: Flag --hooks instala el conjunto indivisible de 13 claves
+#### Scenario: Flag --hooks instala el conjunto indivisible de 14 claves
 
 - **WHEN** el usuario ejecuta `npm run setup:install -- --hooks`
-- **THEN** el script SHALL instalar el conjunto de hooks definido en `configs/hooks.json` (13 claves: gateway, relays stdin único y notificaciones CLI)
+- **THEN** el script SHALL instalar el conjunto de hooks definido en `configs/hooks.json` (14 claves: gateway, relays stdin único, notificaciones CLI y relay task-in-progress-hook-ux)
 - **AND** SHALL no modificar `statusLine` ni `voice*` existentes en `settings.json`
 
 ---
@@ -237,7 +237,7 @@ La función `applyStatuslineUninstall` SHALL aceptar un parámetro `force: boole
 
 ### Requirement: Indivisibilidad de --hooks
 
-El flag `--hooks` SHALL instalar el conjunto indivisible de las **13 claves** de hooks declaradas en `configs/hooks.json`. Este conjunto cubre:
+El flag `--hooks` SHALL instalar el conjunto indivisible de las **14 claves** de hooks declaradas en `configs/hooks.json`. Este conjunto cubre:
 
 - **Gateway** (`scripting/post-hook-event.ts` y relays que integran `POST /hooks`).
 - **Relays stdin único** (`stop-hook-ux.ts`, `gateway-hook-notify.ts`, `pre-tool-use-hook-ux.ts`).
@@ -248,7 +248,7 @@ Las entradas de `SubagentStart`, `SubagentStop` y `StopFailure` combinan gateway
 #### Scenario: --hooks instala los tres dominios en bloque
 
 - **WHEN** el usuario ejecuta `npm run setup:install -- --hooks`
-- **THEN** `settings.hooks` SHALL contener las 13 claves definidas en `configs/hooks.json`
+- **THEN** `settings.hooks` SHALL contener las 14 claves definidas en `configs/hooks.json`
 - **AND** SHALL incluir `gateway-hook-notify`, `pre-tool-use-hook-ux`, `stop-hook-ux` y `notifications/cli.ts` según corresponda
 
 #### Scenario: No existe flag para instalar solo notificaciones

@@ -84,9 +84,11 @@ El sistema SHALL proveer `SessionPersistence` en `src/2-services/session-persist
 
 ---
 
-### Requirement: Escritura atómica de meta.json
+### Requirement: Escritura atómica de archivos de sesión
 
-`SessionPersistence` SHALL escribir `meta.json` de forma atómica: escribir en un archivo temporal y renombrar (write temp + rename). Las escrituras de `meta.json` para un mismo workflow SHALL serializarse mediante un `writeQueue` por archivo para evitar condiciones de carrera.
+`SessionPersistence` SHALL escribir todos los archivos JSON de forma atómica: escribir en un archivo temporal y renombrar (write temp + rename). Las escrituras para un mismo archivo SHALL serializarse mediante un `writeQueue` por ruta para evitar condiciones de carrera.
+
+En Windows, `fs.rename` puede fallar con `EPERM` cuando un proceso externo (antivirus, indexador de Windows Search) mantiene abierto el archivo destino durante el rename. Esta condición no ocurre en Linux/macOS donde `rename()` POSIX es atómico sin restricciones de lock sobre el destino. Para manejarla de forma cross-platform, la escritura atómica SHALL reintentar el rename hasta 3 veces con backoff incremental de 50 ms cuando el error es `EPERM`. Si los 3 reintentos fallan, SHALL eliminar el archivo temporal y relanzar el error.
 
 #### Scenario: Escrituras concurrentes a meta.json se serializan
 
@@ -94,6 +96,20 @@ El sistema SHALL proveer `SessionPersistence` en `src/2-services/session-persist
 - **WHEN** `SessionPersistence` procesa ambos eventos
 - **THEN** las escrituras SHALL ejecutarse secuencialmente (no en paralelo)
 - **AND** el archivo final SHALL reflejar el estado del último evento procesado
+
+#### Scenario: rename falla con EPERM (Windows) → retry y éxito
+
+- **GIVEN** el archivo destino está momentáneamente bloqueado por un proceso externo en Windows
+- **WHEN** `atomicWrite` intenta el rename y recibe `EPERM`
+- **THEN** SHALL reintentar el rename hasta 3 veces con backoff de 50 ms × intento
+- **AND** si un reintento tiene éxito, el archivo SHALL quedar escrito correctamente sin error visible
+
+#### Scenario: rename falla con EPERM en todos los reintentos → limpieza y error
+
+- **GIVEN** el rename sigue fallando con `EPERM` tras 3 reintentos
+- **WHEN** se agota el límite de reintentos
+- **THEN** SHALL eliminarse el archivo temporal
+- **AND** SHALL relanzarse el último error para que `enqueue` lo registre en el logger
 
 ---
 

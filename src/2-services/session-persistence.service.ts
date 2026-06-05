@@ -475,7 +475,31 @@ export class SessionPersistence {
     await fs.mkdir(dir, { recursive: true });
     const tmp = `${abs}.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2)}.tmp`;
     await fs.writeFile(tmp, data);
-    await fs.rename(tmp, abs);
+    try {
+      await fs.rename(tmp, abs);
+    } catch (err) {
+      // En Windows, rename falla con EPERM si el destino está bloqueado por AV/indexador.
+      // En Linux/macOS este catch nunca se activa (rename POSIX es atómico sin restricciones de lock).
+      if ((err as NodeJS.ErrnoException).code !== 'EPERM') {
+        await fs.unlink(tmp).catch(() => {});
+        throw err;
+      }
+      let lastErr: unknown = err;
+      for (let i = 1; i <= 3; i++) {
+        await new Promise<void>((r) => setTimeout(r, 50 * i));
+        try {
+          await fs.rename(tmp, abs);
+          lastErr = null;
+          break;
+        } catch (retryErr) {
+          lastErr = retryErr;
+        }
+      }
+      if (lastErr) {
+        await fs.unlink(tmp).catch(() => {});
+        throw lastErr;
+      }
+    }
   }
 
   /** Append serializado de una línea JSON a un archivo NDJSON (no atómico). */

@@ -386,6 +386,14 @@ export interface AuditWorkflowContext {
   requestBodyOmitted: boolean;
   auditWorkflowDir: string;
   responseStatusCode: number | null;
+  /**
+   * Identificador del workflow específico que abrió el `AuditWorkflowHandler`
+   * para esta request. Los handlers de respuesta (SSE/standard) usan este id
+   * para resolver el workflow destino de los chunks, steps y tool_uses,
+   * evitando que el contenido de un wire-N de continuation se atribuya al
+   * workflow main de la sesión.
+   */
+  workflowId: string;
   workflowKind?: WorkflowRequestKind;
   requestClassification?: RequestClassification;
   /** Índice del step asignado durante request audit, inmutable hasta response audit. */

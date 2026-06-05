@@ -190,6 +190,57 @@ El port `IWorkflowRepository` (capa 1) SHALL exponer una operación `setWorkflow
 - **WHEN** una inferencia completa pero el correlador no tiene el workflow correspondiente abierto
 - **THEN** la propagación es no-op y el pipeline de auditoría legacy continúa sin alteración
 
+### Requirement: forceClose — closedByEvent omitido cuando el cierre no viene de un hook event
+
+`forceClose` en `WorkflowRepositoryService` SHALL producir un `IWorkflowResult` que NO incluya `closedByEvent` cuando el cierre no proviene de un hook event (outcomes `orphaned`, `upstream-error`, `truncated`, `api_error` vía stream error). El campo `closedByEvent` de `IWorkflowResult` es opcional (`closedByEvent?: WorkflowClosedByEvent`) y solo está presente cuando el cierre se origina desde `close(workflowId, hook)` con un hook event válido.
+
+`forceClose` SHALL además invocar `clearToolUseIndexFor(workflowId)` para limpiar el índice de correlación del workflow cerrado.
+
+#### Scenario: forceClose por orphan no incluye closedByEvent en el result
+
+- **GIVEN** un workflow con id `session-wire-3` y `result === null` (aún no cerrado)
+- **AND** `findWorkflowByToolUseId` no encontró el parent para una continuation
+- **WHEN** `forceClose('session-wire-3', 'orphaned', { continuationOrphan: true })` se invoca
+- **THEN** el `IWorkflowResult` SHALL tener `outcome: 'orphaned'` y `stepCount: 0`
+- **AND** el `IWorkflowResult` SHALL NO tener la clave `closedByEvent`
+- **AND** el evento `workflow_complete` SHALL emitirse al bus con `outcome: 'orphaned'`
+- **AND** `workflow.status` SHALL quedar como `'failed'`
+- **AND** el índice `toolUseIdToWorkflowId` SHALL limpiar las entradas asociadas a `session-wire-3`
+
+#### Scenario: forceClose por upstream-error no incluye closedByEvent
+
+- **GIVEN** un workflow activo con id `wf-1`
+- **WHEN** `forceClose('wf-1', 'upstream-error', { httpStatus: 502 })` se invoca
+- **THEN** el `IWorkflowResult` SHALL tener `outcome: 'upstream-error'`
+- **AND** el `IWorkflowResult` SHALL NO tener la clave `closedByEvent`
+
+#### Scenario: close con hook event mantiene closedByEvent
+
+- **GIVEN** un workflow activo
+- **WHEN** `close(workflowId, hook)` se invoca con un hook event válido (ej. `Stop`, `SubagentStop`, `StopFailure`)
+- **THEN** el `IWorkflowResult` SHALL incluir `closedByEvent: hook.eventName`
+
+---
+
+### Requirement: clearToolUseIndexFor — limpieza explícita del índice de correlación
+
+`IWorkflowRepository` SHALL exponer el método `clearToolUseIndexFor(workflowId: string): void` cuya implementación en `WorkflowRepositoryService` elimine todas las entradas de `toolUseIdToWorkflowId` cuyo valor asociado sea `workflowId`. El método SHALL ser no-op si el `workflowId` no tiene entradas asociadas.
+
+#### Scenario: clearToolUseIndexFor elimina entradas del workflow
+
+- **GIVEN** un `WorkflowRepositoryService` con `toolUseIdToWorkflowId` conteniendo entradas para `wf-A` y `wf-B`
+- **WHEN** `clearToolUseIndexFor('wf-A')` se invoca
+- **THEN** todas las entradas cuyo valor sea `'wf-A'` SHALL eliminarse
+- **AND** las entradas de `wf-B` SHALL conservarse intactas
+
+#### Scenario: clearToolUseIndexFor es no-op para workflowId sin entradas
+
+- **GIVEN** un `WorkflowRepositoryService` con `toolUseIdToWorkflowId` vacío o sin entradas del workflow
+- **WHEN** `clearToolUseIndexFor('wf-any')` se invoca
+- **THEN** la operación retorna sin error y sin mutar el índice
+
+---
+
 ### Requirement: Registro y cierre de steps desde handlers wire
 
 `AuditSseResponseHandler` y `AuditStandardResponseHandler` (capa 3) SHALL, al completar cada inferencia, registrar el step en el correlador unificado (`IWorkflowRepository`) invocando `registerStep(workflowId, step)` con un `IStep` construido desde el snapshot del request de inferencia y el resultado ensamblado (`StepAssembler.result()` para SSE; respuesta parseada completa para standard). Cuando el step es terminal (`stopReason === 'end_turn'`), el handler SHALL invocar `closeStep(workflowId, stepId)` inmediatamente al finalizar la inferencia. Cuando el step termina con `tool_use`, el handler SHALL invocar `registerStep` pero NO SHALL invocar `closeStep` hasta el cierre diferido vía hooks (el step permanece abierto en el correlador). Si el workflow no existe en el correlador, las invocaciones SHALL ser no-op defensivo sin error ni interrupción del pipeline legacy.

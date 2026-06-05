@@ -297,15 +297,18 @@ export class WorkflowRepositoryService implements IWorkflowRepository {
     const result: IWorkflowResult = {
       outcome,
       stepCount: closedSteps.length,
-      closedByEvent: 'StopFailure',
       sessionId: workflow.sessionId,
       ...(resultExtras ?? {}),
     };
     workflow.result = result;
     workflow.completedAt = new Date();
-    workflow.status = outcome === 'orphaned' || outcome === 'upstream-error' ? 'failed' : 'failed';
+    workflow.status = 'failed';
     this.emit('workflow_complete', workflowId, { result, outcome, ...(resultExtras ?? {}) });
     this.wireMeta.delete(workflowId);
+    this.clearToolUseIndexFor(workflowId);
+  }
+
+  public clearToolUseIndexFor(workflowId: string): void {
     for (const [toolId, wfId] of this.toolUseIdToWorkflowId) {
       if (wfId === workflowId) this.toolUseIdToWorkflowId.delete(toolId);
     }

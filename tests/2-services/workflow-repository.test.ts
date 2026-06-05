@@ -398,3 +398,72 @@ describe('WorkflowRepositoryService — lookups', () => {
     expect(order).toEqual(['a', 'b']);
   });
 });
+
+// ── forceClose ────────────────────────────────────────────────────────────────────
+
+describe('WorkflowRepositoryService — forceClose', () => {
+  it('forceClose por orphan produce outcome orphaned y NO incluye closedByEvent', () => {
+    const repo = new WorkflowRepositoryService();
+    const wf = repo.openWorkflow('s1', { agentId: 'a', isSubagentRequest: false }, { forceNew: true });
+    repo.forceClose(wf.id, 'orphaned', { continuationOrphan: true });
+    const result = repo.getWorkflow(wf.id)!.result!;
+    expect(result.outcome).toBe('orphaned');
+    expect(result.closedByEvent).toBeUndefined();
+    expect((result as unknown as Record<string, unknown>).continuationOrphan).toBe(true);
+    expect(repo.getWorkflow(wf.id)!.status).toBe('failed');
+  });
+
+  it('forceClose por upstream-error no incluye closedByEvent', () => {
+    const repo = new WorkflowRepositoryService();
+    const wf = repo.openWorkflow('s2', { agentId: 'a', isSubagentRequest: false });
+    repo.forceClose(wf.id, 'upstream-error');
+    const result = repo.getWorkflow(wf.id)!.result!;
+    expect(result.outcome).toBe('upstream-error');
+    expect(result.closedByEvent).toBeUndefined();
+  });
+
+  it('forceClose es idempotente — segunda llamada no muta el resultado', () => {
+    const repo = new WorkflowRepositoryService();
+    const wf = repo.openWorkflow('s3', { agentId: 'a', isSubagentRequest: false });
+    repo.forceClose(wf.id, 'orphaned');
+    const first = repo.getWorkflow(wf.id)!.result;
+    repo.forceClose(wf.id, 'upstream-error');
+    expect(repo.getWorkflow(wf.id)!.result).toBe(first);
+  });
+});
+
+// ── clearToolUseIndexFor ─────────────────────────────────────────────────────────
+
+describe('WorkflowRepositoryService — clearToolUseIndexFor', () => {
+  it('elimina entradas del workflow indicado y conserva las de otros', () => {
+    const repo = new WorkflowRepositoryService();
+    const wfA = repo.openWorkflow('sA', { agentId: 'a', isSubagentRequest: false });
+    const wfB = repo.openWorkflow('sB', { agentId: 'b', isSubagentRequest: false });
+    repo.registerStep(wfA.id, makeStep('step-a', wfA.id));
+    repo.registerStep(wfB.id, makeStep('step-b', wfB.id));
+    repo.registerPendingToolUse(wfA.id, 'step-a', makeToolUse('tu-1', 'step-a', 'Agent'));
+    repo.registerPendingToolUse(wfA.id, 'step-a', makeToolUse('tu-3', 'step-a', 'Agent'));
+    repo.registerPendingToolUse(wfB.id, 'step-b', makeToolUse('tu-2', 'step-b', 'Agent'));
+
+    // Consumir los pendings de wfA para que solo quede el índice toolUseIdToWorkflowId
+    repo.consumePendingToolUse(wfA.id, 'tu-1');
+    repo.consumePendingToolUse(wfA.id, 'tu-3');
+
+    // Antes de limpiar, tu-1 y tu-3 se resuelven vía toolUseIdToWorkflowId
+    expect(repo.findWorkflowByToolUseId('sA', 'tu-1')).toBeDefined();
+    expect(repo.findWorkflowByToolUseId('sA', 'tu-3')).toBeDefined();
+
+    repo.clearToolUseIndexFor(wfA.id);
+
+    // Tras limpiar el índice, ya no se resuelven
+    expect(repo.findWorkflowByToolUseId('sA', 'tu-1')).toBeUndefined();
+    expect(repo.findWorkflowByToolUseId('sA', 'tu-3')).toBeUndefined();
+    // El índice de wfB no se toca
+    expect(repo.findWorkflowByToolUseId('sB', 'tu-2')).toBeDefined();
+  });
+
+  it('es no-op cuando el workflow no tiene entradas en el índice', () => {
+    const repo = new WorkflowRepositoryService();
+    expect(() => repo.clearToolUseIndexFor('wf-sin-entradas')).not.toThrow();
+  });
+});

@@ -17,8 +17,8 @@ export interface IWorkflowResult {
   usage?: AnthropicUsage;
   /** Cantidad de steps cerrados al momento del cierre. */
   stepCount: number;
-  /** Evento del hook que disparó el cierre. */
-  closedByEvent: WorkflowClosedByEvent;
+  /** Evento del hook que disparó el cierre. Ausente cuando el cierre no viene de un hook event (forceClose). */
+  closedByEvent?: WorkflowClosedByEvent;
   /** `session_id` del hook de cierre. */
   sessionId: string;
 }

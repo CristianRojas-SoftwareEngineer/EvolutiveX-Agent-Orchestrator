@@ -49,6 +49,7 @@ export class ProxyController {
 
     if (result) {
       request.auditSessionId = result.auditSessionId;
+      request.auditWorkflowId = result.workflowId;
       request.requestSequence = result.requestSequence;
       request.requestStartTime = Date.now();
       request.auditWorkflowDir = result.auditWorkflowDir;
@@ -132,6 +133,7 @@ export class ProxyController {
       requestId: request.id,
       requestSequence: request.requestSequence || 0,
       auditSessionId: request.auditSessionId || '',
+      workflowId: request.auditWorkflowId || '',
       method: request.method,
       url: request.url,
       upstream: this.deps.config.UPSTREAM_ORIGIN,

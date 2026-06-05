@@ -32,7 +32,7 @@ export class AuditStandardResponseHandler {
     _contentType: string,
     responseHeaders?: Record<string, string | string[] | undefined>,
   ): void {
-    const workflow = this.workflowRepo.getWorkflowBySessionId(context.auditSessionId);
+    const workflow = this.workflowRepo.getWorkflow(context.workflowId);
     if (!workflow) return;
 
     const chunks: Buffer[] = [];

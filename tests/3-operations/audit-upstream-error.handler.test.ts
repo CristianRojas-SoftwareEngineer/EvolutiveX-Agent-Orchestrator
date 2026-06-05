@@ -34,6 +34,7 @@ function makeRepo(overrides: Partial<IWorkflowRepository> = {}): IWorkflowReposi
     nextSequence: vi.fn(async () => 0),
     withSessionLock: vi.fn(async (_s, fn) => fn()),
     forceClose: vi.fn(),
+    clearToolUseIndexFor: vi.fn(),
     ...overrides,
   };
 }
@@ -48,18 +49,21 @@ const BASE_PARAMS = {
 };
 
 describe('AuditUpstreamErrorHandler', () => {
-  it('llama forceClose con outcome upstream-error cuando existe un workflow para la sesión', () => {
+  it('llama clearToolUseIndexFor y forceClose con outcome upstream-error cuando existe un workflow', () => {
     const wf = stubWorkflow('session-1');
     const forceClose = vi.fn();
+    const clearToolUseIndexFor = vi.fn();
     const repo = makeRepo({
       getWorkflowBySessionId: vi.fn(() => wf),
       forceClose,
+      clearToolUseIndexFor,
     });
     const handler = new AuditUpstreamErrorHandler(repo);
 
     handler.execute(BASE_PARAMS);
 
     expect(repo.getWorkflowBySessionId).toHaveBeenCalledWith('session-1');
+    expect(clearToolUseIndexFor).toHaveBeenCalledWith('session-1');
     expect(forceClose).toHaveBeenCalledWith('session-1', 'upstream-error');
   });
 

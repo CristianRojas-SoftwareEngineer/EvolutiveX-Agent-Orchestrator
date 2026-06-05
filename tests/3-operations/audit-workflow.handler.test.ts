@@ -181,6 +181,8 @@ describe('AuditWorkflowHandler', () => {
     expect(eventBus.events.filter((e) => e.type === 'step_request').length).toBeGreaterThanOrEqual(1);
   });
 
+  // Caso genuino de orphan: el SSE del response anterior no llegó o falló (error upstream),
+  // por lo que no hay tool_use_id registrado en el índice cuando llega la continuation.
   it('continuation sin tool_use_id registrado crea workflow orphan', async () => {
     const { handler, workflowRepo } = createTestStack();
     const result = await handler.execute({

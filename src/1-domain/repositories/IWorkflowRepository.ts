@@ -136,6 +136,13 @@ export interface IWorkflowRepository {
   ): void;
 
   /**
+   * Elimina todas las entradas de `toolUseIdToWorkflowId` cuyo valor sea `workflowId`.
+   * No-op si el workflow no tiene entradas asociadas. Usar en paths de error
+   * (stream.on('error'), audit-upstream-error) y en `forceClose`.
+   */
+  clearToolUseIndexFor(workflowId: string): void;
+
+  /**
    * Fija `languageModelId` con el primer modelo observado (idempotente).
    * No-op si el workflowId no existe.
    */

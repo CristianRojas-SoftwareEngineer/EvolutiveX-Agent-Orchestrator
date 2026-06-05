@@ -42,7 +42,7 @@ export class AuditSseResponseHandler {
     context: AuditWorkflowContext,
     _responseHeaders: Record<string, string | string[] | undefined>,
   ): void {
-    const workflow = this.workflowRepo.getWorkflowBySessionId(context.auditSessionId);
+    const workflow = this.workflowRepo.getWorkflow(context.workflowId);
     if (!workflow) return;
 
     const isCoalescedAgentContinuation = context.coalescedAgentContinuation !== undefined;
@@ -59,6 +59,7 @@ export class AuditSseResponseHandler {
     const pendingToolUseKinds = new Map<string, 'agent' | 'web_search' | 'web_fetch'>();
 
     stream.on('error', (err) => {
+      this.workflowRepo.clearToolUseIndexFor(workflow.id);
       streamError = true;
       console.error('Error en stream SSE:', err);
     });

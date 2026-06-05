@@ -50,17 +50,26 @@ export class AuditHookEventHandler {
       case 'SubagentStop': {
         const agentId = event.agentId;
         if (!agentId) break;
-        const wf = this.workflowRepo.getWorkflow(agentId);
-        if (!wf) {
+        const entry = this.workflowRepo.getWorkflowByAgentId(agentId);
+        if (!entry) {
           this.logger?.info(
             { eventName: event.eventName, agentId },
             'sub-workflow no encontrado — evento ignorado',
           );
           break;
         }
-        if (this.workflowRepo.readyToClose(agentId, event)) {
-          this.workflowRepo.close(agentId, event);
-          await this.delegateClosure(event.sessionId, agentId);
+        const wfId = entry.agentId;
+        const wf = this.workflowRepo.getWorkflow(wfId);
+        if (!wf) {
+          this.logger?.info(
+            { eventName: event.eventName, agentId, wfId },
+            'sub-workflow en índice wire pero no en lifecycle — evento ignorado',
+          );
+          break;
+        }
+        if (this.workflowRepo.readyToClose(wfId, event)) {
+          this.workflowRepo.close(wfId, event);
+          await this.delegateClosure(event.sessionId, wfId);
         }
         break;
       }

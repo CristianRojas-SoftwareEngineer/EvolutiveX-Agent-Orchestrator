@@ -57,6 +57,7 @@ function makeWorkflowRepo(overrides: Partial<IWorkflowRepository> = {}): IWorkfl
     nextSequence: vi.fn(async () => 0),
     withSessionLock: vi.fn(async (_s, fn) => fn()),
     forceClose: vi.fn(),
+    clearToolUseIndexFor: vi.fn(),
     ...overrides,
   };
 }
@@ -71,6 +72,7 @@ function makeContext(overrides: Partial<AuditWorkflowContext> = {}): AuditWorkfl
     requestId: 'req-1',
     requestSequence: 1,
     auditSessionId: 'session-1',
+    workflowId: 'session-1',
     method: 'POST',
     url: '/v1/messages',
     upstream: 'https://api.anthropic.com',
@@ -118,9 +120,9 @@ function wait(ms = 80) {
 }
 
 describe('AuditSseResponseHandler', () => {
-  it('es no-op si no existe workflow para la sesión', async () => {
+  it('es no-op si no existe workflow para el workflowId del context', async () => {
     const publish = vi.fn();
-    const repo = makeWorkflowRepo({ getWorkflowBySessionId: vi.fn(() => undefined) });
+    const repo = makeWorkflowRepo({ getWorkflow: vi.fn(() => undefined) });
     const handler = makeSseHandler(undefined, undefined, repo, makeEventBus({ publish }));
 
     const stream = new PassThrough();
@@ -244,11 +246,83 @@ describe('AuditSseResponseHandler', () => {
     const handler = makeSseHandler(undefined, undefined, repo, makeEventBus({ publish }));
 
     const stream = new PassThrough();
-    handler.execute(stream, makeContext({ auditSessionId: 'session-1' }), {});
+    handler.execute(stream, makeContext({ auditSessionId: 'session-1', workflowId: 'session-1' }), {});
     stream.write(Buffer.from(SSE_END_TURN));
     stream.end();
     await wait();
 
     expect(publish).toHaveBeenCalledWith(expect.objectContaining({ type: 'step_response' }));
+  });
+
+  it('atribuye stream_chunks al workflowId del AuditWorkflowContext (no al main de sessionId)', async () => {
+    const publish = vi.fn();
+    const wireWf = stubWorkflow('session-1-wire-1');
+    wireWf.sessionId = 'session-1';
+    const repo = makeWorkflowRepo({
+      getWorkflow: vi.fn((id: string) => id === 'session-1-wire-1' ? wireWf : undefined),
+      closeStep: vi.fn(),
+    });
+    const handler = makeSseHandler(undefined, undefined, repo, makeEventBus({ publish }));
+
+    const stream = new PassThrough();
+    handler.execute(stream, makeContext({ auditSessionId: 'session-1', workflowId: 'session-1-wire-1' }), {});
+    stream.write(Buffer.from(SSE_END_TURN));
+    stream.end();
+    await wait();
+
+    const chunkCalls = (publish as ReturnType<typeof vi.fn>).mock.calls.filter(([e]) => e.type === 'stream_chunk');
+    expect(chunkCalls.length).toBeGreaterThan(0);
+    for (const [evt] of chunkCalls) {
+      expect(evt.workflowId).toBe('session-1-wire-1');
+    }
+  });
+
+  it('registra registerPendingToolUse contra el workflowId del context, no el main', async () => {
+    const registerPendingToolUse = vi.fn();
+    const wireWf = stubWorkflow('session-1-wire-1');
+    wireWf.sessionId = 'session-1';
+    const repo = makeWorkflowRepo({
+      getWorkflow: vi.fn((id: string) => id === 'session-1-wire-1' ? wireWf : undefined),
+      closeStep: vi.fn(),
+      registerPendingToolUse,
+    });
+    const handler = makeSseHandler(undefined, undefined, repo);
+
+    const sse = [
+      'data: {"type":"message_start","message":{"usage":{"input_tokens":5,"output_tokens":0}}}',
+      'data: {"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"tu_wire","name":"Agent","input":{}}}',
+      'data: {"type":"content_block_stop","index":0}',
+      'data: {"type":"message_delta","delta":{"stop_reason":"tool_use"},"usage":{"output_tokens":3}}',
+      'data: {"type":"message_stop"}',
+      '',
+    ].join('\n');
+
+    const stream = new PassThrough();
+    handler.execute(stream, makeContext({ auditSessionId: 'session-1', workflowId: 'session-1-wire-1' }), {});
+    stream.write(Buffer.from(sse));
+    stream.end();
+    await wait();
+
+    expect(registerPendingToolUse).toHaveBeenCalled();
+    const [wfId] = (registerPendingToolUse as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(wfId).toBe('session-1-wire-1');
+  });
+
+  it('stream.on("error") invoca clearToolUseIndexFor con el workflowId correcto', async () => {
+    const clearToolUseIndexFor = vi.fn();
+    const wf = stubWorkflow('session-1-wire-1');
+    wf.sessionId = 'session-1';
+    const repo = makeWorkflowRepo({
+      getWorkflow: vi.fn(() => wf),
+      clearToolUseIndexFor,
+    });
+    const handler = makeSseHandler(undefined, undefined, repo);
+
+    const stream = new PassThrough();
+    handler.execute(stream, makeContext({ workflowId: 'session-1-wire-1' }), {});
+    stream.destroy(new Error('fallo de red'));
+    await wait();
+
+    expect(clearToolUseIndexFor).toHaveBeenCalledWith('session-1-wire-1');
   });
 });

@@ -118,6 +118,60 @@ Tras P2, el sistema SHALL NOT exponer ni usar `ISseAuditWriter` ni `AuditWriterS
 
 ---
 
+### Requirement: Atribución de eventos del SSE handler al workflowId del context
+
+`AuditSseResponseHandler` y `AuditStandardResponseHandler` SHALL resolver el workflow destino usando `getWorkflow(context.workflowId)`, donde `context.workflowId` es el campo obligatorio de `AuditWorkflowContext` que propaga el `workflowId` específico abierto por `AuditWorkflowHandler` para esa request.
+
+Los eventos publicados al `EventBus` (`stream_chunk`, `step_response`, `tool_call`) y las mutaciones al `IWorkflowRepository` (`registerStep`, `closeStep`, `registerToolUse`, `completeToolUse`, `registerPendingToolUse`) SHALL atribuirse al `workflowId` presente en el `AuditWorkflowContext`, no al workflow main de la sesión.
+
+Esta atribución garantiza que la proyección a disco vía `SessionPersistence` refleje la causalidad correcta: los `stream_chunks`, el `step_response`, y los `tool_call` de una inferencia se proyectan contra el workflow específico que abrió el `AuditWorkflowHandler` para esa request (incluyendo wire-N de continuations, subagentes, etc.), no contra el main estable con `id == sessionId`.
+
+#### Scenario: SSE handler atribuye chunks al workflowId del context
+
+- **GIVEN** un `AuditWorkflowHandler` que acaba de crear un workflow `wire-3` con `workflowId: 'session-wire-3'` y `sessionId: 'session'` para una request de continuation
+- **AND** el `AuditWorkflowContext` que se pasa al SSE handler contiene `workflowId: 'session-wire-3'` y `auditSessionId: 'session'`
+- **AND** existe también un workflow main con `id: 'session'`
+- **WHEN** `AuditSseResponseHandler.execute()` procesa el stream SSE de esa request
+- **THEN** el handler SHALL usar `getWorkflow('session-wire-3')` para resolver el workflow destino
+- **AND** los `stream_chunk` eventos publicados al bus SHALL tener `workflowId: 'session-wire-3'`
+- **AND** el `registerPendingToolUse` SHALL invocarse contra `workflowId: 'session-wire-3'`
+- **AND** el índice `toolUseIdToWorkflowId` SHALL mapear los `tool_use_id` observados a `'session-wire-3'`, no a `'session'`
+
+#### Scenario: Continuación siguiente encuentra el parent workflow
+
+- **GIVEN** que el SSE del response anterior publicó `tool_use_id: 'tu-abc'` con `workflowId: 'session-wire-3'`
+- **AND** el `registerPendingToolUse` correspondiente se ejecutó contra `workflowId: 'session-wire-3'`
+- **WHEN** el cliente envía la siguiente continuation con `tool_result.tool_use_id: 'tu-abc'`
+- **THEN** `findWorkflowByToolUseId('session', 'tu-abc')` SHALL devolver el workflow `session-wire-3`
+- **AND** el `handleContinuation` SHALL registrar el step contra `session-wire-3` (no contra el main)
+- **AND** NO SHALL emitirse el warning `[audit] No se encontró workflow padre para continuation`
+
+---
+
+### Requirement: Limpieza de toolUseIdToWorkflowId en paths de error
+
+El sistema SHALL exponer en `IWorkflowRepository` un método `clearToolUseIndexFor(workflowId: string): void` que elimine todas las entradas de `toolUseIdToWorkflowId` cuyo valor sea el `workflowId` dado. Este método SHALL ser invocado desde:
+
+- `AuditSseResponseHandler` en el handler de `stream.on('error')` para el workflow que se está auditando en ese momento.
+- `audit-upstream-error.handler` cuando procesa un error que invalida la inferencia en curso.
+- `forceClose` (invocación interna; el método público reemplaza el código inline previo).
+
+#### Scenario: stream.on('error') limpia el índice para el workflow afectado
+
+- **GIVEN** un SSE handler auditando el workflow `session-wire-3` con varios `tool_use_id` ya en `toolUseIdToWorkflowId`
+- **WHEN** el stream emite un error y `stream.on('error')` se dispara
+- **THEN** el handler SHALL invocar `clearToolUseIndexFor('session-wire-3')`
+- **AND** las entradas correspondientes SHALL eliminarse del `toolUseIdToWorkflowId`
+
+#### Scenario: error upstream limpia el índice del workflow afectado
+
+- **GIVEN** un error upstream que invalida la inferencia del workflow `session-wire-3`
+- **WHEN** `audit-upstream-error.handler` procesa el error
+- **THEN** SHALL invocar `clearToolUseIndexFor('session-wire-3')` antes de cualquier mutación de cierre
+- **AND** las entradas de `tool_use_id` reservadas SHALL eliminarse
+
+---
+
 ### Requirement: AuditWorkflowContext — contexto de handlers L3
 
 La interfaz que desacopla los handlers L3 de Fastify SHALL llamarse `AuditWorkflowContext`
@@ -125,6 +179,7 @@ La interfaz que desacopla los handlers L3 de Fastify SHALL llamarse `AuditWorkfl
 
 - `auditWorkflowDir` (renombrado desde `auditInteractionDir`): ruta al directorio `workflows/NN/`
 - `workflowKind` (renombrado desde `interactionType`): tipo `WorkflowRequestKind` (`'client-preflight' | 'agentic' | 'side-request'`)
+- `workflowId`: identificador obligatorio del workflow específico abierto para esta request; los handlers de respuesta usan este campo para resolver el workflow destino de eventos y mutaciones
 
 Los augments de Fastify (`fastify.augments.d.ts`) SHALL usar los nombres canónicos
 `request.auditWorkflowDir` y `request.workflowKind`.

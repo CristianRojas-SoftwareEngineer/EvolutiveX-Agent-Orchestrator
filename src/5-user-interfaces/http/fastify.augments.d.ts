@@ -4,6 +4,7 @@ import { WorkflowRequestKind, RequestClassification } from '../../1-domain/types
 declare module 'fastify' {
   interface FastifyRequest {
     auditSessionId?: string;
+    auditWorkflowId?: string;
     auditWorkflowDir?: string;
     requestSequence?: number;
     requestStartTime?: number;

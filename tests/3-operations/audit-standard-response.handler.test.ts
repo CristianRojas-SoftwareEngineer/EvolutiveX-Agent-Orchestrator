@@ -57,6 +57,7 @@ function makeWorkflowRepo(overrides: Partial<IWorkflowRepository> = {}): IWorkfl
     nextSequence: vi.fn(async () => 0),
     withSessionLock: vi.fn(async (_s, fn) => fn()),
     forceClose: vi.fn(),
+    clearToolUseIndexFor: vi.fn(),
     ...overrides,
   };
 }
@@ -70,6 +71,7 @@ function makeContext(overrides: Partial<AuditWorkflowContext> = {}): AuditWorkfl
     requestId: 'req-1',
     requestSequence: 1,
     auditSessionId: 'session-1',
+    workflowId: 'session-1',
     method: 'POST',
     url: '/v1/messages',
     upstream: 'https://api.anthropic.com',
@@ -101,9 +103,8 @@ describe('AuditStandardResponseHandler', () => {
     const publish = vi.fn();
     const registerStep = vi.fn();
     const repo = makeWorkflowRepo({
-      getWorkflowBySessionId: vi.fn(() => wf),
-      registerStep,
       getWorkflow: vi.fn(() => wf),
+      registerStep,
       closeStep: vi.fn(),
     });
     const handler = new AuditStandardResponseHandler(
@@ -134,7 +135,6 @@ describe('AuditStandardResponseHandler', () => {
     const wf = stubWorkflow();
     const publish = vi.fn();
     const repo = makeWorkflowRepo({
-      getWorkflowBySessionId: vi.fn(() => wf),
       getWorkflow: vi.fn(() => wf),
       closeStep: vi.fn(),
     });
@@ -160,11 +160,11 @@ describe('AuditStandardResponseHandler', () => {
     );
   });
 
-  it('es no-op si no hay workflow para la sesión', async () => {
+  it('es no-op si no hay workflow para el workflowId del context', async () => {
     const publish = vi.fn();
     const registerStep = vi.fn();
     const repo = makeWorkflowRepo({
-      getWorkflowBySessionId: vi.fn(() => undefined),
+      getWorkflow: vi.fn(() => undefined),
       registerStep,
     });
     const handler = new AuditStandardResponseHandler(
@@ -188,7 +188,7 @@ describe('AuditStandardResponseHandler', () => {
   it('no emite step_response si el body no tiene usage', async () => {
     const wf = stubWorkflow();
     const publish = vi.fn();
-    const repo = makeWorkflowRepo({ getWorkflowBySessionId: vi.fn(() => wf) });
+    const repo = makeWorkflowRepo({ getWorkflow: vi.fn(() => wf) });
     const handler = new AuditStandardResponseHandler(
       makeEventBus({ publish }),
       makeConfig(),
@@ -209,7 +209,6 @@ describe('AuditStandardResponseHandler', () => {
   it('trunca el buffer en memoria al superar MAX_RESPONSE_BUFFER_BYTES', async () => {
     const wf = stubWorkflow();
     const repo = makeWorkflowRepo({
-      getWorkflowBySessionId: vi.fn(() => wf),
       getWorkflow: vi.fn(() => wf),
       closeStep: vi.fn(),
     });
@@ -239,7 +238,7 @@ describe('AuditStandardResponseHandler', () => {
     const wf = stubWorkflow();
     const forceClose = vi.fn();
     const repo = makeWorkflowRepo({
-      getWorkflowBySessionId: vi.fn(() => wf),
+      getWorkflow: vi.fn(() => wf),
       forceClose,
     });
     const handler = new AuditStandardResponseHandler(

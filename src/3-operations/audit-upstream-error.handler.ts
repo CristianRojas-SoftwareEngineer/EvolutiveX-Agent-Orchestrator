@@ -14,6 +14,7 @@ export class AuditUpstreamErrorHandler {
   }): void {
     const workflow = this.workflowRepo.getWorkflowBySessionId(params.auditSessionId);
     if (!workflow) return;
+    this.workflowRepo.clearToolUseIndexFor(workflow.id);
     this.workflowRepo.forceClose(workflow.id, 'upstream-error');
   }
 }

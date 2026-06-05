@@ -5,6 +5,7 @@ import {
   formatStopFailureMessage,
   formatStopMessage,
   formatUserPromptSubmitMessage,
+  repairMojibake,
   resolveHookNotificationMessage,
 } from '../../../src/2-services/notifications/hook-payload-notification-message.js';
 
@@ -84,5 +85,32 @@ describe('hook-payload-notification-message', () => {
 
   it('resolveHookNotificationMessage devuelve null para SessionStart', () => {
     expect(resolveHookNotificationMessage('SessionStart', {})).toBeNull();
+  });
+
+  describe('repairMojibake', () => {
+    it('repara UTF-8 mal decodificado como Latin-1 (caso Cursor)', () => {
+      // "Hola, ¿qué hace?" doblemente codificado por Cursor.
+      expect(repairMojibake('Hola, Â¿quÃ© hace?')).toBe('Hola, ¿qué hace?');
+    });
+
+    it('repara eñes y acentos doblemente codificados', () => {
+      expect(repairMojibake('niÃ±o, sesiÃ³n, acciÃ³n')).toBe('niño, sesión, acción');
+    });
+
+    it('deja intacto el UTF-8 correcto (caso Claude Code)', () => {
+      const ok = 'Hola, ¿qué hace? niño, sesión';
+      expect(repairMojibake(ok)).toBe(ok);
+    });
+
+    it('deja intacto el ASCII puro', () => {
+      expect(repairMojibake('Refactor the module')).toBe('Refactor the module');
+    });
+
+    it('resolveHookNotificationMessage repara el prompt de UserPromptSubmit', () => {
+      const msg = resolveHookNotificationMessage('UserPromptSubmit', {
+        prompt: 'Hola, Â¿quÃ© hace?',
+      });
+      expect(msg).toBe('Hola, ¿qué hace?');
+    });
   });
 });

@@ -272,6 +272,8 @@ Dos capas en el composition root (`buildEvent`):
 
 **Privacidad:** los formatters pueden incluir previews de comandos, rutas o preguntas en el Centro de actividades de Windows (mismo trade-off que el legacy). No hay redacción automática de secretos.
 
+**Reparación de mojibake (Cursor):** algunos clientes que también leen `~/.claude/settings.json` (p. ej. Cursor) envían el payload del hook doblemente codificado —bytes UTF-8 reinterpretados como Latin-1 y reserializados—, por lo que «¿qué» llega como `Â¿quÃ©`. `resolveHookNotificationMessage` aplica `repairMojibake` al mensaje del formatter: detecta esa firma y reinterpreta con `latin1 → utf8`. Los payloads UTF-8 correctos (Claude Code) y el ASCII puro pasan intactos.
+
 | `eventKey` | Formatter stdin (campos principales) |
 |------------|--------------------------------------|
 | `StopFailure` | `error`, `last_assistant_message` |

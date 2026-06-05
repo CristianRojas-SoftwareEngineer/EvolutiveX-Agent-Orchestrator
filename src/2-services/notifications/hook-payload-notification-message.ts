@@ -14,6 +14,28 @@ const STOP_FAILURE_ERROR_MAP: Record<string, string> = {
   unknown: 'Error de API desconocido',
 };
 
+// Firma de mojibake: bytes de continuación UTF-8 (0x80-0xBF) precedidos por un
+// byte líder válido (2 bytes: C2-DF; 3 bytes: E0-EF), tal como aparecen cuando
+// una cadena UTF-8 se decodifica erróneamente como Latin-1/CP1252.
+const MOJIBAKE_SIGNATURE =
+  /[Â-ß][-¿]|[à-ï][-¿]{2}/;
+
+/**
+ * Repara mojibake "UTF-8 leído como Latin-1" (p. ej. `Â¿quÃ©` → `¿qué`).
+ *
+ * Algunos clientes (Cursor) envían el payload del hook doblemente codificado:
+ * los bytes UTF-8 del texto se reinterpretan como Latin-1 y se vuelven a
+ * serializar como UTF-8. Claude Code envía UTF-8 correcto y no activa la
+ * reparación. Solo se repara si hay firma de mojibake y la re-decodificación
+ * no introduce el carácter de reemplazo `U+FFFD` (señal de basura).
+ */
+export function repairMojibake(text: string): string {
+  if (!MOJIBAKE_SIGNATURE.test(text)) return text;
+  const repaired = Buffer.from(text, 'latin1').toString('utf8');
+  if (repaired.includes('�')) return text;
+  return repaired;
+}
+
 export function truncate(text: string, maxLen: number): string {
   if (text.length <= maxLen) return text;
   return text.slice(0, maxLen) + '…';
@@ -140,5 +162,5 @@ export function resolveHookNotificationMessage(
   if (!formatter) return null;
   const result = formatter(payload);
   if (result == null || result.trim() === '') return null;
-  return result;
+  return repairMojibake(result);
 }

@@ -482,6 +482,37 @@ Este requirement NO modifica el contrato del CLI standalone: instalaciones globa
 
 ---
 
+### Requirement: Lectura de stdin UTF-8 en el CLI de notificaciones
+
+Cuando el entry point `src/2-services/notifications/cli.ts` lee el payload del hook con `--stdin-json`, SHALL acumular stdin como `Buffer` y decodificarlo con `toString('utf-8')` antes de `JSON.parse` y `normalizeStdinJsonText`.
+
+#### Scenario: Payload con tildes en `prompt` se parsea correctamente
+
+- **GIVEN** stdin contiene JSON UTF-8 válido con `prompt` que incluye «sesión» y «configuración»
+- **WHEN** se invoca `cli.ts --event-type UserPromptSubmit --stdin-json`
+- **THEN** `resolveNotificationMessage` SHALL devolver esas cadenas sin mojibake (`Ã`, `â€`)
+
+---
+
+### Requirement: Relays scripting que delegan en el mismo contrato que el CLI
+
+El repositorio SHALL exponer relays en `scripting/` que reutilicen `buildEvent` y `DesktopNotificationAdapter`:
+
+| Módulo | Eventos | Secuencia |
+|--------|---------|-----------|
+| `gateway-hook-notify.ts` | `UserPromptSubmit`, `StopFailure` | stdin → `POST /hooks` → toast |
+| `pre-tool-use-hook-ux.ts` | `PreToolUse` | stdin → `POST /hooks` → toast condicional |
+
+Estos relays SHALL leer stdin con el mismo criterio UTF-8 que `post-hook-event.ts` (`readStdinBuffer` + `utf-8`).
+
+#### Scenario: Caracteres españoles en formatter PreToolUse
+
+- **GIVEN** payload con `tool_input.questions[0].question` = «¿Usamos configuración regional?»
+- **WHEN** `resolveHookNotificationMessage('PreToolUse', payload)` se invoca
+- **THEN** el resultado SHALL contener «configuración» correctamente
+
+---
+
 ### Requirement: Formatters de mensaje desde payload de hook
 
 El sistema SHALL exponer en `src/2-services/notifications/hook-payload-notification-message.ts`:

@@ -7,11 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "npx --prefix \"${SMART_CODE_PROXY_ROOT}\" tsx \"${SMART_CODE_PROXY_ROOT}/scripting/post-hook-event.ts\""
-          },
-          {
-            "type": "command",
-            "command": "npx --prefix \"${SMART_CODE_PROXY_ROOT}\" tsx \"${SMART_CODE_PROXY_ROOT}/src/2-services/notifications/cli.ts\" --event-type UserPromptSubmit --stdin-json"
+            "command": "npx --prefix \"${SMART_CODE_PROXY_ROOT}\" tsx \"${SMART_CODE_PROXY_ROOT}/scripting/gateway-hook-notify.ts\" --event-type UserPromptSubmit"
           }
         ]
       }
@@ -22,16 +18,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "npx --prefix \"${SMART_CODE_PROXY_ROOT}\" tsx \"${SMART_CODE_PROXY_ROOT}/scripting/post-hook-event.ts\""
-          }
-        ]
-      },
-      {
-        "matcher": "AskUserQuestion",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "npx --prefix \"${SMART_CODE_PROXY_ROOT}\" tsx \"${SMART_CODE_PROXY_ROOT}/src/2-services/notifications/cli.ts\" --event-type PreToolUse --stdin-json"
+            "command": "npx --prefix \"${SMART_CODE_PROXY_ROOT}\" tsx \"${SMART_CODE_PROXY_ROOT}/scripting/pre-tool-use-hook-ux.ts\""
           }
         ]
       }
@@ -101,11 +88,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "npx --prefix \"${SMART_CODE_PROXY_ROOT}\" tsx \"${SMART_CODE_PROXY_ROOT}/scripting/post-hook-event.ts\""
-          },
-          {
-            "type": "command",
-            "command": "npx --prefix \"${SMART_CODE_PROXY_ROOT}\" tsx \"${SMART_CODE_PROXY_ROOT}/src/2-services/notifications/cli.ts\" --event-type StopFailure --stdin-json"
+            "command": "npx --prefix \"${SMART_CODE_PROXY_ROOT}\" tsx \"${SMART_CODE_PROXY_ROOT}/scripting/gateway-hook-notify.ts\" --event-type StopFailure"
           }
         ]
       }

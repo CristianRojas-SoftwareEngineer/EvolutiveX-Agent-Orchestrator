@@ -3,6 +3,7 @@
 // en N1: el cableado al composition root queda para N2.
 import { Command, Option } from 'commander';
 import { existsSync } from 'fs';
+import { stdin as processStdin } from 'node:process';
 import { fileURLToPath } from 'url';
 import { resolve as resolvePath } from 'path';
 import { DesktopNotificationAdapter } from './DesktopNotificationAdapter.js';
@@ -53,16 +54,17 @@ interface CliOptions {
   icon?: string;
 }
 
+async function readStdinBuffer(): Promise<Buffer> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of processStdin) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks);
+}
+
+/** Lee stdin como UTF-8 (mismo criterio que post-hook-event y relays de hooks). */
 function readStdin(): Promise<string> {
-  return new Promise((resolve, reject) => {
-    let data = '';
-    process.stdin.setEncoding('utf8');
-    process.stdin.on('data', (chunk: string) => {
-      data += chunk;
-    });
-    process.stdin.on('end', () => resolve(data));
-    process.stdin.on('error', (err) => reject(err));
-  });
+  return readStdinBuffer().then((buf) => buf.toString('utf-8'));
 }
 
 /** Quita BOM UTF-8 y espacios (común en stdin de hooks en Windows / PowerShell). */

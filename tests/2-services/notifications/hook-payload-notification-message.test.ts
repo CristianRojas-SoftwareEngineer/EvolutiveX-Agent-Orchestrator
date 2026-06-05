@@ -46,6 +46,14 @@ describe('hook-payload-notification-message', () => {
     expect(msg).toContain('¿Usamos Redis?');
   });
 
+  it('PreToolUse conserva tildes en el preview de la pregunta', () => {
+    const question = 'Prueba: sesión, configuración, acción';
+    const msg = formatPreToolUseAskMessage({
+      tool_input: { questions: [{ question }] },
+    });
+    expect(msg).toContain(question);
+  });
+
   it('PreToolUse sin questions devuelve null', () => {
     expect(formatPreToolUseAskMessage({ tool_input: {} })).toBeNull();
   });
@@ -53,6 +61,13 @@ describe('hook-payload-notification-message', () => {
   it('UserPromptSubmit con prompt', () => {
     const msg = formatUserPromptSubmitMessage({ prompt: 'Refactoriza el módulo' });
     expect(msg).toContain('Refactoriza');
+    expect(msg).toContain('módulo');
+  });
+
+  it('UserPromptSubmit conserva tildes y eñes en el preview', () => {
+    const prompt = 'Prueba: sesión, configuración, acción, niño';
+    const msg = formatUserPromptSubmitMessage({ prompt });
+    expect(msg).toBe(prompt);
   });
 
   it('UserPromptSubmit sin prompt devuelve null', () => {

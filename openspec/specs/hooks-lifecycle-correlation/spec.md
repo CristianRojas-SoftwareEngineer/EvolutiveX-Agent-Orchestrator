@@ -163,31 +163,58 @@ El repositorio SHALL registrar las 8 entradas del lifecycle de hooks de Claude C
 - **WHEN** Claude Code dispara el hook `SubagentStart`
 - **THEN** SHALL ejecutarse únicamente el comando del proyecto, no el del user-level
 
+### Requirement: Relay unificado `gateway-hook-notify` (stdin-json + gateway)
+
+Para los hooks de lifecycle que necesitan **`POST /hooks` y toast con mensaje derivado de stdin**, el repositorio SHALL declarar un **único** comando por clave de evento que ejecute `scripting/gateway-hook-notify.ts` con `--event-type <EventName>`, en lugar de dos comandos paralelos (`post-hook-event.ts` + `cli.ts --stdin-json`).
+
+El relay SHALL leer stdin una vez (UTF-8), reenviar el cuerpo a `POST /hooks`, parsear el JSON, invocar `buildEvent` con `stdinJson: true` y emitir el toast. Eventos cubiertos: `UserPromptSubmit`, `StopFailure`.
+
+**Módulos normativos:** `scripting/gateway-hook-notify.ts`; `buildGatewayHookNotifyCommand` en `scripting/shared/gateway-hook-command.ts`.
+
+#### Scenario: `UserPromptSubmit` con prompt UTF-8 → gateway y toast con tildes
+
+- **GIVEN** `configs/hooks.json` declara un único comando `gateway-hook-notify.ts --event-type UserPromptSubmit`
+- **AND** el payload stdin incluye `prompt` con tildes en español
+- **WHEN** Claude Code dispara `UserPromptSubmit`
+- **THEN** SHALL llegar `POST /hooks` con el payload completo
+- **AND** el toast `message` SHALL contener el preview del `prompt` con tildes preservadas
+
+---
+
+### Requirement: Relay unificado `pre-tool-use-hook-ux` (PreToolUse)
+
+Para `PreToolUse`, el repositorio SHALL declarar **una sola** entrada con `matcher: "*"` que ejecute `scripting/pre-tool-use-hook-ux.ts`: siempre `POST /hooks`; toast solo si `resolveHookNotificationMessage('PreToolUse', payload)` devuelve texto (p. ej. `AskUserQuestion`).
+
+**Módulo normativo:** `scripting/pre-tool-use-hook-ux.ts`.
+
+#### Scenario: `AskUserQuestion` con pregunta acentuada
+
+- **GIVEN** payload con `tool_input.questions[0].question` en español con tildes
+- **WHEN** se ejecuta `pre-tool-use-hook-ux.ts`
+- **THEN** SHALL ejecutarse `POST /hooks`
+- **AND** el toast SHALL contener el preview con tildes preservadas
+
+#### Scenario: `PreToolUse` para Bash sin questions
+
+- **GIVEN** payload sin `tool_input.questions`
+- **WHEN** se ejecuta `pre-tool-use-hook-ux.ts`
+- **THEN** SHALL ejecutarse `POST /hooks`
+- **AND** SHALL NOT emitirse toast
+
+---
+
 ### Requirement: Doble comando en los hooks de lifecycle con notificación (excepto `Stop`)
 
-La entrada del proyecto MUST contener, para los **4 hooks de lifecycle con doble comando** (`UserPromptSubmit`, `SubagentStart`, `SubagentStop`, `StopFailure`), un array `hooks` con dos comandos. El primer comando invoca `POST /hooks` (definido por el requirement anterior). El segundo comando invoca el entry point CLI del servicio de notificaciones migrado al repositorio (`src/2-services/notifications/cli.ts`), con paths **relativos** a la raíz del proyecto y la flag `--event-type <EventName>` y `--message "<texto fijo>"` donde aplique (ver tabla). Los otros 3 hooks del lifecycle (`PreToolUse` con `*`, `PostToolUse` con `*`, `PostToolUseFailure`) MUST contener únicamente el comando `POST /hooks`, sin comando de notificación.
+La entrada del proyecto MUST contener, para los **2 hooks de lifecycle con doble comando** (`SubagentStart`, `SubagentStop`), un array `hooks` con dos comandos. El primer comando invoca `POST /hooks`. El segundo invoca el CLI de notificaciones con `--event-type` y `--message "<texto fijo>"`.
 
-El hook **`Stop`** NO entra en este requirement: su configuración SHALL cumplir el requirement «Relay unificado del hook `Stop`» (un solo proceso; toast único con mensaje de continuidad generado por modelo).
+Los hooks **`UserPromptSubmit`** y **`StopFailure`** SHALL usar `gateway-hook-notify.ts` (un solo comando). El hook **`Stop`** SHALL usar `stop-hook-ux.ts`. El hook **`PreToolUse`** SHALL usar `pre-tool-use-hook-ux.ts`. `PostToolUse` y `PostToolUseFailure` MUST contener únicamente `POST /hooks`.
 
-**Justificación de la exclusión de `PreToolUse` / `PostToolUse`:** los eventos de tool tienen frecuencia alta (5–50 invocaciones por turno en sesiones largas). El gateway necesita `matcher: "*"` para correlacionar todas las tools, pero un toast por cada invocación es ruido de UX, no señal. La notificación se mantiene en las claves de lifecycle, donde un único toast por evento aporta valor (inicio del turno, spawn de subagente, cierre de subagente, cierre del turno, error de cierre). Mismo razonamiento aplica a `PostToolUseFailure` (frecuencia ligada a la de tools).
-
-**Mensajes fijos por hook de notificación:**
+**Mensajes fijos (solo Subagent*):**
 
 | Hook | `--message` |
 |---|---|
-| `UserPromptSubmit` | (no se usa `--message`; la entrada usa `--stdin-json` para derivar `message` del payload) |
 | `SubagentStart` | `"Subagente iniciado"` |
 | `SubagentStop` | `"Subagente terminado"` |
-| `StopFailure` | (no se usa `--message`; la entrada usa `--stdin-json` para derivar `message` del payload) |
-
-> **Nota sobre el message fijo en `SubagentStart` / `SubagentStop`:** estos dos hooks no exponen `last_assistant_message` ni metadatos ricos en el payload (son eventos de spawning/cierre de subagente, no de cierre de turno). Un texto fijo en español es consistente con la decisión previa para `SessionStart`/`SessionEnd` (ver Requirement de UX no-lifecycle). En v1 no se aprovecha el payload; si en una iteración futura se desea derivar `message` del `agent_type` del payload, se reemplaza `--message "<fijo>"` por `--stdin-json` en la entrada correspondiente y se documenta el cambio.
-
-#### Scenario: Los 4 hooks con doble comando disparan `POST /hooks` y notificación
-
-- **GIVEN** `.claude/settings.json` del proyecto contiene la entrada `UserPromptSubmit` con dos comandos en el array `hooks`
-- **WHEN** Claude Code dispara el evento `UserPromptSubmit`
-- **THEN** SHALL ejecutarse el primer comando (que invoca `POST /hooks`)
-- **AND** SHALL ejecutarse el segundo comando (que invoca el entry point CLI del servicio de notificaciones migrado al repositorio, `src/2-services/notifications/cli.ts`, con `--event-type UserPromptSubmit`)
 
 #### Scenario: `SubagentStart` dispara dos comandos en orden
 
@@ -203,19 +230,12 @@ El hook **`Stop`** NO entra en este requirement: su configuración SHALL cumplir
 - **THEN** SHALL ejecutarse el primer comando (que invoca `POST /hooks`, cerrando el sub-workflow en el gateway)
 - **AND** SHALL ejecutarse el segundo comando (que invoca el entry point CLI del servicio de notificaciones migrado al repositorio, `src/2-services/notifications/cli.ts`, con `--event-type SubagentStop --message "Subagente terminado"`)
 
-#### Scenario: Los 3 hooks restantes del lifecycle disparan un único comando
+#### Scenario: `UserPromptSubmit` usa un solo relay (no doble comando)
 
-- **GIVEN** `.claude/settings.json` del proyecto contiene la entrada `PreToolUse` con `matcher: "*"` y un único comando en el array `hooks`
-- **WHEN** Claude Code dispara el evento `PreToolUse` para cualquier tool
-- **THEN** SHALL ejecutarse únicamente el comando que invoca `POST /hooks`
-- **AND** NO SHALL invocarse el notificador externo
-
-#### Scenario: `PreToolUse` con `matcher: "*"` ejecuta solo `POST /hooks`, sin notificación
-
-- **GIVEN** `.claude/settings.json` del proyecto contiene la entrada `PreToolUse` con `matcher: "*"` y un único comando en el array `hooks`
-- **WHEN** Claude Code dispara el evento `PreToolUse` para cualquier tool
-- **THEN** SHALL ejecutarse únicamente el comando que invoca `POST /hooks`
-- **AND** NO SHALL emitirse un toast del servicio de notificaciones
+- **GIVEN** la plantilla canónica `configs/hooks.json` para `UserPromptSubmit`
+- **WHEN** se inspecciona el array `hooks`
+- **THEN** SHALL existir exactamente un comando a `gateway-hook-notify.ts`
+- **AND** SHALL NOT existir `post-hook-event.ts` y `cli.ts --stdin-json` en paralelo para la misma clave
 
 ---
 
@@ -273,11 +293,13 @@ El repositorio SHALL NOT configurar para `Stop` múltiples comandos en paralelo 
 
 ### Requirement: Notificaciones de UX no-lifecycle en `.claude/settings.json` del proyecto
 
-El proyecto SHALL declarar **6 entradas adicionales** en `.claude/settings.json` para cubrir notificaciones de UX que no forman parte del lifecycle de correlación del gateway: `SessionStart` (con `matcher: "startup|resume"`), `SessionEnd`, `PermissionRequest`, una segunda entrada `PreToolUse` con `matcher: "AskUserQuestion"`, `TaskCreated`, y `TaskCompleted`. Cada entrada SHALL contener un **único comando**: el entry point CLI del servicio de notificaciones migrado (`src/2-services/notifications/cli.ts`) con paths relativos a la raíz del proyecto, `--event-type <EventName>` (canónico del lifecycle: `SessionStart`, `SessionEnd`, `PermissionRequest`, `PreToolUse`, `TaskCreated`, `TaskCompleted`) y `--stdin-json` donde aplique.
+El proyecto SHALL declarar **5 entradas adicionales** en `.claude/settings.json` para notificaciones de UX fuera del lifecycle de correlación del gateway: `SessionStart` (con `matcher: "startup|resume"`), `SessionEnd`, `PermissionRequest`, `TaskCreated`, y `TaskCompleted`. Cada entrada SHALL contener un **único comando** al CLI de notificaciones (`src/2-services/notifications/cli.ts`) con `--event-type` y `--stdin-json` o `--message` fijo según `docs/notifications.md`.
+
+La notificación de **`PreToolUse` / `AskUserQuestion`** NO es una entrada UX separada: SHALL cubrirse por `pre-tool-use-hook-ux.ts` en la entrada lifecycle `PreToolUse` con `matcher: "*"`.
 
 > **Nota sobre `TaskCreated` / `TaskCompleted`:** estos dos hooks nativos de Claude Code NO admiten campo `matcher` en `.claude/settings.json` (la documentación oficial indica que el campo es ignorado silenciosamente para estos eventos). Las entradas SHALL omitir el campo `matcher` para mantener la configuración limpia. En v1 se usa texto fijo `--message "<fijo>"`; no se aprovecha el payload vía `--stdin-json` (no aporta valor de UX diferenciado sobre el texto fijo en v1; podría aprovecharse en una iteración futura).
 
-**Ninguna** de estas 6 entradas invoca `POST /hooks`: el `AuditHookEventHandler` solo procesa los 8 `eventName` del lifecycle definidos en el requirement de "Mapeo de eventos al correlador"; el resto cae en `default:` y se descarta. Enviar `POST /hooks` desde estos hooks sería ancho de banda desperdiciado.
+**Ninguna** de estas 5 entradas invoca `POST /hooks`: el `AuditHookEventHandler` solo procesa los 8 `eventName` del lifecycle definidos en el requirement de "Mapeo de eventos al correlador"; el resto cae en `default:` y se descarta. Enviar `POST /hooks` desde estos hooks sería ancho de banda desperdiciado.
 
 **Trade-off explícito (override del user-level):** declarar estas claves en el proyecto sobrescribe las entradas equivalentes del user-level para la misma clave (regla de merge de Claude Code: project-level sobrescribe user-level por clave, ver Scenario "Las entradas del proyecto sobrescriben las del user-level"). Dentro de este repositorio, las notificaciones de UX pasan a ser responsabilidad del proyecto y no del user-level. El usuario asume este trade-off para que el ciclo de vida completo de una sesión quede cubierto desde el repo (sin depender del script externo `C:\AI\claude-code-notifications.ts`, deprecado con fecha de retirada 2026-09-01).
 
@@ -290,7 +312,6 @@ El proyecto SHALL declarar **6 entradas adicionales** en `.claude/settings.json`
 | `SessionStart` (matcher `startup|resume`) | No | El `eventName` viene del flag `--event-type`. El CLI exige `--message` cuando no se usa `--stdin-json` (contrato canónico en `desktop-notifications-service`), así que la entrada pasa un texto fijo `--message "Sesión iniciada"`. |
 | `SessionEnd` | No | Igual que `SessionStart`; texto fijo `--message "Sesión finalizada"`. |
 | `PermissionRequest` | Sí | El payload trae `tool_name` y `tool_input`, útiles para derivar el `message`. |
-| `PreToolUse` (matcher `AskUserQuestion`) | Sí | El payload trae `session_id`, útil para derivar el `message`. |
 | `TaskCreated` | No | Texto fijo `--message "Tarea creada"`; los hooks `TaskCreated`/`TaskCompleted` no soportan matcher y el payload no se aprovecha en v1. |
 | `TaskCompleted` | No | Texto fijo `--message "Tarea completada"`. |
 
@@ -301,14 +322,14 @@ El proyecto SHALL declarar **6 entradas adicionales** en `.claude/settings.json`
 - **THEN** SHALL ejecutarse el comando del CLI con `--event-type SessionStart` y `--message "Sesión iniciada"`
 - **AND** SHALL emitirse un toast nativo del SO con título `SessionStart` y mensaje `Sesión iniciada`
 
-#### Scenario: Notificación de `PreToolUse:AskUserQuestion` ejecutada solo para esa tool
+#### Scenario: `PreToolUse:AskUserQuestion` vía relay unificado (no segunda entrada UX)
 
-- **GIVEN** `.claude/settings.json` del proyecto contiene una segunda entrada `PreToolUse` con `matcher: "AskUserQuestion"` y un único comando que invoca el entry point CLI del servicio de notificaciones migrado con `--event-type PreToolUse --stdin-json`
-- **WHEN** Claude Code dispara `PreToolUse` para la tool `AskUserQuestion`
-- **THEN** SHALL ejecutarse el comando del CLI
-- **AND** SHALL emitirse un toast nativo del SO
-- **WHEN** Claude Code dispara `PreToolUse` para una tool distinta de `AskUserQuestion` (p. ej. `Bash`, `Read`)
-- **THEN** el comando de la entrada con `matcher: "AskUserQuestion"` NO SHALL ejecutarse (solo se ejecuta el comando de la entrada con `matcher: "*"` que invoca `POST /hooks`)
+- **GIVEN** `configs/hooks.json` declara un solo bloque `PreToolUse` con `matcher: "*"` y `pre-tool-use-hook-ux.ts`
+- **WHEN** Claude Code dispara `PreToolUse` para `AskUserQuestion` con `tool_input.questions`
+- **THEN** SHALL ejecutarse `POST /hooks`
+- **AND** SHALL emitirse un toast con preview de la pregunta
+- **WHEN** Claude Code dispara `PreToolUse` para otra tool sin `questions`
+- **THEN** SHALL ejecutarse `POST /hooks` sin toast
 
 #### Scenario: Notificación de `TaskCreated` ejecutada al crear una tarea
 
@@ -326,10 +347,10 @@ El proyecto SHALL declarar **6 entradas adicionales** en `.claude/settings.json`
 - **AND** SHALL emitirse un toast nativo del SO con título `TaskCompleted` y mensaje `Tarea completada`
 - **AND** NO SHALL llegar request al endpoint `/hooks` del proxy desde esta entrada (el `AuditHookEventHandler` no procesa `TaskCompleted`)
 
-#### Scenario: Las 6 entradas de UX no invocan `POST /hooks`
+#### Scenario: Las 5 entradas de UX no invocan `POST /hooks`
 
-- **GIVEN** `.claude/settings.json` del proyecto contiene las 6 entradas de UX (`SessionStart`, `SessionEnd`, `PermissionRequest`, `PreToolUse` con `matcher: "AskUserQuestion"`, `TaskCreated`, `TaskCompleted`)
-- **WHEN** Claude Code dispara cualquiera de los eventos `SessionStart`, `SessionEnd`, `PermissionRequest`, `PreToolUse` para la tool `AskUserQuestion`, `TaskCreated`, o `TaskCompleted`
+- **GIVEN** `.claude/settings.json` del proyecto contiene las 5 entradas de UX (`SessionStart`, `SessionEnd`, `PermissionRequest`, `TaskCreated`, `TaskCompleted`)
+- **WHEN** Claude Code dispara cualquiera de esos eventos
 - **THEN** NO SHALL llegar request al endpoint `/hooks` del proxy desde esas entradas
 - **AND** SHALL ejecutarse únicamente el comando del CLI de notificaciones
 
@@ -337,27 +358,26 @@ El proyecto SHALL declarar **6 entradas adicionales** en `.claude/settings.json`
 
 ### Requirement: Distribución de hooks de SCP en `~/.claude/settings.json` (user-level)
 
-El sistema SHALL proporcionar un mecanismo de instalación de las 14 entradas de hooks de SCP (8 lifecycle + 6 UX) en `~/.claude/settings.json` (user-level) mediante el script `setup --hooks` o `setup:hooks`. La instalación SHALL ser **merge selectivo** que preserve configs ajenas a SCP en las mismas claves.
+El sistema SHALL proporcionar un mecanismo de instalación de las **13 claves** de hooks de SCP (8 lifecycle + 5 UX) en `~/.claude/settings.json` (user-level) mediante el script `setup --hooks` o `setup:hooks`. La instalación SHALL ser **merge selectivo** que preserve configs ajenas a SCP en las mismas claves.
 
-Las 14 entradas gestionadas por SCP SHALl ser:
+Las 13 claves gestionadas por SCP SHALL ser:
 
 **Lifecycle (8):**
-- `UserPromptSubmit` (2 comandos: gateway + notificación con `--stdin-json`)
-- `PreToolUse` matcher `*` (1 comando: gateway)
-- `PreToolUse` matcher `AskUserQuestion` (1 comando: notificación con `--stdin-json`)
-- `PostToolUse` matcher `*` (1 comando: gateway)
-- `PostToolUseFailure` (1 comando: gateway)
-- `SubagentStart` (2 comandos: gateway + notificación con `--message "Subagente iniciado"`)
-- `SubagentStop` (2 comandos: gateway + notificación con `--message "Subagente terminado"`)
-- `Stop` (1 comando: `stop-hook-ux.ts` unificado)
-- `StopFailure` (2 comandos: gateway + notificación con `--stdin-json`)
+- `UserPromptSubmit` (1 comando: `gateway-hook-notify.ts`)
+- `PreToolUse` matcher `*` (1 comando: `pre-tool-use-hook-ux.ts`)
+- `PostToolUse` matcher `*` (1 comando: `post-hook-event.ts`)
+- `PostToolUseFailure` (1 comando: `post-hook-event.ts`)
+- `SubagentStart` (2 comandos: gateway + notificación fija)
+- `SubagentStop` (2 comandos: gateway + notificación fija)
+- `Stop` (1 comando: `stop-hook-ux.ts`)
+- `StopFailure` (1 comando: `gateway-hook-notify.ts`)
 
-**UX (6):**
-- `SessionStart` matcher `startup|resume` (1 comando: notificación con `--message "Sesión iniciada"`)
-- `SessionEnd` (1 comando: notificación con `--message "Sesión finalizada"`)
-- `PermissionRequest` (1 comando: notificación con `--stdin-json`)
-- `TaskCreated` (1 comando: notificación con `--message "Tarea creada"`)
-- `TaskCompleted` (1 comando: notificación con `--message "Tarea completada"`)
+**UX (5):**
+- `SessionStart` matcher `startup|resume`
+- `SessionEnd`
+- `PermissionRequest`
+- `TaskCreated`
+- `TaskCompleted`
 
 El merge selectivo SHALL seguir esta política para cada clave:
 
@@ -369,6 +389,8 @@ El merge selectivo SHALL seguir esta política para cada clave:
 Un comando se considera "de SCP" si su path normalizado (backslash→forward slash) contiene alguno de estos marcadores:
 - `post-hook-event`
 - `stop-hook-ux`
+- `gateway-hook-notify`
+- `pre-tool-use-hook-ux`
 - `notifications/cli.ts`
 - La ruta resolved de `SMART_CODE_PROXY_ROOT`
 
@@ -378,15 +400,15 @@ La plantilla canónica SHALl vivir en `configs/hooks.json` en el repo SCP y SHAL
 
 - **GIVEN** `~/.claude/settings.json` no existe o tiene `hooks: {}`
 - **WHEN** el usuario ejecuta `npm run setup -- --hooks`
-- **THEN** las 14 entradas de SCP SHALl crearse en `settings.hooks`
+- **THEN** las 13 claves de SCP SHALL crearse en `settings.hooks`
 - **AND** `settings.env.SMART_CODE_PROXY_ROOT` SHALL establecerse con la ruta del repo
 
 #### Scenario: Instalación con hooks ajenos existentes
 
-- **GIVEN** `~/.claude/settings.json` tiene `hooks.github-copilot: [{ type: "command", command: "..." }]` (clave ajena a las 14 gestionadas)
+- **GIVEN** `~/.claude/settings.json` tiene `hooks.github-copilot: [{ type: "command", command: "..." }]` (clave ajena a las 13 gestionadas)
 - **WHEN** el usuario ejecuta `npm run setup -- --hooks`
 - **THEN** `hooks.github-copilot` SHALL preservarse intacto
-- **AND** las 14 entradas de SCP SHALl crearse o actualizarse
+- **AND** las 13 claves de SCP SHALL crearse o actualizarse
 
 #### Scenario: Instalación con clave mixta (SCP + ajenos)
 
@@ -436,48 +458,19 @@ La plantilla canónica SHALl vivir en `configs/hooks.json` en el repo SCP y SHAL
 
 ### Requirement: Distribución de hooks de SCP en ~/.claude/settings.json
 
-El sistema SHALL proporcionar un mecanismo de instalación de las 14 entradas de hooks de SCP (8 lifecycle + 6 UX) en `~/.claude/settings.json` (user-level) mediante el script `setup --hooks`. La instalación SHALL ser merge selectivo que preserve configs ajenas a SCP en las mismas claves.
+El sistema SHALL proporcionar un mecanismo de instalación de las **13 claves** de hooks de SCP (8 lifecycle + 5 UX) en `~/.claude/settings.json` (user-level) mediante el script `setup --hooks`. La instalación SHALL ser merge selectivo que preserve configs ajenas a SCP en las mismas claves.
 
-Las 14 entradas managed by SCP SHALl ser:
+Las 13 claves managed by SCP SHALL ser las mismas listadas en el requirement «Distribución de hooks de SCP en `~/.claude/settings.json` (user-level)».
 
-**Lifecycle (8):**
-- `UserPromptSubmit` (2 comandos: gateway + notificación con `--stdin-json`)
-- `PreToolUse` matcher `*` (1 comando: gateway)
-- `PreToolUse` matcher `AskUserQuestion` (1 comando: notificación con `--stdin-json`)
-- `PostToolUse` matcher `*` (1 comando: gateway)
-- `PostToolUseFailure` (1 comando: gateway)
-- `SubagentStart` (2 comandos: gateway + notificación con `--message "Subagente iniciado"`)
-- `SubagentStop` (2 comandos: gateway + notificación con `--message "Subagente terminado"`)
-- `Stop` (1 comando: `stop-hook-ux.ts` unificado)
-- `StopFailure` (2 comandos: gateway + notificación con `--stdin-json`)
+Un comando se considera "de SCP" si su path normalizado contiene `post-hook-event`, `stop-hook-ux`, `gateway-hook-notify`, `pre-tool-use-hook-ux`, `notifications/cli.ts` o la ruta resolved de `SMART_CODE_PROXY_ROOT`.
 
-**UX (6):**
-- `SessionStart` matcher `startup|resume` (1 comando: notificación con `--message "Sesión iniciada"`)
-- `SessionEnd` (1 comando: notificación con `--message "Sesión finalizada"`)
-- `PermissionRequest` (1 comando: notificación con `--stdin-json`)
-- `TaskCreated` (1 comando: notificación con `--message "Tarea creada"`)
-- `TaskCompleted` (1 comando: notificación con `--message "Tarea completada"`)
-
-El merge selectivo SHALL seguir esta política para cada clave:
-
-1. Si la clave NO existe en `~/.claude/settings.json` → crear con versión canónica de SCP.
-2. Si la clave existe y TODOS sus comandos son de SCP → reemplazar con versión canónica.
-3. Si la clave existe y tiene comandos MIXTOS (SCP + ajenos) → preservar los ajenos, agregar los comandos SCP faltantes.
-4. Si la clave existe y TODOS sus comandos son ajenos → preservar intactos (SCP no toca).
-
-Un comando se considera "de SCP" si su path normalizado (backslash→forward slash) contiene alguno de estos marcadores:
-- `post-hook-event`
-- `stop-hook-ux`
-- `notifications/cli.ts`
-- La ruta resolved de `SMART_CODE_PROXY_ROOT`
-
-La plantilla canónica SHALl vivir en `configs/hooks.json` en el repo SCP y SHALl estar versionada.
+La plantilla canónica SHALL vivir en `configs/hooks.json` en el repo SCP y SHALL estar versionada.
 
 #### Scenario: Instalación en config vacía
 
 - **GIVEN** `~/.claude/settings.json` no existe o tiene `hooks: {}`
 - **WHEN** el usuario ejecuta `npm run setup -- --hooks`
-- **THEN** las 14 entradas de SCP SHALl crearse en `settings.hooks`
+- **THEN** las 13 claves de SCP SHALL crearse en `settings.hooks`
 - **AND** `settings.env.SMART_CODE_PROXY_ROOT` SHALL establecerse con la ruta del repo
 
 #### Scenario: Instalación con hooks ajenos existentes
@@ -485,7 +478,7 @@ La plantilla canónica SHALl vivir en `configs/hooks.json` en el repo SCP y SHAL
 - **GIVEN** `~/.claude/settings.json` tiene `hooks.github-copilot: [{ type: "command", command: "..." }]`
 - **WHEN** el usuario ejecuta `npm run setup -- --hooks`
 - **THEN** `hooks.github-copilot` SHALL preservarse intacto
-- **AND** las 14 entradas de SCP SHALl crearse o actualizarse
+- **AND** las 13 claves de SCP SHALL crearse o actualizarse
 
 #### Scenario: Instalación con clave mixta (SCP + ajenos)
 

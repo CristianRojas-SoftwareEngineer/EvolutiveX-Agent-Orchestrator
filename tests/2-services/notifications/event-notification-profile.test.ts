@@ -6,8 +6,8 @@ import {
 } from '../../../src/2-services/notifications/event-notification-profile.js';
 
 describe('event-notification-profile', () => {
-  it('define exactamente 11 claves de evento', () => {
-    expect(NOTIFICATION_EVENT_KEYS).toHaveLength(11);
+  it('define exactamente 12 claves de evento', () => {
+    expect(NOTIFICATION_EVENT_KEYS).toHaveLength(12);
     expect(NOTIFICATION_EVENT_KEYS.sort()).toEqual(
       [
         'PermissionRequest',
@@ -20,6 +20,7 @@ describe('event-notification-profile', () => {
         'SubagentStop',
         'TaskCompleted',
         'TaskCreated',
+        'TaskInProgress',
         'UserPromptSubmit',
       ].sort(),
     );

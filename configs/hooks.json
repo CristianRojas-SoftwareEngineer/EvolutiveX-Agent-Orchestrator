@@ -32,6 +32,15 @@
             "command": "npx --prefix \"${SMART_CODE_PROXY_ROOT}\" tsx \"${SMART_CODE_PROXY_ROOT}/scripting/post-hook-event.ts\""
           }
         ]
+      },
+      {
+        "matcher": "TaskUpdate",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx --prefix \"${SMART_CODE_PROXY_ROOT}\" tsx \"${SMART_CODE_PROXY_ROOT}/scripting/task-in-progress-hook-ux.ts\""
+          }
+        ]
       }
     ],
     "PostToolUseFailure": [

@@ -40,6 +40,12 @@ describe('isScpManagedCommand', () => {
     ).toBe(true);
   });
 
+  it('detecta task-in-progress-hook-ux', () => {
+    expect(
+      isScpManagedCommand('npx tsx /c/repos/scp/scripting/task-in-progress-hook-ux.ts', scpRoot),
+    ).toBe(true);
+  });
+
   it('detecta por ruta resolved de scpRoot', () => {
     expect(
       isScpManagedCommand('echo something with /c/repos/smart-code-proxy inside', scpRoot),

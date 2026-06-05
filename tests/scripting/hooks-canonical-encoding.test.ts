@@ -39,12 +39,27 @@ describe('hooks canónicos y encoding', () => {
     expect(JSON.parse(text)).toBeTruthy();
   });
 
-  it('todas las claves de notificación están en hooks.json', () => {
+  it('todas las claves de notificación lifecycle están en hooks.json (excluyendo TaskInProgress, que se enruta por PostToolUse[matcher=TaskUpdate])', () => {
     const root = resolve(import.meta.dirname, '../..');
     const hooks = readCanonicalHooks(root);
     for (const key of NOTIFICATION_EVENT_KEYS) {
+      if (key === 'TaskInProgress') continue; // implementada como PostToolUse[matcher=TaskUpdate]
       expect(hooks[key], `falta hook para ${key}`).toBeDefined();
     }
+  });
+
+  it('PostToolUse contiene entradas disjuntas para matcher "*" y matcher "TaskUpdate"', () => {
+    const root = resolve(import.meta.dirname, '../..');
+    const hooks = readCanonicalHooks(root);
+    const postToolUse = hooks['PostToolUse'];
+    expect(postToolUse).toBeDefined();
+    const matchers = postToolUse!.map((b) => b.matcher);
+    expect(matchers).toContain('*');
+    expect(matchers).toContain('TaskUpdate');
+    const taskUpdateBlock = postToolUse!.find((b) => b.matcher === 'TaskUpdate');
+    expect(taskUpdateBlock).toBeDefined();
+    expect(taskUpdateBlock!.hooks).toHaveLength(1);
+    expect(taskUpdateBlock!.hooks[0].command).toContain('task-in-progress-hook-ux.ts');
   });
 
   it('muestra de acentos del catálogo no contiene mojibake', () => {

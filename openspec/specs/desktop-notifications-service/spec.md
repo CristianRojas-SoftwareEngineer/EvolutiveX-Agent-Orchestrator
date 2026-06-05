@@ -45,7 +45,7 @@ El sistema SHALL definir un catálogo en código en `src/2-services/notification
 - `image`: nombre de archivo bajo `assets/notifications/events/` (PNG).
 - `sound`: perfil `NotificationSoundProfile` con `win32`, `darwin`, `linux`.
 
-El catálogo SHALL exportar `EVENT_NOTIFICATION_PROFILES` y `getProfileForEvent(eventKey: string)` con exactamente las **11 claves** existentes tras `add-notification-event-profiles`. Los campos `image` y `sound` SHALL conservar los valores acordados en ese change; el campo `message` se añade sin alterar tokens BurntToast ni nombres de PNG. El título del toast **no** vive en el catálogo: lo resuelve el CLI desde el `eventKey` (ver requirement «Entry point CLI standalone»).
+El catálogo SHALL exportar `EVENT_NOTIFICATION_PROFILES` y `getProfileForEvent(eventKey: string)` con exactamente las **12 claves** existentes tras `add-task-in-progress-notification`: las 11 previas (UserPromptSubmit, PreToolUse, SubagentStart, SubagentStop, Stop, StopFailure, SessionStart, SessionEnd, PermissionRequest, TaskCreated, TaskCompleted) más `TaskInProgress`. Los campos `image` y `sound` SHALL conservar los valores acordados para las 11 claves previas; el campo `message` se añade sin alterar tokens BurntToast ni nombres de PNG. El título del toast **no** vive en el catálogo: lo resuelve el CLI desde el `eventKey` (ver requirement «Entry point CLI standalone»).
 
 #### Scenario: Perfil conocido devuelve mensaje, imagen y sonido
 
@@ -66,6 +66,13 @@ El catálogo SHALL exportar `EVENT_NOTIFICATION_PROFILES` y `getProfileForEvent(
 - **GIVEN** `getProfileForEvent('PostToolUse')`
 - **WHEN** se consulta el catálogo
 - **THEN** SHALL devolver `undefined`
+
+#### Scenario: `NOTIFICATION_EVENT_KEYS` contiene las 12 claves tras el change
+
+- **GIVEN** el catálogo tras `add-task-in-progress-notification`
+- **WHEN** se enumera `NOTIFICATION_EVENT_KEYS`
+- **THEN** SHALL tener longitud 12
+- **AND** SHALL incluir `TaskInProgress`
 
 ---
 
@@ -179,9 +186,10 @@ El header del toast (AUMID, `.lnk`, registro) SHALL seguir usando únicamente lo
 
 #### Scenario: Cada imagen del catálogo existe en events/
 
-- **GIVEN** las 11 claves de `NOTIFICATION_EVENT_KEYS`
+- **GIVEN** las 12 claves de `NOTIFICATION_EVENT_KEYS`
 - **WHEN** se resuelve `getProfileForEvent(key).image` para cada clave
 - **THEN** SHALL existir el archivo bajo `assets/notifications/events/` con ese nombre
+- **AND** SHALL existir `assets/notifications/events/task-in-progress.png` para la nueva clave `TaskInProgress`
 
 ---
 
@@ -520,7 +528,7 @@ El sistema SHALL exponer en `src/2-services/notifications/hook-payload-notificat
 - Constantes `MAX_ASSISTANT_MESSAGE_LEN` (140) y `MAX_TOOL_INPUT_PREVIEW_LEN` (120).
 - Función `resolveHookNotificationMessage(eventKey: string, payload: Record<string, unknown>): string | null`.
 - Función `repairMojibake(text: string): string` que repara texto «UTF-8 mal decodificado como Latin-1/CP1252».
-- Registro interno o exportado de formatters por `eventKey` para exactamente estos cinco casos:
+- Registro interno o exportado de formatters por `eventKey` para exactamente estos **seis** casos:
 
 | `eventKey` | Campos del payload consumidos | Comportamiento mínimo |
 |------------|------------------------------|------------------------|
@@ -529,6 +537,7 @@ El sistema SHALL exponer en `src/2-services/notifications/hook-payload-notificat
 | `PreToolUse` | `tool_input.questions[]` | Conteo de preguntas; preview de `question` o `header` de la primera |
 | `UserPromptSubmit` | `prompt` | Preview del prompt truncado y whitespace normalizado |
 | `Stop` | `last_assistant_message` | Texto truncado; `null` si ausente → fallback catálogo |
+| `TaskInProgress` | `tool_input.subject` (fallback `payload.subject`) | `«Tarea iniciada: »` + preview truncado; `null` si ausente → fallback catálogo |
 
 Los formatters SHALL ser funciones puras sin I/O. SHALL aplicar normalización de espacios en previews y sufijo `…` al truncar.
 
@@ -575,6 +584,19 @@ Los formatters SHALL ser funciones puras sin I/O. SHALL aplicar normalización d
 - **GIVEN** payload `{ "prompt": "Hola, ¿qué hace? niño, sesión" }`
 - **WHEN** se invoca `resolveHookNotificationMessage('UserPromptSubmit', payload)`
 - **THEN** SHALL devolver el mismo texto sin alteraciones
+
+#### Scenario: TaskInProgress con subject → mensaje con prefijo
+
+- **GIVEN** payload `{ "tool_input": { "subject": "Refactor del parser", "status": "in_progress" } }`
+- **WHEN** se invoca `resolveHookNotificationMessage('TaskInProgress', payload)`
+- **THEN** SHALL devolver string que comienza con `"Tarea iniciada: "`
+- **AND** SHALL contener `"Refactor del parser"`
+
+#### Scenario: TaskInProgress sin subject → null (fallback catálogo)
+
+- **GIVEN** payload `{ "tool_input": { "status": "in_progress" } }`
+- **WHEN** se invoca `resolveHookNotificationMessage('TaskInProgress', payload)`
+- **THEN** SHALL devolver `null`
 
 ---
 

@@ -7,6 +7,7 @@
  * - Stop UX: `scripting/stop-hook-ux.ts`
  * - Gateway + toast (stdin único): `scripting/gateway-hook-notify.ts`
  * - PreToolUse (POST + toast AskUserQuestion): `scripting/pre-tool-use-hook-ux.ts`
+ * - TaskInProgress (PostToolUse[TaskUpdate] + toast filtrado por status): `scripting/task-in-progress-hook-ux.ts`
  * - Notificaciones: `src/2-services/notifications/cli.ts`
  *
  * Las funciones aquí definidas son puras (no escriben en disco). El
@@ -31,6 +32,7 @@ const POST_HOOK_EVENT_SEGMENT = 'scripting/post-hook-event.ts';
 const STOP_HOOK_UX_SEGMENT = 'scripting/stop-hook-ux.ts';
 const GATEWAY_HOOK_NOTIFY_SEGMENT = 'scripting/gateway-hook-notify.ts';
 const PRE_TOOL_USE_HOOK_UX_SEGMENT = 'scripting/pre-tool-use-hook-ux.ts';
+const TASK_IN_PROGRESS_HOOK_UX_SEGMENT = 'scripting/task-in-progress-hook-ux.ts';
 const NOTIFICATIONS_CLI_SEGMENT = 'src/2-services/notifications/cli.ts';
 const PLACEHOLDER = '${SMART_CODE_PROXY_ROOT}';
 
@@ -82,6 +84,7 @@ export function resolveHooksBlock(hooks: HooksBlock, scpRoot: string): HooksBloc
  * - `stop-hook-ux`
  * - `gateway-hook-notify`
  * - `pre-tool-use-hook-ux`
+ * - `task-in-progress-hook-ux`
  * - `notifications/cli.ts`
  * - La ruta resolved del repo (sin backslash)
  */
@@ -94,6 +97,7 @@ export function isScpManagedCommand(command: string | undefined, scpRoot: string
     normalized.includes('stop-hook-ux') ||
     normalized.includes('gateway-hook-notify') ||
     normalized.includes('pre-tool-use-hook-ux') ||
+    normalized.includes('task-in-progress-hook-ux') ||
     normalized.includes('notifications/cli.ts') ||
     normalized.includes(rootNormalized)
   );
@@ -248,6 +252,7 @@ export function validateScpRoot(scpRoot: string): void {
     STOP_HOOK_UX_SEGMENT,
     GATEWAY_HOOK_NOTIFY_SEGMENT,
     PRE_TOOL_USE_HOOK_UX_SEGMENT,
+    TASK_IN_PROGRESS_HOOK_UX_SEGMENT,
     NOTIFICATIONS_CLI_SEGMENT,
   ];
   const missing: string[] = [];

@@ -140,6 +140,17 @@ export function formatStopMessage(payload: Record<string, unknown>): string | nu
   return truncate(detail, MAX_ASSISTANT_MESSAGE_LEN);
 }
 
+export function formatTaskInProgressMessage(payload: Record<string, unknown>): string | null {
+  const toolInput = payload.tool_input;
+  const subjectFromToolInput =
+    toolInput != null && typeof toolInput === 'object'
+      ? readStringField(toolInput as Record<string, unknown>, 'subject')
+      : undefined;
+  const subject = subjectFromToolInput ?? readStringField(payload, 'subject');
+  if (!subject) return null;
+  return `Tarea iniciada: ${truncate(normalizeWhitespace(subject), MAX_TOOL_INPUT_PREVIEW_LEN)}`;
+}
+
 type PayloadMessageFormatter = (payload: Record<string, unknown>) => string | null;
 
 const HOOK_PAYLOAD_MESSAGE_FORMATTERS: Partial<Record<string, PayloadMessageFormatter>> = {
@@ -148,6 +159,7 @@ const HOOK_PAYLOAD_MESSAGE_FORMATTERS: Partial<Record<string, PayloadMessageForm
   PreToolUse: formatPreToolUseAskMessage,
   UserPromptSubmit: formatUserPromptSubmitMessage,
   Stop: formatStopMessage,
+  TaskInProgress: formatTaskInProgressMessage,
 };
 
 /**

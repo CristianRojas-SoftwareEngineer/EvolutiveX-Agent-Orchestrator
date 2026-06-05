@@ -85,6 +85,12 @@ export const EVENT_NOTIFICATION_PROFILES: Record<string, EventNotificationProfil
     level: 'neutral',
     sound: { win32: 'Default', darwin: 'Tink', linux: true },
   },
+  TaskInProgress: {
+    message: 'Tarea iniciada',
+    image: 'task-in-progress.png',
+    level: 'activity',
+    sound: { win32: 'IM', darwin: 'Ping', linux: true },
+  },
 };
 
 export const NOTIFICATION_EVENT_KEYS = Object.keys(EVENT_NOTIFICATION_PROFILES);

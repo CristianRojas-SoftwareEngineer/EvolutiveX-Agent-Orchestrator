@@ -10,7 +10,7 @@ import { NOTIFICATION_EVENT_KEYS } from '../../../src/2-services/notifications/e
 import { TOAST_BODY_IMAGE_BACKGROUND } from '../../../src/2-services/notifications/toast-body-image-spec.js';
 
 describe('event-notification-image', () => {
-  it('define overlay para los 11 eventos', () => {
+  it('define overlay para los 12 eventos', () => {
     for (const key of NOTIFICATION_EVENT_KEYS) {
       expect(EVENT_IMAGE_OVERLAY_BY_KEY[key]).toBeDefined();
     }

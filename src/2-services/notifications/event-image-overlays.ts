@@ -10,12 +10,14 @@ export type EventImageOverlayId =
   | 'badge-power'
   | 'badge-shield'
   | 'badge-plus'
+  | 'badge-plus-orange'
   | 'badge-task-done';
 
 const CYAN = '#00C8F0';
 const WHITE = '#FFFFFF';
 const NAVY = '#001038';
 const WARNING = '#F5C518';
+const ORANGE = '#FF8C00';
 
 /** SVG overlay alineado al canvas 128×128 (badges abajo-derecha salvo burbujas). */
 export function buildEventOverlaySvg(overlayId: EventImageOverlayId): string {
@@ -56,6 +58,12 @@ export function buildEventOverlaySvg(overlayId: EventImageOverlayId): string {
         `<rect x="100" y="102" width="16" height="16" rx="3" fill="none" stroke="${WHITE}" stroke-width="2.2"/>
          <line x1="108" y1="106" x2="108" y2="114" stroke="${WHITE}" stroke-width="2.5" stroke-linecap="round"/>
          <line x1="104" y1="110" x2="112" y2="110" stroke="${WHITE}" stroke-width="2.5" stroke-linecap="round"/>`,
+      );
+    case 'badge-plus-orange':
+      return badgeCircle(
+        `<rect x="100" y="102" width="16" height="16" rx="3" fill="none" stroke="${ORANGE}" stroke-width="2.2"/>
+         <line x1="108" y1="106" x2="108" y2="114" stroke="${ORANGE}" stroke-width="2.5" stroke-linecap="round"/>
+         <line x1="104" y1="110" x2="112" y2="110" stroke="${ORANGE}" stroke-width="2.5" stroke-linecap="round"/>`,
       );
     case 'badge-task-done':
       return `<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">

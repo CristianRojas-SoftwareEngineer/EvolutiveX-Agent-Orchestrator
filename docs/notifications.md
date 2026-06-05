@@ -4,7 +4,7 @@
 > `claude-code-hooks-implementation`. Reemplaza — funcionalmente — al
 > script externo `C:\AI\claude-code-notifications.ts`, que queda intacto
 > durante N1 como fallback y será marcado `@deprecated` en N2. La
-> cobertura actual de `.claude/settings.json` (13 claves) usa este
+> cobertura actual de `.claude/settings.json` (14 claves) usa este
 > servicio para todas las notificaciones de UX desde el repositorio.
 
 ## Propósito
@@ -19,7 +19,7 @@ configuración externa, y no introduce dependencias Windows-specific.
 
 ## Instalación global (`~/.claude`)
 
-Para recibir toasts en **cualquier proyecto** (no solo Smart Code Proxy), registre los hooks en el perfil de usuario con el mismo patrón que el statusline (`npx --prefix` + `tsx`). Para instalar las **13 claves** (lifecycle + UX) junto con statusline y voz en un único paso:
+Para recibir toasts en **cualquier proyecto** (no solo Smart Code Proxy), registre los hooks en el perfil de usuario con el mismo patrón que el statusline (`npx --prefix` + `tsx`). Para instalar las **14 claves** (lifecycle + UX) junto con statusline y voz en un único paso:
 
 ```bash
 npm run setup:install
@@ -284,7 +284,7 @@ Dos capas en el composition root (`buildEvent`):
 
 ### Perfiles por evento (copy + imagen + sonido)
 
-Los 11 hooks con toast en `.claude/settings.json` comparten el mismo
+Los 12 hooks con toast en `.claude/settings.json` comparten el mismo
 `--event-type` que las claves del catálogo. No hace falta duplicar rutas
 ni `--message` en settings: el CLI aplica título (= nombre del hook), mensaje, imagen y sonido.
 
@@ -301,8 +301,9 @@ ni `--message` en settings: el CLI aplica título (= nombre del hook), mensaje, 
 | `PermissionRequest` | Permiso requerido — Confirma la herramienta en el cliente. | `permission-request.png` | `SMS` | `Hero` | `true` |
 | `TaskCreated` | Tarea creada | `task-created.png` | `Reminder` | `Submarine` | `true` |
 | `TaskCompleted` | Tarea completada | `task-completed.png` | `Default` | `Tink` | `true` |
+| `TaskInProgress` | Tarea iniciada | `task-in-progress.png` | `IM` | `Ping` | `true` |
 
-Con `--stdin-json`, los cinco eventos con formatter (`StopFailure`, `PermissionRequest`, `PreToolUse`, `UserPromptSubmit`, `Stop`) pueden sustituir el cuerpo; el resto usa siempre el mensaje estático de la tabla.
+Con `--stdin-json`, los seis eventos con formatter (`StopFailure`, `PermissionRequest`, `PreToolUse`, `UserPromptSubmit`, `Stop`, `TaskInProgress`) pueden sustituir el cuerpo; el resto usa siempre el mensaje estático de la tabla.
 
 **Paridad legacy:** los tokens del catálogo (`Default`, `IM`, `SMS`, …) heredan
 `claude-notifications-enhanced.ps1` (BurntToast). El resolvedor los traduce a
@@ -385,7 +386,7 @@ Herramientas en `toast-body-image-spec.ts` / `event-notification-image.ts` (no c
 
 | Pipeline | Efecto | Comando |
 |----------|--------|---------|
-| **Compositor** (`writeAllEventNotificationImages`) | Regenera los 11 iconos desde `ai-assistant.png` + overlay SVG | `node --import tsx -e "import { writeAllEventNotificationImages } from './src/2-services/notifications/event-notification-image.ts'; await writeAllEventNotificationImages();"` |
+| **Compositor** (`writeAllEventNotificationImages`) | Regenera los 12 iconos desde `ai-assistant.png` + overlay SVG | `node --import tsx -e "import { writeAllEventNotificationImages } from './src/2-services/notifications/event-notification-image.ts'; await writeAllEventNotificationImages();"` |
 | **Reframe** (`reframeAllEventNotificationImages`) | Conserva el arte de cada PNG; disco circular + fondo `#fefefe` (`contain`) | `node --import tsx -e "import { reframeAllEventNotificationImages } from './src/2-services/notifications/event-notification-image.ts'; await reframeAllEventNotificationImages();"` |
 
 Salida de ambos pipelines: **128×128**, fondo opaco **`#fefefe`** (sin alpha). Tras ejecutar cualquiera:
@@ -597,13 +598,14 @@ apuntan al servicio migrado en el repositorio. Las notificaciones de UX
 
 Instalación global con ruta absoluta: builders en [`scripting/shared/gateway-hook-command.ts`](../scripting/shared/gateway-hook-command.ts).
 
-**Comando canónico por hook (13 claves: 8 del lifecycle + 5 de UX):**
+**Comando canónico por hook (14 claves: 8 del lifecycle + 6 de UX):**
 
 | Hook | Matcher | Comando(s) |
 |---|---|---|
 | `UserPromptSubmit` | — | `npx tsx scripting/gateway-hook-notify.ts --event-type UserPromptSubmit` |
 | `PreToolUse` | `*` | `npx tsx scripting/pre-tool-use-hook-ux.ts` (`POST /hooks` + toast condicional; ver justificación abajo) |
 | `PostToolUse` | `*` | `npx tsx scripting/post-hook-event.ts` (sin notificación; ver justificación abajo) |
+| `PostToolUse` | `TaskUpdate` | `npx tsx scripting/task-in-progress-hook-ux.ts` (relay UX: filtra `status === "in_progress"` + toast dinámico) |
 | `PostToolUseFailure` | — | `npx tsx scripting/post-hook-event.ts` |
 | `SubagentStart` | — | `npx tsx scripting/post-hook-event.ts` + `npx tsx src/2-services/notifications/cli.ts --event-type SubagentStart --message "Subagente iniciado"` |
 | `SubagentStop` | — | `npx tsx scripting/post-hook-event.ts` + `npx tsx src/2-services/notifications/cli.ts --event-type SubagentStop --message "Subagente terminado"` |
@@ -614,6 +616,7 @@ Instalación global con ruta absoluta: builders en [`scripting/shared/gateway-ho
 | `PermissionRequest` | — | `npx tsx src/2-services/notifications/cli.ts --event-type PermissionRequest --stdin-json` |
 | `TaskCreated` | — | `npx tsx src/2-services/notifications/cli.ts --event-type TaskCreated --message "Tarea creada"` |
 | `TaskCompleted` | — | `npx tsx src/2-services/notifications/cli.ts --event-type TaskCompleted --message "Tarea completada"` |
+| `TaskInProgress` (vía `PostToolUse`) | `TaskUpdate` | `npx tsx scripting/task-in-progress-hook-ux.ts` (relay: solo si `tool_input.status === "in_progress"`) |
 
 **Justificación de toast condicional en `PreToolUse` / sin toast en `PostToolUse`:** los
 eventos de tool tienen frecuencia alta (5–50 invocaciones por turno en
@@ -629,8 +632,8 @@ La notificación en otras claves de lifecycle
 
 ### Notificaciones de UX no-lifecycle
 
-Las 5 claves de UX `SessionStart`, `SessionEnd`, `PermissionRequest`,
-`TaskCreated` y `TaskCompleted` **no invocan** `POST /hooks` (el toast
+Las 6 claves de UX `SessionStart`, `SessionEnd`, `PermissionRequest`,
+`TaskCreated`, `TaskCompleted` y `TaskInProgress` **no invocan** `POST /hooks` (el toast
 de `PreToolUse` / `AskUserQuestion` lo cubre el relay lifecycle
 `pre-tool-use-hook-ux.ts`, no una entrada UX separada): el `AuditHookEventHandler` solo procesa los 8
 `eventName` del lifecycle (`UserPromptSubmit`, `PreToolUse`,
@@ -655,6 +658,15 @@ desperdiciado.
 > mitigación nativa es retirar las entradas (no hay filtrado parcial sin
 > throttling/dedupe en el CLI).
 
+> **Nota sobre `TaskInProgress`:** NO es un hook nativo de Claude Code.
+> Se implementa como entrada `PostToolUse` con `matcher: "TaskUpdate"` y
+> un relay (`task-in-progress-hook-ux.ts`) que filtra por
+> `tool_input.status === "in_progress"` antes de emitir el toast. Los
+> `TaskUpdate` con `status: "completed"`, `"deleted"` u otro valor
+> provocan exit 0 silencioso (sin toast). El filtrado reduce el ruido en
+> ~75 % de las invocaciones de `TaskUpdate`, aunque las sesiones con
+> planificación activa siguen generando múltiples toasts por turno.
+
 ### Uso de `--stdin-json` por entrada
 
 | Entrada | `--stdin-json` | Justificación |
@@ -670,11 +682,12 @@ desperdiciado.
 | `PermissionRequest` | Sí | Formatter: `tool_name` y `tool_input`. |
 | `TaskCreated` | No | Copy estático del catálogo. |
 | `TaskCompleted` | No | Copy estático del catálogo. |
+| `TaskInProgress` (vía relay `PostToolUse[TaskUpdate]`) | Sí (vía relay) | El relay filtra `tool_input.status === "in_progress"` y pasa el payload al CLI con `--stdin-json`; el formatter extrae `tool_input.subject`. |
 
 ### Override del user-level
 
-Las 5 claves de UX (`SessionStart`, `SessionEnd`, `PermissionRequest`,
-`TaskCreated`, `TaskCompleted`) declaradas
+Las 6 claves de UX (`SessionStart`, `SessionEnd`, `PermissionRequest`,
+`TaskCreated`, `TaskCompleted`, `TaskInProgress`) declaradas
 en `.claude/settings.json` del proyecto **sobrescriben** las entradas
 equivalentes del user-level (`C:\Users\Cristian\.claude\settings.json`)
 para esas claves. Es la regla nativa de merge de Claude Code:
@@ -732,5 +745,9 @@ verdad del contrato del servicio y de las exclusiones de v1.
 
 `openspec/specs/hooks-lifecycle-correlation/spec.md` — fuente de
 verdad del contrato del `.claude/settings.json` del proyecto
-(8 claves del lifecycle + 5 claves de UX no-lifecycle = 13 claves
+(8 claves del lifecycle + 6 claves de UX no-lifecycle = 14 claves
 totales).
+
+`openspec/specs/task-in-progress-notification/spec.md` — fuente de
+verdad del perfil, formatter, relay y entrada canónica de
+`TaskInProgress`.

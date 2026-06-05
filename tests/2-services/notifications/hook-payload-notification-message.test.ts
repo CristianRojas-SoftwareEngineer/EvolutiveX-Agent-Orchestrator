@@ -4,6 +4,7 @@ import {
   formatPreToolUseAskMessage,
   formatStopFailureMessage,
   formatStopMessage,
+  formatTaskInProgressMessage,
   formatUserPromptSubmitMessage,
   repairMojibake,
   resolveHookNotificationMessage,
@@ -111,6 +112,47 @@ describe('hook-payload-notification-message', () => {
         prompt: 'Hola, Â¿quÃ© hace?',
       });
       expect(msg).toBe('Hola, ¿qué hace?');
+    });
+  });
+
+  describe('formatTaskInProgressMessage', () => {
+    it('devuelve "Tarea iniciada: <subject>" cuando tool_input.subject está presente', () => {
+      const msg = resolveHookNotificationMessage('TaskInProgress', {
+        tool_input: { subject: 'Refactor del parser', status: 'in_progress' },
+      });
+      expect(msg).toBe('Tarea iniciada: Refactor del parser');
+    });
+
+    it('devuelve null cuando no hay subject (fallback al catálogo)', () => {
+      const msg = resolveHookNotificationMessage('TaskInProgress', {
+        tool_input: { status: 'in_progress' },
+      });
+      expect(msg).toBeNull();
+    });
+
+    it('repara mojibake en el subject (paridad con UserPromptSubmit)', () => {
+      const msg = resolveHookNotificationMessage('TaskInProgress', {
+        tool_input: { subject: 'ConfiguraciÃ³n regional' },
+      });
+      expect(msg).toBe('Tarea iniciada: Configuración regional');
+    });
+
+    it('trunca subject > 120 chars con sufijo …', () => {
+      const longSubject = 'A'.repeat(200);
+      const msg = formatTaskInProgressMessage({ tool_input: { subject: longSubject } });
+      expect(msg).toBeDefined();
+      const preview = msg!.replace(/^Tarea iniciada: /, '');
+      // truncate() deja 120 chars + sufijo '…' (paridad con el resto de formatters).
+      expect(preview.length).toBeLessThanOrEqual(121);
+      expect(preview.endsWith('…')).toBe(true);
+      expect(msg!.length).toBeLessThanOrEqual('Tarea iniciada: '.length + 121);
+    });
+
+    it('acepta subject top-level como fallback', () => {
+      const msg = resolveHookNotificationMessage('TaskInProgress', {
+        subject: 'Tarea sin tool_input',
+      });
+      expect(msg).toBe('Tarea iniciada: Tarea sin tool_input');
     });
   });
 });

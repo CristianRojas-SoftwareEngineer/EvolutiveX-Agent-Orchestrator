@@ -29,6 +29,7 @@ export const EVENT_IMAGE_OVERLAY_BY_KEY: Record<string, EventImageOverlayId> = {
   PermissionRequest: 'badge-shield',
   TaskCreated: 'badge-plus',
   TaskCompleted: 'badge-task-done',
+  TaskInProgress: 'badge-plus-orange',
 };
 
 export function getAiAssistantPngPath(): string {
@@ -119,7 +120,7 @@ export async function renderEventNotificationImage(
   return applyOverlay(base, overlayId);
 }
 
-/** Regenera los 11 PNG en `assets/notifications/events/` desde `ai-assistant.png`. */
+/** Regenera los 12 PNG en `assets/notifications/events/` desde `ai-assistant.png`. */
 export async function writeAllEventNotificationImages(
   aiAssistantPath = getAiAssistantPngPath(),
 ): Promise<string[]> {

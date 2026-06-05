@@ -37,6 +37,7 @@ export function createValidProxyRoot(options: ValidProxyRootOptions = {}): strin
   writeFileSync(join(root, 'scripting', 'stop-hook-ux.ts'), 'export {}', 'utf-8');
   writeFileSync(join(root, 'scripting', 'gateway-hook-notify.ts'), 'export {}', 'utf-8');
   writeFileSync(join(root, 'scripting', 'pre-tool-use-hook-ux.ts'), 'export {}', 'utf-8');
+  writeFileSync(join(root, 'scripting', 'task-in-progress-hook-ux.ts'), 'export {}', 'utf-8');
   mkdirSync(join(root, 'src', '2-services', 'notifications'), { recursive: true });
   writeFileSync(join(root, 'src', '2-services', 'notifications', 'cli.ts'), 'export {}', 'utf-8');
   if (options.withSessionsDir) {
@@ -66,6 +67,7 @@ export function createValidProxyRootForHooks(
   writeFileSync(join(root, 'scripting', 'stop-hook-ux.ts'), 'export {}', 'utf-8');
   writeFileSync(join(root, 'scripting', 'gateway-hook-notify.ts'), 'export {}', 'utf-8');
   writeFileSync(join(root, 'scripting', 'pre-tool-use-hook-ux.ts'), 'export {}', 'utf-8');
+  writeFileSync(join(root, 'scripting', 'task-in-progress-hook-ux.ts'), 'export {}', 'utf-8');
   mkdirSync(join(root, 'src', '2-services', 'notifications'), { recursive: true });
   writeFileSync(join(root, 'src', '2-services', 'notifications', 'cli.ts'), 'export {}', 'utf-8');
   return resolve(root);

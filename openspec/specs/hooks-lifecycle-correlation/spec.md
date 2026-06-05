@@ -295,17 +295,17 @@ El repositorio SHALL NOT configurar para `Stop` múltiples comandos en paralelo 
 
 ### Requirement: Notificaciones de UX no-lifecycle en `.claude/settings.json` del proyecto
 
-El proyecto SHALL declarar **5 entradas adicionales** en `.claude/settings.json` para notificaciones de UX fuera del lifecycle de correlación del gateway: `SessionStart` (con `matcher: "startup|resume"`), `SessionEnd`, `PermissionRequest`, `TaskCreated`, y `TaskCompleted`. Cada entrada SHALL contener un **único comando** al CLI de notificaciones (`src/2-services/notifications/cli.ts`) con `--event-type` y `--stdin-json` o `--message` fijo según `docs/notifications.md`.
+El proyecto SHALL declarar **6 entradas adicionales** en `.claude/settings.json` para notificaciones de UX fuera del lifecycle de correlación del gateway: `SessionStart` (con `matcher: "startup|resume"`), `SessionEnd`, `PermissionRequest`, `TaskCreated`, `TaskCompleted`, y `TaskInProgress`. Cada entrada SHALL contener un **único comando** al CLI de notificaciones (`src/2-services/notifications/cli.ts`) con `--event-type` y `--stdin-json` o `--message` fijo según `docs/notifications.md`.
 
 La notificación de **`PreToolUse` / `AskUserQuestion`** NO es una entrada UX separada: SHALL cubrirse por `pre-tool-use-hook-ux.ts` en la entrada lifecycle `PreToolUse` con `matcher: "*"`.
 
-> **Nota sobre `TaskCreated` / `TaskCompleted`:** estos dos hooks nativos de Claude Code NO admiten campo `matcher` en `.claude/settings.json` (la documentación oficial indica que el campo es ignorado silenciosamente para estos eventos). Las entradas SHALL omitir el campo `matcher` para mantener la configuración limpia. En v1 se usa texto fijo `--message "<fijo>"`; no se aprovecha el payload vía `--stdin-json` (no aporta valor de UX diferenciado sobre el texto fijo en v1; podría aprovecharse en una iteración futura).
+> **Nota sobre `TaskCreated` / `TaskCompleted` / `TaskInProgress`:** los hooks `TaskCreated` y `TaskCompleted` no admiten campo `matcher` en `.claude/settings.json` (la documentación oficial indica que el campo es ignorado silenciosamente para esos eventos); las entradas SHALL omitirlo. `TaskInProgress` NO es un hook nativo: se implementa como entrada `PostToolUse` con `matcher: "TaskUpdate"` y filtro de `tool_input.status` dentro del script relay.
 
-**Ninguna** de estas 5 entradas invoca `POST /hooks`: el `AuditHookEventHandler` solo procesa los 8 `eventName` del lifecycle definidos en el requirement de "Mapeo de eventos al correlador"; el resto cae en `default:` y se descarta. Enviar `POST /hooks` desde estos hooks sería ancho de banda desperdiciado.
+**Ninguna** de estas 6 entradas invoca `POST /hooks`: el `AuditHookEventHandler` solo procesa los 8 `eventName` del lifecycle definidos en el requirement de "Mapeo de eventos al correlador"; el resto cae en `default:` y se descarta. Enviar `POST /hooks` desde estos hooks sería ancho de banda desperdiciado.
 
 **Trade-off explícito (override del user-level):** declarar estas claves en el proyecto sobrescribe las entradas equivalentes del user-level para la misma clave (regla de merge de Claude Code: project-level sobrescribe user-level por clave, ver Scenario "Las entradas del proyecto sobrescriben las del user-level"). Dentro de este repositorio, las notificaciones de UX pasan a ser responsabilidad del proyecto y no del user-level. El usuario asume este trade-off para que el ciclo de vida completo de una sesión quede cubierto desde el repo (sin depender del script externo `C:\AI\claude-code-notifications.ts`, deprecado con fecha de retirada 2026-09-01).
 
-**Trade-off explícito (frecuencia de `TaskCreated` / `TaskCompleted`):** estos hooks disparan en cada invocación de la tool `TaskCreate` y en cada `TaskUpdate(status=completed)`. En sesiones con planificación activa (p. ej. `/openspec-new`, `/openspec-apply`, generación de listas de tareas), se generan múltiples toasts por turno. No existe mecanismo nativo de matcher/throttling para estos eventos. El usuario asume este trade-off a cambio de feedback explícito del avance de tareas. Si el ruido resulta excesivo en la práctica, la única mitigación nativa es retirar las entradas (no hay filtrado parcial sin implementar throttling/dedupe en el CLI de notificaciones — fuera del scope de este requirement).
+**Trade-off explícito (frecuencia de `TaskCreated` / `TaskCompleted` / `TaskInProgress`):** estos hooks disparan en cada invocación de la tool `TaskCreate` y en cada `TaskUpdate` (cualquier `status`). En sesiones con planificación activa (p. ej. `/openspec-new`, `/openspec-apply`, generación de listas de tareas), se generan múltiples toasts por turno. No existe mecanismo nativo de matcher/throttling para `TaskCreated`/`TaskCompleted`. Para `TaskInProgress` el filtrado por `status === "in_progress"` dentro del relay reduce el ruido en ~75 % de los `TaskUpdate` (los que pasan a `completed`/`deleted`), pero no elimina las transiciones `pending → in_progress` que se disparan en cascada. El usuario asume este trade-off a cambio de feedback explícito del avance de tareas. Si el ruido resulta excesivo en la práctica, la única mitigación nativa es retirar las entradas (no hay filtrado parcial sin implementar throttling/dedupe en el CLI de notificaciones — fuera del scope de este requirement).
 
 **`--stdin-json` por entrada:**
 
@@ -316,6 +316,7 @@ La notificación de **`PreToolUse` / `AskUserQuestion`** NO es una entrada UX se
 | `PermissionRequest` | Sí | El payload trae `tool_name` y `tool_input`, útiles para derivar el `message`. |
 | `TaskCreated` | No | Texto fijo `--message "Tarea creada"`; los hooks `TaskCreated`/`TaskCompleted` no soportan matcher y el payload no se aprovecha en v1. |
 | `TaskCompleted` | No | Texto fijo `--message "Tarea completada"`. |
+| `TaskInProgress` (matcher `TaskUpdate` en `PostToolUse`) | Sí (vía relay) | El payload trae `tool_input.subject` para derivar el `message` dinámico. El relay filtra `tool_input.status === "in_progress"` antes de invocar el CLI. |
 
 #### Scenario: Notificación de `SessionStart` ejecutada al arranque
 
@@ -349,20 +350,43 @@ La notificación de **`PreToolUse` / `AskUserQuestion`** NO es una entrada UX se
 - **AND** SHALL emitirse un toast nativo del SO con título `TaskCompleted` y mensaje `Tarea completada`
 - **AND** NO SHALL llegar request al endpoint `/hooks` del proxy desde esta entrada (el `AuditHookEventHandler` no procesa `TaskCompleted`)
 
-#### Scenario: Las 5 entradas de UX no invocan `POST /hooks`
+#### Scenario: Notificación de `TaskInProgress` ejecutada al iniciar una tarea
 
-- **GIVEN** `.claude/settings.json` del proyecto contiene las 5 entradas de UX (`SessionStart`, `SessionEnd`, `PermissionRequest`, `TaskCreated`, `TaskCompleted`)
+- **GIVEN** `.claude/settings.json` del proyecto contiene una entrada `PostToolUse` con `matcher: "TaskUpdate"` y un único comando que invoca `task-in-progress-hook-ux.ts`
+- **WHEN** Claude Code invoca la tool `TaskUpdate` con `tool_input.status === "in_progress"` (transición `pending → in_progress`)
+- **THEN** SHALL ejecutarse el script relay `task-in-progress-hook-ux.ts` con el payload JSON vía stdin
+- **AND** el relay SHALL filtrar por `tool_input.status === "in_progress"` y llamar al CLI de notificaciones con `--event-type TaskInProgress` y `--stdin-json`
+- **AND** SHALL emitirse un toast nativo del SO con título `TaskInProgress` y mensaje `"Tarea iniciada: <subject>"` (o fallback del catálogo si no hay subject)
+- **AND** NO SHALL llegar request al endpoint `/hooks` del proxy desde esta entrada
+
+#### Scenario: `TaskInProgress` no notifica en transiciones que no son `in_progress`
+
+- **GIVEN** `.claude/settings.json` tiene la entrada `PostToolUse[matcher=TaskUpdate]` con `task-in-progress-hook-ux.ts`
+- **WHEN** Claude Code invoca `TaskUpdate` con `tool_input.status === "completed"` o `"deleted"` o sin campo `status`
+- **THEN** el relay SHALL leer stdin, detectar que `status !== "in_progress"`, y salir con código 0 sin emitir toast
+
+#### Scenario: Coexistencia de `PostToolUse[matcher=*]` y `PostToolUse[matcher=TaskUpdate]`
+
+- **GIVEN** `configs/hooks.json` declara dos entradas bajo `PostToolUse`: una con `matcher: "*"` (`post-hook-event.ts`) y otra con `matcher: "TaskUpdate"` (`task-in-progress-hook-ux.ts`)
+- **WHEN** Claude Code instala los hooks en `~/.claude/settings.json`
+- **THEN** SHALL existir un array `PostToolUse` con al menos 2 entradas (matchers disjuntos `*` y `TaskUpdate`)
+- **AND** ambos hooks SHALL ejecutarse cuando se invoca `TaskUpdate`: primero `post-hook-event.ts` (audit) luego `task-in-progress-hook-ux.ts` (UX)
+- **AND** solo `post-hook-event.ts` SHALL ejecutarse para herramientas con `matcher: "*"` distintas de `TaskUpdate`
+
+#### Scenario: Las 6 entradas de UX no invocan `POST /hooks`
+
+- **GIVEN** `.claude/settings.json` del proyecto contiene las 6 entradas de UX (`SessionStart`, `SessionEnd`, `PermissionRequest`, `TaskCreated`, `TaskCompleted`, y `PostToolUse[matcher=TaskUpdate]` para `TaskInProgress`)
 - **WHEN** Claude Code dispara cualquiera de esos eventos
 - **THEN** NO SHALL llegar request al endpoint `/hooks` del proxy desde esas entradas
-- **AND** SHALL ejecutarse únicamente el comando del CLI de notificaciones
+- **AND** SHALL ejecutarse únicamente el comando del CLI de notificaciones (o el relay en el caso de `TaskInProgress`)
 
 ---
 
 ### Requirement: Distribución de hooks de SCP en `~/.claude/settings.json` (user-level)
 
-El sistema SHALL proporcionar un mecanismo de instalación de las **13 claves** de hooks de SCP (8 lifecycle + 5 UX) en `~/.claude/settings.json` (user-level) mediante el script `setup --hooks` o `setup:hooks`. La instalación SHALL ser **merge selectivo** que preserve configs ajenas a SCP en las mismas claves.
+El sistema SHALL proporcionar un mecanismo de instalación de las **14 claves** de hooks de SCP (8 lifecycle + 6 UX) en `~/.claude/settings.json` (user-level) mediante el script `setup --hooks` o `setup:hooks`. La instalación SHALL ser **merge selectivo** que preserve configs ajenas a SCP en las mismas claves.
 
-Las 13 claves gestionadas por SCP SHALL ser:
+Las 14 claves gestionadas por SCP SHALL ser:
 
 **Lifecycle (8):**
 - `UserPromptSubmit` (1 comando: `gateway-hook-notify.ts`)
@@ -374,12 +398,13 @@ Las 13 claves gestionadas por SCP SHALL ser:
 - `Stop` (1 comando: `stop-hook-ux.ts`)
 - `StopFailure` (1 comando: `gateway-hook-notify.ts`)
 
-**UX (5):**
+**UX (6):**
 - `SessionStart` matcher `startup|resume`
 - `SessionEnd`
 - `PermissionRequest`
 - `TaskCreated`
 - `TaskCompleted`
+- `TaskInProgress` (vía `PostToolUse` matcher `TaskUpdate` + relay `task-in-progress-hook-ux.ts`)
 
 El merge selectivo SHALL seguir esta política para cada clave:
 
@@ -393,6 +418,7 @@ Un comando se considera "de SCP" si su path normalizado (backslash→forward sla
 - `stop-hook-ux`
 - `gateway-hook-notify`
 - `pre-tool-use-hook-ux`
+- `task-in-progress-hook-ux`
 - `notifications/cli.ts`
 - La ruta resolved de `SMART_CODE_PROXY_ROOT`
 
@@ -402,7 +428,7 @@ La plantilla canónica SHALl vivir en `configs/hooks.json` en el repo SCP y SHAL
 
 - **GIVEN** `~/.claude/settings.json` no existe o tiene `hooks: {}`
 - **WHEN** el usuario ejecuta `npm run setup -- --hooks`
-- **THEN** las 13 claves de SCP SHALL crearse en `settings.hooks`
+- **THEN** las 14 claves de SCP SHALL crearse en `settings.hooks`
 - **AND** `settings.env.SMART_CODE_PROXY_ROOT` SHALL establecerse con la ruta del repo
 
 #### Scenario: Instalación con hooks ajenos existentes
@@ -410,7 +436,7 @@ La plantilla canónica SHALl vivir en `configs/hooks.json` en el repo SCP y SHAL
 - **GIVEN** `~/.claude/settings.json` tiene `hooks.github-copilot: [{ type: "command", command: "..." }]` (clave ajena a las 13 gestionadas)
 - **WHEN** el usuario ejecuta `npm run setup -- --hooks`
 - **THEN** `hooks.github-copilot` SHALL preservarse intacto
-- **AND** las 13 claves de SCP SHALL crearse o actualizarse
+- **AND** las 14 claves de SCP SHALL crearse o actualizarse
 
 #### Scenario: Instalación con clave mixta (SCP + ajenos)
 
@@ -472,7 +498,7 @@ La plantilla canónica SHALL vivir en `configs/hooks.json` en el repo SCP y SHAL
 
 - **GIVEN** `~/.claude/settings.json` no existe o tiene `hooks: {}`
 - **WHEN** el usuario ejecuta `npm run setup -- --hooks`
-- **THEN** las 13 claves de SCP SHALL crearse en `settings.hooks`
+- **THEN** las 14 claves de SCP SHALL crearse en `settings.hooks`
 - **AND** `settings.env.SMART_CODE_PROXY_ROOT` SHALL establecerse con la ruta del repo
 
 #### Scenario: Instalación con hooks ajenos existentes
@@ -480,7 +506,7 @@ La plantilla canónica SHALL vivir en `configs/hooks.json` en el repo SCP y SHAL
 - **GIVEN** `~/.claude/settings.json` tiene `hooks.github-copilot: [{ type: "command", command: "..." }]`
 - **WHEN** el usuario ejecuta `npm run setup -- --hooks`
 - **THEN** `hooks.github-copilot` SHALL preservarse intacto
-- **AND** las 13 claves de SCP SHALL crearse o actualizarse
+- **AND** las 14 claves de SCP SHALL crearse o actualizarse
 
 #### Scenario: Instalación con clave mixta (SCP + ajenos)
 

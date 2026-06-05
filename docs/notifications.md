@@ -109,14 +109,13 @@ Los **prompt hooks** (`type: "prompt"`) de Claude Code no pueden invocar toasts;
 | `DesktopNotificationAdapter.ts` | 2 (adaptador concreto) | Implementa el puerto delegando en `node-notifier.notify()` |
 | `index.ts` | 2 (exports) | Re-exports públicos del paquete |
 | `cli.ts` | 4 (composition root standalone) | Entry point CLI invocable desde hooks de Claude Code |
-| `register.ts` | 4 (composition root standalone) | Helper de AUMID Windows (opt-in, idempotente) — orquesta `.lnk` + registro + copia de assets |
+| `register.ts` | 4 (composition root standalone) | Helper de AUMID Windows (opt-in, idempotente) — orquesta `.lnk` + registro (apunta directamente a los assets del repo) |
 | `snoretoast-shortcut.ts` | 4 (helper de orquestación) | Invoca `snoretoast-x64.exe -install` para crear el `.lnk` con la metadata AUMID que Windows espera, y luego parchea el `IconLocation` con `patchIconLocation` de `lnk-format.ts` |
 | `lnk-format.ts` | 2 (helper) | Generador/parser del formato MS-SHLLINK (escritura binaria pura del `.lnk`) |
 | `registry.ts` | 2 (helper) | Wrapper de `reg.exe` para escribir/leer/borrar `HKCU\Software\Classes\AppUserModelId\{AUMID}` |
-| `asset-paths.ts` | 2 (helper) | Constantes de las rutas ASCII-only (`%LOCALAPPDATA%\AIAssistant\`, `events/`) |
 | `event-notification-profile.ts` | 2 (catálogo) | Perfiles por `--event-type`: mensaje estático, PNG de cuerpo + sonido por SO |
 | `hook-payload-notification-message.ts` | 2 (helper) | **Runtime:** `resolveHookNotificationMessage` — mensaje dinámico desde payload stdin |
-| `event-image-paths.ts` | 2 (helper) | **Runtime:** `resolveEventImagePath`, `syncEventImageFromRepoIfStale` (cache estable → repo) |
+| `event-image-paths.ts` | 2 (helper) | **Runtime:** `resolveEventImagePath` — resuelve la ruta del PNG en `assets/notifications/events/` directamente desde el repo |
 | `resolve-notification-sound.ts` | 2 (helper) | **Runtime:** `resolveNotificationSound` → `Notification.*` en win32 |
 | `toast-body-image-spec.ts` | 2 (helper) | **Mantenimiento:** `applyCircularToastFrame`, `renderToastBodyImageFromSource` (salida 128×128, `#fefefe`) |
 | `event-image-overlays.ts` | 2 (helper) | **Mantenimiento:** SVG de overlays (compositor sharp) |
@@ -359,22 +358,13 @@ Los PNG en `assets/notifications/events/*.png` y `assets/notifications/ai-assist
 
 **Transparencia:** SnoreToast no mezcla bien el alpha; PNG transparentes pueden mostrar letterboxing. Es aceptable si el resultado te convence; los pipelines opcionales (siguiente subsección) ofrecen salida opaca 128×128 como remedio.
 
-#### Sincronización de caché (runtime)
+#### Resolución de PNGs por evento (runtime)
 
-Tras editar PNGs en el repo, en Windows:
-
-```bash
-npm run notifications:register -- --install
-```
-
-Esto recopia `assets/notifications/events/*.png` (y assets globales) a
-`%LOCALAPPDATA%\AIAssistant\events\` (idempotente por hash SHA-256).
-
-Además, en cada notificación el CLI llama `resolveEventImagePath`, que ejecuta
-`syncEventImageFromRepoIfStale`: si el hash del repo difiere del cache, recopia
-al cache **antes** de notificar (aunque no hayas vuelto a ejecutar `register`).
-
-Orden efectivo: comprobar repo → sync si hace falta → devolver ruta estable si existe.
+`resolveEventImagePath` (`src/2-services/notifications/event-image-paths.ts`) devuelve
+directamente la ruta del PNG bajo `assets/notifications/events/` en el repo. No hay
+cache, copia ni sincronización: el repo es la fuente directa en runtime. Si el archivo
+no existe, la función devuelve `undefined` y el CLI degrada con gracia al fallback
+`ai-assistant.png` (también desde el repo) o lo omite.
 
 #### Pipelines opcionales de mantenimiento (salida 128×128, `#fefefe`)
 

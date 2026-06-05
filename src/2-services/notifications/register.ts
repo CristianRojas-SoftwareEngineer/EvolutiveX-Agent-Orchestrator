@@ -11,35 +11,18 @@
 //        sin depender de la caché del shell.
 //
 //   2. Menú Inicio: %APPDATA%\...\AI Assistant.lnk (SnoreToast `-install` +
-//      parche de IconLocation al .ico estable en LOCALAPPDATA).
+//      parche de IconLocation al .ico del repo).
 //      → Sin SnoreToast, `shell:AppsFolder\<AUMID>` falla (icono header roto).
 //      → Sin IconLocation en el .lnk, Windows usa el icono de snoretoast.exe.
-//
-// Además, copia los assets (.ico + .png) desde el repo a
-// `%LOCALAPPDATA%\AIAssistant\` para usar una ruta ASCII-only. Las
-// Windows shell APIs que consultan el icono de un AUMID tienen issues
-// conocidos con caracteres no-ASCII en paths (la "ó" de "Proyectos"
-// en la ruta del repo); con la copia a LOCALAPPDATA el icono se
-// renderiza correctamente.
 //
 // Implementación:
 //   - `.lnk`: TypeScript puro (`lnk-format.ts`, MS-SHLLINK binario).
 //   - Registro: `reg.exe` (CLI built-in de Windows, NO es PowerShell).
-//   - Assets: copiados a LOCALAPPDATA (ASCII-only) vía `fs.copyFileSync`.
 import { Command } from 'commander';
-import { createHash } from 'crypto';
-import { copyFileSync, existsSync, mkdirSync, readdirSync, unlinkSync, readFileSync } from 'fs';
+import { existsSync, readFileSync, unlinkSync } from 'fs';
 import { fileURLToPath } from 'url';
-import { resolve as resolvePath, join, dirname } from 'path';
+import { resolve as resolvePath, join } from 'path';
 import { readRegistry, writeRegistry, deleteRegistry } from './registry.js';
-import {
-  STABLE_ICON_PATH,
-  STABLE_PNG_PATH,
-  STABLE_EVENTS_DIR,
-  buildStableIconLocation,
-  getStableIconUriPath,
-} from './asset-paths.js';
-import { getRepoEventsDir } from './event-image-paths.js';
 import { parseIconLocation } from './lnk-format.js';
 import {
   SHORTCUT_ENGINE_SNORETOAST,
@@ -73,14 +56,6 @@ export function getLnkPath(): string {
 }
 
 // Resolver la ruta al `.ico` desde el `import.meta.url` del módulo.
-// Se usa `dirname` del módulo para que `..` se aplique sobre el
-// directorio `src/2-services/notifications/` y no sobre el nombre de
-// archivo `register.ts` (con `path.resolve(file, '../..')` el primer
-// `..` cancela el nombre del archivo, no el directorio).
-//
-// Esta es la ruta "fuente" en el repo. La ruta "estable" usada en el
-// registro y la CLI es `STABLE_ICON_PATH` (en `%LOCALAPPDATA%\AIAssistant\`),
-// que es ASCII-only para evitar issues con Windows shell APIs.
 export function getIconIcoPath(): string {
   return resolvePath(
     resolvePath(fileURLToPath(import.meta.url), '..'),
@@ -97,60 +72,10 @@ export function getIconPngPath(): string {
   );
 }
 
-function fileSha256(path: string): string {
-  return createHash('sha256').update(readFileSync(path)).digest('hex');
-}
-
-// Copia un asset solo si el contenido cambió (evita no-op cuando el repo
-// regeneró binarios pero registro + .lnk siguen “OK”).
-function copyFileIfChanged(source: string, dest: string): boolean {
-  if (existsSync(dest) && fileSha256(source) === fileSha256(dest)) {
-    return false;
-  }
-  copyFileSync(source, dest);
-  return true;
-}
-
-// Copia los assets desde el repo a `%LOCALAPPDATA%\AIAssistant\`
-// (ASCII-only). Devuelve `updated: true` si algún binario cambió.
-function ensureStableAssets(): { icoPath: string; pngPath: string; updated: boolean } {
-  const sourceIco = getIconIcoPath();
-  const sourcePng = getIconPngPath();
-  if (!existsSync(sourceIco)) {
-    throw new Error(`Icono fuente no encontrado en ${sourceIco}`);
-  }
-  mkdirSync(dirname(STABLE_ICON_PATH), { recursive: true });
-  const icoUpdated = copyFileIfChanged(sourceIco, STABLE_ICON_PATH);
-  let pngUpdated = false;
-  if (existsSync(sourcePng)) {
-    pngUpdated = copyFileIfChanged(sourcePng, STABLE_PNG_PATH);
-  }
-  return {
-    icoPath: STABLE_ICON_PATH,
-    pngPath: STABLE_PNG_PATH,
-    updated: icoUpdated || pngUpdated,
-  };
-}
-
-// Copia PNGs por evento al cache ASCII-only (misma idempotencia por hash).
-function ensureStableEventAssets(): boolean {
-  const sourceDir = getRepoEventsDir();
-  if (!existsSync(sourceDir)) {
-    return false;
-  }
-  mkdirSync(STABLE_EVENTS_DIR, { recursive: true });
-  let updated = false;
-  for (const name of readdirSync(sourceDir)) {
-    if (!name.toLowerCase().endsWith('.png')) {
-      continue;
-    }
-    const source = join(sourceDir, name);
-    const dest = join(STABLE_EVENTS_DIR, name);
-    if (copyFileIfChanged(source, dest)) {
-      updated = true;
-    }
-  }
-  return updated;
+// Índice del frame 32×32 en `ai-assistant.ico` (orden: 0=16, 1=32, …, 5=256).
+// El header del Action Center suele tomar ~32px del .lnk; `,1` evita el 16×16.
+function buildIconLocation(icoPath: string): string {
+  return `${icoPath},1`;
 }
 
 // Resultado del check de idempotencia: ¿están ambos sitios
@@ -170,7 +95,7 @@ async function checkInstallState(
   let lnkIconOk = false;
   if (existsSync(lnkPath)) {
     try {
-      lnkIconOk = parseIconLocation(readFileSync(lnkPath)) === buildStableIconLocation(iconIcoPath);
+      lnkIconOk = parseIconLocation(readFileSync(lnkPath)) === buildIconLocation(iconIcoPath);
     } catch {
       lnkIconOk = false;
     }
@@ -192,33 +117,19 @@ export async function installAction(): Promise<number> {
     return 1;
   }
   const lnkPath = getLnkPath();
+  const iconIcoPath = getIconIcoPath();
+  const iconUriPath = getIconPngPath();
 
-  if (!existsSync(getIconIcoPath())) {
-    process.stderr.write(`Icono no encontrado en ${getIconIcoPath()}. Aborta.\n`);
+  if (!existsSync(iconIcoPath)) {
+    process.stderr.write(`Icono no encontrado en ${iconIcoPath}. Aborta.\n`);
     return 1;
   }
 
-  // Copiar assets a LOCALAPPDATA (ruta ASCII-only) para evitar issues
-  // de Windows shell APIs con caracteres no-ASCII en paths. Esta es
-  // la ruta que se usará en el registro y que la CLI usará como
-  // toast body image.
-  let stableIcoPath: string;
-  let assetsUpdated: boolean;
-  try {
-    const stable = ensureStableAssets();
-    stableIcoPath = stable.icoPath;
-    assetsUpdated = stable.updated || ensureStableEventAssets();
-  } catch (err) {
-    process.stderr.write(`Error copiando assets a LOCALAPPDATA: ${(err as Error).message}\n`);
-    return 1;
-  }
+  const state = await checkInstallState(aumid, iconIcoPath, iconUriPath);
+  const needsRegistry = !state.registryOk;
+  const needsLnk = !state.lnkOk;
 
-  const iconUriPath = getStableIconUriPath();
-  const state = await checkInstallState(aumid, stableIcoPath, iconUriPath);
-  const needsRegistry = !state.registryOk || assetsUpdated;
-  const needsLnk = !state.lnkOk || assetsUpdated;
-
-  // Idempotencia: no-op solo si registro, .lnk y assets en disco están al día.
+  // Idempotencia: no-op solo si registro y .lnk están al día.
   if (!needsRegistry && !needsLnk) {
     process.stdout.write(`AUMID ya registrado (AppUserModelID="${aumid}"): registro OK + .lnk OK. No-op.\n`);
     return 0;
@@ -227,7 +138,7 @@ export async function installAction(): Promise<number> {
   // 1. Registro (efecto inmediato en UWP/SnoreToast).
   if (needsRegistry) {
     try {
-      await writeRegistry(aumid, DISPLAY_NAME, stableIcoPath, iconUriPath);
+      await writeRegistry(aumid, DISPLAY_NAME, iconIcoPath, iconUriPath);
     } catch (err) {
       process.stderr.write(`Error escribiendo registro: ${(err as Error).message}\n`);
       return 1;
@@ -238,14 +149,14 @@ export async function installAction(): Promise<number> {
   if (needsLnk) {
     try {
       const snoreToast = getSnoreToastPath();
-      await installSnoreToastShortcut(LNK_FILENAME, snoreToast, aumid, lnkPath);
+      await installSnoreToastShortcut(LNK_FILENAME, snoreToast, aumid, lnkPath, buildIconLocation(iconIcoPath));
     } catch (err) {
       process.stderr.write(`Error creando .lnk con SnoreToast (registro sí se escribió): ${(err as Error).message}\n`);
       return 1;
     }
   }
 
-  process.stdout.write(`Registrado: AppUserModelID="${aumid}" DisplayName="${DISPLAY_NAME}" (registro + .lnk SnoreToast=${lnkPath}, icono=${stableIcoPath} [copia ASCII-only]).\n`);
+  process.stdout.write(`Registrado: AppUserModelID="${aumid}" DisplayName="${DISPLAY_NAME}" (registro + .lnk SnoreToast=${lnkPath}, icono=${iconIcoPath}).\n`);
   return 0;
 }
 
@@ -281,6 +192,7 @@ export async function uninstallAction(): Promise<number> {
 export async function statusAction(): Promise<number> {
   const aumid = getAumid();
   const lnkPath = getLnkPath();
+  const iconIcoPath = getIconIcoPath();
 
   const lnkExists = existsSync(lnkPath);
 
@@ -297,11 +209,11 @@ export async function statusAction(): Promise<number> {
   } else if (
     registry.exists
     && registry.displayName === DISPLAY_NAME
-    && registry.icon === STABLE_ICON_PATH
-    && registry.iconUri === getStableIconUriPath()
+    && registry.icon === iconIcoPath
+    && registry.iconUri === getIconPngPath()
     && registry.shortcutEngine === SHORTCUT_ENGINE_SNORETOAST
     && lnkExists
-    && parseIconLocation(readFileSync(lnkPath)) === buildStableIconLocation()
+    && parseIconLocation(readFileSync(lnkPath)) === buildIconLocation(iconIcoPath)
   ) {
     process.stdout.write(`registered: AppUserModelID="${aumid}" DisplayName="${DISPLAY_NAME}" (registro + .lnk SnoreToast OK)\n`);
   } else {
@@ -352,8 +264,6 @@ export async function dispatch(opts: DispatchOpts, platform: NodeJS.Platform = p
 
 // Auto-ejecutar solo cuando este módulo es el entry point (evita que
 // `import` desde tests dispare `main()` + `process.exit()`).
-// `import.meta.url` y `process.argv[1]` solo coinciden cuando Node
-// ejecuta este archivo directamente vía `node` o `tsx`.
 const isEntryPoint =
   typeof process.argv[1] === 'string' &&
   fileURLToPath(import.meta.url) === resolvePath(process.argv[1]);

@@ -10,7 +10,6 @@ import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'fs';
 import { createRequire } from 'module';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
-import { buildStableIconLocation } from './asset-paths.js';
 import { patchIconLocation } from './lnk-format.js';
 
 const require = createRequire(fileURLToPath(import.meta.url));
@@ -52,6 +51,7 @@ export async function installSnoreToastShortcut(
   targetExe: string,
   aumid: string,
   lnkAbsolutePath: string,
+  iconLocation: string,
 ): Promise<void> {
   if (existsSync(lnkAbsolutePath)) {
     unlinkSync(lnkAbsolutePath);
@@ -59,8 +59,8 @@ export async function installSnoreToastShortcut(
   await execSnoreToast(['-install', lnkFileName, targetExe, aumid]);
 
   // SnoreToast no asigna IconLocation: el header del toast hereda el icono
-  // del .exe target (SnoreToast genérico). Fijamos el .ico estable del branding.
+  // del .exe target (SnoreToast genérico). Fijamos el .ico del branding.
   const lnk = readFileSync(lnkAbsolutePath);
-  const patched = patchIconLocation(lnk, buildStableIconLocation());
+  const patched = patchIconLocation(lnk, iconLocation);
   writeFileSync(lnkAbsolutePath, patched);
 }

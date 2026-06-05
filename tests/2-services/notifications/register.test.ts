@@ -1,7 +1,7 @@
 // Tests del helper de AUMID (register.ts): wrapper de `reg.exe` + instalación
 // del .lnk vía SnoreToast `--install` (mockeado).
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join, dirname } from 'path';
 
@@ -31,20 +31,13 @@ import {
   getIconIcoPath,
   getIconPngPath,
 } from '../../../src/2-services/notifications/register.js';
-import {
-  STABLE_ICON_PATH,
-  STABLE_PNG_PATH,
-  STABLE_EVENTS_DIR,
-  buildStableIconLocation,
-} from '../../../src/2-services/notifications/asset-paths.js';
-import { getRepoEventsDir } from '../../../src/2-services/notifications/event-image-paths.js';
 import { buildShortcutBytes } from '../../../src/2-services/notifications/lnk-format.js';
 
 const registeredState = () => ({
   exists: true,
   displayName: DISPLAY_NAME,
-  icon: STABLE_ICON_PATH,
-  iconUri: STABLE_PNG_PATH,
+  icon: getIconIcoPath(),
+  iconUri: getIconPngPath(),
   shortcutEngine: 'snoretoast',
 });
 
@@ -54,14 +47,8 @@ let expectedLnkPath: string;
 beforeEach(() => {
   tmpDir = mkdtempSync(join(tmpdir(), 'register-test-'));
   process.env['APPDATA'] = tmpDir;
-  process.env['LOCALAPPDATA'] = tmpDir;
   expectedLnkPath = getLnkPath();
   mkdirSync(dirname(expectedLnkPath), { recursive: true });
-  mkdirSync(dirname(STABLE_ICON_PATH), { recursive: true });
-  copyFileSync(getIconIcoPath(), STABLE_ICON_PATH);
-  if (existsSync(getIconPngPath())) {
-    copyFileSync(getIconPngPath(), STABLE_PNG_PATH);
-  }
 
   registryMock.readRegistry.mockReset();
   registryMock.writeRegistry.mockReset();
@@ -73,17 +60,19 @@ beforeEach(() => {
   registryMock.writeRegistry.mockResolvedValue(undefined);
   registryMock.deleteRegistry.mockResolvedValue(undefined);
   snoreToastMock.getSnoreToastPath.mockReturnValue('C:\\fake\\snoretoast-x64.exe');
-  snoreToastMock.installSnoreToastShortcut.mockImplementation(async (_name, _exe, _aumid, lnkPath) => {
-    writeFileSync(
-      lnkPath,
-      buildShortcutBytes({
-        target: 'C:\\fake\\snoretoast-x64.exe',
-        icon: buildStableIconLocation(),
-        name: 'AI Assistant',
-        aumid: 'AIAssistant.Proxy',
-      }),
-    );
-  });
+  snoreToastMock.installSnoreToastShortcut.mockImplementation(
+    async (_lnkFileName: string, targetExe: string, aumid: string, lnkPath: string, iconLocation: string) => {
+      writeFileSync(
+        lnkPath,
+        buildShortcutBytes({
+          target: targetExe,
+          icon: iconLocation,
+          name: _lnkFileName,
+          aumid,
+        }),
+      );
+    },
+  );
 
   vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
   vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
@@ -93,6 +82,7 @@ afterEach(() => {
   vi.restoreAllMocks();
   rmSync(tmpDir, { recursive: true, force: true });
   delete process.env['AI_ASSISTANT_AUMID'];
+  delete process.env['APPDATA'];
 });
 
 describe('isValidAumid', () => {
@@ -122,7 +112,7 @@ describe('installAction', () => {
       expectedLnkPath,
       buildShortcutBytes({
         target: 'C:\\fake\\snoretoast-x64.exe',
-        icon: buildStableIconLocation(),
+        icon: `${getIconIcoPath()},1`,
         name: 'AI Assistant',
         aumid: 'AIAssistant.Proxy',
       }),
@@ -151,18 +141,6 @@ describe('installAction', () => {
     expect(code).toBe(0);
     expect(snoreToastMock.installSnoreToastShortcut).toHaveBeenCalledTimes(1);
     expect(registryMock.writeRegistry).not.toHaveBeenCalled();
-  });
-
-  it('--install copia PNGs de events al cache estable', async () => {
-    registryMock.readRegistry.mockResolvedValue({ exists: false });
-    const repoEvents = getRepoEventsDir();
-    const stopSrc = join(repoEvents, 'stop.png');
-    if (!existsSync(stopSrc)) {
-      return;
-    }
-    const code = await installAction();
-    expect(code).toBe(0);
-    expect(existsSync(join(STABLE_EVENTS_DIR, 'stop.png'))).toBe(true);
   });
 
   it('falla con exit 1 si writeRegistry lanza', async () => {

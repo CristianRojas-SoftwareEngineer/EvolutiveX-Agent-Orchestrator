@@ -78,37 +78,29 @@ El catálogo SHALL exportar `EVENT_NOTIFICATION_PROFILES` y `getProfileForEvent(
 
 ### Requirement: Resolución de ruta de imagen por evento
 
-El sistema SHALL exponer `resolveEventImagePath(filename)` y `syncEventImageFromRepoIfStale(filename)` en `event-image-paths.ts` con prioridad de ruta:
+El sistema SHALL exponer `resolveEventImagePath(filename)` en `event-image-paths.ts`.
 
-1. `%LOCALAPPDATA%\AIAssistant\events\<filename>` (`STABLE_EVENTS_DIR`) si existe tras sincronización.
-2. `<repo-root>/assets/notifications/events/<filename>` si existe y no hay copia estable.
-3. `undefined` si ninguna existe.
+La función SHALL devolver `<repo-root>/assets/notifications/events/<filename>` si el archivo existe, o `undefined` si no existe.
 
-En `win32`, cuando exista el PNG en el repo, `resolveEventImagePath` SHALL invocar `syncEventImageFromRepoIfStale` antes de resolver: si el hash SHA-256 del repo difiere del cache estable, SHALL `copyFileSync` repo → cache.
+`syncEventImageFromRepoIfStale` SHALL eliminarse del módulo. No existe mecanismo de cache ni copia entre repo y LOCALAPPDATA: el repo es la fuente directa en runtime.
 
-#### Scenario: Prioridad cache ASCII-only en Windows
+#### Scenario: Devuelve la ruta del repo cuando el PNG existe
 
-- **GIVEN** existen ambos archivos: estable y repo, con contenido idéntico (mismo hash)
+- **GIVEN** existe `assets/notifications/events/stop.png` en el repo
 - **WHEN** se invoca `resolveEventImagePath('stop.png')`
-- **THEN** SHALL devolver la ruta bajo `%LOCALAPPDATA%\AIAssistant\events\stop.png`
+- **THEN** SHALL devolver la ruta absoluta a `assets/notifications/events/stop.png`
 
-#### Scenario: Repo y cache con hash distinto sincroniza al resolver
+#### Scenario: Devuelve `undefined` cuando el PNG no existe
 
-- **GIVEN** `process.platform === 'win32'`
-- **AND** existe `assets/notifications/events/stop.png` en el repo
-- **AND** existe `%LOCALAPPDATA%\AIAssistant\events\stop.png` con contenido distinto
+- **GIVEN** no existe ningún archivo `missing.png` en `assets/notifications/events/`
+- **WHEN** se invoca `resolveEventImagePath('missing.png')`
+- **THEN** SHALL devolver `undefined`
+
+#### Scenario: El comportamiento es idéntico en todas las plataformas
+
+- **GIVEN** `process.platform === 'win32'` o `'darwin'` o `'linux'`
 - **WHEN** se invoca `resolveEventImagePath('stop.png')`
-- **THEN** el contenido del cache estable SHALL igualar el del repo
-- **AND** SHALL devolver la ruta bajo `%LOCALAPPDATA%\AIAssistant\events\stop.png`
-
-#### Scenario: Solo existe en repo crea cache al sincronizar
-
-- **GIVEN** `process.platform === 'win32'`
-- **AND** existe el PNG en el repo
-- **AND** NO existe en el cache estable
-- **WHEN** se invoca `resolveEventImagePath` para ese archivo
-- **THEN** SHALL crearse la copia en el cache estable
-- **AND** SHALL devolver la ruta estable
+- **THEN** SHALL devolver la misma ruta del repo independientemente de la plataforma
 
 ---
 
@@ -162,19 +154,6 @@ La limitación de `LoopingAlarm7` en SnoreToast frente al loop BurntToast legacy
 - **WHEN** se invoca `resolveNotificationSound`
 - **THEN** SHALL devolver `true`
 - **AND** SHALL NOT devolver un string
-
----
-
-### Requirement: Copia de PNGs por evento en `register --install`
-
-El helper `register.ts` SHALL copiar `assets/notifications/events/*.png` a `%LOCALAPPDATA%\AIAssistant\events\` durante `--install` (idempotente por hash SHA-256). La idempotencia de `--install` SHALL incluir hashes de `events/`.
-
-#### Scenario: `--install` copia PNGs de events al cache estable
-
-- **GIVEN** `process.platform === 'win32'`
-- **AND** existen PNG en `assets/notifications/events/`
-- **WHEN** se ejecuta `register --install`
-- **THEN** SHALL existir `%LOCALAPPDATA%\AIAssistant\events\stop.png` (entre otros del catálogo)
 
 ---
 
@@ -322,6 +301,7 @@ El servicio SHALL NO incluir en `src/2-services/notifications/`:
 - subdirectorio `sound/` ni archivos `.wav` versionados
 - `windows-toast.ts` (sin registro SnoreToast/AUMID desde el adaptador)
 - acceso a `C:\AI\` desde el servicio
+- **`asset-paths.ts`** (abstracción eliminada en este change; no reintroducir)
 
 El servicio **SHALL** incluir `hook-payload-notification-message.ts` para derivar el **cuerpo** del toast desde el payload JSON de hooks cuando `--stdin-json` esté activo y exista formatter para el `eventKey` resuelto. Ese módulo sustituye la función de mensaje dinámico que cumplía `builders.ts` en el stack externo; **no** sustituye el catálogo para título, imagen ni sonido.
 
@@ -331,7 +311,7 @@ El directorio **MAY** incluir además módulos opcionales de **mantenimiento de 
 
 Los iconos de branding global SHALL vivir en `assets/notifications/ai-assistant.png` y `assets/notifications/ai-assistant.ico`. Las imágenes por evento SHALL vivir en `assets/notifications/events/*.png`.
 
-#### Scenario: Inventario incluye formatters de payload y excluye builders.ts
+#### Scenario: Inventario incluye formatters de payload, excluye builders.ts y asset-paths.ts
 
 - **GIVEN** el directorio `src/2-services/notifications/`
 - **WHEN** se enumeran archivos `.ts` en la raíz
@@ -339,6 +319,7 @@ Los iconos de branding global SHALL vivir en `assets/notifications/ai-assistant.
 - **AND** SHALL existir `toast-body-image-spec.ts`, `event-image-overlays.ts` y `event-notification-image.ts`
 - **AND** SHALL NOT existir `builders.ts`
 - **AND** SHALL NOT existir `config.ts`
+- **AND** SHALL NOT existir `asset-paths.ts`
 - **AND** SHALL NO existir subdirectorio `sound/`, ni `windows-toast.ts`
 - **AND** SHALL NO existir ningún archivo `.lnk` dentro de `src/`, ni `.json` de configuración, ni script `.ps1`
 
@@ -374,7 +355,7 @@ Cuando `--stdin-json` esté presente, el CLI SHALL leer `process.stdin` completo
 3. Si no → `profile.message` del catálogo para el `eventKey` resuelto.
 4. El CLI SHALL NOT concatenar `hook_event_name` y `session_id` como mensaje por defecto.
 
-Branding (`appId`, `icon`) y sonido SHALL seguir las reglas existentes (`resolveBranding`, `resolveEventSound`, overrides `--silent` / `--sound`). Cuando `--app-id` no se proporcione, el CLI SHALL aplicar el default `AIAssistant.Proxy`. Cuando `--icon` no se proporcione, el CLI SHALL resolver la imagen del catálogo para la clave de evento (vía `resolveEventImagePath`); si no hay perfil o el archivo no existe, SHALL aplicar el fallback `ai-assistant.png` (estable o repo); si tampoco existe, SHALL omitir `icon` (degradación con gracia).
+Branding (`appId`, `icon`) y sonido SHALL seguir las reglas existentes (`resolveBranding`, `resolveEventSound`, overrides `--silent` / `--sound`). Cuando `--app-id` no se proporcione, el CLI SHALL aplicar el default `AIAssistant.Proxy`. Cuando `--icon` no se proporcione, el CLI SHALL resolver la imagen del catálogo para la clave de evento (vía `resolveEventImagePath`); si no hay perfil o el archivo no existe, SHALL aplicar el fallback `ai-assistant.png` desde el repo; si tampoco existe, SHALL omitir `icon` (degradación con gracia).
 
 El CLI SHALL escribir un mensaje de error en `stderr` y terminar con código de salida 1 si el payload es inválido con `--stdin-json`, o si no puede derivarse un mensaje válido (sin `--message`, sin formatter aplicable y sin `profile.message`).
 
@@ -604,10 +585,10 @@ Los formatters SHALL ser funciones puras sin I/O. SHALL aplicar normalización d
 
 El sistema SHALL exponer un entry point `src/2-services/notifications/register.ts` que permita registrar, desregistrar y consultar el **AUMID** (Application User Model ID) de la app en Windows, para que las notificaciones firmadas por SnoreToast aparezcan con la marca "AI Assistant" en lugar de "SnoreToast". El helper SHALL ser invocable desde CLI con los subcomandos `--install`, `--uninstall` y `--status` (vía `commander`), SHALL ser **idempotente** (`--install` es no-op si el `.lnk` ya tiene el AUMID correcto; `--uninstall` es no-op si el `.lnk` no existe), y SHALL ser **no-op con mensaje informativo en macOS y Linux** (el AUMID es un concepto Windows-only; en Mac/Linux el branding se aplica vía `appName` en `node-notifier` y no requiere registro).
 
-El `.lnk` SHALL crearse en `%APPDATA%\Microsoft\Windows\Start Menu\Programs\AI Assistant.lnk` con las propiedades `AppUserModelID: "AIAssistant.Proxy"`, `DisplayName: "AI Assistant"`, `IconLocation: <STABLE_ICON_PATH>,1` (frame 32×32; ruta ASCII-only bajo `%LOCALAPPDATA%\AIAssistant\`, no la ruta del repo). El helper SHALL orquestar tres módulos:
+El `.lnk` SHALL crearse en `%APPDATA%\Microsoft\Windows\Start Menu\Programs\AI Assistant.lnk` con las propiedades `AppUserModelID: "AIAssistant.Proxy"`, `DisplayName: "AI Assistant"`, `IconLocation: <repo-icon-path>,1` donde `<repo-icon-path>` es la ruta absoluta a `assets/notifications/ai-assistant.ico` en el repo (frame 32×32; se usa la ruta del repo directamente, sin copia a LOCALAPPDATA). El helper SHALL orquestar tres módulos:
 
 - **`lnk-format.ts`** (TypeScript puro, bounds-checked, sin subprocess): generador `buildShortcutBytes` y parsers `parseAppUserModelId` / `parseIconLocation` que operan sobre el formato [MS-SHLLINK](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-shllink/) (Shell Link Binary File Format), usando el bloque `APP_USER_MODEL_ID` (signature `0xA0000005`, introducido en Windows 7) en los `ExtraData` del archivo. Expone también `patchIconLocation(bytes, location)` para reescribir el bloque `IconLocation` de un `.lnk` ya creado. Las operaciones de `Buffer` son bounds-checked por Node.js (no hay riesgo de buffer overflow).
-- **`snoretoast-shortcut.ts`** (orquestador de subprocess): encapsula el flujo `installSnoreToastShortcut(lnkFileName, targetExe, aumid, lnkPath)` que invoca `snoretoast-x64.exe -install` (binario vendor de `node-notifier`, localizado vía `getSnoreToastPath()`) para crear el `.lnk` con la metadata que Windows espera para AUMID custom (`IPropertyStore` con AUMID + `ToastActivatorCLSID`, registro del CLSID del activador en `HKCU`). Tras SnoreToast, parchea el `IconLocation` del `.lnk` con `patchIconLocation` para apuntar al `.ico` estable (SnoreToast no asigna `IconLocation`, así que el header del toast heredaría el icono de `snoretoast.exe` sin este parche).
+- **`snoretoast-shortcut.ts`** (orquestador de subprocess): encapsula el flujo `installSnoreToastShortcut(lnkFileName, targetExe, aumid, lnkPath, iconLocation)` que invoca `snoretoast-x64.exe -install` (binario vendor de `node-notifier`, localizado vía `getSnoreToastPath()`) para crear el `.lnk` con la metadata que Windows espera para AUMID custom (`IPropertyStore` con AUMID + `ToastActivatorCLSID`, registro del CLSID del activador en `HKCU`). Tras SnoreToast, parchea el `IconLocation` del `.lnk` con `patchIconLocation` para apuntar al `.ico` del repo (SnoreToast no asigna `IconLocation`, así que el header del toast heredaría el icono de `snoretoast.exe` sin este parche).
 - **`registry.ts`** (wrapper de `reg.exe`): expone `readRegistry(aumid)`, `writeRegistry(aumid, displayName, iconIcoPath, iconUriPath)` y `deleteRegistry(aumid)`. `reg.exe` es un binario built-in de Windows, NO PowerShell ni un lenguaje de scripting. Se invoca vía `child_process.execFile` (sin shell, args pasados directamente al binario). Las operaciones son idempotentes (`reg add ... /f`, `reg delete ... /f`).
 
 El target del `.lnk` es la propia ruta de `snoretoast-x64.exe` (mismo criterio que el README de SnoreToast: lo que importa para Windows es que el AUMID esté registrado y haya un target resoluble; el target no se ejecuta).
@@ -617,16 +598,14 @@ Adicionalmente, el helper SHALL registrar el AUMID en el registro de Windows par
 - Clave: `HKCU\Software\Classes\AppUserModelId\AIAssistant.Proxy`
 - Valores:
   - `DisplayName` (REG_SZ) = `"AI Assistant"`
-  - `Icon` (REG_EXPAND_SZ) = ruta ASCII-only del `.ico` (shell)
-  - `IconUri` (REG_SZ) = ruta al `.png` estable (logo del header del toast en WinRT)
+  - `Icon` (REG_EXPAND_SZ) = ruta al `.ico` del repo (ruta directa al repo sin copia a LOCALAPPDATA)
+  - `IconUri` (REG_SZ) = ruta al `.png` del repo (logo del header del toast en WinRT)
   - `IconBackgroundColor` (REG_SZ) = `0`
   - `ShowInSettings` (REG_DWORD) = `0`
   - `ShortcutEngine` (REG_SZ) = `"snoretoast"` — marca que identifica qué motor creó el `.lnk`; la idempotencia del registro exige que el valor actual coincida con `SHORTCUT_ENGINE_SNORETOAST` para considerar la clave "OK" y evitar falsos positivos al migrar de un motor de `.lnk` distinto.
 - Implementación: el helper SHALL invocar `reg.exe` (binario built-in de Windows, NO PowerShell, NO un lenguaje de scripting) vía `child_process.execFile` (sin shell, args pasados directamente al binario). El módulo `registry.ts` SHALL encapsular las tres operaciones: `readRegistry(aumid)`, `writeRegistry(aumid, displayName, iconIcoPath, iconUriPath)`, `deleteRegistry(aumid)`. Las invocaciones SHALL ser idempotentes (`reg add ... /f`, `reg delete ... /f`).
 
-**Directorio estable ASCII-only para assets:** la ruta del repo puede contener caracteres no-ASCII. El helper SHALL copiar los assets globales y cada `*.png` de `assets/notifications/events/` a `%LOCALAPPDATA%\AIAssistant\` y `%LOCALAPPDATA%\AIAssistant\events\` (`STABLE_EVENTS_DIR`) durante `--install`. La copia SHALL ser idempotente (hash SHA-256). El repo sigue siendo la fuente de verdad; `%LOCALAPPDATA%\AIAssistant\` es cache operativo.
-
-`--install` SHALL ser idempotente: si el `.lnk` (verificable vía `parseAppUserModelId` **y** `parseIconLocation` contra `<STABLE_ICON_PATH>,1`), la clave de registro (`Icon` + `IconUri` en rutas estables) y los binarios en `%LOCALAPPDATA%\AIAssistant\` coinciden con el repo (hash), SHALL ser no-op. La verificación de idempotencia es **granular**: si solo el `IconLocation` es obsoleto (p. ej. el `.lnk` apunta a la ruta del repo en vez de a `%LOCALAPPDATA%\AIAssistant\`), se reescribe el `.lnk` aunque el AUMID siga correcto. Si los assets del repo cambiaron, SHALL recopiar y refrescar registro + `.lnk` aunque las rutas sigan siendo las mismas. Si uno de los dos sitios está mal (p. ej. `IconLocation` obsoleto), SHALL reparar solo el que esté mal (granular). El CLI de notificaciones en Windows SHALL seguir pasando el `.png` estable a SnoreToast como `-p` (imagen del toast). `--uninstall` SHALL borrar ambos sitios (no-op si ya no existen). `--status` SHALL reportar el estado de ambos sitios: `registered` (ambos OK), `partially registered` (uno de los dos falta o es incorrecto), o `not registered` (ninguno).
+`--install` SHALL ser idempotente: si el `.lnk` (verificable vía `parseAppUserModelId` **y** `parseIconLocation` contra `<repo-icon-path>,1`) y la clave de registro (`Icon` + `IconUri` apuntando a las rutas del repo) coinciden con los valores esperados, SHALL ser no-op. La verificación de idempotencia es **granular**: si solo el `IconLocation` es obsoleto (p. ej. el `.lnk` apunta a la ruta de LOCALAPPDATA en vez de la del repo), se reescribe el `.lnk` aunque el AUMID siga correcto; si uno de los dos sitios está mal, SHALL reparar solo el que esté mal. `--uninstall` SHALL borrar ambos sitios (no-op si ya no existen). `--status` SHALL reportar el estado de ambos sitios: `registered` (ambos OK), `partially registered` (uno de los dos falta o es incorrecto), o `not registered` (ninguno).
 
 El AUMID SHALL validarse con la regex `/^[A-Za-z0-9.\-]{1,129}$/` (longitud máxima Windows y caracteres permitidos); AUMID inválido SHALL rechazarse con exit 1 y mensaje en `stderr`.
 
@@ -640,15 +619,15 @@ El helper SHALL ser invocable vía el script npm `npm run notifications:register
 - **THEN** SHALL crearse el `.lnk` en `%APPDATA%\Microsoft\Windows\Start Menu\Programs\AI Assistant.lnk`
 - **AND** SHALL tener `AppUserModelID = "AIAssistant.Proxy"`
 - **AND** SHALL tener `DisplayName = "AI Assistant"`
-- **AND** SHALL tener `IconLocation = <STABLE_ICON_PATH>,1`
+- **AND** SHALL tener `IconLocation = <repo-icon-path>,1` (ruta absoluta a `assets/notifications/ai-assistant.ico` en el repo)
 - **AND** SHALL terminar con código de salida 0
 
 #### Scenario: `register --install` es idempotente cuando el `.lnk` ya tiene el AUMID y el IconLocation correctos
 
 - **GIVEN** `process.platform === 'win32'`
-- **AND** el `.lnk` ya existe con `AppUserModelID = "AIAssistant.Proxy"` y `IconLocation = <STABLE_ICON_PATH>,1`
+- **AND** el `.lnk` ya existe con `AppUserModelID = "AIAssistant.Proxy"` y `IconLocation = <repo-icon-path>,1`
 - **WHEN** se ejecuta `register --install` (2ª vez)
-- **THEN** SHALL NO reescribirse el `.lnk` (el contenido es byte-idéntico al previo, `writeFileSync` no se invoca; `parseAppUserModelId` y `parseIconLocation` confirman que coinciden)
+- **THEN** SHALL NO reescribirse el `.lnk`
 - **AND** SHALL imprimirse un mensaje informativo indicando que ya está registrado
 - **AND** SHALL terminar con código de salida 0
 
@@ -669,15 +648,14 @@ El helper SHALL ser invocable vía el script npm `npm run notifications:register
 - **AND** SHALL terminar con código de salida 0
 - **AND** SHALL NO fallar silenciosamente: el archivo siempre termina en estado válido y consistente
 
-#### Scenario: `register --install` repara el `.lnk` cuando el `IconLocation` apunta a una ruta obsoleta
+#### Scenario: `register --install` repara el `.lnk` cuando el `IconLocation` apunta a una ruta obsoleta (LOCALAPPDATA)
 
 - **GIVEN** `process.platform === 'win32'`
 - **AND** el `.lnk` existe con `AppUserModelID = "AIAssistant.Proxy"` correcto
-- **AND** su `IconLocation` apunta a `<repo>/assets/notifications/ai-assistant.ico,0` (ruta con la "ó" de "Proyectos", NO a la ruta ASCII-only)
+- **AND** su `IconLocation` apunta a `%LOCALAPPDATA%\AIAssistant\ai-assistant.ico,1` (ruta obsoleta de cache)
 - **WHEN** se ejecuta `register --install`
-- **THEN** SHALL reescribirse el `.lnk` con `IconLocation = <STABLE_ICON_PATH>,1` (ruta ASCII-only bajo `%LOCALAPPDATA%\AIAssistant\`, frame 32×32)
+- **THEN** SHALL reescribirse el `.lnk` con `IconLocation = <repo-icon-path>,1`
 - **AND** SHALL terminar con código de salida 0
-- **AND** SHALL NO modificarse la clave de registro (su valor `Icon` ya apuntaba a la ruta correcta)
 
 #### Scenario: `register --uninstall` borra el `.lnk`
 

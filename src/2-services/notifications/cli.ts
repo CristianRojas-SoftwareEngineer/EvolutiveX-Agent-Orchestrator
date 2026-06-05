@@ -8,7 +8,6 @@ import { fileURLToPath } from 'url';
 import { resolve as resolvePath } from 'path';
 import { DesktopNotificationAdapter } from './DesktopNotificationAdapter.js';
 import type { NotificationEvent } from './types.js';
-import { STABLE_PNG_PATH } from './asset-paths.js';
 import {
   getProfileForEvent,
   NOTIFICATION_BRAND_TITLE,
@@ -32,15 +31,8 @@ const REPO_GLOBAL_PNG = resolvePath(
   'assets/notifications/ai-assistant.png',
 );
 
-/** Ruta al PNG global de marca (estable ASCII → repo). */
 export function resolveGlobalFallbackIconPath(): string | undefined {
-  if (existsSync(STABLE_PNG_PATH)) {
-    return STABLE_PNG_PATH;
-  }
-  if (existsSync(REPO_GLOBAL_PNG)) {
-    return REPO_GLOBAL_PNG;
-  }
-  return undefined;
+  return existsSync(REPO_GLOBAL_PNG) ? REPO_GLOBAL_PNG : undefined;
 }
 
 interface CliOptions {

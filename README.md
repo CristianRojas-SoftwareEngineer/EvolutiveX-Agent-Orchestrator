@@ -151,28 +151,27 @@ Personaliza el comportamiento ajustando estas variables en tu entorno o en un ar
 
 ### Configuración de hooks
 
-Para instalar las **14 entradas** de hooks de SCP en `~/.claude/settings.json` (user-level) con merge selectivo que preserva configs ajenas del usuario: `npm run setup:install -- --hooks`. Con `--dry-run` para previsualizar, `--force` para sobrescribir configs ajenas (con backup automático), `npm run setup:uninstall -- --hooks` para desinstalar solo los hooks de SCP. La plantilla canónica versionada vive en [`configs/hooks.json`](configs/hooks.json).
+Para instalar las **13 claves** de hooks de SCP en `~/.claude/settings.json` (user-level) con merge selectivo que preserva configs ajenas del usuario: `npm run setup:install -- --hooks`. Con `--dry-run` para previsualizar, `--force` para sobrescribir configs ajenas (con backup automático), `npm run setup:uninstall -- --hooks` para desinstalar solo los hooks de SCP. La plantilla canónica versionada vive en [`configs/hooks.json`](configs/hooks.json).
 
-Adicionalmente, el archivo `.claude/settings.json` del proyecto registra **14 entradas** de hooks de Claude Code (**8 del lifecycle** que alimentan al gateway, más **6 entradas de UX no-lifecycle** que solo emiten toast nativo), sobrescribiendo las entradas equivalentes del user-level (`C:\Users\Cristian\.claude\settings.json`) para esas claves (mecanismo de merge de Claude Code: el proyecto tiene precedencia). Las 14 entradas son:
+Adicionalmente, el archivo `.claude/settings.json` del proyecto registra **13 claves** de hooks de Claude Code (**8 del lifecycle** que alimentan al gateway, más **5 claves de UX no-lifecycle** que solo emiten toast nativo), sobrescribiendo las entradas equivalentes del user-level (`C:\Users\Cristian\.claude\settings.json`) para esas claves (mecanismo de merge de Claude Code: el proyecto tiene precedencia). Las 13 claves son:
 
 | Hook | Matcher | Comandos |
 | --- | --- | --- |
-| `UserPromptSubmit` | — | `post-hook-event.ts` + notificación (entry point del servicio migrado) |
-| `PreToolUse` | `*` | `post-hook-event.ts` |
-| `PreToolUse` | `AskUserQuestion` | notificación |
+| `UserPromptSubmit` | — | `gateway-hook-notify.ts` (`POST /hooks` + toast stdin) |
+| `PreToolUse` | `*` | `pre-tool-use-hook-ux.ts` (`POST /hooks` + toast condicional) |
 | `PostToolUse` | `*` | `post-hook-event.ts` |
 | `PostToolUseFailure` | — | `post-hook-event.ts` |
-| `SubagentStart` | — | `post-hook-event.ts` + notificación |
-| `SubagentStop` | — | `post-hook-event.ts` + notificación |
-| `Stop` | — | `stop-hook-ux.ts` (`POST /hooks` + toast único con mensaje de continuidad; ver abajo) |
-| `StopFailure` | — | `post-hook-event.ts` + notificación |
+| `SubagentStart` | — | `post-hook-event.ts` + notificación (mensaje fijo) |
+| `SubagentStop` | — | `post-hook-event.ts` + notificación (mensaje fijo) |
+| `Stop` | — | `stop-hook-ux.ts` (`POST /hooks` + toast de continuidad; ver abajo) |
+| `StopFailure` | — | `gateway-hook-notify.ts` (`POST /hooks` + toast stdin) |
 | `SessionStart` | `startup|resume` | notificación |
 | `SessionEnd` | — | notificación |
 | `PermissionRequest` | — | notificación |
 | `TaskCreated` | — | notificación |
 | `TaskCompleted` | — | notificación |
 
-Cada `POST /hooks` se invoca con `npx tsx scripting/post-hook-event.ts` (relay TypeScript que lee stdin y usa `ANTHROPIC_BASE_URL`; evita `curl` y `@-`, que PowerShell no interpreta como bash). La URL del proxy se resuelve vía la variable de entorno `ANTHROPIC_BASE_URL` (default `http://127.0.0.1:8787`), por lo que el comando no queda acoplado a un host:puerto literal. Los hooks **`UserPromptSubmit`**, **`SubagentStart`**, **`SubagentStop`** y **`StopFailure`** combinan `post-hook-event.ts` con un segundo comando al CLI de notificaciones (`src/2-services/notifications/cli.ts`). El hook **`Stop`** es una excepción: un único relay [`scripting/stop-hook-ux.ts`](scripting/stop-hook-ux.ts) lee stdin **una vez**, reenvía al gateway y emite un **toast único con mensaje de continuidad** (generado con Haiku a partir del contexto del workflow: qué se completó, qué está abierto, dirección del siguiente prompt). Varios comandos en paralelo sobre el mismo `Stop` vacían stdin en Windows; por eso no se usan handlers separados. El fragmento de `.claude/settings.json` del proyecto (gitignored) y el detalle operativo están en [`docs/notifications.md` § Hook Stop](docs/notifications.md#hook-stop-fin-de-turno-y-resumen-con-modelo). `PreToolUse` y `PostToolUse` con `matcher: "*"` no llevan notificación: los eventos de tool son demasiado frecuentes (5–50/turno) y un toast por invocación es ruido de UX; para notificar la pregunta interactiva se declara una **segunda entrada** bajo la misma clave `PreToolUse` con matcher `AskUserQuestion`. Las 6 entradas de UX (`SessionStart`, `SessionEnd`, `PermissionRequest`, `PreToolUse:AskUserQuestion`, `TaskCreated`, `TaskCompleted`) **no invocan** `POST /hooks`: el `AuditHookEventHandler` solo despacha los 8 `eventName` del lifecycle. Tabla canónica: [`docs/notifications.md`](docs/notifications.md) y [`docs/gateway-architecture.md` §18](docs/gateway-architecture.md#18-plano-c--hooks-claude-code).
+Los relays TypeScript leen stdin **una vez** (UTF-8) y usan `ANTHROPIC_BASE_URL` (default `http://127.0.0.1:8787`); evitan `curl` y `@-`, que PowerShell no interpreta como bash. **`UserPromptSubmit`** y **`StopFailure`** usan [`gateway-hook-notify.ts`](scripting/gateway-hook-notify.ts); **`PreToolUse`** usa [`pre-tool-use-hook-ux.ts`](scripting/pre-tool-use-hook-ux.ts) (toast solo en `AskUserQuestion`). **`Stop`** usa un único relay [`stop-hook-ux.ts`](scripting/stop-hook-ux.ts). **`SubagentStart`** / **`SubagentStop`** siguen con doble comando (el CLI usa mensaje fijo, sin `--stdin-json`, sin carrera por stdin). Varios procesos en paralelo leyendo el mismo stdin vacían el payload en Windows; por eso no se duplica `post-hook-event` + `cli --stdin-json` en esos hooks. Detalle: [`docs/notifications.md`](docs/notifications.md) y [`docs/gateway-architecture.md` §18](docs/gateway-architecture.md#18-plano-c--hooks-claude-code).
 
 ### Notifications
 

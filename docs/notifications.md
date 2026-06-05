@@ -4,7 +4,7 @@
 > `claude-code-hooks-implementation`. Reemplaza — funcionalmente — al
 > script externo `C:\AI\claude-code-notifications.ts`, que queda intacto
 > durante N1 como fallback y será marcado `@deprecated` en N2. La
-> cobertura actual de `.claude/settings.json` (14 entradas) usa este
+> cobertura actual de `.claude/settings.json` (13 claves) usa este
 > servicio para todas las notificaciones de UX desde el repositorio.
 
 ## Propósito
@@ -19,7 +19,7 @@ configuración externa, y no introduce dependencias Windows-specific.
 
 ## Instalación global (`~/.claude`)
 
-Para recibir toasts en **cualquier proyecto** (no solo Smart Code Proxy), registre los hooks en el perfil de usuario con el mismo patrón que el statusline (`npx --prefix` + `tsx`). Para instalar las **14 entradas** (lifecycle + UX) junto con statusline y voz en un único paso:
+Para recibir toasts en **cualquier proyecto** (no solo Smart Code Proxy), registre los hooks en el perfil de usuario con el mismo patrón que el statusline (`npx --prefix` + `tsx`). Para instalar las **13 claves** (lifecycle + UX) junto con statusline y voz en un único paso:
 
 ```bash
 npm run setup:install
@@ -570,16 +570,15 @@ Referencias: [Enable desktop toast with AppUserModelID](https://learn.microsoft.
 
 `C:\AI\claude-code-notifications.ts` está marcado como **`@deprecated`**
 con fecha de retirada prevista **2026-09-01**. A partir de la fase N2
-del roadmap `claude-code-hooks-implementation`, los hooks con doble
-comando en `.claude/settings.json` han dejado de invocarlo: el 2º
-comando de los **5 hooks de lifecycle con notificación**
-(`UserPromptSubmit`, `SubagentStart`, `SubagentStop`, `Stop`,
-`StopFailure`) apunta al entry point CLI del servicio migrado al
-repositorio, no al script externo. Las notificaciones de UX restantes
-(`SessionStart`, `SessionEnd`, `PermissionRequest`,
-`PreToolUse:AskUserQuestion`, `TaskCreated`, `TaskCompleted`) también
-apuntan al servicio migrado (ver "Notificaciones de UX no-lifecycle"
-más abajo).
+del roadmap `claude-code-hooks-implementation`, los hooks han dejado
+de invocarlo. Los relays con toast dinámico desde stdin
+(`UserPromptSubmit`, `StopFailure`, `PreToolUse` vía
+`gateway-hook-notify.ts` y `pre-tool-use-hook-ux.ts`; `Stop` vía
+`stop-hook-ux.ts`) y el CLI directo en `SubagentStart` / `SubagentStop`
+apuntan al servicio migrado en el repositorio. Las notificaciones de UX
+(`SessionStart`, `SessionEnd`, `PermissionRequest`, `TaskCreated`,
+`TaskCompleted`) también apuntan al servicio migrado (ver
+"Notificaciones de UX no-lifecycle" más abajo).
 
 **Ruta final del CLI** (relativa a la raíz del proyecto):
 
@@ -587,45 +586,53 @@ más abajo).
 ./node_modules/tsx/dist/cli.mjs ./src/2-services/notifications/cli.ts
 ```
 
-**Relay al gateway (`POST /hooks`):** en [`.claude/settings.json`](../.claude/settings.json) del proyecto, las 8 entradas del lifecycle usan `npx tsx scripting/post-hook-event.ts` ([`scripting/post-hook-event.ts`](../scripting/post-hook-event.ts)). Lee stdin (payload JSON del hook) y reenvía con `fetch` a `$ANTHROPIC_BASE_URL/hooks`. No usa `curl` ni `--data-binary @-` (sintaxis bash que **PowerShell** no interpreta). Instalación global con ruta absoluta: `buildGatewayHookRelayCommand` en [`scripting/shared/gateway-hook-command.ts`](../scripting/shared/gateway-hook-command.ts).
+**Relays al gateway (`POST /hooks`):** en [`.claude/settings.json`](../.claude/settings.json) del proyecto y en [`configs/hooks.json`](../configs/hooks.json) (plantilla canónica), los hooks de lifecycle usan relays TypeScript que leen stdin **una vez** (UTF-8) y reenvían con `fetch` a `$ANTHROPIC_BASE_URL/hooks` (sin `curl` ni `@-`, incompatible con PowerShell). Tipos de relay:
 
-**Comando canónico por hook (14 entradas: 8 del lifecycle + 6 de UX):**
+| Relay | Hooks | Rol |
+|---|---|---|
+| [`post-hook-event.ts`](../scripting/post-hook-event.ts) | `PostToolUse`, `PostToolUseFailure`, `SubagentStart`, `SubagentStop` (1.er comando) | Solo `POST /hooks` |
+| [`gateway-hook-notify.ts`](../scripting/gateway-hook-notify.ts) | `UserPromptSubmit`, `StopFailure` | `POST /hooks` + toast con `--stdin-json` |
+| [`pre-tool-use-hook-ux.ts`](../scripting/pre-tool-use-hook-ux.ts) | `PreToolUse` (`matcher: "*"`) | `POST /hooks` siempre; toast solo en `AskUserQuestion` |
+| [`stop-hook-ux.ts`](../scripting/stop-hook-ux.ts) | `Stop` | `POST /hooks` + toast de continuidad |
+
+Instalación global con ruta absoluta: builders en [`scripting/shared/gateway-hook-command.ts`](../scripting/shared/gateway-hook-command.ts).
+
+**Comando canónico por hook (13 claves: 8 del lifecycle + 5 de UX):**
 
 | Hook | Matcher | Comando(s) |
 |---|---|---|
-| `UserPromptSubmit` | — | `npx tsx scripting/post-hook-event.ts` + `node "./node_modules/tsx/dist/cli.mjs" "./src/2-services/notifications/cli.ts" --event-type UserPromptSubmit --stdin-json` |
-| `PreToolUse` | `*` | `npx tsx scripting/post-hook-event.ts` (sin notificación; ver justificación abajo) |
-| `PreToolUse` | `AskUserQuestion` | `node "./node_modules/tsx/dist/cli.mjs" "./src/2-services/notifications/cli.ts" --event-type PreToolUse --stdin-json` |
+| `UserPromptSubmit` | — | `npx tsx scripting/gateway-hook-notify.ts --event-type UserPromptSubmit` |
+| `PreToolUse` | `*` | `npx tsx scripting/pre-tool-use-hook-ux.ts` (`POST /hooks` + toast condicional; ver justificación abajo) |
 | `PostToolUse` | `*` | `npx tsx scripting/post-hook-event.ts` (sin notificación; ver justificación abajo) |
 | `PostToolUseFailure` | — | `npx tsx scripting/post-hook-event.ts` |
-| `SubagentStart` | — | `npx tsx scripting/post-hook-event.ts` + `node "./node_modules/tsx/dist/cli.mjs" "./src/2-services/notifications/cli.ts" --event-type SubagentStart` |
-| `SubagentStop` | — | `npx tsx scripting/post-hook-event.ts` + `node "./node_modules/tsx/dist/cli.mjs" "./src/2-services/notifications/cli.ts" --event-type SubagentStop` |
-| `Stop` | — | **Proyecto Smart Code Proxy:** un solo comando `stop-hook-ux.ts` (`POST /hooks` + 2 toasts + resumen Haiku). Ver [§ Hook Stop](#hook-stop-fin-de-turno-y-resumen-con-modelo). **Instalación global / genérica:** `post-hook-event.ts` + `cli.ts --event-type Stop --stdin-json` |
-| `StopFailure` | — | `npx tsx scripting/post-hook-event.ts` + `node "./node_modules/tsx/dist/cli.mjs" "./src/2-services/notifications/cli.ts" --event-type StopFailure --stdin-json` |
-| `SessionStart` | `startup|resume` | `node "./node_modules/tsx/dist/cli.mjs" "./src/2-services/notifications/cli.ts" --event-type SessionStart` |
-| `SessionEnd` | — | `node "./node_modules/tsx/dist/cli.mjs" "./src/2-services/notifications/cli.ts" --event-type SessionEnd` |
-| `PermissionRequest` | — | `node "./node_modules/tsx/dist/cli.mjs" "./src/2-services/notifications/cli.ts" --event-type PermissionRequest --stdin-json` |
-| `TaskCreated` | — | `node "./node_modules/tsx/dist/cli.mjs" "./src/2-services/notifications/cli.ts" --event-type TaskCreated` |
-| `TaskCompleted` | — | `node "./node_modules/tsx/dist/cli.mjs" "./src/2-services/notifications/cli.ts" --event-type TaskCompleted` |
+| `SubagentStart` | — | `npx tsx scripting/post-hook-event.ts` + `npx tsx src/2-services/notifications/cli.ts --event-type SubagentStart --message "Subagente iniciado"` |
+| `SubagentStop` | — | `npx tsx scripting/post-hook-event.ts` + `npx tsx src/2-services/notifications/cli.ts --event-type SubagentStop --message "Subagente terminado"` |
+| `Stop` | — | **Proyecto Smart Code Proxy:** un solo comando `stop-hook-ux.ts` (`POST /hooks` + toast de continuidad). Ver [§ Hook Stop](#hook-stop-fin-de-turno-y-resumen-con-modelo). **Instalación global / genérica:** `post-hook-event.ts` + `cli.ts --event-type Stop --stdin-json` |
+| `StopFailure` | — | `npx tsx scripting/gateway-hook-notify.ts --event-type StopFailure` |
+| `SessionStart` | `startup|resume` | `npx tsx src/2-services/notifications/cli.ts --event-type SessionStart --message "Sesión iniciada"` |
+| `SessionEnd` | — | `npx tsx src/2-services/notifications/cli.ts --event-type SessionEnd --message "Sesión finalizada"` |
+| `PermissionRequest` | — | `npx tsx src/2-services/notifications/cli.ts --event-type PermissionRequest --stdin-json` |
+| `TaskCreated` | — | `npx tsx src/2-services/notifications/cli.ts --event-type TaskCreated --message "Tarea creada"` |
+| `TaskCompleted` | — | `npx tsx src/2-services/notifications/cli.ts --event-type TaskCompleted --message "Tarea completada"` |
 
-**Justificación de `PreToolUse` / `PostToolUse` sin notificación:** los
+**Justificación de toast condicional en `PreToolUse` / sin toast en `PostToolUse`:** los
 eventos de tool tienen frecuencia alta (5–50 invocaciones por turno en
 sesiones largas). El gateway necesita `matcher: "*"` para correlacionar
 todas las tools, pero un toast por cada invocación es ruido de UX, no
-señal. La notificación se mantiene en las claves de lifecycle
+señal. `pre-tool-use-hook-ux.ts` emite toast solo cuando el formatter
+devuelve mensaje (p. ej. `AskUserQuestion` con `tool_input.questions`).
+La notificación en otras claves de lifecycle
 (`UserPromptSubmit`, `SubagentStart`, `SubagentStop`, `Stop`,
-`StopFailure`), donde un único toast por evento aporta valor (inicio
-del turno, spawn de subagente, cierre de subagente, cierre del turno,
-error de cierre). Para una notificación restringida a `PreToolUse:AskUserQuestion`
-se declara una **segunda entrada** bajo la misma clave `PreToolUse` con
-matcher específico (mecanismo nativo de Claude Code: una misma clave
-admite múltiples entradas con matchers distintos).
+`StopFailure`) usa relays de **stdin único** (`gateway-hook-notify`,
+`stop-hook-ux`) o doble comando sin competencia por stdin
+(`SubagentStart` / `SubagentStop`: el CLI no usa `--stdin-json`).
 
 ### Notificaciones de UX no-lifecycle
 
-Las 6 entradas `SessionStart`, `SessionEnd`, `PermissionRequest`,
-`PreToolUse:AskUserQuestion`, `TaskCreated` y `TaskCompleted` **no
-invocan** `POST /hooks`: el `AuditHookEventHandler` solo procesa los 8
+Las 5 claves de UX `SessionStart`, `SessionEnd`, `PermissionRequest`,
+`TaskCreated` y `TaskCompleted` **no invocan** `POST /hooks` (el toast
+de `PreToolUse` / `AskUserQuestion` lo cubre el relay lifecycle
+`pre-tool-use-hook-ux.ts`, no una entrada UX separada): el `AuditHookEventHandler` solo procesa los 8
 `eventName` del lifecycle (`UserPromptSubmit`, `PreToolUse`,
 `PostToolUse`, `PostToolUseFailure`, `SubagentStart`, `SubagentStop`,
 `Stop`, `StopFailure`); el resto cae en `default:` y se descarta.
@@ -666,8 +673,8 @@ desperdiciado.
 
 ### Override del user-level
 
-Las 6 entradas de UX (`SessionStart`, `SessionEnd`, `PermissionRequest`,
-`PreToolUse:AskUserQuestion`, `TaskCreated`, `TaskCompleted`) declaradas
+Las 5 claves de UX (`SessionStart`, `SessionEnd`, `PermissionRequest`,
+`TaskCreated`, `TaskCompleted`) declaradas
 en `.claude/settings.json` del proyecto **sobrescriben** las entradas
 equivalentes del user-level (`C:\Users\Cristian\.claude\settings.json`)
 para esas claves. Es la regla nativa de merge de Claude Code:
@@ -725,5 +732,5 @@ verdad del contrato del servicio y de las exclusiones de v1.
 
 `openspec/specs/hooks-lifecycle-correlation/spec.md` — fuente de
 verdad del contrato del `.claude/settings.json` del proyecto
-(8 entradas del lifecycle + 6 entradas de UX no-lifecycle = 14 entradas
+(8 claves del lifecycle + 5 claves de UX no-lifecycle = 13 claves
 totales).

@@ -1,8 +1,8 @@
 {
   "AUTH_METHOD": "oauth",
   "ANTHROPIC_BASE_URL": "https://api.anthropic.com",
-  "ANTHROPIC_DEFAULT_HAIKU_MODEL": "models/claude-haiku-4-5",
-  "ANTHROPIC_DEFAULT_SONNET_MODEL": "models/claude-sonnet-4-6",
-  "ANTHROPIC_DEFAULT_OPUS_MODEL": "models/claude-opus-4-6",
-  "CLAUDE_CODE_SUBAGENT_MODEL": "models/claude-sonnet-4-6"
+  "ANTHROPIC_DEFAULT_HAIKU_MODEL": "models/claude-haiku-4.5",
+  "ANTHROPIC_DEFAULT_SONNET_MODEL": "models/claude-sonnet-4.6",
+  "ANTHROPIC_DEFAULT_OPUS_MODEL": "models/claude-opus-4.8",
+  "CLAUDE_CODE_SUBAGENT_MODEL": "models/claude-sonnet-4.6"
 }

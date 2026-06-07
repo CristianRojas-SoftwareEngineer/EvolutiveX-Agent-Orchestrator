@@ -857,7 +857,7 @@ Perfective:  01→02→03(+explore)→04(múltiples)→05→06(completa)→07→
 Preventive:  01→02→03(high+explore)→04(múltiples)→05→06(extensa)→07→08(high)→09→[OpenSpec continue]→10
 ```
 
-(`low`/`medium`/`high`/`xhigh` = esfuerzo creciente; las secuencias muestran solo los
+(`low`/`medium`/`high` = esfuerzo creciente; las secuencias muestran solo los
 niveles relevantes por perfil; `+explore` = invocar `openspec-explore` como parte de la
 investigación SM)
 

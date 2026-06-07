@@ -266,6 +266,13 @@ que las fases `01..N-1` estén `done` antes de ejecutar la fase N, y se detiene 
    - lee `case.md` (perfil activo + su entrada de phase-policy + artefactos previos),
    - ejecuta su procedimiento genérico **modulado** por esa política,
    - escribe `NN-<phase>.md` (artefacto versionado) y marca la fase `done` en `case.md`.
+
+   **Bucle de refutación de hipótesis.** Si la fase **08 (análisis) refuta** la hipótesis activa, el
+   orquestador no avanza a la 09: marca los artefactos `04→08` de esa hipótesis como `superseded`
+   (incrementando versión) y **re-ejecuta desde la fase 04** con la siguiente hipótesis candidata de
+   `04-hypothesis.md`. Este bucle es **independiente del perfil** (cualquier hipótesis falsable puede
+   refutarse) y se repite hasta confirmar una hipótesis o agotar las candidatas —en cuyo caso la fase
+   09 emite un veredicto de "no resuelto". Es la **única excepción** al avance lineal `01→10`.
 4. **Consolidación.** Tras la fase 10, el orquestador agrega un veredicto al `case.md`. El **registro de
    casos** y el `CHANGELOG.md` **no se escriben aquí**: son estado **derivado** (del filesystem y de los
    commits respectivamente, §2.5.1). La fase 10 ejecuta el **generador on-demand** pasándole la entrada
@@ -296,7 +303,7 @@ procedimiento interno de la fase, ni la fase conoce qué perfil la invoca.
 | Campo de la política por fase | Significado | Consumido por la fase para… |
 |---|---|---|
 | `focus` | Qué priorizar en esta fase bajo este perfil | Enfocar el procedimiento |
-| `reasoning_effort` | Esfuerzo esperado (`low` / `medium` / `high` / `xhigh`) | Calibrar esfuerzo |
+| `reasoning_effort` | Esfuerzo esperado (`low` / `medium` / `high`) | Calibrar esfuerzo |
 | `evidence` | Tipo de evidencia que el perfil exige | Decidir qué recolectar |
 | `acceptance` | Criterio de aceptación de la salida de la fase | Validar el artefacto |
 | `risk_controls` | Controles de riesgo obligatorios | Aplicar guardas |
@@ -416,6 +423,9 @@ descubrir skills).
 
 CHANGELOG.md                             # transversal — DERIVADO de commits (generador on-demand, Keep a Changelog)
                                          # generado por la fase 10 con --pending; idempotente sin --pending
+
+scripting/                               # directorio de scripts del proyecto (ya existente)
+└── generate-changelog                  # generador on-demand del CHANGELOG (§12.14); ejecutado por la fase 10
 
 maintenance-cases/                       # capa 4 — evidencia (fuera de .claude/, versionable)
 └── <case-id>/
@@ -670,13 +680,14 @@ proyección sobre las fases (`influencia`, `evidencia priorizada`, `conclusiones
   falla primero; análisis→cierre + no-regresión.
 - **Evidencia priorizada:** test de reproducción (rojo→verde), stack traces, diff mínimo.
 - **Conclusiones favorecidas:** "causa raíz X corregida, verificada por test T, sin regresiones".
-- **Ciclo de iteración de hipótesis:** cuando el experimento refuta la hipótesis activa (el test no
-  reproduce el comportamiento esperado o el fix no cierra el fallo), se re-ejecutan las fases
-  04 → 08 con la hipótesis siguiente. Los artefactos de la hipótesis descartada pasan a
-  `status: superseded` y quedan versionados en el expediente; la historia completa de hipótesis
-  exploradas es parte de la evidencia. Este ciclo puede repetirse hasta que una hipótesis se
-  confirme o se descarte el enfoque. La complejidad de la investigación no acorta el proceso:
-  un bug no evidente requiere `modo Full` y puede justificar múltiples rondas.
+- **Ciclo de iteración de hipótesis (instancia del bucle general §3.3):** en corrective este bucle es
+  especialmente frecuente. Cuando la fase 08 refuta la hipótesis activa (el test no reproduce el
+  comportamiento esperado o el fix no cierra el fallo), el orquestador re-ejecuta las fases 04 → 08
+  con la hipótesis siguiente —mecanismo común a todos los perfiles (§3.3, §12.2)—. Los artefactos de
+  la hipótesis descartada pasan a `status: superseded` y quedan versionados en el expediente; la
+  historia completa de hipótesis exploradas es parte de la evidencia. Este ciclo puede repetirse hasta
+  que una hipótesis se confirme o se descarte el enfoque. La complejidad de la investigación no acorta
+  el proceso: un bug no evidente requiere `modo Full` y puede justificar múltiples rondas.
 
 ### 7.2 Adaptive (`sm-profile-adaptive`)
 - **Objetivo:** adaptar el software a un cambio externo (API, dependencia, plataforma, requisito,
@@ -1200,6 +1211,12 @@ in English. Canonical policy: ../artifact-structuring/SKILL.md §language_policy
    Mark the phase `done` and record artifact + version in the canonical YAML block. Stop and report
    if a phase fails its acceptance criterion. (Phase 03 reads MEMORY.md explicitly for recall; phase
    09 writes a lesson; phase 10 runs the changelog generator and drafts the commit with a `Case:` commit metadata (*trailer*).)
+
+   **Hypothesis refutation loop (only exception to linear order).** If phase 08 refutes the active
+   hypothesis, do NOT proceed to 09: mark the 04→08 artifacts of that hypothesis `superseded` (bump
+   version) and re-run from phase 04 with the next candidate hypothesis in 04-hypothesis.md. Repeat
+   until a hypothesis is confirmed or candidates are exhausted (then phase 09 records a "not resolved"
+   verdict). This loop is profile-independent.
 6. **Consolidate.** Read 09-conclusion.md (or the consolidated subsection); write the verdict into case.md.
    Confirm phase 09 wrote a lesson to .claude/memory/ (indexed in MEMORY.md). Do NOT write a case
    ledger — it is derived.
@@ -1248,7 +1265,7 @@ profile skill; profiles never read a phase skill.
 | Field | Type | Meaning |
 |-------|------|---------|
 | `focus` | string | What to prioritize in this phase under this profile |
-| `reasoning_effort` | enum `low\|medium\|high\|xhigh` | Effort/detail expected |
+| `reasoning_effort` | enum `low\|medium\|high` | Effort/detail expected |
 | `evidence` | string[] | Evidence types the profile requires this phase to produce/collect |
 | `acceptance` | string | Pass criterion for this phase's artifact |
 | `risk_controls` | string[] | Mandatory guards (e.g. sandbox, feature flag, rollback) |
@@ -1263,7 +1280,6 @@ the orchestrator.
 ```yaml
 # Inside the canonical state block in case.md:
 case_mode: full   # full | consolidated
-openspec_change: ""   # nombre del change de OpenSpec (Etapa B); vacío si no aplica
 
 phase_policy:
   observation:        { focus: "...", reasoning_effort: medium, evidence: [...], acceptance: "...", risk_controls: [...] }
@@ -1305,6 +1321,15 @@ Pick exactly one profile. If two fit, ask the user (Spanish) presenting the two 
 - "Optimize a broken thing" → corrective first (restore), perfective later (improve).
 - "Migrate and improve" → adaptive (compatibility is the gating concern).
 - "Audit because something failed" → corrective for the failure, preventive for the class.
+
+## Case mode (full vs consolidated) — set after picking the profile
+- **full** (default): one artifact per phase. Use whenever the cause/solution is not unequivocally
+  known up front, or the change is non-localized.
+- **consolidated**: phases write subsections inside case.md instead of separate files. Reserve for
+  trivial, fully localized cases whose location AND cause are unequivocal from observation (e.g. a
+  typo, renaming an internal symbol).
+- `corrective` defaults to **full**: a defect's cause is not known in advance and may need several
+  hypothesis rounds. Only fully localized, trivial corrective cases justify consolidated.
 ````
 
 ### 12.5 Referencia — `.claude/skills/sm-orchestrator/references/artifact-conventions.md`
@@ -1330,14 +1355,14 @@ timestamp: <ISO-8601 UTC>
 status: <pending|in_progress|done|superseded>
 inputs: [<prior artifacts>]
 produces: <this file>
-links: { previous: <file>, next: <file> }
+links: { previous: <file>, next: <file> }   # + previous_version: <file> on the new version when it supersedes a prior one
 ---
 ```
 
 ## Versioning
 - MINOR++ when re-running a phase on the same inputs (refinement).
 - MAJOR++ when upstream inputs changed (phase redone from scratch).
-- Superseded artifacts set `status: superseded` and link `links.previous_version`.
+- The superseded artifact sets `status: superseded`; the new version links back to it via `links.previous_version`.
 - Fine-grained history lives in git (one commit per phase recommended).
 
 ## Commit ↔ case link (metadato de commit)
@@ -1449,7 +1474,6 @@ verdict:                       # filled at consolidation
 
 ```yaml
 case_mode: full                # full | consolidated  (set by orchestrator at classification)
-openspec_change: ""            # nombre del change de OpenSpec; se llena al inicio de Etapa B; vacío si SM 09 no derivó en change
 
 phase_policy:
   observation:        { focus: "", reasoning_effort: medium, evidence: [], acceptance: "", risk_controls: [] }
@@ -1525,7 +1549,7 @@ timestamp: <ISO-8601 UTC>
 status: in_progress
 inputs: []
 produces: <NN-phase>.md
-links: { previous: , next: }
+links: { previous: , next: }   # add previous_version: <file> when this version supersedes a prior one
 ---
 
 # <Phase title> — <case_id>
@@ -2140,7 +2164,7 @@ ni `--amend`; solo escribe el archivo. La fase 10 lo invoca con `--pending`/`--c
 
 ````bash
 #!/usr/bin/env bash
-# scripts/generate-changelog — regenerate CHANGELOG.md from conventional commits (Keep a Changelog).
+# scripting/generate-changelog — regenerate CHANGELOG.md from conventional commits (Keep a Changelog).
 # Derived state: never hand-edit CHANGELOG.md. Single source of truth = git history.
 #
 # Usage:

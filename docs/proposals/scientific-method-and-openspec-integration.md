@@ -5,12 +5,14 @@
 > `.claude/skills/openspec-specialist/SKILL.md`.
 >
 > **Estado:** propuesta de diseño · **Versión:** v0.2
+> **Madurez de los sistemas:** OpenSpec está **completamente implementado** (skills activos en
+> `.claude/skills/openspec-*/`). SM es **solo una propuesta de diseño** — ningún skill `sm-*`
+> existe todavía. Este documento integra un sistema en producción con uno que aún está por
+> construir.
 > **Cambio estructural respecto a v0.1:** OpenSpec se invoca únicamente al cierre de la fase SM 09
 > (conclusión validada), nunca durante la experimentación. La incertidumbre y el ensayo y error
 > quedan contenidos dentro del proceso científico; OpenSpec formaliza e implementa cambios que ya
 > cuentan con validación previa por evidencia.
->
-> **Backup de v0.1:** `docs/proposals/scientific-method-and-openspec-integration.original.md`
 
 ---
 
@@ -138,7 +140,7 @@ sus 10 artefactos por fase y su carpeta `experiments/`. OpenSpec sigue usando
 | Especificación normativa del cambio validado | OpenSpec `specs/` (alimentado por SM 09) |
 | Ejecución estructurada y trazable | OpenSpec `apply` |
 | Verificación formal contra requisitos | OpenSpec `verify` |
-| Conclusión científica sobre el resultado del cambio | SM fase 09 (evalúa output de `verify`) |
+| Conclusión científica sobre el resultado del cambio | SM fase 10 (cierra `09-conclusion.md` con el veredicto final, incorporando output de `verify`) |
 | Cierre, changelog, lección y archivo del change | SM fase 10 + OpenSpec `sync` + `archive` |
 
 Notar el orden: la investigación SM va primero, sin OpenSpec. La formalización OpenSpec va después,
@@ -237,17 +239,22 @@ trazable y verificable?**
            │  • Veredicto final sobre la hipótesis                  │
            │  • Lección destilada → base de conocimiento             │
            │  • CHANGELOG.md (generador on-demand)                   │
-           │  • Commit unificado con doble trailer                  │
+           │  • Commit de cierre: `Case: <case-id>`                 │
+           │    (+ `OpenSpec-Change:` solo si archivado, ver §5.3)  │
            │                                                        │
            │  Output: veredicto + changelog + lección + commit      │
            └──────────────────────────────────────────────────────┘
 ```
 
-Hay **una sola frontera operativa** entre los dos sistemas: la entrega de la especificación
-validada al inicio del flujo OpenSpec. La frontera inferior no es entre sistemas sino entre dos
-fases del mismo sistema (OpenSpec verify → SM 10 comunicación). Esta arquitectura es más limpia
-que la v0.1, que tenía dos costuras (diagnóstico→planificación y verificación→conclusión) y
-mezclaba las responsabilidades en el medio.
+Hay **una sola frontera operativa principal** entre los dos sistemas: la entrega de la
+especificación validada al inicio del flujo OpenSpec. Esta frontera es **direccional para
+investigación** (SM → OpenSpec; el flujo no atraviesa la frontera al revés para re-investigar).
+Sí admite un **cruce de corrección acotado**: si `openspec-verify` revela que el error es de
+especificación (no de implementación), se vuelve a SM 09 para refinar el documento, no para
+re-investigar (ver §5.4). La frontera inferior no es entre sistemas sino entre dos fases del
+mismo sistema (OpenSpec verify → SM 10 comunicación). Esta arquitectura es más limpia que la
+v0.1, que tenía dos costuras (diagnóstico→planificación y verificación→conclusión) y mezclaba
+las responsabilidades en el medio.
 
 La frontera respeta el principio de responsabilidad única: SM no define requisitos normativos,
 OpenSpec no diagnostica causas. La "interfaz" entre ambos es un documento concreto — la
@@ -296,7 +303,7 @@ de implementación. Esta nota se mantiene desde v0.1 sin cambios.
 | `08-analysis.md` | — | Análisis comparativo interno; no alimenta specs directamente |
 | `09-conclusion.md` | `proposal.md` + `specs/` + `design.md` + `tasks.md` | **Fuente directa de los 4 artefactos OpenSpec** |
 | `10-communication.md` | post `openspec-sync` + `archive` | Cierre conjunto |
-| `case.md` | `.openspec.yaml` + metadatos del change | Ambos son el manifest del trabajo; conviven en paralelo |
+| `case.md` | `.openspec.yaml` + metadatos del change | Manifests paralelos pero **asimétricos**: `case.md` es la única fuente de verdad del estado del caso (validada por el orquestador SM); `.openspec.yaml` es metadata auxiliar del change de OpenSpec |
 | `experiments/*` | — | Artefactos de experimentación, efímeros, no se promueven |
 
 El cambio principal respecto a v0.1: **toda la alimentación de OpenSpec se concentra en SM 09**.
@@ -389,8 +396,10 @@ forma trazable y verificable.
    **`openspec-propose`** (o `openspec-ff`/`openspec-continue` según el modo) para crear el
    change. El nombre del change sigue la convención de §10.2 (típicamente idéntico al
    `case-id`).
-2. Los cuatro artefactos de OpenSpec se redactan alimentándose **exclusivamente** de la
-   especificación validada:
+2. Los cuatro artefactos de OpenSpec se redactan alimentándose **principalmente** de la
+   especificación validada. `proposal.md`, `specs/` y `tasks.md` se redactan exclusivamente
+   desde `09-conclusion.md`; `design.md` puede referenciar también `03-research.md` para
+   documentar las alternativas descartadas en la fase de investigación:
 
    | Artefacto OpenSpec | Fuente | Contenido clave |
    |---|---|---|
@@ -405,9 +414,12 @@ forma trazable y verificable.
      YAML canónico.
 4. **`openspec-apply`:** ejecuta `tasks.md` y deja el código en producción.
 5. **`openspec-verify`:** comprueba la implementación contra los artefactos OpenSpec, especialmente
-   `specs/`. El output de verify (CRITICAL/WARNING/SUGGESTION) se captura en
-   `07-data-collection.md` (actualización post-aplicación) y se reinterpreta en `08-analysis.md`
-   (análisis del resultado del cambio).
+   `specs/`. El output de verify (CRITICAL/WARNING/SUGGESTION) se captura como una
+   **re-ejecución** de `07-data-collection.md` (bump de versión MINOR) y se reinterpreta
+   como una re-ejecución de `08-analysis.md` (bump de versión MINOR), según la convención
+   de versionado de SM §8.4 (MINOR++ al re-ejecutar una fase sobre los mismos insumos
+   ampliados). El bloque `phases` del `case.md` marca ambas fases como `done` con la versión
+   actualizada.
 
 **Precondición para pasar a la Etapa C:** `openspec-verify` no emite CRITICALs, o los CRITICALs
 emitidos son aceptados por el usuario como fuera del alcance de este caso (en cuyo caso se
@@ -422,13 +434,24 @@ documentan explícitamente en `08-analysis.md`).
 1. El orquestador SM (o el usuario) ejecuta la fase 10 con la siguiente secuencia:
    - Cierra `08-analysis.md` y `09-conclusion.md` con el veredicto final sobre la hipótesis
      (confirmada, refutada parcialmente, refutada).
-   - Ejecuta **`openspec-sync`** para mergear los deltas en `openspec/specs/`.
-   - Ejecuta **`openspec-archive`** para mover el change a `openspec/changes/archive/`.
+   - **Si la hipótesis quedó confirmada** (la implementación cumple `specs/` y `openspec-verify`
+     no dejó CRITICALs pendientes, o los CRITICALs fueron aceptados como fuera de alcance):
+     - Ejecuta **`openspec-sync`** para mergear los deltas en `openspec/specs/`.
+     - Ejecuta **`openspec-archive`** para mover el change a `openspec/changes/archive/`.
+   - **Si la hipótesis quedó refutada** (la implementación no produjo el efecto esperado o
+     `openspec-verify` reportó CRITICALs no aceptados):
+     - Si `openspec-apply` ejecutó código en el repositorio, **revertir el apply con
+       `git revert`** antes de cerrar el caso. SM documenta la decisión; no ejecuta el revert
+       automáticamente (ver §11.2).
+     - Se omiten `openspec-sync` y `openspec-archive`. El change de OpenSpec queda como
+       artefacto histórico del intento; opcionalmente se elimina manualmente si se decide
+       que no aporta trazabilidad.
    - Ejecuta el **generador on-demand** con `--pending "<subject>" --case <id>` para
      actualizar `CHANGELOG.md`.
    - Escribe la **lección destilada** en `.claude/memory/<lesson-slug>.md` y la añade al
      índice `MEMORY.md`.
-   - Crea el **commit unificado** con trailers `Case: <case-id>` y `OpenSpec-Change: <name>`.
+   - Crea el **commit unificado** con trailers `Case: <case-id>` y, si el change fue archivado,
+     `OpenSpec-Change: <name>`.
 2. El expediente `maintenance-cases/<case-id>/` queda intacto como evidencia histórica del
    caso.
 3. La carpeta `experiments/` puede purgarse selectivamente (ver §6.4) si se decide que algunos
@@ -571,15 +594,16 @@ artefactos OpenSpec + specs actualizadas.
 Tipicamente una sola hipótesis, evidencia mínima.
 
 ```
-SM 01(lite) → 02(lite) → 03(skip) → 04(1 hipótesis) → 05(lite)
-          → 06(1 experimento breve) → 07(lite) → 08(lite)
+SM 01(low) → 02(low) → 03(skip) → 04(1 hipótesis) → 05(low)
+          → 06(1 experimento breve) → 07(low) → 08(low)
           → 09 (especificación validada mínima) → OpenSpec propose (ff)
-          → apply → verify → SM 10(lite) → OpenSpec sync + archive
+          → apply → verify → SM 10(low) → OpenSpec sync + archive
 ```
 
-**Diferencia clave respecto al Modo Completo:** SM opera en `case_mode: lite` (un único
-`case.md` con subsecciones por fase en lugar de 10 archivos independientes). La
-especificación validada (SM 09) puede ser breve pero sigue siendo el puente obligatorio con
+**Diferencia clave respecto al Modo Completo:** SM opera con dos dimensiones ortogonales:
+`case_mode: consolidated` (un único `case.md` con subsecciones por fase en lugar de 10 archivos
+independientes) y `reasoning_effort: low` por fase (artefactos breves; convención de §9.5). La
+especificación validada (SM 09) puede ser mínima pero sigue siendo el puente obligatorio con
 OpenSpec. La investigación se minimiza; la implementación se acelera.
 
 ### 7.3 Modo Solo SM (investigación sin cambio listo)
@@ -609,15 +633,16 @@ reportado con causa raíz conocida) y no se necesita diagnóstico ni experimenta
 OpenSpec propose → apply → verify → sync → archive
 ```
 
-Opcionalmente: al cierre, el generador on-demand de SM actualiza `CHANGELOG.md` y se registra
-una lección mínima en la base de conocimiento si el cambio reveló algo inesperado. No se crea
-un expediente SM completo.
+Opcionalmente: si el cambio reveló algo inesperado, la lección puede registrarse manualmente
+en `.claude/memory/`. **Limitación:** el generador de CHANGELOG y la escritura de lecciones
+son mecanismos de SM fase 10 y no están disponibles como operaciones autónomas sin un
+expediente SM (`--case <id>` no aplica). No se crea un expediente SM completo.
 
 ### 7.5 Matriz modo × perfil
 
 | Perfil | Modo primario | Modos aceptables | Notas |
 |---|---|---|---|
-| **Corrective** | Rápido | Solo OpenSpec (si la causa es trivial) | `case_mode: lite` por defecto; `openspec-ff` preferido |
+| **Corrective** | Rápido | Solo OpenSpec (si la causa es trivial) | `case_mode: consolidated` por defecto; `openspec-ff` preferido |
 | **Adaptive** | Completo o Rápido | Solo OpenSpec (raro) | Selección según complejidad del cambio externo |
 | **Perfective** | Completo | — | Investigación y comparación de alternativas son el valor |
 | **Preventive** | Completo | Solo SM (cuando se concluye "implementación diferida") | Profundidad máxima; suele requerir múltiples hipótesis |
@@ -663,11 +688,14 @@ repo/
 │
 ├── .claude/
 │   ├── skills/
-│   │   ├── sm-orchestrator/                # skills SM
+│   │   ├── sm-orchestrator/                # skills SM (diseño; no implementados aún)
 │   │   ├── sm-profile-*/
 │   │   ├── sm-phase-*/
-│   │   ├── openspec-specialist/            # skills OpenSpec
+│   │   ├── openspec-specialist/            # skills OpenSpec (implementados)
 │   │   ├── openspec-propose/
+│   │   ├── openspec-ff/                    # fast-forward: todos los artefactos en un paso
+│   │   ├── openspec-continue/              # paso a paso: siguiente artefacto en orden
+│   │   ├── openspec-explore/               # modo exploración: sin código, solo diseño
 │   │   ├── openspec-apply/
 │   │   ├── openspec-verify/
 │   │   ├── openspec-sync/
@@ -756,7 +784,7 @@ El perfil SM no solo modula cómo se ejecutan las fases del método científico:
 
 **Característica:** restauración rápida del servicio; diagnóstico mínimo.
 
-- **Modo primario:** Rápido (§7.2) con `case_mode: lite`.
+- **Modo primario:** Rápido (§7.2) con `case_mode: consolidated`.
 - **Hipótesis:** típicamente una sola (la corrección obvia).
 - **Experimentación:** verificación rápida (reproducir el bug, aplicar el fix, validar que no
   aparece). Artefactos en `experiments/fix-verification/`.
@@ -806,14 +834,14 @@ hay urgencia; el valor se acumula en el tiempo.
 ### 9.5 Secuencia compacta por perfil
 
 ```
-Corrective:  01(lite)→02(lite)→[04+02 fundidos]→05(lite)→06(1 breve)→07(lite)→08(lite)
-            →09→[OpenSpec ff]→10(lite)
+Corrective:  01(low)→02(low)→[04+02 fundidos]→05(low)→06(1 breve)→07(low)→08(low)
+            →09→[OpenSpec ff]→10(low)
 Adaptive:    01→02→03→04(1-3)→05→06→07→08→09→[OpenSpec ff/continue]→10
 Perfective:  01→02→03(+explore)→04(múltiples)→05→06(completa)→07→08→09→[OpenSpec continue]→10
-Preventive:  01→02→03(deep+explore)→04(múltiples)→05→06(extensa)→07→08(deep)→09→[OpenSpec continue]→10
+Preventive:  01→02→03(high+explore)→04(múltiples)→05→06(extensa)→07→08(high)→09→[OpenSpec continue]→10
 ```
 
-(`lite` = profundidad reducida; `deep` = máxima profundidad; `+explore` = invocar
+(`low` = esfuerzo mínimo; `high` = esfuerzo máximo; `+explore` = invocar
 `openspec-explore` como parte de la investigación SM)
 
 ---
@@ -871,8 +899,9 @@ Case: proxy-timeout-anthropic-2026-06
 OpenSpec-Change: proxy-timeout-anthropic-2026-06
 ```
 
-Los commits intermedios (Etapas A y B) llevan solo `Case: <case-id>`; el trailer
-`OpenSpec-Change` aparece recién cuando el change se abre formalmente (Etapa B).
+Los commits intermedios (Etapas A y B) llevan solo `Case: <case-id>`. El trailer
+`OpenSpec-Change:` aparece únicamente en el commit de cierre de Etapa C, y solo si el change fue
+archivado (ver §5.3 y regla 3 de §10.2).
 
 ---
 
@@ -921,8 +950,9 @@ Los commits intermedios (Etapas A y B) llevan solo `Case: <case-id>`; el trailer
 - **Versionado semántico automático** basado en el tipo de casos cerrados.
 - **Planificación multi-caso con dependencias cruzadas** entre cases SM y changes OpenSpec
   (este es terreno de `openspec-roadmap-manager`, no de este flujo).
-- **Orquestador maestro SM↔OpenSpec** (`sm-openspec-bridge` o similar). Se menciona en §12
-  como candidato futuro, sujeto a validación en casos reales antes de cualquier diseño
+- **Orquestador maestro SM↔OpenSpec** (`sm-openspec-bridge` o similar). Candidato para una
+  iteración futura de diseño una vez el flujo manual esté validado en al menos 3–5 casos
+  reales; no implementar en v0.2. Requiere aprobación explícita antes de cualquier diseño
   detallado.
 - **Limpieza automática de `experiments/`.** La decisión de qué conservar y qué descartar es
   humana, registrada en `10-communication.md`. No hay poda automática.
@@ -963,9 +993,9 @@ datos voluminosos) en `.claude/skills/sm-orchestrator/references/artifact-conven
 una referencia nueva. Sin convención, cada caso improvisará su propia organización.
 
 **6. Trailer `OpenSpec-Change` en commits**
-Extender la convención de commits para incluir `OpenSpec-Change: <name>` junto al trailer
-`Case: <case-id>` existente en commits de la Etapa B y C. Los commits de la Etapa A
-(experimentación) llevan solo `Case: <case-id>`.
+Extender la convención de commits para incluir `OpenSpec-Change: <name>` en el commit de cierre
+de Etapa C, y solo cuando el change haya sido archivado. Los commits de Etapas A y B llevan
+únicamente `Case: <case-id>`.
 
 **7. Validar el flujo en los próximos casos reales**
 Aplicar el Modo Completo (§7.1) en el próximo caso perfective o preventive, y el Modo
@@ -978,14 +1008,7 @@ de conocimiento SM. Las fricciones más probables son:
 - Dificultad para mantener la disciplina de la carpeta `experiments/` (mitigación: revisar
   periódicamente y podar).
 
-**8. Skill de integración `sm-openspec-bridge` (futuro, requiere aprobación explícita)**
-Una vez el flujo manual esté validado en al menos 3–5 casos reales, considerar un skill
-liviano que, dado un `case-id` con `09-conclusion.md` completo, automatice la creación del
-change en OpenSpec y la copia inicial de los 4 artefactos desde la especificación validada.
-Candidato para una segunda iteración de diseño; no implementar antes de validar el flujo
-manual.
-
-**9. Política de conservación de `experiments/`**
+**8. Política de conservación de `experiments/`**
 Definir y documentar una política por defecto para la retención de artefactos
 experimentales (p. ej. "todo lo que sustenta evidencia en 09-conclusion.md se conserva; el
 resto se descarta al cierre"). Esta política debe quedar en una referencia del orquestador

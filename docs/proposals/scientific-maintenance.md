@@ -145,7 +145,7 @@ orquestador conoce a ambos pero no implementa ninguno.
 Todo caso produce una **cadena auditable** de artefactos `01 → 10`, enlazada y versionada, más un
 `case.md` que actúa como índice del expediente. Cualquier conclusión es rastreable hasta la observación
 original y la evidencia que la sustenta. La trazabilidad es **bidireccional**: cada commit lleva el
-trailer `Case: <case-id>` (caso → commits) y cada entrada del changelog remite a su caso (changelog →
+metadato de commit (en la convención de Git: *trailer*) `Case: <case-id>` (caso → commits) y cada entrada del changelog remite a su caso (changelog →
 expediente). Esta cadena es sostenida **best-effort** por el orquestador (que verifica el orden y el
 estado antes de cada fase) y verificada por la validación obligatoria del esquema YAML; no es una
 garantía del runtime de Claude Code.
@@ -210,7 +210,7 @@ Cuerpo de los skills en inglés; interacción con el usuario en español (polít
 │                   └─ registro de casos ─ DERIVADO (no se edita a mano)    │
 │                                 ·                                         │
 │  TRANSVERSAL: CHANGELOG  CHANGELOG.md  ◄─ derivado de commits (on-demand) │
-│               trazabilidad bidireccional vía trailer `Case: <case-id>`    │
+│               trazabilidad bidireccional vía metadato de commit `Case: <case-id>`    │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -220,7 +220,7 @@ conocimiento** organizada bajo el patrón de memoria del subsistema —un aprend
 (Claude Code **no** carga `MEMORY.md` automáticamente; el recall es un paso explícito de la fase 03
 que lo lee); y (b) un **registro de casos derivado** del filesystem (`maintenance-cases/`) y del
 `CHANGELOG.md`, que **nunca** se mantiene a mano. El **changelog** es un *concern* transversal
-**derivado** de los commits convencionales (no es una capa que alguien edite), y el trailer `Case:`
+**derivado** de los commits convencionales (no es una capa que alguien edite), y el metadato de commit `Case:`
 cierra el enlace changelog↔expediente.
 
 ### 3.2 Por qué existe cada componente
@@ -387,7 +387,7 @@ descubrir skills).
 │   │   ├── references/
 │   │   │   ├── phase-policy-schema.md      # contrato perfil↔fase
 │   │   │   ├── classification-guide.md     # cómo elegir perfil
-│   │   │   ├── artifact-conventions.md     # nombres, frontmatter, versionado, trailer Case:
+│   │   │   ├── artifact-conventions.md     # nombres, frontmatter, versionado, metadato de commit Case:
 │   │   │   ├── knowledge-base.md           # esquema de lección + protocolo de recall
 │   │   │   └── changelog.md                # formato Keep a Changelog + derivación
 │   │   └── templates/
@@ -468,7 +468,7 @@ los 14 skills `sm-*`, pero deben existir antes de implementar el sistema:
 |---|---|
 | **Propósito** | Conducir un caso de mantenimiento de extremo a extremo. |
 | **Entradas** | Solicitud del usuario en lenguaje natural; opcionalmente un `case-id` para reanudar. |
-| **Salidas** | `case.md` actualizado, artefactos de las 10 fases (Full: 10 archivos `NN-*.md`; Consolidado: subsecciones en `case.md`), lección en la base de conocimiento, `CHANGELOG.md` actualizado, commit con trailer `Case:`, resumen al usuario. |
+| **Salidas** | `case.md` actualizado, artefactos de las 10 fases (Full: 10 archivos `NN-*.md`; Consolidado: subsecciones en `case.md`), lección en la base de conocimiento, `CHANGELOG.md` actualizado, commit con metadato de commit `Case:`, resumen al usuario. |
 | **Responsabilidades** | Generar `case-id`; clasificar perfil; crear/leer `case.md`; invocar perfil y fases en orden; consolidar. El registro de casos y el changelog son **derivados** (no los escribe). |
 | **NO hace** | Política de mantenimiento; procedimiento de fase. |
 | **Invoca** | 1 perfil + 10 fases. |
@@ -625,14 +625,14 @@ adapta según el perfil. La adaptación es **siempre** vía la `phase-policy mat
 - **Entradas:** `09` y la cadena completa.
 - **Salidas / artefacto:** `10-communication.md` — resumen ejecutivo, cambios, evidencia, riesgos,
   enlaces a artefactos; borrador de mensaje de commit/PR (en español, conventional commits del repo)
-  **con trailer `Case: <case-id>`**.
+  **con metadato de commit `Case: <case-id>`**.
 - **Changelog derivado:** esta fase **no redacta** el `CHANGELOG.md` a mano. Ejecuta el **generador
   on-demand** pasándole la entrada pendiente del caso actual (`--pending "<subject>" --case <id>`),
   de modo que `CHANGELOG.md` se actualiza e incluye en el mismo commit (sin `--amend`, sin commit
   extra). El changelog es estado derivado (§2.5.1); el generador también puede ejecutarse sin
   `--pending` para regenerar el archivo completo desde el `git log` (uso idempotente, p. ej. en CI).
 - **Validación:** autocontenida; enlaza evidencia; audiencia correcta; sin afirmaciones no soportadas;
-  el borrador de commit incluye el trailer `Case:`.
+  el borrador de commit incluye el metadato de commit `Case:`.
 - **Adaptación:** corrective enfatiza causa raíz y prueba de no-regresión; adaptive enfatiza
   compatibilidad y migración; perfective enfatiza el delta de métricas; preventive enfatiza el riesgo
   evitado y el residual.
@@ -793,13 +793,13 @@ links:
   `links.previous_version`. El historial fino lo aporta **git** (cada fase es un commit o parte de uno).
 
 #### 8.4.1 Enlace commit↔caso y derivación del changelog
-- **Trailer obligatorio.** Cada commit de un caso lleva el trailer `Case: <case-id>` en su pie (formato
-  de trailer de git). Esto cierra la trazabilidad **bidireccional**: del expediente a sus commits
+- **Metadato de commit obligatorio.** Cada commit de un caso lleva el metadato de commit `Case: <case-id>` en su pie (formato
+  de metadato de commit de git). Esto cierra la trazabilidad **bidireccional**: del expediente a sus commits
   (`git log --grep "Case: <case-id>"`) y de cada entrada del changelog a su expediente.
 - **Changelog derivado.** El `CHANGELOG.md` **no se edita a mano**: se **deriva** de los commits
   convencionales (fuente única de verdad) mediante el **generador on-demand** (§9.3), agrupando por tipo
   en formato Keep a Changelog. La fase 10 lo ejecuta con `--pending` e incluye el archivo en su commit.
-  El trailer `Case:` se preserva en cada entrada para el enlace inverso.
+  El metadato de commit `Case:` se preserva en cada entrada para el enlace inverso.
 - **Registro de casos derivado.** El índice de casos tampoco se persiste: se **deriva** del filesystem
   (`maintenance-cases/*/case.md`) y del `CHANGELOG.md` cuando se necesita (§9.2).
 
@@ -811,7 +811,7 @@ original (`01`). Una auditoría posterior puede:
 2. Seguir `links` fase a fase.
 3. Reproducir el experimento desde `05`/`06`.
 4. Derivar el registro de casos (filesystem + changelog) y consultar el `CHANGELOG.md` —y desde una
-   entrada, saltar al expediente vía el trailer `Case:`— para detectar patrones entre casos.
+   entrada, saltar al expediente vía el metadato de commit `Case:`— para detectar patrones entre casos.
 
 ---
 
@@ -850,7 +850,7 @@ filesystem (`maintenance-cases/*/case.md`: id, perfil, fecha, veredicto) y del `
 necesita un índice. Ver §9.2.
 
 **(c) `CLAUDE.md` del subsistema** — instrucciones persistentes: cómo se nombran los casos, política de
-rollback por defecto, no saltarse fases, "artefactos = fuente de verdad", trailer `Case:` obligatorio y
+rollback por defecto, no saltarse fases, "artefactos = fuente de verdad", metadato de commit `Case:` obligatorio y
 "changelog/registro = derivados".
 
 ### 9.2 Registro de casos (derivado)
@@ -858,7 +858,7 @@ rollback por defecto, no saltarse fases, "artefactos = fuente de verdad", traile
 El índice histórico de casos **no se persiste**; se **deriva** bajo demanda de dos fuentes ya existentes:
 
 - **Filesystem:** cada `maintenance-cases/<case-id>/case.md` aporta id, perfil, fecha y veredicto.
-- **Changelog:** `CHANGELOG.md` aporta los cambios publicados, enlazados al caso por el trailer `Case:`.
+- **Changelog:** `CHANGELOG.md` aporta los cambios publicados, enlazados al caso por el metadato de commit `Case:`.
 
 Derivarlo (en vez de mantener un ledger plano) elimina la divergencia entre el índice y la realidad: el
 registro **siempre** refleja el estado actual de los expedientes y de los commits. No hay un paso manual
@@ -868,7 +868,7 @@ de "actualizar el ledger" ni un hook que lo anexe.
 
 - **Fuente única de verdad:** los **commits convencionales** del repositorio (skill `conventional-commits`).
 - **Formato:** **Keep a Changelog**, agrupado por tipo de commit (`feat`, `fix`, `perf`, etc.), con cada
-  entrada conservando su trailer `Case: <case-id>` para el enlace inverso al expediente.
+  entrada conservando su metadato de commit `Case: <case-id>` para el enlace inverso al expediente.
 - **Mecanismo:** **generador on-demand** (sketch en §12.14). La fase 10 lo ejecuta pasándole la entrada
   pendiente del caso actual (`--pending "<subject>" --case <id>`); el generador actualiza `CHANGELOG.md`
   y la fase lo incluye en su commit normal (sin `--amend`, sin commit extra). Sin `--pending` el
@@ -879,7 +879,7 @@ de "actualizar el ledger" ni un hook que lo anexe.
 - **Rendimiento O(n):** no es un problema porque el generador se ejecuta raramente (on-demand, no en
   cada commit). Integraciones con semantic-release o generación automática de versiones están fuera del
   alcance deliberado de este diseño.
-- **Alcance:** `CHANGELOG.md` **global del proyecto** + trailer `Case:` en cada commit (enlace
+- **Alcance:** `CHANGELOG.md` **global del proyecto** + metadato de commit `Case:` en cada commit (enlace
   bidireccional changelog↔expediente).
 
 ### 9.4 Generador on-demand vs git hook para el changelog
@@ -934,7 +934,7 @@ subsecciones dentro de un único `case.md` en lugar de artefactos individuales.
 | 07 Datos | test rojo→verde; latencia p99 normalizada | `07-data-collection.md` |
 | 08 Análisis | hipótesis confirmada; sin regresiones en suite | `08-analysis.md` |
 | 09 Conclusión | aplicar fix; añadir test de carga al CI | `09-conclusion.md` |
-| 10 Comunicación | PR + commit `fix(auth): ...` con trailer `Case:` | `10-communication.md` |
+| 10 Comunicación | PR + commit `fix(auth): ...` con metadato de commit `Case:` | `10-communication.md` |
 
 - **Artefactos del caso:** `maintenance-cases/20260606-login-timeout/case.md` + `01..10-*.md`.
 - **Commit (fuente de verdad):**
@@ -982,7 +982,7 @@ Case: 20260606-login-timeout
 | 10 | PR `feat(payments): adaptar a API v2` + guía de migración | `10-communication.md` |
 
 - **Artefactos del caso:** `maintenance-cases/20260607-payments-api-v2/case.md` + `01..10-*.md`.
-- **Commit:** `feat(payments): adaptar a API v2 detrás de feature flag` con trailer
+- **Commit:** `feat(payments): adaptar a API v2 detrás de feature flag` con metadato de commit
   `Case: 20260607-payments-api-v2`.
 - **Changelog (derivado):** entrada en `### Added` con `(Case: 20260607-payments-api-v2)`.
 - **Lección (fase 09):** `.claude/memory/api-migration-behind-flag.md` con tags `component: payments`,
@@ -1010,7 +1010,7 @@ Case: 20260606-login-timeout
 | 10 | PR `perf(reports): batching de queries` con números | `10-communication.md` |
 
 - **Artefactos del caso:** `maintenance-cases/20260608-reports-latency/case.md` + `01..10-*.md`.
-- **Commit:** `perf(reports): batching de queries para reducir p95` con trailer
+- **Commit:** `perf(reports): batching de queries para reducir p95` con metadato de commit
   `Case: 20260608-reports-latency`.
 - **Changelog (derivado):** entrada en `### Changed` con `(Case: 20260608-reports-latency)`.
 - **Lección (fase 09):** `.claude/memory/n-plus-one-batching.md` con tags `component: reports`,
@@ -1038,7 +1038,7 @@ Case: 20260606-login-timeout
 | 10 | PR `fix(gateway): error boundary` + nota de riesgo residual | `10-communication.md` |
 
 - **Artefactos del caso:** `maintenance-cases/20260609-gateway-error-boundary/case.md` + `01..10-*.md`.
-- **Commit:** `fix(gateway): añadir error boundary para errores no manejados` con trailer
+- **Commit:** `fix(gateway): añadir error boundary para errores no manejados` con metadato de commit
   `Case: 20260609-gateway-error-boundary`.
 - **Changelog (derivado):** entrada en `### Fixed` con `(Case: 20260609-gateway-error-boundary)`.
 - **Lección (fase 09):** `.claude/memory/unhandled-rejection-boundary.md` con tags `component: gateway`,
@@ -1069,7 +1069,7 @@ Case: 20260606-login-timeout
    lo apruebe (§9.4).
 7. **Changelog derivado: generador on-demand.** Orden sugerido: (a) escribir el generador idempotente
    (sketch en §12.14) que produce `CHANGELOG.md` desde `git log` en formato Keep a Changelog, agrupando
-   por tipo, preservando el trailer `Case:` y aceptando `--pending`/`--case`; (b) la fase 10 lo ejecuta
+   por tipo, preservando el metadato de commit `Case:` y aceptando `--pending`/`--case`; (b) la fase 10 lo ejecuta
    con `--pending` e incluye `CHANGELOG.md` en su commit normal; (c) opcional: añadir un paso de CI que
    ejecute el generador sin `--pending` y verifique que el árbol queda limpio. El changelog nunca se
    edita a mano (§2.5.1, §9.3). Sin `--amend`, sin hook `post-commit`.
@@ -1080,7 +1080,7 @@ Case: 20260606-login-timeout
 9. **Sub-agents como evolución futura.** Si una fase (p. ej. investigación) se vuelve costosa en
    contexto, puede aislarse en un sub-agent **sin cambiar el contrato**: el orquestador seguiría leyendo
    el mismo artefacto. El diseño base no los necesita.
-10. **No saltarse fases.** Incluso en casos triviales, las fases pueden ejecutarse en modo `light`
+10. **No saltarse fases.** Incluso en casos triviales, las fases pueden ejecutarse en modo `lite`
    (`reasoning_effort: low`) produciendo artefactos breves, pero la cadena de trazabilidad se mantiene completa.
 
 ---
@@ -1123,12 +1123,12 @@ This repository runs software maintenance as reproducible scientific experiments
   does NOT load MEMORY.md automatically; phase 03 reads it as an explicit recall step. This CLAUDE.md
   references MEMORY.md so it enters context each session. Phase 09 writes lessons.
 - Case index is DERIVED from maintenance-cases/ and CHANGELOG.md — never a hand-kept ledger.
-- Every commit for a case carries the trailer `Case: <case-id>`. CHANGELOG.md is regenerated from
+- Every commit for a case carries the commit metadata (*trailer*) `Case: <case-id>`. CHANGELOG.md is regenerated from
   git log by the on-demand generator (Keep a Changelog). Phase 10 runs it. See references/changelog.md.
 
 ## Default policies
 - Default rollback for any experiment: revert the change / disable the feature flag.
-- On verdict: write a lesson (phase 09) and commit with the `Case:` trailer (phase 10). Do NOT edit
+- On verdict: write a lesson (phase 09) and commit with the `Case:` commit metadata (*trailer*) (phase 10). Do NOT edit
   the changelog or any case ledger by hand — both are derived.
 
 ## Memory index (explicit reference — MEMORY.md is not auto-loaded by the runtime)
@@ -1151,7 +1151,7 @@ description: >
   Drive a software maintenance case end-to-end as a scientific experiment: classify the case,
   select a maintenance profile and case mode (full/consolidated), run the ten scientific-method phases in
   order, produce phase artifacts (full: one file per phase; consolidated: subsections in case.md), consolidate
-  a verdict, distill a lesson, run the changelog generator, and commit with a `Case:` trailer
+  a verdict, distill a lesson, run the changelog generator, and commit with a `Case:` commit metadata (*trailer*)
   (the changelog and case index are derived, never hand-edited). Use
   when the user asks to maintain, fix a bug, correct a regression, optimize, refactor, migrate,
   upgrade a dependency, adapt to a new API/platform, harden, audit, or reduce risk. Also trigger
@@ -1188,7 +1188,7 @@ in English. Canonical policy: ../artifact-structuring/SKILL.md §language_policy
    artifact path; in consolidated mode, confirm the `## NN — <Phase>` subsection in case.md was written.
    Mark the phase `done` and record artifact + version in the canonical YAML block. Stop and report
    if a phase fails its acceptance criterion. (Phase 03 reads MEMORY.md explicitly for recall; phase
-   09 writes a lesson; phase 10 runs the changelog generator and drafts the commit with a `Case:` trailer.)
+   09 writes a lesson; phase 10 runs the changelog generator and drafts the commit with a `Case:` commit metadata (*trailer*).)
 6. **Consolidate.** Read 09-conclusion.md (or the consolidated subsection); write the verdict into case.md.
    Confirm phase 09 wrote a lesson to .claude/memory/ (indexed in MEMORY.md). Do NOT write a case
    ledger — it is derived.
@@ -1208,7 +1208,7 @@ experiment-execution → data-collection → analysis → conclusion → communi
 |------|--------------|
 | references/phase-policy-schema.md | The profile↔phase contract (always, before step 4) |
 | references/classification-guide.md | Choosing the profile (step 2) |
-| references/artifact-conventions.md | Naming, frontmatter, versioning, `Case:` trailer (steps 3–7) |
+| references/artifact-conventions.md | Naming, frontmatter, versioning, `Case:` commit metadata (*trailer*) (steps 3–7) |
 | references/knowledge-base.md | Lesson schema + recall protocol (steps 5–6) |
 | references/changelog.md | Keep a Changelog format + derivation from commits (step 7) |
 | templates/case.md | Manifest skeleton (step 3) |
@@ -1329,10 +1329,10 @@ links: { previous: <file>, next: <file> }
 - Superseded artifacts set `status: superseded` and link `links.previous_version`.
 - Fine-grained history lives in git (one commit per phase recommended).
 
-## Commit ↔ case link (trailer)
-- Every commit for a case ends with the git trailer `Case: <case-id>`.
+## Commit ↔ case link (metadato de commit)
+- Every commit for a case ends with the git commit metadata (*trailer*) `Case: <case-id>`.
 - This gives bidirectional traceability: case → commits (`git log --grep "Case: <case-id>"`) and
-  changelog entry → case (the trailer is preserved per entry).
+  changelog entry → case (the commit metadata (*trailer*) is preserved per entry).
 
 ## Derived state (do NOT hand-edit)
 - CHANGELOG.md is derived from conventional commits by the on-demand generator
@@ -1393,14 +1393,14 @@ repository's conventional commits (see the `conventional-commits` skill).
 ## Format
 - Keep a Changelog (https://keepachangelog.com), grouped by commit type:
   `feat → Added`, `fix → Fixed`, `perf → Changed`, `refactor → Changed`, `docs → Documentation`, etc.
-- Each entry preserves the `Case: <case-id>` trailer for the reverse link to the case file.
+- Each entry preserves the `Case: <case-id>` commit metadata (*trailer*) for the reverse link to the case file.
 
 ## Derivation mechanism
 - Generated by the **on-demand generator** (sketch: see §12.14 of the design doc). Phase 10 runs it
   with `--pending "<subject>" --case <id>` and includes CHANGELOG.md in its commit. No skill or phase
   hand-writes changelog entries. Without `--pending` the generator rebuilds the full file from `git log`
   (idempotent; suitable for CI sync-checks).
-- Scope: a single project-global CHANGELOG.md, plus the `Case:` trailer on every commit
+- Scope: a single project-global CHANGELOG.md, plus the `Case:` commit metadata (*trailer*) on every commit
   (bidirectional changelog ↔ case link).
 - Releases: if `vX.Y.Z` tags exist, entries are grouped under `## [X.Y.Z]` sections; commits after the
   latest tag appear under `## [Unreleased]`.
@@ -2064,15 +2064,15 @@ See ../artifact-structuring/SKILL.md §language_policy and the conventional-comm
 1. Read the policy entry.
 2. Summarize for the target audience: what changed, why, evidence, risks, links to artifacts.
 3. Draft the commit/PR message in Spanish following the repo's conventional-commits skill, ending with
-   the trailer `Case: <case-id>` (see ../sm-orchestrator/references/changelog.md).
+   the commit metadata (*trailer*) `Case: <case-id>` (see ../sm-orchestrator/references/changelog.md).
 
 ## Output
 Write `10-communication.md`: Applied policy, Executive summary, Changes, Evidence (links), Risks,
-Commit/PR draft (Spanish, with `Case:` trailer).
+Commit/PR draft (Spanish, with `Case:` commit metadata (*trailer*)).
 
 ## Acceptance
 Self-contained; links evidence; correct audience; no unsupported claims; commit draft carries the
-`Case:` trailer.
+`Case:` commit metadata (*trailer*).
 
 <constraints>Communicate; do not introduce new changes or conclusions. Run the changelog generator with the
 pending entry (`--pending "<subject>" --case <id>`) and include CHANGELOG.md in the commit. Never
@@ -2117,7 +2117,7 @@ Por ejemplo, para listar casos correctivos cerrados:
 for f in maintenance-cases/*/case.md; do
   grep -E '^(case_id|profile|verdict):' "$f"
 done
-# o, partiendo del changelog, saltar de una entrada a su expediente vía el trailer Case:
+# o, partiendo del changelog, saltar de una entrada a su expediente vía el metadato de commit Case:
 git log --grep '^Case: ' --pretty='%s %(trailers:key=Case,valueonly)'
 ````
 
@@ -2208,7 +2208,7 @@ emit_section() {
 } > "$OUT"
 ````
 
-> Esbozo de referencia. En producción conviene endurecer el parseo del tipo de commit y los trailers
+> Esbozo de referencia. En producción conviene endurecer el parseo del tipo de commit y los metadatos de commit
 > multi-línea. El rendimiento es O(n) en el número de commits, lo que no es un problema dado que el
 > generador se ejecuta raramente (on-demand desde la fase 10, no en cada commit).
 
@@ -2254,7 +2254,7 @@ decision (see project CLAUDE.md §6).
 > versionables (`maintenance-cases/<case-id>/`), la memoria en dos niveles (base de conocimiento con
 > patrón de índice `MEMORY.md` + registro de casos **derivado**; recall explícito en fase 03), el
 > changelog **derivado** por **generador on-demand** (ejecutado por la fase 10, sin git hook, sin
-> `--amend`) con trazabilidad bidireccional vía el trailer `Case:`, el bloque YAML canónico en `case.md`
+> `--amend`) con trazabilidad bidireccional vía el metadato de commit `Case:`, el bloque YAML canónico en `case.md`
 > como única fuente de estado machine-readable, los dos modos de salida (Full / Consolidado), las dependencias
 > externas explícitas (§4.4), y los límites del runtime documentados (§3.6), sin sub-agents y sin
 > duplicación de lógica. Rige el principio **estado derivado sobre estado duplicado** (§2.5.1). La

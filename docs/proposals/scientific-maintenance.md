@@ -670,6 +670,13 @@ proyección sobre las fases (`influencia`, `evidencia priorizada`, `conclusiones
   falla primero; análisis→cierre + no-regresión.
 - **Evidencia priorizada:** test de reproducción (rojo→verde), stack traces, diff mínimo.
 - **Conclusiones favorecidas:** "causa raíz X corregida, verificada por test T, sin regresiones".
+- **Ciclo de iteración de hipótesis:** cuando el experimento refuta la hipótesis activa (el test no
+  reproduce el comportamiento esperado o el fix no cierra el fallo), se re-ejecutan las fases
+  04 → 08 con la hipótesis siguiente. Los artefactos de la hipótesis descartada pasan a
+  `status: superseded` y quedan versionados en el expediente; la historia completa de hipótesis
+  exploradas es parte de la evidencia. Este ciclo puede repetirse hasta que una hipótesis se
+  confirme o se descarte el enfoque. La complejidad de la investigación no acorta el proceso:
+  un bug no evidente requiere `modo Full` y puede justificar múltiples rondas.
 
 ### 7.2 Adaptive (`sm-profile-adaptive`)
 - **Objetivo:** adaptar el software a un cambio externo (API, dependencia, plataforma, requisito,
@@ -913,9 +920,13 @@ usuario lo apruebe (§6 de `CLAUDE.md`).
 
 Cada ejemplo muestra: entrada inicial, perfil seleccionado, secuencia de fases, artefactos producidos y
 salida final esperada. Los cuatro ejemplos usan **modo Full** (los más representativos para documentar
-el flujo completo). Un caso trivial como *"corregir un typo en un mensaje de error"* usaría **modo
-Consolidado**: el orquestador clasificaría `corrective`, fijaría `case_mode: consolidated`, y las 10 fases escribirían
-subsecciones dentro de un único `case.md` en lugar de artefactos individuales.
+el flujo completo). Un caso trivial como *"renombrar una función interna cuyo nombre induce a
+confusión"* usaría **modo Consolidado**: el orquestador clasificaría `perfective`, fijaría
+`case_mode: consolidated`, y las 10 fases escribirían subsecciones dentro de un único `case.md`
+en lugar de artefactos individuales. El perfil `corrective` usa `modo Full` por defecto, porque la
+causa del fallo no se conoce de antemano y la investigación puede requerir múltiples rondas de
+hipótesis; solo casos correctivos completamente localizados y triviales (p. ej. un typo cuya
+ubicación y causa son inequívocas desde la observación) justifican `modo Consolidado`.
 
 ### 10.1 Caso Corrective
 

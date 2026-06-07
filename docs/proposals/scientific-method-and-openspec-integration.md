@@ -261,6 +261,25 @@ La frontera respeta el principio de responsabilidad única: SM no define requisi
 OpenSpec no diagnostica causas. La "interfaz" entre ambos es un documento concreto — la
 especificación validada producida por SM 09 — cuyo contenido se detalla en §4.3.
 
+**Nota — los dos sentidos de "invocar" y la regla canónica de la frontera.** A lo largo de este
+documento "invocar `openspec-*`" tiene dos sentidos que conviene distinguir para evitar
+contradicciones aparentes (p. ej. entre §5.3 y §11.2):
+
+1. **Automatización programática nueva a través de la frontera** (un skill puente que llame
+   `openspec-*` por su cuenta, un gatillo automático, sincronización de estado). Esto está
+   **prohibido** en v0.2 (ver §11.2 "sin orquestador maestro" y §11.3 `sm-openspec-bridge` "no
+   implementar").
+2. **El orquestador (el agente) carga y ejecuta un skill `openspec-*` en el mismo turno**,
+   siguiendo el flujo SM. Esto es **inevitable y permitido** en Claude Code: los skills no se
+   llaman entre sí, de modo que el agente es quien continúa el flujo.
+
+Regla canónica: **SM nunca crea automatización programática a través de la frontera; el orquestador
+(el agente) puede continuar a OpenSpec previa autorización del usuario en la frontera.** En v0.2 esa
+autorización es **siempre un checkpoint explícito** (el orquestador se detiene tras la fase 09,
+presenta la spec lista y el siguiente paso, y solo continúa con el OK del usuario). Pre-autorizar la
+pausa por perfil (p. ej. Rápido/corrective) es una optimización diferida a v0.3, coherente con §12.7
+("validar el flujo manual en 3–5 casos antes de automatizar").
+
 ---
 
 ## 4. Mapeo entre flujos
@@ -393,7 +412,15 @@ caso sigue la trayectoria de Modo Solo SM (ver §7.3) y no se abre ningún chang
 **Objetivo:** traducir la especificación validada de SM 09 en un change formal y ejecutarlo de
 forma trazable y verificable.
 
-1. El usuario (o, en una iteración futura, el skill `sm-openspec-bridge`) invoca
+**Quién conduce la Etapa B.** Toda la Etapa B —derivar los 4 artefactos OpenSpec desde
+`09-conclusion.md`, ejecutar `openspec-propose`/`apply`/`verify` y re-ejecutar `08-analysis.md` con
+el output de verify— la conduce el **orquestador SM** (el agente), **no** la fase 09 ni la fase 08.
+Las fases solo deben quedar re-ejecutables e idempotentes; el disparo y la ingesta los hace el
+orquestador. El cruce de la frontera requiere autorización del usuario: en v0.2, un **checkpoint
+explícito** tras la fase 09 (ver la nota de §3.3). Con esa autorización el orquestador continúa sin
+crear ninguna automatización programática nueva.
+
+1. El orquestador SM, **previa autorización del usuario en la frontera**, ejecuta
    **`openspec-propose`** (o `openspec-ff`/`openspec-continue` según el modo) para crear el
    change. El nombre del change sigue la convención de §10.2 (típicamente idéntico al
    `case-id`).
@@ -433,7 +460,9 @@ documentan explícitamente en `08-analysis.md`).
 
 **Objetivo:** cerrar el ciclo científico y archivar el change de OpenSpec de forma unificada.
 
-1. El orquestador SM (o el usuario) ejecuta la fase 10 con la siguiente secuencia:
+1. El orquestador SM, **previa autorización del usuario en la frontera**, ejecuta la fase 10 con la
+   siguiente secuencia (los pasos que cruzan a OpenSpec —`sync`/`archive`— quedan cubiertos por esa
+   misma autorización; el orquestador no crea automatización programática nueva, ver §3.3):
    - Cierra `08-analysis.md` y `09-conclusion.md` con el veredicto final sobre la hipótesis
      (confirmada, refutada parcialmente, refutada).
    - **Si la hipótesis quedó confirmada** (la implementación cumple `specs/` y `openspec-verify`
@@ -442,9 +471,9 @@ documentan explícitamente en `08-analysis.md`).
      - Ejecuta **`openspec-archive`** para mover el change a `openspec/changes/archive/`.
    - **Si la hipótesis quedó refutada** (la implementación no produjo el efecto esperado o
      `openspec-verify` reportó CRITICALs no aceptados):
-     - Si `openspec-apply` ejecutó código en el repositorio, **revertir el apply con
-       `git revert`** antes de cerrar el caso. SM documenta la decisión; no ejecuta el revert
-       automáticamente (ver §11.2).
+     - Si `openspec-apply` ejecutó código en el repositorio, el caso documenta el **`git revert`
+       del apply** como paso de cierre, pero **lo ejecuta el usuario**: SM documenta, no ejecuta
+       (ver §11.2). No se trata de un rollback automático.
      - Se omiten `openspec-sync` y `openspec-archive`. El change de OpenSpec queda como
        artefacto histórico del intento; opcionalmente se elimina manualmente si se decide
        que no aporta trazabilidad.
@@ -915,8 +944,8 @@ Experimento validado: la hipótesis de que el timeout de 30s era insuficiente
 para modelos de alta latencia se confirmó tras benchmarks con p95 y p99.
 Se ajustó a 90s con retry exponencial.
 
-Case: proxy-timeout-anthropic-2026-06
-OpenSpec-Change: proxy-timeout-anthropic-2026-06
+Case: 20260601-proxy-timeout-anthropic
+OpenSpec-Change: 20260601-proxy-timeout-anthropic
 ```
 
 Los commits intermedios (Etapas A y B) llevan solo `Case: <case-id>`. El metadato de commit
@@ -997,9 +1026,12 @@ Añadir `openspec_change: ""` al bloque YAML canónico de
 el change en OpenSpec; queda vacío en Modo Solo SM.
 
 **3. Sección `## Contexto SM` en `proposal.md`**
-Añadir en `openspec/config.yaml`, bajo `rules.proposal`, una instrucción que solicite incluir
-la sección `## Contexto SM` con `case_id` y ruta al expediente cuando el change tenga un case
-SM asociado. Si no hay case SM, la sección se omite.
+En v0.2 la sección `## Contexto SM` (con `case_id` y ruta al expediente) la escribe **el
+orquestador SM** al derivar `proposal.md` desde `09-conclusion.md`, en la Etapa B (lado SM). No se
+toca la configuración de OpenSpec en esta fase. El enfoque alternativo —añadir la instrucción en
+`openspec/config.yaml` bajo `rules.proposal` para que OpenSpec la solicite por su cuenta— queda como
+**optimización futura fuera de alcance** (acopla los dos sistemas a través de la config de OpenSpec).
+Si no hay case SM asociado, la sección se omite.
 
 **4. Estructura de la especificación validada (nuevo artefacto)**
 Documentar y/o formalizar la estructura de `09-conclusion.md` propuesta en §4.3 como plantilla

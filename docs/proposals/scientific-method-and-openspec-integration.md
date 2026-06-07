@@ -481,7 +481,7 @@ documentan explícitamente en `08-analysis.md`).
      actualizar `CHANGELOG.md`.
    - Escribe la **lección destilada** en `.claude/memory/<lesson-slug>.md` y la añade al
      índice `MEMORY.md`.
-   - Crea el **commit unificado** con metadatos de commit (en la convención de Git: *trailers*) `Case: <case-id>` y, si el change fue archivado,
+   - Crea el **commit unificado** con metadatos de commit (en la convención de Git: *metadatos de commit*) `Case: <case-id>` y, si el change fue archivado,
      `OpenSpec-Change: <name>`.
 2. El expediente `maintenance-cases/<case-id>/` queda intacto como evidencia histórica del
    caso.
@@ -586,7 +586,7 @@ artefactos dentro son autoexplicativos y están versionados junto con el resto d
 - **Scripts y datos pequeños** (algunos cientos de líneas/KB): van directamente a
   `experiments/hypothesis-X/`.
 - **Implementaciones más grandes** (más de unos cientos de líneas): se sugiere usar una **rama
-  git throwaway** con nombre `exp/<case-id>/hypothesis-X`. Los commits llevan el metadato de commit
+  git throwaway** con nombre `exp/<case-id>/hypothesis-X`. Los commits llevan los metadatos de commit
   `Case: <case-id>` pero no se mergean; la rama queda en el historial como referencia. Al
   cerrar el caso, la decisión de borrar o conservar la rama se documenta en
   `09-conclusion.md`.
@@ -922,10 +922,10 @@ el caso al change y desde el change al caso.
    del change en OpenSpec. Si el caso es Modo Solo SM, este campo queda vacío.
 2. `proposal.md` de OpenSpec incluye una sección `## Contexto SM` con el `case-id` y ruta al
    expediente. Si el change es Modo Solo OpenSpec, esta sección queda vacía o se omite.
-3. Todo commit producido durante la Etapa B (OpenSpec) lleva el metadato de commit `Case: <case-id>`. Los
+3. Todo commit producido durante la Etapa B (OpenSpec) lleva los metadatos de commit `Case: <case-id>`. Los
    commits de la Etapa A (experimentación) llevan solo `Case: <case-id>` (sin OpenSpec-Change,
    porque todavía no hay change).
-4. El metadato de commit `OpenSpec-Change: <name>` aparece únicamente en el commit de cierre de Etapa C, y
+4. Los metadatos de commit `OpenSpec-Change: <name>` aparecen únicamente en el commit de cierre de Etapa C, y
    solo si el change fue archivado (hipótesis confirmada → `openspec-archive`). Ningún commit de
    Etapas A o B lo lleva (ver §5.3 y §10.3).
 5. La entrada del changelog generada por SM fase 10 referencia tanto el `case-id` como el nombre
@@ -948,8 +948,8 @@ Case: 20260601-proxy-timeout-anthropic
 OpenSpec-Change: 20260601-proxy-timeout-anthropic
 ```
 
-Los commits intermedios (Etapas A y B) llevan solo `Case: <case-id>`. El metadato de commit
-`OpenSpec-Change:` aparece únicamente en el commit de cierre de Etapa C, y solo si el change fue
+Los commits intermedios (Etapas A y B) llevan solo `Case: <case-id>`. Los metadatos de commit
+`OpenSpec-Change:` aparecen únicamente en el commit de cierre de Etapa C, y solo si el change fue
 archivado (ver §5.3 y reglas 3 y 4 de §10.2).
 
 ---
@@ -1045,7 +1045,7 @@ Documentar la convención de §6 (organización por hipótesis, scripts/datos, r
 datos voluminosos) en `.claude/skills/sm-orchestrator/references/artifact-conventions.md` o en
 una referencia nueva. Sin convención, cada caso improvisará su propia organización.
 
-**6. Metadato de commit `OpenSpec-Change` en commits**
+**6. Metadatos de commit `OpenSpec-Change` en commits**
 Extender la convención de commits para incluir `OpenSpec-Change: <name>` en el commit de cierre
 de Etapa C, y solo cuando el change haya sido archivado. Los commits de Etapas A y B llevan
 únicamente `Case: <case-id>`.

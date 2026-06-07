@@ -594,7 +594,7 @@ artefactos OpenSpec + specs actualizadas.
 Tipicamente una sola hipótesis, evidencia mínima.
 
 ```
-SM 01(low) → 02(low) → 03(skip) → 04(1 hipótesis) → 05(low)
+SM 01(low) → 02(low) → 03(low) → 04(1 hipótesis) → 05(low)
           → 06(1 experimento breve) → 07(low) → 08(low)
           → 09 (especificación validada mínima) → OpenSpec propose (ff)
           → apply → verify → SM 10(low) → OpenSpec sync + archive

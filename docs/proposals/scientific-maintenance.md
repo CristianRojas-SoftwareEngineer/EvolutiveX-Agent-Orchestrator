@@ -1252,6 +1252,7 @@ the orchestrator.
 ```yaml
 # Inside the canonical state block in case.md:
 case_mode: full   # full | consolidated
+openspec_change: ""   # nombre del change de OpenSpec (Etapa B); vacío si no aplica
 
 phase_policy:
   observation:        { focus: "...", reasoning_effort: medium, evidence: [...], acceptance: "...", risk_controls: [...] }
@@ -1437,6 +1438,7 @@ verdict:                       # filled at consolidation
 
 ```yaml
 case_mode: full                # full | consolidated  (set by orchestrator at classification)
+openspec_change: ""            # nombre del change de OpenSpec; se llena al inicio de Etapa B; vacío si SM 09 no derivó en change
 
 phase_policy:
   observation:        { focus: "", reasoning_effort: medium, evidence: [], acceptance: "", risk_controls: [] }

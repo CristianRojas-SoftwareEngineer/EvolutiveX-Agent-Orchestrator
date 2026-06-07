@@ -103,7 +103,8 @@ Esta separación tiene tres consecuencias directas:
 La integración preserva los contratos internos de ambos sistemas: SM sigue usando su `case.md`,
 sus 10 artefactos por fase y su carpeta `experiments/`. OpenSpec sigue usando
 `openspec/changes/<name>/` con sus cuatro artefactos canónicos. El puente entre ambos es **un
-único corte** entre SM 09 y `openspec-propose`.
+único corte de ida** entre SM 09 y `openspec-propose`; el flujo solo lo cruza de vuelta para un
+caso acotado de corrección de especificación (§5.4), nunca para re-investigar.
 
 ---
 
@@ -149,7 +150,7 @@ sobre la base de una especificación validada. El cierre es conjunto.
 ### 2.3 Por qué OpenSpec va al final, no en el medio
 
 En la versión v0.1 de este documento, OpenSpec aparecía en el medio del flujo: las fases SM 06–08
-( ejecución del experimento, recolección de datos, análisis) se trataban como sinónimos de
+(ejecución del experimento, recolección de datos, análisis) se trataban como sinónimos de
 `openspec-apply`, `openspec-verify` y "análisis post-verify". Esa equivalencia tenía tres
 problemas:
 
@@ -206,12 +207,12 @@ trazable y verificable?**
 
 ```
            ┌──────────────────────────────────────────────────────┐
-           │  INVESTIGACIÓN Y VALIDACIÓN (SM phases 01–09)         │
+           │  INVESTIGACIÓN Y VALIDACIÓN (SM phases 01–09)          │
            │                                                        │
-           │  • Observar · Definir · Investigar · Hipotetizar      │
-           │  • Experimentar · Medir · Analizar · Comparar         │
-           │  • Descartar alternativas inviables                   │
-           │  • Seleccionar cambio ganador con evidencia           │
+           │  • Observar · Definir · Investigar · Hipotetizar       │
+           │  • Experimentar · Medir · Analizar · Comparar          │
+           │  • Descartar alternativas inviables                    │
+           │  • Seleccionar cambio ganador con evidencia            │
            │                                                        │
            │  Output: 09-conclusion.md + especificación validada    │
            │          + expediente completo del caso                │
@@ -240,7 +241,7 @@ trazable y verificable?**
            │  • Lección destilada → base de conocimiento            │
            │  • CHANGELOG.md (generador on-demand)                  │
            │  • Commit de cierre: `Case: <case-id>`                 │
-           │    (+ `OpenSpec-Change:` solo si archivado, ver §5.3) │
+           │    (+ `OpenSpec-Change:` solo si archivado, ver §5.3)  │
            │                                                        │
            │  Output: veredicto + changelog + lección + commit      │
            └──────────────────────────────────────────────────────┘
@@ -300,7 +301,7 @@ de implementación. Esta nota se mantiene desde v0.1 sin cambios.
 | `05-experiment-design.md` | — | Idem; planificación experimental |
 | `06-experiment-execution.md` | — | **No** equivalente a `openspec-apply`; es ejecución experimental |
 | `07-data-collection.md` | — | **No** equivalente a `openspec-verify`; son datos crudos |
-| `08-analysis.md` | — | Análisis comparativo interno; no alimenta specs directamente |
+| `08-analysis.md` | — | Análisis comparativo interno; no alimenta specs directamente. Recibe (no aporta) el output de `openspec-verify` en Etapa B (ver §5.2) |
 | `09-conclusion.md` | `proposal.md` + `specs/` + `design.md` + `tasks.md` | **Fuente directa de los 4 artefactos OpenSpec** |
 | `10-communication.md` | post `openspec-sync` + `archive` | Cierre conjunto |
 | `case.md` | `.openspec.yaml` + metadatos del change | Manifests paralelos pero **asimétricos**: `case.md` es la única fuente de verdad del estado del caso (validada por el orquestador SM); `.openspec.yaml` es metadata auxiliar del change de OpenSpec |
@@ -895,9 +896,12 @@ el caso al change y desde el change al caso.
 3. Todo commit producido durante la Etapa B (OpenSpec) lleva el trailer `Case: <case-id>`. Los
    commits de la Etapa A (experimentación) llevan solo `Case: <case-id>` (sin OpenSpec-Change,
    porque todavía no hay change).
-4. La entrada del changelog generada por SM fase 10 referencia tanto el `case-id` como el nombre
+4. El trailer `OpenSpec-Change: <name>` aparece únicamente en el commit de cierre de Etapa C, y
+   solo si el change fue archivado (hipótesis confirmada → `openspec-archive`). Ningún commit de
+   Etapas A o B lo lleva (ver §5.3 y §10.3).
+5. La entrada del changelog generada por SM fase 10 referencia tanto el `case-id` como el nombre
    del change archivado en OpenSpec.
-5. La convención de nomenclatura `case-id = change name` se aplica siempre que ambos expedientes
+6. La convención de nomenclatura `case-id = change name` se aplica siempre que ambos expedientes
    existan; en Modo Solo SM no hay change, y en Modo Solo OpenSpec no hay case-id.
 
 ### 10.3 Ejemplo de commit unificado
@@ -917,7 +921,7 @@ OpenSpec-Change: proxy-timeout-anthropic-2026-06
 
 Los commits intermedios (Etapas A y B) llevan solo `Case: <case-id>`. El trailer
 `OpenSpec-Change:` aparece únicamente en el commit de cierre de Etapa C, y solo si el change fue
-archivado (ver §5.3 y regla 3 de §10.2).
+archivado (ver §5.3 y reglas 3 y 4 de §10.2).
 
 ---
 

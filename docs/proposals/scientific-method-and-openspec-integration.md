@@ -472,18 +472,32 @@ orquestador SM itera **dentro de las fases 06–09** sin involucrar a OpenSpec:
   └─► emitir nueva 09-conclusion.md
 ```
 
-Si durante la Etapa B `openspec-verify` emite CRITICALs, el orquestador evalúa si son
-atribuibles a un error de especificación en SM 09 (en cuyo caso se vuelve a SM para refinar la
-especificación) o a un error de implementación (en cuyo caso se reabre `openspec-apply` y se
-corrige). En cualquier caso, OpenSpec no se mueve por su cuenta: solo ejecuta la
-especificación validada y reporta desviaciones.
+Si durante la Etapa B `openspec-verify` emite CRITICALs, el orquestador evalúa la causa:
 
-Cada iteración produce versiones nuevas de los artefactos SM (v2, v3, …) sin sobreescribir las
-anteriores (idempotencia y reanudabilidad, §2.6 de SM). El bloque `phases` de `case.md` marca
-la fase como `in-progress` durante la iteración y `done` al cierre.
+- **Error de implementación** (el código no cumple lo que `09-conclusion.md` especificaba): se
+  reabre `openspec-apply` y se corrige. Los artefactos del change no cambian; solo se re-ejecuta
+  el apply con la corrección.
+
+- **Error de especificación** (SM 09 estaba incompleta o era incorrecta y el verify lo reveló):
+  1. Producir `09-conclusion.md` v1.1 con la especificación corregida.
+  2. Actualizar los artefactos del change **en place** desde SM 09 v1.1: `proposal.md`,
+     `specs/`, `tasks.md`; `design.md` si cambió alguna decisión arquitectónica. No se crea un
+     nuevo change ni se vuelve a ejecutar `openspec-propose`.
+  3. Re-ejecutar `openspec-apply` → `openspec-verify`.
+  4. Si los CRITICALs persisten más de dos iteraciones, reconsiderar la hipótesis (volver al
+     bucle de Etapa A).
+
+En cualquier caso, OpenSpec no se mueve por su cuenta: solo ejecuta la especificación validada
+y reporta desviaciones.
+
+Cada iteración produce versiones nuevas de los artefactos SM (v1.1, v1.2, …) sin sobreescribir
+las anteriores (idempotencia y reanudabilidad, §2.6 de SM). El bloque `phases` de `case.md`
+marca la fase como `in_progress` durante la iteración y `done` al cierre con la versión final.
 
 **Diferencia clave respecto a v0.1:** el bucle ya no alterna entre SM y OpenSpec, sino que vive
-enteramente dentro de SM. OpenSpec solo se invoca una vez, sobre una especificación estable.
+enteramente dentro de SM. `openspec-propose` se ejecuta una sola vez por caso (el change se
+crea una sola vez); `openspec-apply` y `openspec-verify` pueden repetirse dentro de Etapa B
+hasta que la especificación y la implementación converjan.
 
 ---
 
@@ -834,7 +848,7 @@ hay urgencia; el valor se acumula en el tiempo.
 ### 9.5 Secuencia compacta por perfil
 
 ```
-Corrective:  01(low)→02(low)→[04+02 fundidos]→05(low)→06(1 breve)→07(low)→08(low)
+Corrective:  01(low)→02(low)→03(low)→04(1 hipótesis)→05(low)→06(1 breve)→07(low)→08(low)
             →09→[OpenSpec ff]→10(low)
 Adaptive:    01→02→03→04(1-3)→05→06→07→08→09→[OpenSpec ff/continue]→10
 Perfective:  01→02→03(+explore)→04(múltiples)→05→06(completa)→07→08→09→[OpenSpec continue]→10

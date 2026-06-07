@@ -98,3 +98,43 @@ La solución debe ser minimal y localizada: un script dedicado que no reemplace 
 **Q3**: ¿Se debe actualizar el contador de pasos en `verify-config.ts`?
 
 **A3 (decisión)**: No. El step `clean-modules` sigue existiendo con el mismo `id` y `verifier`. Solo cambia el script al que apunta en `package.json`. El verificador `path-absent-node-modules` funciona igual — detecta si `node_modules/` existe o no.
+
+---
+
+## Divergencias documentadas
+
+Las siguientes decisiones de diseño fueron ajustadas durante la implementación,
+manteniendo trazabilidad entre lo planificado y lo construido.
+
+### D1 — Procesos a matar en pre-limpieza Windows
+
+| | Original (D2) | Implementado |
+|--|---|---|
+| Procesos | `node`, `esbuild`, `vitest` | `esbuild`, `vitest` (solo) |
+
+**Justificación de la divergencia**: `taskkill /T` mata el árbol de procesos completo (padre + hijos). Matar `node` con `/T` cascada al proceso padre (bash, npm, gateway de Claude Code). Si el gateway se mata a sí mismo, el proceso queda colgado sin posibilidad de recuperación. Los procesos `node` que mantienen handles sobre `node_modules/` son hijos de los procesos de desarrollo (esbuild, vitest), no el inverso — matar los hijos es suficiente y no afecta al padre.
+
+### D2 — Mecanismo de auto-recuperación
+
+| | Original (D3/D4) | Implementado |
+|--|---|---|
+| Método | `execSync('npm install', { stdio: 'inherit' })` — bloqueante | `spawn('npm', ['install'], { detached: true })` — no bloqueante |
+| Comportamiento del padre | Bloqueado ~20s esperando npm install | Termina inmediatamente con exit 1 |
+
+**Justificación de la divergencia**: `execSync` con `stdio: 'inherit'` bloquea el proceso padre hasta que `npm install` termina completamente (~20s). Esto impide que el verificador de la pipeline reciba un exit code oportuno. Con `spawn` + `detached: true`, el proceso hijo corre en background y el padre termina inmediatamente con código 1, permitiendo que la pipeline detecte el fallo y el auto-recovery se ejecuten en paralelo.
+
+### D3 — Comportamiento transaccional (contradicción interna en artefactos)
+
+| Fuente | Comportamiento especificado |
+|---|---|
+| `09-conclusion.md` §40 | "si el borrado falla, `node_modules/` debe mantenerse intacto" |
+| `design.md` D3/D4 | Threshold: cualquier contenido > 0 items post-rimraf = corrupto; auto-recuperación con `npm install` |
+
+**Resolución**: la implementación siguió D3/D4 (auto-recuperación), no §40 de la spec. La spec §40 era contradictoria con el diseño D4. El comportamiento final es: si `node_modules/` persiste post-rimraf con items, se ejecuta `npm install` para restaurar y se termina con exit 1. El directorio queda restaurado, no intacto.
+
+### Nota sobre lesson learned
+
+Esta divergencia fue identificada durante la fase de experimentación del caso SM
+`20260607-clean-modules-windows`. La lesson fue registrada en
+`maintenance-cases/20260607-clean-modules-windows/09-conclusion.md` y
+`.claude/memory/` como referencia para casos similares.

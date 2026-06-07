@@ -178,7 +178,7 @@ export const VERIFIERS: Record<
 };
 
 /**
- * Lista canónica y ordenada de los 38 pasos de verificación.
+ * Lista canónica y ordenada de los 40 pasos de verificación.
  *
  * El orden de aparición es el orden de ejecución. El script itera
  * secuencialmente; los pasos con `dependsOn` no satisfecho se marcan como
@@ -200,6 +200,41 @@ export const VERIFY_STEPS: VerifyStep[] = [
     verifier: 'expect-stdout',
   },
   {
+    id: 'setup-install',
+    script: 'setup:install',
+    args: ['run', 'setup:install', '--', '--dry-run'],
+    kind: 'blocking',
+    verifier: 'expect-stdout',
+  },
+  {
+    id: 'setup-uninstall',
+    script: 'setup:uninstall',
+    args: ['run', 'setup:uninstall', '--', '--dry-run'],
+    kind: 'blocking',
+    verifier: 'expect-stdout',
+  },
+  {
+    id: 'statusline-router-details-on',
+    script: 'statusline:router-details:on',
+    args: ['run', 'statusline:router-details:on', '--', '--dry-run'],
+    kind: 'blocking',
+    verifier: 'expect-stdout',
+  },
+  {
+    id: 'statusline-router-details-off',
+    script: 'statusline:router-details:off',
+    args: ['run', 'statusline:router-details:off', '--', '--dry-run'],
+    kind: 'blocking',
+    verifier: 'expect-stdout',
+  },
+  {
+    id: 'statusline-router-details-toggle',
+    script: 'statusline:router-details:toggle',
+    args: ['run', 'statusline:router-details:toggle', '--', '--dry-run'],
+    kind: 'blocking',
+    verifier: 'expect-stdout',
+  },
+  {
     id: 'create-agents-reference',
     script: 'create:agents-reference',
     args: ['run', 'create:agents-reference'],
@@ -213,33 +248,6 @@ export const VERIFY_STEPS: VerifyStep[] = [
     kind: 'blocking',
     skip: true,
     skipReason: 'Auto-referencia: este paso es el script mismo; lo emite la pipeline al invocarse.',
-  },
-  {
-    id: 'install-statusline-dry-run',
-    script: 'install:statusline',
-    args: ['run', 'install:statusline', '--', '--dry-run'],
-    kind: 'blocking',
-    skip: true,
-    skipReason:
-      'Drift de package.json: el script `install:statusline` ya no existe. Se conserva el paso para auditoría histórica; remediación pendiente.',
-  },
-  {
-    id: 'install-notifications-dry-run',
-    script: 'install:notifications',
-    args: ['run', 'install:notifications', '--', '--dry-run'],
-    kind: 'blocking',
-    skip: true,
-    skipReason:
-      'Drift de package.json: el script `install:notifications` ya no existe. Se conserva el paso para auditoría histórica; remediación pendiente.',
-  },
-  {
-    id: 'setup-dry-run',
-    script: 'setup',
-    args: ['run', 'setup', '--', '--dry-run'],
-    kind: 'blocking',
-    skip: true,
-    skipReason:
-      'Drift de package.json: el script `setup` ya no existe; reemplazado por `setup:install` y `setup:uninstall`. Remediación pendiente.',
   },
   {
     id: 'notifications-register',

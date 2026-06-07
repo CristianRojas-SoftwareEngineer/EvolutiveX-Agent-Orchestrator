@@ -172,7 +172,7 @@ orquestador puede retomar un caso leyendo `case.md` y continuando desde la últi
 El método científico se modela completo (10 fases distinguibles) porque es el dominio del problema, no
 una abstracción especulativa. No se añaden capas, sub-agents ni configurabilidad no solicitada. Los
 hooks son opcionales y mínimos. Para casos triviales o localizados, el orquestador puede elegir el
-**modo Lite** (`case_mode: lite`): se siguen ejecutando las 10 fases, pero en lugar de 10 artefactos
+**modo Consolidado** (`case_mode: consolidated`): se siguen ejecutando las 10 fases, pero en lugar de 10 artefactos
 individuales se produce y actualiza una única sección por fase dentro del mismo `case.md`. El modo
 **Full** (por defecto) genera los 10 artefactos `NN-<phase>.md` independientes. La elección se registra
 en el bloque YAML canónico de `case.md` y no cambia el contrato perfil↔fase.
@@ -296,7 +296,7 @@ procedimiento interno de la fase, ni la fase conoce qué perfil la invoca.
 | Campo de la política por fase | Significado | Consumido por la fase para… |
 |---|---|---|
 | `focus` | Qué priorizar en esta fase bajo este perfil | Enfocar el procedimiento |
-| `depth` | Profundidad esperada (`light` / `standard` / `deep`) | Calibrar esfuerzo |
+| `reasoning_effort` | Esfuerzo esperado (`low` / `medium` / `high` / `xhigh`) | Calibrar esfuerzo |
 | `evidence` | Tipo de evidencia que el perfil exige | Decidir qué recolectar |
 | `acceptance` | Criterio de aceptación de la salida de la fase | Validar el artefacto |
 | `risk_controls` | Controles de riesgo obligatorios | Aplicar guardas |
@@ -468,7 +468,7 @@ los 14 skills `sm-*`, pero deben existir antes de implementar el sistema:
 |---|---|
 | **Propósito** | Conducir un caso de mantenimiento de extremo a extremo. |
 | **Entradas** | Solicitud del usuario en lenguaje natural; opcionalmente un `case-id` para reanudar. |
-| **Salidas** | `case.md` actualizado, artefactos de las 10 fases (Full: 10 archivos `NN-*.md`; Lite: subsecciones en `case.md`), lección en la base de conocimiento, `CHANGELOG.md` actualizado, commit con trailer `Case:`, resumen al usuario. |
+| **Salidas** | `case.md` actualizado, artefactos de las 10 fases (Full: 10 archivos `NN-*.md`; Consolidado: subsecciones en `case.md`), lección en la base de conocimiento, `CHANGELOG.md` actualizado, commit con trailer `Case:`, resumen al usuario. |
 | **Responsabilidades** | Generar `case-id`; clasificar perfil; crear/leer `case.md`; invocar perfil y fases en orden; consolidar. El registro de casos y el changelog son **derivados** (no los escribe). |
 | **NO hace** | Política de mantenimiento; procedimiento de fase. |
 | **Invoca** | 1 perfil + 10 fases. |
@@ -499,7 +499,7 @@ escribe artefacto) y difieren en el procedimiento concreto. Cada una:
 | **Propósito** | Ejecutar una fase del método científico, parametrizada por el perfil activo. |
 | **Entradas** | `case.md`; artefactos de fases previas; su entrada `phase-policy`. |
 | **Salidas** | `NN-<phase>.md` versionado; estado de la fase en `case.md`. |
-| **Responsabilidades** | Procedimiento genérico de la fase; aplicar `focus/depth/evidence/risk_controls`; validar contra `acceptance`. |
+| **Responsabilidades** | Procedimiento genérico de la fase; aplicar `focus/reasoning_effort/evidence/risk_controls`; validar contra `acceptance`. |
 | **NO hace** | Conocer perfiles concretos; decidir orden; consolidar el caso. |
 | **Activación** | Invocada por el orquestador. |
 
@@ -511,10 +511,10 @@ Detalle por fase en la [sección 6](#6-especificación-de-cada-fase).
 
 Para cada fase se detalla propósito, entradas, salidas, artefacto, criterios de validación y cómo se
 adapta según el perfil. La adaptación es **siempre** vía la `phase-policy matrix`: la fase lee
-`focus/depth/evidence/acceptance/risk_controls` y ajusta su comportamiento.
+`focus/reasoning_effort/evidence/acceptance/risk_controls` y ajusta su comportamiento.
 
-> **Modos Full y Lite.** En **modo Full** (por defecto) cada fase produce un artefacto independiente
-> `NN-<phase>.md`. En **modo Lite** (casos triviales/localizados) cada fase escribe o actualiza una
+> **Modos Full y Consolidado.** En **modo Full** (por defecto) cada fase produce un artefacto independiente
+> `NN-<phase>.md`. En **modo Consolidado** (casos triviales/localizados) cada fase escribe o actualiza una
 > subsección del `case.md`; el contrato de entradas/salidas y la `phase-policy matrix` son idénticos en
 > ambos modos. Las 10 fases se ejecutan siempre; solo cambia el soporte de salida. El modo elegido
 > (`case_mode`) está registrado en el bloque YAML canónico de `case.md`.
@@ -580,7 +580,7 @@ adapta según el perfil. La adaptación es **siempre** vía la `phase-policy mat
 - **Salidas / artefacto:** `06-experiment-execution.md` — comandos ejecutados, cambios aplicados,
   desviaciones, logs crudos.
 - **Validación:** se siguió el diseño; desviaciones documentadas; entorno registrado; reversible.
-- **Adaptación:** el `depth` y los `risk_controls` del perfil determinan si se ejecuta en sandbox, con
+- **Adaptación:** el `reasoning_effort` y los `risk_controls` del perfil determinan si se ejecuta en sandbox, con
   feature flag, o directamente; corrective exige reproducción previa al fix; preventive exige
   aislamiento estricto.
 
@@ -737,7 +737,7 @@ proyección sobre las fases (`influencia`, `evidencia priorizada`, `conclusiones
   y `phases`).
 - **Modo Full** (por defecto): artefactos de fase como archivos individuales `NN-<phase>.md` con `NN` ∈
   `01..10`.
-- **Modo Lite** (casos triviales/localizados): sin archivos `NN-*.md` independientes; cada fase escribe
+- **Modo Consolidado** (casos triviales/localizados): sin archivos `NN-*.md` independientes; cada fase escribe
   o actualiza una subsección `## NN — <Phase>` dentro del propio `case.md`. El bloque `phases` del YAML
   canónico registra el status de cada fase igual que en modo Full (el campo `artifact` apunta a la
   subsección `case.md#NN`).
@@ -914,7 +914,7 @@ usuario lo apruebe (§6 de `CLAUDE.md`).
 Cada ejemplo muestra: entrada inicial, perfil seleccionado, secuencia de fases, artefactos producidos y
 salida final esperada. Los cuatro ejemplos usan **modo Full** (los más representativos para documentar
 el flujo completo). Un caso trivial como *"corregir un typo en un mensaje de error"* usaría **modo
-Lite**: el orquestador clasificaría `corrective`, fijaría `case_mode: lite`, y las 10 fases escribirían
+Consolidado**: el orquestador clasificaría `corrective`, fijaría `case_mode: consolidated`, y las 10 fases escribirían
 subsecciones dentro de un único `case.md` en lugar de artefactos individuales.
 
 ### 10.1 Caso Corrective
@@ -1056,7 +1056,7 @@ Case: 20260606-login-timeout
 2. **Implementar primero un *vertical slice*.** Un perfil (`corrective`) + las 10 fases con
    comportamiento genérico. Ejecutar el ejemplo 10.1 de extremo a extremo. Solo entonces añadir los
    otros tres perfiles (que ya no tocan las fases).
-3. **Mantener el contrato pequeño.** `focus/depth/evidence/acceptance/risk_controls` cubren las
+3. **Mantener el contrato pequeño.** `focus/reasoning_effort/evidence/acceptance/risk_controls` cubren las
    necesidades de adaptación conocidas. Resistir la tentación de ampliarlo "por si acaso" (§2/§6 de
    `CLAUDE.md`).
 4. **Frontmatter `description` explícito.** Claude Code tiende a *undertrigger*; el orquestador debe
@@ -1081,7 +1081,7 @@ Case: 20260606-login-timeout
    contexto, puede aislarse en un sub-agent **sin cambiar el contrato**: el orquestador seguiría leyendo
    el mismo artefacto. El diseño base no los necesita.
 10. **No saltarse fases.** Incluso en casos triviales, las fases pueden ejecutarse en modo `light`
-   (`depth: light`) produciendo artefactos breves, pero la cadena de trazabilidad se mantiene completa.
+   (`reasoning_effort: low`) produciendo artefactos breves, pero la cadena de trazabilidad se mantiene completa.
 
 ---
 
@@ -1104,7 +1104,7 @@ This repository runs software maintenance as reproducible scientific experiments
 ## Non-negotiable rules
 - Artifacts are the source of truth, not the conversation. Every phase writes one versioned
   artifact under `maintenance-cases/<case-id>/`. The case manifest is `case.md`.
-- Never skip phases. Trivial cases may run phases with `depth: light` (short artifacts) but the
+- Never skip phases. Trivial cases may run phases with `reasoning_effort: low` (short artifacts) but the
   full 01→10 chain must exist.
 - Profiles set policy; phases execute procedure. Never put profile logic inside a phase, nor
   phase procedure inside a profile.
@@ -1149,8 +1149,8 @@ token efficiency; explanations, questions, and summaries to the user are Spanish
 name: sm-orchestrator
 description: >
   Drive a software maintenance case end-to-end as a scientific experiment: classify the case,
-  select a maintenance profile and case mode (full/lite), run the ten scientific-method phases in
-  order, produce phase artifacts (full: one file per phase; lite: subsections in case.md), consolidate
+  select a maintenance profile and case mode (full/consolidated), run the ten scientific-method phases in
+  order, produce phase artifacts (full: one file per phase; consolidated: subsections in case.md), consolidate
   a verdict, distill a lesson, run the changelog generator, and commit with a `Case:` trailer
   (the changelog and case index are derived, never hand-edited). Use
   when the user asks to maintain, fix a bug, correct a regression, optimize, refactor, migrate,
@@ -1176,7 +1176,7 @@ in English. Canonical policy: ../artifact-structuring/SKILL.md §language_policy
 2. **Classify the profile.** Use references/classification-guide.md to pick one of corrective,
    adaptive, perfective, preventive. If ambiguous, ask the user in Spanish (offer the 2 best fits).
 3. **Create the manifest.** Copy templates/case.md to `maintenance-cases/<case-id>/case.md`; fill
-   case_id, profile, case_mode (lite for trivial/localized fixes, full otherwise), and the 10 phases
+   case_id, profile, case_mode (consolidated for trivial/localized fixes, full otherwise), and the 10 phases
    as `pending` in the canonical YAML block.
 4. **Load policy.** Invoke the matching `sm-profile-<x>` skill. It writes its parameters and the
    phase-policy matrix into the canonical YAML block in case.md. **Validate the schema** (mandatory):
@@ -1185,11 +1185,11 @@ in English. Canonical policy: ../artifact-structuring/SKILL.md §language_policy
 5. **Run phases 01→10 in order.** Before executing phase N, verify in the canonical YAML block that
    phases 01..N-1 are `done`; stop and report if any is not. For each phase, invoke the matching
    `sm-phase-*` skill. After each phase: in full mode, confirm `NN-<phase>.md` exists and set
-   artifact path; in lite mode, confirm the `## NN — <Phase>` subsection in case.md was written.
+   artifact path; in consolidated mode, confirm the `## NN — <Phase>` subsection in case.md was written.
    Mark the phase `done` and record artifact + version in the canonical YAML block. Stop and report
    if a phase fails its acceptance criterion. (Phase 03 reads MEMORY.md explicitly for recall; phase
    09 writes a lesson; phase 10 runs the changelog generator and drafts the commit with a `Case:` trailer.)
-6. **Consolidate.** Read 09-conclusion.md (or the lite subsection); write the verdict into case.md.
+6. **Consolidate.** Read 09-conclusion.md (or the consolidated subsection); write the verdict into case.md.
    Confirm phase 09 wrote a lesson to .claude/memory/ (indexed in MEMORY.md). Do NOT write a case
    ledger — it is derived.
 7. **Commit, do not hand-edit derived state.** Phase 10 runs the changelog generator with
@@ -1237,7 +1237,7 @@ profile skill; profiles never read a phase skill.
 | Field | Type | Meaning |
 |-------|------|---------|
 | `focus` | string | What to prioritize in this phase under this profile |
-| `depth` | enum `light\|standard\|deep` | Effort/detail expected |
+| `reasoning_effort` | enum `low\|medium\|high\|xhigh` | Effort/detail expected |
 | `evidence` | string[] | Evidence types the profile requires this phase to produce/collect |
 | `acceptance` | string | Pass criterion for this phase's artifact |
 | `risk_controls` | string[] | Mandatory guards (e.g. sandbox, feature flag, rollback) |
@@ -1251,19 +1251,19 @@ the orchestrator.
 
 ```yaml
 # Inside the canonical state block in case.md:
-case_mode: full   # full | lite
+case_mode: full   # full | consolidated
 
 phase_policy:
-  observation:        { focus: "...", depth: standard, evidence: [...], acceptance: "...", risk_controls: [...] }
-  problem-definition: { focus: "...", depth: standard, evidence: [...], acceptance: "...", risk_controls: [...] }
-  research:           { focus: "...", depth: standard, evidence: [...], acceptance: "...", risk_controls: [...] }
-  hypothesis:         { focus: "...", depth: standard, evidence: [...], acceptance: "...", risk_controls: [...] }
-  experiment-design:  { focus: "...", depth: standard, evidence: [...], acceptance: "...", risk_controls: [...] }
-  experiment-execution:{ focus: "...", depth: standard, evidence: [...], acceptance: "...", risk_controls: [...] }
-  data-collection:    { focus: "...", depth: standard, evidence: [...], acceptance: "...", risk_controls: [...] }
-  analysis:           { focus: "...", depth: standard, evidence: [...], acceptance: "...", risk_controls: [...] }
-  conclusion:         { focus: "...", depth: standard, evidence: [...], acceptance: "...", risk_controls: [...] }
-  communication:      { focus: "...", depth: standard, evidence: [...], acceptance: "...", risk_controls: [...] }
+  observation:        { focus: "...", reasoning_effort: medium, evidence: [...], acceptance: "...", risk_controls: [...] }
+  problem-definition: { focus: "...", reasoning_effort: medium, evidence: [...], acceptance: "...", risk_controls: [...] }
+  research:           { focus: "...", reasoning_effort: medium, evidence: [...], acceptance: "...", risk_controls: [...] }
+  hypothesis:         { focus: "...", reasoning_effort: medium, evidence: [...], acceptance: "...", risk_controls: [...] }
+  experiment-design:  { focus: "...", reasoning_effort: medium, evidence: [...], acceptance: "...", risk_controls: [...] }
+  experiment-execution:{ focus: "...", reasoning_effort: medium, evidence: [...], acceptance: "...", risk_controls: [...] }
+  data-collection:    { focus: "...", reasoning_effort: medium, evidence: [...], acceptance: "...", risk_controls: [...] }
+  analysis:           { focus: "...", reasoning_effort: medium, evidence: [...], acceptance: "...", risk_controls: [...] }
+  conclusion:         { focus: "...", reasoning_effort: medium, evidence: [...], acceptance: "...", risk_controls: [...] }
+  communication:      { focus: "...", reasoning_effort: medium, evidence: [...], acceptance: "...", risk_controls: [...] }
 
 phases:
   "01-observation":         { status: pending, artifact: "", version: "" }
@@ -1305,7 +1305,7 @@ Pick exactly one profile. If two fit, ask the user (Spanish) presenting the two 
 - If `maintenance-cases/<case-id>/` already exists, append an incremental suffix: `-2`, `-3`, etc.
   (e.g. `20260606-login-timeout-2`). Concurrent locking is out of scope by deliberate design choice.
 - Manifest: `case.md`. Phase artifacts (full mode): `NN-<phase>.md`, NN in 01..10.
-- Lite mode: phase content lives in `## NN — <Phase>` subsections of `case.md`. No separate artifacts.
+- Consolidated mode: phase content lives in `## NN — <Phase>` subsections of `case.md`. No separate artifacts.
 
 ## Frontmatter (phase artifact)
 ```yaml
@@ -1414,7 +1414,7 @@ hidden side effects. See §9.4 for the full rationale.
 ### 12.6 Plantilla — `.claude/skills/sm-orchestrator/templates/case.md`
 
 La plantilla incluye el **bloque YAML canónico** machine-readable (única fuente de estado del caso).
-Se presentan las variantes Full (artefactos individuales por fase) y Lite (un solo archivo actualizado).
+Se presentan las variantes Full (artefactos individuales por fase) y Consolidado (un solo archivo actualizado).
 
 ````markdown
 ---
@@ -1436,22 +1436,22 @@ verdict:                       # filled at consolidation
 ## Canonical state (machine-readable — single source of truth)
 
 ```yaml
-case_mode: full                # full | lite  (set by orchestrator at classification)
+case_mode: full                # full | consolidated  (set by orchestrator at classification)
 
 phase_policy:
-  observation:        { focus: "", depth: standard, evidence: [], acceptance: "", risk_controls: [] }
-  problem-definition: { focus: "", depth: standard, evidence: [], acceptance: "", risk_controls: [] }
-  research:           { focus: "", depth: standard, evidence: [], acceptance: "", risk_controls: [] }
-  hypothesis:         { focus: "", depth: standard, evidence: [], acceptance: "", risk_controls: [] }
-  experiment-design:  { focus: "", depth: standard, evidence: [], acceptance: "", risk_controls: [] }
-  experiment-execution:{ focus: "", depth: standard, evidence: [], acceptance: "", risk_controls: [] }
-  data-collection:    { focus: "", depth: standard, evidence: [], acceptance: "", risk_controls: [] }
-  analysis:           { focus: "", depth: standard, evidence: [], acceptance: "", risk_controls: [] }
-  conclusion:         { focus: "", depth: standard, evidence: [], acceptance: "", risk_controls: [] }
-  communication:      { focus: "", depth: standard, evidence: [], acceptance: "", risk_controls: [] }
+  observation:        { focus: "", reasoning_effort: medium, evidence: [], acceptance: "", risk_controls: [] }
+  problem-definition: { focus: "", reasoning_effort: medium, evidence: [], acceptance: "", risk_controls: [] }
+  research:           { focus: "", reasoning_effort: medium, evidence: [], acceptance: "", risk_controls: [] }
+  hypothesis:         { focus: "", reasoning_effort: medium, evidence: [], acceptance: "", risk_controls: [] }
+  experiment-design:  { focus: "", reasoning_effort: medium, evidence: [], acceptance: "", risk_controls: [] }
+  experiment-execution:{ focus: "", reasoning_effort: medium, evidence: [], acceptance: "", risk_controls: [] }
+  data-collection:    { focus: "", reasoning_effort: medium, evidence: [], acceptance: "", risk_controls: [] }
+  analysis:           { focus: "", reasoning_effort: medium, evidence: [], acceptance: "", risk_controls: [] }
+  conclusion:         { focus: "", reasoning_effort: medium, evidence: [], acceptance: "", risk_controls: [] }
+  communication:      { focus: "", reasoning_effort: medium, evidence: [], acceptance: "", risk_controls: [] }
 
 phases:
-  # full mode: artifact = NN-<phase>.md  |  lite mode: artifact = case.md#<phase>
+  # full mode: artifact = NN-<phase>.md  |  consolidated mode: artifact = case.md#<phase>
   "01-observation":         { status: pending, artifact: "", version: "" }
   "02-problem-definition":  { status: pending, artifact: "", version: "" }
   "03-research":            { status: pending, artifact: "", version: "" }
@@ -1464,7 +1464,7 @@ phases:
   "10-communication":       { status: pending, artifact: "", version: "" }
 ```
 
-<!-- ── LITE MODE ONLY: phase content below (omit in full mode) ───────────── -->
+<!-- ── CONSOLIDATED MODE ONLY: phase content below (omit in full mode) ──── -->
 
 ## Fases
 <!-- Each phase produces a subsection here instead of a separate file. -->
@@ -1518,7 +1518,7 @@ links: { previous: , next: }
 # <Phase title> — <case_id>
 
 ## Applied policy
-<echo of focus / depth / evidence / acceptance / risk_controls read from case.md>
+<echo of focus / reasoning_effort / evidence / acceptance / risk_controls read from case.md>
 
 ## Result
 <phase-specific content — see the phase skill>
@@ -1558,16 +1558,16 @@ Restore correct behavior by removing a defect with a minimal, verified change.
 
 ```yaml
 phase_policy:
-  observation:        { focus: "symptoms + reproduction steps", depth: standard, evidence: [stack_trace, repro_steps], acceptance: "failure reproducible or precisely characterized", risk_controls: [] }
-  problem-definition: { focus: "defect statement + no-regression criterion", depth: standard, evidence: [], acceptance: "falsifiable, measurable bug statement", risk_controls: [] }
-  research:           { focus: "recent changes / regressions in the area", depth: standard, evidence: [related_commits, code_refs], acceptance: "suspected change(s) localized", risk_controls: [] }
-  hypothesis:         { focus: "most probable, cheapest-to-test root cause", depth: standard, evidence: [], acceptance: "falsifiable root-cause hypothesis", risk_controls: [] }
-  experiment-design:  { focus: "write a failing test that reproduces the bug first", depth: standard, evidence: [repro_test], acceptance: "repro test + rollback defined", risk_controls: [rollback] }
-  experiment-execution:{ focus: "confirm red, then apply minimal fix", depth: standard, evidence: [test_run], acceptance: "fix applied per design", risk_controls: [rollback] }
-  data-collection:    { focus: "red→green + regression suite", depth: standard, evidence: [test_results], acceptance: "repro test passes, suite green", risk_controls: [] }
-  analysis:           { focus: "defect closed without regressions", depth: standard, evidence: [], acceptance: "hypothesis confirmed, no regressions", risk_controls: [] }
-  conclusion:         { focus: "apply fix + add covering test to CI", depth: standard, evidence: [], acceptance: "actionable verdict", risk_controls: [] }
-  communication:      { focus: "root cause + no-regression proof", depth: standard, evidence: [], acceptance: "self-contained PR/commit draft", risk_controls: [] }
+  observation:        { focus: "symptoms + reproduction steps", reasoning_effort: medium, evidence: [stack_trace, repro_steps], acceptance: "failure reproducible or precisely characterized", risk_controls: [] }
+  problem-definition: { focus: "defect statement + no-regression criterion", reasoning_effort: medium, evidence: [], acceptance: "falsifiable, measurable bug statement", risk_controls: [] }
+  research:           { focus: "recent changes / regressions in the area", reasoning_effort: medium, evidence: [related_commits, code_refs], acceptance: "suspected change(s) localized", risk_controls: [] }
+  hypothesis:         { focus: "most probable, cheapest-to-test root cause", reasoning_effort: medium, evidence: [], acceptance: "falsifiable root-cause hypothesis", risk_controls: [] }
+  experiment-design:  { focus: "write a failing test that reproduces the bug first", reasoning_effort: medium, evidence: [repro_test], acceptance: "repro test + rollback defined", risk_controls: [rollback] }
+  experiment-execution:{ focus: "confirm red, then apply minimal fix", reasoning_effort: medium, evidence: [test_run], acceptance: "fix applied per design", risk_controls: [rollback] }
+  data-collection:    { focus: "red→green + regression suite", reasoning_effort: medium, evidence: [test_results], acceptance: "repro test passes, suite green", risk_controls: [] }
+  analysis:           { focus: "defect closed without regressions", reasoning_effort: medium, evidence: [], acceptance: "hypothesis confirmed, no regressions", risk_controls: [] }
+  conclusion:         { focus: "apply fix + add covering test to CI", reasoning_effort: medium, evidence: [], acceptance: "actionable verdict", risk_controls: [] }
+  communication:      { focus: "root cause + no-regression proof", reasoning_effort: medium, evidence: [], acceptance: "self-contained PR/commit draft", risk_controls: [] }
 ```
 
 ## Evidence prioritized
@@ -1608,16 +1608,16 @@ Adapt the software to an external change while preserving compatibility.
 
 ```yaml
 phase_policy:
-  observation:        { focus: "environment/requirement delta + current usage", depth: standard, evidence: [usage_map, deprecation_notice], acceptance: "delta and impacted surface mapped", risk_controls: [] }
-  problem-definition: { focus: "required compatibility delta", depth: standard, evidence: [], acceptance: "explicit compatibility target", risk_controls: [] }
-  research:           { focus: "new API/contract + breaking changes", depth: deep, evidence: [api_diff, docs], acceptance: "breaking changes enumerated", risk_controls: [] }
-  hypothesis:         { focus: "adaptation strategy preserving compatibility", depth: standard, evidence: [], acceptance: "testable adaptation strategy", risk_controls: [] }
-  experiment-design:  { focus: "compatibility/contract tests for old+new", depth: standard, evidence: [contract_tests], acceptance: "tests + feature-flag rollback defined", risk_controls: [feature_flag, rollback] }
-  experiment-execution:{ focus: "implement behind a flag; run both contract tests", depth: standard, evidence: [test_run], acceptance: "implemented per design", risk_controls: [feature_flag] }
-  data-collection:    { focus: "compatibility matrix old/new", depth: standard, evidence: [compat_matrix], acceptance: "matrix green", risk_controls: [] }
-  analysis:           { focus: "compatibility confirmed, no public breakage", depth: standard, evidence: [], acceptance: "compatibility validated", risk_controls: [] }
-  conclusion:         { focus: "gradual rollout + old-version retirement plan", depth: standard, evidence: [], acceptance: "reversible migration plan", risk_controls: [feature_flag] }
-  communication:      { focus: "compatibility + migration guide", depth: standard, evidence: [], acceptance: "migration guide included", risk_controls: [] }
+  observation:        { focus: "environment/requirement delta + current usage", reasoning_effort: medium, evidence: [usage_map, deprecation_notice], acceptance: "delta and impacted surface mapped", risk_controls: [] }
+  problem-definition: { focus: "required compatibility delta", reasoning_effort: medium, evidence: [], acceptance: "explicit compatibility target", risk_controls: [] }
+  research:           { focus: "new API/contract + breaking changes", reasoning_effort: high, evidence: [api_diff, docs], acceptance: "breaking changes enumerated", risk_controls: [] }
+  hypothesis:         { focus: "adaptation strategy preserving compatibility", reasoning_effort: medium, evidence: [], acceptance: "testable adaptation strategy", risk_controls: [] }
+  experiment-design:  { focus: "compatibility/contract tests for old+new", reasoning_effort: medium, evidence: [contract_tests], acceptance: "tests + feature-flag rollback defined", risk_controls: [feature_flag, rollback] }
+  experiment-execution:{ focus: "implement behind a flag; run both contract tests", reasoning_effort: medium, evidence: [test_run], acceptance: "implemented per design", risk_controls: [feature_flag] }
+  data-collection:    { focus: "compatibility matrix old/new", reasoning_effort: medium, evidence: [compat_matrix], acceptance: "matrix green", risk_controls: [] }
+  analysis:           { focus: "compatibility confirmed, no public breakage", reasoning_effort: medium, evidence: [], acceptance: "compatibility validated", risk_controls: [] }
+  conclusion:         { focus: "gradual rollout + old-version retirement plan", reasoning_effort: medium, evidence: [], acceptance: "reversible migration plan", risk_controls: [feature_flag] }
+  communication:      { focus: "compatibility + migration guide", reasoning_effort: medium, evidence: [], acceptance: "migration guide included", risk_controls: [] }
 ```
 
 ## Evidence prioritized
@@ -1659,16 +1659,16 @@ functional behavior.
 
 ```yaml
 phase_policy:
-  observation:        { focus: "current quality metric + hotspots", depth: standard, evidence: [profile, metric_baseline], acceptance: "baseline measured", risk_controls: [] }
-  problem-definition: { focus: "target metric + threshold, behavior invariant", depth: standard, evidence: [], acceptance: "metric target with threshold", risk_controls: [] }
-  research:           { focus: "optimization patterns / smells", depth: standard, evidence: [code_refs, benchmarks], acceptance: "improvement candidate identified", risk_controls: [] }
-  hypothesis:         { focus: "candidate change improves metric, keeps behavior", depth: standard, evidence: [], acceptance: "testable optimization hypothesis", risk_controls: [] }
-  experiment-design:  { focus: "A/B benchmark, equal-output check", depth: deep, evidence: [benchmark_plan], acceptance: "baseline N runs + output-equality + rollback", risk_controls: [rollback] }
-  experiment-execution:{ focus: "apply change; run benchmark before/after", depth: standard, evidence: [benchmark_run], acceptance: "applied per design", risk_controls: [rollback] }
-  data-collection:    { focus: "metric deltas with variance + output snapshot", depth: deep, evidence: [metric_deltas, output_snapshot], acceptance: "deltas with variance recorded", risk_controls: [] }
-  analysis:           { focus: "significance + behavior invariance", depth: deep, evidence: [], acceptance: "significant improvement, behavior unchanged", risk_controls: [] }
-  conclusion:         { focus: "accept optimization, functional suite green", depth: standard, evidence: [], acceptance: "accept/reject with numbers", risk_controls: [] }
-  communication:      { focus: "metric delta narrative", depth: standard, evidence: [], acceptance: "before/after numbers included", risk_controls: [] }
+  observation:        { focus: "current quality metric + hotspots", reasoning_effort: medium, evidence: [profile, metric_baseline], acceptance: "baseline measured", risk_controls: [] }
+  problem-definition: { focus: "target metric + threshold, behavior invariant", reasoning_effort: medium, evidence: [], acceptance: "metric target with threshold", risk_controls: [] }
+  research:           { focus: "optimization patterns / smells", reasoning_effort: medium, evidence: [code_refs, benchmarks], acceptance: "improvement candidate identified", risk_controls: [] }
+  hypothesis:         { focus: "candidate change improves metric, keeps behavior", reasoning_effort: medium, evidence: [], acceptance: "testable optimization hypothesis", risk_controls: [] }
+  experiment-design:  { focus: "A/B benchmark, equal-output check", reasoning_effort: high, evidence: [benchmark_plan], acceptance: "baseline N runs + output-equality + rollback", risk_controls: [rollback] }
+  experiment-execution:{ focus: "apply change; run benchmark before/after", reasoning_effort: medium, evidence: [benchmark_run], acceptance: "applied per design", risk_controls: [rollback] }
+  data-collection:    { focus: "metric deltas with variance + output snapshot", reasoning_effort: high, evidence: [metric_deltas, output_snapshot], acceptance: "deltas with variance recorded", risk_controls: [] }
+  analysis:           { focus: "significance + behavior invariance", reasoning_effort: high, evidence: [], acceptance: "significant improvement, behavior unchanged", risk_controls: [] }
+  conclusion:         { focus: "accept optimization, functional suite green", reasoning_effort: medium, evidence: [], acceptance: "accept/reject with numbers", risk_controls: [] }
+  communication:      { focus: "metric delta narrative", reasoning_effort: medium, evidence: [], acceptance: "before/after numbers included", risk_controls: [] }
 ```
 
 ## Evidence prioritized
@@ -1709,16 +1709,16 @@ Reduce the probability or impact of future failures before they occur.
 
 ```yaml
 phase_policy:
-  observation:        { focus: "weak signals, trends, fragile areas", depth: deep, evidence: [static_analysis, trend_data], acceptance: "risk surface characterized", risk_controls: [sandbox] }
-  problem-definition: { focus: "risk to mitigate + probability/impact", depth: standard, evidence: [], acceptance: "risk statement with prob/impact", risk_controls: [] }
-  research:           { focus: "defect class / analogous vulnerabilities + knowledge-base recall", depth: deep, evidence: [threat_model, recalled_lessons], acceptance: "defect class understood", risk_controls: [] }
-  hypothesis:         { focus: "risk materialization mechanism", depth: standard, evidence: [], acceptance: "falsifiable risk hypothesis", risk_controls: [] }
-  experiment-design:  { focus: "test that provokes the risk condition in sandbox", depth: deep, evidence: [risk_probe], acceptance: "probe + trivial rollback defined", risk_controls: [sandbox, rollback] }
-  experiment-execution:{ focus: "provoke condition; add guards/boundary", depth: standard, evidence: [probe_run], acceptance: "executed in isolation", risk_controls: [sandbox] }
-  data-collection:    { focus: "before/after risk condition", depth: standard, evidence: [risk_state_before_after], acceptance: "risk state captured", risk_controls: [] }
-  analysis:           { focus: "effective risk reduction + residual", depth: deep, evidence: [], acceptance: "risk reduced, residual identified", risk_controls: [] }
-  conclusion:         { focus: "apply guards; backlog residual paths", depth: standard, evidence: [], acceptance: "mitigation + quantified residual", risk_controls: [] }
-  communication:      { focus: "risk avoided + residual risk note", depth: standard, evidence: [], acceptance: "risk note included", risk_controls: [] }
+  observation:        { focus: "weak signals, trends, fragile areas", reasoning_effort: high, evidence: [static_analysis, trend_data], acceptance: "risk surface characterized", risk_controls: [sandbox] }
+  problem-definition: { focus: "risk to mitigate + probability/impact", reasoning_effort: medium, evidence: [], acceptance: "risk statement with prob/impact", risk_controls: [] }
+  research:           { focus: "defect class / analogous vulnerabilities + knowledge-base recall", reasoning_effort: high, evidence: [threat_model, recalled_lessons], acceptance: "defect class understood", risk_controls: [] }
+  hypothesis:         { focus: "risk materialization mechanism", reasoning_effort: medium, evidence: [], acceptance: "falsifiable risk hypothesis", risk_controls: [] }
+  experiment-design:  { focus: "test that provokes the risk condition in sandbox", reasoning_effort: high, evidence: [risk_probe], acceptance: "probe + trivial rollback defined", risk_controls: [sandbox, rollback] }
+  experiment-execution:{ focus: "provoke condition; add guards/boundary", reasoning_effort: medium, evidence: [probe_run], acceptance: "executed in isolation", risk_controls: [sandbox] }
+  data-collection:    { focus: "before/after risk condition", reasoning_effort: medium, evidence: [risk_state_before_after], acceptance: "risk state captured", risk_controls: [] }
+  analysis:           { focus: "effective risk reduction + residual", reasoning_effort: high, evidence: [], acceptance: "risk reduced, residual identified", risk_controls: [] }
+  conclusion:         { focus: "apply guards; backlog residual paths", reasoning_effort: medium, evidence: [], acceptance: "mitigation + quantified residual", risk_controls: [] }
+  communication:      { focus: "risk avoided + residual risk note", reasoning_effort: medium, evidence: [], acceptance: "risk note included", risk_controls: [] }
 ```
 
 ## Evidence prioritized
@@ -1755,7 +1755,7 @@ Generic, profile-parameterized. Reads policy; never decides order; never consoli
 - The user request; access to code, logs, metrics, tests, issues.
 
 ## Procedure
-1. Read case.md → `phase_policy.observation` (focus, depth, evidence, acceptance, risk_controls).
+1. Read case.md → `phase_policy.observation` (focus, reasoning_effort, evidence, acceptance, risk_controls).
 2. Collect observable facts in line with `focus` and gather every required `evidence` item.
 3. Record facts only — no causes, no fixes. Date and source each fact.
 4. Delimit scope.
@@ -1893,7 +1893,7 @@ description: >
 ## Procedure
 1. Read the policy entry; honor `risk_controls` (e.g. sandbox, feature_flag, rollback).
 2. Design a reproducible procedure: variables, controls, success/failure criteria.
-3. Define an explicit rollback. Keep cost bounded by `depth`.
+3. Define an explicit rollback. Keep cost bounded by `reasoning_effort`.
 
 ## Output
 Write `05-experiment-design.md`: Applied policy, Procedure, Variables, Controls, Success/Failure,
@@ -2253,7 +2253,7 @@ decision (see project CLAUDE.md §6).
 > patrón de índice `MEMORY.md` + registro de casos **derivado**; recall explícito en fase 03), el
 > changelog **derivado** por **generador on-demand** (ejecutado por la fase 10, sin git hook, sin
 > `--amend`) con trazabilidad bidireccional vía el trailer `Case:`, el bloque YAML canónico en `case.md`
-> como única fuente de estado machine-readable, los dos modos de salida (Full / Lite), las dependencias
+> como única fuente de estado machine-readable, los dos modos de salida (Full / Consolidado), las dependencias
 > externas explícitas (§4.4), y los límites del runtime documentados (§3.6), sin sub-agents y sin
 > duplicación de lógica. Rige el principio **estado derivado sobre estado duplicado** (§2.5.1). La
 > evolución futura (nuevos perfiles, nuevas fases, o aislar una fase en un sub-agent) no requiere romper

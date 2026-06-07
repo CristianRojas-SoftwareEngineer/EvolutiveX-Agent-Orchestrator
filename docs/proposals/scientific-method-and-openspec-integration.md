@@ -208,13 +208,13 @@ trazable y verificable?**
            ┌──────────────────────────────────────────────────────┐
            │  INVESTIGACIÓN Y VALIDACIÓN (SM phases 01–09)         │
            │                                                        │
-           │  • Observar · Definir · Investigar · Hipotetizar       │
-           │  • Experimentar · Medir · Analizar · Comparar           │
-           │  • Descartar alternativas inviables                      │
-           │  • Seleccionar cambio ganador con evidencia              │
+           │  • Observar · Definir · Investigar · Hipotetizar      │
+           │  • Experimentar · Medir · Analizar · Comparar         │
+           │  • Descartar alternativas inviables                   │
+           │  • Seleccionar cambio ganador con evidencia           │
            │                                                        │
-           │  Output: 09-conclusion.md + especificación validada     │
-           │          + expediente completo del caso                 │
+           │  Output: 09-conclusion.md + especificación validada    │
+           │          + expediente completo del caso                │
            └──────────────────────────┬───────────────────────────┘
                                       │  frontera única
                                       │  (conclusión validada → propuesta formal)
@@ -222,13 +222,13 @@ trazable y verificable?**
            ┌──────────────────────────────────────────────────────┐
            │  FORMALIZACIÓN E IMPLEMENTACIÓN (OpenSpec)             │
            │                                                        │
-           │  • openspec-propose (usa la especificación validada)    │
-           │  • openspec-apply (ejecuta tasks.md)                    │
-           │  • openspec-verify (compara con specs/)                 │
-           │  • openspec-sync (mergea deltas)                        │
-           │  • openspec-archive (mueve a archive/)                  │
+           │  • openspec-propose (usa la especificación validada)   │
+           │  • openspec-apply (ejecuta tasks.md)                   │
+           │  • openspec-verify (compara con specs/)                │
+           │  • openspec-sync (mergea deltas)                       │
+           │  • openspec-archive (mueve a archive/)                 │
            │                                                        │
-           │  Output: código en producción + specs actualizadas      │
+           │  Output: código en producción + specs actualizadas     │
            └──────────────────────────┬───────────────────────────┘
                                       │  frontera de cierre
                                       │  (verificado → comunicación)
@@ -237,10 +237,10 @@ trazable y verificable?**
            │  COMUNICACIÓN Y CONSOLIDACIÓN (SM phase 10)            │
            │                                                        │
            │  • Veredicto final sobre la hipótesis                  │
-           │  • Lección destilada → base de conocimiento             │
-           │  • CHANGELOG.md (generador on-demand)                   │
+           │  • Lección destilada → base de conocimiento            │
+           │  • CHANGELOG.md (generador on-demand)                  │
            │  • Commit de cierre: `Case: <case-id>`                 │
-           │    (+ `OpenSpec-Change:` solo si archivado, ver §5.3)  │
+           │    (+ `OpenSpec-Change:` solo si archivado, ver §5.3) │
            │                                                        │
            │  Output: veredicto + changelog + lección + commit      │
            └──────────────────────────────────────────────────────┘
@@ -358,7 +358,7 @@ experimental.
 
 1. El usuario o el sistema detecta una señal de mantenimiento (fallo, degradación, deuda, riesgo).
 2. `sm-orchestrator` clasifica el caso → elige perfil → crea `maintenance-cases/<case-id>/case.md`.
-3. `sm-profile-<X>` escribe la `phase-policy` en `case.md`.
+3. `sm-profile-<X>` escribe la `phase_policy` en `case.md`.
 4. **Fase 01 — Observación:** recolecta síntomas, métricas, contexto del sistema. Output:
    `01-observation.md`.
 5. **Fase 02 — Definición del problema:** encuadra el problema con precisión. Output:
@@ -414,12 +414,13 @@ forma trazable y verificable.
      YAML canónico.
 4. **`openspec-apply`:** ejecuta `tasks.md` y deja el código en producción.
 5. **`openspec-verify`:** comprueba la implementación contra los artefactos OpenSpec, especialmente
-   `specs/`. El output de verify (CRITICAL/WARNING/SUGGESTION) se captura como una
-   **re-ejecución** de `07-data-collection.md` (bump de versión MINOR) y se reinterpreta
-   como una re-ejecución de `08-analysis.md` (bump de versión MINOR), según la convención
-   de versionado de SM §8.4 (MINOR++ al re-ejecutar una fase sobre los mismos insumos
-   ampliados). El bloque `phases` del `case.md` marca ambas fases como `done` con la versión
-   actualizada.
+   `specs/`. El output de verify (CRITICAL/WARNING/SUGGESTION) se incorpora como una
+   **re-ejecución de `08-analysis.md`** (bump de versión MINOR), según la convención de
+   versionado de SM §8.4 (MINOR++ al re-ejecutar una fase sobre los mismos insumos
+   ampliados). No se toca `07-data-collection.md`: los datos crudos de experimentación
+   (fase 07) son distintos del output de verificación, que es material de análisis
+   (coherente con §4.2 y §8.1). El bloque `phases` del `case.md` marca la fase 08 como
+   `done` con la versión actualizada.
 
 **Precondición para pasar a la Etapa C:** `openspec-verify` no emite CRITICALs, o los CRITICALs
 emitidos son aceptados por el usuario como fuera del alcance de este caso (en cuyo caso se
@@ -772,7 +773,7 @@ maintenance-cases/<case-id>/case.md       [creado por sm-orchestrator]
   └──► 10-communication.md
          ├── generador on-demand ──► CHANGELOG.md
          ├── lección ──► .claude/memory/<slug>.md
-         └── commit con trailers Case: <case-id> + OpenSpec-Change: <name>
+         └── commit de cierre: Case: <case-id>  (+ OpenSpec-Change: <name> solo si archivado)
 ```
 
 ### 8.3 Responsabilidades de mantenimiento por tipo de artefacto
@@ -855,8 +856,9 @@ Perfective:  01→02→03(+explore)→04(múltiples)→05→06(completa)→07→
 Preventive:  01→02→03(high+explore)→04(múltiples)→05→06(extensa)→07→08(high)→09→[OpenSpec continue]→10
 ```
 
-(`low` = esfuerzo mínimo; `high` = esfuerzo máximo; `+explore` = invocar
-`openspec-explore` como parte de la investigación SM)
+(`low`/`medium`/`high`/`xhigh` = esfuerzo creciente; las secuencias muestran solo los
+niveles relevantes por perfil; `+explore` = invocar `openspec-explore` como parte de la
+investigación SM)
 
 ---
 
@@ -875,7 +877,7 @@ señal de mantenimiento
               └─► 09-conclusion.md (especificación validada)
                     └─► change name en OpenSpec (= case-id)
                           └─► openspec/changes/<case-id>/ (proposal, specs, design, tasks)
-                                └─► commits con trailer Case: <case-id> + OpenSpec-Change: <name>
+                                └─► commit de cierre con trailers Case: <case-id> + OpenSpec-Change: <name> (camino archivado)
                                       └─► CHANGELOG.md (entrada generada on-demand)
                                             └─► openspec/changes/archive/YYYY-MM-DD-<case-id>/
                                                   └─► openspec/specs/ (delta mergeado)
@@ -944,7 +946,7 @@ archivado (ver §5.3 y regla 3 de §10.2).
   `proposal.md` son convenciones editoriales, no enlaces estructurados.
 - **Sin gestión de conflictos entre cases SM simultáneos.** Si dos cases SM modifican el mismo
   delta de specs en OpenSpec, la resolución de conflictos en `openspec-sync` es manual.
-- **La refutación de una hipótesis no revierte automáticamente el apply.** SM fase 09 puede
+- **La refutación de una hipótesis no revierte automáticamente el apply.** SM fase 10 puede
   concluir que la hipótesis fue refutada tras `openspec-verify`, pero el rollback del código es
   responsabilidad del usuario (`git revert`). SM documenta la decisión; no la ejecuta.
 - **La experimentación puede ser costosa en tiempo y recursos.** El diseño no impone límites al
@@ -977,8 +979,9 @@ archivado (ver §5.3 y regla 3 de §10.2).
 
 ## 12. Recomendaciones de implementación
 
-Las siguientes recomendaciones están ordenadas por prioridad y son independientes entre sí; se
-pueden adoptar incrementalmente.
+Las siguientes recomendaciones están ordenadas por prioridad y son mayormente independientes;
+se pueden adoptar incrementalmente. (Excepciones: las recomendaciones 2 y 4 tocan el mismo
+template `case.md`; la 8 desarrolla la política ya esbozada en §6.4 y §11.3.)
 
 **1. Convención de nomenclatura (sin código nuevo)**
 Adoptar la regla `case-id = change name en OpenSpec` desde el primer caso integrado. Requiere

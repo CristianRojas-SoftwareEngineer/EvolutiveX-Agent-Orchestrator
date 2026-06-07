@@ -3,6 +3,7 @@
 ### Event Schemas
 
 #### tool_call schema
+
 The tool_call event SHALL extend BaseEvent and include the following fields:
 
 ```json
@@ -24,11 +25,27 @@ The tool_call event SHALL extend BaseEvent and include the following fields:
     "agent_id": { "type": "string" },
     "parent_agent_id": { "type": ["string", "null"] }
   },
-  "required": ["event_type", "timestamp", "request_id", "workflow_id", "session_id", "schema_version", "tool_use_id", "tool_name", "tool_input", "provider_format", "agent_role", "input_size_bytes", "agent_id", "parent_agent_id"]
+  "required": [
+    "event_type",
+    "timestamp",
+    "request_id",
+    "workflow_id",
+    "session_id",
+    "schema_version",
+    "tool_use_id",
+    "tool_name",
+    "tool_input",
+    "provider_format",
+    "agent_role",
+    "input_size_bytes",
+    "agent_id",
+    "parent_agent_id"
+  ]
 }
 ```
 
 #### tool_result schema
+
 The tool_result event SHALL extend BaseEvent and include the following fields:
 
 ```json
@@ -52,11 +69,29 @@ The tool_result event SHALL extend BaseEvent and include the following fields:
     "agent_id": { "type": "string" },
     "parent_agent_id": { "type": ["string", "null"] }
   },
-  "required": ["event_type", "timestamp", "request_id", "workflow_id", "session_id", "schema_version", "tool_use_id", "tool_name", "tool_output", "is_error", "execution_duration_ms", "provider_format", "agent_role", "output_size_bytes", "agent_id", "parent_agent_id"]
+  "required": [
+    "event_type",
+    "timestamp",
+    "request_id",
+    "workflow_id",
+    "session_id",
+    "schema_version",
+    "tool_use_id",
+    "tool_name",
+    "tool_output",
+    "is_error",
+    "execution_duration_ms",
+    "provider_format",
+    "agent_role",
+    "output_size_bytes",
+    "agent_id",
+    "parent_agent_id"
+  ]
 }
 ```
 
 #### tool_error schema
+
 The tool_error event SHALL extend BaseEvent and include the following fields:
 
 ```json
@@ -75,68 +110,96 @@ The tool_error event SHALL extend BaseEvent and include the following fields:
     "agent_id": { "type": "string" },
     "parent_agent_id": { "type": ["string", "null"] }
   },
-  "required": ["event_type", "timestamp", "request_id", "workflow_id", "session_id", "schema_version", "tool_name", "error_type", "error_message", "agent_id", "parent_agent_id"]
+  "required": [
+    "event_type",
+    "timestamp",
+    "request_id",
+    "workflow_id",
+    "session_id",
+    "schema_version",
+    "tool_name",
+    "error_type",
+    "error_message",
+    "agent_id",
+    "parent_agent_id"
+  ]
 }
 ```
 
 ### Requirement: Track tool calls
+
 The system SHALL capture tool call events when tools are invoked by the LLM, normalizing native provider tool formats (OpenAI tool_calls, Gemini functionCall, Anthropic tool_use, Ollama tool) into a unified event schema. Raw native events are captured separately when CLAUDISH_TELEMETRY_CAPTURE_RAW is enabled.
 
 #### Scenario: Tool call initiated
+
 - **WHEN** LLM requests a tool call (regardless of upstream format: Anthropic content_block_start.type="tool_use", OpenAI tool_calls[], Gemini functionCall, Ollama tool)
 - **THEN** system logs tool_call event with tool_name, tool_input, request_id, and provider_format
 - **AND** the normalized event uses Anthropic-compatible field names (tool_use_id, tool_name, tool_input)
 - **AND** if raw capture is enabled, emits raw_tool_call with the native event structure
 
 #### Scenario: Tool call completed
+
 - **WHEN** tool execution completes
 - **THEN** system logs tool_result event with tool_name, tool_output, execution_duration_ms, and provider_format
 - **AND** tool_output type may be string, object, or array depending on provider
 - **AND** if raw capture is enabled, emits raw_tool_result with the native event structure
 
 ### Requirement: Track tool calls per agent
+
 The system SHALL associate tool calls with the agent/session that initiated them.
 
 #### Scenario: Agent tool call
+
 - **WHEN** an agent (opus, sonnet, haiku, subagent) invokes a tool
 - **THEN** system logs tool_call event with agent_role and session_id
 
 #### Scenario: Multiple agents
+
 - **WHEN** multiple agents invoke tools in the same session
 - **THEN** system logs each tool call with its associated agent_role
 
 ### Requirement: Track tool execution duration
+
 The system SHALL measure and log the duration of each tool execution.
 
 #### Scenario: Tool execution timing
+
 - **WHEN** a tool is executed
 - **THEN** system records start_time and end_time
 - **AND** logs execution_duration_ms in the tool_result event
 
 ### Requirement: Track tool errors
+
 The system SHALL capture tool execution errors for debugging.
 
 #### Scenario: Tool execution error
+
 - **WHEN** tool execution fails
 - **THEN** system logs tool_error event with tool_name, error_type, and error_message
 
 #### Scenario: Tool timeout
+
 - **WHEN** tool execution times out
 - **THEN** system logs tool_error event with error_type="timeout"
 
 ### Requirement: Track tool input/output sizes
+
 The system SHALL log the size of tool inputs and outputs for capacity planning.
 
 #### Scenario: Tool input size
+
 - **WHEN** a tool is called
 - **THEN** system logs input_size_bytes in tool_call event
 
 #### Scenario: Tool output size
+
 - **WHEN** a tool result is returned
 - **THEN** system logs output_size_bytes in tool_result event
 
 ### Requirement: Aggregate tool usage statistics
+
 Tool usage statistics per session and per agent are computable on-demand by consumers from the primitive `tool_call` and `tool_result` events. Consumers (GUI, historical API) can derive:
+
 - `total_tool_calls` (integer) — count of tool_call events per session/workflow
 - `tools_by_name` (object mapping tool_name to count) — group tool_call events by tool_name
 - `total_tool_duration_ms` (integer) — sum of execution_duration_ms from tool_result events

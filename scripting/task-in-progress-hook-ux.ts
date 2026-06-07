@@ -26,9 +26,7 @@ export async function runTaskInProgressHookUx(): Promise<number> {
     }
     payload = parsed as Record<string, unknown>;
   } catch (err) {
-    process.stderr.write(
-      `task-in-progress-hook-ux: JSON inválido: ${(err as Error).message}\n`,
-    );
+    process.stderr.write(`task-in-progress-hook-ux: JSON inválido: ${(err as Error).message}\n`);
     return 0;
   }
 
@@ -60,9 +58,7 @@ export async function runTaskInProgressHookUx(): Promise<number> {
     await adapter.notify(built);
     return 0;
   } catch (err) {
-    process.stderr.write(
-      `task-in-progress-hook-ux: toast: ${(err as Error).message}\n`,
-    );
+    process.stderr.write(`task-in-progress-hook-ux: toast: ${(err as Error).message}\n`);
     return 0;
   }
 }

@@ -76,19 +76,19 @@ Documento de referencia del **gateway tal como está implementado**: el modelo d
 
 **Dos responsabilidades principales:**
 
-| Responsabilidad | Descripción |
-|-----------------|-------------|
-| **Proxy transparente** | Reenviar `POST /v1/messages` (y rutas afines) al upstream con latencia mínima; reenviar streams SSE al cliente. |
+| Responsabilidad                   | Descripción                                                                                                                                                                                              |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Proxy transparente**            | Reenviar `POST /v1/messages` (y rutas afines) al upstream con latencia mínima; reenviar streams SSE al cliente.                                                                                          |
 | **Auditoría orientada al humano** | Persistir bajo `sessions/<session-id>/` una jerarquía legible: workflows, steps HTTP, subagentes, reconstrucción de mensajes. No es un event store exhaustivo de cada delta SSE como entidad de dominio. |
 
 El gateway eleva la observabilidad a un **modelo de dominio propio** (vocabulario gateway) y distribuye responsabilidades según PKA, proyectando en disco la estructura `causal-workflows-v1` (Parte IV, §24–§33) y exponiendo un segundo borde normativo (hooks Claude Code). La proyección a `sessions/` es coherente con `session-audit-model.md`.
 
 **Documentos hermanos (profundidad, no prerequisito):**
 
-| Documento | Contenido |
-|-----------|-----------|
-| [session-audit-model.md](session-audit-model.md) | Modelo de auditoría en disco (`sessions/`) |
-| [README.md](../README.md) | Operación, configuración, diagrama de flujo general |
+| Documento                                        | Contenido                                           |
+| ------------------------------------------------ | --------------------------------------------------- |
+| [session-audit-model.md](session-audit-model.md) | Modelo de auditoría en disco (`sessions/`)          |
+| [README.md](../README.md)                        | Operación, configuración, diagrama de flujo general |
 
 ---
 
@@ -98,40 +98,40 @@ PKA es un modelo de **seis capas concéntricas** que asigna un paradigma clásic
 
 ### 2.1 Paradigma por capa
 
-| Capa | Nombre | Paradigma | Rol |
-|------|--------|-----------|-----|
-| **1** | Domain | DDD | Vocabulario del negocio, reglas invariantes, contratos de persistencia abstractos. |
-| **2** | Services | Hexagonal | Ports + adapters cohesionados: tecnología sin reglas de negocio. |
-| **3** | Operations | CQRS | Casos de uso: command/query handlers que orquestan dominio + adapters. |
-| **4** | Application Programming Interface | Orquestación transversal | Multiplexor interno (DI, Mediator, auth, UoW, tracing). |
-| **5** | User Interfaces / Delivery | Protocolos | HTTP, CLI, colas: traducen wire → intención de aplicación. |
-| **6** | Graphical User Interfaces | Presentación | **No aplica** a este proxy. |
+| Capa  | Nombre                            | Paradigma                | Rol                                                                                |
+| ----- | --------------------------------- | ------------------------ | ---------------------------------------------------------------------------------- |
+| **1** | Domain                            | DDD                      | Vocabulario del negocio, reglas invariantes, contratos de persistencia abstractos. |
+| **2** | Services                          | Hexagonal                | Ports + adapters cohesionados: tecnología sin reglas de negocio.                   |
+| **3** | Operations                        | CQRS                     | Casos de uso: command/query handlers que orquestan dominio + adapters.             |
+| **4** | Application Programming Interface | Orquestación transversal | Multiplexor interno (DI, Mediator, auth, UoW, tracing).                            |
+| **5** | User Interfaces / Delivery        | Protocolos               | HTTP, CLI, colas: traducen wire → intención de aplicación.                         |
+| **6** | Graphical User Interfaces         | Presentación             | **No aplica** a este proxy.                                                        |
 
 ### 2.2 Tres zonas conceptuales
 
-| Zona | Capas | Qué cambia cuando evoluciona el sistema |
-|------|-------|----------------------------------------|
-| **Semántica de negocio** | 1 y 3 | Reglas de dominio y flujos de casos de uso. |
-| **Encapsulación tecnológica** | 2, 5 (y 6) | Frameworks, disco, protocolos. |
-| **Orquestación transversal** | 4 | Políticas comunes a todos los canales. |
+| Zona                          | Capas      | Qué cambia cuando evoluciona el sistema     |
+| ----------------------------- | ---------- | ------------------------------------------- |
+| **Semántica de negocio**      | 1 y 3      | Reglas de dominio y flujos de casos de uso. |
+| **Encapsulación tecnológica** | 2, 5 (y 6) | Frameworks, disco, protocolos.              |
+| **Orquestación transversal**  | 4          | Políticas comunes a todos los canales.      |
 
 ### 2.3 Regla de dependencia
 
-| Capa | Puede importar | No puede conocer |
-|------|----------------|------------------|
-| 5 | 4 | 1–3 directamente |
-| 4 | 3, contratos de 2 | 5–6 |
-| 3 | 2, 1 | 4–6 |
-| 2 | 1 | 3–6 |
-| 1 | — | 2–6 |
+| Capa | Puede importar    | No puede conocer |
+| ---- | ----------------- | ---------------- |
+| 5    | 4                 | 1–3 directamente |
+| 4    | 3, contratos de 2 | 5–6              |
+| 3    | 2, 1              | 4–6              |
+| 2    | 1                 | 3–6              |
+| 1    | —                 | 2–6              |
 
 ### 2.4 Perfil PKA adoptado en Smart Code Proxy
 
-| Decisión | Descripción |
-|----------|-------------|
-| **Dominio anémico** | Capa 1: tipos, value objects y domain services puros (clasificación, agregación de tokens, redacción). Poca o ninguna lógica con efectos. |
-| **Orquestación en capa 3** | La secuencia "clasificar → abrir workflow → escribir request → procesar SSE → cerrar workflow" vive en handlers. |
-| **Capa 4 reducida** | Solo Composition Root + configuración; sin Mediator ni pipeline (un único canal HTTP). |
+| Decisión                   | Descripción                                                                                                                               |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| **Dominio anémico**        | Capa 1: tipos, value objects y domain services puros (clasificación, agregación de tokens, redacción). Poca o ninguna lógica con efectos. |
+| **Orquestación en capa 3** | La secuencia "clasificar → abrir workflow → escribir request → procesar SSE → cerrar workflow" vive en handlers.                          |
+| **Capa 4 reducida**        | Solo Composition Root + configuración; sin Mediator ni pipeline (un único canal HTTP).                                                    |
 
 ---
 
@@ -139,23 +139,23 @@ PKA es un modelo de **seis capas concéntricas** que asigna un paradigma clásic
 
 ### 3.1 Matriz de alcance por capa
 
-| Capa | Responsabilidad | Alcance en este diseño |
-|------|-----------------|------------------------|
-| **Aplicación** (encima del gateway) | Orquestación de apps propias; bibliotecas cliente de terceros | Solo mención periférica |
-| **Claude Code** | Ejecuta tools y subagentes; emite hooks; construye el historial de mensajes | Cliente + emisor de hooks |
-| **Gateway (este diseño)** | Proxy HTTP + correlación + persistencia de observabilidad | **Alcance del documento** |
-| **Dominio Anthropic** (`types/anthropic`) | Forma de mensajes, bloques, request/response, SSE | Reutilización sin duplicar |
-| **Infraestructura** | Cliente HTTP upstream, endpoint hooks, correlador, persistencia disco | Implementación |
+| Capa                                      | Responsabilidad                                                             | Alcance en este diseño     |
+| ----------------------------------------- | --------------------------------------------------------------------------- | -------------------------- |
+| **Aplicación** (encima del gateway)       | Orquestación de apps propias; bibliotecas cliente de terceros               | Solo mención periférica    |
+| **Claude Code**                           | Ejecuta tools y subagentes; emite hooks; construye el historial de mensajes | Cliente + emisor de hooks  |
+| **Gateway (este diseño)**                 | Proxy HTTP + correlación + persistencia de observabilidad                   | **Alcance del documento**  |
+| **Dominio Anthropic** (`types/anthropic`) | Forma de mensajes, bloques, request/response, SSE                           | Reutilización sin duplicar |
+| **Infraestructura**                       | Cliente HTTP upstream, endpoint hooks, correlador, persistencia disco       | Implementación             |
 
 ### 3.2 Principios
 
-| # | Principio | Implicación |
-|---|-----------|-------------|
-| 1 | **Proxy primero** | El gateway reenvía `POST /v1/messages` sin orquestar el loop agéntico. Claude Code arma `messages[]`. |
-| 2 | **Observabilidad propia** | `Step` y `Workflow` son términos del gateway, no préstamos de capas superiores. |
-| 3 | **Dos bordes normativos** | Wire Anthropic (HTTP/SSE) + hooks Claude Code (lifecycle, cierre E2E, `finalText`). |
-| 4 | **Composición con tipos Anthropic** | No duplicar mensajes/bloques; referenciar `AnthropicRequest`, `AnthropicMessage`, `AnthropicUsage`. |
-| 5 | **Sin entidad Agent** | Metadatos de subagente viven en `Workflow` (`kind`, `agentType?`, `agentId?`). |
+| #   | Principio                           | Implicación                                                                                           |
+| --- | ----------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| 1   | **Proxy primero**                   | El gateway reenvía `POST /v1/messages` sin orquestar el loop agéntico. Claude Code arma `messages[]`. |
+| 2   | **Observabilidad propia**           | `Step` y `Workflow` son términos del gateway, no préstamos de capas superiores.                       |
+| 3   | **Dos bordes normativos**           | Wire Anthropic (HTTP/SSE) + hooks Claude Code (lifecycle, cierre E2E, `finalText`).                   |
+| 4   | **Composición con tipos Anthropic** | No duplicar mensajes/bloques; referenciar `AnthropicRequest`, `AnthropicMessage`, `AnthropicUsage`.   |
+| 5   | **Sin entidad Agent**               | Metadatos de subagente viven en `Workflow` (`kind`, `agentType?`, `agentId?`).                        |
 
 ```mermaid
 flowchart TB
@@ -194,16 +194,16 @@ flowchart TB
 
 ### Mapa señal observada → entidad gateway
 
-| Señal observada | Entidad | Origen |
-|-----------------|---------|--------|
-| `session_id` | **Session** | Campo común en hooks |
-| `UserPromptSubmit` → `Stop` | **Workflow** (main) | Hooks lifecycle |
-| `SubagentStart` → `SubagentStop` | **Workflow** (sub) | Hooks lifecycle |
-| `POST /v1/messages` → `message_stop` | **Step** | Wire proxied |
-| `tool_use` block en assistant → `PostToolUse` | **ToolUse** | Wire + hooks |
-| `X-Claude-Code-Agent-Id` | `Workflow.agentId` | Wire header |
-| `model` en request | **LanguageModel** ref | Wire body |
-| Provider base URL | **Provider** | Configuración |
+| Señal observada                               | Entidad               | Origen               |
+| --------------------------------------------- | --------------------- | -------------------- |
+| `session_id`                                  | **Session**           | Campo común en hooks |
+| `UserPromptSubmit` → `Stop`                   | **Workflow** (main)   | Hooks lifecycle      |
+| `SubagentStart` → `SubagentStop`              | **Workflow** (sub)    | Hooks lifecycle      |
+| `POST /v1/messages` → `message_stop`          | **Step**              | Wire proxied         |
+| `tool_use` block en assistant → `PostToolUse` | **ToolUse**           | Wire + hooks         |
+| `X-Claude-Code-Agent-Id`                      | `Workflow.agentId`    | Wire header          |
+| `model` en request                            | **LanguageModel** ref | Wire body            |
+| Provider base URL                             | **Provider**          | Configuración        |
 
 ---
 
@@ -211,26 +211,26 @@ flowchart TB
 
 Las entidades del gateway **referencian** DTOs Anthropic; no redefinen mensajes ni bloques.
 
-| Concepto gateway | Tipo Anthropic reutilizado |
-|------------------|---------------------------|
-| Request en Step | `IAnthropicRequest` |
-| Mensaje assistant (por hop) | `IAnthropicMessage` en `Step.assistantMessage` |
-| Texto final E2E (resumen) | `string` en `WorkflowResult.finalText` — origen hook, no wire |
-| Bloques en respuesta sync | `IAnthropicContentBlock[]` en `IAnthropicResponse.content` |
-| Bloques en ToolUse | `IAnthropicContentBlock` |
-| Uso de tokens (por hop) | `IAnthropicUsage` en `Step.usage` |
+| Concepto gateway                      | Tipo Anthropic reutilizado                                              |
+| ------------------------------------- | ----------------------------------------------------------------------- |
+| Request en Step                       | `IAnthropicRequest`                                                     |
+| Mensaje assistant (por hop)           | `IAnthropicMessage` en `Step.assistantMessage`                          |
+| Texto final E2E (resumen)             | `string` en `WorkflowResult.finalText` — origen hook, no wire           |
+| Bloques en respuesta sync             | `IAnthropicContentBlock[]` en `IAnthropicResponse.content`              |
+| Bloques en ToolUse                    | `IAnthropicContentBlock`                                                |
+| Uso de tokens (por hop)               | `IAnthropicUsage` en `Step.usage`                                       |
 | Uso de tokens (consumo facturado E2E) | `IAnthropicUsage` en `WorkflowResult.usage` — misma forma, suma por hop |
-| Respuesta síncrona | `IAnthropicResponse` / clase `Response` |
-| Streaming SSE | `AnthropicSseEvent` + interfaces `IAnthropicSse*` |
-| Roles y tipos de bloque | `AnthropicRole`, `AnthropicBlockType` |
+| Respuesta síncrona                    | `IAnthropicResponse` / clase `Response`                                 |
+| Streaming SSE                         | `AnthropicSseEvent` + interfaces `IAnthropicSse*`                       |
+| Roles y tipos de bloque               | `AnthropicRole`, `AnthropicBlockType`                                   |
 
 **Mapeo ToolUse ↔ bloques wire:**
 
-| Fase | Bloque Anthropic | Campo ToolUse |
-|------|------------------|---------------|
-| Solicitud | `type: 'tool_use'` | `toolUseBlock`, `arguments` ← `input` |
-| Resultado | `type: 'tool_result'` | `toolResultBlock`, `tool_use_id` |
-| Error / denegado | `tool_result` + `is_error: true` | `status: 'rejected' \| 'error'` |
+| Fase             | Bloque Anthropic                 | Campo ToolUse                         |
+| ---------------- | -------------------------------- | ------------------------------------- |
+| Solicitud        | `type: 'tool_use'`               | `toolUseBlock`, `arguments` ← `input` |
+| Resultado        | `type: 'tool_result'`            | `toolResultBlock`, `tool_use_id`      |
+| Error / denegado | `tool_result` + `is_error: true` | `status: 'rejected' \| 'error'`       |
 
 > **Streaming SSE:** los tipos existen para parseo en el borde; no se persisten como agregados gateway. Ver §20.
 
@@ -279,12 +279,12 @@ Un **Step** no es solo una llamada HTTP aislada: incluye la fase de tools observ
 
 **Rol:** Identifica quién ejecuta la inferencia y cómo se enruta la petición proxied.
 
-| Campo | Tipo | Notas |
-|-------|------|-------|
-| `id` | `string` | Identificador interno del gateway |
-| `kind` | `ProviderKind` | `'anthropic' \| 'vertex' \| 'bedrock' \| 'custom'` |
-| `baseUrl?` | `string` | URL base cuando no es first-party Anthropic |
-| `displayName?` | `string` | Etiqueta para UI/logs |
+| Campo          | Tipo           | Notas                                              |
+| -------------- | -------------- | -------------------------------------------------- |
+| `id`           | `string`       | Identificador interno del gateway                  |
+| `kind`         | `ProviderKind` | `'anthropic' \| 'vertex' \| 'bedrock' \| 'custom'` |
+| `baseUrl?`     | `string`       | URL base cuando no es first-party Anthropic        |
+| `displayName?` | `string`       | Etiqueta para UI/logs                              |
 
 **Invariantes:**
 
@@ -297,14 +297,14 @@ Un **Step** no es solo una llamada HTTP aislada: incluye la fase de tools observ
 
 **Rol:** Modelo LLM disponible a través de un proveedor (p. ej. `claude-sonnet-4-6`).
 
-| Campo | Tipo | Notas |
-|-------|------|-------|
-| `id` | `string` | ID interno del gateway |
-| `providerId` | `string` | FK lógica a `Provider` |
-| `modelId` | `string` | ID enviado a la API (`IAnthropicRequest.model`) |
-| `displayName?` | `string` | |
-| `supportsEffort?` | `boolean` | Capacidad del proveedor/modelo |
-| `supportsExtendedThinking?` | `boolean` | Opcional |
+| Campo                       | Tipo      | Notas                                           |
+| --------------------------- | --------- | ----------------------------------------------- |
+| `id`                        | `string`  | ID interno del gateway                          |
+| `providerId`                | `string`  | FK lógica a `Provider`                          |
+| `modelId`                   | `string`  | ID enviado a la API (`IAnthropicRequest.model`) |
+| `displayName?`              | `string`  |                                                 |
+| `supportsEffort?`           | `boolean` | Capacidad del proveedor/modelo                  |
+| `supportsExtendedThinking?` | `boolean` | Opcional                                        |
 
 **Integración Anthropic:** `modelId` corresponde al campo `model` observado en requests proxied.
 
@@ -318,21 +318,21 @@ Un **Step** no es solo una llamada HTTP aislada: incluye la fase de tools observ
 
 **Rol:** Agrupa la continuidad observada de una sesión Claude Code y el historial de workflows correlacionados.
 
-| Campo | Tipo | Notas |
-|-------|------|-------|
-| `id` | `string` | ID interno del gateway |
-| `externalSessionId?` | `string` | `session_id` de hooks Claude Code |
-| `providerId?` | `string` | Proveedor por defecto de la sesión |
-| `workflows` | `Workflow[]` | Historial de workflows observados |
-| `createdAt` | `Date` | |
-| `metadata?` | `Record<string, unknown>` | Proyecto, usuario, etc. |
+| Campo                | Tipo                      | Notas                              |
+| -------------------- | ------------------------- | ---------------------------------- |
+| `id`                 | `string`                  | ID interno del gateway             |
+| `externalSessionId?` | `string`                  | `session_id` de hooks Claude Code  |
+| `providerId?`        | `string`                  | Proveedor por defecto de la sesión |
+| `workflows`          | `Workflow[]`              | Historial de workflows observados  |
+| `createdAt`          | `Date`                    |                                    |
+| `metadata?`          | `Record<string, unknown>` | Proyecto, usuario, etc.            |
 
 **Eventos de sesión (no son Steps):**
 
-| Hook | Ubicación en dominio |
-|------|---------------------|
-| `SessionStart` | Crear o reanudar metadata de `Session` |
-| `SessionEnd` | Cierre de sesión observado |
+| Hook                         | Ubicación en dominio                           |
+| ---------------------------- | ---------------------------------------------- |
+| `SessionStart`               | Crear o reanudar metadata de `Session`         |
+| `SessionEnd`                 | Cierre de sesión observado                     |
 | `PreCompact` / `PostCompact` | `SessionEvent` futuro o log de infraestructura |
 
 **Invariantes:**
@@ -346,35 +346,35 @@ Un **Step** no es solo una llamada HTTP aislada: incluye la fase de tools observ
 
 **Rol:** Intervalo de observabilidad E2E desde el input del usuario (o spawn de subagente) hasta el Step final con mensaje de cierre.
 
-| Campo | Tipo | Notas |
-|-------|------|-------|
-| `id` | `string` | |
-| `sessionId` | `string` | |
-| `kind` | `WorkflowKind` | `'main' \| 'subagent'` |
-| `agentType?` | `string` | De hook `agent_type` / `SubagentStart` |
-| `agentId?` | `string` | De hook `agent_id` (subagentes) |
-| `languageModelId?` | `string` | Último o dominante en Steps |
-| `prompt?` | `string` | De `UserPromptSubmit.prompt` o input subagente |
-| `status` | `WorkflowStatus` | Ver §13 |
-| `steps` | `Step[]` | Steps correlacionados en orden |
-| `result?` | `WorkflowResult` | Snapshot inmutable al cierre; ver **§9** |
-| `transcriptPath?` | `string` | Referencia hook; reconciliación opcional |
-| `parentWorkflowId?` | `string` | Sub-workflow |
-| `parentToolUseId?` | `string` | Enlace al `ToolUse` que lo disparó |
-| `startedAt` | `Date` | |
-| `completedAt?` | `Date` | |
+| Campo               | Tipo             | Notas                                          |
+| ------------------- | ---------------- | ---------------------------------------------- |
+| `id`                | `string`         |                                                |
+| `sessionId`         | `string`         |                                                |
+| `kind`              | `WorkflowKind`   | `'main' \| 'subagent'`                         |
+| `agentType?`        | `string`         | De hook `agent_type` / `SubagentStart`         |
+| `agentId?`          | `string`         | De hook `agent_id` (subagentes)                |
+| `languageModelId?`  | `string`         | Último o dominante en Steps                    |
+| `prompt?`           | `string`         | De `UserPromptSubmit.prompt` o input subagente |
+| `status`            | `WorkflowStatus` | Ver §13                                        |
+| `steps`             | `Step[]`         | Steps correlacionados en orden                 |
+| `result?`           | `WorkflowResult` | Snapshot inmutable al cierre; ver **§9**       |
+| `transcriptPath?`   | `string`         | Referencia hook; reconciliación opcional       |
+| `parentWorkflowId?` | `string`         | Sub-workflow                                   |
+| `parentToolUseId?`  | `string`         | Enlace al `ToolUse` que lo disparó             |
+| `startedAt`         | `Date`           |                                                |
+| `completedAt?`      | `Date`           |                                                |
 
 **Delimitadores (hooks):**
 
-| Evento | Acción |
-|--------|--------|
-| `UserPromptSubmit` | Abre `Workflow` con `kind: 'main'` |
-| `SubagentStart` | Abre `Workflow` con `kind: 'subagent'` |
-| `Stop` | Cierra main si `stop_hook_active === false` y sin `background_tasks` pendientes |
-| `SubagentStop` | Cierra sub-workflow |
-| `StopFailure` | Cierra con `WorkflowResult.outcome: 'api_error'` |
+| Evento             | Acción                                                                          |
+| ------------------ | ------------------------------------------------------------------------------- |
+| `UserPromptSubmit` | Abre `Workflow` con `kind: 'main'`                                              |
+| `SubagentStart`    | Abre `Workflow` con `kind: 'subagent'`                                          |
+| `Stop`             | Cierra main si `stop_hook_active === false` y sin `background_tasks` pendientes |
+| `SubagentStop`     | Cierra sub-workflow                                                             |
+| `StopFailure`      | Cierra con `WorkflowResult.outcome: 'api_error'`                                |
 
-**Cardinalidad:** `Session` 1 — * `Workflow`. Cada prompt significativo abre un workflow; reanudar sesión puede abrir un workflow nuevo.
+**Cardinalidad:** `Session` 1 — \* `Workflow`. Cada prompt significativo abre un workflow; reanudar sesión puede abrir un workflow nuevo.
 
 **Invariantes:**
 
@@ -389,7 +389,7 @@ Un **Step** no es solo una llamada HTTP aislada: incluye la fase de tools observ
 
 **Rol:** Value object **inmutable** adjunto a `Workflow.result` al cierre del workflow.
 
-Responde: *¿cómo terminó la ejecución E2E del workflow?* — resultado global, texto final reportado por el orquestador, coste agregado y extensión en Steps.
+Responde: _¿cómo terminó la ejecución E2E del workflow?_ — resultado global, texto final reportado por el orquestador, coste agregado y extensión en Steps.
 
 - Se construye **una vez** al recibir un hook de cierre (`Stop`, `SubagentStop`, `StopFailure`).
 - Es un **snapshot de resumen** para API, persistencia y dashboards.
@@ -407,14 +407,14 @@ Responde: *¿cómo terminó la ejecución E2E del workflow?* — resultado globa
 
 ### 9.3 Campos
 
-| Campo | Tipo | Origen | Descripción |
-|-------|------|--------|-------------|
-| `outcome` | `WorkflowOutcome` | Hook + reglas de cierre (§9.4) | Resultado global: `'success' \| 'api_error' \| 'aborted' \| 'unknown'` |
-| `finalText?` | `string` | Hook de cierre | Texto plano E2E; passthrough de `last_assistant_message` (**hook**, no StepBuffer). Fuentes primarias: `Stop`, `SubagentStop`; `StopFailure` solo si el campo viene. Ver **§9.7** |
-| `usage?` | `IAnthropicUsage` | Agregación | Suma **por categoría** de `Step.usage` cerrados (+ rollup hijos). **Consumo facturado E2E** del workflow; no cardinalidad única de contexto. Ver **§9.6**. |
-| `stepCount` | `number` | Agregación | Cantidad de Steps **cerrados** al momento del cierre |
-| `closedByEvent` | `WorkflowClosedByEvent` | Hook | Evento que disparó el cierre: `'Stop' \| 'SubagentStop' \| 'StopFailure'` |
-| `sessionId` | `string` | Hook | `session_id` del hook de cierre |
+| Campo           | Tipo                    | Origen                         | Descripción                                                                                                                                                                       |
+| --------------- | ----------------------- | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `outcome`       | `WorkflowOutcome`       | Hook + reglas de cierre (§9.4) | Resultado global: `'success' \| 'api_error' \| 'aborted' \| 'unknown'`                                                                                                            |
+| `finalText?`    | `string`                | Hook de cierre                 | Texto plano E2E; passthrough de `last_assistant_message` (**hook**, no StepBuffer). Fuentes primarias: `Stop`, `SubagentStop`; `StopFailure` solo si el campo viene. Ver **§9.7** |
+| `usage?`        | `IAnthropicUsage`       | Agregación                     | Suma **por categoría** de `Step.usage` cerrados (+ rollup hijos). **Consumo facturado E2E** del workflow; no cardinalidad única de contexto. Ver **§9.6**.                        |
+| `stepCount`     | `number`                | Agregación                     | Cantidad de Steps **cerrados** al momento del cierre                                                                                                                              |
+| `closedByEvent` | `WorkflowClosedByEvent` | Hook                           | Evento que disparó el cierre: `'Stop' \| 'SubagentStop' \| 'StopFailure'`                                                                                                         |
+| `sessionId`     | `string`                | Hook                           | `session_id` del hook de cierre                                                                                                                                                   |
 
 Contrato TypeScript de referencia:
 
@@ -432,12 +432,12 @@ interface WorkflowResult {
 
 ### 9.4 Derivación de outcome y reglas de cierre
 
-| Hook / regla | `outcome` | Condiciones |
-|--------------|-----------|-------------|
-| `Stop` / `SubagentStop` | `'success'` | Cierre permitido (ver abajo) |
-| `StopFailure` | `'api_error'` | Siempre al recibir el hook |
-| `PostToolBatch` con `decision: block` | `'aborted'` | Bloqueo de batch de tools |
-| Caso no clasificado | `'unknown'` | Fallback |
+| Hook / regla                          | `outcome`     | Condiciones                  |
+| ------------------------------------- | ------------- | ---------------------------- |
+| `Stop` / `SubagentStop`               | `'success'`   | Cierre permitido (ver abajo) |
+| `StopFailure`                         | `'api_error'` | Siempre al recibir el hook   |
+| `PostToolBatch` con `decision: block` | `'aborted'`   | Bloqueo de batch de tools    |
+| Caso no clasificado                   | `'unknown'`   | Fallback                     |
 
 **Condiciones para cerrar en `Stop` / `SubagentStop`:**
 
@@ -457,15 +457,15 @@ flowchart LR
 El correlador (vía el domain service `buildWorkflowResult`) arma el snapshot:
 
 ```typescript
-const closedSteps = workflow.steps.filter(s => s.closedAt != null);
+const closedSteps = workflow.steps.filter((s) => s.closedAt != null);
 const completedChildWorkflows = resolveCompletedChildWorkflows(workflow); // §9.6
 
 const result: WorkflowResult = {
-  outcome: deriveOutcome(hook),           // ← hook + reglas §9.4
-  finalText: deriveFinalText(hook),       // ← hook; no extraer de steps (§9.7)
-  closedByEvent: hook.eventName,          // ← hook
-  sessionId: hook.session_id,             // ← hook
-  stepCount: closedSteps.length,          // ← agregación
+  outcome: deriveOutcome(hook), // ← hook + reglas §9.4
+  finalText: deriveFinalText(hook), // ← hook; no extraer de steps (§9.7)
+  closedByEvent: hook.eventName, // ← hook
+  sessionId: hook.session_id, // ← hook
+  stepCount: closedSteps.length, // ← agregación
   usage: aggregateWorkflowUsage(closedSteps, completedChildWorkflows), // ← §9.6
 };
 ```
@@ -492,22 +492,22 @@ Adicionalmente, el caso `StopFailure` (Step abierto o parcial) tiene reglas prop
 - Sumar `input_tokens` entre Steps del mismo workflow **repite** contexto ya contado en hops anteriores; eso es **correcto para coste/consumo facturado** e **incorrecto** si se interpreta como «cuántos tokens únicos tuvo el workflow».
 - Para aproximar el **tamaño del contexto en el último hop**, usar el último Step cerrado: `steps[steps.length - 1].usage` (o su `inferenceRequest`), no `WorkflowResult.usage`.
 
-| Pregunta | Fuente recomendada |
-|----------|-------------------|
-| ¿Cuánto me cobraron en este workflow/turno? | `WorkflowResult.usage` |
+| Pregunta                                         | Fuente recomendada                              |
+| ------------------------------------------------ | ----------------------------------------------- |
+| ¿Cuánto me cobraron en este workflow/turno?      | `WorkflowResult.usage`                          |
 | ¿Cuánto midió el prompt en la última inferencia? | Último `Step.usage` / último `inferenceRequest` |
-| Detalle forense por hop | `Workflow.steps[]` |
+| Detalle forense por hop                          | `Workflow.steps[]`                              |
 
 Los campos `cache_read_input_tokens` y `cache_creation_input_tokens` son **categorías de facturación** del mismo hop (ver skill `anthropic-api-protocol`). Al agregar entre hops, se suman **por categoría**, no para un único número «tamaño del prompt». No trates `input_tokens + cache_*` agregados como cardinalidad única del contexto.
 
 **Tabla comparativa**
 
-| Aspecto | `Step.usage` | `WorkflowResult.usage` |
-|---------|--------------|------------------------|
-| Alcance | Un hop de inferencia (un POST) | Workflow E2E (consumo facturado agregado) |
-| Origen | Wire: `IAnthropicResponse.usage` o StepBuffer | Agregación gateway |
-| Cuándo se fija | Al cerrar el Step (`message_stop` / response sync) | Una vez en hook `Stop` / `SubagentStop` / `StopFailure` |
-| Relación con Anthropic | Copia 1:1 del campo wire | **No existe** en ningún JSON de respuesta única |
+| Aspecto                | `Step.usage`                                       | `WorkflowResult.usage`                                  |
+| ---------------------- | -------------------------------------------------- | ------------------------------------------------------- |
+| Alcance                | Un hop de inferencia (un POST)                     | Workflow E2E (consumo facturado agregado)               |
+| Origen                 | Wire: `IAnthropicResponse.usage` o StepBuffer      | Agregación gateway                                      |
+| Cuándo se fija         | Al cerrar el Step (`message_stop` / response sync) | Una vez en hook `Stop` / `SubagentStop` / `StopFailure` |
+| Relación con Anthropic | Copia 1:1 del campo wire                           | **No existe** en ningún JSON de respuesta única         |
 
 **Anti-patrón**
 
@@ -518,10 +518,10 @@ Los campos `cache_read_input_tokens` y `cache_creation_input_tokens` son **categ
 **Ejemplo multi-Step (main workflow, sin subagente)**
 
 | Step | `stopReason` | `usage` (ejemplo) |
-|------|--------------|-------------------|
-| 0 | `tool_use` | 1200 in / 80 out |
-| 1 | `tool_use` | 2400 in / 120 out |
-| 2 | `end_turn` | 2600 in / 200 out |
+| ---- | ------------ | ----------------- |
+| 0    | `tool_use`   | 1200 in / 80 out  |
+| 1    | `tool_use`   | 2400 in / 120 out |
+| 2    | `end_turn`   | 2600 in / 200 out |
 
 `WorkflowResult.usage` = suma aritmética de los tres (6200 in / 400 out), **no** el usage del Step 2 solo (2600 in / 200 out). Los 6200 `input_tokens` agregados son **consumo facturado acumulado** (1200+2400+2600), no el tamaño del prompt del Step 2 (2600). Omitir Steps 0–1 subestima el **coste**; usar solo el último Step no sustituye al agregado para facturación E2E.
 
@@ -538,16 +538,15 @@ Al cierre de un workflow **main**, el usage agregado incluye tokens de sub-workf
 
 ```typescript
 aggregateWorkflowUsage(closedSteps, completedChildWorkflows) =
-  sumStepUsage(closedSteps) +
-  sumChildWorkflowUsage(completedChildWorkflows);
+  sumStepUsage(closedSteps) + sumChildWorkflowUsage(completedChildWorkflows);
 ```
 
 Donde `completedChildWorkflows` son workflows `kind: 'subagent'` enlazados vía `ToolUse.childWorkflowId` cuyo `result` ya existe al cerrar el padre.
 
-| Entidad | Qué incluye en `usage` |
-|---------|------------------------|
-| Sub-workflow hijo `WorkflowResult` | Σ `Step.usage` cerrados del hijo (auditoría del subagente) |
-| Main `WorkflowResult` | Σ Steps cerrados del main **+** Σ `result.usage` de hijos completados (visión E2E) |
+| Entidad                            | Qué incluye en `usage`                                                             |
+| ---------------------------------- | ---------------------------------------------------------------------------------- |
+| Sub-workflow hijo `WorkflowResult` | Σ `Step.usage` cerrados del hijo (auditoría del subagente)                         |
+| Main `WorkflowResult`              | Σ Steps cerrados del main **+** Σ `result.usage` de hijos completados (visión E2E) |
 
 **Ejemplo con subagente**
 
@@ -561,10 +560,10 @@ Main workflow
 └── Step 2: 2600/200  (end_turn)
 ```
 
-| Entidad | `usage` agregado |
-|---------|------------------|
-| Sub-workflow `WorkflowResult` | 8000 in / 450 out |
-| Main `WorkflowResult` | 6200+8000 in / 400+450 out (Steps main + rollup hijo) |
+| Entidad                       | `usage` agregado                                      |
+| ----------------------------- | ----------------------------------------------------- |
+| Sub-workflow `WorkflowResult` | 8000 in / 450 out                                     |
+| Main `WorkflowResult`         | 6200+8000 in / 400+450 out (Steps main + rollup hijo) |
 
 **Métricas a nivel Session**
 
@@ -576,25 +575,25 @@ Sumar todos los `WorkflowResult.usage` de una Session (main + sub) **contaría d
 
 **Tres actores**
 
-| Actor | Qué «dice» | Canal |
-|-------|------------|-------|
-| **Modelo (API Anthropic)** | Bloques estructurados por hop (`text`, `tool_use`, thinking, …) | Tráfico proxied → `Step.assistantMessage` (StepBuffer / sync) |
-| **Claude Code (orquestador)** | «El turno terminó; este fue el último texto assistant» | Hook `Stop` / `SubagentStop` → `last_assistant_message` |
-| **Gateway** | Observa y persiste; no reescribe | `WorkflowResult.finalText` = passthrough del hook |
+| Actor                         | Qué «dice»                                                      | Canal                                                         |
+| ----------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------- |
+| **Modelo (API Anthropic)**    | Bloques estructurados por hop (`text`, `tool_use`, thinking, …) | Tráfico proxied → `Step.assistantMessage` (StepBuffer / sync) |
+| **Claude Code (orquestador)** | «El turno terminó; este fue el último texto assistant»          | Hook `Stop` / `SubagentStop` → `last_assistant_message`       |
+| **Gateway**                   | Observa y persiste; no reescribe                                | `WorkflowResult.finalText` = passthrough del hook             |
 
 **Orquestador** = Claude Code: ejecuta tools, arma `messages[]`, decide cuándo un turno/workflow terminó y emite el hook de cierre. El gateway **no** cierra el workflow porque observó `stop_reason: end_turn` en el wire; cierra al recibir `Stop` / `SubagentStop` (con las reglas de **§9.4**).
 
-Referencia normativa del campo hook: [Hooks reference — Stop / SubagentStop](https://code.claude.com/docs/en/hooks). Cita abreviada: *«The `last_assistant_message` field contains the **text content** of Claude's / the subagent's **final response**, so hooks can access it without parsing the transcript file.»*
+Referencia normativa del campo hook: [Hooks reference — Stop / SubagentStop](https://code.claude.com/docs/en/hooks). Cita abreviada: _«The `last_assistant_message` field contains the **text content** of Claude's / the subagent's **final response**, so hooks can access it without parsing the transcript file.»_
 
 **Tabla comparativa**
 
-| Aspecto | `IAnthropicResponse.content` / `Step.assistantMessage` | `WorkflowResult.finalText` |
-|---------|----------------------------------------------------------|----------------------------|
-| Alcance | Un hop de inferencia (un Step) | Workflow E2E al cierre del turno |
-| Origen | Wire proxied: StepBuffer o parse sync | Hook Claude Code (`last_assistant_message`) |
-| Formato | `IAnthropicContentBlock[]` (text, tool_use, thinking, …) | `string` plano |
-| Cuándo se fija | Al cerrar el Step (`message_stop` / response sync) | Una vez en hook `Stop` / `SubagentStop` (`StopFailure` solo si el campo viene) |
-| Relación con Anthropic | Campo estándar de la API | **No existe** en ningún `IAnthropicResponse`; señal del orquestador |
+| Aspecto                | `IAnthropicResponse.content` / `Step.assistantMessage`   | `WorkflowResult.finalText`                                                     |
+| ---------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| Alcance                | Un hop de inferencia (un Step)                           | Workflow E2E al cierre del turno                                               |
+| Origen                 | Wire proxied: StepBuffer o parse sync                    | Hook Claude Code (`last_assistant_message`)                                    |
+| Formato                | `IAnthropicContentBlock[]` (text, tool_use, thinking, …) | `string` plano                                                                 |
+| Cuándo se fija         | Al cerrar el Step (`message_stop` / response sync)       | Una vez en hook `Stop` / `SubagentStop` (`StopFailure` solo si el campo viene) |
+| Relación con Anthropic | Campo estándar de la API                                 | **No existe** en ningún `IAnthropicResponse`; señal del orquestador            |
 
 **Anti-patrón**
 
@@ -605,13 +604,13 @@ Referencia normativa del campo hook: [Hooks reference — Stop / SubagentStop](h
 - **Es:** texto plano de la **última respuesta assistant** del ámbito que cierra el hook — `Stop` → agente main en ese turno; `SubagentStop` → subagente (`kind: 'subagent'`).
 - **No es** agregado de Steps, historial concatenado, ni volcado de `content` del wire.
 
-| No es | Por qué |
-|-------|---------|
-| `IAnthropicResponse.content` | Wire de **un POST**; el workflow tiene N Steps |
-| Concatenación de todos los Steps | Informe inventado por el gateway |
-| `tool_result` de tools | Mensajes user-side en el historial |
+| No es                                         | Por qué                                         |
+| --------------------------------------------- | ----------------------------------------------- |
+| `IAnthropicResponse.content`                  | Wire de **un POST**; el workflow tiene N Steps  |
+| Concatenación de todos los Steps              | Informe inventado por el gateway                |
+| `tool_result` de tools                        | Mensajes user-side en el historial              |
 | Resumen del subagente en el workflow **main** | Main cierra con `Stop`; hijo con `SubagentStop` |
-| Texto reconstruido desde SSE / StepBuffer | Capa wire → `Step`, no cierre E2E |
+| Texto reconstruido desde SSE / StepBuffer     | Capa wire → `Step`, no cierre E2E               |
 
 **Dónde está el detalle estructurado**
 
@@ -656,23 +655,23 @@ sequenceDiagram
 
 **Sub-workflows**
 
-| Workflow | Hook de cierre | `finalText` |
-|----------|----------------|-------------|
-| Main (`kind: 'main'`) | `Stop` | Último texto assistant del agente main en el turno |
-| Subagente (`kind: 'subagent'`) | `SubagentStop` | Último texto assistant del subagente |
+| Workflow                       | Hook de cierre | `finalText`                                        |
+| ------------------------------ | -------------- | -------------------------------------------------- |
+| Main (`kind: 'main'`)          | `Stop`         | Último texto assistant del agente main en el turno |
+| Subagente (`kind: 'subagent'`) | `SubagentStop` | Último texto assistant del subagente               |
 
 El `finalText` del main **no** incluye el resumen del hijo; el padre observa el subagente vía `ToolUse` / `tool_result` en Steps propios.
 
 **Casos límite**
 
-| Situación | `finalText` esperado | Notas |
-|-----------|---------------------|-------|
-| Cierre normal (`Stop` / `SubagentStop`, reglas OK) | `last_assistant_message` del hook | Caso principal |
-| Subagente completado | `last_assistant_message` de `SubagentStop` | Alcance = respuesta del hijo |
-| `StopFailure` (error API) | Opcional / a menudo ausente | Passthrough si existe; ver **§9.6** |
-| Hook sin `last_assistant_message` | `undefined` | Sin fallback silencioso desde Steps |
-| `PostToolBatch` con `decision: block` | Puede faltar | `outcome: 'aborted'` |
-| Sin hook `Stop` (stall, interrupt) | Workflow puede no cerrarse | Limitación conocida |
+| Situación                                          | `finalText` esperado                       | Notas                               |
+| -------------------------------------------------- | ------------------------------------------ | ----------------------------------- |
+| Cierre normal (`Stop` / `SubagentStop`, reglas OK) | `last_assistant_message` del hook          | Caso principal                      |
+| Subagente completado                               | `last_assistant_message` de `SubagentStop` | Alcance = respuesta del hijo        |
+| `StopFailure` (error API)                          | Opcional / a menudo ausente                | Passthrough si existe; ver **§9.6** |
+| Hook sin `last_assistant_message`                  | `undefined`                                | Sin fallback silencioso desde Steps |
+| `PostToolBatch` con `decision: block`              | Puede faltar                               | `outcome: 'aborted'`                |
+| Sin hook `Stop` (stall, interrupt)                 | Workflow puede no cerrarse                 | Limitación conocida                 |
 
 **Propósito del campo**
 
@@ -702,18 +701,18 @@ function deriveFinalText(hook: ClaudeHookEvent): string | undefined {
 
 **Rol:** Unidad de observabilidad que agrupa inferencia, respuesta del modelo y ejecución/resultados de tools de un ciclo.
 
-| Campo | Tipo | Origen | Notas |
-|-------|------|--------|-------|
-| `id` | `string` | — | |
-| `workflowId` | `string` | — | |
-| `index` | `number` | — | Orden 0-based en el workflow |
-| `inferenceRequest` | `IAnthropicRequest` | Tráfico proxied | Snapshot al abrir el step |
-| `assistantMessage` | `IAnthropicMessage` | StepBuffer / sync | Respuesta consolidada; `role: 'assistant'`. Origen: **StepBuffer** al `message_stop` si `stream: true`; parseo de `IAnthropicResponse` si sync |
-| `toolUses` | `ToolUse[]` | Correlador + hooks | 0..N; solo si hubo `tool_use` en la respuesta |
-| `usage?` | `IAnthropicUsage` | Wire Anthropic | Homólogo de `IAnthropicResponse.usage`: StepBuffer (`message_delta`) o response sync. **Solo** el hop de inferencia del Step; agregación E2E → **§9.6** |
-| `stopReason?` | `string` | Wire Anthropic | `tool_use`, `end_turn`, …; desde StepBuffer o response sync |
-| `startedAt` | `Date` | Gateway | |
-| `closedAt?` | `Date` | Gateway | |
+| Campo              | Tipo                | Origen             | Notas                                                                                                                                                   |
+| ------------------ | ------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`               | `string`            | —                  |                                                                                                                                                         |
+| `workflowId`       | `string`            | —                  |                                                                                                                                                         |
+| `index`            | `number`            | —                  | Orden 0-based en el workflow                                                                                                                            |
+| `inferenceRequest` | `IAnthropicRequest` | Tráfico proxied    | Snapshot al abrir el step                                                                                                                               |
+| `assistantMessage` | `IAnthropicMessage` | StepBuffer / sync  | Respuesta consolidada; `role: 'assistant'`. Origen: **StepBuffer** al `message_stop` si `stream: true`; parseo de `IAnthropicResponse` si sync          |
+| `toolUses`         | `ToolUse[]`         | Correlador + hooks | 0..N; solo si hubo `tool_use` en la respuesta                                                                                                           |
+| `usage?`           | `IAnthropicUsage`   | Wire Anthropic     | Homólogo de `IAnthropicResponse.usage`: StepBuffer (`message_delta`) o response sync. **Solo** el hop de inferencia del Step; agregación E2E → **§9.6** |
+| `stopReason?`      | `string`            | Wire Anthropic     | `tool_use`, `end_turn`, …; desde StepBuffer o response sync                                                                                             |
+| `startedAt`        | `Date`              | Gateway            |                                                                                                                                                         |
+| `closedAt?`        | `Date`              | Gateway            |                                                                                                                                                         |
 
 **Ciclo de vida:**
 
@@ -728,12 +727,12 @@ stateDiagram-v2
 
 **Casos de Step:**
 
-| Caso | `assistantMessage` | `toolUses` | Step siguiente |
-|------|-------------------|------------|----------------|
-| Respuesta con tools | Contiene `tool_use` | ≥ 1, completados vía hooks | Su `inferenceRequest.messages` incluye `tool_result` |
-| Respuesta final del workflow | Solo texto | 0 | No hay step posterior en el mismo workflow |
-| Tool Agent (subagente) | `tool_use` Agent | 1 + `childWorkflowId` | Padre continúa tras `SubagentStop` + `PostToolUse(Agent)` |
-| Error API en inferencia | Parcial o ausente | 0 | Workflow → `failed` vía `StopFailure` |
+| Caso                         | `assistantMessage`  | `toolUses`                 | Step siguiente                                            |
+| ---------------------------- | ------------------- | -------------------------- | --------------------------------------------------------- |
+| Respuesta con tools          | Contiene `tool_use` | ≥ 1, completados vía hooks | Su `inferenceRequest.messages` incluye `tool_result`      |
+| Respuesta final del workflow | Solo texto          | 0                          | No hay step posterior en el mismo workflow                |
+| Tool Agent (subagente)       | `tool_use` Agent    | 1 + `childWorkflowId`      | Padre continúa tras `SubagentStop` + `PostToolUse(Agent)` |
+| Error API en inferencia      | Parcial o ausente   | 0                          | Workflow → `failed` vía `StopFailure`                     |
 
 **Invariantes:**
 
@@ -750,11 +749,11 @@ stateDiagram-v2
 
 **Tabla de proyección:**
 
-| Concepto | Dominio (§10) | Disco `causal-workflows-v1` (Parte IV) |
-| -------- | ------------- | -------------------------------------- |
-| Step | Ciclo inferencia + tools | `steps/MM/` (1 POST + `tools/`) |
-| Fase tools | Estado `AwaitingTools` en correlador | Directorios `tools/KK-slug/` bajo el step |
-| Cierre | `PostToolUse` completa todas las tools o `end_turn` | Correlador cierra + emite evento al bus (§23) |
+| Concepto   | Dominio (§10)                                       | Disco `causal-workflows-v1` (Parte IV)        |
+| ---------- | --------------------------------------------------- | --------------------------------------------- |
+| Step       | Ciclo inferencia + tools                            | `steps/MM/` (1 POST + `tools/`)               |
+| Fase tools | Estado `AwaitingTools` en correlador                | Directorios `tools/KK-slug/` bajo el step     |
+| Cierre     | `PostToolUse` completa todas las tools o `end_turn` | Correlador cierra + emite evento al bus (§23) |
 
 ---
 
@@ -762,18 +761,18 @@ stateDiagram-v2
 
 **Rol:** Registro de observabilidad de una invocación de herramienta. Claude Code ejecuta; el gateway observa vía hooks y bloques en mensajes proxied.
 
-| Campo | Tipo | Notas |
-|-------|------|-------|
-| `id` | `string` | Coincide con `id` del bloque `tool_use` / `tool_use_id` en hooks |
-| `stepId` | `string` | |
-| `name` | `string` | Nombre de herramienta (`Bash`, `Read`, `Agent`, …) |
-| `arguments` | `unknown` | `input` del bloque `tool_use` |
-| `status` | `ToolUseStatus` | `'pending' \| 'running' \| 'completed' \| 'rejected' \| 'error'` |
-| `toolUseBlock` | `IAnthropicContentBlock` | `type: 'tool_use'` |
-| `toolResultBlock?` | `IAnthropicContentBlock` | `type: 'tool_result'` |
-| `childWorkflowId?` | `string` | Solo si `name === 'Agent'` (subagente) |
-| `startedAt?` | `Date` | |
-| `completedAt?` | `Date` | |
+| Campo              | Tipo                     | Notas                                                            |
+| ------------------ | ------------------------ | ---------------------------------------------------------------- |
+| `id`               | `string`                 | Coincide con `id` del bloque `tool_use` / `tool_use_id` en hooks |
+| `stepId`           | `string`                 |                                                                  |
+| `name`             | `string`                 | Nombre de herramienta (`Bash`, `Read`, `Agent`, …)               |
+| `arguments`        | `unknown`                | `input` del bloque `tool_use`                                    |
+| `status`           | `ToolUseStatus`          | `'pending' \| 'running' \| 'completed' \| 'rejected' \| 'error'` |
+| `toolUseBlock`     | `IAnthropicContentBlock` | `type: 'tool_use'`                                               |
+| `toolResultBlock?` | `IAnthropicContentBlock` | `type: 'tool_result'`                                            |
+| `childWorkflowId?` | `string`                 | Solo si `name === 'Agent'` (subagente)                           |
+| `startedAt?`       | `Date`                   |                                                                  |
+| `completedAt?`     | `Date`                   |                                                                  |
 
 **Integración Anthropic:**
 
@@ -797,27 +796,27 @@ tool_result → toolResultBlock  (tool_use_id, content, is_error)
 
 ## 12. Invariantes globales (G1–G19)
 
-| # | Regla |
-|---|--------|
-| G1 | Todo `Workflow` pertenece a exactamente una `Session`. |
-| G2 | Todo `Step` pertenece a exactamente un `Workflow`. |
-| G3 | Todo `ToolUse` pertenece a exactamente un `Step`. |
-| G4 | `LanguageModel.providerId` debe existir en el registro de proveedores conocido (validación en aplicación). |
-| G5 | Un sub-workflow tiene `parentWorkflowId` y `parentToolUseId` obligatorios. |
-| G6 | No hay ciclos en la cadena de sub-workflows. |
-| G7 | Mensajes y bloques en Steps/ToolUses usan únicamente tipos Anthropic ya definidos. |
-| G8 | El dominio gateway no contiene colecciones persistidas de `AnthropicSseEvent`; ver **§20** (StepBuffer y decisión SSE). |
-| G9 | Step con `stopReason === 'tool_use'` implica `toolUses.length >= 1` al cerrarse. |
-| G10 | Los `tool_result` del Step N aparecen en `inferenceRequest.messages` del Step N+1, no como campo separado en Step N. |
-| G11 | StepBuffer no persiste eventos SSE; solo el correlador persiste el Step al cerrarlo. |
-| G12 | `WorkflowResult` no contiene campos duplicados de un solo Step (`stopReason`, `assistantMessage`, etc.); eso permanece en `Step`. Ver **§9.2**. |
-| G13 | `stepCount` y `usage` en `WorkflowResult` consideran solo Steps con `closedAt` definido (más rollup de hijos en main). Ver **§9.3**, **§9.6** y **§9.6.1**. |
-| G14 | `WorkflowResult.usage` no debe derivarse del `usage` de un único POST; es agregación gateway por hop. No debe interpretarse como cardinalidad única del contexto. Ver **§9.6** y **§9.6.1**. |
-| G15 | `WorkflowResult.usage` de un workflow **main** incluye rollup de sub-workflows completados enlazados por `ToolUse.childWorkflowId`. Ver **§9.6**. |
-| G16 | Métricas a nivel **Session** suman solo `WorkflowResult.usage` de workflows `kind: 'main'` (evitar doble conteo padre/hijo). Consumo facturado acumulado, no cardinalidad de contexto. Ver **§9.6** y **§9.6.1**. |
-| G17 | `WorkflowResult.finalText` no debe derivarse de `IAnthropicResponse.content` ni de `Step.assistantMessage`; proviene del hook (`last_assistant_message`). Ver **§9.7**. |
+| #   | Regla                                                                                                                                                                                                                                      |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| G1  | Todo `Workflow` pertenece a exactamente una `Session`.                                                                                                                                                                                     |
+| G2  | Todo `Step` pertenece a exactamente un `Workflow`.                                                                                                                                                                                         |
+| G3  | Todo `ToolUse` pertenece a exactamente un `Step`.                                                                                                                                                                                          |
+| G4  | `LanguageModel.providerId` debe existir en el registro de proveedores conocido (validación en aplicación).                                                                                                                                 |
+| G5  | Un sub-workflow tiene `parentWorkflowId` y `parentToolUseId` obligatorios.                                                                                                                                                                 |
+| G6  | No hay ciclos en la cadena de sub-workflows.                                                                                                                                                                                               |
+| G7  | Mensajes y bloques en Steps/ToolUses usan únicamente tipos Anthropic ya definidos.                                                                                                                                                         |
+| G8  | El dominio gateway no contiene colecciones persistidas de `AnthropicSseEvent`; ver **§20** (StepBuffer y decisión SSE).                                                                                                                    |
+| G9  | Step con `stopReason === 'tool_use'` implica `toolUses.length >= 1` al cerrarse.                                                                                                                                                           |
+| G10 | Los `tool_result` del Step N aparecen en `inferenceRequest.messages` del Step N+1, no como campo separado en Step N.                                                                                                                       |
+| G11 | StepBuffer no persiste eventos SSE; solo el correlador persiste el Step al cerrarlo.                                                                                                                                                       |
+| G12 | `WorkflowResult` no contiene campos duplicados de un solo Step (`stopReason`, `assistantMessage`, etc.); eso permanece en `Step`. Ver **§9.2**.                                                                                            |
+| G13 | `stepCount` y `usage` en `WorkflowResult` consideran solo Steps con `closedAt` definido (más rollup de hijos en main). Ver **§9.3**, **§9.6** y **§9.6.1**.                                                                                |
+| G14 | `WorkflowResult.usage` no debe derivarse del `usage` de un único POST; es agregación gateway por hop. No debe interpretarse como cardinalidad única del contexto. Ver **§9.6** y **§9.6.1**.                                               |
+| G15 | `WorkflowResult.usage` de un workflow **main** incluye rollup de sub-workflows completados enlazados por `ToolUse.childWorkflowId`. Ver **§9.6**.                                                                                          |
+| G16 | Métricas a nivel **Session** suman solo `WorkflowResult.usage` de workflows `kind: 'main'` (evitar doble conteo padre/hijo). Consumo facturado acumulado, no cardinalidad de contexto. Ver **§9.6** y **§9.6.1**.                          |
+| G17 | `WorkflowResult.finalText` no debe derivarse de `IAnthropicResponse.content` ni de `Step.assistantMessage`; proviene del hook (`last_assistant_message`). Ver **§9.7**.                                                                    |
 | G18 | El correlador emite eventos de telemetría al bus (`IEventBus`); `SessionPersistence` consume eventos del bus para proyectar a disco. El bus es unidireccional (emisor → suscriptores); la persistencia no muta el correlador. Ver **§23**. |
-| G19 | El timer de timeout de `ToolUse` vive en el correlador; `SessionPersistence` no implementa timers de timeout propios. La persistencia reacciona al evento `tool_result` (timeout) emitido por el correlador. Ver **§18.1**. |
+| G19 | El timer de timeout de `ToolUse` vive en el correlador; `SessionPersistence` no implementa timers de timeout propios. La persistencia reacciona al evento `tool_result` (timeout) emitido por el correlador. Ver **§18.1**.                |
 
 ---
 
@@ -835,12 +834,7 @@ type ProviderKind = 'anthropic' | 'vertex' | 'bedrock' | 'custom';
 type WorkflowKind = 'main' | 'subagent';
 
 // WorkflowStatus
-type WorkflowStatus =
-  | 'pending'
-  | 'running'
-  | 'completed'
-  | 'failed'
-  | 'aborted';
+type WorkflowStatus = 'pending' | 'running' | 'completed' | 'failed' | 'aborted';
 
 // WorkflowOutcome
 type WorkflowOutcome = 'success' | 'api_error' | 'aborted' | 'unknown';
@@ -849,40 +843,35 @@ type WorkflowOutcome = 'success' | 'api_error' | 'aborted' | 'unknown';
 type WorkflowClosedByEvent = 'Stop' | 'SubagentStop' | 'StopFailure';
 
 // ToolUseStatus
-type ToolUseStatus =
-  | 'pending'
-  | 'running'
-  | 'completed'
-  | 'rejected'
-  | 'error';
+type ToolUseStatus = 'pending' | 'running' | 'completed' | 'rejected' | 'error';
 ```
 
 ### Interfaces DTO (`interfaces/gateway/`)
 
 Contratos planos para persistencia, API REST del gateway o eventos. Sin lógica.
 
-| Interfaz | Propósito |
-|----------|-----------|
-| `IProvider` | Snapshot de Provider |
-| `ILanguageModel` | Snapshot de LanguageModel |
-| `ISession` | Session serializable |
-| `IWorkflow` | Workflow serializable |
-| `IStep` | Step serializable |
-| `IToolUse` | ToolUse serializable |
-| `IWorkflowResult` | Resultado final |
+| Interfaz          | Propósito                 |
+| ----------------- | ------------------------- |
+| `IProvider`       | Snapshot de Provider      |
+| `ILanguageModel`  | Snapshot de LanguageModel |
+| `ISession`        | Session serializable      |
+| `IWorkflow`       | Workflow serializable     |
+| `IStep`           | Step serializable         |
+| `IToolUse`        | ToolUse serializable      |
+| `IWorkflowResult` | Resultado final           |
 
 Las clases en `models/gateway/` implementan estas interfaces (mismo patrón que `Request` / `Response` con Anthropic).
 
 ### Clases de dominio (`models/gateway/`)
 
-| Clase | Implementa | Comportamiento |
-|-------|------------|----------------|
-| `Provider` | `IProvider` | Validación de `kind` / `baseUrl` |
-| `LanguageModel` | `ILanguageModel` | `toModelId(): string` |
-| `Session` | `ISession` | `addWorkflow()`, `getActiveWorkflow()` |
-| `Workflow` | `IWorkflow` | `addStep()`, `isSubWorkflow()` |
-| `Step` | `IStep` | `hasToolCalls()`, `isTerminal()` |
-| `ToolUse` | `IToolUse` | `markRunning()`, `isSubagent()` |
+| Clase           | Implementa       | Comportamiento                         |
+| --------------- | ---------------- | -------------------------------------- |
+| `Provider`      | `IProvider`      | Validación de `kind` / `baseUrl`       |
+| `LanguageModel` | `ILanguageModel` | `toModelId(): string`                  |
+| `Session`       | `ISession`       | `addWorkflow()`, `getActiveWorkflow()` |
+| `Workflow`      | `IWorkflow`      | `addStep()`, `isSubWorkflow()`         |
+| `Step`          | `IStep`          | `hasToolCalls()`, `isTerminal()`       |
+| `ToolUse`       | `IToolUse`       | `markRunning()`, `isSubagent()`        |
 
 ### Dependencias entre capas
 
@@ -944,11 +933,11 @@ El detalle completo de la composición por capa (incluido el mapa archivo → ca
 
 ## 14. Sistema de correlación: tres planos de señal
 
-| Plano | Borde | Señales | Cuándo llega | Responsabilidad |
-| ----- | ----- | ------- | ------------ | --------------- |
-| **A — Identidad** | Wire | `X-Claude-Code-Agent-Id`, `X-Claude-Code-Parent-Agent-Id` (headers HTTP en cada POST) | `request_received` | Grafo de agentes por sesión; apertura/ruteo de sub-workflow en disco **sin** depender de pending. |
-| **B — Delegación** | Wire | SSE content blocks `tool_use` con `name: "Agent"` / `"Explore"` / `"Plan"` | `message_stop` del padre | `tool_use_id`, `prompt`, `subagent_type`, modo parallel/background; join con hijo identificado por plano A. |
-| **C — Ciclo E2E** | Hooks | `UserPromptSubmit`, `SubagentStart`, `SubagentStop`, `Stop`, `StopFailure`, `PreToolUse`, `PostToolUse`, `PostToolUseFailure` | Eventos lifecycle Claude Code | Lifecycle workflow; estado `ToolUse`; **cierre autoritativo**; `WorkflowResult.finalText`. |
+| Plano              | Borde | Señales                                                                                                                       | Cuándo llega                  | Responsabilidad                                                                                             |
+| ------------------ | ----- | ----------------------------------------------------------------------------------------------------------------------------- | ----------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| **A — Identidad**  | Wire  | `X-Claude-Code-Agent-Id`, `X-Claude-Code-Parent-Agent-Id` (headers HTTP en cada POST)                                         | `request_received`            | Grafo de agentes por sesión; apertura/ruteo de sub-workflow en disco **sin** depender de pending.           |
+| **B — Delegación** | Wire  | SSE content blocks `tool_use` con `name: "Agent"` / `"Explore"` / `"Plan"`                                                    | `message_stop` del padre      | `tool_use_id`, `prompt`, `subagent_type`, modo parallel/background; join con hijo identificado por plano A. |
+| **C — Ciclo E2E**  | Hooks | `UserPromptSubmit`, `SubagentStart`, `SubagentStop`, `Stop`, `StopFailure`, `PreToolUse`, `PostToolUse`, `PostToolUseFailure` | Eventos lifecycle Claude Code | Lifecycle workflow; estado `ToolUse`; **cierre autoritativo**; `WorkflowResult.finalText`.                  |
 
 **Complementariedad:**
 
@@ -958,22 +947,22 @@ El detalle completo de la composición por capa (incluido el mapa archivo → ca
 
 ### 14.1 Claves de correlación
 
-| Clave | Uso |
-| ----- | --- |
-| `session_id` | Agrupa `Session` y workflows activos; presente en hooks y header HTTP. |
+| Clave            | Uso                                                                              |
+| ---------------- | -------------------------------------------------------------------------------- |
+| `session_id`     | Agrupa `Session` y workflows activos; presente en hooks y header HTTP.           |
 | Ventana temporal | Requests proxied entre `UserPromptSubmit` y `Stop` → mismo workflow main activo. |
-| `agent_id` | Identifica sub-workflows; headers HTTP (plano A) + hooks (plano C). |
-| `tool_use_id` | Enlaza `PreToolUse` ↔ `PostToolUse` ↔ `ToolUse.id`; correlación tool↔subagente. |
-| Orden de llegada | Desempate cuando falte `session_id` en request HTTP (header/metadata). |
+| `agent_id`       | Identifica sub-workflows; headers HTTP (plano A) + hooks (plano C).              |
+| `tool_use_id`    | Enlaza `PreToolUse` ↔ `PostToolUse` ↔ `ToolUse.id`; correlación tool↔subagente.  |
+| Orden de llegada | Desempate cuando falte `session_id` en request HTTP (header/metadata).           |
 
 ### 14.2 Estado en memoria del correlador
 
-| Estado | Responsable | Descripción |
-| ------ | ----------- | ----------- |
-| `activeWorkflowBySession` | Correlador | Workflow main/sub activo por sesión; indexado por `session_id`. |
-| `activeStepBySession` | Correlador | Step abierto (esperando `message_stop` o cierre de tools). |
-| `pendingToolUses` | Correlador | `tool_use` blocks observados en SSE pendientes de `PostToolUse` hook. |
-| `stepBufferByRequestId` | StepBuffer | Una instancia por POST stream activo; ensambla deltas SSE → `assistantMessage`. |
+| Estado                    | Responsable | Descripción                                                                     |
+| ------------------------- | ----------- | ------------------------------------------------------------------------------- |
+| `activeWorkflowBySession` | Correlador  | Workflow main/sub activo por sesión; indexado por `session_id`.                 |
+| `activeStepBySession`     | Correlador  | Step abierto (esperando `message_stop` o cierre de tools).                      |
+| `pendingToolUses`         | Correlador  | `tool_use` blocks observados en SSE pendientes de `PostToolUse` hook.           |
+| `stepBufferByRequestId`   | StepBuffer  | Una instancia por POST stream activo; ensambla deltas SSE → `assistantMessage`. |
 
 ```mermaid
 sequenceDiagram
@@ -1041,15 +1030,15 @@ sequenceDiagram
 
 ## 15. Reglas de autoridad por concern
 
-| Concern | Autoridad primaria | Fallback / complemento |
-| ------- | ------------------ | ---------------------- |
-| **Sesión** | Header HTTP `x-cc-audit-session` + reconciliar `session_id` en payload hook. | Si hook llega antes de primer POST: crear sesión desde hook. |
-| **Abrir workflow main** | Wire request `fresh` (abre en disco). | Hook `UserPromptSubmit` alinea/confirma workflow main en repo. |
-| **Abrir workflow subagente** | Plano A: cabeceras `agent-id` + `parent-agent-id` en POST `fresh`. | Legacy: `findInteractionWithPendingAgents` + prompt si CC < 2.1.139. Hook `SubagentStart` confirma y enlaza `childWorkflowId`. |
-| **Enlazar `tool_use_id` ↔ hijo** | Plano B: SSE `registerPendingTool` + `joinToolUseToSubagent`. | Hook `PreToolUse`/`PostToolUse` enriquecen `ToolUse.status` y timing. |
-| **Cerrar workflow** | **Plano C**: hook `Stop` / `SubagentStop` (autoritativo). | Wire `stop_reason` como cierre **transitorio** solo si hook no llega (ventana documentada). |
-| **Texto final E2E** | **Plano C**: `last_assistant_message` del hook de cierre. | `output/result.json` (`finalText` + `steps[]`); reconstrucción SSE como fallback si hook no incluye el campo. |
-| **Join paralelo (N hijos)** | Prompt match → FIFO por orden SSE (limitación documentada). | Si CC envía agent-id único por hijo, join es trivial por identidad. |
+| Concern                          | Autoridad primaria                                                           | Fallback / complemento                                                                                                         |
+| -------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| **Sesión**                       | Header HTTP `x-cc-audit-session` + reconciliar `session_id` en payload hook. | Si hook llega antes de primer POST: crear sesión desde hook.                                                                   |
+| **Abrir workflow main**          | Wire request `fresh` (abre en disco).                                        | Hook `UserPromptSubmit` alinea/confirma workflow main en repo.                                                                 |
+| **Abrir workflow subagente**     | Plano A: cabeceras `agent-id` + `parent-agent-id` en POST `fresh`.           | Legacy: `findInteractionWithPendingAgents` + prompt si CC < 2.1.139. Hook `SubagentStart` confirma y enlaza `childWorkflowId`. |
+| **Enlazar `tool_use_id` ↔ hijo** | Plano B: SSE `registerPendingTool` + `joinToolUseToSubagent`.                | Hook `PreToolUse`/`PostToolUse` enriquecen `ToolUse.status` y timing.                                                          |
+| **Cerrar workflow**              | **Plano C**: hook `Stop` / `SubagentStop` (autoritativo).                    | Wire `stop_reason` como cierre **transitorio** solo si hook no llega (ventana documentada).                                    |
+| **Texto final E2E**              | **Plano C**: `last_assistant_message` del hook de cierre.                    | `output/result.json` (`finalText` + `steps[]`); reconstrucción SSE como fallback si hook no incluye el campo.                  |
+| **Join paralelo (N hijos)**      | Prompt match → FIFO por orden SSE (limitación documentada).                  | Si CC envía agent-id único por hijo, join es trivial por identidad.                                                            |
 
 ---
 
@@ -1057,9 +1046,9 @@ sequenceDiagram
 
 Referencia: [LLM gateway — Claude Code](https://code.claude.com/docs/en/llm-gateway).
 
-| Cabecera HTTP | Campo dominio | Persistencia disco |
-| ------------- | ------------- | ------------------ |
-| `X-Claude-Code-Agent-Id` | `agentId` en workflow activo y `ParentContext` | `meta.json` → `agentId` |
+| Cabecera HTTP                   | Campo dominio                                      | Persistencia disco                           |
+| ------------------------------- | -------------------------------------------------- | -------------------------------------------- |
+| `X-Claude-Code-Agent-Id`        | `agentId` en workflow activo y `ParentContext`     | `meta.json` → `agentId`                      |
 | `X-Claude-Code-Parent-Agent-Id` | `parentAgentId`; indexado en `IWorkflowRepository` | `parentContext.parentAgentId` en `meta.json` |
 
 **Servicio puro** `resolveAgentContext(headers)` → `{ agentId?, parentAgentId?, isSubagentRequest: boolean }` (case-insensitive, sin I/O).
@@ -1097,12 +1086,12 @@ El registro de tools pending en SSE:
 
 **Política de join (función pura, dominio):**
 
-| Caso | Resolución | `correlationMethod` |
-| ---- | ---------- | ------------------- |
-| 1 pending en step, sin ambigüedad | Asignar | `'unique-pending'` o `'agent-headers'` si headers presentes |
-| N pending, prompt del hijo matcha exactamente con un pending | Asignar por prompt | `'prompt'` |
-| N pending, sin match determinístico | FIFO (orden de registro SSE) | `'fifo-pending'` |
-| 0 pending (hook llegó antes que SSE complete) | Diferir join hasta `confirmSubagentFromHook` | provisional |
+| Caso                                                         | Resolución                                   | `correlationMethod`                                         |
+| ------------------------------------------------------------ | -------------------------------------------- | ----------------------------------------------------------- |
+| 1 pending en step, sin ambigüedad                            | Asignar                                      | `'unique-pending'` o `'agent-headers'` si headers presentes |
+| N pending, prompt del hijo matcha exactamente con un pending | Asignar por prompt                           | `'prompt'`                                                  |
+| N pending, sin match determinístico                          | FIFO (orden de registro SSE)                 | `'fifo-pending'`                                            |
+| 0 pending (hook llegó antes que SSE complete)                | Diferir join hasta `confirmSubagentFromHook` | provisional                                                 |
 
 **Metadata en `message_stop` del padre** (enriquecimiento, no apertura):
 
@@ -1119,18 +1108,18 @@ El registro de tools pending en SSE:
 
 **Mapa de eventos hook → acción en dominio:**
 
-| Hook | Efecto en `IWorkflowRepository` / correlador |
-| ---- | --------------------------------------------- |
-| `SessionStart` | Crear/reconciliar metadata de sesión (`externalSessionId`). |
-| `SessionEnd` | Marcar sesión inactiva. |
-| `UserPromptSubmit` | Abrir o alinear workflow `kind: main` en repo. Si wire ya abrió la interacción, enlazar. |
-| `SubagentStart` | `confirmSubagentFromHook(agentId, toolUseId?)` — confirma sub-workflow; enlaza `ToolUse.childWorkflowId` si join ya ocurrió. |
-| `PreToolUse` | `ToolUse.status = 'running'`; registrar `startedAt`. |
-| `PostToolUse` | Completar `ToolUse`; si `name === 'Agent'`, enriquecer metadata del enlace hijo. |
-| `PostToolUseFailure` | `ToolUse.status = 'error'`. |
-| `SubagentStop` | Cerrar workflow hijo → `buildWorkflowResult` → `WorkflowResult.finalText` desde `last_assistant_message`. |
-| `Stop` | Cerrar workflow main (con reglas: no cerrar si `stop_hook_active === true` o si hay `background_tasks` pendientes). |
-| `StopFailure` | Cerrar con `outcome: 'api_error'`. |
+| Hook                 | Efecto en `IWorkflowRepository` / correlador                                                                                 |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `SessionStart`       | Crear/reconciliar metadata de sesión (`externalSessionId`).                                                                  |
+| `SessionEnd`         | Marcar sesión inactiva.                                                                                                      |
+| `UserPromptSubmit`   | Abrir o alinear workflow `kind: main` en repo. Si wire ya abrió la interacción, enlazar.                                     |
+| `SubagentStart`      | `confirmSubagentFromHook(agentId, toolUseId?)` — confirma sub-workflow; enlaza `ToolUse.childWorkflowId` si join ya ocurrió. |
+| `PreToolUse`         | `ToolUse.status = 'running'`; registrar `startedAt`.                                                                         |
+| `PostToolUse`        | Completar `ToolUse`; si `name === 'Agent'`, enriquecer metadata del enlace hijo.                                             |
+| `PostToolUseFailure` | `ToolUse.status = 'error'`.                                                                                                  |
+| `SubagentStop`       | Cerrar workflow hijo → `buildWorkflowResult` → `WorkflowResult.finalText` desde `last_assistant_message`.                    |
+| `Stop`               | Cerrar workflow main (con reglas: no cerrar si `stop_hook_active === true` o si hay `background_tasks` pendientes).          |
+| `StopFailure`        | Cerrar con `outcome: 'api_error'`.                                                                                           |
 
 **Reglas de cierre:**
 
@@ -1245,20 +1234,20 @@ Para obtener `Step.assistantMessage` completo (texto, `tool_use`, thinking, etc.
 
 > **Decisión:** Los eventos SSE Anthropic se tipan y parsean en el borde, se ensamblan en RAM mediante StepBuffer durante cada inferencia con `stream: true`, y solo se persisten snapshots de dominio (`Step`, `ToolUse`, `WorkflowResult`) al cerrarse un Step o un workflow. No se persisten deltas SSE como entidad de dominio. El reenvío transparente al cliente y el StepBuffer operan en paralelo y son obligatorios en streaming.
 
-| Artefacto | Capa | ¿Persiste? |
-|-----------|------|------------|
-| `AnthropicSseEvent` / `IAnthropicSse*` | Tipado borde | No como entidad; solo contrato de parseo |
-| **StepBuffer** | Infraestructura proxy | No (RAM efímera por inferencia) |
-| **Correlador** | Infraestructura | No (estado en memoria de Steps abiertos) |
-| `Step`, `ToolUse`, `WorkflowResult` | Dominio gateway | Sí (snapshot al cerrar Step o workflow) |
-| Stream hacia Claude Code | Proxy | Efímero; reenvío transparente |
+| Artefacto                              | Capa                  | ¿Persiste?                               |
+| -------------------------------------- | --------------------- | ---------------------------------------- |
+| `AnthropicSseEvent` / `IAnthropicSse*` | Tipado borde          | No como entidad; solo contrato de parseo |
+| **StepBuffer**                         | Infraestructura proxy | No (RAM efímera por inferencia)          |
+| **Correlador**                         | Infraestructura       | No (estado en memoria de Steps abiertos) |
+| `Step`, `ToolUse`, `WorkflowResult`    | Dominio gateway       | Sí (snapshot al cerrar Step o workflow)  |
+| Stream hacia Claude Code               | Proxy                 | Efímero; reenvío transparente            |
 
 ### 20.2 Alternativa considerada (rechazada)
 
-| Enfoque | Descripción | Motivo de rechazo |
-|---------|-------------|-------------------------|
-| **Event store SSE** | `Workflow.streamEvents: AnthropicSseEvent[]` persistido como entidad de dominio | Redundante con el Step final; alto volumen; sin valor de negocio gateway |
-| **Entidad por tipo de delta** | Modelos gateway por cada evento delta (`ContentBlockDelta`, etc.) | Duplica `IAnthropicSse*`; complejidad sin retorno |
+| Enfoque                       | Descripción                                                                     | Motivo de rechazo                                                        |
+| ----------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| **Event store SSE**           | `Workflow.streamEvents: AnthropicSseEvent[]` persistido como entidad de dominio | Redundante con el Step final; alto volumen; sin valor de negocio gateway |
+| **Entidad por tipo de delta** | Modelos gateway por cada evento delta (`ContentBlockDelta`, etc.)               | Duplica `IAnthropicSse*`; complejidad sin retorno                        |
 
 > **Nota:** el gateway persiste `streaming/*.ndjson` como log forense de chunks SSE (capa 2), pero esto es una proyección de infraestructura, no una entidad de dominio. El dominio solo conoce snapshots cerrados (`Step.assistantMessage`).
 
@@ -1282,20 +1271,20 @@ stopReason?      : string
 
 En `message_stop`, StepBuffer notifica al **correlador** (`onInferenceComplete`) y **descarta** su RAM. No persiste deltas.
 
-| Evento SSE | Acción StepBuffer |
-|------------|-------------------|
-| `message_start` | Inicializar buffer |
-| `content_block_start` / `content_block_delta` / `content_block_stop` | Acumular bloques parciales |
-| `message_delta` | Capturar `stop_reason`, `usage` |
-| `message_stop` | Ensamblar `IAnthropicMessage`; handoff al correlador |
-| `ping` | Ignorar |
+| Evento SSE                                                           | Acción StepBuffer                                    |
+| -------------------------------------------------------------------- | ---------------------------------------------------- |
+| `message_start`                                                      | Inicializar buffer                                   |
+| `content_block_start` / `content_block_delta` / `content_block_stop` | Acumular bloques parciales                           |
+| `message_delta`                                                      | Capturar `stop_reason`, `usage`                      |
+| `message_stop`                                                       | Ensamblar `IAnthropicMessage`; handoff al correlador |
+| `ping`                                                               | Ignorar                                              |
 
-| StepBuffer **sí** | StepBuffer **no** |
-|-------------------|-------------------|
-| Ensambla la **respuesta del modelo** de **un** POST | Ejecuta tools |
-| Trabaja solo durante **una** inferencia (un stream) | Agrupa tools con inferencia (eso es el **correlador**) |
-| Vive en RAM hasta `message_stop` | Persiste deltas en BD |
-| Parsea SSE Anthropic | Recibe `tool_result` (vienen después, vía hooks o en el **siguiente** POST) |
+| StepBuffer **sí**                                   | StepBuffer **no**                                                           |
+| --------------------------------------------------- | --------------------------------------------------------------------------- |
+| Ensambla la **respuesta del modelo** de **un** POST | Ejecuta tools                                                               |
+| Trabaja solo durante **una** inferencia (un stream) | Agrupa tools con inferencia (eso es el **correlador**)                      |
+| Vive en RAM hasta `message_stop`                    | Persiste deltas en BD                                                       |
+| Parsea SSE Anthropic                                | Recibe `tool_result` (vienen después, vía hooks o en el **siguiente** POST) |
 
 **Analogía:**
 
@@ -1381,11 +1370,11 @@ Si `stopReason === 'tool_use'`, el Step **no** se persiste en `message_stop`; pe
 
 La estrategia de **salida hacia Claude Code** es ortogonal al StepBuffer interno: el proxy puede reenviar eventos Anthropic **y** ensamblar en StepBuffer al mismo tiempo.
 
-| Estrategia | Qué ve el cliente | Cuándo usarla |
-|------------|-------------------|---------------|
-| **Proxy transparente** | Eventos Anthropic reenviados | Cliente compatible con protocolo Anthropic |
-| **Eventos de dominio** | `text.delta`, `tool.started`, etc. | UI de producto; abstracción multi-proveedor (futuro) |
-| **Solo resultado** | Sin stream; datos al cerrar workflow | Clientes simples (futuro) |
+| Estrategia             | Qué ve el cliente                    | Cuándo usarla                                        |
+| ---------------------- | ------------------------------------ | ---------------------------------------------------- |
+| **Proxy transparente** | Eventos Anthropic reenviados         | Cliente compatible con protocolo Anthropic           |
+| **Eventos de dominio** | `text.delta`, `tool.started`, etc.   | UI de producto; abstracción multi-proveedor (futuro) |
+| **Solo resultado**     | Sin stream; datos al cerrar workflow | Clientes simples (futuro)                            |
 
 ### 20.7 Implicaciones y tradeoffs
 
@@ -1458,14 +1447,14 @@ stateDiagram-v2
 
 **Escenarios documentados:**
 
-| # | Orden temporal | Comportamiento |
-| - | -------------- | -------------- |
-| 1 | POST subagent (headers) → `SubagentStart` → steps → `SubagentStop` | Caso nominal: wire abre `sub-agent/workflow/`, hook confirma y cierra. |
-| 2 | `SubagentStart` → POST subagent (headers) | Crear workflow `status: pending` indexado por `agent_id`; al llegar POST, reconciliar con carpeta en disco. |
-| 3 | Main: wire `fresh` → `UserPromptSubmit` | Wire abre interacción; hook alinea workflow main en repo (idempotente). |
-| 4 | Wire cierra por `stop_reason` → hook `Stop` llega después | Hook **gana**: reescribir `output/result.json` con `finalText` del orquestador; `closedByEvent: 'Stop'`; actualizar `meta.json` con `status: completed`. |
-| 5 | Hook `Stop` llega → wire `stop_reason` en request posterior | Hook ya cerró; wire posterior se ignora para cierre (workflow ya inmutable). |
-| 6 | CC < 2.1.139: sin cabeceras ni hooks configurados | Fallback completo a heurística (pending+prompt + cierre por wire). |
+| #   | Orden temporal                                                     | Comportamiento                                                                                                                                           |
+| --- | ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | POST subagent (headers) → `SubagentStart` → steps → `SubagentStop` | Caso nominal: wire abre `sub-agent/workflow/`, hook confirma y cierra.                                                                                   |
+| 2   | `SubagentStart` → POST subagent (headers)                          | Crear workflow `status: pending` indexado por `agent_id`; al llegar POST, reconciliar con carpeta en disco.                                              |
+| 3   | Main: wire `fresh` → `UserPromptSubmit`                            | Wire abre interacción; hook alinea workflow main en repo (idempotente).                                                                                  |
+| 4   | Wire cierra por `stop_reason` → hook `Stop` llega después          | Hook **gana**: reescribir `output/result.json` con `finalText` del orquestador; `closedByEvent: 'Stop'`; actualizar `meta.json` con `status: completed`. |
+| 5   | Hook `Stop` llega → wire `stop_reason` en request posterior        | Hook ya cerró; wire posterior se ignora para cierre (workflow ya inmutable).                                                                             |
+| 6   | CC < 2.1.139: sin cabeceras ni hooks configurados                  | Fallback completo a heurística (pending+prompt + cierre por wire).                                                                                       |
 
 **Idempotencia:** hooks pueden llegar duplicados (reintentos); el handler verifica estado en repo antes de mutar.
 
@@ -1477,12 +1466,12 @@ Esta sección define el puente entre la Parte III (correlación runtime) y la Pa
 
 ### 23.1 Ubicación PKA del bus de eventos
 
-| Componente | Capa PKA | Rol |
-| ---------- | -------- | --- |
-| `IEventBus` (port) | 1 (Domain) | Contrato abstracto de emisión/suscripción; sin I/O. |
-| `EventBus` (adapter) | 2 (Services) | Implementación async in-process (pub/sub en memoria). No contiene lógica de dominio. |
-| `IWorkflowRepository` / Correlador | 2 (Services) | Adapter en memoria; mutado por handlers de capa 3. Al mutar, emite eventos al bus. |
-| `SessionPersistence` | 2 (Services) | Suscriptor independiente; consume eventos del bus y proyecta a disco bajo `sessions/`. |
+| Componente                         | Capa PKA     | Rol                                                                                    |
+| ---------------------------------- | ------------ | -------------------------------------------------------------------------------------- |
+| `IEventBus` (port)                 | 1 (Domain)   | Contrato abstracto de emisión/suscripción; sin I/O.                                    |
+| `EventBus` (adapter)               | 2 (Services) | Implementación async in-process (pub/sub en memoria). No contiene lógica de dominio.   |
+| `IWorkflowRepository` / Correlador | 2 (Services) | Adapter en memoria; mutado por handlers de capa 3. Al mutar, emite eventos al bus.     |
+| `SessionPersistence`               | 2 (Services) | Suscriptor independiente; consume eventos del bus y proyecta a disco bajo `sessions/`. |
 
 ### 23.2 Flujo: handler → correlador → bus → persistencia
 
@@ -1546,21 +1535,21 @@ sequenceDiagram
 
 Eventos emitidos por el correlador al bus. `SessionPersistence` consume todos (`*`) para proyectar a disco.
 
-| Mutación en correlador | Evento emitido | Datos clave |
-| ---------------------- | -------------- | ----------- |
-| Crear/reconciliar sesión | `session_start` | `session_id` |
-| Abrir workflow main | `workflow_start` | `workflow_id`, `session_id`, `kind: 'main'`, `agent_id` |
-| Abrir workflow subagente | `workflow_spawn` | `workflow_id`, `parent_workflow_id`, `triggering_tool_use_id`, `agent_id` |
-| Abrir Step | `step_request` | `request_id`, `workflow_id`, body snapshot (request) |
-| StepBuffer completa inferencia | `step_inference_complete` | `assistantMessage`, `usage`, `stopReason` |
-| Registrar ToolUse pending (SSE) | `tool_call` | `tool_use_id`, `tool_name`, `input`, `workflow_id` |
-| Completar ToolUse (hook o timeout §18.1) | `tool_result` | `tool_use_id`, `result`, `is_error`, `execution_duration_ms` |
-| Cerrar Step | `step_closed` | Step snapshot completo (index, assistantMessage, toolUses, usage, stopReason) |
-| Chunk SSE (streaming forense) | `stream_chunk` | Chunk data, sequence number, `request_id` |
-| Cerrar workflow (éxito) | `workflow_complete` | `WorkflowResult` snapshot, `stop_reason` |
-| Cerrar workflow (fallo/cancel) | `workflow_cancel` | `outcome`, `reason` |
-| Token usage por hop | `token_usage` | `model_id`, `usage` desglose |
-| Cerrar sesión | `session_complete` | `session_id`, `duration_ms` |
+| Mutación en correlador                   | Evento emitido            | Datos clave                                                                   |
+| ---------------------------------------- | ------------------------- | ----------------------------------------------------------------------------- |
+| Crear/reconciliar sesión                 | `session_start`           | `session_id`                                                                  |
+| Abrir workflow main                      | `workflow_start`          | `workflow_id`, `session_id`, `kind: 'main'`, `agent_id`                       |
+| Abrir workflow subagente                 | `workflow_spawn`          | `workflow_id`, `parent_workflow_id`, `triggering_tool_use_id`, `agent_id`     |
+| Abrir Step                               | `step_request`            | `request_id`, `workflow_id`, body snapshot (request)                          |
+| StepBuffer completa inferencia           | `step_inference_complete` | `assistantMessage`, `usage`, `stopReason`                                     |
+| Registrar ToolUse pending (SSE)          | `tool_call`               | `tool_use_id`, `tool_name`, `input`, `workflow_id`                            |
+| Completar ToolUse (hook o timeout §18.1) | `tool_result`             | `tool_use_id`, `result`, `is_error`, `execution_duration_ms`                  |
+| Cerrar Step                              | `step_closed`             | Step snapshot completo (index, assistantMessage, toolUses, usage, stopReason) |
+| Chunk SSE (streaming forense)            | `stream_chunk`            | Chunk data, sequence number, `request_id`                                     |
+| Cerrar workflow (éxito)                  | `workflow_complete`       | `WorkflowResult` snapshot, `stop_reason`                                      |
+| Cerrar workflow (fallo/cancel)           | `workflow_cancel`         | `outcome`, `reason`                                                           |
+| Token usage por hop                      | `token_usage`             | `model_id`, `usage` desglose                                                  |
+| Cerrar sesión                            | `session_complete`        | `session_id`, `duration_ms`                                                   |
 
 > **Nota:** `stream_chunk` es emitido directamente por el handler SSE (capa 3) al bus, no por el correlador. El handler SSE opera en dos ramas paralelas: reenvío transparente a Claude Code y emisión de chunks al bus. El StepBuffer consume los mismos eventos SSE internamente para ensamblar `assistantMessage` (§20).
 
@@ -1626,20 +1615,20 @@ flowchart TB
 
 > Esta parte describe el **layout de persistencia** `causal-workflows-v1`. La conexión entre el correlador runtime (Parte III) y la persistencia se define en **§23**: el correlador emite eventos de telemetría al bus; `SessionPersistence` los consume y proyecta a disco. Esta parte se centra en el **layout de disco** y las **reglas de proyección**.
 >
-> **`causal-workflows-v1`** es el identificador de versión de este layout. Se llama *causal* porque modela cada sesión LLM como un árbol causal en disco: cada workflow contiene steps, cada step contiene tools, y las tools de tipo Agent anidan un sub-workflow hijo bajo la tool invocadora — reflejando la cadena causa→efecto. El sufijo *v1* permite evoluciones futuras del schema sin romper retrocompatibilidad (cada `meta.json` declara su `layoutVersion`).
+> **`causal-workflows-v1`** es el identificador de versión de este layout. Se llama _causal_ porque modela cada sesión LLM como un árbol causal en disco: cada workflow contiene steps, cada step contiene tools, y las tools de tipo Agent anidan un sub-workflow hijo bajo la tool invocadora — reflejando la cadena causa→efecto. El sufijo _v1_ permite evoluciones futuras del schema sin romper retrocompatibilidad (cada `meta.json` declara su `layoutVersion`).
 >
 > `SessionPersistence` se suscribe al bus de eventos (§23) y reacciona a eventos de telemetría (`session_start`, `workflow_start`, `workflow_spawn`, `step_request`, `tool_call`, `tool_result`, `stream_chunk`, `workflow_complete`, `workflow_cancel`, `session_complete`, `token_usage`). No hay acoplamiento directo con handlers de transporte ni con el correlador; la persistencia solo consume eventos del bus.
 
 **Conceptos clave de persistencia:**
 
-| Concepto | Definición en contexto de persistencia |
-| -------- | -------------------------------------- |
-| **Session** | Unidad de continuidad; agrupa todos los workflows de una sesión de usuario. Directorio raíz `sessions/<id>/`. |
-| **Workflow** | Ejecución E2E (main o subagent). Directorio `workflows/NN/`. Contiene `meta.json` (identidad + estado), `input/`, `output/result.json`, `steps/`. |
-| **Step** | Un turno LLM (request + response + tools). Directorio `steps/MM/`. |
-| **Tool** | Invocación de herramienta. Directorio `tools/KK-<slug>/` bajo el step que la produjo. |
-| **Sub-agent** | Workflow anidado bajo una tool Agent. Directorio `sub-agent/workflow/` bajo la tool invocadora. |
-| **Side-request** | Request auxiliar (preflight, quota). Directorio `side-requests/NN/` (reservado). |
+| Concepto         | Definición en contexto de persistencia                                                                                                            |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Session**      | Unidad de continuidad; agrupa todos los workflows de una sesión de usuario. Directorio raíz `sessions/<id>/`.                                     |
+| **Workflow**     | Ejecución E2E (main o subagent). Directorio `workflows/NN/`. Contiene `meta.json` (identidad + estado), `input/`, `output/result.json`, `steps/`. |
+| **Step**         | Un turno LLM (request + response + tools). Directorio `steps/MM/`.                                                                                |
+| **Tool**         | Invocación de herramienta. Directorio `tools/KK-<slug>/` bajo el step que la produjo.                                                             |
+| **Sub-agent**    | Workflow anidado bajo una tool Agent. Directorio `sub-agent/workflow/` bajo la tool invocadora.                                                   |
+| **Side-request** | Request auxiliar (preflight, quota). Directorio `side-requests/NN/` (reservado).                                                                  |
 
 ---
 
@@ -1649,11 +1638,11 @@ flowchart TB
 
 El layout utiliza **tres pares de conceptos distintos** según el nivel de anidamiento:
 
-| Nivel | Entrada | Salida | Ubicación física |
-|---|---|---|---|
-| **Workflow** | `input/` | `output/` | `workflows/00/input/prompt.json` / `output/result.json` |
-| **Step** | `request/` | `response/` | `steps/01/request/body.json` / `response/body.json` |
-| **Tool** | `input.json` | `result.json` | `tools/00-read/input.json` / `result.json` |
+| Nivel        | Entrada      | Salida        | Ubicación física                                        |
+| ------------ | ------------ | ------------- | ------------------------------------------------------- |
+| **Workflow** | `input/`     | `output/`     | `workflows/00/input/prompt.json` / `output/result.json` |
+| **Step**     | `request/`   | `response/`   | `steps/01/request/body.json` / `response/body.json`     |
+| **Tool**     | `input.json` | `result.json` | `tools/00-read/input.json` / `result.json`              |
 
 No existe homogeneidad terminológica, y esta **inconsistencia aparente es intencional**.
 
@@ -1664,6 +1653,7 @@ No existe homogeneidad terminológica, y esta **inconsistencia aparente es inten
 **Decisión:** Un workflow es una unidad de trabajo de alto nivel. Recibe un **input** (prompt del usuario o invocación de sub-agente) y produce un **output** (respuesta final tras todos los pasos, tools y sub-agentes).
 
 **Justificación:**
+
 - **Ambigüedad intencional:** Un workflow no sabe qué contiene su entrada o salida. Puede ser lenguaje natural, JSON, invocación programática, o el resultado de otro workflow.
 - **Abstracción de proceso:** `input/output` captura la noción de "algo entra, algo sale" sin asumir el formato o semántica interna.
 - **Independencia de transporte:** Un workflow no es una llamada HTTP; es un proceso lógico que puede ejecutarse localmente, en un sub-agente, o distribuirse.
@@ -1682,7 +1672,8 @@ No existe homogeneidad terminológica, y esta **inconsistencia aparente es inten
 **Decisión:** Un step es exactamente una llamada HTTP a un LLM provider. El directorio `request/` contiene el cuerpo enviado; el directorio `response/` contiene el cuerpo reconstruido de la respuesta del modelo.
 
 **Justificación:**
-- **Precisión técnica:** Cada step es *exactly one LLM request/response*. Los términos `request/response` reflejan fielmente esta naturaleza.
+
+- **Precisión técnica:** Cada step es _exactly one LLM request/response_. Los términos `request/response` reflejan fielmente esta naturaleza.
 - **Protocolo de transporte:** Un step implica latencia, códigos de estado HTTP, streaming, headers, timeouts y errores de red. `input/output` oscurecería esta realidad.
 - **Streaming chunks:** El directorio `response/streaming/` contiene chunks SSE individuales para reconstrucción forense. Esto es específico de un protocolo de streaming, no genérico a cualquier "output".
 
@@ -1693,6 +1684,7 @@ No existe homogeneidad terminológica, y esta **inconsistencia aparente es inten
 **Decisión:** Una tool es una función externa que el LLM invoca. Recibe **input** (argumentos serializados) y produce **result** (consecuencia de la ejecución, exitosa o fallida).
 
 **Justificación:**
+
 - **Dualidad éxito/error:** Una tool puede devolver un valor útil (`is_error: false`) o fallar con un error (`is_error: true`). El término `result` captura esta dualidad; `output` sugiere siempre producción exitosa.
 - **Efecto colateral:** Una tool no es una transformación pura; es una operación con efecto colateral (lectura de archivo, ejecución de comando, llamada API). `result` comunica que es la **consecuencia** de una ejecución, no meramente un producto.
 - **Consistencia con `is_error`:** El archivo `result.json` contiene `{ isError: boolean, result: unknown }`. Si fuera `output.json`, la propiedad `isError` sería semánticamente contradictoria.
@@ -1701,11 +1693,11 @@ No existe homogeneidad terminológica, y esta **inconsistencia aparente es inten
 
 ### 24.3. Tabla de decisiones de diseño
 
-| Nivel | Par elegido | Archivo de salida | Dominio semántico | Razón principal | Alternativa rechazada |
-|---|---|---|---|---|---|
-| Workflow | `input/output` | `output/result.json` | Proceso agéntico | Ambigüedad intencional del contenido; no es una llamada HTTP; `result` alineado con `IWorkflowResult` y dualidad outcome | `request/response` (HTTP); `output/response.json` y `output/body.json` (vocabulario HTTP en nivel de proceso) |
-| Step | `request/response` | `response/body.json` | Protocolo de red (LLM) | Precisión técnica: es exactamente una llamada HTTP con streaming | `input/output` (pierde naturaleza de transporte) |
-| Tool | `input/result` | `result.json` | Operación con efecto | Dualidad éxito/error (`is_error`); efecto colateral | `input/output` (`output` sugiere siempre éxito) |
+| Nivel    | Par elegido        | Archivo de salida    | Dominio semántico      | Razón principal                                                                                                          | Alternativa rechazada                                                                                         |
+| -------- | ------------------ | -------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
+| Workflow | `input/output`     | `output/result.json` | Proceso agéntico       | Ambigüedad intencional del contenido; no es una llamada HTTP; `result` alineado con `IWorkflowResult` y dualidad outcome | `request/response` (HTTP); `output/response.json` y `output/body.json` (vocabulario HTTP en nivel de proceso) |
+| Step     | `request/response` | `response/body.json` | Protocolo de red (LLM) | Precisión técnica: es exactamente una llamada HTTP con streaming                                                         | `input/output` (pierde naturaleza de transporte)                                                              |
+| Tool     | `input/result`     | `result.json`        | Operación con efecto   | Dualidad éxito/error (`is_error`); efecto colateral                                                                      | `input/output` (`output` sugiere siempre éxito)                                                               |
 
 ### 24.4. ¿Por qué no homogeneizar?
 
@@ -1787,12 +1779,12 @@ El layout es **adaptativo**: los directorios sólo se crean cuando hay contenido
 
 ### 26.1 Contadores e índices internos de persistencia
 
-| Contador / índice | Tipo | Descripción |
-| ----------------- | ---- | ----------- |
-| `counters.workflow` | `number` | Índice global de workflow en la sesión (00, 01, …). Incrementa en cada `workflow_start`. |
-| `counters.toolUse` | `number` | Índice global de tool use por step (00, 01, …). Genera el prefijo `KK` en `tools/KK-<slug>/`. |
-| `workflowStepCounters` | `Map<workflowId, number>` | Contador de steps por workflow; cada workflow tiene numeración independiente (00, 01, …). |
-| `workflowLastSteps` | `Map<workflowId, number>` | Último step conocido por workflow; usado para `workflow_complete` y cálculo de `stepCount`. |
+| Contador / índice      | Tipo                      | Descripción                                                                                   |
+| ---------------------- | ------------------------- | --------------------------------------------------------------------------------------------- |
+| `counters.workflow`    | `number`                  | Índice global de workflow en la sesión (00, 01, …). Incrementa en cada `workflow_start`.      |
+| `counters.toolUse`     | `number`                  | Índice global de tool use por step (00, 01, …). Genera el prefijo `KK` en `tools/KK-<slug>/`. |
+| `workflowStepCounters` | `Map<workflowId, number>` | Contador de steps por workflow; cada workflow tiene numeración independiente (00, 01, …).     |
+| `workflowLastSteps`    | `Map<workflowId, number>` | Último step conocido por workflow; usado para `workflow_complete` y cálculo de `stepCount`.   |
 
 Estos contadores viven en memoria dentro del servicio de persistencia y se reinician por sesión. No se persisten a disco directamente — la numeración de directorios refleja su valor.
 
@@ -1800,12 +1792,12 @@ Estos contadores viven en memoria dentro del servicio de persistencia y se reini
 
 Cada turno LLM = un step = un directorio `workflows/NN/steps/MM/`.
 
-| Lado del turno | Artefacto | Origen |
-| -------------- | --------- | ------ |
-| **Solicitud** | `steps/MM/request/body.json` | Cuerpo JSON enviado al endpoint LLM (`step_request.body`) |
-| **Respuesta (final)** | `steps/MM/response/body.json` | Reconstruido por `aggregateSseChunks` desde chunks SSE; o escrito directamente si no-streaming |
-| **Respuesta (legible)** | `steps/MM/response/body.parsed.md` | Render Markdown del body vía `MarkdownRendererService` |
-| **Respuesta (forense)** | `steps/MM/response/streaming/NNNN-chunk.ndjson` | Cada evento `stream_chunk` como artefacto individual |
+| Lado del turno          | Artefacto                                       | Origen                                                                                         |
+| ----------------------- | ----------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| **Solicitud**           | `steps/MM/request/body.json`                    | Cuerpo JSON enviado al endpoint LLM (`step_request.body`)                                      |
+| **Respuesta (final)**   | `steps/MM/response/body.json`                   | Reconstruido por `aggregateSseChunks` desde chunks SSE; o escrito directamente si no-streaming |
+| **Respuesta (legible)** | `steps/MM/response/body.parsed.md`              | Render Markdown del body vía `MarkdownRendererService`                                         |
+| **Respuesta (forense)** | `steps/MM/response/streaming/NNNN-chunk.ndjson` | Cada evento `stream_chunk` como artefacto individual                                           |
 
 **Numeración de steps:**
 
@@ -1829,6 +1821,7 @@ workflows/00/steps/
 ### 27.1. Workflow sin tools (text-only response)
 
 **Flujo de eventos:**
+
 1. `session_start`
 2. `workflow_start (workflow_id=wf-A)`
 3. `step_request (request_id=req-1)`
@@ -1837,6 +1830,7 @@ workflows/00/steps/
 6. `session_complete`
 
 **Estructura generada:**
+
 ```text
 sessions/<sid>/
 ├── events.ndjson
@@ -1863,6 +1857,7 @@ sessions/<sid>/
 ### 27.2. Workflow con una tool (loop agéntico simple)
 
 **Flujo de eventos:**
+
 1. `session_start`, `workflow_start`
 2. `step_request (req-1)` → chunks → assistant emite tool_use
 3. `tool_call (tool_use_id=tu-A, name=Read)` ← step 00
@@ -1871,6 +1866,7 @@ sessions/<sid>/
 6. `workflow_complete (stop_reason=end_turn)`
 
 **Estructura generada:**
+
 ```text
 workflows/00/
 ├── meta.json
@@ -1889,6 +1885,7 @@ workflows/00/
 ```
 
 **Notas:**
+
 - `step_request` incrementa el contador local de steps del workflow vía `nextStepNum`.
 - `tool_call` usa `getCurrentStepNum` para asociar la tool al step actual (step 00).
 - `tool_result` se correlaciona por `tool_use_id` (no por índice posicional), tolerando llegadas fuera de orden.
@@ -1899,6 +1896,7 @@ workflows/00/
 Cuando el assistant emite múltiples `tool_use` blocks en el mismo step (batch paralelo de Claude), llegan varios `tool_call` consecutivos antes de los `tool_result`.
 
 **Flujo de eventos (resumido):**
+
 1. `step_request (req-1)` → chunks que incluyen 3 tool_use blocks (Read, Grep, WebFetch)
 2. `tool_call (tu-A=Read)`, `tool_call (tu-B=Grep)`, `tool_call (tu-C=WebFetch)` ← todas en step 00
 3. `tool_result` pueden llegar en **cualquier orden** (ej. B → C → A)
@@ -1906,6 +1904,7 @@ Cuando el assistant emite múltiples `tool_use` blocks en el mismo step (batch p
 5. ...
 
 **Estructura generada:**
+
 ```text
 workflows/00/steps/00/
 ├── request/body.json
@@ -1917,6 +1916,7 @@ workflows/00/steps/00/
 ```
 
 **Notas:**
+
 - Los índices `KK` reflejan el **orden de aparición en el assistant message**, no el orden de ejecución.
 - La correlación `tool_use_id` → location resuelve out-of-order.
 - El step `meta.json` puede registrar `observedExecutionMode: "parallel" | "sequential" | "mixed" | "unknown"` (campo reservado).
@@ -1926,6 +1926,7 @@ workflows/00/steps/00/
 **Detección:** El `WorkflowTracker` reconoce nombres de tools sub-agent: `Agent`, `Explore`, `Plan` (constante interna `SUBAGENT_TOOL_NAMES`). Cuando se emite `tool_call` con uno de estos nombres, se registra el `tool_use_id` en `pendingSubagentTools[parentAgentId]`. Al llegar `subagent_detected`, se consume el pending tool y se emite `workflow_spawn` enriquecido con `triggering_tool_use_id` y `triggering_tool_name`.
 
 **Flujo de eventos:**
+
 1. `workflow_start (wf-parent)` → step 00 del parent
 2. `tool_call (tu-agent-1, name=Agent)` en parent step 00
 3. `subagent_detected` (interno) → `workflow_spawn (wf-child, parent=wf-parent, triggering_tool_use_id=tu-agent-1)`
@@ -1936,6 +1937,7 @@ workflows/00/steps/00/
 8. `workflow_complete (wf-parent)`
 
 **Estructura generada (anidada bajo el tool invocador):**
+
 ```text
 workflows/00/                            # wf-parent
 ├── meta.json                            # kind=main
@@ -1964,6 +1966,7 @@ workflows/00/                            # wf-parent
 ```
 
 **Validaciones críticas:**
+
 - `workflow_spawn` SIN `triggering_tool_use_id` se rechaza con warning `subagent_spawn_missing_triggering_tool_use_id` (no se persiste).
 - No se crea **ningún** workflow top-level duplicado para sub-agents.
 - Los steps del sub-agent usan su contador **local** (independiente del parent).
@@ -1973,6 +1976,7 @@ workflows/00/                            # wf-parent
 Cuando el assistant emite múltiples `Agent`/`Explore`/`Plan` en el mismo step (ej. 3 reviewers en paralelo):
 
 **Estructura generada:**
+
 ```text
 workflows/00/steps/00/tools/
 ├── 00-agent/sub-agent/workflow/    # sub-agent 1
@@ -1992,14 +1996,14 @@ Cada uno se anida bajo su propia tool invocadora. El `WorkflowTracker` mantiene 
 
 ### 27.7. Sub-agents anidados — limitación Claude Code
 
-⚠️ **Limitación de Claude Code:** Esta sección describe una capacidad teórica del diseño de persistencia, pero **no se materializa en la práctica** con Claude Code actual. Según la documentación oficial de Claude Code, los sub-agentes no pueden crear otros sub-agentes (*"This prevents infinite nesting (subagents cannot spawn other subagents)"*). Esta es una limitación intencional del diseño de Claude Code para evitar anidamiento infinito.
+⚠️ **Limitación de Claude Code:** Esta sección describe una capacidad teórica del diseño de persistencia, pero **no se materializa en la práctica** con Claude Code actual. Según la documentación oficial de Claude Code, los sub-agentes no pueden crear otros sub-agentes (_"This prevents infinite nesting (subagents cannot spawn other subagents)"_). Esta es una limitación intencional del diseño de Claude Code para evitar anidamiento infinito.
 
 **Profundidad máxima en la práctica:**
 
-| Profundidad | ¿Posible? | Ejemplo |
-|---|---|---|
-| 0 → 1 | ✅ Sí | Main agent → code-reviewer (documentado en §27.4, §27.5, §27.6) |
-| 1 → 2+ | ❌ No | Sub-agent → sub-sub-agent (bloqueado por Claude Code) |
+| Profundidad | ¿Posible? | Ejemplo                                                         |
+| ----------- | --------- | --------------------------------------------------------------- |
+| 0 → 1       | ✅ Sí     | Main agent → code-reviewer (documentado en §27.4, §27.5, §27.6) |
+| 1 → 2+      | ❌ No     | Sub-agent → sub-sub-agent (bloqueado por Claude Code)           |
 
 **Capacidad teórica del diseño:**
 El diseño de persistencia es recursivo y soporta anidamiento arbitrario. Si un sub-agent pudiera invocar otra tool `Agent`, se generaría:
@@ -2013,13 +2017,15 @@ workflows/00/steps/00/tools/00-agent/sub-agent/workflow/
 El `resolveWorkflowLocation` resuelve la ubicación canónica para cualquier nivel de anidamiento usando el map `workflowLocations` keyed por `workflow_id`. Esta capacidad está implementada pero nunca se utiliza en la práctica debido a la limitación de Claude Code.
 
 **Referencias:**
-- Documentación oficial de Claude Code: *"This prevents infinite nesting (subagents cannot spawn other subagents)"*
+
+- Documentación oficial de Claude Code: _"This prevents infinite nesting (subagents cannot spawn other subagents)"_
 - GitHub issue #4182: "Sub-Agent Task Tool Not Exposed When Launching Nested Agents"
 - GitHub issue #19077: "[BUG] Sub-agents can't create sub-sub-agents, even with Task tool"
 
 ### 27.8. Workflow cancelado
 
 `workflow_cancel` actualiza el `meta.json` del workflow:
+
 ```json
 {
   "status": "cancelled",
@@ -2184,16 +2190,19 @@ Cada vez que se detecta un reintento (mismo `tool_use_id`), el escritor lee la m
 ### 28.7. Persistencia de tools: flujo `onToolCall` / `onToolResult`
 
 **Producción (step padre):** Al observar un bloque `tool_use` en `assistantMessage` de un step cerrado, el servicio de persistencia invoca `onToolCall`:
+
 1. Resuelve la ubicación del tool (`toolUseLocations`) usando `tool_use_id`.
 2. Crea `tools/KK-<slug>/` bajo el step correspondiente.
 3. Escribe `input.json` (entrada serializada) y `meta.json` (índice, nombre, status `pending`).
 
 **Consumo (step siguiente):** Al llegar `tool_result` (vía hooks `PostToolUse` o en `messages[]` del siguiente request), invoca `onToolResult`:
+
 1. Busca `tool_use_id` en `toolUseLocations` para resolver la ruta canónica.
 2. Escribe `result.json` (`{ isError, result }`).
 3. Actualiza `meta.json` con `status: 'completed'|'failed'|'denied'`, `consumedByStep`.
 
 **Correlación step↔tool:**
+
 - El step que **produce** el `tool_use` block es el padre de la tool (hereda `parentStepIndex`).
 - El step que **consume** el `tool_result` es el paso siguiente (`consumedByStep` en metadata).
 - Si `tool_use_id` no tiene match en `toolUseLocations`, se loggea warning sin interrumpir el flujo.
@@ -2208,19 +2217,19 @@ Se añaden propiedades al schema `StepMetadata`. Un monitor dinámico asíncrono
 
 **Valores posibles:**
 
-| Valor | Significado |
-| ----- | ----------- |
-| `"parallel"` | Múltiples tools ejecutándose concurrentemente (solapamiento temporal detectado). |
-| `"sequential"` | Tools ejecutadas una tras otra sin solapamiento. |
-| `"mixed"` | Combinación de ejecuciones paralelas y secuenciales en el mismo step. |
-| `"unknown"` | No se pudo determinar (p.ej. step con 0-1 tools o datos insuficientes). |
+| Valor          | Significado                                                                      |
+| -------------- | -------------------------------------------------------------------------------- |
+| `"parallel"`   | Múltiples tools ejecutándose concurrentemente (solapamiento temporal detectado). |
+| `"sequential"` | Tools ejecutadas una tras otra sin solapamiento.                                 |
+| `"mixed"`      | Combinación de ejecuciones paralelas y secuenciales en el mismo step.            |
+| `"unknown"`    | No se pudo determinar (p.ej. step con 0-1 tools o datos insuficientes).          |
 
 **Variables de entorno configurables (nombres a definir por SCP):**
 
-| Propósito | Descripción | Default sugerido |
-| --------- | ----------- | ---------------- |
-| Tool timeout | Timer del **correlador** (§18.1); `SessionPersistence` consume el evento `tool_result` (timeout), no implementa timer propio. | 30s |
-| Streaming max chunks | Límite de chunks SSE persistidos por step (protección contra streams infinitos). | 10000 |
+| Propósito            | Descripción                                                                                                                   | Default sugerido |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ---------------- |
+| Tool timeout         | Timer del **correlador** (§18.1); `SessionPersistence` consume el evento `tool_result` (timeout), no implementa timer propio. | 30s              |
+| Streaming max chunks | Límite de chunks SSE persistidos por step (protección contra streams infinitos).                                              | 10000            |
 
 ---
 
@@ -2230,11 +2239,11 @@ Se añaden propiedades al schema `StepMetadata`. Un monitor dinámico asíncrono
 
 Cada `stream_chunk` se persiste como artefacto independiente en `response/streaming/NNNN-chunk.ndjson` (numerado con 4 dígitos). Esto proporciona:
 
-| Aspecto | Beneficio |
-|---|---|
-| Crash recovery mid-stream | Total (chunks parciales preservados) |
-| Timeline forense | Reconstrucción exacta token-by-token |
-| Reproducibilidad | Cada chunk SSE es un artefacto inmutable |
+| Aspecto                   | Beneficio                                |
+| ------------------------- | ---------------------------------------- |
+| Crash recovery mid-stream | Total (chunks parciales preservados)     |
+| Timeline forense          | Reconstrucción exacta token-by-token     |
+| Reproducibilidad          | Cada chunk SSE es un artefacto inmutable |
 
 ### 29.2. Proceso `aggregateSseChunks`
 
@@ -2277,14 +2286,14 @@ Los chunks de tipo `ping` se descartan (no se escriben a disco). Esto evita ruid
 
 ```typescript
 type WorkflowLocation =
-  | { kind: "top-level"; workflowNum: number; workflowDir: string }
+  | { kind: 'top-level'; workflowNum: number; workflowDir: string }
   | {
-      kind: "nested-subagent";
+      kind: 'nested-subagent';
       parentWorkflowNum: number;
       parentStepNum: number;
       toolUseNum: number;
       toolName: string;
-      workflowDir: string;        // Path absoluto al directorio nested
+      workflowDir: string; // Path absoluto al directorio nested
     };
 ```
 
@@ -2321,34 +2330,34 @@ Todos usan `resolveWorkflowLocation(sessionId, workflowId)` para obtener el `wor
 
 ### 32.1. Mapeo de entidades
 
-| Entidad | Ruta `causal-workflows-v1` |
-|---|---|
-| Session | `sessions/<id>/` |
-| Workflow main | `workflows/NN/` |
-| Workflow subagent | `tools/KK-agent/sub-agent/workflow/` |
-| Step | `workflows/NN/steps/MM/` |
-| ToolUse | `steps/MM/tools/KK-slug/` |
-| `events.ndjson` | `sessions/<id>/events.ndjson` |
-| `session-metrics.json` | `sessions/<id>/session-metrics.json` |
-| `workflow-sequence.json` | `workflows/workflow-sequence.json` |
+| Entidad                  | Ruta `causal-workflows-v1`           |
+| ------------------------ | ------------------------------------ |
+| Session                  | `sessions/<id>/`                     |
+| Workflow main            | `workflows/NN/`                      |
+| Workflow subagent        | `tools/KK-agent/sub-agent/workflow/` |
+| Step                     | `workflows/NN/steps/MM/`             |
+| ToolUse                  | `steps/MM/tools/KK-slug/`            |
+| `events.ndjson`          | `sessions/<id>/events.ndjson`        |
+| `session-metrics.json`   | `sessions/<id>/session-metrics.json` |
+| `workflow-sequence.json` | `workflows/workflow-sequence.json`   |
 
 ### 32.2. Doble persistencia SSE (decisión explícita)
 
 El layout adopta `streaming/*.ndjson` (un archivo por chunk SSE) para forensia:
 
-| Aspecto | `streaming/*.ndjson` |
-|---|---|
-| Granularidad | Un archivo por chunk SSE |
-| Crash recovery | Total (chunks atómicos) |
-| Timeline forense | Cada chunk es un artefacto independiente |
-| Filtrado de pings | Pings descartados antes de persistir |
-| Reconstrucción | `aggregateSseChunks` estandarizado |
+| Aspecto           | `streaming/*.ndjson`                     |
+| ----------------- | ---------------------------------------- |
+| Granularidad      | Un archivo por chunk SSE                 |
+| Crash recovery    | Total (chunks atómicos)                  |
+| Timeline forense  | Cada chunk es un artefacto independiente |
+| Filtrado de pings | Pings descartados antes de persistir     |
+| Reconstrucción    | `aggregateSseChunks` estandarizado       |
 
 La persistencia de deltas SSE es una decisión de **proyección** (capa 2), ortogonal al dominio (G8):
 
-| Artefacto | Capa | ¿Persiste deltas SSE? |
-|---|---|---|
-| Agregado `Step` en dominio | 1 (Domain) | No — solo snapshot al cerrar step. |
+| Artefacto                     | Capa           | ¿Persiste deltas SSE?                                        |
+| ----------------------------- | -------------- | ------------------------------------------------------------ |
+| Agregado `Step` en dominio    | 1 (Domain)     | No — solo snapshot al cerrar step.                           |
 | `streaming/*.ndjson` en disco | 2 (Proyección) | Sí — decisión de auditoría humana SCP, ortogonal al dominio. |
 
 ### 32.3. `events.ndjson`: log cronológico centralizado
@@ -2356,6 +2365,7 @@ La persistencia de deltas SSE es una decisión de **proyección** (capa 2), orto
 `events.ndjson` es un append-only log de **todos** los eventos emitidos al bus (`session_start`, `workflow_start`, `step_request`, `tool_call`, `tool_result`, `stream_chunk`, `workflow_complete`, `session_complete`, etc.).
 
 Este artefacto proporciona:
+
 - **Verdad cronológica:** Orden exacto de todos los eventos, independiente de la estructura de directorios.
 - **Debugging:** Permite reconstruir el flujo completo de una sesión sin navegar el árbol de directorios.
 - **Auditoría:** Base para métricas, dashboards y análisis post-mortem.
@@ -2368,28 +2378,28 @@ Este artefacto proporciona:
 
 Criterios de conformidad para validar que la persistencia cumple el layout `causal-workflows-v1`. Derivados del test suite de referencia (`tests/2-services/session-persistence.test.ts`). Los casos marcados **Fuera de v1** se documentan en §40 y no son requisito de conformidad del layout vigente.
 
-| # | Caso | Qué valida | Conformidad |
-| - | ---- | ---------- | ----------- |
-| 1 | Persistencia de `events.ndjson` | Append-only log de todos los eventos de la sesión. | ✅ Conforme |
-| 2 | Agregación de `session-metrics.json` | Contadores (count, totals, cache_efficiency, finalize). | ✅ Conforme |
-| 3 | Workflow meta vía `workflow_start` | Creación de `meta.json` al iniciar workflow. | ✅ Conforme |
-| 4 | Tool input/output/meta con correlación | Escritura bajo `tools/KK/` con `input.json`, `result.json`, `meta.json`. | ✅ Conforme |
-| 5 | Sub-agent metadata anidada bajo tool invocador | Ausencia de workflow top-level duplicado; nested bajo step/tool padre. | ✅ Conforme |
-| 6 | Sub-agent steps dentro del nested workflow | Steps del hijo en `workflows/NN/steps/MM/` del directorio nested. | ✅ Conforme |
-| 7 | No crear `tools/` sin tools | Si un step no invoca tools, no se crea el directorio. | ✅ Conforme |
-| 8 | Out-of-order tool results | Correlación por `tool_use_id`, no por índice posicional. | Fuera de v1 (§40) |
-| 9 | Tool timeout (timer automático) | Timer automático del correlador (§18.1). Hoy la cadena `completeToolUse` → `tool_result` → persistencia (`result.json`) se observa vía hooks `PostToolUse`; el timer auto está fuera de v1. | Fuera de v1 (§40) |
-| 10 | Tool retry con `retryCount` | Detección por `tool_use_id` duplicado; `previousAttempts[]` en `meta.json`. | Fuera de v1 (§40) |
-| 11 | Workflow cancellation | Status `cancelled` + `cancellationReason` en `meta.json`. | ✅ Conforme |
-| 12 | Streaming chunks + body reconstruction | Chunks SSE → `body.json` / `body.parsed.md` correctos (text + tool_use + partial_json). | ✅ Conforme |
-| 13 | Filtrado de pings | Eventos `ping` excluidos de chunks persistidos. | ✅ Conforme |
-| 14 | Equivalencia stream-reconstructed ≡ direct write | Cuerpo reconstruido desde chunks idéntico al body directo. | ✅ Conforme |
-| 15 | `workflow-sequence.json` | Índice incremental de workflows por sesión. | ✅ Conforme |
-| 16 | `detectOrphans()` al startup | `meta.json` con `status ∈ {pending, running}` + `lastActivity` antigua → marcar huérfano. | Fuera de v1 (§40) |
-| 17 | `previousAttempts[]` en tool metadata | Historial de reintentos con timestamp y error. | Fuera de v1 (§40) |
-| 18 | Vistas coalesced | `body.coalesced.json` / `body.coalesced.parsed.md` integran sub-agentes recursivamente. | ✅ Conforme |
-| 19 | `input/` y `output/` de workflows | `prompt.json` al inicio; `result.json` + `result.parsed.md` al completar (`workflow_complete`). | ✅ Conforme |
-| 20 | `observedExecutionMode` en step metadata | Detección dinámica `parallel` / `sequential` de tools en un step. | Fuera de v1 (§40) |
+| #   | Caso                                             | Qué valida                                                                                                                                                                                  | Conformidad       |
+| --- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- |
+| 1   | Persistencia de `events.ndjson`                  | Append-only log de todos los eventos de la sesión.                                                                                                                                          | ✅ Conforme       |
+| 2   | Agregación de `session-metrics.json`             | Contadores (count, totals, cache_efficiency, finalize).                                                                                                                                     | ✅ Conforme       |
+| 3   | Workflow meta vía `workflow_start`               | Creación de `meta.json` al iniciar workflow.                                                                                                                                                | ✅ Conforme       |
+| 4   | Tool input/output/meta con correlación           | Escritura bajo `tools/KK/` con `input.json`, `result.json`, `meta.json`.                                                                                                                    | ✅ Conforme       |
+| 5   | Sub-agent metadata anidada bajo tool invocador   | Ausencia de workflow top-level duplicado; nested bajo step/tool padre.                                                                                                                      | ✅ Conforme       |
+| 6   | Sub-agent steps dentro del nested workflow       | Steps del hijo en `workflows/NN/steps/MM/` del directorio nested.                                                                                                                           | ✅ Conforme       |
+| 7   | No crear `tools/` sin tools                      | Si un step no invoca tools, no se crea el directorio.                                                                                                                                       | ✅ Conforme       |
+| 8   | Out-of-order tool results                        | Correlación por `tool_use_id`, no por índice posicional.                                                                                                                                    | Fuera de v1 (§40) |
+| 9   | Tool timeout (timer automático)                  | Timer automático del correlador (§18.1). Hoy la cadena `completeToolUse` → `tool_result` → persistencia (`result.json`) se observa vía hooks `PostToolUse`; el timer auto está fuera de v1. | Fuera de v1 (§40) |
+| 10  | Tool retry con `retryCount`                      | Detección por `tool_use_id` duplicado; `previousAttempts[]` en `meta.json`.                                                                                                                 | Fuera de v1 (§40) |
+| 11  | Workflow cancellation                            | Status `cancelled` + `cancellationReason` en `meta.json`.                                                                                                                                   | ✅ Conforme       |
+| 12  | Streaming chunks + body reconstruction           | Chunks SSE → `body.json` / `body.parsed.md` correctos (text + tool_use + partial_json).                                                                                                     | ✅ Conforme       |
+| 13  | Filtrado de pings                                | Eventos `ping` excluidos de chunks persistidos.                                                                                                                                             | ✅ Conforme       |
+| 14  | Equivalencia stream-reconstructed ≡ direct write | Cuerpo reconstruido desde chunks idéntico al body directo.                                                                                                                                  | ✅ Conforme       |
+| 15  | `workflow-sequence.json`                         | Índice incremental de workflows por sesión.                                                                                                                                                 | ✅ Conforme       |
+| 16  | `detectOrphans()` al startup                     | `meta.json` con `status ∈ {pending, running}` + `lastActivity` antigua → marcar huérfano.                                                                                                   | Fuera de v1 (§40) |
+| 17  | `previousAttempts[]` en tool metadata            | Historial de reintentos con timestamp y error.                                                                                                                                              | Fuera de v1 (§40) |
+| 18  | Vistas coalesced                                 | `body.coalesced.json` / `body.coalesced.parsed.md` integran sub-agentes recursivamente.                                                                                                     | ✅ Conforme       |
+| 19  | `input/` y `output/` de workflows                | `prompt.json` al inicio; `result.json` + `result.parsed.md` al completar (`workflow_complete`).                                                                                             | ✅ Conforme       |
+| 20  | `observedExecutionMode` en step metadata         | Detección dinámica `parallel` / `sequential` de tools en un step.                                                                                                                           | Fuera de v1 (§40) |
 
 ---
 
@@ -2450,12 +2460,12 @@ El diagrama muestra dos puntos de entrada en capa 5 (wire HTTP y hooks lifecycle
 
 ### 34.1 Componentes por capa (resumen)
 
-| Capa | Componentes |
-| ---- | ----------- |
-| **1** | `resolveAgentContext`, `joinToolUseToSubagent`, `buildWorkflowResult`, `deriveOutcome`, `deriveFinalText`, `aggregateWorkflowUsage`, `IWorkflowRepository`, `IEventBus`, `IProviderCatalog`, tipos hook (`ClaudeHookEvent`), `ParentContext`, `CorrelationMethod`. |
+| Capa  | Componentes                                                                                                                                                                                                                                                                                  |
+| ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **1** | `resolveAgentContext`, `joinToolUseToSubagent`, `buildWorkflowResult`, `deriveOutcome`, `deriveFinalText`, `aggregateWorkflowUsage`, `IWorkflowRepository`, `IEventBus`, `IProviderCatalog`, tipos hook (`ClaudeHookEvent`), `ParentContext`, `CorrelationMethod`.                           |
 | **2** | `WorkflowRepositoryService` (correlador: índices `sessionId+agentId`, `interactionDir`, `tool_use_id`), `EventBusService`, `SessionPersistenceService` (suscriptor), `StepAssemblerService`, `SseReconstructService`, `StreamTeeService`, `ProviderCatalogService`, `SessionMetricsService`. |
-| **3** | `AuditWorkflowHandler` (clasificación + routing), `AuditSseResponseHandler`, `AuditHookEventHandler`, `AuditWorkflowClosureHandler` (cierre + resultado), `AuditStandardResponseHandler`, `AuditUpstreamErrorHandler`, `FilterToolsHandler`. |
-| **5** | `POST /v1/messages` (proxy), `POST /hooks` (excluida de side-interactions, respuesta rápida 2xx). |
+| **3** | `AuditWorkflowHandler` (clasificación + routing), `AuditSseResponseHandler`, `AuditHookEventHandler`, `AuditWorkflowClosureHandler` (cierre + resultado), `AuditStandardResponseHandler`, `AuditUpstreamErrorHandler`, `FilterToolsHandler`.                                                 |
+| **5** | `POST /v1/messages` (proxy), `POST /hooks` (excluida de side-interactions, respuesta rápida 2xx).                                                                                                                                                                                            |
 
 El mapa completo archivo → capa está en **§35**.
 
@@ -2521,63 +2531,63 @@ flowchart TB
 
 ### 35.1 Capa 1 — Domain
 
-| Categoría | Archivos |
-| --------- | -------- |
-| **Tipos wire/gateway** | `types/anthropic.types.ts`; `types/gateway/{provider,workflow,tool-use,session-metrics}.types.ts`; `types/hook.types.ts`; `types/telemetry.types.ts`; `types/{audit,config,logger,json}.types.ts` |
-| **Constantes** | `constants/{audit-paths,audit-limits,session-headers}.ts` |
-| **Interfaces DTO** | `interfaces/gateway/{IProvider,ILanguageModel,IProviderCatalog,ISession,IWorkflow,IStep,IToolUse,IWorkflowResult}.ts` |
-| **Modelos (clases anémicas)** | `models/gateway/{Provider,LanguageModel,Session,Workflow,Step,ToolUse}.ts` |
-| **Ports de repositorio** | `repositories/{IEventBus,IWorkflowRepository}.ts` |
-| **Domain services de cierre (puros)** | `services/gateway/{aggregate-workflow-usage,aggregate-workflow-usage-by-model,build-workflow-result,derive-final-text,derive-outcome,validate-workflow-invariants}.ts` |
-| **Domain services de correlación/soporte (puros)** | `services/{resolve-agent-context,join-tool-use-to-subagent,session-resolver,request-classifier,redact,markdown-renderer,event-pattern-match}.service.ts` |
+| Categoría                                          | Archivos                                                                                                                                                                                          |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Tipos wire/gateway**                             | `types/anthropic.types.ts`; `types/gateway/{provider,workflow,tool-use,session-metrics}.types.ts`; `types/hook.types.ts`; `types/telemetry.types.ts`; `types/{audit,config,logger,json}.types.ts` |
+| **Constantes**                                     | `constants/{audit-paths,audit-limits,session-headers}.ts`                                                                                                                                         |
+| **Interfaces DTO**                                 | `interfaces/gateway/{IProvider,ILanguageModel,IProviderCatalog,ISession,IWorkflow,IStep,IToolUse,IWorkflowResult}.ts`                                                                             |
+| **Modelos (clases anémicas)**                      | `models/gateway/{Provider,LanguageModel,Session,Workflow,Step,ToolUse}.ts`                                                                                                                        |
+| **Ports de repositorio**                           | `repositories/{IEventBus,IWorkflowRepository}.ts`                                                                                                                                                 |
+| **Domain services de cierre (puros)**              | `services/gateway/{aggregate-workflow-usage,aggregate-workflow-usage-by-model,build-workflow-result,derive-final-text,derive-outcome,validate-workflow-invariants}.ts`                            |
+| **Domain services de correlación/soporte (puros)** | `services/{resolve-agent-context,join-tool-use-to-subagent,session-resolver,request-classifier,redact,markdown-renderer,event-pattern-match}.service.ts`                                          |
 
 ### 35.2 Capa 2 — Services (adapters)
 
-| Componente | Archivo | Rol |
-| ---------- | ------- | --- |
-| Correlador | `workflow-repository.service.ts` | Estado en memoria de workflows/steps/tools; índices `tool_use_id`; emite al bus. |
-| Bus de eventos | `event-bus.service.ts` | Pub/sub in-process del port `IEventBus`. |
-| Persistencia | `session-persistence.service.ts` | Suscriptor del bus; proyecta layout `causal-workflows-v1`. |
-| Métricas | `session-metrics.service.ts` | `session-metrics.json` por modelo (§28.2). |
-| Catálogo de proveedores | `provider-catalog.service.ts` | Deriva `Provider` / `LanguageModel`. |
-| StepBuffer | `step-assembler.service.ts` | SSE → `assistantMessage`, `usage`, `stopReason` (§20). |
-| Tee de stream | `stream-tee.service.ts` | Reenvío transparente + rama auditoría. |
-| Reconstrucción SSE | `sse-reconstruct.service.ts` | Forense / `response/body.json` desde chunks. |
-| Enrutamiento | `session-routing.ts` | Resolución de rutas de sesión. |
-| Ports | `ports/{sse-reconstructor,step-assembler,stream-tee}.port.ts` | Contratos de adapters. |
-| Utilidades | `utils/{async,file-write}.utils.ts` | Helpers de escritura atómica y async. |
+| Componente              | Archivo                                                       | Rol                                                                              |
+| ----------------------- | ------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| Correlador              | `workflow-repository.service.ts`                              | Estado en memoria de workflows/steps/tools; índices `tool_use_id`; emite al bus. |
+| Bus de eventos          | `event-bus.service.ts`                                        | Pub/sub in-process del port `IEventBus`.                                         |
+| Persistencia            | `session-persistence.service.ts`                              | Suscriptor del bus; proyecta layout `causal-workflows-v1`.                       |
+| Métricas                | `session-metrics.service.ts`                                  | `session-metrics.json` por modelo (§28.2).                                       |
+| Catálogo de proveedores | `provider-catalog.service.ts`                                 | Deriva `Provider` / `LanguageModel`.                                             |
+| StepBuffer              | `step-assembler.service.ts`                                   | SSE → `assistantMessage`, `usage`, `stopReason` (§20).                           |
+| Tee de stream           | `stream-tee.service.ts`                                       | Reenvío transparente + rama auditoría.                                           |
+| Reconstrucción SSE      | `sse-reconstruct.service.ts`                                  | Forense / `response/body.json` desde chunks.                                     |
+| Enrutamiento            | `session-routing.ts`                                          | Resolución de rutas de sesión.                                                   |
+| Ports                   | `ports/{sse-reconstructor,step-assembler,stream-tee}.port.ts` | Contratos de adapters.                                                           |
+| Utilidades              | `utils/{async,file-write}.utils.ts`                           | Helpers de escritura atómica y async.                                            |
 
 ### 35.3 Capa 3 — Operations (handlers)
 
-| Handler / util | Archivo |
-| -------------- | ------- |
-| Request entrante (clasificación + routing) | `audit-workflow.handler.ts` |
-| Stream SSE | `audit-sse-response.handler.ts` |
-| Eventos hook | `audit-hook-event.handler.ts` |
-| Cierre de workflow + `WorkflowResult` | `audit-workflow-closure.handler.ts` |
-| Respuestas no streaming | `audit-standard-response.handler.ts` |
-| Errores upstream | `audit-upstream-error.handler.ts` |
-| Filtrado de herramientas | `filter-tools.handler.ts` |
-| Helper de step wire | `gateway-wire-step.util.ts` |
+| Handler / util                             | Archivo                              |
+| ------------------------------------------ | ------------------------------------ |
+| Request entrante (clasificación + routing) | `audit-workflow.handler.ts`          |
+| Stream SSE                                 | `audit-sse-response.handler.ts`      |
+| Eventos hook                               | `audit-hook-event.handler.ts`        |
+| Cierre de workflow + `WorkflowResult`      | `audit-workflow-closure.handler.ts`  |
+| Respuestas no streaming                    | `audit-standard-response.handler.ts` |
+| Errores upstream                           | `audit-upstream-error.handler.ts`    |
+| Filtrado de herramientas                   | `filter-tools.handler.ts`            |
+| Helper de step wire                        | `gateway-wire-step.util.ts`          |
 
 ### 35.4 Capas 4 y 5
 
-| Capa | Archivos | Rol |
-| ---- | -------- | --- |
-| **4 — Composition** | `4-api/composition-root.ts`, `4-api/config/env.config.ts`, `src/app.ts`, `src/index.ts` | Ensamblar el grafo de dependencias; variables de entorno; bootstrapping Fastify; entrypoint. |
-| **5 — Delivery** | `5-user-interfaces/http/{proxy.controller,proxy.routes,hooks.controller,fastify.augments.d.ts}` | Rutas catch-all proxy, endpoint `POST /hooks`, tipos augment Fastify. |
+| Capa                | Archivos                                                                                        | Rol                                                                                          |
+| ------------------- | ----------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| **4 — Composition** | `4-api/composition-root.ts`, `4-api/config/env.config.ts`, `src/app.ts`, `src/index.ts`         | Ensamblar el grafo de dependencias; variables de entorno; bootstrapping Fastify; entrypoint. |
+| **5 — Delivery**    | `5-user-interfaces/http/{proxy.controller,proxy.routes,hooks.controller,fastify.augments.d.ts}` | Rutas catch-all proxy, endpoint `POST /hooks`, tipos augment Fastify.                        |
 
 ### 35.5 Artefactos fuera de `src/`
 
-| Ruta | Rol | Capa conceptual |
-| ---- | --- | --------------- |
-| `scripting/` | Scripts operativos: `configure-provider.ts` (routing multi-proveedor), statusline, utilidades. | Infraestructura operativa (no PKA) |
-| `routing/` | Configuración de providers y reglas de enrutamiento. | Infraestructura operativa |
-| `sessions/` | Persistencia de auditoría en disco (output de capa 2). | Almacenamiento |
-| `tests/` | Tests unitarios e integración. | Verificación |
-| `configs/` | Archivos de configuración (TS, JSON). | Infraestructura |
-| `containerization/` | Docker / compose. | Infraestructura despliegue |
-| `server/` | Configuración servidor auxiliar. | Infraestructura |
+| Ruta                | Rol                                                                                            | Capa conceptual                    |
+| ------------------- | ---------------------------------------------------------------------------------------------- | ---------------------------------- |
+| `scripting/`        | Scripts operativos: `configure-provider.ts` (routing multi-proveedor), statusline, utilidades. | Infraestructura operativa (no PKA) |
+| `routing/`          | Configuración de providers y reglas de enrutamiento.                                           | Infraestructura operativa          |
+| `sessions/`         | Persistencia de auditoría en disco (output de capa 2).                                         | Almacenamiento                     |
+| `tests/`            | Tests unitarios e integración.                                                                 | Verificación                       |
+| `configs/`          | Archivos de configuración (TS, JSON).                                                          | Infraestructura                    |
+| `containerization/` | Docker / compose.                                                                              | Infraestructura despliegue         |
+| `server/`           | Configuración servidor auxiliar.                                                               | Infraestructura                    |
 
 ---
 
@@ -2585,12 +2595,12 @@ flowchart TB
 
 La capa 1 contiene tipos primitivos, interfaces DTO, modelos de clase anémicos, ports de repositorio y domain services puros (sin I/O). El árbol de archivos está en §13 y §35.1.
 
-| Tipo de lógica | Ejemplos |
-| -------------- | -------- |
-| **Datos de dominio** | `IWorkflow`, `IStep`, `IToolUse`, `IWorkflowResult`, `IProvider`, `ILanguageModel`. |
+| Tipo de lógica             | Ejemplos                                                                                                                                                                                                                                     |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Datos de dominio**       | `IWorkflow`, `IStep`, `IToolUse`, `IWorkflowResult`, `IProvider`, `ILanguageModel`.                                                                                                                                                          |
 | **Transformaciones puras** | `aggregateWorkflowUsage(closedSteps, childResults)`, `aggregateWorkflowUsageByModel(closedSteps)` (agrupa `Step.usage` por `modelId`), `deriveOutcome(hook)`, `deriveFinalText(hook)`, `buildWorkflowResult(wf, steps, childResults, hook)`. |
-| **Validaciones** | Invariante G5: sub-workflow requiere `parentWorkflowId` + `parentToolUseId` (`validate-workflow-invariants.ts`). |
-| **Sin I/O** | Ningún `fs`, `fetch`, ni parseo SSE aquí. |
+| **Validaciones**           | Invariante G5: sub-workflow requiere `parentWorkflowId` + `parentToolUseId` (`validate-workflow-invariants.ts`).                                                                                                                             |
+| **Sin I/O**                | Ningún `fs`, `fetch`, ni parseo SSE aquí.                                                                                                                                                                                                    |
 
 **Perfil anémico:** en lugar de `Workflow.complete()` como método con efectos secundarios, el cierre se implementa como **`buildWorkflowResult(...)`** — función pura invocada desde el handler de capa 3. Esto permite testear la lógica de cierre sin dependencias de infraestructura. El hook de cierre usa `ClaudeHookEvent` de `types/hook.types.ts`.
 
@@ -2602,39 +2612,39 @@ La capa 1 contiene tipos primitivos, interfaces DTO, modelos de clase anémicos,
 
 ## 37. Capa 2 — Services
 
-| Componente | Rol | Referencia interna |
-| ---------- | --- | ------------------ |
-| `WorkflowRepositoryService` (memoria) | `Session`, workflows activos, steps abiertos, índices `tool_use_id`; emite eventos al bus | Correlador §14 |
-| `EventBusService` | Adapter async in-process del port `IEventBus`; pub/sub unidireccional | Bus de eventos §23 |
-| `SessionPersistenceService` | Suscriptor del bus; proyecta eventos de telemetría a disco `sessions/` (`causal-workflows-v1`) | §23, Parte IV |
-| `SessionMetricsService` | Escritura atómica de `session-metrics.json` agrupada por modelo (`models`, `session_totals`, `cache_efficiency`); solo workflows `kind: 'main'` (invariante G16) | §28.2 |
-| `StepAssemblerService` | RAM: SSE → `assistantMessage`, `usage`, `stopReason`; callback `onInferenceComplete` | StepBuffer §20 |
-| `SseReconstructService` | Forense / `response/body.json` desde chunks SSE | Complemento; no sustituye `finalText` de hooks |
-| `StreamTeeService` | Reenvío transparente + rama auditoría | §19 |
-| `ProviderCatalogService` | Deriva `Provider`, `LanguageModel` desde `UPSTREAM_ORIGIN` | Entidades §7 |
+| Componente                            | Rol                                                                                                                                                              | Referencia interna                             |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| `WorkflowRepositoryService` (memoria) | `Session`, workflows activos, steps abiertos, índices `tool_use_id`; emite eventos al bus                                                                        | Correlador §14                                 |
+| `EventBusService`                     | Adapter async in-process del port `IEventBus`; pub/sub unidireccional                                                                                            | Bus de eventos §23                             |
+| `SessionPersistenceService`           | Suscriptor del bus; proyecta eventos de telemetría a disco `sessions/` (`causal-workflows-v1`)                                                                   | §23, Parte IV                                  |
+| `SessionMetricsService`               | Escritura atómica de `session-metrics.json` agrupada por modelo (`models`, `session_totals`, `cache_efficiency`); solo workflows `kind: 'main'` (invariante G16) | §28.2                                          |
+| `StepAssemblerService`                | RAM: SSE → `assistantMessage`, `usage`, `stopReason`; callback `onInferenceComplete`                                                                             | StepBuffer §20                                 |
+| `SseReconstructService`               | Forense / `response/body.json` desde chunks SSE                                                                                                                  | Complemento; no sustituye `finalText` de hooks |
+| `StreamTeeService`                    | Reenvío transparente + rama auditoría                                                                                                                            | §19                                            |
+| `ProviderCatalogService`              | Deriva `Provider`, `LanguageModel` desde `UPSTREAM_ORIGIN`                                                                                                       | Entidades §7                                   |
 
 **Principio:** los adapters **no** deciden cuándo cerrar un workflow; ejecutan lo que capa 3 ordena. Los handlers de capa 3 **no** escriben disco directamente (§23.4 regla 1); la proyección a disco la realiza `SessionPersistence` consumiendo eventos del bus.
 
 **Doble persistencia SSE (decisión explícita):**
 
-| Artefacto | Capa | ¿Persiste deltas SSE? |
-| --------- | ---- | --------------------- |
-| Agregado `Step` en dominio | 1 | No — solo snapshot al cerrar step. |
+| Artefacto                     | Capa           | ¿Persiste deltas SSE?                                  |
+| ----------------------------- | -------------- | ------------------------------------------------------ |
+| Agregado `Step` en dominio    | 1              | No — solo snapshot al cerrar step.                     |
 | `streaming/*.ndjson` en disco | 2 (proyección) | Sí — decisión de auditoría humana SCP, ortogonal a G8. |
 
 ---
 
 ## 38. Capa 3 — Operations
 
-| Handler | Borde | Orquestación |
-| ------- | ----- | ------------ |
-| `AuditWorkflowHandler` | Wire | Clasificar → `resolveAgentContext(headers)` → abrir workflow/step en repo → emitir `step_request`. |
-| `AuditSseResponseHandler` | Wire | `tee` → `stepAssembler.onEvent` → al `message_stop`: completar step en repo → emitir `stream_chunk` / `step_inference_complete` → registrar pending tools. |
-| `AuditWorkflowClosureHandler` | Wire + Hooks | Invocar `buildWorkflowResult` → emitir `workflow_complete` → marcar workflow cerrado. Cierre autoritativo por hook `Stop`/`SubagentStop`; wire `stop_reason` como respaldo transitorio. |
-| `AuditHookEventHandler` | Hooks | `UserPromptSubmit` / `Stop` / `SubagentStart` / `SubagentStop` / `PreToolUse` / `PostToolUse` → mutar repo → delegar cierre a `AuditWorkflowClosureHandler`. |
-| `AuditStandardResponseHandler` | Wire | Respuestas no streaming. |
-| `AuditUpstreamErrorHandler` | Wire | Errores upstream / conexión. |
-| `FilterToolsHandler` | Wire | Filtrar herramientas del body antes de audit/upstream. |
+| Handler                        | Borde        | Orquestación                                                                                                                                                                            |
+| ------------------------------ | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AuditWorkflowHandler`         | Wire         | Clasificar → `resolveAgentContext(headers)` → abrir workflow/step en repo → emitir `step_request`.                                                                                      |
+| `AuditSseResponseHandler`      | Wire         | `tee` → `stepAssembler.onEvent` → al `message_stop`: completar step en repo → emitir `stream_chunk` / `step_inference_complete` → registrar pending tools.                              |
+| `AuditWorkflowClosureHandler`  | Wire + Hooks | Invocar `buildWorkflowResult` → emitir `workflow_complete` → marcar workflow cerrado. Cierre autoritativo por hook `Stop`/`SubagentStop`; wire `stop_reason` como respaldo transitorio. |
+| `AuditHookEventHandler`        | Hooks        | `UserPromptSubmit` / `Stop` / `SubagentStart` / `SubagentStop` / `PreToolUse` / `PostToolUse` → mutar repo → delegar cierre a `AuditWorkflowClosureHandler`.                            |
+| `AuditStandardResponseHandler` | Wire         | Respuestas no streaming.                                                                                                                                                                |
+| `AuditUpstreamErrorHandler`    | Wire         | Errores upstream / conexión.                                                                                                                                                            |
+| `FilterToolsHandler`           | Wire         | Filtrar herramientas del body antes de audit/upstream.                                                                                                                                  |
 
 La **secuencia** entre repo, assembler y proyección vive aquí; las **reglas de suma de tokens** viven en capa 1. Todos los handlers comparten el mismo `IWorkflowRepository` en memoria como correlador unificado.
 
@@ -2642,10 +2652,10 @@ La **secuencia** entre repo, assembler y proyección vive aquí; las **reglas de
 
 ## 39. Capas 4–5 — Composition y Delivery
 
-| Capa | Rol |
-| ---- | --- |
+| Capa                | Rol                                                                                                                                                                                                                                                            |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **4 — Composition** | `composition-root.ts` registra `IWorkflowRepository`, `EventBus`, `SessionPersistence`, handlers hook y wire, y `ProviderCatalog` en `ProxyDependencies`. Sin lógica de negocio; solo cableado de dependencias. `env.config.ts` resuelve variables de entorno. |
-| **5 — Delivery** | Controller delgado; `POST /v1/messages` (proxy catch-all) y `POST /hooks` (segundo canal de entrada, `hooks.controller.ts`). |
+| **5 — Delivery**    | Controller delgado; `POST /v1/messages` (proxy catch-all) y `POST /hooks` (segundo canal de entrada, `hooks.controller.ts`).                                                                                                                                   |
 
 Consideraciones para `POST /hooks`:
 
@@ -2659,18 +2669,18 @@ Consideraciones para `POST /hooks`:
 
 ## 40. Fuera de alcance y limitaciones conocidas
 
-| Tema | Tratamiento |
-| ---- | ----------- |
-| Bibliotecas cliente de aplicación (capa superior) | Fuera del dominio gateway |
-| Eventos SSE delta (`IAnthropicSse*`) | Tipado en borde + ensamblaje StepBuffer; ver §20 |
-| Hooks no disparados en algunos límites de sesión | Limitación documentada; fallback vía `transcript_path` |
-| Silent stall sin hook `Stop` | Limitación; timeout/heartbeat en infraestructura |
-| Skills, MCP, CLAUDE.md | Metadata de `Session`; no entidades de dominio |
-| Configuración hooks HTTP | Doc operativa separada (`.claude/settings.json`) |
-| Tool retry / `previousAttempts[]` (§33 #10, #17) | Fuera de v1; extensión futura opcional |
-| `observedExecutionMode` en step (§33 #20) | Fuera de v1 |
-| `detectOrphans()` al startup (§33 #16) | Fuera de v1 |
-| Correlación OoO de tool results (§33 #8) | Fuera de v1 salvo que tests existentes demuestren el comportamiento actual |
+| Tema                                              | Tratamiento                                                                            |
+| ------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Bibliotecas cliente de aplicación (capa superior) | Fuera del dominio gateway                                                              |
+| Eventos SSE delta (`IAnthropicSse*`)              | Tipado en borde + ensamblaje StepBuffer; ver §20                                       |
+| Hooks no disparados en algunos límites de sesión  | Limitación documentada; fallback vía `transcript_path`                                 |
+| Silent stall sin hook `Stop`                      | Limitación; timeout/heartbeat en infraestructura                                       |
+| Skills, MCP, CLAUDE.md                            | Metadata de `Session`; no entidades de dominio                                         |
+| Configuración hooks HTTP                          | Doc operativa separada (`.claude/settings.json`)                                       |
+| Tool retry / `previousAttempts[]` (§33 #10, #17)  | Fuera de v1; extensión futura opcional                                                 |
+| `observedExecutionMode` en step (§33 #20)         | Fuera de v1                                                                            |
+| `detectOrphans()` al startup (§33 #16)            | Fuera de v1                                                                            |
+| Correlación OoO de tool results (§33 #8)          | Fuera de v1 salvo que tests existentes demuestren el comportamiento actual             |
 | Timer automático de tool timeout (§18.1 / §33 #9) | Fuera de v1; hoy solo vía hooks `PostToolUse`/`PostToolUseFailure` → `completeToolUse` |
 
 ---
@@ -2679,35 +2689,35 @@ Consideraciones para `POST /hooks`:
 
 ### 41.1 Documentos internos del proyecto
 
-| Recurso | Ruta |
-| ------- | ---- |
-| session-audit-model.md | `docs/session-audit-model.md` |
-| README PKA del repo | `README.md` § Diseño PKA |
-| Capa 4 en SCP | `src/4-api/README.md` |
-| workflow-persistence design | `docs/external-references/workflow-persistence-refactor-phase/design.md` |
-| Arquitectura del Gateway (este documento) | `docs/gateway-architecture.md` |
-| **Historia de la migración gateway** (registro de cómo se construyó esta arquitectura) | `openspec/changes/archive/2026-06-01-gateway-migration/` |
+| Recurso                                                                                | Ruta                                                                     |
+| -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| session-audit-model.md                                                                 | `docs/session-audit-model.md`                                            |
+| README PKA del repo                                                                    | `README.md` § Diseño PKA                                                 |
+| Capa 4 en SCP                                                                          | `src/4-api/README.md`                                                    |
+| workflow-persistence design                                                            | `docs/external-references/workflow-persistence-refactor-phase/design.md` |
+| Arquitectura del Gateway (este documento)                                              | `docs/gateway-architecture.md`                                           |
+| **Historia de la migración gateway** (registro de cómo se construyó esta arquitectura) | `openspec/changes/archive/2026-06-01-gateway-migration/`                 |
 
 ### 41.2 Skills y referencias PKA
 
-| Recurso | Ruta |
-| ------- | ---- |
-| PKA skill | `~/.claude/skills/progressive-kernel-architecture/SKILL.md` |
+| Recurso            | Ruta                                                                            |
+| ------------------ | ------------------------------------------------------------------------------- |
+| PKA skill          | `~/.claude/skills/progressive-kernel-architecture/SKILL.md`                     |
 | PKA especificación | `~/.claude/skills/progressive-kernel-architecture/references/ESPECIFICACION.md` |
-| PKA fundamentos | `~/.claude/skills/progressive-kernel-architecture/references/FUNDAMENTOS.md` |
+| PKA fundamentos    | `~/.claude/skills/progressive-kernel-architecture/references/FUNDAMENTOS.md`    |
 
 ### 41.3 Referencias externas
 
-| Recurso | URL |
-| ------- | --- |
+| Recurso                                    | URL                                                                                        |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------ |
 | LLM gateway Claude Code (cabeceras agente) | [https://code.claude.com/docs/en/llm-gateway](https://code.claude.com/docs/en/llm-gateway) |
-| Hooks reference Claude Code | [https://code.claude.com/docs/en/hooks](https://code.claude.com/docs/en/hooks) |
+| Hooks reference Claude Code                | [https://code.claude.com/docs/en/hooks](https://code.claude.com/docs/en/hooks)             |
 
 ### 41.4 Proyección a disco: campos de correlación y cierre
 
-| Archivo disco | Campos | Origen |
-| ------------- | ------ | ------ |
-| `workflows/NN/meta.json` | `parentContext: { agentId, parentAgentId, correlationMethod }`, `lastActivity` | Wire headers plano A (parentContext); transiciones de estado (lastActivity) |
+| Archivo disco                     | Campos                                                                                               | Origen                                                                                  |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `workflows/NN/meta.json`          | `parentContext: { agentId, parentAgentId, correlationMethod }`, `lastActivity`                       | Wire headers plano A (parentContext); transiciones de estado (lastActivity)             |
 | `workflows/NN/output/result.json` | `outcome`, `closedByEvent`, `finalText`, `usage` (agregado E2E), `stepCount`, `sessionId`, `steps[]` | `IWorkflowResult` de `buildWorkflowResult()` + `Step[]` del correlador (plano C cierre) |
 
 ### 41.5 Evolución API Anthropic: campos por incorporar
@@ -2748,6 +2758,7 @@ No se necesita `AwaitingTools` intermedio porque el proxy no ejecuta la tool —
 2. Agregar campo opcional `Step.stopDetails` para metadata de refusal.
 3. Nuevo outcome en `WorkflowResult`: `'refused'` — indica que el modelo rehusó y no hubo continuation exitosa posterior.
 4. El diagrama de estados del Step se extiende:
+
 ```
 Open --> Closed: stop_reason refusal (policy violation)
 ```
@@ -2779,12 +2790,14 @@ Cobro: $10 por 1000 búsquedas web. Los resultados de búsqueda cuentan como inp
 **Decisión de diseño:**
 
 1. Extender `IAnthropicUsage`:
+
 ```typescript
 server_tool_use?: {
   web_search_requests?: number;
   web_fetch_requests?: number;
 };
 ```
+
 2. En agregación de `WorkflowResult.usage`, sumar `web_search_requests` y `web_fetch_requests` entre Steps.
 
 #### 41.5.4 `cache_creation.ephemeral_5m` / `ephemeral_1h`
@@ -2796,6 +2809,7 @@ server_tool_use?: {
 - `cache_creation.ephemeral_1h_input_tokens`: tokens cacheados con TTL 1 hora (write cost 2×).
 
 **Estado actual en src/:** `AnthropicUsage` ya tiene el desglose (`anthropic.types.ts`):
+
 ```typescript
 cache_creation?: {
   ephemeral_5m_input_tokens?: number;

@@ -4,12 +4,12 @@ Especificación del statusline de Smart Code Proxy: diseño visual, fuentes de d
 
 ## Implementación
 
-| Artefacto | Ruta |
-| --------- | ---- |
-| Script principal | [`scripting/router-status.ts`](../scripting/router-status.ts) |
-| Instalador | [`scripting/install-statusline.ts`](../scripting/install-statusline.ts) |
+| Artefacto                     | Ruta                                                                            |
+| ----------------------------- | ------------------------------------------------------------------------------- |
+| Script principal              | [`scripting/router-status.ts`](../scripting/router-status.ts)                   |
+| Instalador                    | [`scripting/install-statusline.ts`](../scripting/install-statusline.ts)         |
 | Lectura/escritura de settings | [`scripting/shared/claude-settings.ts`](../scripting/shared/claude-settings.ts) |
-| Tests | `tests/scripting/router-status-*.test.ts` |
+| Tests                         | `tests/scripting/router-status-*.test.ts`                                       |
 
 ---
 
@@ -37,19 +37,19 @@ Instalación: [`npm run install:statusline`](#9-integración) (véase [how-to-st
 
 `router-status.ts` lee exactamente estas fuentes en el flujo soportado:
 
-| Dato | Fuente | Campo |
-| ---- | ------ | ----- |
-| Session ID | stdin (`$ctx`) | `ctx.session_id` |
-| Modelo activo | stdin (`$ctx`) | `ctx.model.display_name` |
-| Tamaño de contexto | stdin (`$ctx`) | `ctx.context_window.context_window_size` |
-| Porcentaje de uso de contexto | stdin (`$ctx`) | `ctx.context_window.used_percentage` |
-| Rate limits (solo OAuth) | stdin (`$ctx`) | `ctx.rate_limits.five_hour`, `ctx.rate_limits.seven_day` |
-| Provider upstream activo | `configs/.env` | `UPSTREAM_ORIGIN` |
-| Nombre del proveedor | `routing/providers/*/config.json` → cruce con `UPSTREAM_ORIGIN` | `config.ANTHROPIC_BASE_URL` |
-| Método de auth | `~/.claude/settings.json → env` | `ANTHROPIC_API_KEY` / `ANTHROPIC_AUTH_TOKEN` |
-| Modelos por nivel | `~/.claude/settings.json → env` | `ANTHROPIC_DEFAULT_HAIKU_MODEL`, `ANTHROPIC_DEFAULT_SONNET_MODEL`, `ANTHROPIC_DEFAULT_OPUS_MODEL` |
-| Display name de modelo | `routing/providers/<p>/models/<m>/metadata.json` | `displayName` |
-| Métricas acumuladas de sesión | `sessions/<ctx.session_id>/session-metrics.json` | contadores por `modelId` |
+| Dato                          | Fuente                                                          | Campo                                                                                             |
+| ----------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| Session ID                    | stdin (`$ctx`)                                                  | `ctx.session_id`                                                                                  |
+| Modelo activo                 | stdin (`$ctx`)                                                  | `ctx.model.display_name`                                                                          |
+| Tamaño de contexto            | stdin (`$ctx`)                                                  | `ctx.context_window.context_window_size`                                                          |
+| Porcentaje de uso de contexto | stdin (`$ctx`)                                                  | `ctx.context_window.used_percentage`                                                              |
+| Rate limits (solo OAuth)      | stdin (`$ctx`)                                                  | `ctx.rate_limits.five_hour`, `ctx.rate_limits.seven_day`                                          |
+| Provider upstream activo      | `configs/.env`                                                  | `UPSTREAM_ORIGIN`                                                                                 |
+| Nombre del proveedor          | `routing/providers/*/config.json` → cruce con `UPSTREAM_ORIGIN` | `config.ANTHROPIC_BASE_URL`                                                                       |
+| Método de auth                | `~/.claude/settings.json → env`                                 | `ANTHROPIC_API_KEY` / `ANTHROPIC_AUTH_TOKEN`                                                      |
+| Modelos por nivel             | `~/.claude/settings.json → env`                                 | `ANTHROPIC_DEFAULT_HAIKU_MODEL`, `ANTHROPIC_DEFAULT_SONNET_MODEL`, `ANTHROPIC_DEFAULT_OPUS_MODEL` |
+| Display name de modelo        | `routing/providers/<p>/models/<m>/metadata.json`                | `displayName`                                                                                     |
+| Métricas acumuladas de sesión | `sessions/<ctx.session_id>/session-metrics.json`                | contadores por `modelId`                                                                          |
 
 ### Variables de entorno de Claude Code
 
@@ -73,12 +73,12 @@ El statusline consta de **dos o tres tablas** según el método de autenticació
 
 **Columnas (4 columnas planas):**
 
-| Columna           | Contenido                                                      | Fuente                                                           | Alineación |
-| ----------------- | -------------------------------------------------------------- | ---------------------------------------------------------------- | ---------- |
-| Proveedor         | nombre del proveedor resuelto (capitalizado)                   | cruce `UPSTREAM_ORIGIN` vs `config.json`                         | centrada   |
-| Modelo activo     | texto de `ctx.model.display_name`, enriquecido con `displayName` si coincide con un `modelId` en `metadata.json` | stdin (`ctx.model.display_name`) + búsqueda en `metadata.json` por `modelId` | centrada   |
-| Contexto (tks)    | tamaño de ventana formateado como `NNNk` / `NNNm`              | stdin (`ctx.context_window.context_window_size`)                 | centrada   |
-| Porcentaje de uso | barra de progreso + porcentaje                                 | stdin (`ctx.context_window.used_percentage`) con fallback a caché (véase abajo) | centrada   |
+| Columna           | Contenido                                                                                                        | Fuente                                                                          | Alineación |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | ---------- |
+| Proveedor         | nombre del proveedor resuelto (capitalizado)                                                                     | cruce `UPSTREAM_ORIGIN` vs `config.json`                                        | centrada   |
+| Modelo activo     | texto de `ctx.model.display_name`, enriquecido con `displayName` si coincide con un `modelId` en `metadata.json` | stdin (`ctx.model.display_name`) + búsqueda en `metadata.json` por `modelId`    | centrada   |
+| Contexto (tks)    | tamaño de ventana formateado como `NNNk` / `NNNm`                                                                | stdin (`ctx.context_window.context_window_size`)                                | centrada   |
+| Porcentaje de uso | barra de progreso + porcentaje                                                                                   | stdin (`ctx.context_window.used_percentage`) con fallback a caché (véase abajo) | centrada   |
 
 **Barra de progreso:** 8 bloques, usando `█` (lleno) y `░` (vacío). Color dinámico por rango de porcentaje: verde (`#2ecc71`) 0–39%, naranja (`#f39c12`) 40–69%, rojo (`#e74c3c`) 70–100%. Vacío: gris (`\x1B[90m`).
 
@@ -127,16 +127,16 @@ El statusline refleja el cambio en el siguiente refresh (no requiere reiniciar C
 
 **Columnas (8):**
 
-| Columna              | Contenido                                                       | Fuente                                                                   | Alineación |
-| -------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------ | ---------- |
-| Nivel                | `Lite` / `Standard` / `Reasoning`                               | texto fijo por slot                                                      | izquierda  |
-| Modelo               | display name del modelo del nivel; **columna elástica**: se expande con relleno o se trunca con `...` para anclar Tabla 2 al ancho del bloque superior (véase §4.2) | `metadata.json → displayName` (o `modelId` si falta) | izquierda  |
-| # Workflows          | workflows main cerrados que usaron este nivel en la sesión      | `session-metrics.json → models[modelId].workflow_count`                  | derecha    |
-| # Steps              | cantidad de hops de inferencia del nivel en la sesión           | `session-metrics.json → models[modelId].count`                           | derecha    |
-| Input (tks)          | suma de `input_tokens` para el nivel                            | `session-metrics.json → models[modelId].input_tokens`                    | derecha    |
-| Caché Write (tks)    | suma de `cache_creation_input_tokens` para el nivel             | `session-metrics.json → models[modelId].cache_creation_input_tokens`     | derecha    |
-| Caché Read (tks)     | suma de `cache_read_input_tokens` para el nivel                 | `session-metrics.json → models[modelId].cache_read_input_tokens`         | derecha    |
-| Output (tks)         | suma de `output_tokens` para el nivel                           | `session-metrics.json → models[modelId].output_tokens`                   | derecha    |
+| Columna           | Contenido                                                                                                                                                           | Fuente                                                               | Alineación |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- | ---------- |
+| Nivel             | `Lite` / `Standard` / `Reasoning`                                                                                                                                   | texto fijo por slot                                                  | izquierda  |
+| Modelo            | display name del modelo del nivel; **columna elástica**: se expande con relleno o se trunca con `...` para anclar Tabla 2 al ancho del bloque superior (véase §4.2) | `metadata.json → displayName` (o `modelId` si falta)                 | izquierda  |
+| # Workflows       | workflows main cerrados que usaron este nivel en la sesión                                                                                                          | `session-metrics.json → models[modelId].workflow_count`              | derecha    |
+| # Steps           | cantidad de hops de inferencia del nivel en la sesión                                                                                                               | `session-metrics.json → models[modelId].count`                       | derecha    |
+| Input (tks)       | suma de `input_tokens` para el nivel                                                                                                                                | `session-metrics.json → models[modelId].input_tokens`                | derecha    |
+| Caché Write (tks) | suma de `cache_creation_input_tokens` para el nivel                                                                                                                 | `session-metrics.json → models[modelId].cache_creation_input_tokens` | derecha    |
+| Caché Read (tks)  | suma de `cache_read_input_tokens` para el nivel                                                                                                                     | `session-metrics.json → models[modelId].cache_read_input_tokens`     | derecha    |
+| Output (tks)      | suma de `output_tokens` para el nivel                                                                                                                               | `session-metrics.json → models[modelId].output_tokens`               | derecha    |
 
 **Fila de totales:** celdas fusionadas en columnas 0+1 (texto `"Totales de sesión"`), suma de las tres filas de nivel para las columnas numéricas. Los separadores horizontales usan `┴` en la posición de la columna fusionada.
 
@@ -200,18 +200,18 @@ buildStatuslineOutput()
 
 El script usa códigos ANSI raw sin dependencias externas:
 
-| Elemento                  | Color          | Código ANSI            |
-| ------------------------- | -------------- | ---------------------- |
-| Cabeceras y títulos       | Azul `#253ecc` | `\x1B[38;2;37;62;204m` |
-| Valores de celdas         | Blanco         | `\x1B[37m`             |
-| Nivel Lite                | Gris           | `\x1B[90m`             |
-| Nivel Standard            | Blanco         | `\x1B[37m`             |
-| Nivel Reasoning           | Blanco bold    | `\x1B[1;37m`           |
-| Barra de progreso (lleno, 0–39%) | Verde `#2ecc71` | `\x1B[38;2;46;204;113m` |
-| Barra de progreso (lleno, 40–69%) | Naranja `#f39c12` | `\x1B[38;2;243;156;18m` |
-| Barra de progreso (lleno, 70–100%) | Rojo `#e74c3c` | `\x1B[38;2;231;76;60m` |
-| Barra de progreso (vacío) | Gris           | `\x1B[90m`             |
-| Bordes de tabla           | Gris           | `\x1B[90m`             |
+| Elemento                           | Color             | Código ANSI             |
+| ---------------------------------- | ----------------- | ----------------------- |
+| Cabeceras y títulos                | Azul `#253ecc`    | `\x1B[38;2;37;62;204m`  |
+| Valores de celdas                  | Blanco            | `\x1B[37m`              |
+| Nivel Lite                         | Gris              | `\x1B[90m`              |
+| Nivel Standard                     | Blanco            | `\x1B[37m`              |
+| Nivel Reasoning                    | Blanco bold       | `\x1B[1;37m`            |
+| Barra de progreso (lleno, 0–39%)   | Verde `#2ecc71`   | `\x1B[38;2;46;204;113m` |
+| Barra de progreso (lleno, 40–69%)  | Naranja `#f39c12` | `\x1B[38;2;243;156;18m` |
+| Barra de progreso (lleno, 70–100%) | Rojo `#e74c3c`    | `\x1B[38;2;231;76;60m`  |
+| Barra de progreso (vacío)          | Gris              | `\x1B[90m`              |
+| Bordes de tabla                    | Gris              | `\x1B[90m`              |
 
 Los bloques llenos (`█`) de las barras de contexto (Tabla 1) y de cuotas (Tabla 3) usan la escala dinámica anterior; ver §3.1.
 
@@ -246,18 +246,18 @@ La columna **Modelo** de Tabla 2 es la columna elástica: absorbe el ajuste de a
 
 El statusline persiste estado ligero por sesión para mejorar la lectura entre re-invocaciones de Claude Code. **No** sustituye a `session-metrics.json`.
 
-| Aspecto | Detalle |
-| ------- | ------- |
-| Ruta | `sessions/<sessionDir>/.statusline-state.json` |
-| Lectura | Al renderizar Tabla 1 (fallback de %) y Tabla 2 (diff de celdas), si existe `sessionDir` |
+| Aspecto   | Detalle                                                                                                                   |
+| --------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Ruta      | `sessions/<sessionDir>/.statusline-state.json`                                                                            |
+| Lectura   | Al renderizar Tabla 1 (fallback de %) y Tabla 2 (diff de celdas), si existe `sessionDir`                                  |
 | Escritura | Tras renderizar Tabla 1 (`contextUsagePercentage` si stdin aportó valor usable) y al final de Tabla 2 (`metricsSnapshot`) |
 
 **Campos:**
 
-| Campo | Uso |
-| ----- | --- |
-| `contextUsagePercentage` | Fallback de la barra de contexto (Tabla 1) cuando stdin no trae `ctx.context_window.used_percentage` **usable** (`number`, `Number.isFinite`, `> 0`) |
-| `metricsSnapshot` | Snapshot `{ lite, standard, reasoning }` con `count`, `inputTokens`, `cacheReadInputTokens`, `outputTokens` para atenuar (`dim`) o resaltar (`value`) celdas numéricas en Tabla 2 vía `cellColor` |
+| Campo                    | Uso                                                                                                                                                                                               |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `contextUsagePercentage` | Fallback de la barra de contexto (Tabla 1) cuando stdin no trae `ctx.context_window.used_percentage` **usable** (`number`, `Number.isFinite`, `> 0`)                                              |
+| `metricsSnapshot`        | Snapshot `{ lite, standard, reasoning }` con `count`, `inputTokens`, `cacheReadInputTokens`, `outputTokens` para atenuar (`dim`) o resaltar (`value`) celdas numéricas en Tabla 2 vía `cellColor` |
 
 **Fuera de alcance de la caché:** reconstruir métricas de sesión si falta o está corrupto `session-metrics.json`; la Tabla 2 sigue dependiendo exclusivamente de ese archivo.
 
@@ -267,11 +267,11 @@ El statusline persiste estado ligero por sesión para mejorar la lectura entre r
 
 `configure-provider.ts` configura exactamente tres modelos en `~/.claude/settings.json → env`:
 
-| Nivel | Variable | Slot en la API |
-| ----- | -------- | -------------- |
-| Lite | `ANTHROPIC_DEFAULT_HAIKU_MODEL` | haiku |
-| Standard | `ANTHROPIC_DEFAULT_SONNET_MODEL` | sonnet |
-| Reasoning | `ANTHROPIC_DEFAULT_OPUS_MODEL` | opus |
+| Nivel     | Variable                         | Slot en la API |
+| --------- | -------------------------------- | -------------- |
+| Lite      | `ANTHROPIC_DEFAULT_HAIKU_MODEL`  | haiku          |
+| Standard  | `ANTHROPIC_DEFAULT_SONNET_MODEL` | sonnet         |
+| Reasoning | `ANTHROPIC_DEFAULT_OPUS_MODEL`   | opus           |
 
 Para clasificar una interacción en un nivel, el script compara el `modelId` del registro en `session-metrics.json` contra los tres valores configurados:
 
@@ -370,17 +370,17 @@ y en `env`: `"SMART_CODE_PROXY_ROOT": "<RUTA_ABSOLUTA_DEL_PROXY>"`.
 
 ### Comportamiento ante entradas inválidas
 
-| Condición | Comportamiento esperado |
-| --------- | ----------------------- |
-| `ctx.session_id` sin carpeta coincidente en `sessions/` | Tabla 2 se renderiza en cero/sin datos |
-| `session-metrics.json` ausente o malformado | Tabla 2 se renderiza en cero/sin datos |
-| `modelId` de un registro no coincide con ningún modelo configurado | El registro no se suma a ningún nivel |
-| `ANTHROPIC_DEFAULT_*_MODEL` ausentes o vacías | Fallback heurístico por términos `haiku`/`opus`/`sonnet` en el `modelId`; `null` si no hay coincidencia |
-| `cacheReadInputTokens` es `null` | Se trata como `0` en la suma (`coerceMetricNumber` en el lector del statusline; mismo criterio para `count`, `inputTokens`, `outputTokens`) |
-| `displayName` ausente en `metadata.json` (Tabla 2) | Se muestra `modelId` como texto de la columna Modelo |
-| `ctx.context_window.used_percentage` ausente, no finito o `0` | Usar `contextUsagePercentage` de `.statusline-state.json` si existe; si no, barra al `0%` |
-| `authMethod === 'oauth'` sin `five_hour` ni `seven_day` en `ctx.rate_limits` | No se muestra Tabla 3 |
-| `.statusline-state.json` ausente, corrupto o ilegible | Ignorar caché; Tabla 2 sin diff de celdas; Tabla 1 sin % de contexto cacheado |
+| Condición                                                                    | Comportamiento esperado                                                                                                                     |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ctx.session_id` sin carpeta coincidente en `sessions/`                      | Tabla 2 se renderiza en cero/sin datos                                                                                                      |
+| `session-metrics.json` ausente o malformado                                  | Tabla 2 se renderiza en cero/sin datos                                                                                                      |
+| `modelId` de un registro no coincide con ningún modelo configurado           | El registro no se suma a ningún nivel                                                                                                       |
+| `ANTHROPIC_DEFAULT_*_MODEL` ausentes o vacías                                | Fallback heurístico por términos `haiku`/`opus`/`sonnet` en el `modelId`; `null` si no hay coincidencia                                     |
+| `cacheReadInputTokens` es `null`                                             | Se trata como `0` en la suma (`coerceMetricNumber` en el lector del statusline; mismo criterio para `count`, `inputTokens`, `outputTokens`) |
+| `displayName` ausente en `metadata.json` (Tabla 2)                           | Se muestra `modelId` como texto de la columna Modelo                                                                                        |
+| `ctx.context_window.used_percentage` ausente, no finito o `0`                | Usar `contextUsagePercentage` de `.statusline-state.json` si existe; si no, barra al `0%`                                                   |
+| `authMethod === 'oauth'` sin `five_hour` ni `seven_day` en `ctx.rate_limits` | No se muestra Tabla 3                                                                                                                       |
+| `.statusline-state.json` ausente, corrupto o ilegible                        | Ignorar caché; Tabla 2 sin diff de celdas; Tabla 1 sin % de contexto cacheado                                                               |
 
 ### Fuera de alcance
 

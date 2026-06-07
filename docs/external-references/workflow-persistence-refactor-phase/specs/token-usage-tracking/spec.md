@@ -1,9 +1,11 @@
 ## ADDED Requirements
 
 ### Requirement: Capture token usage per request
+
 The system SHALL capture token usage data for every request step and emit it as a structured `token_usage` event to the event bus.
 
 #### Scenario: Token usage event emission
+
 - **WHEN** a streaming response completes (message_stop received)
 - **THEN** system emits a `token_usage` event extending BaseEvent with the following fields:
   - `model_id`: string — the exact model identifier as reported by the upstream provider
@@ -28,18 +30,32 @@ The system SHALL capture token usage data for every request step and emit it as 
       "cache_creation_input_tokens": { "type": "integer" },
       "cache_read_input_tokens": { "type": "integer" }
     },
-    "required": ["event_type", "timestamp", "request_id", "workflow_id", "session_id", "schema_version", "model_id", "input_tokens", "output_tokens", "cache_creation_input_tokens", "cache_read_input_tokens"]
+    "required": [
+      "event_type",
+      "timestamp",
+      "request_id",
+      "workflow_id",
+      "session_id",
+      "schema_version",
+      "model_id",
+      "input_tokens",
+      "output_tokens",
+      "cache_creation_input_tokens",
+      "cache_read_input_tokens"
+    ]
   }
   ```
 - **AND** all four token fields are required; missing values from the provider are normalized to 0
 - **AND** `model_id` uses the exact string returned by the provider (e.g., `claude-opus-4-5-20251101`), not a normalized alias
 
 #### Scenario: Token usage for non-streaming responses
+
 - **WHEN** a non-streaming (batch) response is received
 - **THEN** system emits a `token_usage` event with the same fields extracted from the response body's `usage` object
 - **AND** the event is emitted after the response body is fully parsed
 
 #### Scenario: Token usage when provider omits usage fields
+
 - **WHEN** an upstream provider returns a response without token usage data
 - **THEN** system emits a `token_usage` event with all token fields set to 0
 - **AND** system logs a `token_usage_missing` warning with `model_id` and `request_id` for diagnostic purposes
@@ -48,9 +64,11 @@ The system SHALL capture token usage data for every request step and emit it as 
 ---
 
 ### Requirement: Define per-model token aggregation schema
+
 The system SHALL define the per-model token aggregation schema that `session-persistence` consumes from `token_usage` events to update `session-metrics.json`.
 
 #### Scenario: token_usage event consumed by session-persistence
+
 - **WHEN** a `token_usage` event is emitted to the event bus
 - **THEN** the `session-persistence` subscriber consumes the event
 - **AND** reads the current `sessions/<session-id>/session-metrics.json`
@@ -66,20 +84,21 @@ The system SHALL define the per-model token aggregation schema that `session-per
 - **AND** `session-persistence` is the sole component authorized to write `session-metrics.json`
 
 #### Scenario: Per-model entry schema
+
 - **WHEN** `session-metrics.json.models[model_id]` is written
 - **THEN** each entry conforms to the following schema:
   ```json
   {
-    "count": { "type": "integer", "description": "Number of steps that contributed tokens for this model" },
+    "count": {
+      "type": "integer",
+      "description": "Number of steps that contributed tokens for this model"
+    },
     "input_tokens": { "type": "integer" },
     "output_tokens": { "type": "integer" },
     "cache_creation_input_tokens": { "type": "integer" },
     "cache_read_input_tokens": { "type": "integer" },
     "cache_efficiency": {
-      "anyOf": [
-        { "type": "number", "minimum": 0.0, "maximum": 1.0 },
-        { "type": "null" }
-      ],
+      "anyOf": [{ "type": "number", "minimum": 0.0, "maximum": 1.0 }, { "type": "null" }],
       "description": "cache_read_input_tokens / (cache_read_input_tokens + input_tokens); null when denominator is 0"
     }
   }
@@ -88,6 +107,7 @@ The system SHALL define the per-model token aggregation schema that `session-per
 - **AND** `model_id` is used as the key without normalization so that different API versions of the same model (e.g., `claude-sonnet-4-6` vs `claude-sonnet-4-6-20260901`) are tracked separately
 
 #### Scenario: token_usage event emission failure
+
 - **WHEN** the `token_usage` event fails to be emitted to the event bus (e.g., subscriber error, event bus disabled)
 - **THEN** system logs `token_usage_emission_error` with `session_id` and error details
 - **AND** request processing continues without interruption
@@ -96,9 +116,11 @@ The system SHALL define the per-model token aggregation schema that `session-per
 ---
 
 ### Requirement: Define cache efficiency calculation
+
 The system SHALL define the cache efficiency formula that `session-persistence` applies when updating `session-metrics.json`.
 
 #### Scenario: Cache efficiency calculation
+
 - **WHEN** `session-persistence` updates `session-metrics.json` after consuming a `token_usage` event
 - **THEN** for each model entry in `session-metrics.json.models`, it calculates:
   - `cache_efficiency` = `cache_read_input_tokens / (cache_read_input_tokens + input_tokens)`
@@ -107,21 +129,20 @@ The system SHALL define the cache efficiency formula that `session-persistence` 
 - **AND** `session-persistence` updates this field on every write, not only at session end
 
 #### Scenario: Cache efficiency schema
+
 - **WHEN** `session-metrics.json.models[model_id]` is written
 - **THEN** the entry includes a `cache_efficiency` field:
   ```json
   {
     "cache_efficiency": {
-      "anyOf": [
-        { "type": "number", "minimum": 0.0, "maximum": 1.0 },
-        { "type": "null" }
-      ],
+      "anyOf": [{ "type": "number", "minimum": 0.0, "maximum": 1.0 }, { "type": "null" }],
       "description": "cache_read_input_tokens / (cache_read_input_tokens + input_tokens); null when denominator is 0"
     }
   }
   ```
 
 #### Scenario: Cache efficiency across sub-agents
+
 - **WHEN** multiple workflows (root agent and sub-agents) use the same model ID within a session
 - **THEN** the cache efficiency is calculated over the combined token totals for that model across all workflows
 - **AND** per-workflow breakdown is available via individual step `token_usage` events in `events.ndjson`
@@ -129,9 +150,11 @@ The system SHALL define the cache efficiency formula that `session-persistence` 
 ---
 
 ### Requirement: Define session-level token totals schema
+
 The system SHALL define the `session_totals` schema that `session-persistence` computes and writes to `session-metrics.json` by summing across all model entries.
 
 #### Scenario: Session totals calculation
+
 - **WHEN** `session-persistence` updates `session-metrics.json`
 - **THEN** it computes `session_totals` by summing all model entries:
   - `session_totals.input_tokens` = sum of `models[*].input_tokens`
@@ -142,6 +165,7 @@ The system SHALL define the `session_totals` schema that `session-persistence` c
 - **AND** `session_totals` is always recomputed from the model entries on each write (never accumulated separately)
 
 #### Scenario: Session totals schema
+
 - **WHEN** `session-metrics.json` is written
 - **THEN** the top-level structure includes a `session_totals` field:
   ```json
@@ -155,15 +179,25 @@ The system SHALL define the `session_totals` schema that `session-persistence` c
         "cache_read_input_tokens": { "type": "integer" },
         "total_steps": { "type": "integer" }
       },
-      "required": ["input_tokens", "output_tokens", "cache_creation_input_tokens", "cache_read_input_tokens", "total_steps"]
+      "required": [
+        "input_tokens",
+        "output_tokens",
+        "cache_creation_input_tokens",
+        "cache_read_input_tokens",
+        "total_steps"
+      ]
     },
-    "duration_ms": { "type": "integer", "description": "Time from session_start to session_complete" },
+    "duration_ms": {
+      "type": "integer",
+      "description": "Time from session_start to session_complete"
+    },
     "outcome": { "type": "string", "enum": ["success", "failure", "timeout"] }
   }
   ```
 - **AND** `session_totals` is derived from `models` and is never stored independently; readers SHOULD treat `models` as the source of truth
 
 #### Scenario: Empty session totals
+
 - **WHEN** a session has no completed steps with token data
 - **THEN** `session_totals` contains all fields set to 0
 - **AND** `models` is an empty object `{}`
@@ -189,13 +223,17 @@ The following JSON Schema defines the complete top-level structure of `session-m
             "cache_creation_input_tokens": { "type": "integer" },
             "cache_read_input_tokens": { "type": "integer" },
             "cache_efficiency": {
-              "anyOf": [
-                { "type": "number", "minimum": 0.0, "maximum": 1.0 },
-                { "type": "null" }
-              ]
+              "anyOf": [{ "type": "number", "minimum": 0.0, "maximum": 1.0 }, { "type": "null" }]
             }
           },
-          "required": ["count", "input_tokens", "output_tokens", "cache_creation_input_tokens", "cache_read_input_tokens", "cache_efficiency"]
+          "required": [
+            "count",
+            "input_tokens",
+            "output_tokens",
+            "cache_creation_input_tokens",
+            "cache_read_input_tokens",
+            "cache_efficiency"
+          ]
         }
       }
     },
@@ -208,7 +246,13 @@ The following JSON Schema defines the complete top-level structure of `session-m
         "cache_read_input_tokens": { "type": "integer" },
         "total_steps": { "type": "integer" }
       },
-      "required": ["input_tokens", "output_tokens", "cache_creation_input_tokens", "cache_read_input_tokens", "total_steps"]
+      "required": [
+        "input_tokens",
+        "output_tokens",
+        "cache_creation_input_tokens",
+        "cache_read_input_tokens",
+        "total_steps"
+      ]
     },
     "duration_ms": { "type": "integer" },
     "outcome": { "type": "string", "enum": ["success", "failure", "timeout"] }
@@ -220,9 +264,11 @@ The following JSON Schema defines the complete top-level structure of `session-m
 ---
 
 ### Requirement: Define token fields for session-metrics.json consumption
+
 The `token_usage` event SHALL include all fields required for `session-persistence` to update `session-metrics.json`.
 
 #### Scenario: token_usage event schema for downstream aggregation
+
 - **WHEN** a `token_usage` event is emitted
 - **THEN** it includes the following fields consumed by `session-persistence`:
   - `session_id`: string — identifies the session to update

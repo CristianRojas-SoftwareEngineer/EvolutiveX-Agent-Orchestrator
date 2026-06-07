@@ -76,7 +76,10 @@ async function countSubagentCorrupt(sessionId: string, projectDir: string): Prom
   return total;
 }
 
-async function repairSubagents(sessionId: string, projectDir: string): Promise<{
+async function repairSubagents(
+  sessionId: string,
+  projectDir: string,
+): Promise<{
   files: number;
   blocksRemoved: number;
 }> {

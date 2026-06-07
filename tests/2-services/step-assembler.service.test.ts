@@ -95,7 +95,11 @@ describe('StepAssemblerService', () => {
     const assembler = new StepAssemblerService();
     feed(assembler, [
       { type: 'content_block_start', index: 1, content_block: { type: 'thinking' } },
-      { type: 'content_block_delta', index: 1, delta: { type: 'thinking_delta', thinking: 'razonando' } },
+      {
+        type: 'content_block_delta',
+        index: 1,
+        delta: { type: 'thinking_delta', thinking: 'razonando' },
+      },
       { type: 'content_block_stop', index: 1 },
     ]);
     const result = assembler.result();

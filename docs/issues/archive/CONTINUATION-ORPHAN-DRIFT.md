@@ -14,14 +14,14 @@ Warning recurrente en `server/logs.jsonl` (50 ocurrencias en la sesión `fe6e7d9
 
 ### Estructura en disco (tree /F + análisis programático)
 
-| Métrica | Valor |
-|---------|-------|
-| Total de workflows en `workflows/` | 65 |
-| Workflows con `continuationOrphan: true` | 49 |
-| Workflows con `status: running` sin cerrar | 15 |
+| Métrica                                       | Valor                |
+| --------------------------------------------- | -------------------- |
+| Total de workflows en `workflows/`            | 65                   |
+| Workflows con `continuationOrphan: true`      | 49                   |
+| Workflows con `status: running` sin cerrar    | 15                   |
 | Workflow con `id = sessionId` (main original) | 1 (sequence index 0) |
-| Workflows huérfanos con `stepCount: 0` | 49 |
-| Duración promedio de un orphan | ~6 ms |
+| Workflows huérfanos con `stepCount: 0`        | 49                   |
+| Duración promedio de un orphan                | ~6 ms                |
 
 ### `workflow-sequence.json` (fragmento relevante)
 
@@ -35,13 +35,13 @@ Warning recurrente en `server/logs.jsonl` (50 ocurrencias en la sesión `fe6e7d9
 
 ### Distribución de eventos en `events.ndjson` por workflowId
 
-| workflowId | stream_chunks | step_response | tool_call | workflow_start/complete |
-|-----------|---------------|---------------|-----------|-------------------------|
-| `fe6e7d92-...` (id=sessionId) | **5986** | **201** | **201** | 2 |
-| `fe6e7d92-...-wire-1` | 3 | 0 | 0 | 2 |
-| `fe6e7d92-...-wire-2` | 0 | 0 | 0 | 2 |
-| `fe6e7d92-...-wire-3` | 0 | 0 | 0 | 2 |
-| `fe6e7d92-...-wire-N` (resto) | 0 | 0 | 0 | 2-4 |
+| workflowId                    | stream_chunks | step_response | tool_call | workflow_start/complete |
+| ----------------------------- | ------------- | ------------- | --------- | ----------------------- |
+| `fe6e7d92-...` (id=sessionId) | **5986**      | **201**       | **201**   | 2                       |
+| `fe6e7d92-...-wire-1`         | 3             | 0             | 0         | 2                       |
+| `fe6e7d92-...-wire-2`         | 0             | 0             | 0         | 2                       |
+| `fe6e7d92-...-wire-3`         | 0             | 0             | 0         | 2                       |
+| `fe6e7d92-...-wire-N` (resto) | 0             | 0             | 0         | 2-4                     |
 
 ### Subagente `workflows/00` (el único con respuesta completa)
 
@@ -190,15 +190,15 @@ El cliente continúa y las siguientes continuations encuentran los toolUseIds re
 
 ## Impacto en el layout `causal-workflows-v1`
 
-| Aspecto | Estado |
-|---------|--------|
-| Directorios `workflows/NN/` | Se crean (65 en esta sesión) |
-| `meta.json` por workflow | Se escribe para orphans, pero con `stepCount: 0` |
-| `output/result.json` | Existe para orphans, pero sin `body.json` real |
-| `steps/MM/request/body.json` | Se persiste el request |
-| `steps/MM/response/body.json` | **No se persiste** para wire-N (los chunks van al main equivocado) |
-| `tools/KK-Agent/sub-agent/workflow/` | Se persiste correctamente para subagentes |
-| `events.ndjson` | Registra eventos pero contra workflowId incorrecto |
+| Aspecto                              | Estado                                                             |
+| ------------------------------------ | ------------------------------------------------------------------ |
+| Directorios `workflows/NN/`          | Se crean (65 en esta sesión)                                       |
+| `meta.json` por workflow             | Se escribe para orphans, pero con `stepCount: 0`                   |
+| `output/result.json`                 | Existe para orphans, pero sin `body.json` real                     |
+| `steps/MM/request/body.json`         | Se persiste el request                                             |
+| `steps/MM/response/body.json`        | **No se persiste** para wire-N (los chunks van al main equivocado) |
+| `tools/KK-Agent/sub-agent/workflow/` | Se persiste correctamente para subagentes                          |
+| `events.ndjson`                      | Registra eventos pero contra workflowId incorrecto                 |
 
 **El layout se genera estructuralmente**, pero los wire-N orphans no tienen contenido de respuesta ni herramientas registradas. El workflow main con id=sessionId recibe los chunks, los tools, los resultados, etc. — es decir, **toda la auditoría real está mal atribuida al main workflow**.
 
@@ -259,14 +259,14 @@ En `handleContinuation`, si el `toolUseId` se acaba de registrar (porque el SSE 
 
 ## Archivos afectados
 
-| Archivo | Línea | Problema |
-|---------|-------|----------|
-| `src/3-operations/audit-sse-response.handler.ts` | 45 | `getWorkflowBySessionId` en vez de `getWorkflow(context.workflowId)` |
-| `src/1-domain/types/audit.types.ts` | (AuditWorkflowContext) | No contiene `workflowId` explícito |
-| `src/3-operations/audit-workflow.handler.ts` | (varios) | No propaga `workflowId` al construir el context |
-| `src/2-services/workflow-repository.service.ts` | 300 | `forceClose` fija `closedByEvent: "StopFailure"` siempre — incorrecto |
-| `src/3-operations/audit-hook-event.handler.ts` | 53 | `getWorkflow(agentId)` no resuelve por agentId → workflowId |
-| `src/3-operations/audit-sse-response.handler.ts` | (stream.on('error')) | No limpia índice `toolUseIdToWorkflowId` en errores |
+| Archivo                                          | Línea                  | Problema                                                              |
+| ------------------------------------------------ | ---------------------- | --------------------------------------------------------------------- |
+| `src/3-operations/audit-sse-response.handler.ts` | 45                     | `getWorkflowBySessionId` en vez de `getWorkflow(context.workflowId)`  |
+| `src/1-domain/types/audit.types.ts`              | (AuditWorkflowContext) | No contiene `workflowId` explícito                                    |
+| `src/3-operations/audit-workflow.handler.ts`     | (varios)               | No propaga `workflowId` al construir el context                       |
+| `src/2-services/workflow-repository.service.ts`  | 300                    | `forceClose` fija `closedByEvent: "StopFailure"` siempre — incorrecto |
+| `src/3-operations/audit-hook-event.handler.ts`   | 53                     | `getWorkflow(agentId)` no resuelve por agentId → workflowId           |
+| `src/3-operations/audit-sse-response.handler.ts` | (stream.on('error'))   | No limpia índice `toolUseIdToWorkflowId` en errores                   |
 
 ## Verificación recomendada antes de implementar
 
@@ -287,18 +287,18 @@ En `handleContinuation`, si el `toolUseId` se acaba de registrar (porque el SSE 
 
 ### Cambios realizados
 
-| Archivo | Cambio |
-|---------|--------|
-| `src/1-domain/types/audit.types.ts` | `workflowId: string` añadido como campo obligatorio a `AuditWorkflowContext` |
-| `src/1-domain/repositories/IWorkflowRepository.ts` | Firma `clearToolUseIndexFor(workflowId: string): void` añadida |
-| `src/1-domain/interfaces/gateway/IWorkflowResult.ts` | `closedByEvent` cambiado a opcional (`closedByEvent?: WorkflowClosedByEvent`) |
-| `src/2-services/workflow-repository.service.ts` | Implementado `clearToolUseIndexFor`; `forceClose` usa el nuevo método y omite `closedByEvent` |
-| `src/3-operations/audit-sse-response.handler.ts` | Lookup cambiado a `getWorkflow(context.workflowId)`; `stream.on('error')` invoca `clearToolUseIndexFor` |
-| `src/3-operations/audit-standard-response.handler.ts` | Mismo lookup que SSE handler |
-| `src/3-operations/audit-hook-event.handler.ts` | `SubagentStop` usa `getWorkflowByAgentId` → `getWorkflow` |
-| `src/3-operations/audit-upstream-error.handler.ts` | Invoca `clearToolUseIndexFor` antes de `forceClose` |
-| `src/5-user-interfaces/http/fastify.augments.d.ts` | Campo `auditWorkflowId?: string` añadido a `FastifyRequest` |
-| `src/5-user-interfaces/http/proxy.controller.ts` | Propagación de `workflowId` al context |
+| Archivo                                               | Cambio                                                                                                  |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `src/1-domain/types/audit.types.ts`                   | `workflowId: string` añadido como campo obligatorio a `AuditWorkflowContext`                            |
+| `src/1-domain/repositories/IWorkflowRepository.ts`    | Firma `clearToolUseIndexFor(workflowId: string): void` añadida                                          |
+| `src/1-domain/interfaces/gateway/IWorkflowResult.ts`  | `closedByEvent` cambiado a opcional (`closedByEvent?: WorkflowClosedByEvent`)                           |
+| `src/2-services/workflow-repository.service.ts`       | Implementado `clearToolUseIndexFor`; `forceClose` usa el nuevo método y omite `closedByEvent`           |
+| `src/3-operations/audit-sse-response.handler.ts`      | Lookup cambiado a `getWorkflow(context.workflowId)`; `stream.on('error')` invoca `clearToolUseIndexFor` |
+| `src/3-operations/audit-standard-response.handler.ts` | Mismo lookup que SSE handler                                                                            |
+| `src/3-operations/audit-hook-event.handler.ts`        | `SubagentStop` usa `getWorkflowByAgentId` → `getWorkflow`                                               |
+| `src/3-operations/audit-upstream-error.handler.ts`    | Invoca `clearToolUseIndexFor` antes de `forceClose`                                                     |
+| `src/5-user-interfaces/http/fastify.augments.d.ts`    | Campo `auditWorkflowId?: string` añadido a `FastifyRequest`                                             |
+| `src/5-user-interfaces/http/proxy.controller.ts`      | Propagación de `workflowId` al context                                                                  |
 
 ### Resultado esperado
 

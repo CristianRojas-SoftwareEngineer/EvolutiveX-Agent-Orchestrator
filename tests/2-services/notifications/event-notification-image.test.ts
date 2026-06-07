@@ -18,7 +18,10 @@ describe('event-notification-image', () => {
 
   it('la base tiene esquinas con fondo del toast (#fefefe)', async () => {
     const base = await renderNotificationImageBase(getAiAssistantPngPath());
-    const corner = await sharp(base).extract({ left: 0, top: 0, width: 1, height: 1 }).raw().toBuffer();
+    const corner = await sharp(base)
+      .extract({ left: 0, top: 0, width: 1, height: 1 })
+      .raw()
+      .toBuffer();
     const bg = TOAST_BODY_IMAGE_BACKGROUND;
     expect(corner[0]).toBe(bg.r);
     expect(corner[1]).toBe(bg.g);

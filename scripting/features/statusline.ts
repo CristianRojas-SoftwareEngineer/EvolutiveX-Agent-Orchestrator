@@ -36,7 +36,8 @@ export function shouldOverwriteStatusLine(
   if (isSmartCodeStatusLine(existingCommand)) return { ok: true };
   return {
     ok: false,
-    message: 'Ya existe un statusLine que no es de Smart Code Proxy. Use --force para sobrescribirlo.',
+    message:
+      'Ya existe un statusLine que no es de Smart Code Proxy. Use --force para sobrescribirlo.',
   };
 }
 
@@ -48,7 +49,9 @@ export function validateProxyRoot(proxyRoot: string): void {
     throw new Error(`No se encontró ${scriptPath}. Ejecute el instalador desde la raíz del proxy.`);
   }
   if (!existsSync(providersPath)) {
-    throw new Error(`No se encontró ${providersPath}. Compruebe --root o el directorio de trabajo.`);
+    throw new Error(
+      `No se encontró ${providersPath}. Compruebe --root o el directorio de trabajo.`,
+    );
   }
 }
 
@@ -72,10 +75,7 @@ export function applyStatuslineInstall(
  * Desinstala statusline con preservación de ajeno (S4).
  * Si el comando actual no es de SCP y `force` es false, no toca nada.
  */
-export function applyStatuslineUninstall(
-  settings: ClaudeSettings,
-  force: boolean,
-): ClaudeSettings {
+export function applyStatuslineUninstall(settings: ClaudeSettings, force: boolean): ClaudeSettings {
   const next: ClaudeSettings = { ...settings };
   const existing = next.statusLine?.command;
   if (existing && !isSmartCodeStatusLine(existing) && !force) {

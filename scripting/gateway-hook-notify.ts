@@ -13,9 +13,7 @@ const STDIN_JSON_EVENT_TYPES = new Set(['UserPromptSubmit', 'StopFailure']);
 
 export async function runGatewayHookNotify(eventType: string): Promise<number> {
   if (!STDIN_JSON_EVENT_TYPES.has(eventType)) {
-    process.stderr.write(
-      `gateway-hook-notify: event-type no soportado: ${eventType}\n`,
-    );
+    process.stderr.write(`gateway-hook-notify: event-type no soportado: ${eventType}\n`);
     return 1;
   }
 
@@ -37,9 +35,7 @@ export async function runGatewayHookNotify(eventType: string): Promise<number> {
     }
     stdinPayload = parsed as Record<string, unknown>;
   } catch (err) {
-    process.stderr.write(
-      `gateway-hook-notify: JSON inválido: ${(err as Error).message}\n`,
-    );
+    process.stderr.write(`gateway-hook-notify: JSON inválido: ${(err as Error).message}\n`);
     return 1;
   }
 
@@ -62,9 +58,7 @@ export async function runGatewayHookNotify(eventType: string): Promise<number> {
     await adapter.notify(built);
     return 0;
   } catch (err) {
-    process.stderr.write(
-      `gateway-hook-notify: toast: ${(err as Error).message}\n`,
-    );
+    process.stderr.write(`gateway-hook-notify: toast: ${(err as Error).message}\n`);
     return 1;
   }
 }

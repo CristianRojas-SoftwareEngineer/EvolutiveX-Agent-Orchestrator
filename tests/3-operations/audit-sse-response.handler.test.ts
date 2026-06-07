@@ -62,7 +62,6 @@ function makeWorkflowRepo(overrides: Partial<IWorkflowRepository> = {}): IWorkfl
   };
 }
 
-
 function stubWorkflow(id = 'session-1'): IWorkflow {
   return { id, sessionId: id, kind: 'main', status: 'running', steps: [], startedAt: new Date() };
 }
@@ -161,7 +160,6 @@ describe('AuditSseResponseHandler', () => {
     expect(firstChunk.payload.chunk).toHaveProperty('line');
     expect(firstChunk.payload).toHaveProperty('stepIndex', 0);
   });
-
 
   it('registra wire step en correlador al final del stream', async () => {
     const registerStep = vi.fn();
@@ -263,7 +261,11 @@ describe('AuditSseResponseHandler', () => {
     ].join('\n');
 
     const stream = new PassThrough();
-    handler.execute(stream, makeContext({ auditSessionId: 'session-1', workflowId: 'session-1-wire-1' }), {});
+    handler.execute(
+      stream,
+      makeContext({ auditSessionId: 'session-1', workflowId: 'session-1-wire-1' }),
+      {},
+    );
     stream.write(Buffer.from(sse));
     stream.end();
     await wait();
@@ -292,7 +294,11 @@ describe('AuditSseResponseHandler', () => {
     ].join('\n');
 
     const stream = new PassThrough();
-    handler.execute(stream, makeContext({ auditSessionId: 'session-1', workflowId: 'session-1' }), {});
+    handler.execute(
+      stream,
+      makeContext({ auditSessionId: 'session-1', workflowId: 'session-1' }),
+      {},
+    );
     stream.write(Buffer.from(sse));
     stream.end();
     await wait();
@@ -309,7 +315,11 @@ describe('AuditSseResponseHandler', () => {
     const handler = makeSseHandler(undefined, undefined, repo, makeEventBus({ publish }));
 
     const stream = new PassThrough();
-    handler.execute(stream, makeContext({ auditSessionId: 'session-1', workflowId: 'session-1' }), {});
+    handler.execute(
+      stream,
+      makeContext({ auditSessionId: 'session-1', workflowId: 'session-1' }),
+      {},
+    );
     stream.write(Buffer.from(SSE_END_TURN));
     stream.end();
     await wait();
@@ -322,18 +332,24 @@ describe('AuditSseResponseHandler', () => {
     const wireWf = stubWorkflow('session-1-wire-1');
     wireWf.sessionId = 'session-1';
     const repo = makeWorkflowRepo({
-      getWorkflow: vi.fn((id: string) => id === 'session-1-wire-1' ? wireWf : undefined),
+      getWorkflow: vi.fn((id: string) => (id === 'session-1-wire-1' ? wireWf : undefined)),
       closeStep: vi.fn(),
     });
     const handler = makeSseHandler(undefined, undefined, repo, makeEventBus({ publish }));
 
     const stream = new PassThrough();
-    handler.execute(stream, makeContext({ auditSessionId: 'session-1', workflowId: 'session-1-wire-1' }), {});
+    handler.execute(
+      stream,
+      makeContext({ auditSessionId: 'session-1', workflowId: 'session-1-wire-1' }),
+      {},
+    );
     stream.write(Buffer.from(SSE_END_TURN));
     stream.end();
     await wait();
 
-    const chunkCalls = (publish as ReturnType<typeof vi.fn>).mock.calls.filter(([e]) => e.type === 'stream_chunk');
+    const chunkCalls = (publish as ReturnType<typeof vi.fn>).mock.calls.filter(
+      ([e]) => e.type === 'stream_chunk',
+    );
     expect(chunkCalls.length).toBeGreaterThan(0);
     for (const [evt] of chunkCalls) {
       expect(evt.workflowId).toBe('session-1-wire-1');
@@ -345,7 +361,7 @@ describe('AuditSseResponseHandler', () => {
     const wireWf = stubWorkflow('session-1-wire-1');
     wireWf.sessionId = 'session-1';
     const repo = makeWorkflowRepo({
-      getWorkflow: vi.fn((id: string) => id === 'session-1-wire-1' ? wireWf : undefined),
+      getWorkflow: vi.fn((id: string) => (id === 'session-1-wire-1' ? wireWf : undefined)),
       closeStep: vi.fn(),
       registerPendingToolUse,
     });
@@ -361,7 +377,11 @@ describe('AuditSseResponseHandler', () => {
     ].join('\n');
 
     const stream = new PassThrough();
-    handler.execute(stream, makeContext({ auditSessionId: 'session-1', workflowId: 'session-1-wire-1' }), {});
+    handler.execute(
+      stream,
+      makeContext({ auditSessionId: 'session-1', workflowId: 'session-1-wire-1' }),
+      {},
+    );
     stream.write(Buffer.from(sse));
     stream.end();
     await wait();

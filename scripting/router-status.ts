@@ -94,10 +94,7 @@ interface ResolvedStatuslinePaths {
  * Resuelve la raíz del repositorio del proxy desde settings o cwd.
  * Si `SMART_CODE_PROXY_ROOT` no apunta a un repo válido (`routing/providers`), usa cwd.
  */
-export function resolveProjectRoot(
-  settingsEnv: ClaudeSettingsEnv,
-  cwd?: string,
-): string {
+export function resolveProjectRoot(settingsEnv: ClaudeSettingsEnv, cwd?: string): string {
   const fallback = resolve(cwd ?? process.cwd());
   const fromSettings = settingsEnv[SMART_CODE_PROXY_ROOT_KEY]?.trim();
   if (!fromSettings) return fallback;
@@ -535,10 +532,7 @@ function resolveActiveProvider(paths: ResolvedStatuslinePaths): {
   return { providerName: 'Desconocido', upstreamOrigin };
 }
 
-function resolveSessionPath(
-  sessionId: string | undefined,
-  sessionsPath: string,
-): string | null {
+function resolveSessionPath(sessionId: string | undefined, sessionsPath: string): string | null {
   if (!existsSync(sessionsPath)) return null;
 
   const sessions = readdirSync(sessionsPath, { withFileTypes: true }).filter((d) =>
@@ -601,8 +595,8 @@ export function classifyModelWithEnv(
   // Fallback heurístico cuando vars no están configuradas (ej. provider default / OAuth nativo).
   // Solo se activa si las tres están ausentes; si alguna tiene valor, se respeta la configuración explícita.
   if (!haiku && !opus && !sonnet) {
-    if (modelId.includes('haiku'))  return 'lite';
-    if (modelId.includes('opus'))   return 'reasoning';
+    if (modelId.includes('haiku')) return 'lite';
+    if (modelId.includes('opus')) return 'reasoning';
     if (modelId.includes('sonnet')) return 'standard';
   }
 
@@ -950,7 +944,10 @@ function renderTokenTable(
 
   // Renderizar tabla sin fila de total; columna Modelo (índice 1) es la columna elástica
   const { table, width, columnWidths } = renderTable(
-    headers, rows, alignments, [0, 1, 2],
+    headers,
+    rows,
+    alignments,
+    [0, 1, 2],
     undefined,
     targetWidth,
     1,
@@ -1187,7 +1184,11 @@ export function buildStatuslineOutput(
         },
       });
     } else {
-      table2 = renderTokenTable(createEmptyMetrics(settingsEnv, paths.routingPath), null, targetWidth);
+      table2 = renderTokenTable(
+        createEmptyMetrics(settingsEnv, paths.routingPath),
+        null,
+        targetWidth,
+      );
     }
     output.push(table2.lines.join('\n'));
   }

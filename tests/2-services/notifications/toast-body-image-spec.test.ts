@@ -7,10 +7,7 @@ import {
   blendOpaqueWhiteOverToastShell,
 } from '../../../src/2-services/notifications/toast-body-image-spec.js';
 
-const EVENTS_DIR = resolve(
-  import.meta.dirname,
-  '../../../assets/notifications/events',
-);
+const EVENTS_DIR = resolve(import.meta.dirname, '../../../assets/notifications/events');
 
 describe('toast-body-image-spec', () => {
   it('mezcla opaca blanco 90 % sobre gris del toast → #fefefe', () => {
@@ -24,7 +21,10 @@ describe('toast-body-image-spec', () => {
     const meta = await sharp(buf).metadata();
     expect(meta.width).toBe(128);
     expect(meta.height).toBe(128);
-    const corner = await sharp(buf).extract({ left: 0, top: 0, width: 1, height: 1 }).raw().toBuffer();
+    const corner = await sharp(buf)
+      .extract({ left: 0, top: 0, width: 1, height: 1 })
+      .raw()
+      .toBuffer();
     expect([corner[0], corner[1], corner[2]]).toEqual([254, 254, 254]);
     const center = await sharp(buf)
       .extract({ left: 64, top: 64, width: 1, height: 1 })

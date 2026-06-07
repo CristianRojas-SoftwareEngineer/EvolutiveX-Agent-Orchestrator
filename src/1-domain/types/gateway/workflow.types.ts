@@ -2,12 +2,7 @@
 export type WorkflowKind = 'main' | 'subagent';
 
 /** Estado del ciclo de vida del workflow. */
-export type WorkflowStatus =
-  | 'pending'
-  | 'running'
-  | 'completed'
-  | 'failed'
-  | 'aborted';
+export type WorkflowStatus = 'pending' | 'running' | 'completed' | 'failed' | 'aborted';
 
 /** Resultado global al cierre del workflow. */
 export type WorkflowOutcome =

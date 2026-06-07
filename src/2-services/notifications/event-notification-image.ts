@@ -9,10 +9,7 @@ import {
   NOTIFICATION_IMAGE_CIRCLE_RADIUS_RATIO,
   applyCircularToastFrame,
 } from './toast-body-image-spec.js';
-import {
-  buildEventOverlaySvg,
-  type EventImageOverlayId,
-} from './event-image-overlays.js';
+import { buildEventOverlaySvg, type EventImageOverlayId } from './event-image-overlays.js';
 import { NOTIFICATION_EVENT_KEYS } from './event-notification-profile.js';
 import { getProfileForEvent } from './event-notification-profile.js';
 import { getRepoEventsDir } from './event-image-paths.js';
@@ -41,9 +38,7 @@ export function getAiAssistantPngPath(): string {
 }
 
 /** Aplica máscara circular y fondo opaco del toast fuera del disco. */
-export async function renderNotificationImageBase(
-  aiAssistantPath: string,
-): Promise<Buffer> {
+export async function renderNotificationImageBase(aiAssistantPath: string): Promise<Buffer> {
   const size = TOAST_BODY_IMAGE_WIDTH_PX;
   const bg = TOAST_BODY_IMAGE_BACKGROUND;
   const cx = size / 2;
@@ -82,7 +77,10 @@ export async function renderNotificationImageBase(
 async function compositeDualRobot(base: Buffer): Promise<Buffer> {
   const size = TOAST_BODY_IMAGE_WIDTH_PX;
   const bg = TOAST_BODY_IMAGE_BACKGROUND;
-  const small = await sharp(base).resize(Math.round(size * 0.52)).png().toBuffer();
+  const small = await sharp(base)
+    .resize(Math.round(size * 0.52))
+    .png()
+    .toBuffer();
   return sharp({
     create: { width: size, height: size, channels: 3, background: bg },
   })

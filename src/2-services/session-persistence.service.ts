@@ -155,7 +155,11 @@ export class SessionPersistence {
       parentContext?: Record<string, unknown>;
       request?: unknown;
     };
-    const baseDir = this.resolveSpawnBaseDir(event.sessionId, p.parentWorkflowId, p.parentToolUseId);
+    const baseDir = this.resolveSpawnBaseDir(
+      event.sessionId,
+      p.parentWorkflowId,
+      p.parentToolUseId,
+    );
     const meta: Record<string, unknown> = {
       workflowId: p.workflowId,
       sessionId: event.sessionId,
@@ -317,7 +321,8 @@ export class SessionPersistence {
     entry.meta.completedAt = event.timestamp;
     if (auditOutcome !== undefined) entry.meta.outcome = auditOutcome;
     if (p.lostPendingAgents !== undefined) entry.meta.lostPendingAgents = p.lostPendingAgents;
-    if (p.lostPendingWebSearch !== undefined) entry.meta.lostPendingWebSearch = p.lostPendingWebSearch;
+    if (p.lostPendingWebSearch !== undefined)
+      entry.meta.lostPendingWebSearch = p.lostPendingWebSearch;
     if (p.lostPendingWebFetch !== undefined) entry.meta.lostPendingWebFetch = p.lostPendingWebFetch;
     if (p.continuationOrphan !== undefined) entry.meta.continuationOrphan = p.continuationOrphan;
     this.writeMeta(entry.baseDir, entry.meta);
@@ -372,7 +377,9 @@ export class SessionPersistence {
 
     const chunkFile = `${this.stepDir(entry, p.stepIndex)}response/streaming/${pad4(p.seq)}-chunk.ndjson`;
     const lineData = JSON.stringify(p.chunk);
-    this.enqueue(chunkFile, () => this.atomicWrite(chunkFile, Buffer.from(`${lineData}\n`, 'utf8')));
+    this.enqueue(chunkFile, () =>
+      this.atomicWrite(chunkFile, Buffer.from(`${lineData}\n`, 'utf8')),
+    );
   }
 
   private onAnyEvent(event: TelemetryEvent): void {

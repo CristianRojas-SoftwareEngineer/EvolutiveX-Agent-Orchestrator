@@ -85,7 +85,12 @@ describe('aggregateWorkflowUsage', () => {
   });
 
   it('omite service_tier e inference_geo del resultado', () => {
-    const step = makeStep({ input_tokens: 1, output_tokens: 1, service_tier: 'standard', inference_geo: 'us' });
+    const step = makeStep({
+      input_tokens: 1,
+      output_tokens: 1,
+      service_tier: 'standard',
+      inference_geo: 'us',
+    });
     const result = aggregateWorkflowUsage([step], []);
     expect(result).not.toHaveProperty('service_tier');
     expect(result).not.toHaveProperty('inference_geo');

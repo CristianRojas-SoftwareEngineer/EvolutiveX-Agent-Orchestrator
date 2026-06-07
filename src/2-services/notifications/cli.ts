@@ -8,10 +8,7 @@ import { fileURLToPath } from 'url';
 import { resolve as resolvePath } from 'path';
 import { DesktopNotificationAdapter } from './DesktopNotificationAdapter.js';
 import type { NotificationEvent } from './types.js';
-import {
-  getProfileForEvent,
-  NOTIFICATION_BRAND_TITLE,
-} from './event-notification-profile.js';
+import { getProfileForEvent, NOTIFICATION_BRAND_TITLE } from './event-notification-profile.js';
 import { resolveEventImagePath } from './event-image-paths.js';
 import { resolveHookNotificationMessage } from './hook-payload-notification-message.js';
 import { resolveNotificationSound } from './resolve-notification-sound.js';
@@ -125,10 +122,7 @@ export function resolveEventSound(
 }
 
 /** Título: override CLI → nombre del hook (eventKey) → marca por defecto. */
-export function resolveNotificationTitle(
-  options: CliOptions,
-  eventKey?: string,
-): string {
+export function resolveNotificationTitle(options: CliOptions, eventKey?: string): string {
   if (options.title !== undefined && options.title !== '') {
     return options.title;
   }
@@ -198,13 +192,22 @@ async function main(): Promise<number> {
     .name('claude-notify')
     .description('Emite un toast nativo del SO desde un hook de Claude Code')
     .option('--event-type <type>', 'Tipo de evento del lifecycle (p. ej. Stop)')
-    .option('--message <msg>', 'Cuerpo del toast (override; por defecto catálogo o formatter stdin)')
+    .option(
+      '--message <msg>',
+      'Cuerpo del toast (override; por defecto catálogo o formatter stdin)',
+    )
     .option('--title <title>', 'Título del toast (override; por defecto nombre del hook)')
     .addOption(new Option(`--${SOUND_FLAG}`, 'Reproducir sonido genérico').conflicts(SILENT_FLAG))
     .addOption(new Option(`--${SILENT_FLAG}`, 'Silenciar el toast').conflicts(SOUND_FLAG))
     .option(`--${STDIN_JSON_FLAG}`, 'Leer payload JSON por stdin y derivar mensaje dinámico')
-    .option(`--${APP_ID_FLAG} <id>`, `Identificador de aplicación (AUMID Windows); default: ${DEFAULT_APP_ID}`)
-    .option(`--${ICON_FLAG} <path>`, 'Ruta al icono de la notificación; default: perfil del evento o ai-assistant.png')
+    .option(
+      `--${APP_ID_FLAG} <id>`,
+      `Identificador de aplicación (AUMID Windows); default: ${DEFAULT_APP_ID}`,
+    )
+    .option(
+      `--${ICON_FLAG} <path>`,
+      'Ruta al icono de la notificación; default: perfil del evento o ai-assistant.png',
+    )
     .allowExcessArguments(false)
     .parse(process.argv);
 

@@ -107,11 +107,16 @@ describe('classifyRequestBody', () => {
     const body = Buffer.from(
       JSON.stringify({
         messages: [
-          { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'hist-1', content: 'ok' }] },
+          {
+            role: 'user',
+            content: [{ type: 'tool_result', tool_use_id: 'hist-1', content: 'ok' }],
+          },
           { role: 'assistant', content: [{ type: 'text', text: 'entendido' }] },
           { role: 'user', content: 'nueva instrucción del usuario' },
         ],
-        tools: [{ name: 'Read', description: 'lee', input_schema: { type: 'object', properties: {} } }],
+        tools: [
+          { name: 'Read', description: 'lee', input_schema: { type: 'object', properties: {} } },
+        ],
         max_tokens: 4096,
       }),
     );
@@ -124,7 +129,10 @@ describe('classifyRequestBody', () => {
     const body = Buffer.from(
       JSON.stringify({
         messages: [
-          { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'hist-2', content: 'ok' }] },
+          {
+            role: 'user',
+            content: [{ type: 'tool_result', tool_use_id: 'hist-2', content: 'ok' }],
+          },
           { role: 'assistant', content: [{ type: 'text', text: 'ok' }] },
           { role: 'user', content: 'hola' },
         ],

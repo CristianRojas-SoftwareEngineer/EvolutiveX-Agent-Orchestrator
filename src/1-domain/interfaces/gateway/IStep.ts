@@ -1,4 +1,8 @@
-import type { AnthropicMessage, AnthropicRequest, AnthropicUsage } from '../../types/anthropic.types.js';
+import type {
+  AnthropicMessage,
+  AnthropicRequest,
+  AnthropicUsage,
+} from '../../types/anthropic.types.js';
 import type { IToolUse } from './IToolUse.js';
 
 /** Unidad de observabilidad: agrupa inferencia, respuesta y ejecución de tools de un ciclo. */

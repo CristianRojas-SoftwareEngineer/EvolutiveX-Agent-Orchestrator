@@ -31,6 +31,7 @@ C:\Users\Cristian\Desktop\Proyectos\Smart Code Proxy\assets\notifications\
 ```
 
 Características de esta ruta:
+
 - Contiene espacios (`Smart Code Proxy`)
 - Todos los caracteres son ASCII estándar (no hay acentos ni caracteres no-ASCII)
 
@@ -48,6 +49,7 @@ notificación visual.
 **Mecanismo probado**: SnoreToast `-p <ruta>` → imagen del cuerpo del toast.
 
 **Comando ejecutado**:
+
 ```
 snoretoast-x64.exe
   -t "EXP 1A — repo path"
@@ -70,6 +72,7 @@ rutas estables.
 `HKCU\Software\Classes\AppUserModelId\AIAssistant.Proxy` apuntando al repo.
 
 **Configuración temporal**:
+
 ```
 Icon    = C:\Users\Cristian\Desktop\Proyectos\Smart Code Proxy\assets\notifications\ai-assistant.ico
 IconUri = C:\Users\Cristian\Desktop\Proyectos\Smart Code Proxy\assets\notifications\ai-assistant.png
@@ -87,6 +90,7 @@ manejan correctamente rutas con espacios.
 **Mecanismo probado**: Registro + `.lnk` `IconLocation` + `-p`, todo apuntando al repo simultáneamente.
 
 **Configuración temporal**:
+
 ```
 Registro Icon    = C:\Users\...\Smart Code Proxy\assets\notifications\ai-assistant.ico
 Registro IconUri = C:\Users\...\Smart Code Proxy\assets\notifications\ai-assistant.png
@@ -103,12 +107,12 @@ cuando la ruta sólo contiene espacios (ASCII).
 
 ## Hallazgos consolidados
 
-| Mecanismo | LOCALAPPDATA necesario | Con repo path |
-|---|---|---|
-| Body image (`-p` flag) | No | ✅ Funciona |
-| Header icon (registro `Icon`/`IconUri`) | No | ✅ Funciona |
-| Header icon (`.lnk` `IconLocation`) | No | ✅ Funciona |
-| Escenario completo (los tres simultáneos) | No | ✅ Funciona |
+| Mecanismo                                 | LOCALAPPDATA necesario | Con repo path |
+| ----------------------------------------- | ---------------------- | ------------- |
+| Body image (`-p` flag)                    | No                     | ✅ Funciona   |
+| Header icon (registro `Icon`/`IconUri`)   | No                     | ✅ Funciona   |
+| Header icon (`.lnk` `IconLocation`)       | No                     | ✅ Funciona   |
+| Escenario completo (los tres simultáneos) | No                     | ✅ Funciona   |
 
 **El mecanismo de copia a `%LOCALAPPDATA%` no es necesario cuando la ruta del repo sólo contiene
 espacios y caracteres ASCII.**
@@ -156,7 +160,8 @@ runtime (resolveEventImagePath)
 ```
 
 Archivos eliminables si se adopta esta simplificación:
-- `src/2-services/notifications/asset-paths.ts` (constantes STABLE_*)
+
+- `src/2-services/notifications/asset-paths.ts` (constantes STABLE\_\*)
 - Lógica de copia en `register.ts` (`ensureStableAssets`, `ensureStableEventAssets`, `copyFileIfChanged`)
 - `src/2-services/notifications/event-image-paths.ts` (`syncEventImageFromRepoIfStale`)
 - Directorio `%LOCALAPPDATA%\AIAssistant\` dejaría de crearse

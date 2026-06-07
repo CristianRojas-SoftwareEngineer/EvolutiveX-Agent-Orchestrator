@@ -4,12 +4,12 @@ El proxy expone pocas variables de entorno en [`configs/.env.example`](../config
 
 ## Cabeceras de sesión y strip hacia upstream
 
-| Constante | Archivo | Valor por defecto |
-|-----------|---------|-------------------|
-| `AUDIT_SESSION_OVERRIDE_HEADER` | [`src/1-domain/constants/session-headers.ts`](../src/1-domain/constants/session-headers.ts) | `x-cc-audit-session` |
-| `AUDIT_SESSION_FALLBACK_HEADER` | mismo | `x-claude-code-session-id` |
-| `STRIP_AUDIT_SESSION_HEADER` | mismo | `true` (no reenvía la cabecera de sesión al upstream) |
-| `AUDIT_SESSION_HASH_SUFFIX` | mismo | `false` (sin sufijo `-<hash8>` en carpetas) |
+| Constante                       | Archivo                                                                                     | Valor por defecto                                     |
+| ------------------------------- | ------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| `AUDIT_SESSION_OVERRIDE_HEADER` | [`src/1-domain/constants/session-headers.ts`](../src/1-domain/constants/session-headers.ts) | `x-cc-audit-session`                                  |
+| `AUDIT_SESSION_FALLBACK_HEADER` | mismo                                                                                       | `x-claude-code-session-id`                            |
+| `STRIP_AUDIT_SESSION_HEADER`    | mismo                                                                                       | `true` (no reenvía la cabecera de sesión al upstream) |
+| `AUDIT_SESSION_HASH_SUFFIX`     | mismo                                                                                       | `false` (sin sufijo `-<hash8>` en carpetas)           |
 
 **Prioridad de resolución:** override → fallback Claude Code → `_unknown` (sin auditoría en disco).
 
@@ -27,10 +27,10 @@ Para depurar otro modo de negociación, modifica temporalmente `proxy.routes.ts`
 
 ## Límites de bytes
 
-| Concepto | Origen |
-|----------|--------|
-| Volcado en disco (request, response, `sse.txt`) | Env `MAX_AUDIT_BYTES` (default 50 MiB) |
-| Buffer en memoria para respuestas no-SSE | Derivado: `max(MAX_AUDIT_BYTES, 100 MiB)` — ver [`audit-limits.ts`](../src/1-domain/constants/audit-limits.ts) |
+| Concepto                                        | Origen                                                                                                         |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Volcado en disco (request, response, `sse.txt`) | Env `MAX_AUDIT_BYTES` (default 50 MiB)                                                                         |
+| Buffer en memoria para respuestas no-SSE        | Derivado: `max(MAX_AUDIT_BYTES, 100 MiB)` — ver [`audit-limits.ts`](../src/1-domain/constants/audit-limits.ts) |
 
 **Buffer de memoria distinto al de disco:** edita `DEFAULT_PROXY_BUFFER_CEILING_BYTES` o `resolveProxyResponseBufferBytes()` en `audit-limits.ts`.
 

@@ -699,9 +699,8 @@ export class AuditWorkflowHandler {
   ): { targetStepIndex: number; toolUseIds: string[] } | null {
     if (toolUseIds.length === 0) return null;
 
-    const pendings = this.workflowRepo.findWorkflowWithPendingTools(
-      parentWorkflow.sessionId,
-      (t) => toolUseIds.includes(t.id),
+    const pendings = this.workflowRepo.findWorkflowWithPendingTools(parentWorkflow.sessionId, (t) =>
+      toolUseIds.includes(t.id),
     );
     if (!pendings || pendings.workflow.id !== parentWorkflow.id) return null;
 
@@ -749,7 +748,10 @@ export class AuditWorkflowHandler {
     auditSessionId: string,
     classification: RequestClassification,
   ): Promise<AuditWorkflowResult> {
-    const isSessionNaming = await this.detectSessionNamingSideRequest(auditSessionId, params.rawBody);
+    const isSessionNaming = await this.detectSessionNamingSideRequest(
+      auditSessionId,
+      params.rawBody,
+    );
     const { workflow, layoutIndex, seq, omitted } = await this.openWireWorkflow(
       auditSessionId,
       'side-request',
@@ -865,7 +867,9 @@ export class AuditWorkflowHandler {
     });
   }
 
-  private collectLostAgentPendings(workflowId: string): Array<{ stepIndex: number; toolUseId: string }> {
+  private collectLostAgentPendings(
+    workflowId: string,
+  ): Array<{ stepIndex: number; toolUseId: string }> {
     const wf = this.workflowRepo.getWorkflow(workflowId);
     if (!wf) return [];
     const match = this.workflowRepo.findWorkflowWithPendingTools(

@@ -1,13 +1,13 @@
 import { StringDecoder } from 'node:string_decoder';
 import type { IWorkflowRepository } from '../1-domain/repositories/IWorkflowRepository.js';
 import type { IEventBus } from '../1-domain/repositories/IEventBus.js';
-import type { AssembledInference, IStepAssembler } from '../2-services/ports/step-assembler.port.js';
+import type {
+  AssembledInference,
+  IStepAssembler,
+} from '../2-services/ports/step-assembler.port.js';
 import { SessionMetricsService } from '../2-services/session-metrics.service.js';
 import { ProxyEnvironmentConfig } from '../1-domain/types/config.types.js';
-import {
-  AuditWorkflowContext,
-  SsePhase,
-} from '../1-domain/types/audit.types.js';
+import { AuditWorkflowContext, SsePhase } from '../1-domain/types/audit.types.js';
 import type { IWorkflow } from '../1-domain/interfaces/gateway/IWorkflow.js';
 import type { IToolUse } from '../1-domain/interfaces/gateway/IToolUse.js';
 import type { Logger } from '../1-domain/types/logger.types.js';
@@ -168,7 +168,12 @@ export class AuditSseResponseHandler {
               name: block.name,
               arguments: block.input,
               status: 'running',
-              toolUseBlock: { type: 'tool_use', id: block.id, name: block.name, input: block.input },
+              toolUseBlock: {
+                type: 'tool_use',
+                id: block.id,
+                name: block.name,
+                input: block.input,
+              },
             };
             if (pendingToolUseKinds.has(block.id)) {
               this.workflowRepo.registerPendingToolUse(workflow.id, wireStep.id, toolUse);
@@ -200,7 +205,11 @@ export class AuditSseResponseHandler {
         if (isCoalescedAgentContinuation) {
           const stopReason = assembled.stopReason ?? null;
           const outcome =
-            stopReason === 'max_tokens' ? 'truncated' : streamError ? 'upstream-error' : 'completed';
+            stopReason === 'max_tokens'
+              ? 'truncated'
+              : streamError
+                ? 'upstream-error'
+                : 'completed';
           this.logger?.info(
             { sessionId: context.auditSessionId, outcome },
             'coalesced SSE interaction finalizada',
@@ -212,10 +221,7 @@ export class AuditSseResponseHandler {
     });
   }
 
-  private registerWireInference(
-    workflow: IWorkflow,
-    assembled: AssembledInference,
-  ) {
+  private registerWireInference(workflow: IWorkflow, assembled: AssembledInference) {
     const inferenceRequest = buildInferenceRequestSnapshot(workflow, assembled);
     const now = new Date();
     const wireStep = buildWireStep({

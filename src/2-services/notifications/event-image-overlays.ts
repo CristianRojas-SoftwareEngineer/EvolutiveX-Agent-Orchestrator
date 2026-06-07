@@ -39,9 +39,7 @@ export function buildEventOverlaySvg(overlayId: EventImageOverlayId): string {
         `<polyline points="98,108 104,114 116,100" fill="none" stroke="${WHITE}" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>`,
       );
     case 'badge-play':
-      return badgeCircle(
-        `<polygon points="100,100 100,116 116,108" fill="${WHITE}"/>`,
-      );
+      return badgeCircle(`<polygon points="100,100 100,116 116,108" fill="${WHITE}"/>`);
     case 'badge-power':
       return badgeCircle(
         `<circle cx="108" cy="104" r="5" fill="none" stroke="${WHITE}" stroke-width="2.5"/>

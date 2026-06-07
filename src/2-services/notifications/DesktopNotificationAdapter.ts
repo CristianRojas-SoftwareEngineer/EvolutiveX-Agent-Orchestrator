@@ -44,7 +44,7 @@ export class DesktopNotificationAdapter implements INotificationService {
     const options: NodeNotifierOptions = {
       title: event.title,
       message: event.message,
-      sound: event.silent === true ? false : event.sound ?? false,
+      sound: event.silent === true ? false : (event.sound ?? false),
       wait: false,
     };
     if (event.appId !== undefined) options.appID = event.appId;

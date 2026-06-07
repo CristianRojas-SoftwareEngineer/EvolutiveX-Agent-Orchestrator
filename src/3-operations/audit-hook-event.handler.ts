@@ -112,8 +112,7 @@ export class AuditHookEventHandler {
 
     const match = this.workflowRepo.findWorkflowWithPendingToolUse(event.sessionId, toolUseId);
     const workflow =
-      match?.workflow ??
-      this.workflowRepo.findWorkflowByToolUseId(event.sessionId, toolUseId);
+      match?.workflow ?? this.workflowRepo.findWorkflowByToolUseId(event.sessionId, toolUseId);
     if (!workflow) return;
 
     const resultPayload =

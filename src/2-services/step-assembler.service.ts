@@ -93,9 +93,16 @@ export class StepAssemblerService implements IStepAssembler {
       }
     }
 
-    if (e.type === 'content_block_start' && (e.content_block as Record<string, unknown>)?.type === 'tool_use') {
+    if (
+      e.type === 'content_block_start' &&
+      (e.content_block as Record<string, unknown>)?.type === 'tool_use'
+    ) {
       const block = e.content_block as Record<string, unknown>;
-      if (typeof e.index === 'number' && typeof block.id === 'string' && typeof block.name === 'string') {
+      if (
+        typeof e.index === 'number' &&
+        typeof block.id === 'string' &&
+        typeof block.name === 'string'
+      ) {
         this.toolUseTracker.set(e.index, {
           id: block.id,
           name: block.name,

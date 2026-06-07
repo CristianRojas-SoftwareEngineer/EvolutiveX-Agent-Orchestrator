@@ -2,7 +2,11 @@ import { randomUUID } from 'node:crypto';
 import type { IWorkflowRepository } from '../1-domain/repositories/IWorkflowRepository.js';
 import type { IStep } from '../1-domain/interfaces/gateway/IStep.js';
 import type { IWorkflow } from '../1-domain/interfaces/gateway/IWorkflow.js';
-import type { AnthropicMessage, AnthropicRequest, AnthropicUsage } from '../1-domain/types/anthropic.types.js';
+import type {
+  AnthropicMessage,
+  AnthropicRequest,
+  AnthropicUsage,
+} from '../1-domain/types/anthropic.types.js';
 import type { AssembledInference } from '../2-services/ports/step-assembler.port.js';
 
 export interface BuildWireStepParams {

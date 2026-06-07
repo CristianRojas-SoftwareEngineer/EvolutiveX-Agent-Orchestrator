@@ -8,7 +8,7 @@ export const PRE_TOOL_USE_HOOK_UX_SEGMENT = 'scripting/pre-tool-use-hook-ux.ts';
 /** Comando para hooks del proyecto cuando el cwd es la raíz del repo. */
 export const PROJECT_GATEWAY_HOOK_COMMAND = `npx tsx ${POST_HOOK_EVENT_SEGMENT}`;
 
-const LEGACY_CURL_MARKERS = ['--data-binary @-', "ANTHROPIC_BASE_URL/hooks"] as const;
+const LEGACY_CURL_MARKERS = ['--data-binary @-', 'ANTHROPIC_BASE_URL/hooks'] as const;
 
 export function buildGatewayHookRelayCommand(proxyRoot: string): string {
   return buildNpxTsxCommand(proxyRoot, POST_HOOK_EVENT_SEGMENT);

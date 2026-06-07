@@ -592,15 +592,23 @@ describe('SseReconstructService — P2-f: lectura desde streaming/*.ndjson', () 
   it('§37b #12: reconstructStepMessage reconstruye desde streaming/*.ndjson', async () => {
     await writeChunks([
       { line: 'event: message_start' },
-      { line: 'data: {"type":"message_start","message":{"id":"msg_p2f","type":"message","role":"assistant","content":[],"model":"claude-sonnet","stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":5,"output_tokens":0}}}' },
+      {
+        line: 'data: {"type":"message_start","message":{"id":"msg_p2f","type":"message","role":"assistant","content":[],"model":"claude-sonnet","stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":5,"output_tokens":0}}}',
+      },
       { line: 'event: content_block_start' },
-      { line: 'data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}' },
+      {
+        line: 'data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}',
+      },
       { line: 'event: content_block_delta' },
-      { line: 'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hola P2"}}' },
+      {
+        line: 'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hola P2"}}',
+      },
       { line: 'event: content_block_stop' },
       { line: 'data: {"type":"content_block_stop","index":0}' },
       { line: 'event: message_delta' },
-      { line: 'data: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null},"usage":{"output_tokens":5}}' },
+      {
+        line: 'data: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null},"usage":{"output_tokens":5}}',
+      },
       { line: 'event: message_stop' },
       { line: 'data: {"type":"message_stop"}' },
     ]);
@@ -613,13 +621,22 @@ describe('SseReconstructService — P2-f: lectura desde streaming/*.ndjson', () 
   it('§37b #14: reconstructStepPhaseMessage reconstruye fase delegation', async () => {
     await writeChunks([
       { line: 'event: message_start', phase: 'delegation' },
-      { line: 'data: {"type":"message_start","message":{"id":"msg_deleg","model":"claude","role":"assistant","content":[],"stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":5,"output_tokens":0}}}', phase: 'delegation' },
+      {
+        line: 'data: {"type":"message_start","message":{"id":"msg_deleg","model":"claude","role":"assistant","content":[],"stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":5,"output_tokens":0}}}',
+        phase: 'delegation',
+      },
       { line: 'event: content_block_start', phase: 'delegation' },
-      { line: 'data: {"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"tu_01","name":"Agent","input":{}}}', phase: 'delegation' },
+      {
+        line: 'data: {"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"tu_01","name":"Agent","input":{}}}',
+        phase: 'delegation',
+      },
       { line: 'event: content_block_stop', phase: 'delegation' },
       { line: 'data: {"type":"content_block_stop","index":0}', phase: 'delegation' },
       { line: 'event: message_delta', phase: 'delegation' },
-      { line: 'data: {"type":"message_delta","delta":{"stop_reason":"tool_use"}}', phase: 'delegation' },
+      {
+        line: 'data: {"type":"message_delta","delta":{"stop_reason":"tool_use"}}',
+        phase: 'delegation',
+      },
     ]);
 
     const msg = await service.reconstructStepPhaseMessage(stepDir, 'delegation');

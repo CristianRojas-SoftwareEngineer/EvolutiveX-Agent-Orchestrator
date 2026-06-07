@@ -2,15 +2,13 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import * as os from 'node:os';
-import { SessionMetricsService, computeCacheEfficiency } from '../../src/2-services/session-metrics.service.js';
+import {
+  SessionMetricsService,
+  computeCacheEfficiency,
+} from '../../src/2-services/session-metrics.service.js';
 import type { IStep } from '../../src/1-domain/interfaces/gateway/IStep.js';
 
-function makeStep(
-  id: string,
-  model: string,
-  usage: IStep['usage'],
-  workflowId = 'w1',
-): IStep {
+function makeStep(id: string, model: string, usage: IStep['usage'], workflowId = 'w1'): IStep {
   return {
     id,
     workflowId,
@@ -100,12 +98,18 @@ describe('SessionMetricsService', () => {
   });
 
   it('merge incremental: updateFromStep×2 + finalizeWorkflowMetrics×2 workflows distintos', async () => {
-    await service.updateFromStep(tmpDir, makeStep('s1', 'm1', { input_tokens: 10, output_tokens: 5 }, 'w1'));
+    await service.updateFromStep(
+      tmpDir,
+      makeStep('s1', 'm1', { input_tokens: 10, output_tokens: 5 }, 'w1'),
+    );
     await service.finalizeWorkflowMetrics(tmpDir, 'w1', [
       makeStep('s1', 'm1', { input_tokens: 10, output_tokens: 5 }, 'w1'),
     ]);
 
-    await service.updateFromStep(tmpDir, makeStep('s2', 'm1', { input_tokens: 20, output_tokens: 10 }, 'w2'));
+    await service.updateFromStep(
+      tmpDir,
+      makeStep('s2', 'm1', { input_tokens: 20, output_tokens: 10 }, 'w2'),
+    );
     await service.finalizeWorkflowMetrics(tmpDir, 'w2', [
       makeStep('s2', 'm1', { input_tokens: 20, output_tokens: 10 }, 'w2'),
     ]);

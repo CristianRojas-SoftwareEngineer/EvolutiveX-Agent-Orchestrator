@@ -209,7 +209,12 @@ export type CorrelationStatus = 'resolved' | 'unresolved';
  * - 'fifo-pending': Señal posicional (primer pending registrado); último recurso determinista cuando hay N pendings sin match, por debajo de prompt/unique.
  * - 'none': No se pudo resolver la correlación.
  */
-export type CorrelationMethod = 'agent-headers' | 'prompt' | 'unique-pending' | 'fifo-pending' | 'none';
+export type CorrelationMethod =
+  | 'agent-headers'
+  | 'prompt'
+  | 'unique-pending'
+  | 'fifo-pending'
+  | 'none';
 
 /**
  * Contexto de agente extraído de las cabeceras X-Claude-Code-Agent-Id y X-Claude-Code-Parent-Agent-Id.

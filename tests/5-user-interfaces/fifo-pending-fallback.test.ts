@@ -46,14 +46,58 @@ async function findJsonFiles(dir: string, filename: string): Promise<string[]> {
 /** Genera el payload SSE con 2 Agent tool_use blocks. */
 function makeSseWith2Agents(): string {
   const events = [
-    { type: 'message_start', message: { id: 'msg_p', type: 'message', usage: { input_tokens: 10, output_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 } } },
-    { type: 'content_block_start', index: 0, content_block: { type: 'tool_use', id: 'toolu_first_agent', name: 'Agent', input: {} } },
-    { type: 'content_block_delta', index: 0, delta: { type: 'input_json_delta', partial_json: JSON.stringify({ subagent_type: 'general-purpose', prompt: 'Task Alpha: analyze the code' }) } },
+    {
+      type: 'message_start',
+      message: {
+        id: 'msg_p',
+        type: 'message',
+        usage: {
+          input_tokens: 10,
+          output_tokens: 0,
+          cache_creation_input_tokens: 0,
+          cache_read_input_tokens: 0,
+        },
+      },
+    },
+    {
+      type: 'content_block_start',
+      index: 0,
+      content_block: { type: 'tool_use', id: 'toolu_first_agent', name: 'Agent', input: {} },
+    },
+    {
+      type: 'content_block_delta',
+      index: 0,
+      delta: {
+        type: 'input_json_delta',
+        partial_json: JSON.stringify({
+          subagent_type: 'general-purpose',
+          prompt: 'Task Alpha: analyze the code',
+        }),
+      },
+    },
     { type: 'content_block_stop', index: 0 },
-    { type: 'content_block_start', index: 1, content_block: { type: 'tool_use', id: 'toolu_second_agent', name: 'Agent', input: {} } },
-    { type: 'content_block_delta', index: 1, delta: { type: 'input_json_delta', partial_json: JSON.stringify({ subagent_type: 'Plan', prompt: 'Task Beta: plan the refactor' }) } },
+    {
+      type: 'content_block_start',
+      index: 1,
+      content_block: { type: 'tool_use', id: 'toolu_second_agent', name: 'Agent', input: {} },
+    },
+    {
+      type: 'content_block_delta',
+      index: 1,
+      delta: {
+        type: 'input_json_delta',
+        partial_json: JSON.stringify({
+          subagent_type: 'Plan',
+          prompt: 'Task Beta: plan the refactor',
+        }),
+      },
+    },
     { type: 'content_block_stop', index: 1 },
-    { type: 'message_delta', delta: { stop_reason: 'tool_use', stop_sequence: null }, usage: { output_tokens: 80 } },
+    {
+      type: 'message_delta',
+      delta: { stop_reason: 'tool_use', stop_sequence: null },
+      usage: { output_tokens: 80 },
+    },
     { type: 'message_stop' },
   ];
   return events.map((e) => `data: ${JSON.stringify(e)}`).join('\n\n') + '\n\n';
@@ -82,7 +126,9 @@ describe('Test E2E - Fallback FIFO para N pendings sin cabeceras de agente (plan
       } else {
         // Requests de subagente: respuesta JSON normal
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ id: 'msg_sub', type: 'message', content: [], stop_reason: 'end_turn' }));
+        res.end(
+          JSON.stringify({ id: 'msg_sub', type: 'message', content: [], stop_reason: 'end_turn' }),
+        );
       }
     });
 
@@ -101,7 +147,8 @@ describe('Test E2E - Fallback FIFO para N pendings sin cabeceras de agente (plan
     vi.resetModules();
 
     const { config } = await import('../../src/4-api/config/env.config.js');
-    const { createProxyDependencies: createDeps } = await import('../../src/4-api/composition-root.js');
+    const { createProxyDependencies: createDeps } =
+      await import('../../src/4-api/composition-root.js');
     const deps = await createDeps(config, mockLogger, tempSessionsDir);
     proxyApp = (await import('../../src/app.js')).buildApp(deps, mockLogger);
     await proxyApp.ready();
@@ -127,8 +174,16 @@ describe('Test E2E - Fallback FIFO para N pendings sin cabeceras de agente (plan
       },
       payload: JSON.stringify({
         model: 'claude-3-5-sonnet',
-        messages: [{ role: 'user', content: [{ type: 'text', text: 'Ejecuta dos tareas en paralelo' }] }],
-        tools: [{ name: 'Agent', description: 'Crea subagente', input_schema: { type: 'object', properties: {} } }],
+        messages: [
+          { role: 'user', content: [{ type: 'text', text: 'Ejecuta dos tareas en paralelo' }] },
+        ],
+        tools: [
+          {
+            name: 'Agent',
+            description: 'Crea subagente',
+            input_schema: { type: 'object', properties: {} },
+          },
+        ],
         max_tokens: 4096,
       }),
     });
@@ -152,7 +207,9 @@ describe('Test E2E - Fallback FIFO para N pendings sin cabeceras de agente (plan
       payload: JSON.stringify({
         model: 'claude-3-5-sonnet',
         messages: [{ role: 'user', content: [{ type: 'text', text: 'prompt sin match' }] }],
-        tools: [{ name: 'Read', description: 'lee', input_schema: { type: 'object', properties: {} } }],
+        tools: [
+          { name: 'Read', description: 'lee', input_schema: { type: 'object', properties: {} } },
+        ],
         max_tokens: 256,
       }),
     });

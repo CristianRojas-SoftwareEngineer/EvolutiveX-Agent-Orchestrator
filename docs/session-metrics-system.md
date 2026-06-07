@@ -55,9 +55,9 @@ Sesiones creadas antes de G4 pueden conservar entradas en **camelCase** (`inputT
 
 `updateSessionMetrics()` en `AuditWriterService` fue **retirado** en G4. La actualización la realiza `SessionMetricsService` (`src/2-services/session-metrics.service.ts`) con dos operaciones:
 
-| Método | Cuándo | Qué actualiza |
-| ------ | ------ | ------------- |
-| `updateFromStep(sessionDir, step)` | Tras hop main **contable** en wire (stop terminal + `usage`) | `count`, tokens, `cache_efficiency`, `session_totals`; **no** `workflow_count` |
+| Método                                                         | Cuándo                                                           | Qué actualiza                                                                                    |
+| -------------------------------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `updateFromStep(sessionDir, step)`                             | Tras hop main **contable** en wire (stop terminal + `usage`)     | `count`, tokens, `cache_efficiency`, `session_totals`; **no** `workflow_count`                   |
 | `finalizeWorkflowMetrics(sessionDir, workflowId, closedSteps)` | Hook `Stop` / `StopFailure` en workflow **`kind: 'main'`** (G16) | `workflow_count` (+1 por modelo del workflow); tokens/count solo para steps no volcados per-step |
 
 Los sub-workflows **nunca** escriben `session-metrics.json`.
@@ -70,11 +70,11 @@ Los sub-workflows **nunca** escriben `session-metrics.json`.
 
 Ambos métodos usan cola `writeQueue`, `writeJsonAtomic` y escriben métricas + sidecar en la misma operación encolada.
 
-| Componente | Rol |
-| ---------- | --- |
-| `AuditHookEventHandler` | `close()` + `finalizeWorkflowMetrics` (solo main) |
+| Componente                                                 | Rol                                                                                    |
+| ---------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `AuditHookEventHandler`                                    | `close()` + `finalizeWorkflowMetrics` (solo main)                                      |
 | `AuditSseResponseHandler` / `AuditStandardResponseHandler` | `registerStep` / `closeStep` + `persistBillableStepMetricsIfNeeded` → `updateFromStep` |
-| `persist-billable-step-metrics.util.ts` | G16 + `isStepBillableForSessionMetrics` antes de `updateFromStep` |
+| `persist-billable-step-metrics.util.ts`                    | G16 + `isStepBillableForSessionMetrics` antes de `updateFromStep`                      |
 
 Los `client-preflight` no actualizan métricas de sesión.
 

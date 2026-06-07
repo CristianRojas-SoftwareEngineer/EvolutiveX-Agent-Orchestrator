@@ -40,14 +40,14 @@ export function runRouterDetails({ action, dryRun }: RouterDetailsRunOptions): n
   const resultValue = next.env![STATUSLINE_ROUTER_DETAILS_KEY];
 
   if (dryRun) {
-    console.log(chalk.yellow(`[dry-run] ${STATUSLINE_ROUTER_DETAILS_KEY} quedaría: ${resultValue}`));
+    console.log(
+      chalk.yellow(`[dry-run] ${STATUSLINE_ROUTER_DETAILS_KEY} quedaría: ${resultValue}`),
+    );
     return 0;
   }
 
   writeClaudeSettings(next);
-  console.log(
-    chalk.green(`${STATUSLINE_ROUTER_DETAILS_KEY} = ${resultValue}`),
-  );
+  console.log(chalk.green(`${STATUSLINE_ROUTER_DETAILS_KEY} = ${resultValue}`));
   console.log(chalk.cyan('El statusline refleja el cambio en el siguiente refresh.'));
   return 0;
 }
@@ -56,7 +56,9 @@ const program = new Command();
 
 program
   .name('statusline-router-details')
-  .description('Controla la visibilidad de la Tabla 2 del statusline (Trabajo por niveles de razonamiento)')
+  .description(
+    'Controla la visibilidad de la Tabla 2 del statusline (Trabajo por niveles de razonamiento)',
+  )
   .option('--dry-run', 'Muestra el valor resultante sin escribir en settings.json');
 
 program

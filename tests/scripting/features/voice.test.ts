@@ -1,8 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  applyVoiceInstall,
-  applyVoiceUninstall,
-} from '../../../scripting/features/voice.js';
+import { applyVoiceInstall, applyVoiceUninstall } from '../../../scripting/features/voice.js';
 import { type ClaudeSettings } from '../../../scripting/shared/claude-settings.js';
 
 describe('applyVoiceInstall', () => {

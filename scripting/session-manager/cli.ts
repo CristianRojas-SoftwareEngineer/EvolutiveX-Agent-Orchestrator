@@ -85,29 +85,31 @@ program
   .option('-p, --project <path>', 'Ruta del proyecto', process.cwd())
   .option('--ids <csv>', 'IDs separados por coma')
   .option('-f, --force', 'Confirmar eliminación irreversible')
-  .action(async (positional: string[], opts: { project: string; ids?: string; force?: boolean }) => {
-    if (!opts.force) {
-      console.error(
-        chalk.red(
-          'Eliminación irreversible. Repite con --force / -f.\nEjemplo: npm run sessions:delete -- <id> --force',
-        ),
-      );
-      process.exit(1);
-    }
-    const ids = parseSessionIds(opts.ids, positional);
-    if (ids.length === 0) {
-      console.error(chalk.red('Indica al menos un session ID.'));
-      process.exit(1);
-    }
-    try {
-      for (const id of ids) {
-        await deleteSession(id, opts.project);
-        console.log(chalk.green(`Eliminada: ${id}`));
+  .action(
+    async (positional: string[], opts: { project: string; ids?: string; force?: boolean }) => {
+      if (!opts.force) {
+        console.error(
+          chalk.red(
+            'Eliminación irreversible. Repite con --force / -f.\nEjemplo: npm run sessions:delete -- <id> --force',
+          ),
+        );
+        process.exit(1);
       }
-    } catch (err) {
-      handleArchiveError(err);
-    }
-  });
+      const ids = parseSessionIds(opts.ids, positional);
+      if (ids.length === 0) {
+        console.error(chalk.red('Indica al menos un session ID.'));
+        process.exit(1);
+      }
+      try {
+        for (const id of ids) {
+          await deleteSession(id, opts.project);
+          console.log(chalk.green(`Eliminada: ${id}`));
+        }
+      } catch (err) {
+        handleArchiveError(err);
+      }
+    },
+  );
 
 program
   .command('list-archived')

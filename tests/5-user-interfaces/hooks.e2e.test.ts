@@ -26,7 +26,9 @@ describe('Test E2E - POST /hooks (borde hooks C3)', () => {
   let proxyApp: FastifyInstance;
   let tempSessionsDir: string;
   let originalEnv: NodeJS.ProcessEnv;
-  let deps: Awaited<ReturnType<typeof import('../../src/4-api/composition-root.js').createProxyDependencies>>;
+  let deps: Awaited<
+    ReturnType<typeof import('../../src/4-api/composition-root.js').createProxyDependencies>
+  >;
   let upstreamHit: boolean;
 
   beforeAll(async () => {
@@ -34,7 +36,9 @@ describe('Test E2E - POST /hooks (borde hooks C3)', () => {
     mockUpstream = http.createServer((_req, res) => {
       upstreamHit = true;
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ id: 'msg_test', type: 'message', content: [], stop_reason: 'end_turn' }));
+      res.end(
+        JSON.stringify({ id: 'msg_test', type: 'message', content: [], stop_reason: 'end_turn' }),
+      );
     });
 
     await new Promise<void>((resolve) => {
@@ -51,7 +55,8 @@ describe('Test E2E - POST /hooks (borde hooks C3)', () => {
     vi.resetModules();
 
     const { config } = await import('../../src/4-api/config/env.config.js');
-    const { createProxyDependencies: createDeps } = await import('../../src/4-api/composition-root.js');
+    const { createProxyDependencies: createDeps } =
+      await import('../../src/4-api/composition-root.js');
     deps = await createDeps(config, mockLogger, tempSessionsDir);
     proxyApp = (await import('../../src/app.js')).buildApp(deps, mockLogger);
     await proxyApp.ready();

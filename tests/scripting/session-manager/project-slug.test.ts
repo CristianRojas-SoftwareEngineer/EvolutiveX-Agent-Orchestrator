@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { posixToWindows, projectPathToSlug } from '../../../scripting/session-manager/shared/project-slug.js';
+import {
+  posixToWindows,
+  projectPathToSlug,
+} from '../../../scripting/session-manager/shared/project-slug.js';
 
 describe('project-slug', () => {
   it('convierte path POSIX /c/Users/... a Windows', () => {

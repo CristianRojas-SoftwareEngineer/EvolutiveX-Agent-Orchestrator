@@ -127,10 +127,7 @@ describe('CLI - buildEvent', () => {
 
   it('resolveEventKey prefiere --event-type sobre stdin', () => {
     expect(
-      resolveEventKey(
-        { ...baseOptions, eventType: 'Stop' },
-        { hook_event_name: 'Other' },
-      ),
+      resolveEventKey({ ...baseOptions, eventType: 'Stop' }, { hook_event_name: 'Other' }),
     ).toBe('Stop');
   });
 
@@ -227,9 +224,9 @@ describe('CLI - buildEvent', () => {
   });
 
   it('respeta --title como override', () => {
-    expect(
-      resolveNotificationTitle({ ...baseOptions, title: 'Título custom' }, 'Stop'),
-    ).toBe('Título custom');
+    expect(resolveNotificationTitle({ ...baseOptions, title: 'Título custom' }, 'Stop')).toBe(
+      'Título custom',
+    );
   });
 
   it('respeta --message como override frente al formatter', () => {
@@ -243,7 +240,12 @@ describe('CLI - buildEvent', () => {
   });
 
   it('con --stdin-json y sin payload devuelve error', () => {
-    const result = buildEvent({ ...baseOptions, stdinJson: true, eventType: undefined, message: undefined });
+    const result = buildEvent({
+      ...baseOptions,
+      stdinJson: true,
+      eventType: undefined,
+      message: undefined,
+    });
     expect('error' in result).toBe(true);
     if ('error' in result) {
       expect(result.error).toMatch(/stdin/);
@@ -262,9 +264,8 @@ describe('CLI - buildEvent (icono ausente al cargar el módulo)', () => {
   });
 
   it('omite el campo icon del evento cuando el default no existe en disco', async () => {
-    const { buildEvent: buildEventFresh } = await import(
-      '../../../src/2-services/notifications/cli.js'
-    );
+    const { buildEvent: buildEventFresh } =
+      await import('../../../src/2-services/notifications/cli.js');
     const result = buildEventFresh({
       eventType: 'Stop',
       message: 'Test',

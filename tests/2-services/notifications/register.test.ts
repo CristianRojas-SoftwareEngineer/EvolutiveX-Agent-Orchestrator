@@ -61,7 +61,13 @@ beforeEach(() => {
   registryMock.deleteRegistry.mockResolvedValue(undefined);
   snoreToastMock.getSnoreToastPath.mockReturnValue('C:\\fake\\snoretoast-x64.exe');
   snoreToastMock.installSnoreToastShortcut.mockImplementation(
-    async (_lnkFileName: string, targetExe: string, aumid: string, lnkPath: string, iconLocation: string) => {
+    async (
+      _lnkFileName: string,
+      targetExe: string,
+      aumid: string,
+      lnkPath: string,
+      iconLocation: string,
+    ) => {
       writeFileSync(
         lnkPath,
         buildShortcutBytes({

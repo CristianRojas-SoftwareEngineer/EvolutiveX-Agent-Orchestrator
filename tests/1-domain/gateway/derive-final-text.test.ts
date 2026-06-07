@@ -4,7 +4,11 @@ import type { ClaudeHookEvent } from '../../../src/1-domain/types/hook.types.js'
 
 describe('deriveFinalText', () => {
   it('retorna el texto cuando lastAssistantMessage está presente', () => {
-    const hook: ClaudeHookEvent = { eventName: 'Stop', sessionId: 's', lastAssistantMessage: 'Hola mundo' };
+    const hook: ClaudeHookEvent = {
+      eventName: 'Stop',
+      sessionId: 's',
+      lastAssistantMessage: 'Hola mundo',
+    };
     expect(deriveFinalText(hook)).toBe('Hola mundo');
   });
 
@@ -19,13 +23,21 @@ describe('deriveFinalText', () => {
   });
 
   it('retorna undefined cuando lastAssistantMessage es solo espacios', () => {
-    const hook: ClaudeHookEvent = { eventName: 'Stop', sessionId: 's', lastAssistantMessage: '   ' };
+    const hook: ClaudeHookEvent = {
+      eventName: 'Stop',
+      sessionId: 's',
+      lastAssistantMessage: '   ',
+    };
     expect(deriveFinalText(hook)).toBeUndefined();
   });
 
   it('preserva el texto sin modificar (passthrough)', () => {
     const text = 'Texto con\nsaltos de línea y  espacios';
-    const hook: ClaudeHookEvent = { eventName: 'SubagentStop', sessionId: 's', lastAssistantMessage: text };
+    const hook: ClaudeHookEvent = {
+      eventName: 'SubagentStop',
+      sessionId: 's',
+      lastAssistantMessage: text,
+    };
     expect(deriveFinalText(hook)).toBe(text);
   });
 });

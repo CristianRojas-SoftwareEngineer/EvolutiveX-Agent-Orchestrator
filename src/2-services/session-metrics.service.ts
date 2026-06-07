@@ -19,10 +19,7 @@ export interface SessionMetricsAppliedState {
 }
 
 /** Calcula cache_efficiency según §33.2. */
-export function computeCacheEfficiency(
-  inputTokens: number,
-  cacheReadInputTokens: number,
-): number {
+export function computeCacheEfficiency(inputTokens: number, cacheReadInputTokens: number): number {
   const denominator = inputTokens + cacheReadInputTokens;
   if (denominator <= 0) return 0;
   return cacheReadInputTokens / denominator;
@@ -104,8 +101,7 @@ function mergeModelUsage(
     workflow_count: (existing.workflow_count ?? 0) + workflowCountDelta,
     input_tokens: mergedInput,
     output_tokens: existing.output_tokens + output_tokens,
-    cache_creation_input_tokens:
-      existing.cache_creation_input_tokens + cache_creation_input_tokens,
+    cache_creation_input_tokens: existing.cache_creation_input_tokens + cache_creation_input_tokens,
     cache_read_input_tokens: mergedCacheRead,
     cache_efficiency: computeCacheEfficiency(mergedInput, mergedCacheRead),
   };
@@ -204,9 +200,7 @@ export class SessionMetricsService {
 
       const data = await loadMetrics(sessionDir);
 
-      const modelIdsForWorkflow = new Set(
-        stepsWithUsage.map((s) => s.inferenceRequest.model),
-      );
+      const modelIdsForWorkflow = new Set(stepsWithUsage.map((s) => s.inferenceRequest.model));
       for (const modelId of modelIdsForWorkflow) {
         const existing = data.models[modelId] ?? defaultModelMetrics();
         data.models[modelId] = {
@@ -221,7 +215,10 @@ export class SessionMetricsService {
         const existing = data.models[modelId] ?? defaultModelMetrics();
         data.models[modelId] = mergeModelUsage(existing, entry.usage, entry.stepCount, 0);
         for (const step of unapplied) {
-          if (step.inferenceRequest.model === modelId && !applied.applied_step_ids.includes(step.id)) {
+          if (
+            step.inferenceRequest.model === modelId &&
+            !applied.applied_step_ids.includes(step.id)
+          ) {
             applied.applied_step_ids.push(step.id);
           }
         }

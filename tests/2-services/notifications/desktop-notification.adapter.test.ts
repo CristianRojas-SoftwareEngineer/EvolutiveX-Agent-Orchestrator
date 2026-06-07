@@ -22,11 +22,9 @@ describe('DesktopNotificationAdapter', () => {
 
   beforeEach(() => {
     notifyMock.mockReset();
-    notifyMock.mockImplementation(
-      (_opts: unknown, cb: (err: Error | null) => void) => {
-        cb(null);
-      },
-    );
+    notifyMock.mockImplementation((_opts: unknown, cb: (err: Error | null) => void) => {
+      cb(null);
+    });
     adapter = new DesktopNotificationAdapter();
   });
 
@@ -70,11 +68,9 @@ describe('DesktopNotificationAdapter', () => {
   });
 
   it('notify propaga errores de node-notifier como rechazo', async () => {
-    notifyMock.mockImplementationOnce(
-      (_opts: unknown, cb: (err: Error | null) => void) => {
-        cb(new Error('boom'));
-      },
-    );
+    notifyMock.mockImplementationOnce((_opts: unknown, cb: (err: Error | null) => void) => {
+      cb(new Error('boom'));
+    });
     await expect(adapter.notify({ title: 'x', message: 'y' })).rejects.toThrow('boom');
   });
 

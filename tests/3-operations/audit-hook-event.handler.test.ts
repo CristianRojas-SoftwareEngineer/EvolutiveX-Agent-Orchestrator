@@ -46,7 +46,19 @@ function stubWorkflow(id = 'session-1'): IWorkflow {
     sessionId: id,
     kind: 'main',
     status: 'running',
-    steps: [{ id: 's1', workflowId: id, index: 0, inferenceRequest: { model: 'm', messages: [], max_tokens: 1 }, assistantMessage: { role: 'assistant', content: [] }, toolUses: [], usage: { input_tokens: 0, output_tokens: 0 }, startedAt: new Date(), closedAt: new Date() }],
+    steps: [
+      {
+        id: 's1',
+        workflowId: id,
+        index: 0,
+        inferenceRequest: { model: 'm', messages: [], max_tokens: 1 },
+        assistantMessage: { role: 'assistant', content: [] },
+        toolUses: [],
+        usage: { input_tokens: 0, output_tokens: 0 },
+        startedAt: new Date(),
+        closedAt: new Date(),
+      },
+    ],
     startedAt: new Date(),
   };
 }
@@ -107,11 +119,19 @@ describe('AuditHookEventHandler', () => {
     const sessionMetrics = makeSessionMetrics();
     const handler = makeHandler(repo, sessionMetrics);
 
-    handler.execute({ eventName: 'Stop', sessionId: 'session-1', stopHookActive: false, backgroundTasks: 0 });
+    handler.execute({
+      eventName: 'Stop',
+      sessionId: 'session-1',
+      stopHookActive: false,
+      backgroundTasks: 0,
+    });
 
     await new Promise((r) => setTimeout(r, 50));
 
-    expect(readyToClose).toHaveBeenCalledWith('session-1', expect.objectContaining({ eventName: 'Stop' }));
+    expect(readyToClose).toHaveBeenCalledWith(
+      'session-1',
+      expect.objectContaining({ eventName: 'Stop' }),
+    );
     expect(close).toHaveBeenCalledWith('session-1', expect.objectContaining({ eventName: 'Stop' }));
     expect(sessionMetrics.finalizeWorkflowMetrics).toHaveBeenCalled();
   });
@@ -160,7 +180,10 @@ describe('AuditHookEventHandler', () => {
     await new Promise((r) => setTimeout(r, 50));
 
     expect(readyToClose).not.toHaveBeenCalled();
-    expect(close).toHaveBeenCalledWith('session-1', expect.objectContaining({ eventName: 'StopFailure' }));
+    expect(close).toHaveBeenCalledWith(
+      'session-1',
+      expect.objectContaining({ eventName: 'StopFailure' }),
+    );
     expect(sessionMetrics.finalizeWorkflowMetrics).toHaveBeenCalled();
   });
 
@@ -169,9 +192,16 @@ describe('AuditHookEventHandler', () => {
     const repo = makeRepo({ openWorkflow });
     const handler = makeHandler(repo);
 
-    handler.execute({ eventName: 'UserPromptSubmit', sessionId: 'session-1', agentId: 'agent-root' });
+    handler.execute({
+      eventName: 'UserPromptSubmit',
+      sessionId: 'session-1',
+      agentId: 'agent-root',
+    });
 
-    expect(openWorkflow).toHaveBeenCalledWith('session-1', expect.objectContaining({ isSubagentRequest: false }));
+    expect(openWorkflow).toHaveBeenCalledWith(
+      'session-1',
+      expect.objectContaining({ isSubagentRequest: false }),
+    );
   });
 
   it('PostToolUse → completeToolUse con isError false', () => {
@@ -197,7 +227,9 @@ describe('AuditHookEventHandler', () => {
   it('PostToolUseFailure → completeToolUse con isError true', () => {
     const wf = stubWorkflow();
     const completeToolUse = vi.fn();
-    const findWorkflowWithPendingToolUse = vi.fn().mockReturnValue({ workflow: wf, toolUse: { id: 'tu-1' } });
+    const findWorkflowWithPendingToolUse = vi
+      .fn()
+      .mockReturnValue({ workflow: wf, toolUse: { id: 'tu-1' } });
     const repo = makeRepo({ findWorkflowWithPendingToolUse, completeToolUse });
     const handler = makeHandler(repo);
 
@@ -217,8 +249,12 @@ describe('AuditHookEventHandler', () => {
   it('SubagentStop con agentId conocido usa getWorkflowByAgentId → getWorkflow para cerrar', async () => {
     const wf = stubWorkflow('agent-child');
     const readyToClose = vi.fn().mockReturnValue(true);
-    const close = vi.fn().mockReturnValue({ outcome: 'success', stepCount: 1, sessionId: 'session-1' });
-    const getWorkflowByAgentId = vi.fn().mockReturnValue({ sessionId: 'session-1', agentId: 'agent-child' });
+    const close = vi
+      .fn()
+      .mockReturnValue({ outcome: 'success', stepCount: 1, sessionId: 'session-1' });
+    const getWorkflowByAgentId = vi
+      .fn()
+      .mockReturnValue({ sessionId: 'session-1', agentId: 'agent-child' });
     const getWorkflow = vi.fn().mockReturnValue(wf);
     const repo = makeRepo({ getWorkflowByAgentId, getWorkflow, readyToClose, close });
     const handler = makeHandler(repo);
@@ -228,7 +264,10 @@ describe('AuditHookEventHandler', () => {
 
     expect(getWorkflowByAgentId).toHaveBeenCalledWith('agent-child');
     expect(getWorkflow).toHaveBeenCalledWith('agent-child');
-    expect(close).toHaveBeenCalledWith('agent-child', expect.objectContaining({ eventName: 'SubagentStop' }));
+    expect(close).toHaveBeenCalledWith(
+      'agent-child',
+      expect.objectContaining({ eventName: 'SubagentStop' }),
+    );
   });
 
   it('SubagentStop con agentId desconocido no lanza excepción y no invoca close', async () => {
@@ -238,7 +277,11 @@ describe('AuditHookEventHandler', () => {
     const handler = makeHandler(repo);
 
     expect(() =>
-      handler.execute({ eventName: 'SubagentStop', sessionId: 'session-1', agentId: 'agent-unknown' }),
+      handler.execute({
+        eventName: 'SubagentStop',
+        sessionId: 'session-1',
+        agentId: 'agent-unknown',
+      }),
     ).not.toThrow();
 
     await new Promise((r) => setTimeout(r, 50));

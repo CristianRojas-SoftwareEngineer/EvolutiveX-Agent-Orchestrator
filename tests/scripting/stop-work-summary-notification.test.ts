@@ -175,11 +175,9 @@ describe('runContinuityNotification', () => {
 
   it('emite toast de catálogo si no hay texto fuente', async () => {
     const notify = vi.fn().mockResolvedValue(undefined);
-    const code = await runContinuityNotification(
-      JSON.stringify({ hook_event_name: 'Stop' }),
-      '',
-      { notify },
-    );
+    const code = await runContinuityNotification(JSON.stringify({ hook_event_name: 'Stop' }), '', {
+      notify,
+    });
     expect(code).toBe(0);
     expect(notify).toHaveBeenCalledWith();
   });

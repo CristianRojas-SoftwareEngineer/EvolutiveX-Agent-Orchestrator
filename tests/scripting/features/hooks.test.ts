@@ -23,20 +23,21 @@ describe('isScpManagedCommand', () => {
   const scpRoot = '/c/repos/smart-code-proxy';
 
   it('detecta post-hook-event', () => {
-    expect(
-      isScpManagedCommand('npx tsx /c/repos/scp/scripting/post-hook-event.ts', scpRoot),
-    ).toBe(true);
+    expect(isScpManagedCommand('npx tsx /c/repos/scp/scripting/post-hook-event.ts', scpRoot)).toBe(
+      true,
+    );
   });
 
   it('detecta stop-hook-ux', () => {
-    expect(
-      isScpManagedCommand('npx tsx /c/repos/scripting/stop-hook-ux.ts', scpRoot),
-    ).toBe(true);
+    expect(isScpManagedCommand('npx tsx /c/repos/scripting/stop-hook-ux.ts', scpRoot)).toBe(true);
   });
 
   it('detecta notifications/cli.ts', () => {
     expect(
-      isScpManagedCommand('npx tsx /c/repos/src/2-services/notifications/cli.ts --event-type Stop', scpRoot),
+      isScpManagedCommand(
+        'npx tsx /c/repos/src/2-services/notifications/cli.ts --event-type Stop',
+        scpRoot,
+      ),
     ).toBe(true);
   });
 
@@ -62,9 +63,9 @@ describe('isScpManagedCommand', () => {
   });
 
   it('normaliza backslashes en Windows', () => {
-    expect(
-      isScpManagedCommand('C:\\repos\\scp\\scripting\\post-hook-event.ts', scpRoot),
-    ).toBe(true);
+    expect(isScpManagedCommand('C:\\repos\\scp\\scripting\\post-hook-event.ts', scpRoot)).toBe(
+      true,
+    );
   });
 });
 
@@ -104,9 +105,7 @@ describe('classifyKey', () => {
 describe('mergeHooks', () => {
   const scpRoot = '/c/repos/scp';
   const canonical: HooksBlock = {
-    UserPromptSubmit: [
-      { hooks: [{ type: 'command', command: `${scpRoot}/post-hook-event.ts` }] },
-    ],
+    UserPromptSubmit: [{ hooks: [{ type: 'command', command: `${scpRoot}/post-hook-event.ts` }] }],
   };
 
   it('crea entrada si no existe', () => {
@@ -178,9 +177,7 @@ describe('mergeHooks', () => {
 describe('unmergeHooks', () => {
   const scpRoot = '/c/repos/scp';
   const canonical: HooksBlock = {
-    UserPromptSubmit: [
-      { hooks: [{ type: 'command', command: `${scpRoot}/post-hook-event.ts` }] },
-    ],
+    UserPromptSubmit: [{ hooks: [{ type: 'command', command: `${scpRoot}/post-hook-event.ts` }] }],
     Stop: [{ hooks: [{ type: 'command', command: `${scpRoot}/stop-hook-ux.ts` }] }],
   };
 
@@ -255,7 +252,8 @@ describe('readCanonicalHooks', () => {
             hooks: [
               {
                 type: 'command',
-                command: 'npx --prefix "${SMART_CODE_PROXY_ROOT}" tsx "${SMART_CODE_PROXY_ROOT}/scripting/post-hook-event.ts"',
+                command:
+                  'npx --prefix "${SMART_CODE_PROXY_ROOT}" tsx "${SMART_CODE_PROXY_ROOT}/scripting/post-hook-event.ts"',
               },
             ],
           },

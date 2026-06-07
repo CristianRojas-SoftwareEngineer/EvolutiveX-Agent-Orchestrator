@@ -50,6 +50,7 @@ These capabilities provide complete forensics for debugging without requiring GU
 ### Explicit Exclusions
 
 The following features are **not** in Phase 2 and are deferred to later phases:
+
 - WebSocket endpoint → Phase 3
 - Historical API → Phase 3
 - Observability GUI → Phase 3
@@ -81,6 +82,7 @@ None. Phase 2 has no soft dependencies on other phases.
 ### Dependency Contract
 
 Phase 2 provides the following contracts to subsequent phases:
+
 - **Tool execution tracking**: Tool call/result/error events with normalized formats
 - **Routing traceability**: Routing decision, fallback, and catalog resolution events
 - **Token usage tracking**: Token usage events with cache efficiency metrics
@@ -90,7 +92,7 @@ Phase 2 provides the following contracts to subsequent phases:
 ## Impact
 
 - **Code**: New modules for tool tracking, routing tracing, token tracking, workflow tracking, session persistence
-- **Configuration**: CLAUDISH_TELEMETRY_* environment variables for Phase 2 capabilities, CLAUDISH_TELEMETRY_SESSION_DIR
+- **Configuration**: CLAUDISH*TELEMETRY*\* environment variables for Phase 2 capabilities, CLAUDISH_TELEMETRY_SESSION_DIR
 - **Performance**: Minimal overhead when disabled; async emission ensures zero latency impact when enabled
 - **Compatibility**: Fully backward compatible when all features disabled
 - **Dependencies**: No new external dependencies

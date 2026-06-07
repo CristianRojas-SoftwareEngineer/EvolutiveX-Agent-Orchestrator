@@ -1,12 +1,5 @@
 import chalk from 'chalk';
-import {
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  renameSync,
-  statSync,
-  unlinkSync,
-} from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, renameSync, statSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { getActiveSessionIds, isActiveSession } from './shared/active-sessions.js';
 import {
@@ -31,13 +24,7 @@ interface SessionsIndexFile {
 export class SessionManagerError extends Error {
   constructor(
     message: string,
-    readonly code:
-      | 'active'
-      | 'not_found'
-      | 'ambiguous'
-      | 'io'
-      | 'project'
-      | 'usage' = 'io',
+    readonly code: 'active' | 'not_found' | 'ambiguous' | 'io' | 'project' | 'usage' = 'io',
   ) {
     super(message);
     this.name = 'SessionManagerError';

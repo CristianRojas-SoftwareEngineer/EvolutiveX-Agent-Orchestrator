@@ -76,7 +76,10 @@ export async function readRegistry(aumid: string): Promise<RegistryState> {
     //       DisplayName    REG_SZ    AI Assistant
     //       Icon           REG_EXPAND_SZ    C:\path\to\icon.ico
     for (const line of stdout.split(/\r?\n/)) {
-      const match = /^\s+(DisplayName|Icon|IconUri|ShortcutEngine)\s+REG_(?:SZ|EXPAND_SZ|DWORD)\s+(.*?)\s*$/i.exec(line);
+      const match =
+        /^\s+(DisplayName|Icon|IconUri|ShortcutEngine)\s+REG_(?:SZ|EXPAND_SZ|DWORD)\s+(.*?)\s*$/i.exec(
+          line,
+        );
       if (match) {
         const name = String(match[1]).toLowerCase();
         const value = String(match[2]);

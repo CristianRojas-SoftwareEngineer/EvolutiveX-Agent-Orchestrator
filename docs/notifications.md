@@ -43,14 +43,14 @@ Requisitos: `npm install` en la raíz del proxy (para `tsx` en `node_modules`). 
 
 En Smart Code Proxy, el evento **`Stop`** usa un relay unificado en lugar de varios comandos en paralelo.
 
-| Paso | Qué hace |
-| --- | --- |
-| 1 | Lee el payload JSON del hook **una sola vez** por stdin |
-| 2 | `POST /hooks` al proxy (misma semántica que [`post-hook-event.ts`](../scripting/post-hook-event.ts)) |
-| 3 | Lee el contexto del workflow desde `transcript_path` (turno previo + turno actual) |
-| 4 | Genera un **mensaje de continuidad** con **Haiku** (`ANTHROPIC_*` del entorno): qué se completó, qué está abierto, dirección del siguiente prompt. Si no hay API key o falla, usa el texto del último mensaje del asistente como fallback |
-| 5 | Persiste el mensaje completo en `sessions/.last-continuity-message.txt` (punto de integración TTS) |
-| 6 | **Toast único** — título «Stop», cuerpo = preview de hasta 250 caracteres del mensaje de continuidad (o copy del catálogo si no hay texto fuente) |
+| Paso | Qué hace                                                                                                                                                                                                                                  |
+| ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1    | Lee el payload JSON del hook **una sola vez** por stdin                                                                                                                                                                                   |
+| 2    | `POST /hooks` al proxy (misma semántica que [`post-hook-event.ts`](../scripting/post-hook-event.ts))                                                                                                                                      |
+| 3    | Lee el contexto del workflow desde `transcript_path` (turno previo + turno actual)                                                                                                                                                        |
+| 4    | Genera un **mensaje de continuidad** con **Haiku** (`ANTHROPIC_*` del entorno): qué se completó, qué está abierto, dirección del siguiente prompt. Si no hay API key o falla, usa el texto del último mensaje del asistente como fallback |
+| 5    | Persiste el mensaje completo en `sessions/.last-continuity-message.txt` (punto de integración TTS)                                                                                                                                        |
+| 6    | **Toast único** — título «Stop», cuerpo = preview de hasta 250 caracteres del mensaje de continuidad (o copy del catálogo si no hay texto fuente)                                                                                         |
 
 **Scripts:** [`scripting/stop-hook-ux.ts`](../scripting/stop-hook-ux.ts) (orquestador, único entry point del hook) y [`scripting/stop-work-summary-notification.ts`](../scripting/stop-work-summary-notification.ts) (módulo import-only: contexto + mensaje + toast; no ejecutable directamente). El builder de comando con ruta absoluta: `buildStopHookUxCommand` en [`scripting/shared/gateway-hook-command.ts`](../scripting/shared/gateway-hook-command.ts).
 
@@ -102,24 +102,24 @@ Los **prompt hooks** (`type: "prompt"`) de Claude Code no pueden invocar toasts;
 
 ## Componentes
 
-| Archivo (en `src/2-services/notifications/`) | Capa PKA | Rol |
-|---|---|---|
-| `types.ts` | 1 (tipos puros) | `NotificationEvent`, `EventType` |
-| `INotificationService.ts` | 1 (puerto) | Interfaz del servicio (un único método `notify`) |
-| `DesktopNotificationAdapter.ts` | 2 (adaptador concreto) | Implementa el puerto delegando en `node-notifier.notify()` |
-| `index.ts` | 2 (exports) | Re-exports públicos del paquete |
-| `cli.ts` | 4 (composition root standalone) | Entry point CLI invocable desde hooks de Claude Code |
-| `register.ts` | 4 (composition root standalone) | Helper de AUMID Windows (opt-in, idempotente) — orquesta `.lnk` + registro (apunta directamente a los assets del repo) |
-| `snoretoast-shortcut.ts` | 4 (helper de orquestación) | Invoca `snoretoast-x64.exe -install` para crear el `.lnk` con la metadata AUMID que Windows espera, y luego parchea el `IconLocation` con `patchIconLocation` de `lnk-format.ts` |
-| `lnk-format.ts` | 2 (helper) | Generador/parser del formato MS-SHLLINK (escritura binaria pura del `.lnk`) |
-| `registry.ts` | 2 (helper) | Wrapper de `reg.exe` para escribir/leer/borrar `HKCU\Software\Classes\AppUserModelId\{AUMID}` |
-| `event-notification-profile.ts` | 2 (catálogo) | Perfiles por `--event-type`: mensaje estático, PNG de cuerpo + sonido por SO |
-| `hook-payload-notification-message.ts` | 2 (helper) | **Runtime:** `resolveHookNotificationMessage` — mensaje dinámico desde payload stdin |
-| `event-image-paths.ts` | 2 (helper) | **Runtime:** `resolveEventImagePath` — resuelve la ruta del PNG en `assets/notifications/events/` directamente desde el repo |
-| `resolve-notification-sound.ts` | 2 (helper) | **Runtime:** `resolveNotificationSound` → `Notification.*` en win32 |
-| `toast-body-image-spec.ts` | 2 (helper) | **Mantenimiento:** `applyCircularToastFrame`, `renderToastBodyImageFromSource` (salida 128×128, `#fefefe`) |
-| `event-image-overlays.ts` | 2 (helper) | **Mantenimiento:** SVG de overlays (compositor sharp) |
-| `event-notification-image.ts` | 2 (helper) | **Mantenimiento:** `writeAllEventNotificationImages()`, `reframeAllEventNotificationImages()` |
+| Archivo (en `src/2-services/notifications/`) | Capa PKA                        | Rol                                                                                                                                                                              |
+| -------------------------------------------- | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `types.ts`                                   | 1 (tipos puros)                 | `NotificationEvent`, `EventType`                                                                                                                                                 |
+| `INotificationService.ts`                    | 1 (puerto)                      | Interfaz del servicio (un único método `notify`)                                                                                                                                 |
+| `DesktopNotificationAdapter.ts`              | 2 (adaptador concreto)          | Implementa el puerto delegando en `node-notifier.notify()`                                                                                                                       |
+| `index.ts`                                   | 2 (exports)                     | Re-exports públicos del paquete                                                                                                                                                  |
+| `cli.ts`                                     | 4 (composition root standalone) | Entry point CLI invocable desde hooks de Claude Code                                                                                                                             |
+| `register.ts`                                | 4 (composition root standalone) | Helper de AUMID Windows (opt-in, idempotente) — orquesta `.lnk` + registro (apunta directamente a los assets del repo)                                                           |
+| `snoretoast-shortcut.ts`                     | 4 (helper de orquestación)      | Invoca `snoretoast-x64.exe -install` para crear el `.lnk` con la metadata AUMID que Windows espera, y luego parchea el `IconLocation` con `patchIconLocation` de `lnk-format.ts` |
+| `lnk-format.ts`                              | 2 (helper)                      | Generador/parser del formato MS-SHLLINK (escritura binaria pura del `.lnk`)                                                                                                      |
+| `registry.ts`                                | 2 (helper)                      | Wrapper de `reg.exe` para escribir/leer/borrar `HKCU\Software\Classes\AppUserModelId\{AUMID}`                                                                                    |
+| `event-notification-profile.ts`              | 2 (catálogo)                    | Perfiles por `--event-type`: mensaje estático, PNG de cuerpo + sonido por SO                                                                                                     |
+| `hook-payload-notification-message.ts`       | 2 (helper)                      | **Runtime:** `resolveHookNotificationMessage` — mensaje dinámico desde payload stdin                                                                                             |
+| `event-image-paths.ts`                       | 2 (helper)                      | **Runtime:** `resolveEventImagePath` — resuelve la ruta del PNG en `assets/notifications/events/` directamente desde el repo                                                     |
+| `resolve-notification-sound.ts`              | 2 (helper)                      | **Runtime:** `resolveNotificationSound` → `Notification.*` en win32                                                                                                              |
+| `toast-body-image-spec.ts`                   | 2 (helper)                      | **Mantenimiento:** `applyCircularToastFrame`, `renderToastBodyImageFromSource` (salida 128×128, `#fefefe`)                                                                       |
+| `event-image-overlays.ts`                    | 2 (helper)                      | **Mantenimiento:** SVG de overlays (compositor sharp)                                                                                                                            |
+| `event-notification-image.ts`                | 2 (helper)                      | **Mantenimiento:** `writeAllEventNotificationImages()`, `reframeAllEventNotificationImages()`                                                                                    |
 
 ## Puerto: `INotificationService`
 
@@ -131,10 +131,10 @@ interface INotificationService {
 interface NotificationEvent {
   title: string;
   message: string;
-  sound?: boolean | string;  // default efectivo: false; string = token BurntToast (win) o nombre macOS
-  silent?: boolean;   // default: false; si true, fuerza sound=false
-  appId?: string;     // branding: AUMID Windows, inyectado por la CLI
-  icon?: string;      // branding: ruta a asset de imagen, inyectado por la CLI
+  sound?: boolean | string; // default efectivo: false; string = token BurntToast (win) o nombre macOS
+  silent?: boolean; // default: false; si true, fuerza sound=false
+  appId?: string; // branding: AUMID Windows, inyectado por la CLI
+  icon?: string; // branding: ruta a asset de imagen, inyectado por la CLI
 }
 ```
 
@@ -156,7 +156,7 @@ opciones:
 nodeNotifier.notify({
   title: event.title,
   message: event.message,
-  sound: event.silent === true ? false : event.sound ?? false,
+  sound: event.silent === true ? false : (event.sound ?? false),
   wait: false,
   // appId e icon solo se reenvían si están presentes en el evento
   // (la CLI los aplica como defaults; ver "Branding (icon + appId)" abajo).
@@ -176,16 +176,16 @@ invoca `SnoreToast`, no accede a archivos `.lnk` y no registra AUMID
 El CLI (`src/2-services/notifications/cli.ts`) acepta los siguientes
 flags (vía `commander`):
 
-| Flag | Descripción |
-|---|---|
-| `--event-type <type>` | Tipo de evento del lifecycle (`UserPromptSubmit`, `PreToolUse`, …) |
-| `--message <msg>` | Override del cuerpo del toast |
-| `--title <title>` | Override del título del toast (por defecto: nombre del hook / `--event-type`) |
-| `--sound` | Fuerza `sound: true` genérico (no el token del perfil del evento) |
-| `--silent` | Silenciar el toast (contradice `--sound`; ignora el sonido del catálogo) |
-| `--stdin-json` | Leer payload JSON de `stdin`; derivar mensaje dinámico si hay formatter |
-| `--app-id <id>` | Identificador de aplicación (AUMID Windows); default `AIAssistant.Proxy` |
-| `--icon <path>` | Override de imagen de cuerpo; default = PNG del perfil del evento o `ai-assistant.png` |
+| Flag                  | Descripción                                                                            |
+| --------------------- | -------------------------------------------------------------------------------------- |
+| `--event-type <type>` | Tipo de evento del lifecycle (`UserPromptSubmit`, `PreToolUse`, …)                     |
+| `--message <msg>`     | Override del cuerpo del toast                                                          |
+| `--title <title>`     | Override del título del toast (por defecto: nombre del hook / `--event-type`)          |
+| `--sound`             | Fuerza `sound: true` genérico (no el token del perfil del evento)                      |
+| `--silent`            | Silenciar el toast (contradice `--sound`; ignora el sonido del catálogo)               |
+| `--stdin-json`        | Leer payload JSON de `stdin`; derivar mensaje dinámico si hay formatter                |
+| `--app-id <id>`       | Identificador de aplicación (AUMID Windows); default `AIAssistant.Proxy`               |
+| `--icon <path>`       | Override de imagen de cuerpo; default = PNG del perfil del evento o `ai-assistant.png` |
 
 ### Ejemplos
 
@@ -206,10 +206,10 @@ node src/2-services/notifications/cli.ts --event-type UserPromptSubmit --silent
 
 ### Códigos de salida
 
-| Código | Significado |
-|---|---|
-| `0` | Toast emitido correctamente |
-| `1` | Error: payload stdin inválido, falta `--event-type` (sin `--stdin-json`), mensaje no resoluble (sin perfil ni formatter), fallo de `node-notifier`, etc. |
+| Código | Significado                                                                                                                                              |
+| ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `0`    | Toast emitido correctamente                                                                                                                              |
+| `1`    | Error: payload stdin inválido, falta `--event-type` (sin `--stdin-json`), mensaje no resoluble (sin perfil ni formatter), fallo de `node-notifier`, etc. |
 
 Los errores se imprimen en `stderr`.
 
@@ -236,7 +236,7 @@ exploración previa al L1 y formalizada en la spec
 > **Nota:** el helper `register.ts` (ver "Branding (icon + appId)" abajo)
 > **sí** accede a `%APPDATA%` y crea archivos `.lnk`, pero solo se
 > ejecuta bajo invocación explícita del usuario (`npm run
-> notifications:register`) y nunca dentro del flujo de `notify`.
+notifications:register`) y nunca dentro del flujo de `notify`.
 
 Si en el futuro se necesita alguna de estas capacidades, se introducirá
 en un change posterior sin romper el contrato actual del puerto.
@@ -273,13 +273,13 @@ Dos capas en el composition root (`buildEvent`):
 
 **Reparación de mojibake (Cursor):** algunos clientes que también leen `~/.claude/settings.json` (p. ej. Cursor) envían el payload del hook doblemente codificado —bytes UTF-8 reinterpretados como Latin-1 y reserializados—, por lo que «¿qué» llega como `Â¿quÃ©`. `resolveHookNotificationMessage` aplica `repairMojibake` al mensaje del formatter: detecta esa firma y reinterpreta con `latin1 → utf8`. Los payloads UTF-8 correctos (Claude Code) y el ASCII puro pasan intactos.
 
-| `eventKey` | Formatter stdin (campos principales) |
-|------------|--------------------------------------|
-| `StopFailure` | `error`, `last_assistant_message` |
-| `PermissionRequest` | `tool_name`, `tool_input` |
-| `PreToolUse` | `tool_input.questions[]` |
-| `UserPromptSubmit` | `prompt` |
-| `Stop` | `last_assistant_message` |
+| `eventKey`          | Formatter stdin (campos principales) |
+| ------------------- | ------------------------------------ |
+| `StopFailure`       | `error`, `last_assistant_message`    |
+| `PermissionRequest` | `tool_name`, `tool_input`            |
+| `PreToolUse`        | `tool_input.questions[]`             |
+| `UserPromptSubmit`  | `prompt`                             |
+| `Stop`              | `last_assistant_message`             |
 
 ### Perfiles por evento (copy + imagen + sonido)
 
@@ -287,20 +287,20 @@ Los 12 hooks con toast en `.claude/settings.json` comparten el mismo
 `--event-type` que las claves del catálogo. No hace falta duplicar rutas
 ni `--message` en settings: el CLI aplica título (= nombre del hook), mensaje, imagen y sonido.
 
-| `--event-type` | Mensaje estático (catálogo) | Imagen (`events/`) | win32 | darwin | linux |
-|----------------|---------------------------|-------------------|-------|--------|-------|
-| `UserPromptSubmit` | Procesando tu solicitud... | `user-prompt-submit.png` | `Reminder` | `Submarine` | `true` |
-| `PreToolUse` | Pregunta pendiente — Responde en la ventana del cliente. | `pre-tool-use-ask.png` | `SMS` | `Hero` | `true` |
-| `SubagentStart` | Subagente iniciado | `subagent-start.png` | `IM` | `Ping` | `true` |
-| `SubagentStop` | Subagente terminado | `subagent-stop.png` | `Default` | `Tink` | `true` |
-| `Stop` | Tu turno — El asistente terminó. Escribe tu siguiente mensaje. | `stop.png` | `IM` | `Ping` | `true` |
-| `StopFailure` | Error de API — No se completó la respuesta. | `stop-failure.png` | `LoopingAlarm7` | `Basso` | `true` |
-| `SessionStart` | Sesión iniciada | `session-start.png` | `Default` | `Tink` | `true` |
-| `SessionEnd` | Sesión finalizada | `session-end.png` | `Default` | `Tink` | `true` |
-| `PermissionRequest` | Permiso requerido — Confirma la herramienta en el cliente. | `permission-request.png` | `SMS` | `Hero` | `true` |
-| `TaskCreated` | Tarea creada | `task-created.png` | `Reminder` | `Submarine` | `true` |
-| `TaskCompleted` | Tarea completada | `task-completed.png` | `Default` | `Tink` | `true` |
-| `TaskInProgress` | Tarea iniciada | `task-in-progress.png` | `IM` | `Ping` | `true` |
+| `--event-type`      | Mensaje estático (catálogo)                                    | Imagen (`events/`)       | win32           | darwin      | linux  |
+| ------------------- | -------------------------------------------------------------- | ------------------------ | --------------- | ----------- | ------ |
+| `UserPromptSubmit`  | Procesando tu solicitud...                                     | `user-prompt-submit.png` | `Reminder`      | `Submarine` | `true` |
+| `PreToolUse`        | Pregunta pendiente — Responde en la ventana del cliente.       | `pre-tool-use-ask.png`   | `SMS`           | `Hero`      | `true` |
+| `SubagentStart`     | Subagente iniciado                                             | `subagent-start.png`     | `IM`            | `Ping`      | `true` |
+| `SubagentStop`      | Subagente terminado                                            | `subagent-stop.png`      | `Default`       | `Tink`      | `true` |
+| `Stop`              | Tu turno — El asistente terminó. Escribe tu siguiente mensaje. | `stop.png`               | `IM`            | `Ping`      | `true` |
+| `StopFailure`       | Error de API — No se completó la respuesta.                    | `stop-failure.png`       | `LoopingAlarm7` | `Basso`     | `true` |
+| `SessionStart`      | Sesión iniciada                                                | `session-start.png`      | `Default`       | `Tink`      | `true` |
+| `SessionEnd`        | Sesión finalizada                                              | `session-end.png`        | `Default`       | `Tink`      | `true` |
+| `PermissionRequest` | Permiso requerido — Confirma la herramienta en el cliente.     | `permission-request.png` | `SMS`           | `Hero`      | `true` |
+| `TaskCreated`       | Tarea creada                                                   | `task-created.png`       | `Reminder`      | `Submarine` | `true` |
+| `TaskCompleted`     | Tarea completada                                               | `task-completed.png`     | `Default`       | `Tink`      | `true` |
+| `TaskInProgress`    | Tarea iniciada                                                 | `task-in-progress.png`   | `IM`            | `Ping`      | `true` |
 
 Con `--stdin-json`, los seis eventos con formatter (`StopFailure`, `PermissionRequest`, `PreToolUse`, `UserPromptSubmit`, `Stop`, `TaskInProgress`) pueden sustituir el cuerpo; el resto usa siempre el mensaje estático de la tabla.
 
@@ -310,12 +310,12 @@ Con `--stdin-json`, los seis eventos con formatter (`StopFailure`, `PermissionRe
 prefijo y usan siempre `Notification.Default`.
 
 | Catálogo (BurntToast) | Valor enviado a SnoreToast (`-s`) |
-|----------------------|-----------------------------------|
-| `Default` | `Notification.Default` |
-| `IM` | `Notification.IM` |
-| `Reminder` | `Notification.Reminder` |
-| `SMS` | `Notification.SMS` |
-| `LoopingAlarm7` | `Notification.Looping.Alarm7` |
+| --------------------- | --------------------------------- |
+| `Default`             | `Notification.Default`            |
+| `IM`                  | `Notification.IM`                 |
+| `Reminder`            | `Notification.Reminder`           |
+| `SMS`                 | `Notification.SMS`                |
+| `LoopingAlarm7`       | `Notification.Looping.Alarm7`     |
 
 **Orden de sonido en el CLI:** `--silent` → `sound: false`; `--sound` →
 `sound: true` genérico; si no hay flags → sonido del catálogo vía
@@ -340,11 +340,11 @@ usa `ToastGeneric` ni `appLogoOverride` (48×48): usa la plantilla legacy
 **`ToastImageAndText02`** — imagen **cuadrada a la izquierda** del bloque de
 título y mensaje (ver `KDE/snoretoast`, `displayToast()`).
 
-| Concepto | Tamaño en shell / doc externa | Uso en este repo |
-|----------|------------------------------|------------------|
-| App logo override (`ToastGeneric`) | 48×48 | No aplica a `-p` (header usa AUMID + `.ico`) |
-| Hero image (`ToastGeneric`) | 364×180 | No usamos hero |
-| Hueco `ToastImageAndText02` | ~128×128 px (orientación) | SnoreToast escala el PNG que recibe |
+| Concepto                           | Tamaño en shell / doc externa | Uso en este repo                             |
+| ---------------------------------- | ----------------------------- | -------------------------------------------- |
+| App logo override (`ToastGeneric`) | 48×48                         | No aplica a `-p` (header usa AUMID + `.ico`) |
+| Hero image (`ToastGeneric`)        | 364×180                       | No usamos hero                               |
+| Hueco `ToastImageAndText02`        | ~128×128 px (orientación)     | SnoreToast escala el PNG que recibe          |
 
 #### Assets versionados (estado actual del repo)
 
@@ -374,10 +374,10 @@ no existe, la función devuelve `undefined` y el CLI degrada con gracia al fallb
 
 Herramientas en `toast-body-image-spec.ts` / `event-notification-image.ts` (no cableadas al CLI):
 
-| Pipeline | Efecto | Comando |
-|----------|--------|---------|
-| **Compositor** (`writeAllEventNotificationImages`) | Regenera los 12 iconos desde `ai-assistant.png` + overlay SVG | `node --import tsx -e "import { writeAllEventNotificationImages } from './src/2-services/notifications/event-notification-image.ts'; await writeAllEventNotificationImages();"` |
-| **Reframe** (`reframeAllEventNotificationImages`) | Conserva el arte de cada PNG; disco circular + fondo `#fefefe` (`contain`) | `node --import tsx -e "import { reframeAllEventNotificationImages } from './src/2-services/notifications/event-notification-image.ts'; await reframeAllEventNotificationImages();"` |
+| Pipeline                                           | Efecto                                                                     | Comando                                                                                                                                                                             |
+| -------------------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Compositor** (`writeAllEventNotificationImages`) | Regenera los 12 iconos desde `ai-assistant.png` + overlay SVG              | `node --import tsx -e "import { writeAllEventNotificationImages } from './src/2-services/notifications/event-notification-image.ts'; await writeAllEventNotificationImages();"`     |
+| **Reframe** (`reframeAllEventNotificationImages`)  | Conserva el arte de cada PNG; disco circular + fondo `#fefefe` (`contain`) | `node --import tsx -e "import { reframeAllEventNotificationImages } from './src/2-services/notifications/event-notification-image.ts'; await reframeAllEventNotificationImages();"` |
 
 Salida de ambos pipelines: **128×128**, fondo opaco **`#fefefe`** (sin alpha). Tras ejecutar cualquiera:
 
@@ -456,11 +456,11 @@ El helper es:
 
 ### Comportamiento por SO
 
-| SO | Fuente del toast | Icono | Setup adicional |
-|---|---|---|---|
+| SO          | Fuente del toast                                             | Icono                                                  | Setup adicional                                        |
+| ----------- | ------------------------------------------------------------ | ------------------------------------------------------ | ------------------------------------------------------ |
 | **Windows** | "SnoreToast" sin `--install`; "AI Assistant" con `--install` | AI Assistant (cosmético vía `icon` en `node-notifier`) | `npm run notifications:register -- --install` (opt-in) |
-| **macOS** | "node" (limitación: sin bundle `.app`; documentada) | AI Assistant (cosmético vía `icon` en `node-notifier`) | Ninguno |
-| **Linux** | "AI Assistant" (vía `appName` en `notify-send`) | AI Assistant (cosmético vía `icon` en `node-notifier`) | Ninguno |
+| **macOS**   | "node" (limitación: sin bundle `.app`; documentada)          | AI Assistant (cosmético vía `icon` en `node-notifier`) | Ninguno                                                |
+| **Linux**   | "AI Assistant" (vía `appName` en `notify-send`)              | AI Assistant (cosmético vía `icon` en `node-notifier`) | Ninguno                                                |
 
 > **Limitación macOS:** el icono sí se muestra vía `node-notifier`, pero
 > la fuente sigue siendo "node" porque el change no aborda el bundle
@@ -479,9 +479,9 @@ El helper es:
 
 En Windows hay **dos imágenes distintas** en un toast:
 
-| Elemento | Quién lo controla | Cómo se configura en este repo |
-|---|---|---|
-| **Imagen del cuerpo** (logo grande en el toast) | SnoreToast flag `-p` | `icon` en la CLI → `ai-assistant.png` estable (`%LOCALAPPDATA%\AIAssistant\`) |
+| Elemento                                               | Quién lo controla               | Cómo se configura en este repo                                                           |
+| ------------------------------------------------------ | ------------------------------- | ---------------------------------------------------------------------------------------- |
+| **Imagen del cuerpo** (logo grande en el toast)        | SnoreToast flag `-p`            | `icon` en la CLI → `ai-assistant.png` estable (`%LOCALAPPDATA%\AIAssistant\`)            |
 | **Icono del header** (cuadrado junto a “AI Assistant”) | WinRT / Action Center vía AUMID | Registro `Icon` + **`IconUri`** + `IconLocation` del `.lnk` → `ai-assistant.ico` estable |
 
 Si el cuerpo se ve bien pero el header sigue “roto” (p. ej. tres cubos blancos), el fallo está en la fila del header, no en `-p`.
@@ -503,7 +503,6 @@ Si el cuerpo se ve bien pero el header sigue “roto” (p. ej. tres cubos blanc
    ```
 
    Esperado:
-
    - `DisplayName` = `AI Assistant`
    - `Icon` = `C:\Users\<tu-usuario>\AppData\Local\AIAssistant\ai-assistant.ico` (ruta **ASCII-only**, sin `Proyectos` ni `ó`)
    - `IconUri` = ruta al **`.png` estable** (WinRT usa `IconUri` para el header; `Icon` apunta al `.ico` para el shell)
@@ -579,34 +578,34 @@ apuntan al servicio migrado en el repositorio. Las notificaciones de UX
 
 **Relays al gateway (`POST /hooks`):** en [`.claude/settings.json`](../.claude/settings.json) del proyecto y en [`configs/hooks.json`](../configs/hooks.json) (plantilla canónica), los hooks de lifecycle usan relays TypeScript que leen stdin **una vez** (UTF-8) y reenvían con `fetch` a `$ANTHROPIC_BASE_URL/hooks` (sin `curl` ni `@-`, incompatible con PowerShell). Tipos de relay:
 
-| Relay | Hooks | Rol |
-|---|---|---|
-| [`post-hook-event.ts`](../scripting/post-hook-event.ts) | `PostToolUse`, `PostToolUseFailure`, `SubagentStart`, `SubagentStop` (1.er comando) | Solo `POST /hooks` |
-| [`gateway-hook-notify.ts`](../scripting/gateway-hook-notify.ts) | `UserPromptSubmit`, `StopFailure` | `POST /hooks` + toast con `--stdin-json` |
-| [`pre-tool-use-hook-ux.ts`](../scripting/pre-tool-use-hook-ux.ts) | `PreToolUse` (`matcher: "*"`) | `POST /hooks` siempre; toast solo en `AskUserQuestion` |
-| [`stop-hook-ux.ts`](../scripting/stop-hook-ux.ts) | `Stop` | `POST /hooks` + toast de continuidad |
+| Relay                                                             | Hooks                                                                               | Rol                                                    |
+| ----------------------------------------------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| [`post-hook-event.ts`](../scripting/post-hook-event.ts)           | `PostToolUse`, `PostToolUseFailure`, `SubagentStart`, `SubagentStop` (1.er comando) | Solo `POST /hooks`                                     |
+| [`gateway-hook-notify.ts`](../scripting/gateway-hook-notify.ts)   | `UserPromptSubmit`, `StopFailure`                                                   | `POST /hooks` + toast con `--stdin-json`               |
+| [`pre-tool-use-hook-ux.ts`](../scripting/pre-tool-use-hook-ux.ts) | `PreToolUse` (`matcher: "*"`)                                                       | `POST /hooks` siempre; toast solo en `AskUserQuestion` |
+| [`stop-hook-ux.ts`](../scripting/stop-hook-ux.ts)                 | `Stop`                                                                              | `POST /hooks` + toast de continuidad                   |
 
 Instalación global con ruta absoluta: builders en [`scripting/shared/gateway-hook-command.ts`](../scripting/shared/gateway-hook-command.ts).
 
 **Comando canónico por hook (14 claves: 8 del lifecycle + 6 de UX):**
 
-| Hook | Matcher | Comando(s) |
-|---|---|---|
-| `UserPromptSubmit` | — | `npx tsx scripting/gateway-hook-notify.ts --event-type UserPromptSubmit` |
-| `PreToolUse` | `*` | `npx tsx scripting/pre-tool-use-hook-ux.ts` (`POST /hooks` + toast condicional; ver justificación abajo) |
-| `PostToolUse` | `*` | `npx tsx scripting/post-hook-event.ts` (sin notificación; ver justificación abajo) |
-| `PostToolUse` | `TaskUpdate` | `npx tsx scripting/task-in-progress-hook-ux.ts` (relay UX: filtra `status === "in_progress"` + toast dinámico) |
-| `PostToolUseFailure` | — | `npx tsx scripting/post-hook-event.ts` |
-| `SubagentStart` | — | `npx tsx scripting/post-hook-event.ts` + `npx tsx src/2-services/notifications/cli.ts --event-type SubagentStart --message "Subagente iniciado"` |
-| `SubagentStop` | — | `npx tsx scripting/post-hook-event.ts` + `npx tsx src/2-services/notifications/cli.ts --event-type SubagentStop --message "Subagente terminado"` |
-| `Stop` | — | **Proyecto Smart Code Proxy:** un solo comando `stop-hook-ux.ts` (`POST /hooks` + toast de continuidad). Ver [§ Hook Stop](#hook-stop-fin-de-turno-y-resumen-con-modelo). **Instalación global / genérica:** `post-hook-event.ts` + `cli.ts --event-type Stop --stdin-json` |
-| `StopFailure` | — | `npx tsx scripting/gateway-hook-notify.ts --event-type StopFailure` |
-| `SessionStart` | `startup|resume` | `npx tsx src/2-services/notifications/cli.ts --event-type SessionStart --message "Sesión iniciada"` |
-| `SessionEnd` | — | `npx tsx src/2-services/notifications/cli.ts --event-type SessionEnd --message "Sesión finalizada"` |
-| `PermissionRequest` | — | `npx tsx src/2-services/notifications/cli.ts --event-type PermissionRequest --stdin-json` |
-| `TaskCreated` | — | `npx tsx src/2-services/notifications/cli.ts --event-type TaskCreated --message "Tarea creada"` |
-| `TaskCompleted` | — | `npx tsx src/2-services/notifications/cli.ts --event-type TaskCompleted --message "Tarea completada"` |
-| `TaskInProgress` (vía `PostToolUse`) | `TaskUpdate` | `npx tsx scripting/task-in-progress-hook-ux.ts` (relay: solo si `tool_input.status === "in_progress"`) |
+| Hook                                 | Matcher      | Comando(s)                                                                                                                                                                                                                                                                  |
+| ------------------------------------ | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `UserPromptSubmit`                   | —            | `npx tsx scripting/gateway-hook-notify.ts --event-type UserPromptSubmit`                                                                                                                                                                                                    |
+| `PreToolUse`                         | `*`          | `npx tsx scripting/pre-tool-use-hook-ux.ts` (`POST /hooks` + toast condicional; ver justificación abajo)                                                                                                                                                                    |
+| `PostToolUse`                        | `*`          | `npx tsx scripting/post-hook-event.ts` (sin notificación; ver justificación abajo)                                                                                                                                                                                          |
+| `PostToolUse`                        | `TaskUpdate` | `npx tsx scripting/task-in-progress-hook-ux.ts` (relay UX: filtra `status === "in_progress"` + toast dinámico)                                                                                                                                                              |
+| `PostToolUseFailure`                 | —            | `npx tsx scripting/post-hook-event.ts`                                                                                                                                                                                                                                      |
+| `SubagentStart`                      | —            | `npx tsx scripting/post-hook-event.ts` + `npx tsx src/2-services/notifications/cli.ts --event-type SubagentStart --message "Subagente iniciado"`                                                                                                                            |
+| `SubagentStop`                       | —            | `npx tsx scripting/post-hook-event.ts` + `npx tsx src/2-services/notifications/cli.ts --event-type SubagentStop --message "Subagente terminado"`                                                                                                                            |
+| `Stop`                               | —            | **Proyecto Smart Code Proxy:** un solo comando `stop-hook-ux.ts` (`POST /hooks` + toast de continuidad). Ver [§ Hook Stop](#hook-stop-fin-de-turno-y-resumen-con-modelo). **Instalación global / genérica:** `post-hook-event.ts` + `cli.ts --event-type Stop --stdin-json` |
+| `StopFailure`                        | —            | `npx tsx scripting/gateway-hook-notify.ts --event-type StopFailure`                                                                                                                                                                                                         |
+| `SessionStart`                       | `startup     | resume`                                                                                                                                                                                                                                                                     | `npx tsx src/2-services/notifications/cli.ts --event-type SessionStart --message "Sesión iniciada"` |
+| `SessionEnd`                         | —            | `npx tsx src/2-services/notifications/cli.ts --event-type SessionEnd --message "Sesión finalizada"`                                                                                                                                                                         |
+| `PermissionRequest`                  | —            | `npx tsx src/2-services/notifications/cli.ts --event-type PermissionRequest --stdin-json`                                                                                                                                                                                   |
+| `TaskCreated`                        | —            | `npx tsx src/2-services/notifications/cli.ts --event-type TaskCreated --message "Tarea creada"`                                                                                                                                                                             |
+| `TaskCompleted`                      | —            | `npx tsx src/2-services/notifications/cli.ts --event-type TaskCompleted --message "Tarea completada"`                                                                                                                                                                       |
+| `TaskInProgress` (vía `PostToolUse`) | `TaskUpdate` | `npx tsx scripting/task-in-progress-hook-ux.ts` (relay: solo si `tool_input.status === "in_progress"`)                                                                                                                                                                      |
 
 **Justificación de toast condicional en `PreToolUse` / sin toast en `PostToolUse`:** los
 eventos de tool tienen frecuencia alta (5–50 invocaciones por turno en
@@ -659,20 +658,20 @@ desperdiciado.
 
 ### Uso de `--stdin-json` por entrada
 
-| Entrada | `--stdin-json` | Justificación |
-|---|---|---|
-| `UserPromptSubmit` | Sí | Formatter: preview de `prompt`. |
-| `SubagentStart` | No | Copy estático del catálogo. |
-| `SubagentStop` | No | Copy estático del catálogo. |
-| `PreToolUse` (matcher `AskUserQuestion`) | Sí | Formatter: preguntas en `tool_input.questions`. |
-| `Stop` | Sí (solo si el hook usa `cli.ts` directo) | Formatter: `last_assistant_message`; si falta, catálogo. En el **proyecto**, `stop-hook-ux.ts` no usa `--stdin-json` en el CLI: el 1.er toast es catálogo y el 2.º lleva resumen Haiku. |
-| `StopFailure` | Sí | Formatter: `error` + `last_assistant_message`. |
-| `SessionStart` | No | Copy estático del catálogo. |
-| `SessionEnd` | No | Copy estático del catálogo. |
-| `PermissionRequest` | Sí | Formatter: `tool_name` y `tool_input`. |
-| `TaskCreated` | No | Copy estático del catálogo. |
-| `TaskCompleted` | No | Copy estático del catálogo. |
-| `TaskInProgress` (vía relay `PostToolUse[TaskUpdate]`) | Sí (vía relay) | El relay filtra `tool_input.status === "in_progress"` y pasa el payload al CLI con `--stdin-json`; el formatter extrae `tool_input.subject`. |
+| Entrada                                                | `--stdin-json`                            | Justificación                                                                                                                                                                           |
+| ------------------------------------------------------ | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `UserPromptSubmit`                                     | Sí                                        | Formatter: preview de `prompt`.                                                                                                                                                         |
+| `SubagentStart`                                        | No                                        | Copy estático del catálogo.                                                                                                                                                             |
+| `SubagentStop`                                         | No                                        | Copy estático del catálogo.                                                                                                                                                             |
+| `PreToolUse` (matcher `AskUserQuestion`)               | Sí                                        | Formatter: preguntas en `tool_input.questions`.                                                                                                                                         |
+| `Stop`                                                 | Sí (solo si el hook usa `cli.ts` directo) | Formatter: `last_assistant_message`; si falta, catálogo. En el **proyecto**, `stop-hook-ux.ts` no usa `--stdin-json` en el CLI: el 1.er toast es catálogo y el 2.º lleva resumen Haiku. |
+| `StopFailure`                                          | Sí                                        | Formatter: `error` + `last_assistant_message`.                                                                                                                                          |
+| `SessionStart`                                         | No                                        | Copy estático del catálogo.                                                                                                                                                             |
+| `SessionEnd`                                           | No                                        | Copy estático del catálogo.                                                                                                                                                             |
+| `PermissionRequest`                                    | Sí                                        | Formatter: `tool_name` y `tool_input`.                                                                                                                                                  |
+| `TaskCreated`                                          | No                                        | Copy estático del catálogo.                                                                                                                                                             |
+| `TaskCompleted`                                        | No                                        | Copy estático del catálogo.                                                                                                                                                             |
+| `TaskInProgress` (vía relay `PostToolUse[TaskUpdate]`) | Sí (vía relay)                            | El relay filtra `tool_input.status === "in_progress"` y pasa el payload al CLI con `--stdin-json`; el formatter extrae `tool_input.subject`.                                            |
 
 ### Override del user-level
 

@@ -69,8 +69,7 @@ export async function repairJsonlFile(jsonlPath: string): Promise<number> {
         if (obj.message?.role === 'assistant' && Array.isArray(obj.message.content)) {
           const originalCount = obj.message.content.length;
           obj.message.content = obj.message.content.filter(
-            (block) =>
-              !(block.type === 'thinking' && !isValidThinkingSignature(block.signature)),
+            (block) => !(block.type === 'thinking' && !isValidThinkingSignature(block.signature)),
           );
           removedCount += originalCount - obj.message.content.length;
         }

@@ -185,9 +185,9 @@ Abre tu flujo habitual (proyecto, chat, lo que use la API). Las peticiones pasar
 
 ### Paso E — Dónde mirar el resultado (dos sitios distintos)
 
-| Qué quieres ver                                         | Dónde está                                                                              | Qué es                                                                                                                                                                                                                   |
-| ------------------------------------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Actividad en vivo** (peticiones, respuestas, errores) | Terminal de `npm run dev` y archivo **`server/logs.jsonl`** (relativo al CWD)          | Consola: Pino Pretty (legible). Archivo: JSON línea a línea en `server/logs.jsonl` para revisar o filtrar después. Nivel configurable con `LOG_LEVEL` (por defecto `info`). |
+| Qué quieres ver                                         | Dónde está                                                                              | Qué es                                                                                                                                                                                                                                                                 |
+| ------------------------------------------------------- | --------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Actividad en vivo** (peticiones, respuestas, errores) | Terminal de `npm run dev` y archivo **`server/logs.jsonl`** (relativo al CWD)           | Consola: Pino Pretty (legible). Archivo: JSON línea a línea en `server/logs.jsonl` para revisar o filtrar después. Nivel configurable con `LOG_LEVEL` (por defecto `info`).                                                                                            |
 | **Copias en disco** por turno                           | Carpeta **`sessions/`** en el ordenador (relativa al CWD desde donde arrancas el proxy) | Árbol por sesión: `workflows/NN/` (layout `causal-workflows-v1`). Turnos `agentic`, preflights y side-requests son workflows hermanos bajo el mismo árbol. Referencia en [`session-audit-model.md` §0](./session-audit-model.md#0-layout-vigente-causal-workflows-v1). |
 
 **Estructura bajo cada sesión (P1)**
@@ -207,15 +207,15 @@ Para **limpiar** las sesiones acumuladas, ejecuta `npm run clean:sessions`. Para
 
 No hace falta leer la tabla entera del README el primer día:
 
-| Variable                  | Para qué sirve (resumen)                                                                         |
-| ------------------------- | ------------------------------------------------------------------------------------------------ |
-| `PORT`                    | Puerto donde escucha el proxy en tu máquina (por defecto `8787`).                                |
-| `UPSTREAM_ORIGIN`         | URL base del API al que el proxy reenvía (por defecto Anthropic).                                |
-| `MAX_REQUEST_BODY`        | Tamaño máximo del body que Fastify acepta en memoria (por defecto `50mb`).                       |
-| `MAX_AUDIT_BYTES`         | Tope único de volcado en disco bajo `sessions/` (request, response, `sse.txt` raw; default 50 MiB). |
-| `LOG_LEVEL`               | Nivel de logs en consola y `server/logs.jsonl` (por defecto `info`).                             |
+| Variable                  | Para qué sirve (resumen)                                                                                                                                                                |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PORT`                    | Puerto donde escucha el proxy en tu máquina (por defecto `8787`).                                                                                                                       |
+| `UPSTREAM_ORIGIN`         | URL base del API al que el proxy reenvía (por defecto Anthropic).                                                                                                                       |
+| `MAX_REQUEST_BODY`        | Tamaño máximo del body que Fastify acepta en memoria (por defecto `50mb`).                                                                                                              |
+| `MAX_AUDIT_BYTES`         | Tope único de volcado en disco bajo `sessions/` (request, response, `sse.txt` raw; default 50 MiB).                                                                                     |
+| `LOG_LEVEL`               | Nivel de logs en consola y `server/logs.jsonl` (por defecto `info`).                                                                                                                    |
 | `FILTERED_TOOLS`          | Lista de tool names a excluir del request (coma-separado). Sin definir la variable = lista por defecto (7 tools). Para desactivar el filtrado: `FILTERED_TOOLS=` o `FILTERED_TOOLS=""`. |
-| `PROXY_UNREDACT_THINKING` | Remueve flag de redacción de thinking para capturar contenido legible (por defecto `false`).     |
+| `PROXY_UNREDACT_THINKING` | Remueve flag de redacción de thinking para capturar contenido legible (por defecto `false`).                                                                                            |
 
 La carpeta de salida es siempre `./sessions`, relativa al directorio desde donde ejecutas el proxy.
 

@@ -8,7 +8,10 @@ import {
   applyStatuslineUninstall,
 } from '../../../scripting/features/statusline.js';
 import { createValidProxyRootForStatusline } from '../helpers/proxy-root-fixture.js';
-import { SMART_CODE_PROXY_ROOT_KEY, type ClaudeSettings } from '../../../scripting/shared/claude-settings.js';
+import {
+  SMART_CODE_PROXY_ROOT_KEY,
+  type ClaudeSettings,
+} from '../../../scripting/shared/claude-settings.js';
 
 describe('isSmartCodeStatusLine', () => {
   it('retorna true si el comando incluye router-status.ts', () => {
@@ -41,7 +44,9 @@ describe('shouldOverwriteStatusLine', () => {
   });
 
   it('ok si el statusLine existente es de SCP', () => {
-    expect(shouldOverwriteStatusLine('npx tsx /repo/scripting/router-status.ts', false)).toEqual({ ok: true });
+    expect(shouldOverwriteStatusLine('npx tsx /repo/scripting/router-status.ts', false)).toEqual({
+      ok: true,
+    });
   });
 
   it('ok con --force aunque el statusLine sea ajeno', () => {

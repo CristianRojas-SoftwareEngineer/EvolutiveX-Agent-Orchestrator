@@ -14,7 +14,11 @@ const noHeaders: AgentContext = {
   isSubagentRequest: false,
 };
 
-function makePending(toolUseId: string, prompt?: string, subagentType?: string): PendingAgentToolUse {
+function makePending(
+  toolUseId: string,
+  prompt?: string,
+  subagentType?: string,
+): PendingAgentToolUse {
   return { stepIndex: 1, toolUseId, prompt, subagentType };
 }
 

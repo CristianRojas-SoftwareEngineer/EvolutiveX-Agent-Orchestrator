@@ -1,4 +1,8 @@
-import type { AnthropicMessage, AnthropicRequest, AnthropicUsage } from '../../types/anthropic.types.js';
+import type {
+  AnthropicMessage,
+  AnthropicRequest,
+  AnthropicUsage,
+} from '../../types/anthropic.types.js';
 import type { IStep } from '../../interfaces/gateway/IStep.js';
 import type { IToolUse } from '../../interfaces/gateway/IToolUse.js';
 

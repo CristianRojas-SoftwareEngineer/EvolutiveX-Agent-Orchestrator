@@ -9,7 +9,13 @@ import type { TelemetryEvent, SubscriptionRef } from '../../src/1-domain/types/t
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function makeStopHook(overrides: Partial<ClaudeHookEvent> = {}): ClaudeHookEvent {
-  return { eventName: 'Stop', sessionId: 'session-1', stopHookActive: false, backgroundTasks: 0, ...overrides };
+  return {
+    eventName: 'Stop',
+    sessionId: 'session-1',
+    stopHookActive: false,
+    backgroundTasks: 0,
+    ...overrides,
+  };
 }
 
 function makeStep(id: string, workflowId: string, closed = false, index = 0): IStep {
@@ -278,7 +284,12 @@ describe('WorkflowRepositoryService — emisión al EventBus', () => {
   it('openSubagentWorkflow emite workflow_spawn', () => {
     const bus = new SpyBus();
     const repo = new WorkflowRepositoryService(bus);
-    repo.openSubagentWorkflow('s1', { agentId: 'child', isSubagentRequest: true }, 'wf-main', 'tu-1');
+    repo.openSubagentWorkflow(
+      's1',
+      { agentId: 'child', isSubagentRequest: true },
+      'wf-main',
+      'tu-1',
+    );
     const ev = bus.ofType('workflow_spawn');
     expect(ev).toHaveLength(1);
     expect((ev[0].payload as Record<string, unknown>).parentToolUseId).toBe('tu-1');
@@ -404,7 +415,11 @@ describe('WorkflowRepositoryService — lookups', () => {
 describe('WorkflowRepositoryService — forceClose', () => {
   it('forceClose por orphan produce outcome orphaned y NO incluye closedByEvent', () => {
     const repo = new WorkflowRepositoryService();
-    const wf = repo.openWorkflow('s1', { agentId: 'a', isSubagentRequest: false }, { forceNew: true });
+    const wf = repo.openWorkflow(
+      's1',
+      { agentId: 'a', isSubagentRequest: false },
+      { forceNew: true },
+    );
     repo.forceClose(wf.id, 'orphaned', { continuationOrphan: true });
     const result = repo.getWorkflow(wf.id)!.result!;
     expect(result.outcome).toBe('orphaned');

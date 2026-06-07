@@ -22,11 +22,7 @@ export function printSessionTable(rows: SessionRow[], emptyMessage?: string): vo
 
   const pad = (s: string, w: number) => (s.length > w ? s.slice(0, w - 1) + '…' : s.padEnd(w));
 
-  console.log(
-    chalk.bold(
-      headers.map((h, i) => pad(h, colWidths[i]!)).join(' '),
-    ),
-  );
+  console.log(chalk.bold(headers.map((h, i) => pad(h, colWidths[i]!)).join(' ')));
   console.log(chalk.gray('─'.repeat(colWidths.reduce((a, b) => a + b + 1, 0))));
 
   for (const row of rows) {

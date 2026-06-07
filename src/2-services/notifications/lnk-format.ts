@@ -36,8 +36,7 @@
 
 const HEADER_SIZE = 0x4c;
 const LINK_CLSID_BYTES = Buffer.from([
-  0x01, 0x14, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0xc0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46,
+  0x01, 0x14, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46,
 ]);
 const APP_USER_MODEL_ID_SIGNATURE = 0xa0000005;
 const SW_SHOWNORMAL = 1;
@@ -48,7 +47,7 @@ const LINK_FLAGS =
   0x00000002 | // HasLinkInfo
   0x00000004 | // HasName
   0x00000040 | // HasIconLocation
-  0x00000080;  // IsUnicode
+  0x00000080; // IsUnicode
 
 // LinkInfoFlags: VolumeIDAndLocalBasePath | LocalBasePathUnicode.
 const LINK_INFO_FLAGS = 0x01 | 0x80;
@@ -134,9 +133,9 @@ function buildAppUserModelIdBlock(aumid: string): Buffer {
 
 export interface ShortcutArgs {
   target: string; // ruta absoluta al .exe (LocalBasePath)
-  icon: string;   // ruta al .ico + ",0" (IconLocation)
-  name: string;   // DisplayName (NAME_STRING)
-  aumid: string;  // AppUserModelID
+  icon: string; // ruta al .ico + ",0" (IconLocation)
+  name: string; // DisplayName (NAME_STRING)
+  aumid: string; // AppUserModelID
 }
 
 export function buildShortcutBytes(args: ShortcutArgs): Buffer {
@@ -176,7 +175,11 @@ function skipLinkInfo(lnk: Buffer, offset: number): number {
   return offset + size;
 }
 
-function readCountedString(lnk: Buffer, offset: number, isUnicode: boolean): { value: string; nextOffset: number } {
+function readCountedString(
+  lnk: Buffer,
+  offset: number,
+  isUnicode: boolean,
+): { value: string; nextOffset: number } {
   const count = lnk.readUInt16LE(offset);
   const bytes = count * (isUnicode ? 2 : 1);
   if (offset + 2 + bytes > lnk.length) {

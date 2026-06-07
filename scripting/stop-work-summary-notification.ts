@@ -10,7 +10,10 @@ import { join } from 'node:path';
 import Anthropic from '@anthropic-ai/sdk';
 import { DesktopNotificationAdapter } from '../src/2-services/notifications/DesktopNotificationAdapter.js';
 import { buildEvent } from '../src/2-services/notifications/cli.js';
-import { truncate, normalizeWhitespace } from '../src/2-services/notifications/hook-payload-notification-message.js';
+import {
+  truncate,
+  normalizeWhitespace,
+} from '../src/2-services/notifications/hook-payload-notification-message.js';
 
 const DEFAULT_HAIKU = 'claude-haiku-4-5-20251001';
 const MAX_INPUT_CHARS = 15_000;
@@ -78,9 +81,7 @@ export async function extractWorkflowContext(
     rl.close();
   }
 
-  const userIndices = segments
-    .map((s, i) => (s.role === 'user' ? i : -1))
-    .filter((i) => i !== -1);
+  const userIndices = segments.map((s, i) => (s.role === 'user' ? i : -1)).filter((i) => i !== -1);
 
   if (userIndices.length === 0) return undefined;
 

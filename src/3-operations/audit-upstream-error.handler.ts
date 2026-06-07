@@ -8,10 +8,7 @@ import type { IWorkflowRepository } from '../1-domain/repositories/IWorkflowRepo
 export class AuditUpstreamErrorHandler {
   constructor(private workflowRepo: IWorkflowRepository) {}
 
-  public execute(params: {
-    auditSessionId: string;
-    error: Error & { code?: string };
-  }): void {
+  public execute(params: { auditSessionId: string; error: Error & { code?: string } }): void {
     const workflow = this.workflowRepo.getWorkflowBySessionId(params.auditSessionId);
     if (!workflow) return;
     this.workflowRepo.clearToolUseIndexFor(workflow.id);

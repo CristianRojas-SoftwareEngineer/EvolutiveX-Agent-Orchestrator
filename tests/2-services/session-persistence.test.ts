@@ -202,7 +202,12 @@ describe('SessionPersistence — P2-b stream_chunk', () => {
       seq: 1,
       stepIndex: 0,
       workflowId: 'wf-1',
-      chunk: { i: 1, ts: '2026-01-01T00:00:00Z', line: 'data: {"type":"ping"}', phase: 'delegation' },
+      chunk: {
+        i: 1,
+        ts: '2026-01-01T00:00:00Z',
+        line: 'data: {"type":"ping"}',
+        phase: 'delegation',
+      },
     });
     await persistence.flush();
     expect(await exists('sessions/sess-1/workflows/00/steps/00/response/streaming')).toBe(false);
@@ -214,7 +219,12 @@ describe('SessionPersistence — P2-b stream_chunk', () => {
       seq: 1,
       stepIndex: 0,
       workflowId: 'wf-1',
-      chunk: { i: 1, ts: '2026-01-01T00:00:00Z', line: 'data: {"type":"message_start"}', phase: 'delegation' },
+      chunk: {
+        i: 1,
+        ts: '2026-01-01T00:00:00Z',
+        line: 'data: {"type":"message_start"}',
+        phase: 'delegation',
+      },
     });
     await persistence.flush();
     const chunkPath = 'sessions/sess-1/workflows/00/steps/00/response/streaming/0001-chunk.ndjson';
@@ -231,7 +241,12 @@ describe('SessionPersistence — P2-b stream_chunk', () => {
       seq: 10001,
       stepIndex: 0,
       workflowId: 'wf-1',
-      chunk: { i: 10001, ts: '2026-01-01T00:00:00Z', line: 'data: {"type":"content_block_delta"}', phase: 'delegation' },
+      chunk: {
+        i: 10001,
+        ts: '2026-01-01T00:00:00Z',
+        line: 'data: {"type":"content_block_delta"}',
+        phase: 'delegation',
+      },
     });
     await persistence.flush();
     expect(await exists('sessions/sess-1/workflows/00/steps/00/response/streaming')).toBe(false);
@@ -274,7 +289,9 @@ describe('SessionPersistence — P2-e workflow-sequence.json', () => {
   it('workflow_start crea entrada running en workflow-sequence.json', async () => {
     emit('workflow_start', 'sess-1', { workflowId: 'wf-1', kind: 'main' });
     await persistence.flush();
-    const seq = await readJson('sessions/sess-1/workflows/workflow-sequence.json') as unknown as Array<Record<string, unknown>>;
+    const seq = (await readJson(
+      'sessions/sess-1/workflows/workflow-sequence.json',
+    )) as unknown as Array<Record<string, unknown>>;
     expect(Array.isArray(seq)).toBe(true);
     expect(seq[0].workflowId).toBe('wf-1');
     expect(seq[0].status).toBe('running');
@@ -287,7 +304,9 @@ describe('SessionPersistence — P2-e workflow-sequence.json', () => {
       result: { outcome: 'success' },
     });
     await persistence.flush();
-    const seq = await readJson('sessions/sess-1/workflows/workflow-sequence.json') as unknown as Array<Record<string, unknown>>;
+    const seq = (await readJson(
+      'sessions/sess-1/workflows/workflow-sequence.json',
+    )) as unknown as Array<Record<string, unknown>>;
     expect(seq[0].status).toBe('completed');
     expect(seq[0].completedAt).toBeDefined();
   });
@@ -300,7 +319,9 @@ describe('SessionPersistence — P2-e workflow-sequence.json', () => {
       parentToolUseId: 'tu-1',
     });
     await persistence.flush();
-    const seq = await readJson('sessions/sess-1/workflows/workflow-sequence.json') as unknown as Array<Record<string, unknown>>;
+    const seq = (await readJson(
+      'sessions/sess-1/workflows/workflow-sequence.json',
+    )) as unknown as Array<Record<string, unknown>>;
     expect(seq.every((e) => e.workflowId !== 'wf-sub')).toBe(true);
   });
 });
@@ -329,10 +350,11 @@ describe('SessionPersistence — P2-g vistas coalesced', () => {
       reconstructStepMessage: vi.fn(),
       reconstructSseJsonlFile: vi.fn(),
       reconstructSseJsonlPhaseMessage: vi.fn(),
-      reconstructStepPhaseMessage: vi.fn().mockImplementation(
-        (_stepDir: string, phase: SsePhase) =>
+      reconstructStepPhaseMessage: vi
+        .fn()
+        .mockImplementation((_stepDir: string, phase: SsePhase) =>
           Promise.resolve(phase === 'delegation' ? delegMsg : contMsg),
-      ),
+        ),
       runReconstruction: vi.fn(),
     };
 

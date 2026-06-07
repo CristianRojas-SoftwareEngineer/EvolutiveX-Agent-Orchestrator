@@ -1,0 +1,464 @@
+{
+  "schemaVersion": 1,
+  "startedAt": "2026-06-07T21:39:09.157Z",
+  "finishedAt": "2026-06-07T21:40:43.654Z",
+  "steps": [
+    {
+      "id": "help",
+      "script": "help",
+      "kind": "blocking",
+      "status": "pass",
+      "durationMs": 921,
+      "failureReason": null,
+      "skippedReason": null
+    },
+    {
+      "id": "configure-provider",
+      "script": "configure:provider",
+      "kind": "blocking",
+      "status": "pass",
+      "durationMs": 947,
+      "failureReason": null,
+      "skippedReason": null
+    },
+    {
+      "id": "setup-install",
+      "script": "setup:install",
+      "kind": "blocking",
+      "status": "pass",
+      "durationMs": 984,
+      "failureReason": null,
+      "skippedReason": null
+    },
+    {
+      "id": "setup-uninstall",
+      "script": "setup:uninstall",
+      "kind": "blocking",
+      "status": "pass",
+      "durationMs": 1204,
+      "failureReason": null,
+      "skippedReason": null
+    },
+    {
+      "id": "statusline-router-details-on",
+      "script": "statusline:router-details:on",
+      "kind": "blocking",
+      "status": "pass",
+      "durationMs": 990,
+      "failureReason": null,
+      "skippedReason": null
+    },
+    {
+      "id": "statusline-router-details-off",
+      "script": "statusline:router-details:off",
+      "kind": "blocking",
+      "status": "pass",
+      "durationMs": 941,
+      "failureReason": null,
+      "skippedReason": null
+    },
+    {
+      "id": "statusline-router-details-toggle",
+      "script": "statusline:router-details:toggle",
+      "kind": "blocking",
+      "status": "pass",
+      "durationMs": 944,
+      "failureReason": null,
+      "skippedReason": null
+    },
+    {
+      "id": "create-agents-reference",
+      "script": "create:agents-reference",
+      "kind": "blocking",
+      "status": "pass",
+      "durationMs": 911,
+      "failureReason": null,
+      "skippedReason": null
+    },
+    {
+      "id": "verify-package-scripts",
+      "script": "verify:package-scripts",
+      "kind": "blocking",
+      "status": "skip",
+      "durationMs": 0,
+      "failureReason": null,
+      "skippedReason": "Auto-referencia: este paso es el script mismo; lo emite la pipeline al invocarse."
+    },
+    {
+      "id": "notifications-register",
+      "script": "notifications:register",
+      "kind": "blocking",
+      "status": "pass",
+      "durationMs": 941,
+      "failureReason": null,
+      "skippedReason": null
+    },
+    {
+      "id": "lint",
+      "script": "lint",
+      "kind": "blocking",
+      "status": "pass",
+      "durationMs": 3069,
+      "failureReason": null,
+      "skippedReason": null
+    },
+    {
+      "id": "typecheck",
+      "script": "typecheck",
+      "kind": "blocking",
+      "status": "pass",
+      "durationMs": 3552,
+      "failureReason": null,
+      "skippedReason": null
+    },
+    {
+      "id": "test-unit",
+      "script": "test:unit",
+      "kind": "blocking",
+      "status": "pass",
+      "durationMs": 5597,
+      "failureReason": null,
+      "skippedReason": null
+    },
+    {
+      "id": "test-integration",
+      "script": "test:integration",
+      "kind": "blocking",
+      "status": "pass",
+      "durationMs": 5194,
+      "failureReason": null,
+      "skippedReason": null
+    },
+    {
+      "id": "format",
+      "script": "format",
+      "kind": "blocking",
+      "status": "pass",
+      "durationMs": 4227,
+      "failureReason": null,
+      "skippedReason": null
+    },
+    {
+      "id": "lint-fix",
+      "script": "lint:fix",
+      "kind": "blocking",
+      "status": "pass",
+      "durationMs": 3508,
+      "failureReason": null,
+      "skippedReason": null
+    },
+    {
+      "id": "clean-dist",
+      "script": "clean:dist",
+      "kind": "destructive",
+      "status": "pass",
+      "durationMs": 772,
+      "failureReason": null,
+      "skippedReason": null
+    },
+    {
+      "id": "build-js",
+      "script": "build:js",
+      "kind": "blocking",
+      "status": "pass",
+      "durationMs": 1173,
+      "failureReason": null,
+      "skippedReason": null
+    },
+    {
+      "id": "build-types",
+      "script": "build:types",
+      "kind": "blocking",
+      "status": "pass",
+      "durationMs": 3174,
+      "failureReason": null,
+      "skippedReason": null
+    },
+    {
+      "id": "build",
+      "script": "build",
+      "kind": "blocking",
+      "status": "pass",
+      "durationMs": 5255,
+      "failureReason": null,
+      "skippedReason": null
+    },
+    {
+      "id": "test-quick",
+      "script": "test:quick",
+      "kind": "blocking",
+      "status": "pass",
+      "durationMs": 10740,
+      "failureReason": null,
+      "skippedReason": null
+    },
+    {
+      "id": "test",
+      "script": "test",
+      "kind": "blocking",
+      "status": "pass",
+      "durationMs": 15033,
+      "failureReason": null,
+      "skippedReason": null
+    },
+    {
+      "id": "start",
+      "script": "start",
+      "kind": "background",
+      "status": "pass",
+      "durationMs": 3044,
+      "failureReason": null,
+      "skippedReason": "Coincidió patrón 'listening'; proceso arrancado en puerto 14700 y terminado."
+    },
+    {
+      "id": "dev",
+      "script": "dev",
+      "kind": "background",
+      "status": "pass",
+      "durationMs": 3536,
+      "failureReason": null,
+      "skippedReason": "Coincidió patrón 'listening'; proceso arrancado en puerto 18121 y terminado."
+    },
+    {
+      "id": "test-watch",
+      "script": "test:watch",
+      "kind": "background",
+      "status": "pass",
+      "durationMs": 3032,
+      "failureReason": null,
+      "skippedReason": "Coincidió patrón 'RUN'; proceso arrancado en puerto 18382 y terminado."
+    },
+    {
+      "id": "sessions-list",
+      "script": "sessions:list",
+      "kind": "blocking",
+      "status": "pass",
+      "durationMs": 2245,
+      "failureReason": null,
+      "skippedReason": null
+    },
+    {
+      "id": "sessions-list-archived",
+      "script": "sessions:list-archived",
+      "kind": "blocking",
+      "status": "pass",
+      "durationMs": 1096,
+      "failureReason": null,
+      "skippedReason": null
+    },
+    {
+      "id": "sessions-sanitize-scan",
+      "script": "sessions:sanitize:scan",
+      "kind": "blocking",
+      "status": "pass",
+      "durationMs": 1257,
+      "failureReason": null,
+      "skippedReason": null
+    },
+    {
+      "id": "sessions-archive-error-path",
+      "script": "sessions:archive",
+      "kind": "blocking",
+      "status": "pass",
+      "durationMs": 974,
+      "failureReason": null,
+      "skippedReason": null
+    },
+    {
+      "id": "sessions-restore-error-path",
+      "script": "sessions:restore",
+      "kind": "blocking",
+      "status": "pass",
+      "durationMs": 1016,
+      "failureReason": null,
+      "skippedReason": null
+    },
+    {
+      "id": "sessions-delete-error-path",
+      "script": "sessions:delete",
+      "kind": "blocking",
+      "status": "pass",
+      "durationMs": 972,
+      "failureReason": null,
+      "skippedReason": null
+    },
+    {
+      "id": "sessions-sanitize-error-path",
+      "script": "sessions:sanitize",
+      "kind": "blocking",
+      "status": "pass",
+      "durationMs": 939,
+      "failureReason": null,
+      "skippedReason": null
+    },
+    {
+      "id": "sessions-sanitize-all",
+      "script": "sessions:sanitize:all",
+      "kind": "blocking",
+      "status": "pass",
+      "durationMs": 1432,
+      "failureReason": null,
+      "skippedReason": null
+    },
+    {
+      "id": "clean-sessions",
+      "script": "clean:sessions",
+      "kind": "destructive",
+      "status": "pass",
+      "durationMs": 1961,
+      "failureReason": null,
+      "skippedReason": null
+    },
+    {
+      "id": "clean-logs",
+      "script": "clean:logs",
+      "kind": "destructive",
+      "status": "pass",
+      "durationMs": 763,
+      "failureReason": null,
+      "skippedReason": null
+    },
+    {
+      "id": "clean-modules",
+      "script": "clean:modules",
+      "kind": "destructive",
+      "status": "fail",
+      "durationMs": 2144,
+      "failureReason": "node_modules/ aún existe después de clean:modules.",
+      "skippedReason": null
+    },
+    {
+      "id": "restore-dependencies-after-modules",
+      "script": "",
+      "kind": "restore",
+      "status": "skip",
+      "durationMs": 0,
+      "failureReason": null,
+      "skippedReason": "Dependencias no satisfechas: clean-modules."
+    },
+    {
+      "id": "clean-all",
+      "script": "clean:all",
+      "kind": "destructive",
+      "status": "skip",
+      "durationMs": 0,
+      "failureReason": null,
+      "skippedReason": "Dependencias no satisfechas: restore-dependencies-after-modules."
+    },
+    {
+      "id": "restore-dependencies-after-all",
+      "script": "",
+      "kind": "restore",
+      "status": "skip",
+      "durationMs": 0,
+      "failureReason": null,
+      "skippedReason": "Dependencias no satisfechas: clean-all."
+    },
+    {
+      "id": "restore-build-artifacts",
+      "script": "build",
+      "kind": "restore",
+      "status": "skip",
+      "durationMs": 0,
+      "failureReason": null,
+      "skippedReason": "Dependencias no satisfechas: restore-dependencies-after-all."
+    }
+  ],
+  "coverage": {
+    "declaredInConfig": [
+      "build",
+      "build:js",
+      "build:types",
+      "clean:all",
+      "clean:dist",
+      "clean:logs",
+      "clean:modules",
+      "clean:sessions",
+      "configure:provider",
+      "create:agents-reference",
+      "dev",
+      "format",
+      "help",
+      "lint",
+      "lint:fix",
+      "notifications:register",
+      "sessions:archive",
+      "sessions:delete",
+      "sessions:list",
+      "sessions:list-archived",
+      "sessions:restore",
+      "sessions:sanitize",
+      "sessions:sanitize:all",
+      "sessions:sanitize:scan",
+      "setup:install",
+      "setup:uninstall",
+      "start",
+      "statusline:router-details:off",
+      "statusline:router-details:on",
+      "statusline:router-details:toggle",
+      "test",
+      "test:integration",
+      "test:quick",
+      "test:unit",
+      "test:watch",
+      "typecheck",
+      "verify:package-scripts"
+    ],
+    "declaredInPackageJson": [
+      "build",
+      "build:js",
+      "build:types",
+      "clean:all",
+      "clean:dist",
+      "clean:logs",
+      "clean:modules",
+      "clean:sessions",
+      "configure:provider",
+      "create:agents-reference",
+      "dev",
+      "format",
+      "help",
+      "lint",
+      "lint:fix",
+      "notifications:register",
+      "sessions:archive",
+      "sessions:delete",
+      "sessions:list",
+      "sessions:list-archived",
+      "sessions:restore",
+      "sessions:sanitize",
+      "sessions:sanitize:all",
+      "sessions:sanitize:scan",
+      "setup:install",
+      "setup:uninstall",
+      "start",
+      "statusline:router-details:off",
+      "statusline:router-details:on",
+      "statusline:router-details:toggle",
+      "test",
+      "test:integration",
+      "test:quick",
+      "test:unit",
+      "test:watch",
+      "typecheck",
+      "verify:package-scripts"
+    ],
+    "missingFromConfig": [],
+    "missingFromPackageJson": []
+  },
+  "failures": [
+    {
+      "stepId": "clean-modules",
+      "reason": "node_modules/ aún existe después de clean:modules."
+    }
+  ],
+  "workspaceState": {
+    "nodeModulesRestored": true,
+    "buildArtifactsPresent": true,
+    "destructiveStepsRan": [
+      "clean-dist",
+      "clean-sessions",
+      "clean-logs"
+    ]
+  }
+}

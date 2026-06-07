@@ -16,13 +16,13 @@ El proxy utiliza **Progressive Kernel Architecture (PKA)** — un modelo arquite
 
 ### 🧩 Capas de Responsabilidad
 
-| Capa                           | Ubicación                | Responsabilidad                                                                   | Componentes Clave                                                                                                                                                   |
-| ------------------------------ | ------------------------ | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **1 - Dominio**                | `src/1-domain/`          | Tipos puros (entidades) y lógica de dominio sin dependencias externas             | `SessionResolverService`, `RequestClassifierService`, `RedactService`, `MarkdownRendererService`, `SseSimulatorService`, Tipos de auditoría                         |
+| Capa                           | Ubicación                | Responsabilidad                                                                   | Componentes Clave                                                                                                                                                                        |
+| ------------------------------ | ------------------------ | --------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **1 - Dominio**                | `src/1-domain/`          | Tipos puros (entidades) y lógica de dominio sin dependencias externas             | `SessionResolverService`, `RequestClassifierService`, `RedactService`, `MarkdownRendererService`, `SseSimulatorService`, Tipos de auditoría                                              |
 | **2 - Servicios (Adapters)**   | `src/2-services/`        | Implementaciones concretas con I/O (filesystem, streams) y **ports** (interfaces) | `EventBus`, `SessionPersistence`, `WorkflowRepositoryService`, `SseReconstructService`, `StreamTeeService`, Ports: `IEventBus`, `IWorkflowRepository`, `ISseReconstructor`, `IStreamTee` |
-| **3 - Operaciones (Handlers)** | `src/3-operations/`      | Orquestación de casos de uso (Command Handlers)                                   | `AuditWorkflowHandler`, `AuditSseResponseHandler`, `AuditStandardResponseHandler`, `AuditUpstreamErrorHandler`, `FilterToolsHandler`                             |
-| **4 - API (Composition Root)** | `src/4-api/`             | Wiring de dependencias y configuración                                            | `createProxyDependencies()`, Configuración de entorno                                                                                                               |
-| **5 - Interfaces de Usuario**  | `src/5-user-interfaces/` | Adaptadores HTTP (reciben deps inyectadas via options)                            | `ProxyController`, `proxyRoutes`, `fastify.augments.d.ts`                                                                                                           |
+| **3 - Operaciones (Handlers)** | `src/3-operations/`      | Orquestación de casos de uso (Command Handlers)                                   | `AuditWorkflowHandler`, `AuditSseResponseHandler`, `AuditStandardResponseHandler`, `AuditUpstreamErrorHandler`, `FilterToolsHandler`                                                     |
+| **4 - API (Composition Root)** | `src/4-api/`             | Wiring de dependencias y configuración                                            | `createProxyDependencies()`, Configuración de entorno                                                                                                                                    |
+| **5 - Interfaces de Usuario**  | `src/5-user-interfaces/` | Adaptadores HTTP (reciben deps inyectadas via options)                            | `ProxyController`, `proxyRoutes`, `fastify.augments.d.ts`                                                                                                                                |
 
 ### 📐 Regla de Dependencia
 
@@ -140,7 +140,7 @@ Personaliza el comportamiento ajustando estas variables en tu entorno o en un ar
 |   **Core**   | `PORT`                    | Puerto de escucha del proxy.                                                                                                    | `8787`                                                                                  |
 | **Upstream** | `UPSTREAM_ORIGIN`         | URL objetivo (Anthropic, OpenRouter, etc.).                                                                                     | `https://api.anthropic.com`                                                             |
 | **Límites**  | `MAX_REQUEST_BODY`        | Límite del cuerpo de petición (memoria en proxy).                                                                               | `50mb`                                                                                  |
-|              | `MAX_AUDIT_BYTES`         | Tope único de volcado en disco (request, response, `sse.txt` raw). Buffer en memoria se deriva internamente.                     | `52428800`                                                                              |
+|              | `MAX_AUDIT_BYTES`         | Tope único de volcado en disco (request, response, `sse.txt` raw). Buffer en memoria se deriva internamente.                    | `52428800`                                                                              |
 | **Thinking** | `PROXY_UNREDACT_THINKING` | Remueve el flag `redact-thinking-2026-02-12` del header `anthropic-beta` para capturar contenido thinking legible.              | `false` (desactivado)                                                                   |
 | **Filtrado** | `FILTERED_TOOLS`          | Tool names a excluir del request (coma-separado). Omitir la variable = default abajo. Desactivar filtrado: `FILTERED_TOOLS=""`. | `ScheduleWakeup,NotebookEdit,ExitWorktree,EnterWorktree,CronList,CronDelete,CronCreate` |
 |   **Logs**   | `LOG_LEVEL`               | Nivel de log de Pino (consola y `server/logs.jsonl`).                                                                           | `info`                                                                                  |
@@ -155,22 +155,22 @@ Para instalar las **14 claves** de hooks de SCP en `~/.claude/settings.json` (us
 
 Adicionalmente, el archivo `.claude/settings.json` del proyecto registra **14 claves** de hooks de Claude Code (**8 del lifecycle** que alimentan al gateway, más **6 claves de UX no-lifecycle** que solo emiten toast nativo), sobrescribiendo las entradas equivalentes del user-level (`C:\Users\Cristian\.claude\settings.json`) para esas claves (mecanismo de merge de Claude Code: el proyecto tiene precedencia). Las 14 claves son:
 
-| Hook | Matcher | Comandos |
-| --- | --- | --- |
-| `UserPromptSubmit` | — | `gateway-hook-notify.ts` (`POST /hooks` + toast stdin) |
-| `PreToolUse` | `*` | `pre-tool-use-hook-ux.ts` (`POST /hooks` + toast condicional) |
-| `PostToolUse` | `*` | `post-hook-event.ts` |
-| `PostToolUseFailure` | — | `post-hook-event.ts` |
-| `SubagentStart` | — | `post-hook-event.ts` + notificación (mensaje fijo) |
-| `SubagentStop` | — | `post-hook-event.ts` + notificación (mensaje fijo) |
-| `Stop` | — | `stop-hook-ux.ts` (`POST /hooks` + toast de continuidad; ver abajo) |
-| `StopFailure` | — | `gateway-hook-notify.ts` (`POST /hooks` + toast stdin) |
-| `SessionStart` | `startup|resume` | notificación |
-| `SessionEnd` | — | notificación |
-| `PermissionRequest` | — | notificación |
-| `TaskCreated` | — | notificación |
-| `TaskCompleted` | — | notificación |
-| `PostToolUse` | `TaskUpdate` | `task-in-progress-hook-ux.ts` (toast solo si `status === "in_progress"`) |
+| Hook                 | Matcher      | Comandos                                                                 |
+| -------------------- | ------------ | ------------------------------------------------------------------------ | ------------ |
+| `UserPromptSubmit`   | —            | `gateway-hook-notify.ts` (`POST /hooks` + toast stdin)                   |
+| `PreToolUse`         | `*`          | `pre-tool-use-hook-ux.ts` (`POST /hooks` + toast condicional)            |
+| `PostToolUse`        | `*`          | `post-hook-event.ts`                                                     |
+| `PostToolUseFailure` | —            | `post-hook-event.ts`                                                     |
+| `SubagentStart`      | —            | `post-hook-event.ts` + notificación (mensaje fijo)                       |
+| `SubagentStop`       | —            | `post-hook-event.ts` + notificación (mensaje fijo)                       |
+| `Stop`               | —            | `stop-hook-ux.ts` (`POST /hooks` + toast de continuidad; ver abajo)      |
+| `StopFailure`        | —            | `gateway-hook-notify.ts` (`POST /hooks` + toast stdin)                   |
+| `SessionStart`       | `startup     | resume`                                                                  | notificación |
+| `SessionEnd`         | —            | notificación                                                             |
+| `PermissionRequest`  | —            | notificación                                                             |
+| `TaskCreated`        | —            | notificación                                                             |
+| `TaskCompleted`      | —            | notificación                                                             |
+| `PostToolUse`        | `TaskUpdate` | `task-in-progress-hook-ux.ts` (toast solo si `status === "in_progress"`) |
 
 Los relays TypeScript leen stdin **una vez** (UTF-8) y usan `ANTHROPIC_BASE_URL` (default `http://127.0.0.1:8787`); evitan `curl` y `@-`, que PowerShell no interpreta como bash. **`UserPromptSubmit`** y **`StopFailure`** usan [`gateway-hook-notify.ts`](scripting/gateway-hook-notify.ts); **`PreToolUse`** usa [`pre-tool-use-hook-ux.ts`](scripting/pre-tool-use-hook-ux.ts) (toast solo en `AskUserQuestion`). **`Stop`** usa un único relay [`stop-hook-ux.ts`](scripting/stop-hook-ux.ts). **`SubagentStart`** / **`SubagentStop`** siguen con doble comando (el CLI usa mensaje fijo, sin `--stdin-json`, sin carrera por stdin). Varios procesos en paralelo leyendo el mismo stdin vacían el payload en Windows; por eso no se duplica `post-hook-event` + `cli --stdin-json` en esos hooks. Detalle: [`docs/notifications.md`](docs/notifications.md) y [`docs/gateway-architecture.md` §18](docs/gateway-architecture.md#18-plano-c--hooks-claude-code).
 
@@ -217,16 +217,16 @@ Todo volcado que se trunca genera un archivo `.omitted.txt` documentando la omis
 
 CLI npm para el historial de **Claude Code** en `~/.claude` (listar, archivar, restaurar, eliminar y sanitizar bloques `thinking` inválidos tras usar el proxy). No confundir con `npm run clean:sessions`, que purga la carpeta `./sessions/` de **auditoría del proxy**.
 
-| Script | Descripción |
-|--------|-------------|
-| `sessions:list` | Lista sesiones del proyecto (cwd) |
-| `sessions:archive` | Archiva a `~/.claude/archived-sessions/` |
-| `sessions:restore` | Restaura una sesión archivada |
-| `sessions:delete` | Elimina permanentemente (requiere `--force`) |
-| `sessions:list-archived` | Lista archivadas |
-| `sessions:sanitize:scan` | Detecta thinking blocks con firma inválida |
-| `sessions:sanitize` | Sanitiza una sesión (`npm run … -- <id>`) |
-| `sessions:sanitize:all` | Sanitiza en lote (requiere `-- --force`) |
+| Script                   | Descripción                                  |
+| ------------------------ | -------------------------------------------- |
+| `sessions:list`          | Lista sesiones del proyecto (cwd)            |
+| `sessions:archive`       | Archiva a `~/.claude/archived-sessions/`     |
+| `sessions:restore`       | Restaura una sesión archivada                |
+| `sessions:delete`        | Elimina permanentemente (requiere `--force`) |
+| `sessions:list-archived` | Lista archivadas                             |
+| `sessions:sanitize:scan` | Detecta thinking blocks con firma inválida   |
+| `sessions:sanitize`      | Sanitiza una sesión (`npm run … -- <id>`)    |
+| `sessions:sanitize:all`  | Sanitiza en lote (requiere `-- --force`)     |
 
 Detalle, layout en disco y ejemplos: [scripting/session-manager/README.md](scripting/session-manager/README.md).
 

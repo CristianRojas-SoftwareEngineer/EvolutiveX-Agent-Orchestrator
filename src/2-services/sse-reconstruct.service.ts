@@ -55,7 +55,9 @@ export class SseReconstructService implements ISseReconstructor {
       const headersRaw = await fs.readFile(headersPath, 'utf8');
       const headers = JSON.parse(headersRaw) as Record<string, unknown>;
       useBeta = headers['anthropic-beta'] !== undefined;
-    } catch { /* default false */ }
+    } catch {
+      /* default false */
+    }
     return this.reconstructMessageFromSseBytes(sseBuffer, useBeta);
   }
 
@@ -94,7 +96,9 @@ export class SseReconstructService implements ISseReconstructor {
         const content = await fs.readFile(path.join(streamingDir, name), 'utf8');
         const trimmed = content.trim();
         if (trimmed) lines.push(trimmed);
-      } catch { /* ignorar archivo ilegible */ }
+      } catch {
+        /* ignorar archivo ilegible */
+      }
     }
     if (lines.length === 0) return Buffer.alloc(0);
     return Buffer.from(`${lines.join('\n')}\n`, 'utf8');

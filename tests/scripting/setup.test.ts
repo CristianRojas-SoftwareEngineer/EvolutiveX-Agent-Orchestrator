@@ -122,7 +122,11 @@ describe('runSetup — integración', () => {
   it('force sobre statusLine ajeno lo sobrescribe', () => {
     writeFileSync(
       settingsPath,
-      JSON.stringify({ statusLine: { type: 'command', command: 'echo other', padding: 0 } }, null, 2),
+      JSON.stringify(
+        { statusLine: { type: 'command', command: 'echo other', padding: 0 } },
+        null,
+        2,
+      ),
       'utf-8',
     );
     const blocked = runSetup({ ...DEFAULT_OPTS, root: proxyRoot, statusline: true, force: false });
@@ -131,7 +135,9 @@ describe('runSetup — integración', () => {
     const forced = runSetup({ ...DEFAULT_OPTS, root: proxyRoot, statusline: true, force: true });
     expect(forced).toBe(0);
     const onDisk = JSON.parse(readFileSync(settingsPath, 'utf-8')) as Record<string, unknown>;
-    expect((onDisk['statusLine'] as Record<string, unknown>)['command']).toContain('router-status.ts');
+    expect((onDisk['statusLine'] as Record<string, unknown>)['command']).toContain(
+      'router-status.ts',
+    );
   });
 
   it('uninstall --statusline preserva statusLine ajeno sin --force (S4)', () => {
@@ -153,7 +159,13 @@ describe('runSetup — integración', () => {
       JSON.stringify({ statusLine: { command: 'echo other' } }, null, 2),
       'utf-8',
     );
-    const code = runSetup({ ...DEFAULT_OPTS, root: proxyRoot, statusline: true, uninstall: true, force: true });
+    const code = runSetup({
+      ...DEFAULT_OPTS,
+      root: proxyRoot,
+      statusline: true,
+      uninstall: true,
+      force: true,
+    });
     expect(code).toBe(0);
     const onDisk = JSON.parse(readFileSync(settingsPath, 'utf-8')) as Record<string, unknown>;
     expect(onDisk['statusLine']).toBeUndefined();
@@ -177,8 +189,8 @@ describe('runSetup — integración', () => {
     expect(code).toBe(0);
     const onDisk = JSON.parse(readFileSync(settingsPath, 'utf-8')) as Record<string, unknown>;
     const hooks = onDisk['hooks'] as Record<string, Array<{ hooks: Array<{ command?: string }> }>>;
-    const commands = Object.values(hooks).flatMap(blocks =>
-      blocks.flatMap(b => b.hooks.map(h => h.command ?? '')),
+    const commands = Object.values(hooks).flatMap((blocks) =>
+      blocks.flatMap((b) => b.hooks.map((h) => h.command ?? '')),
     );
     for (const cmd of commands) {
       expect(cmd).not.toContain('\\');

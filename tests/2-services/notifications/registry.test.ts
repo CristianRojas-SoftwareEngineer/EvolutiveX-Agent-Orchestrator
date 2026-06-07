@@ -11,18 +11,39 @@ vi.mock('child_process', () => ({
   execFile: execFileMock,
 }));
 
-import { readRegistry, writeRegistry, deleteRegistry } from '../../../src/2-services/notifications/registry.js';
+import {
+  readRegistry,
+  writeRegistry,
+  deleteRegistry,
+} from '../../../src/2-services/notifications/registry.js';
 
 const AUMID = 'AIAssistant.Proxy';
 
 // Helper para crear el callback de execFile con stdout/stderr controlados.
-function cbOk(stdout: string, stderr = ''): (cmd: string, args: string[], opts: unknown, cb: (err: null, stdout: string, stderr: string) => void) => void {
+function cbOk(
+  stdout: string,
+  stderr = '',
+): (
+  cmd: string,
+  args: string[],
+  opts: unknown,
+  cb: (err: null, stdout: string, stderr: string) => void,
+) => void {
   return (_cmd, _args, _opts, cb) => {
     cb(null, stdout, stderr);
   };
 }
 
-function cbErr(code: number, stdout = '', stderr = ''): (cmd: string, args: string[], opts: unknown, cb: (err: NodeJS.ErrnoException, stdout: string, stderr: string) => void) => void {
+function cbErr(
+  code: number,
+  stdout = '',
+  stderr = '',
+): (
+  cmd: string,
+  args: string[],
+  opts: unknown,
+  cb: (err: NodeJS.ErrnoException, stdout: string, stderr: string) => void,
+) => void {
   return (_cmd, _args, _opts, cb) => {
     const err = Object.assign(new Error('reg.exe failed'), { code: String(code) });
     cb(err, stdout, stderr);
@@ -65,7 +86,9 @@ describe('readRegistry', () => {
   });
 
   it('devuelve exists=false cuando reg.exe retorna exit 1 (clave no existe)', async () => {
-    execFileMock.mockImplementationOnce(cbErr(1, '', 'ERROR: The system was unable to find the specified registry key or value.'));
+    execFileMock.mockImplementationOnce(
+      cbErr(1, '', 'ERROR: The system was unable to find the specified registry key or value.'),
+    );
     const result = await readRegistry(AUMID);
     expect(result.exists).toBe(false);
   });
@@ -87,39 +110,43 @@ describe('readRegistry', () => {
 describe('writeRegistry', () => {
   it('invoca reg add con DisplayName, Icon, IconUri, IconBackgroundColor y ShowInSettings', async () => {
     execFileMock.mockImplementation(cbOk(''));
-    await writeRegistry(
-      AUMID,
-      'AI Assistant',
-      'C:\\path\\to\\icon.ico',
-      'C:\\path\\to\\logo.png',
-    );
+    await writeRegistry(AUMID, 'AI Assistant', 'C:\\path\\to\\icon.ico', 'C:\\path\\to\\logo.png');
     expect(execFileMock).toHaveBeenCalledTimes(6);
     const cmd1 = execFileMock.mock.calls[0]!;
     expect(cmd1[0]).toBe('reg');
     expect(cmd1[1]).toEqual([
       'add',
       `HKCU\\Software\\Classes\\AppUserModelId\\${AUMID}`,
-      '/v', 'DisplayName',
-      '/t', 'REG_SZ',
-      '/d', 'AI Assistant',
+      '/v',
+      'DisplayName',
+      '/t',
+      'REG_SZ',
+      '/d',
+      'AI Assistant',
       '/f',
     ]);
     const cmd2 = execFileMock.mock.calls[1]!;
     expect(cmd2[1]).toEqual([
       'add',
       `HKCU\\Software\\Classes\\AppUserModelId\\${AUMID}`,
-      '/v', 'Icon',
-      '/t', 'REG_EXPAND_SZ',
-      '/d', 'C:\\path\\to\\icon.ico',
+      '/v',
+      'Icon',
+      '/t',
+      'REG_EXPAND_SZ',
+      '/d',
+      'C:\\path\\to\\icon.ico',
       '/f',
     ]);
     const cmd3 = execFileMock.mock.calls[2]!;
     expect(cmd3[1]).toEqual([
       'add',
       `HKCU\\Software\\Classes\\AppUserModelId\\${AUMID}`,
-      '/v', 'IconUri',
-      '/t', 'REG_SZ',
-      '/d', 'C:\\path\\to\\logo.png',
+      '/v',
+      'IconUri',
+      '/t',
+      'REG_SZ',
+      '/d',
+      'C:\\path\\to\\logo.png',
       '/f',
     ]);
   });
@@ -140,7 +167,9 @@ describe('deleteRegistry', () => {
   });
 
   it('es no-op (no propaga) cuando la clave no existe (exit 1)', async () => {
-    execFileMock.mockImplementationOnce(cbErr(1, '', 'ERROR: The system was unable to find the specified registry key or value.'));
+    execFileMock.mockImplementationOnce(
+      cbErr(1, '', 'ERROR: The system was unable to find the specified registry key or value.'),
+    );
     await expect(deleteRegistry(AUMID)).resolves.toBeUndefined();
   });
 

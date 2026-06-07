@@ -1,8 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import {
-  postHookEvent,
-  resolveHooksUrl,
-} from '../../scripting/post-hook-event.js';
+import { postHookEvent, resolveHooksUrl } from '../../scripting/post-hook-event.js';
 import {
   PROJECT_GATEWAY_HOOK_COMMAND,
   buildGatewayHookRelayCommand,

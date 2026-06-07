@@ -182,7 +182,9 @@ describe('AuditWorkflowHandler', () => {
     expect(result!.workflowKind).toBe('agentic');
     expect(result!.requestClassification).toEqual({ type: 'continuation' });
     expect(result!.auditWorkflowDir.replace(/\\/g, '/')).toContain('workflows/01');
-    expect(eventBus.events.filter((e) => e.type === 'step_request').length).toBeGreaterThanOrEqual(1);
+    expect(eventBus.events.filter((e) => e.type === 'step_request').length).toBeGreaterThanOrEqual(
+      1,
+    );
   });
 
   // Caso genuino de orphan: el SSE del response anterior no llegó o falló (error upstream),
@@ -204,7 +206,12 @@ describe('AuditWorkflowHandler', () => {
   // como step nuevo del padre, sin orphan ni warning.
   it('continuation con tool_result client-side registrado enlaza step sin orphan ni warning', async () => {
     const warn = vi.fn();
-    const logger = { info: vi.fn(), warn, error: vi.fn(), debug: vi.fn() } as unknown as import('../../src/1-domain/types/logger.types.js').Logger;
+    const logger = {
+      info: vi.fn(),
+      warn,
+      error: vi.fn(),
+      debug: vi.fn(),
+    } as unknown as import('../../src/1-domain/types/logger.types.js').Logger;
     const { handler, workflowRepo, eventBus } = createTestStack((repo) => {
       const wf = repo.openWorkflow(
         'test-session',
@@ -259,7 +266,9 @@ describe('AuditWorkflowHandler', () => {
     expect(result!.assignedStepIndex).toBe(stepsBefore + 1);
     // Sin warning de orphan.
     expect(warn).not.toHaveBeenCalled();
-    expect(eventBus.events.filter((e) => e.type === 'step_request').length).toBeGreaterThanOrEqual(1);
+    expect(eventBus.events.filter((e) => e.type === 'step_request').length).toBeGreaterThanOrEqual(
+      1,
+    );
   });
 
   it('debería clasificar preflight-quota: workflow sin request top-level', async () => {
@@ -393,10 +402,12 @@ describe('AuditWorkflowHandler', () => {
   it('fresh con cabeceras agente + pending → agent-headers y openSubagentFromWire', async () => {
     const calls: AgentContext[] = [];
     const { handler, workflowRepo } = createTestStack();
-    const openWire = vi.spyOn(workflowRepo, 'openSubagentFromWire').mockImplementation((sid, ctx) => {
-      calls.push(ctx);
-      return { sessionId: sid, agentId: ctx.agentId ?? '' };
-    });
+    const openWire = vi
+      .spyOn(workflowRepo, 'openSubagentFromWire')
+      .mockImplementation((sid, ctx) => {
+        calls.push(ctx);
+        return { sessionId: sid, agentId: ctx.agentId ?? '' };
+      });
     seedParentWithAgentPending(workflowRepo, 's', 'toolu_abc', 1, 'Explore');
     await handler.execute({
       headers: {

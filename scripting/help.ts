@@ -55,17 +55,20 @@ const scripts: NpmScript[] = [
   },
   {
     name: 'setup:install',
-    description: 'Instala las features de SCP en ~/.claude (statusline, voz, hooks). Flags: --statusline --voice --hooks --force --dry-run --root',
+    description:
+      'Instala las features de SCP en ~/.claude (statusline, voz, hooks). Flags: --statusline --voice --hooks --force --dry-run --root',
     category: 'local',
   },
   {
     name: 'setup:uninstall',
-    description: 'Desinstala las features de SCP de ~/.claude. Flags: --statusline --voice --hooks --force --dry-run --root',
+    description:
+      'Desinstala las features de SCP de ~/.claude. Flags: --statusline --voice --hooks --force --dry-run --root',
     category: 'local',
   },
   {
     name: 'notifications:register',
-    description: 'Helper de AUMID Windows (--install, --uninstall, --status). Idempotente y opt-in; no-op con mensaje informativo en macOS/Linux.',
+    description:
+      'Helper de AUMID Windows (--install, --uninstall, --status). Idempotente y opt-in; no-op con mensaje informativo en macOS/Linux.',
     category: 'local',
   },
   {

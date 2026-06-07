@@ -100,20 +100,22 @@ async function checkInstallState(
       lnkIconOk = false;
     }
   }
-  const lnkOk = lnkIconOk
-    && registry.shortcutEngine === SHORTCUT_ENGINE_SNORETOAST;
-  const registryOk = registry.exists
-    && registry.displayName === DISPLAY_NAME
-    && registry.icon === iconIcoPath
-    && registry.iconUri === iconUriPath
-    && registry.shortcutEngine === SHORTCUT_ENGINE_SNORETOAST;
+  const lnkOk = lnkIconOk && registry.shortcutEngine === SHORTCUT_ENGINE_SNORETOAST;
+  const registryOk =
+    registry.exists &&
+    registry.displayName === DISPLAY_NAME &&
+    registry.icon === iconIcoPath &&
+    registry.iconUri === iconUriPath &&
+    registry.shortcutEngine === SHORTCUT_ENGINE_SNORETOAST;
   return { lnkOk, registryOk };
 }
 
 export async function installAction(): Promise<number> {
   const aumid = getAumid();
   if (!isValidAumid(aumid)) {
-    process.stderr.write(`AUMID inválido: "${aumid}". Debe coincidir con /^[A-Za-z0-9.\\-]{1,129}$/\n`);
+    process.stderr.write(
+      `AUMID inválido: "${aumid}". Debe coincidir con /^[A-Za-z0-9.\\-]{1,129}$/\n`,
+    );
     return 1;
   }
   const lnkPath = getLnkPath();
@@ -131,7 +133,9 @@ export async function installAction(): Promise<number> {
 
   // Idempotencia: no-op solo si registro y .lnk están al día.
   if (!needsRegistry && !needsLnk) {
-    process.stdout.write(`AUMID ya registrado (AppUserModelID="${aumid}"): registro OK + .lnk OK. No-op.\n`);
+    process.stdout.write(
+      `AUMID ya registrado (AppUserModelID="${aumid}"): registro OK + .lnk OK. No-op.\n`,
+    );
     return 0;
   }
 
@@ -149,14 +153,24 @@ export async function installAction(): Promise<number> {
   if (needsLnk) {
     try {
       const snoreToast = getSnoreToastPath();
-      await installSnoreToastShortcut(LNK_FILENAME, snoreToast, aumid, lnkPath, buildIconLocation(iconIcoPath));
+      await installSnoreToastShortcut(
+        LNK_FILENAME,
+        snoreToast,
+        aumid,
+        lnkPath,
+        buildIconLocation(iconIcoPath),
+      );
     } catch (err) {
-      process.stderr.write(`Error creando .lnk con SnoreToast (registro sí se escribió): ${(err as Error).message}\n`);
+      process.stderr.write(
+        `Error creando .lnk con SnoreToast (registro sí se escribió): ${(err as Error).message}\n`,
+      );
       return 1;
     }
   }
 
-  process.stdout.write(`Registrado: AppUserModelID="${aumid}" DisplayName="${DISPLAY_NAME}" (registro + .lnk SnoreToast=${lnkPath}, icono=${iconIcoPath}).\n`);
+  process.stdout.write(
+    `Registrado: AppUserModelID="${aumid}" DisplayName="${DISPLAY_NAME}" (registro + .lnk SnoreToast=${lnkPath}, icono=${iconIcoPath}).\n`,
+  );
   return 0;
 }
 
@@ -185,7 +199,9 @@ export async function uninstallAction(): Promise<number> {
     return 1;
   }
 
-  process.stdout.write(`Reversión completa. SnoreToast volverá a firmar como "SnoreToast" hasta el próximo --install.\n`);
+  process.stdout.write(
+    `Reversión completa. SnoreToast volverá a firmar como "SnoreToast" hasta el próximo --install.\n`,
+  );
   return 0;
 }
 
@@ -205,24 +221,32 @@ export async function statusAction(): Promise<number> {
   }
 
   if (!lnkExists && !registry.exists) {
-    process.stdout.write('not registered. Ejecuta `npm run notifications:register -- --install` para habilitar el branding en Windows\n');
+    process.stdout.write(
+      'not registered. Ejecuta `npm run notifications:register -- --install` para habilitar el branding en Windows\n',
+    );
   } else if (
-    registry.exists
-    && registry.displayName === DISPLAY_NAME
-    && registry.icon === iconIcoPath
-    && registry.iconUri === getIconPngPath()
-    && registry.shortcutEngine === SHORTCUT_ENGINE_SNORETOAST
-    && lnkExists
-    && parseIconLocation(readFileSync(lnkPath)) === buildIconLocation(iconIcoPath)
+    registry.exists &&
+    registry.displayName === DISPLAY_NAME &&
+    registry.icon === iconIcoPath &&
+    registry.iconUri === getIconPngPath() &&
+    registry.shortcutEngine === SHORTCUT_ENGINE_SNORETOAST &&
+    lnkExists &&
+    parseIconLocation(readFileSync(lnkPath)) === buildIconLocation(iconIcoPath)
   ) {
-    process.stdout.write(`registered: AppUserModelID="${aumid}" DisplayName="${DISPLAY_NAME}" (registro + .lnk SnoreToast OK)\n`);
+    process.stdout.write(
+      `registered: AppUserModelID="${aumid}" DisplayName="${DISPLAY_NAME}" (registro + .lnk SnoreToast OK)\n`,
+    );
   } else {
     const parts: string[] = [];
-    parts.push(registry.exists
-      ? `registro: DisplayName="${registry.displayName}" Icon="${registry.icon}" IconUri="${registry.iconUri ?? '(ausente)'}" ShortcutEngine="${registry.shortcutEngine ?? '(ausente)'}"`
-      : 'registro: no presente');
+    parts.push(
+      registry.exists
+        ? `registro: DisplayName="${registry.displayName}" Icon="${registry.icon}" IconUri="${registry.iconUri ?? '(ausente)'}" ShortcutEngine="${registry.shortcutEngine ?? '(ausente)'}"`
+        : 'registro: no presente',
+    );
     parts.push(lnkExists ? '.lnk: presente' : '.lnk: no presente');
-    process.stdout.write(`partially registered (${parts.join('; ')}). Ejecuta --install para reparar.\n`);
+    process.stdout.write(
+      `partially registered (${parts.join('; ')}). Ejecuta --install para reparar.\n`,
+    );
   }
   return 0;
 }
@@ -231,9 +255,14 @@ async function main(): Promise<number> {
   const program = new Command();
   program
     .name('notifications-register')
-    .description('Registra, desregistra o consulta el AUMID de AI Assistant en Windows (idempotente, opt-in).')
+    .description(
+      'Registra, desregistra o consulta el AUMID de AI Assistant en Windows (idempotente, opt-in).',
+    )
     .allowExcessArguments(false)
-    .option('--install', 'Crea o actualiza el .lnk en el Menú Inicio y la clave de registro del AUMID')
+    .option(
+      '--install',
+      'Crea o actualiza el .lnk en el Menú Inicio y la clave de registro del AUMID',
+    )
     .option('--uninstall', 'Elimina el .lnk y la clave de registro del AUMID')
     .option('--status', 'Muestra el estado actual del registro (registro + .lnk)')
     .parse(process.argv);
@@ -248,9 +277,14 @@ export interface DispatchOpts {
   status?: boolean;
 }
 
-export async function dispatch(opts: DispatchOpts, platform: NodeJS.Platform = process.platform): Promise<number> {
+export async function dispatch(
+  opts: DispatchOpts,
+  platform: NodeJS.Platform = process.platform,
+): Promise<number> {
   if (platform !== 'win32') {
-    process.stdout.write('AUMID setup is Windows-only. En macOS/Linux el branding se aplica via `appName` en node-notifier (sin registro).\n');
+    process.stdout.write(
+      'AUMID setup is Windows-only. En macOS/Linux el branding se aplica via `appName` en node-notifier (sin registro).\n',
+    );
     return 0;
   }
 

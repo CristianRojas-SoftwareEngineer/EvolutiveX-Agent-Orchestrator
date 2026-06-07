@@ -35,10 +35,10 @@ correctamente (confirmado empíricamente; ver `docs/issues/cross-platform-analis
 
 ## Archivos eliminados / simplificados
 
-| Acción | Archivo |
-|--------|---------|
-| ELIMINADO | `src/2-services/notifications/asset-paths.ts` |
-| SIMPLIFICADO | `src/2-services/notifications/event-image-paths.ts` |
-| SIMPLIFICADO | `src/2-services/notifications/cli.ts` |
-| SIMPLIFICADO | `src/2-services/notifications/register.ts` |
+| Acción       | Archivo                                               |
+| ------------ | ----------------------------------------------------- |
+| ELIMINADO    | `src/2-services/notifications/asset-paths.ts`         |
+| SIMPLIFICADO | `src/2-services/notifications/event-image-paths.ts`   |
+| SIMPLIFICADO | `src/2-services/notifications/cli.ts`                 |
+| SIMPLIFICADO | `src/2-services/notifications/register.ts`            |
 | SIMPLIFICADO | `src/2-services/notifications/snoretoast-shortcut.ts` |

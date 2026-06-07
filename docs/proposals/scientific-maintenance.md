@@ -97,20 +97,20 @@ versionable por fase** y consolidando conclusiones con trazabilidad histórica c
 
 La arquitectura separa con rigor cinco responsabilidades que habitualmente se mezclan:
 
-| Capa | Responsabilidad | Materializada en |
-|------|-----------------|------------------|
-| **Orquestación** | Clasificar, secuenciar fases, consolidar, registrar | `sm-orchestrator` |
-| **Política de mantenimiento** | Qué priorizar, qué evidencia exigir, cómo modular cada fase | 4 skills `sm-profile-*` |
-| **Procedimiento científico** | Cómo ejecutar cada fase, genérico y parametrizable | 10 skills `sm-phase-*` |
-| **Evidencia** | Expedientes de caso inmutables y versionados por fase | `maintenance-cases/<case-id>/` |
-| **Memoria persistente** | Base de conocimiento (lecciones) + registro de casos derivado | índice `MEMORY.md` (convención del subsistema) + `CLAUDE.md` |
+| Capa                          | Responsabilidad                                               | Materializada en                                             |
+| ----------------------------- | ------------------------------------------------------------- | ------------------------------------------------------------ |
+| **Orquestación**              | Clasificar, secuenciar fases, consolidar, registrar           | `sm-orchestrator`                                            |
+| **Política de mantenimiento** | Qué priorizar, qué evidencia exigir, cómo modular cada fase   | 4 skills `sm-profile-*`                                      |
+| **Procedimiento científico**  | Cómo ejecutar cada fase, genérico y parametrizable            | 10 skills `sm-phase-*`                                       |
+| **Evidencia**                 | Expedientes de caso inmutables y versionados por fase         | `maintenance-cases/<case-id>/`                               |
+| **Memoria persistente**       | Base de conocimiento (lecciones) + registro de casos derivado | índice `MEMORY.md` (convención del subsistema) + `CLAUDE.md` |
 
-Como *concern* transversal, un **changelog derivado** (`CHANGELOG.md`) y un **registro de casos
+Como _concern_ transversal, un **changelog derivado** (`CHANGELOG.md`) y un **registro de casos
 derivado** se generan a partir de los commits y del filesystem, nunca a mano (principio §2.5.1).
 
 El principio rector es **una sola definición de cada fase**, parametrizada por el perfil activo. Los
-perfiles no reimplementan las fases: aportan una **matriz de política por fase** (*phase-policy
-matrix*) que cada fase consume para adaptar su comportamiento. Esto elimina la duplicación de lógica
+perfiles no reimplementan las fases: aportan una **matriz de política por fase** (_phase-policy
+matrix_) que cada fase consume para adaptar su comportamiento. Esto elimina la duplicación de lógica
 (4 perfiles × 10 fases = 40 combinaciones se resuelven con **14 skills**, no con 40) y mantiene el
 sistema escalable: añadir un perfil no obliga a tocar las fases, y añadir una fase no obliga a tocar
 los perfiles.
@@ -127,48 +127,56 @@ sub-agents. La composición ocurre en un único hilo de contexto mediante un **c
 Estos principios gobiernan todas las decisiones de diseño y son los criterios de aceptación del sistema.
 
 ### 2.1 Separación estricta de roles (cohesión)
+
 Cada skill tiene **una** razón para cambiar. El orquestador cambia si cambia el flujo; un perfil cambia
 si cambia la política de mantenimiento; una fase cambia si cambia el procedimiento científico. Ningún
 skill mezcla dos de estos motivos.
 
 ### 2.2 Composición sobre duplicación (bajo acoplamiento)
+
 Las fases son **genéricas y parametrizadas**. Nunca existe `sm-phase-hypothesis-corrective`: existe
 `sm-phase-hypothesis` que lee la política del perfil activo. La variación de comportamiento es **dato**
 (la matriz del perfil), no **código** (una fase por perfil).
 
 ### 2.3 Inversión de dependencia conceptual
-Las fases **no conocen** perfiles concretos: dependen de un **contrato** (el *phase-policy schema*).
+
+Las fases **no conocen** perfiles concretos: dependen de un **contrato** (el _phase-policy schema_).
 Los perfiles **no conocen** el procedimiento interno de una fase: solo rellenan el contrato. El
 orquestador conoce a ambos pero no implementa ninguno.
 
 ### 2.4 Trazabilidad total
+
 Todo caso produce una **cadena auditable** de artefactos `01 → 10`, enlazada y versionada, más un
 `case.md` que actúa como índice del expediente. Cualquier conclusión es rastreable hasta la observación
 original y la evidencia que la sustenta. La trazabilidad es **bidireccional**: cada commit lleva el
-metadatos de commit (en la convención de Git: *trailer*) `Case: <case-id>` (caso → commits) y cada entrada del changelog remite a su caso (changelog →
+metadatos de commit (en la convención de Git: _trailer_) `Case: <case-id>` (caso → commits) y cada entrada del changelog remite a su caso (changelog →
 expediente). Esta cadena es sostenida **best-effort** por el orquestador (que verifica el orden y el
 estado antes de cada fase) y verificada por la validación obligatoria del esquema YAML; no es una
 garantía del runtime de Claude Code.
 
 ### 2.5 Artefactos como fuente de verdad
+
 El estado del caso **no vive en la memoria conversacional** sino en archivos versionables. Esto permite
 reanudar, auditar y revisar casos meses después, y hace el sistema robusto frente a la pérdida de
 contexto.
 
 #### 2.5.1 Estado derivado sobre estado duplicado
+
 Refuerzo directo de §2.5: cuando una información ya existe como fuente de verdad, **no se mantiene una
 segunda copia a mano** sino que se **deriva** de la primera. El `CHANGELOG.md` se deriva de los commits
 convencionales; el **registro de casos** se deriva del filesystem (`maintenance-cases/`) y del changelog;
 ninguno de los dos se edita manualmente. Solo se persiste deliberadamente aquello que **no es derivable**:
 las **lecciones** generalizables (base de conocimiento). Duplicar estado introduce divergencia inevitable
-y trabajo manual frágil; derivarlo lo elimina. Regla: *si puede derivarse, no se duplica; si debe
-recordarse, se persiste una sola vez con un dueño único.*
+y trabajo manual frágil; derivarlo lo elimina. Regla: _si puede derivarse, no se duplica; si debe
+recordarse, se persiste una sola vez con un dueño único._
 
 ### 2.6 Idempotencia y reanudabilidad
+
 Reejecutar una fase produce una nueva **versión** de su artefacto, no corrompe las anteriores. El
 orquestador puede retomar un caso leyendo `case.md` y continuando desde la última fase completada.
 
 ### 2.7 Ausencia de sobreingeniería
+
 El método científico se modela completo (10 fases distinguibles) porque es el dominio del problema, no
 una abstracción especulativa. No se añaden capas, sub-agents ni configurabilidad no solicitada. Los
 hooks son opcionales y mínimos. Para casos triviales o localizados, el orquestador puede elegir el
@@ -178,6 +186,7 @@ individuales se produce y actualiza una única sección por fase dentro del mism
 en el bloque YAML canónico de `case.md` y no cambia el contrato perfil↔fase.
 
 ### 2.8 Compatibilidad nativa con Claude Code
+
 El sistema usa únicamente primitivas soportadas: skills con frontmatter `name`/`description`, formato
 híbrido XML+Markdown, `references/` y `templates/` on-demand, memoria persistente y `CLAUDE.md`.
 Cuerpo de los skills en inglés; interacción con el usuario en español (política del repositorio).
@@ -219,18 +228,18 @@ conocimiento** organizada bajo el patrón de memoria del subsistema —un aprend
 `.claude/memory/`, con `MEMORY.md` como índice— donde se persisten **lecciones** generalizables
 (Claude Code **no** carga `MEMORY.md` automáticamente; el recall es un paso explícito de la fase 03
 que lo lee); y (b) un **registro de casos derivado** del filesystem (`maintenance-cases/`) y del
-`CHANGELOG.md`, que **nunca** se mantiene a mano. El **changelog** es un *concern* transversal
+`CHANGELOG.md`, que **nunca** se mantiene a mano. El **changelog** es un _concern_ transversal
 **derivado** de los commits convencionales (no es una capa que alguien edite), y los metadatos de commit `Case:`
 cierra el enlace changelog↔expediente.
 
 ### 3.2 Por qué existe cada componente
 
 **Por qué un orquestador.** El método científico es una secuencia con dependencias (no se formula una
-hipótesis sin definir el problema). Alguien debe poseer el *flujo*: clasificar el caso, garantizar el
+hipótesis sin definir el problema). Alguien debe poseer el _flujo_: clasificar el caso, garantizar el
 orden, gestionar el `case.md`, y consolidar. Distribuir esta responsabilidad entre las fases las
 acoplaría entre sí. Centralizarla en un orquestador mantiene a las fases independientes y reutilizables.
 
-**Por qué un skill por perfil.** Corrective y preventive son *políticas* distintas: uno minimiza el
+**Por qué un skill por perfil.** Corrective y preventive son _políticas_ distintas: uno minimiza el
 tiempo a la restauración del servicio; el otro maximiza la reducción de riesgo futuro. Esa diferencia
 afecta a **todas** las fases (qué observar, qué hipótesis priorizar, qué experimento es aceptable, qué
 conclusión es válida). Encapsular cada política en un skill permite razonar y evolucionar cada una de
@@ -249,8 +258,8 @@ evolución lineal.
 
 ### 3.3 Mecanismo de composición (sin sub-agents)
 
-La composición ocurre en **un solo hilo de contexto**. No hay sub-agents; el orquestador *lee cada
-`SKILL.md` y sus referencias, y ejecuta sus instrucciones* en secuencia (o vía la herramienta Skill
+La composición ocurre en **un solo hilo de contexto**. No hay sub-agents; el orquestador _lee cada
+`SKILL.md` y sus referencias, y ejecuta sus instrucciones_ en secuencia (o vía la herramienta Skill
 cuando esté disponible en la sesión). El estado se persiste en archivos, no en el contexto
 conversacional. El orden fijo y el "no saltarse fases" **no** los garantiza el runtime de Claude Code:
 son **best-effort**, reforzados porque el orquestador verifica en el bloque `phases` del `case.md`
@@ -273,6 +282,7 @@ que las fases `01..N-1` estén `done` antes de ejecutar la fase N, y se detiene 
    `04-hypothesis.md`. Este bucle es **independiente del perfil** (cualquier hipótesis falsable puede
    refutarse) y se repite hasta confirmar una hipótesis o agotar las candidatas —en cuyo caso la fase
    09 emite un veredicto de "no resuelto". Es la **única excepción** al avance lineal `01→10`.
+
 4. **Consolidación.** Tras la fase 10, el orquestador agrega un veredicto al `case.md`. El **registro de
    casos** y el `CHANGELOG.md` **no se escriben aquí**: son estado **derivado** (del filesystem y de los
    commits respectivamente, §2.5.1). La fase 10 ejecuta el **generador on-demand** pasándole la entrada
@@ -294,32 +304,32 @@ sm-orchestrator
         · registro de casos ─► DERIVADO (no se edita)
 ```
 
-### 3.4 El contrato perfil↔fase (*phase-policy schema*)
+### 3.4 El contrato perfil↔fase (_phase-policy schema_)
 
 El acoplamiento entre perfiles y fases se reduce a un **contrato de datos** estable. Cada perfil
 declara, por fase, los mismos campos; cada fase lee esos mismos campos. Ni el perfil conoce el
 procedimiento interno de la fase, ni la fase conoce qué perfil la invoca.
 
-| Campo de la política por fase | Significado | Consumido por la fase para… |
-|---|---|---|
-| `focus` | Qué priorizar en esta fase bajo este perfil | Enfocar el procedimiento |
-| `reasoning_effort` | Esfuerzo esperado (`low` / `medium` / `high`) | Calibrar esfuerzo |
-| `evidence` | Tipo de evidencia que el perfil exige | Decidir qué recolectar |
-| `acceptance` | Criterio de aceptación de la salida de la fase | Validar el artefacto |
-| `risk_controls` | Controles de riesgo obligatorios | Aplicar guardas |
+| Campo de la política por fase | Significado                                    | Consumido por la fase para… |
+| ----------------------------- | ---------------------------------------------- | --------------------------- |
+| `focus`                       | Qué priorizar en esta fase bajo este perfil    | Enfocar el procedimiento    |
+| `reasoning_effort`            | Esfuerzo esperado (`low` / `medium` / `high`)  | Calibrar esfuerzo           |
+| `evidence`                    | Tipo de evidencia que el perfil exige          | Decidir qué recolectar      |
+| `acceptance`                  | Criterio de aceptación de la salida de la fase | Validar el artefacto        |
+| `risk_controls`               | Controles de riesgo obligatorios               | Aplicar guardas             |
 
 Este contrato es el único punto de acoplamiento. Cambiarlo es un cambio de arquitectura; todo lo demás
 evoluciona sin tocarlo.
 
 ### 3.5 Responsabilidades que cada capa NO debe asumir
 
-| Capa | NO debe |
-|------|---------|
+| Capa        | NO debe                                                              |
+| ----------- | -------------------------------------------------------------------- |
 | Orquestador | Implementar procedimiento de fase; decidir política de mantenimiento |
-| Perfil | Ejecutar fases; escribir artefactos de fase; secuenciar |
-| Fase | Conocer perfiles concretos; decidir el orden; consolidar el caso |
-| Artefactos | Contener lógica; mutar artefactos previos |
-| Memoria | Sustituir a los artefactos como fuente de verdad de un caso |
+| Perfil      | Ejecutar fases; escribir artefactos de fase; secuenciar              |
+| Fase        | Conocer perfiles concretos; decidir el orden; consolidar el caso     |
+| Artefactos  | Contener lógica; mutar artefactos previos                            |
+| Memoria     | Sustituir a los artefactos como fuente de verdad de un caso          |
 
 ### 3.6 Supuestos y límites sobre Claude Code
 
@@ -337,7 +347,7 @@ límites explícitos que el diseño reconoce y mitiga por convención, no por el
   índice y abre las lecciones relevantes. Para que `MEMORY.md` entre en el contexto de cada sesión,
   `.claude/CLAUDE.md` contiene una referencia directa a él.
 
-- **Presupuesto de contexto acotado por diseño.** Cada fase lee solo sus *inputs declarados* (§6/§8),
+- **Presupuesto de contexto acotado por diseño.** Cada fase lee solo sus _inputs declarados_ (§6/§8),
   no toda la cadena de artefactos anteriores (p. ej. la fase 08 lee artefactos 04 y 07, no 01–07).
   Los artefactos en disco actúan como memoria externa; no se mantiene toda la cadena en el contexto
   conversacional. Una fase costosa en contexto (p. ej. investigación amplia) puede aislarse en un
@@ -443,11 +453,11 @@ maintenance-cases/                       # capa 4 — evidencia (fuera de .claud
 
 ### 4.3 Equivalencia entre ambas vistas
 
-| Conceptual | Real (plano) | Descubrimiento |
-|---|---|---|
-| `orchestrator/orchestrator` | `.claude/skills/sm-orchestrator/` | auto + `/sm-orchestrator` |
-| `profiles/<x>` | `.claude/skills/sm-profile-<x>/` | invocado por el orquestador |
-| `phases/NN-<x>` | `.claude/skills/sm-phase-<x>/` | invocado por el orquestador |
+| Conceptual                  | Real (plano)                      | Descubrimiento              |
+| --------------------------- | --------------------------------- | --------------------------- |
+| `orchestrator/orchestrator` | `.claude/skills/sm-orchestrator/` | auto + `/sm-orchestrator`   |
+| `profiles/<x>`              | `.claude/skills/sm-profile-<x>/`  | invocado por el orquestador |
+| `phases/NN-<x>`             | `.claude/skills/sm-phase-<x>/`    | invocado por el orquestador |
 
 > **Decisión:** las **referencias compartidas** y **plantillas** viven dentro de `sm-orchestrator`
 > (su dueño natural) y se enlazan desde perfiles y fases con rutas relativas
@@ -458,11 +468,11 @@ maintenance-cases/                       # capa 4 — evidencia (fuera de .claud
 El subsistema requiere los siguientes recursos externos ya presentes en el repositorio. No son parte de
 los 14 skills `sm-*`, pero deben existir antes de implementar el sistema:
 
-| Recurso | Tipo | Función |
-|---------|------|---------|
-| `.claude/skills/artifact-structuring/` | Skill existente | Define `§language_policy` (inglés en cuerpos de skills, español en interacción con el usuario). Referenciado desde todos los skills `sm-*`. |
-| `.claude/skills/conventional-commits/` | Skill existente | Formato de mensajes de commit. Referenciado desde `sm-phase-communication` y el generador de changelog. |
-| `.claude/CLAUDE.md` | Archivo de instrucciones | Instrucciones persistentes del subsistema (§12.1). Debe existir y referenciar `MEMORY.md` para que el índice de lecciones entre en contexto. |
+| Recurso                                | Tipo                     | Función                                                                                                                                      |
+| -------------------------------------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.claude/skills/artifact-structuring/` | Skill existente          | Define `§language_policy` (inglés en cuerpos de skills, español en interacción con el usuario). Referenciado desde todos los skills `sm-*`.  |
+| `.claude/skills/conventional-commits/` | Skill existente          | Formato de mensajes de commit. Referenciado desde `sm-phase-communication` y el generador de changelog.                                      |
+| `.claude/CLAUDE.md`                    | Archivo de instrucciones | Instrucciones persistentes del subsistema (§12.1). Debe existir y referenciar `MEMORY.md` para que el índice de lecciones entre en contexto. |
 
 > **Nota en el árbol §4.2:** los skills `artifact-structuring` y `conventional-commits` aparecen como
 > dependencias externas (`../artifact-structuring/SKILL.md §language_policy`) en las referencias de
@@ -474,28 +484,28 @@ los 14 skills `sm-*`, pero deben existir antes de implementar el sistema:
 
 ### 5.1 `sm-orchestrator` (capa 1)
 
-| Atributo | Valor |
-|---|---|
-| **Propósito** | Conducir un caso de mantenimiento de extremo a extremo. |
-| **Entradas** | Solicitud del usuario en lenguaje natural; opcionalmente un `case-id` para reanudar. |
-| **Salidas** | `case.md` actualizado, artefactos de las 10 fases (Full: 10 archivos `NN-*.md`; Consolidado: subsecciones en `case.md`), lección en la base de conocimiento, `CHANGELOG.md` actualizado, commit con metadatos de commit `Case:`, resumen al usuario. |
-| **Responsabilidades** | Generar `case-id`; clasificar perfil; crear/leer `case.md`; invocar perfil y fases en orden; consolidar. El registro de casos y el changelog son **derivados** (no los escribe). |
-| **NO hace** | Política de mantenimiento; procedimiento de fase. |
-| **Invoca** | 1 perfil + 10 fases. |
-| **Activación** | `/sm-orchestrator` o frases como "mantén", "corrige el bug", "optimiza", "migra a", "endurece". |
+| Atributo              | Valor                                                                                                                                                                                                                                                |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Propósito**         | Conducir un caso de mantenimiento de extremo a extremo.                                                                                                                                                                                              |
+| **Entradas**          | Solicitud del usuario en lenguaje natural; opcionalmente un `case-id` para reanudar.                                                                                                                                                                 |
+| **Salidas**           | `case.md` actualizado, artefactos de las 10 fases (Full: 10 archivos `NN-*.md`; Consolidado: subsecciones en `case.md`), lección en la base de conocimiento, `CHANGELOG.md` actualizado, commit con metadatos de commit `Case:`, resumen al usuario. |
+| **Responsabilidades** | Generar `case-id`; clasificar perfil; crear/leer `case.md`; invocar perfil y fases en orden; consolidar. El registro de casos y el changelog son **derivados** (no los escribe).                                                                     |
+| **NO hace**           | Política de mantenimiento; procedimiento de fase.                                                                                                                                                                                                    |
+| **Invoca**            | 1 perfil + 10 fases.                                                                                                                                                                                                                                 |
+| **Activación**        | `/sm-orchestrator` o frases como "mantén", "corrige el bug", "optimiza", "migra a", "endurece".                                                                                                                                                      |
 
 ### 5.2 Skills de perfil (capa 2) — visión común
 
 Los cuatro perfiles comparten **estructura idéntica** y difieren solo en contenido. Cada uno:
 
-| Atributo | Valor |
-|---|---|
-| **Propósito** | Declarar la política de mantenimiento y proyectarla sobre las 10 fases. |
-| **Entradas** | `case.md` (creado por el orquestador) + descripción del caso. |
-| **Salidas** | Bloque de parámetros + `phase-policy matrix` escritos en `case.md`. |
+| Atributo              | Valor                                                                                                |
+| --------------------- | ---------------------------------------------------------------------------------------------------- |
+| **Propósito**         | Declarar la política de mantenimiento y proyectarla sobre las 10 fases.                              |
+| **Entradas**          | `case.md` (creado por el orquestador) + descripción del caso.                                        |
+| **Salidas**           | Bloque de parámetros + `phase-policy matrix` escritos en `case.md`.                                  |
 | **Responsabilidades** | Definir objetivo, prioridades, señales, métricas, umbrales de riesgo; rellenar el contrato por fase. |
-| **NO hace** | Ejecutar fases; escribir artefactos `NN-*.md`. |
-| **Activación** | Invocado por el orquestador; manual solo para inspección. |
+| **NO hace**           | Ejecutar fases; escribir artefactos `NN-*.md`.                                                       |
+| **Activación**        | Invocado por el orquestador; manual solo para inspección.                                            |
 
 Detalle por perfil en la [sección 7](#7-especificación-de-cada-perfil).
 
@@ -504,14 +514,14 @@ Detalle por perfil en la [sección 7](#7-especificación-de-cada-perfil).
 Las diez fases comparten un **esqueleto idéntico** (lee política → ejecuta procedimiento → valida →
 escribe artefacto) y difieren en el procedimiento concreto. Cada una:
 
-| Atributo | Valor |
-|---|---|
-| **Propósito** | Ejecutar una fase del método científico, parametrizada por el perfil activo. |
-| **Entradas** | `case.md`; artefactos de fases previas; su entrada `phase-policy`. |
-| **Salidas** | `NN-<phase>.md` versionado; estado de la fase en `case.md`. |
+| Atributo              | Valor                                                                                                                    |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| **Propósito**         | Ejecutar una fase del método científico, parametrizada por el perfil activo.                                             |
+| **Entradas**          | `case.md`; artefactos de fases previas; su entrada `phase-policy`.                                                       |
+| **Salidas**           | `NN-<phase>.md` versionado; estado de la fase en `case.md`.                                                              |
 | **Responsabilidades** | Procedimiento genérico de la fase; aplicar `focus/reasoning_effort/evidence/risk_controls`; validar contra `acceptance`. |
-| **NO hace** | Conocer perfiles concretos; decidir orden; consolidar el caso. |
-| **Activación** | Invocada por el orquestador. |
+| **NO hace**           | Conocer perfiles concretos; decidir orden; consolidar el caso.                                                           |
+| **Activación**        | Invocada por el orquestador.                                                                                             |
 
 Detalle por fase en la [sección 6](#6-especificación-de-cada-fase).
 
@@ -530,6 +540,7 @@ adapta según el perfil. La adaptación es **siempre** vía la `phase-policy mat
 > (`case_mode`) está registrado en el bloque YAML canónico de `case.md`.
 
 ### 6.1 Fase 01 — Observación (`sm-phase-observation`)
+
 - **Propósito:** capturar el estado observable del sistema y los síntomas sin interpretarlos.
 - **Entradas:** solicitud del usuario; acceso a código, logs, métricas, tests, issues.
 - **Salidas / artefacto:** `01-observation.md` — hechos observados, contexto, alcance, no-interpretación.
@@ -539,6 +550,7 @@ adapta según el perfil. La adaptación es **siempre** vía la `phase-policy mat
   débiles y tendencias antes de que fallen.
 
 ### 6.2 Fase 02 — Definición del problema (`sm-phase-problem-definition`)
+
 - **Propósito:** convertir las observaciones en un enunciado de problema preciso y acotado.
 - **Entradas:** `01-observation.md`.
 - **Salidas / artefacto:** `02-problem-definition.md` — enunciado, criterios de "resuelto", límites,
@@ -549,6 +561,7 @@ adapta según el perfil. La adaptación es **siempre** vía la `phase-policy mat
   riesgo a mitigar y su probabilidad/impacto.
 
 ### 6.3 Fase 03 — Investigación (`sm-phase-research`)
+
 - **Propósito:** reunir conocimiento previo relevante (código, docs, historial, literatura) **y aplicar
   el protocolo de recall** sobre la base de conocimiento.
 - **Entradas:** `02-problem-definition.md`; la **base de conocimiento** (índice `MEMORY.md`; el recall es explícito, no automático).
@@ -565,6 +578,7 @@ adapta según el perfil. La adaptación es **siempre** vía la `phase-policy mat
   vulnerabilidades análogas.
 
 ### 6.4 Fase 04 — Formulación de hipótesis (`sm-phase-hypothesis`)
+
 - **Propósito:** proponer una o más hipótesis falsables que expliquen el problema o el cambio.
 - **Entradas:** `02`, `03`.
 - **Salidas / artefacto:** `04-hypothesis.md` — hipótesis priorizadas, predicción de cada una, criterio
@@ -575,6 +589,7 @@ adapta según el perfil. La adaptación es **siempre** vía la `phase-policy mat
   hipótesis de riesgo y su mecanismo de materialización.
 
 ### 6.5 Fase 05 — Diseño experimental (`sm-phase-experiment-design`)
+
 - **Propósito:** diseñar el experimento que confirma o refuta la hipótesis con mínimo riesgo.
 - **Entradas:** `04`.
 - **Salidas / artefacto:** `05-experiment-design.md` — procedimiento, variables, controles, criterio de
@@ -585,6 +600,7 @@ adapta según el perfil. La adaptación es **siempre** vía la `phase-policy mat
   condición de riesgo en entorno controlado.
 
 ### 6.6 Fase 06 — Ejecución del experimento (`sm-phase-experiment-execution`)
+
 - **Propósito:** ejecutar el experimento diseñado sin desviarse del protocolo.
 - **Entradas:** `05`.
 - **Salidas / artefacto:** `06-experiment-execution.md` — comandos ejecutados, cambios aplicados,
@@ -595,6 +611,7 @@ adapta según el perfil. La adaptación es **siempre** vía la `phase-policy mat
   aislamiento estricto.
 
 ### 6.7 Fase 07 — Recolección de datos (`sm-phase-data-collection`)
+
 - **Propósito:** capturar de forma estructurada los datos producidos por la ejecución.
 - **Entradas:** `06`.
 - **Salidas / artefacto:** `07-data-collection.md` — datos normalizados, métricas, resultados de tests,
@@ -606,6 +623,7 @@ adapta según el perfil. La adaptación es **siempre** vía la `phase-policy mat
   presencia de la condición de riesgo).
 
 ### 6.8 Fase 08 — Análisis (`sm-phase-analysis`)
+
 - **Propósito:** interpretar los datos frente a la hipótesis y al criterio de éxito.
 - **Entradas:** `04`, `07`.
 - **Salidas / artefacto:** `08-analysis.md` — hipótesis confirmada/refutada, magnitud del efecto,
@@ -615,6 +633,7 @@ adapta según el perfil. La adaptación es **siempre** vía la `phase-policy mat
   perfective evalúa significancia de la mejora; preventive evalúa reducción efectiva del riesgo.
 
 ### 6.9 Fase 09 — Conclusión (`sm-phase-conclusion`)
+
 - **Propósito:** decidir el resultado del caso y la acción resultante, y **destilar una lección
   generalizable** hacia la base de conocimiento.
 - **Entradas:** `02`, `08`.
@@ -631,6 +650,7 @@ adapta según el perfil. La adaptación es **siempre** vía la `phase-policy mat
   mitigación con riesgo residual cuantificado.
 
 ### 6.10 Fase 10 — Comunicación (`sm-phase-communication`)
+
 - **Propósito:** producir la comunicación final para humanos (PR, changelog, informe, commit).
 - **Entradas:** `09` y la cadena completa.
 - **Salidas / artefacto:** `10-communication.md` — resumen ejecutivo, cambios, evidencia, riesgos,
@@ -649,18 +669,18 @@ adapta según el perfil. La adaptación es **siempre** vía la `phase-policy mat
 
 ### 6.11 Matriz fase × artefacto (resumen)
 
-| # | Fase | Skill | Artefacto |
-|---|------|-------|-----------|
-| 01 | Observación | `sm-phase-observation` | `01-observation.md` |
-| 02 | Definición del problema | `sm-phase-problem-definition` | `02-problem-definition.md` |
-| 03 | Investigación | `sm-phase-research` | `03-research.md` |
-| 04 | Hipótesis | `sm-phase-hypothesis` | `04-hypothesis.md` |
-| 05 | Diseño experimental | `sm-phase-experiment-design` | `05-experiment-design.md` |
-| 06 | Ejecución | `sm-phase-experiment-execution` | `06-experiment-execution.md` |
-| 07 | Recolección de datos | `sm-phase-data-collection` | `07-data-collection.md` |
-| 08 | Análisis | `sm-phase-analysis` | `08-analysis.md` |
-| 09 | Conclusión | `sm-phase-conclusion` | `09-conclusion.md` |
-| 10 | Comunicación | `sm-phase-communication` | `10-communication.md` |
+| #   | Fase                    | Skill                           | Artefacto                    |
+| --- | ----------------------- | ------------------------------- | ---------------------------- |
+| 01  | Observación             | `sm-phase-observation`          | `01-observation.md`          |
+| 02  | Definición del problema | `sm-phase-problem-definition`   | `02-problem-definition.md`   |
+| 03  | Investigación           | `sm-phase-research`             | `03-research.md`             |
+| 04  | Hipótesis               | `sm-phase-hypothesis`           | `04-hypothesis.md`           |
+| 05  | Diseño experimental     | `sm-phase-experiment-design`    | `05-experiment-design.md`    |
+| 06  | Ejecución               | `sm-phase-experiment-execution` | `06-experiment-execution.md` |
+| 07  | Recolección de datos    | `sm-phase-data-collection`      | `07-data-collection.md`      |
+| 08  | Análisis                | `sm-phase-analysis`             | `08-analysis.md`             |
+| 09  | Conclusión              | `sm-phase-conclusion`           | `09-conclusion.md`           |
+| 10  | Comunicación            | `sm-phase-communication`        | `10-communication.md`        |
 
 ---
 
@@ -670,6 +690,7 @@ Cada perfil declara objetivo, prioridades, señales de activación, métricas, c
 proyección sobre las fases (`influencia`, `evidencia priorizada`, `conclusiones favorecidas`).
 
 ### 7.1 Corrective (`sm-profile-corrective`)
+
 - **Objetivo:** restaurar el comportamiento correcto eliminando un defecto.
 - **Prioridades:** reproducir → causa raíz → fix mínimo → no-regresión. Velocidad de restauración.
 - **Señales que lo activan:** bug reportado, excepción, fallo en producción, test rojo, regresión.
@@ -690,6 +711,7 @@ proyección sobre las fases (`influencia`, `evidencia priorizada`, `conclusiones
   el proceso: un bug no evidente requiere `modo Full` y puede justificar múltiples rondas.
 
 ### 7.2 Adaptive (`sm-profile-adaptive`)
+
 - **Objetivo:** adaptar el software a un cambio externo (API, dependencia, plataforma, requisito,
   normativa) preservando compatibilidad.
 - **Prioridades:** compatibilidad → migración segura → cobertura del nuevo contrato.
@@ -705,6 +727,7 @@ proyección sobre las fases (`influencia`, `evidencia priorizada`, `conclusiones
 - **Conclusiones favorecidas:** "adaptado a Y manteniendo compatibilidad con X; migración reversible".
 
 ### 7.3 Perfective (`sm-profile-perfective`)
+
 - **Objetivo:** mejorar atributos de calidad sin cambiar comportamiento funcional (rendimiento,
   legibilidad, mantenibilidad, UX).
 - **Prioridades:** mejora medible → preservación funcional → ausencia de regresión de calidad.
@@ -719,6 +742,7 @@ proyección sobre las fases (`influencia`, `evidencia priorizada`, `conclusiones
 - **Conclusiones favorecidas:** "métrica M mejoró Δ (p<umbral) sin cambio funcional".
 
 ### 7.4 Preventive (`sm-profile-preventive`)
+
 - **Objetivo:** reducir la probabilidad o el impacto de fallos futuros antes de que ocurran.
 - **Prioridades:** identificación de riesgo → mitigación → cuantificación del riesgo residual.
 - **Señales:** auditoría, hardening, análisis de fragilidad, clase de defecto recurrente,
@@ -735,19 +759,20 @@ proyección sobre las fases (`influencia`, `evidencia priorizada`, `conclusiones
 
 ### 7.5 Tabla comparativa de perfiles
 
-| Dimensión | Corrective | Adaptive | Perfective | Preventive |
-|---|---|---|---|---|
-| Detona por | Fallo presente | Cambio externo | Oportunidad de calidad | Riesgo futuro |
-| Optimiza | Restaurar | Compatibilizar | Mejorar métrica | Reducir riesgo |
-| Evidencia clave | Test rojo→verde | Contract tests | Benchmark A/B | Prueba de riesgo |
-| Riesgo a evitar | Fix sin test | Migración irreversible | Optimizar sin baseline | Añadir riesgo neto |
-| Conclusión típica | Causa raíz corregida | Adaptación compatible | Mejora significativa | Riesgo mitigado |
+| Dimensión         | Corrective           | Adaptive               | Perfective             | Preventive         |
+| ----------------- | -------------------- | ---------------------- | ---------------------- | ------------------ |
+| Detona por        | Fallo presente       | Cambio externo         | Oportunidad de calidad | Riesgo futuro      |
+| Optimiza          | Restaurar            | Compatibilizar         | Mejorar métrica        | Reducir riesgo     |
+| Evidencia clave   | Test rojo→verde      | Contract tests         | Benchmark A/B          | Prueba de riesgo   |
+| Riesgo a evitar   | Fix sin test         | Migración irreversible | Optimizar sin baseline | Añadir riesgo neto |
+| Conclusión típica | Causa raíz corregida | Adaptación compatible  | Mejora significativa   | Riesgo mitigado    |
 
 ---
 
 ## 8. Artefactos
 
 ### 8.1 Convención de nombres y ubicación
+
 - Carpeta por caso: `maintenance-cases/<case-id>/` donde `case-id = YYYYMMDD-<slug>` (p. ej.
   `20260606-login-timeout`). Si la carpeta ya existe (mismo slug, mismo día), añadir sufijo incremental:
   `20260606-login-timeout-2`, `-3`, etc.
@@ -763,6 +788,7 @@ proyección sobre las fases (`influencia`, `evidencia priorizada`, `conclusiones
   `case_mode`; el usuario puede forzar el modo con un parámetro explícito.
 
 ### 8.2 Formato
+
 Markdown con **frontmatter YAML** obligatorio + cuerpo estructurado. El `case.md` contiene además un
 **bloque YAML canónico** machine-readable (sección "Canonical state") que es la **única fuente de
 estado del caso**: incluye `case_mode`, `phase_policy` (una entrada por fase) y `phases` (status,
@@ -778,7 +804,7 @@ profile: corrective
 phase: 04-hypothesis
 version: v1.0
 timestamp: 2026-06-06T14:32:00Z
-status: done          # pending | in_progress | done | superseded
+status: done # pending | in_progress | done | superseded
 inputs: [02-problem-definition.md, 03-research.md]
 produces: 04-hypothesis.md
 links:
@@ -789,21 +815,22 @@ links:
 
 ### 8.3 Contenido mínimo esperado por artefacto
 
-| Artefacto | Secciones mínimas |
-|---|---|
-| `case.md` | Caso, perfil, parámetros del perfil, bloque YAML canónico (`case_mode` + `phase_policy` + `phases`), veredicto |
-| `01-observation.md` | Hechos observados, contexto, alcance, lo que NO se interpreta |
-| `02-problem-definition.md` | Enunciado, criterio de "resuelto", límites, severidad |
-| `03-research.md` | Hallazgos con fuentes (`file:línea`/URL/commit), restricciones |
-| `04-hypothesis.md` | Hipótesis priorizadas, predicción, criterio de refutación |
-| `05-experiment-design.md` | Procedimiento, variables, controles, éxito/fracaso, rollback |
-| `06-experiment-execution.md` | Comandos, cambios, desviaciones, logs crudos |
-| `07-data-collection.md` | Datos normalizados, métricas, antes/después |
-| `08-analysis.md` | Veredicto sobre hipótesis, magnitud, amenazas a la validez |
-| `09-conclusion.md` | Decisión, residuos, deuda, seguimiento |
-| `10-communication.md` | Resumen, cambios, evidencia, riesgos, borrador de commit/PR |
+| Artefacto                    | Secciones mínimas                                                                                              |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `case.md`                    | Caso, perfil, parámetros del perfil, bloque YAML canónico (`case_mode` + `phase_policy` + `phases`), veredicto |
+| `01-observation.md`          | Hechos observados, contexto, alcance, lo que NO se interpreta                                                  |
+| `02-problem-definition.md`   | Enunciado, criterio de "resuelto", límites, severidad                                                          |
+| `03-research.md`             | Hallazgos con fuentes (`file:línea`/URL/commit), restricciones                                                 |
+| `04-hypothesis.md`           | Hipótesis priorizadas, predicción, criterio de refutación                                                      |
+| `05-experiment-design.md`    | Procedimiento, variables, controles, éxito/fracaso, rollback                                                   |
+| `06-experiment-execution.md` | Comandos, cambios, desviaciones, logs crudos                                                                   |
+| `07-data-collection.md`      | Datos normalizados, métricas, antes/después                                                                    |
+| `08-analysis.md`             | Veredicto sobre hipótesis, magnitud, amenazas a la validez                                                     |
+| `09-conclusion.md`           | Decisión, residuos, deuda, seguimiento                                                                         |
+| `10-communication.md`        | Resumen, cambios, evidencia, riesgos, borrador de commit/PR                                                    |
 
 ### 8.4 Convención de versionado
+
 - `version: vMAJOR.MINOR` en frontmatter.
 - **MINOR** se incrementa al reejecutar una fase (refinamiento sobre los mismos insumos).
 - **MAJOR** se incrementa si cambian los insumos aguas arriba (la fase se rehace desde cero).
@@ -811,6 +838,7 @@ links:
   `links.previous_version`. El historial fino lo aporta **git** (cada fase es un commit o parte de uno).
 
 #### 8.4.1 Enlace commit↔caso y derivación del changelog
+
 - **Metadatos de commit obligatorios.** Cada commit de un caso lleva los metadatos de commit `Case: <case-id>` en su pie (formato
   de metadatos de commit de git). Esto cierra la trazabilidad **bidireccional**: del expediente a sus commits
   (`git log --grep "Case: <case-id>"`) y de cada entrada del changelog a su expediente.
@@ -822,9 +850,11 @@ links:
   (`maintenance-cases/*/case.md`) y del `CHANGELOG.md` cuando se necesita (§9.2).
 
 ### 8.5 Relación entre artefactos y auditoría posterior
+
 La cadena `01 → 10` más `case.md` constituye el **expediente del caso**: toda conclusión (`09`) es
 rastreable hasta su evidencia (`07`), su experimento (`05`/`06`), su hipótesis (`04`) y la observación
 original (`01`). Una auditoría posterior puede:
+
 1. Abrir `case.md` para ver perfil, veredicto y estado.
 2. Seguir `links` fase a fase.
 3. Reproducir el experimento desde `05`/`06`.
@@ -844,17 +874,17 @@ y el registro de casos se **derivan** de fuentes de verdad existentes (commits, 
 La memoria se desdobla en dos niveles con **dueño único** cada uno:
 
 **(a) Base de conocimiento (lecciones) — persistida deliberadamente.**
-Organizada bajo el **patrón de memoria del subsistema**: *un aprendizaje por archivo* bajo
+Organizada bajo el **patrón de memoria del subsistema**: _un aprendizaje por archivo_ bajo
 `.claude/memory/`, con `MEMORY.md` como índice (una línea por lección). Claude Code **no** carga
 `MEMORY.md` automáticamente; el recall es un paso explícito de la fase 03 que lee el índice y abre
 las lecciones relevantes. Para que `MEMORY.md` entre en contexto en cada sesión, `.claude/CLAUDE.md`
 contiene una referencia a él. Cada lección lleva frontmatter con tags de recall:
 
-| Tag | Significado |
-|---|---|
-| `component` | Componente/módulo afectado (p. ej. `auth`, `payments`, `gateway`) |
-| `defect-class` | Clase de defecto/riesgo (p. ej. `connection-pool`, `n+1`, `unhandled-rejection`) |
-| `profile` | Perfil bajo el que se aprendió (`corrective`/`adaptive`/`perfective`/`preventive`) |
+| Tag            | Significado                                                                        |
+| -------------- | ---------------------------------------------------------------------------------- |
+| `component`    | Componente/módulo afectado (p. ej. `auth`, `payments`, `gateway`)                  |
+| `defect-class` | Clase de defecto/riesgo (p. ej. `connection-pool`, `n+1`, `unhandled-rejection`)   |
+| `profile`      | Perfil bajo el que se aprendió (`corrective`/`adaptive`/`perfective`/`preventive`) |
 
 - **Dueño:** la fase 09 (Conclusión) la **escribe** (destila la lección); la fase 03 (Investigación) la
   **lee** (recall). Crece por **aprendizaje**, no por volumen de casos.
@@ -904,6 +934,7 @@ de "actualizar el ledger" ni un hook que lo anexe.
 
 **Por qué no un git hook `post-commit`.** La alternativa de un hook `post-commit` con `--amend` fue
 evaluada y descartada por tres riesgos concretos:
+
 1. **Reescritura de commits:** `git commit --amend` modifica el commit que acaba de crearse, lo que
    puede desencadenar un segundo `post-commit`, crear un bucle o introducir inconsistencias si el hook
    falla en mitad del proceso.
@@ -912,7 +943,7 @@ evaluada y descartada por tres riesgos concretos:
 3. **Complejidad oculta:** el hook dispara en cualquier commit, incluyendo merges o commits de CI donde
    su intervención puede ser indeseada.
 
-**Por qué on-demand.** El generador se ejecuta *cuando corresponde* (la fase 10 lo invoca) con la
+**Por qué on-demand.** El generador se ejecuta _cuando corresponde_ (la fase 10 lo invoca) con la
 entrada precisa (`--pending "<subject>" --case <id>`), actualiza `CHANGELOG.md` y este se incluye en el
 commit normal como cualquier otro archivo modificado. No hay `--amend`, no hay riesgo de bucle, no hay
 estado oculto. La validación de sincronía puede delegarse a CI ejecutando el generador sin `--pending`
@@ -931,8 +962,8 @@ usuario lo apruebe (§6 de `CLAUDE.md`).
 
 Cada ejemplo muestra: entrada inicial, perfil seleccionado, secuencia de fases, artefactos producidos y
 salida final esperada. Los cuatro ejemplos usan **modo Full** (los más representativos para documentar
-el flujo completo). Un caso trivial como *"renombrar una función interna cuyo nombre induce a
-confusión"* usaría **modo Consolidado**: el orquestador clasificaría `perfective`, fijaría
+el flujo completo). Un caso trivial como _"renombrar una función interna cuyo nombre induce a
+confusión"_ usaría **modo Consolidado**: el orquestador clasificaría `perfective`, fijaría
 `case_mode: consolidated`, y las 10 fases escribirían subsecciones dentro de un único `case.md`
 en lugar de artefactos individuales. El perfil `corrective` usa `modo Full` por defecto, porque la
 causa del fallo no se conoce de antemano y la investigación puede requerir múltiples rondas de
@@ -941,27 +972,27 @@ ubicación y causa son inequívocas desde la observación) justifican `modo Cons
 
 ### 10.1 Caso Corrective
 
-- **Entrada:** *"El login falla con timeout intermitente desde ayer; hay un 500 en producción."*
+- **Entrada:** _"El login falla con timeout intermitente desde ayer; hay un 500 en producción."_
 - **Perfil seleccionado:** `corrective` (señal: fallo presente + regresión reciente).
 - **Secuencia y artefactos:**
 
-| Fase | Resultado clave | Artefacto |
-|---|---|---|
-| 01 Observación | 500 intermitente; pico de latencia en `auth/session.ts` | `01-observation.md` |
-| 02 Definición | "login devuelve 500 cuando la conexión al store supera 2s" | `02-problem-definition.md` |
-| 03 Investigación | commit reciente cambió el timeout del pool `session.ts:88` | `03-research.md` |
-| 04 Hipótesis | "el pool agota conexiones por timeout mal configurado" | `04-hypothesis.md` |
-| 05 Diseño | test que reproduce timeout bajo carga; rollback = revertir commit | `05-experiment-design.md` |
-| 06 Ejecución | test rojo reproduce el 500; aplicar fix de pool | `06-experiment-execution.md` |
-| 07 Datos | test rojo→verde; latencia p99 normalizada | `07-data-collection.md` |
-| 08 Análisis | hipótesis confirmada; sin regresiones en suite | `08-analysis.md` |
-| 09 Conclusión | aplicar fix; añadir test de carga al CI | `09-conclusion.md` |
-| 10 Comunicación | PR + commit `fix(auth): ...` con metadatos de commit `Case:` | `10-communication.md` |
+| Fase             | Resultado clave                                                   | Artefacto                    |
+| ---------------- | ----------------------------------------------------------------- | ---------------------------- |
+| 01 Observación   | 500 intermitente; pico de latencia en `auth/session.ts`           | `01-observation.md`          |
+| 02 Definición    | "login devuelve 500 cuando la conexión al store supera 2s"        | `02-problem-definition.md`   |
+| 03 Investigación | commit reciente cambió el timeout del pool `session.ts:88`        | `03-research.md`             |
+| 04 Hipótesis     | "el pool agota conexiones por timeout mal configurado"            | `04-hypothesis.md`           |
+| 05 Diseño        | test que reproduce timeout bajo carga; rollback = revertir commit | `05-experiment-design.md`    |
+| 06 Ejecución     | test rojo reproduce el 500; aplicar fix de pool                   | `06-experiment-execution.md` |
+| 07 Datos         | test rojo→verde; latencia p99 normalizada                         | `07-data-collection.md`      |
+| 08 Análisis      | hipótesis confirmada; sin regresiones en suite                    | `08-analysis.md`             |
+| 09 Conclusión    | aplicar fix; añadir test de carga al CI                           | `09-conclusion.md`           |
+| 10 Comunicación  | PR + commit `fix(auth): ...` con metadatos de commit `Case:`      | `10-communication.md`        |
 
 - **Artefactos del caso:** `maintenance-cases/20260606-login-timeout/case.md` + `01..10-*.md`.
 - **Commit (fuente de verdad):**
 
-````text
+```text
 fix(auth): corregir timeout del pool de conexiones en login
 
 El pool agotaba conexiones por un timeout mal configurado introducido en
@@ -969,14 +1000,15 @@ session.ts:88, devolviendo 500 intermitentes. Se restaura el valor y se
 añade un test de carga al CI.
 
 Case: 20260606-login-timeout
-````
+```
 
 - **Changelog (derivado por generador on-demand):**
 
-````markdown
+```markdown
 ### Fixed
+
 - corregir timeout del pool de conexiones en login (Case: 20260606-login-timeout)
-````
+```
 
 - **Lección (base de conocimiento, escrita en fase 09):**
   `.claude/memory/connection-pool-timeout-regressions.md` con tags `component: auth`,
@@ -986,22 +1018,22 @@ Case: 20260606-login-timeout
 
 ### 10.2 Caso Adaptive
 
-- **Entrada:** *"Hay que migrar de la API v1 de pagos a la v2 antes de su deprecación."*
+- **Entrada:** _"Hay que migrar de la API v1 de pagos a la v2 antes de su deprecación."_
 - **Perfil:** `adaptive` (señal: cambio externo / deprecación).
 - **Secuencia y artefactos:**
 
-| Fase | Resultado clave | Artefacto |
-|---|---|---|
-| 01 | uso de v1 en `payments/*`; fecha de deprecación | `01-observation.md` |
-| 02 | "soportar v2 manteniendo contrato público de `PaymentService`" | `02-problem-definition.md` |
-| 03 | diferencias v1↔v2; breaking changes | `03-research.md` |
-| 04 | "adaptador v2 detrás de feature flag mantiene compatibilidad" | `04-hypothesis.md` |
-| 05 | contract tests v1 y v2; rollback = flag off | `05-experiment-design.md` |
-| 06 | implementar adaptador; ejecutar ambos contract tests | `06-experiment-execution.md` |
-| 07 | matriz de compatibilidad v1/v2 verde | `07-data-collection.md` |
-| 08 | compatibilidad confirmada; sin ruptura pública | `08-analysis.md` |
-| 09 | activar v2 gradualmente; plan de retirada de v1 | `09-conclusion.md` |
-| 10 | PR `feat(payments): adaptar a API v2` + guía de migración | `10-communication.md` |
+| Fase | Resultado clave                                                | Artefacto                    |
+| ---- | -------------------------------------------------------------- | ---------------------------- |
+| 01   | uso de v1 en `payments/*`; fecha de deprecación                | `01-observation.md`          |
+| 02   | "soportar v2 manteniendo contrato público de `PaymentService`" | `02-problem-definition.md`   |
+| 03   | diferencias v1↔v2; breaking changes                            | `03-research.md`             |
+| 04   | "adaptador v2 detrás de feature flag mantiene compatibilidad"  | `04-hypothesis.md`           |
+| 05   | contract tests v1 y v2; rollback = flag off                    | `05-experiment-design.md`    |
+| 06   | implementar adaptador; ejecutar ambos contract tests           | `06-experiment-execution.md` |
+| 07   | matriz de compatibilidad v1/v2 verde                           | `07-data-collection.md`      |
+| 08   | compatibilidad confirmada; sin ruptura pública                 | `08-analysis.md`             |
+| 09   | activar v2 gradualmente; plan de retirada de v1                | `09-conclusion.md`           |
+| 10   | PR `feat(payments): adaptar a API v2` + guía de migración      | `10-communication.md`        |
 
 - **Artefactos del caso:** `maintenance-cases/20260607-payments-api-v2/case.md` + `01..10-*.md`.
 - **Commit:** `feat(payments): adaptar a API v2 detrás de feature flag` con metadatos de commit
@@ -1014,22 +1046,22 @@ Case: 20260606-login-timeout
 
 ### 10.3 Caso Perfective
 
-- **Entrada:** *"El endpoint de reporting tarda 4s; hay que optimizarlo."*
+- **Entrada:** _"El endpoint de reporting tarda 4s; hay que optimizarlo."_
 - **Perfil:** `perfective` (señal: oportunidad de calidad/rendimiento).
 - **Secuencia y artefactos:**
 
-| Fase | Resultado clave | Artefacto |
-|---|---|---|
-| 01 | p95 = 4.1s en `/reports`; CPU alta en agregación | `01-observation.md` |
-| 02 | "reducir p95 de `/reports` por debajo de 1s sin cambiar la salida" | `02-problem-definition.md` |
-| 03 | N+1 queries en `report.repository.ts` | `03-research.md` |
-| 04 | "batch + índice reduce el tiempo manteniendo el resultado" | `04-hypothesis.md` |
-| 05 | benchmark A/B; baseline 50 runs; igualdad de salida | `05-experiment-design.md` |
-| 06 | aplicar batching; ejecutar benchmark antes/después | `06-experiment-execution.md` |
-| 07 | p95 4.1s → 0.7s; salida idéntica (snapshot) | `07-data-collection.md` |
-| 08 | mejora significativa; comportamiento invariante | `08-analysis.md` |
-| 09 | aceptar optimización; suite funcional verde | `09-conclusion.md` |
-| 10 | PR `perf(reports): batching de queries` con números | `10-communication.md` |
+| Fase | Resultado clave                                                    | Artefacto                    |
+| ---- | ------------------------------------------------------------------ | ---------------------------- |
+| 01   | p95 = 4.1s en `/reports`; CPU alta en agregación                   | `01-observation.md`          |
+| 02   | "reducir p95 de `/reports` por debajo de 1s sin cambiar la salida" | `02-problem-definition.md`   |
+| 03   | N+1 queries en `report.repository.ts`                              | `03-research.md`             |
+| 04   | "batch + índice reduce el tiempo manteniendo el resultado"         | `04-hypothesis.md`           |
+| 05   | benchmark A/B; baseline 50 runs; igualdad de salida                | `05-experiment-design.md`    |
+| 06   | aplicar batching; ejecutar benchmark antes/después                 | `06-experiment-execution.md` |
+| 07   | p95 4.1s → 0.7s; salida idéntica (snapshot)                        | `07-data-collection.md`      |
+| 08   | mejora significativa; comportamiento invariante                    | `08-analysis.md`             |
+| 09   | aceptar optimización; suite funcional verde                        | `09-conclusion.md`           |
+| 10   | PR `perf(reports): batching de queries` con números                | `10-communication.md`        |
 
 - **Artefactos del caso:** `maintenance-cases/20260608-reports-latency/case.md` + `01..10-*.md`.
 - **Commit:** `perf(reports): batching de queries para reducir p95` con metadatos de commit
@@ -1042,22 +1074,22 @@ Case: 20260606-login-timeout
 
 ### 10.4 Caso Preventive
 
-- **Entrada:** *"Auditemos el manejo de errores del gateway antes de la próxima release."*
+- **Entrada:** _"Auditemos el manejo de errores del gateway antes de la próxima release."_
 - **Perfil:** `preventive` (señal: hardening / auditoría de riesgo futuro).
 - **Secuencia y artefactos:**
 
-| Fase | Resultado clave | Artefacto |
-|---|---|---|
-| 01 | rutas sin manejo de error en `gateway/*`; logs silenciosos | `01-observation.md` |
-| 02 | "evitar caídas no controladas por errores no manejados en el gateway" | `02-problem-definition.md` |
-| 03 | clase de defecto: promesas sin catch; recall de lecciones por `defect-class` | `03-research.md` |
-| 04 | "un error no capturado en upstream tumba el proceso" | `04-hypothesis.md` |
-| 05 | prueba que inyecta fallo upstream en sandbox; rollback trivial | `05-experiment-design.md` |
-| 06 | inyectar fallo: el proceso cae; añadir guardas + boundary | `06-experiment-execution.md` |
-| 07 | antes: crash; después: error contenido y logueado | `07-data-collection.md` |
-| 08 | riesgo confirmado y mitigado; residual = paths no cubiertos | `08-analysis.md` |
-| 09 | aplicar guardas; backlog para paths residuales | `09-conclusion.md` |
-| 10 | PR `fix(gateway): error boundary` + nota de riesgo residual | `10-communication.md` |
+| Fase | Resultado clave                                                              | Artefacto                    |
+| ---- | ---------------------------------------------------------------------------- | ---------------------------- |
+| 01   | rutas sin manejo de error en `gateway/*`; logs silenciosos                   | `01-observation.md`          |
+| 02   | "evitar caídas no controladas por errores no manejados en el gateway"        | `02-problem-definition.md`   |
+| 03   | clase de defecto: promesas sin catch; recall de lecciones por `defect-class` | `03-research.md`             |
+| 04   | "un error no capturado en upstream tumba el proceso"                         | `04-hypothesis.md`           |
+| 05   | prueba que inyecta fallo upstream en sandbox; rollback trivial               | `05-experiment-design.md`    |
+| 06   | inyectar fallo: el proceso cae; añadir guardas + boundary                    | `06-experiment-execution.md` |
+| 07   | antes: crash; después: error contenido y logueado                            | `07-data-collection.md`      |
+| 08   | riesgo confirmado y mitigado; residual = paths no cubiertos                  | `08-analysis.md`             |
+| 09   | aplicar guardas; backlog para paths residuales                               | `09-conclusion.md`           |
+| 10   | PR `fix(gateway): error boundary` + nota de riesgo residual                  | `10-communication.md`        |
 
 - **Artefactos del caso:** `maintenance-cases/20260609-gateway-error-boundary/case.md` + `01..10-*.md`.
 - **Commit:** `fix(gateway): añadir error boundary para errores no manejados` con metadatos de commit
@@ -1075,13 +1107,13 @@ Case: 20260606-login-timeout
 1. **Construir de afuera hacia adentro.** Empezar por `sm-orchestrator` + `phase-policy-schema.md` +
    `case.md`/`phase-artifact.md` (las plantillas). Validan el flujo y el contrato antes de escribir las
    14 skills.
-2. **Implementar primero un *vertical slice*.** Un perfil (`corrective`) + las 10 fases con
+2. **Implementar primero un _vertical slice_.** Un perfil (`corrective`) + las 10 fases con
    comportamiento genérico. Ejecutar el ejemplo 10.1 de extremo a extremo. Solo entonces añadir los
    otros tres perfiles (que ya no tocan las fases).
 3. **Mantener el contrato pequeño.** `focus/reasoning_effort/evidence/acceptance/risk_controls` cubren las
    necesidades de adaptación conocidas. Resistir la tentación de ampliarlo "por si acaso" (§2/§6 de
    `CLAUDE.md`).
-4. **Frontmatter `description` explícito.** Claude Code tiende a *undertrigger*; el orquestador debe
+4. **Frontmatter `description` explícito.** Claude Code tiende a _undertrigger_; el orquestador debe
    declarar triggers en español (corrige, optimiza, migra, endurece, mantén). Los perfiles y fases no
    necesitan auto-activación fuerte porque los invoca el orquestador.
 5. **Artefactos versionados con git.** Cada caso es una rama o un conjunto de commits; un commit por
@@ -1103,7 +1135,7 @@ Case: 20260606-login-timeout
    contexto, puede aislarse en un sub-agent **sin cambiar el contrato**: el orquestador seguiría leyendo
    el mismo artefacto. El diseño base no los necesita.
 10. **No saltarse fases.** Incluso en casos triviales, las fases pueden ejecutarse en modo `lite`
-   (`reasoning_effort: low`) produciendo artefactos breves, pero la cadena de trazabilidad se mantiene completa.
+    (`reasoning_effort: low`) produciendo artefactos breves, pero la cadena de trazabilidad se mantiene completa.
 
 ---
 
@@ -1116,14 +1148,16 @@ Case: 20260606-login-timeout
 
 ### 12.1 `.claude/CLAUDE.md` (instrucciones persistentes del subsistema)
 
-````markdown
+```markdown
 <scientific_maintenance>
+
 # Scientific Maintenance Subsystem — persistent instructions
 
 This repository runs software maintenance as reproducible scientific experiments through the
-`sm-*` skill family. Treat every maintenance request as a *case* driven by `sm-orchestrator`.
+`sm-*` skill family. Treat every maintenance request as a _case_ driven by `sm-orchestrator`.
 
 ## Non-negotiable rules
+
 - Artifacts are the source of truth, not the conversation. Every phase writes one versioned
   artifact under `maintenance-cases/<case-id>/`. The case manifest is `case.md`.
 - Never skip phases. Trivial cases may run phases with `reasoning_effort: low` (short artifacts) but the
@@ -1136,24 +1170,28 @@ This repository runs software maintenance as reproducible scientific experiments
   and the filesystem); never hand-edit them. Only lessons are persisted deliberately.
 
 ## Case identity
+
 - `case-id = YYYYMMDD-<slug>` (kebab slug from the problem).
 - All artifacts for a case live in `maintenance-cases/<case-id>/`.
 
 ## Knowledge & traceability
+
 - Knowledge base = MEMORY.md index convention (not runtime-loaded): one lesson per file under
   .claude/memory/, indexed by MEMORY.md, tagged `component`/`defect-class`/`profile`. Claude Code
   does NOT load MEMORY.md automatically; phase 03 reads it as an explicit recall step. This CLAUDE.md
   references MEMORY.md so it enters context each session. Phase 09 writes lessons.
 - Case index is DERIVED from maintenance-cases/ and CHANGELOG.md — never a hand-kept ledger.
-- Every commit for a case carries the commit metadata (*metadatos de commit*) `Case: <case-id>`. CHANGELOG.md is regenerated from
+- Every commit for a case carries the commit metadata (_metadatos de commit_) `Case: <case-id>`. CHANGELOG.md is regenerated from
   git log by the on-demand generator (Keep a Changelog). Phase 10 runs it. See references/changelog.md.
 
 ## Default policies
+
 - Default rollback for any experiment: revert the change / disable the feature flag.
-- On verdict: write a lesson (phase 09) and commit with the `Case:` commit metadata (*metadatos de commit*) (phase 10). Do NOT edit
+- On verdict: write a lesson (phase 09) and commit with the `Case:` commit metadata (_metadatos de commit_) (phase 10). Do NOT edit
   the changelog or any case ledger by hand — both are derived.
 
 ## Memory index (explicit reference — MEMORY.md is not auto-loaded by the runtime)
+
 See: .claude/memory/MEMORY.md
 </scientific_maintenance>
 
@@ -1162,11 +1200,11 @@ All user-facing output is in Spanish. Skill bodies and artifact header fields ar
 token efficiency; explanations, questions, and summaries to the user are Spanish. See
 .claude/skills/artifact-structuring/SKILL.md §language_policy.
 </user_communication>
-````
+```
 
 ### 12.2 `.claude/skills/sm-orchestrator/SKILL.md`
 
-````markdown
+```markdown
 ---
 name: sm-orchestrator
 description: >
@@ -1210,13 +1248,14 @@ in English. Canonical policy: ../artifact-structuring/SKILL.md §language_policy
    artifact path; in consolidated mode, confirm the `## NN — <Phase>` subsection in case.md was written.
    Mark the phase `done` and record artifact + version in the canonical YAML block. Stop and report
    if a phase fails its acceptance criterion. (Phase 03 reads MEMORY.md explicitly for recall; phase
-   09 writes a lesson; phase 10 runs the changelog generator and drafts the commit with a `Case:` commit metadata (*metadatos de commit*).)
+   09 writes a lesson; phase 10 runs the changelog generator and drafts the commit with a `Case:` commit metadata (_metadatos de commit_).)
 
    **Hypothesis refutation loop (only exception to linear order).** If phase 08 refutes the active
    hypothesis, do NOT proceed to 09: mark the 04→08 artifacts of that hypothesis `superseded` (bump
    version) and re-run from phase 04 with the next candidate hypothesis in 04-hypothesis.md. Repeat
    until a hypothesis is confirmed or candidates are exhausted (then phase 09 records a "not resolved"
    verdict). This loop is profile-independent.
+
 6. **Consolidate.** Read 09-conclusion.md (or the consolidated subsection); write the verdict into case.md.
    Confirm phase 09 wrote a lesson to .claude/memory/ (indexed in MEMORY.md). Do NOT write a case
    ledger — it is derived.
@@ -1232,15 +1271,15 @@ experiment-execution → data-collection → analysis → conclusion → communi
 
 ## References
 
-| File | When to read |
-|------|--------------|
-| references/phase-policy-schema.md | The profile↔phase contract (always, before step 4) |
-| references/classification-guide.md | Choosing the profile (step 2) |
-| references/artifact-conventions.md | Naming, frontmatter, versioning, `Case:` commit metadata (*metadatos de commit*) (steps 3–7) |
-| references/knowledge-base.md | Lesson schema + recall protocol (steps 5–6) |
-| references/changelog.md | Keep a Changelog format + derivation from commits (step 7) |
-| templates/case.md | Manifest skeleton (step 3) |
-| templates/phase-artifact.md | Phase artifact skeleton (passed to phases) |
+| File                               | When to read                                                                                 |
+| ---------------------------------- | -------------------------------------------------------------------------------------------- |
+| references/phase-policy-schema.md  | The profile↔phase contract (always, before step 4)                                           |
+| references/classification-guide.md | Choosing the profile (step 2)                                                                |
+| references/artifact-conventions.md | Naming, frontmatter, versioning, `Case:` commit metadata (_metadatos de commit_) (steps 3–7) |
+| references/knowledge-base.md       | Lesson schema + recall protocol (steps 5–6)                                                  |
+| references/changelog.md            | Keep a Changelog format + derivation from commits (step 7)                                   |
+| templates/case.md                  | Manifest skeleton (step 3)                                                                   |
+| templates/phase-artifact.md        | Phase artifact skeleton (passed to phases)                                                   |
 
 <constraints>
 - One profile per case; one artifact per phase; phases run in the fixed order above.
@@ -1249,7 +1288,7 @@ experiment-execution → data-collection → analysis → conclusion → communi
 - Derived state over duplicated state: never hand-edit CHANGELOG.md or a case ledger.
 - No sub-agents.
 </constraints>
-````
+```
 
 ### 12.3 Referencia compartida — `.claude/skills/sm-orchestrator/references/phase-policy-schema.md`
 
@@ -1262,13 +1301,13 @@ profile skill; profiles never read a phase skill.
 
 ## Fields (per phase)
 
-| Field | Type | Meaning |
-|-------|------|---------|
-| `focus` | string | What to prioritize in this phase under this profile |
-| `reasoning_effort` | enum `low\|medium\|high` | Effort/detail expected |
-| `evidence` | string[] | Evidence types the profile requires this phase to produce/collect |
-| `acceptance` | string | Pass criterion for this phase's artifact |
-| `risk_controls` | string[] | Mandatory guards (e.g. sandbox, feature flag, rollback) |
+| Field              | Type                     | Meaning                                                           |
+| ------------------ | ------------------------ | ----------------------------------------------------------------- |
+| `focus`            | string                   | What to prioritize in this phase under this profile               |
+| `reasoning_effort` | enum `low\|medium\|high` | Effort/detail expected                                            |
+| `evidence`         | string[]                 | Evidence types the profile requires this phase to produce/collect |
+| `acceptance`       | string                   | Pass criterion for this phase's artifact                          |
+| `risk_controls`    | string[]                 | Mandatory guards (e.g. sandbox, feature flag, rollback)           |
 
 ## Location in case.md
 
@@ -1305,24 +1344,26 @@ Changing this schema is an architectural change. Everything else evolves without
 
 ### 12.4 Referencia — `.claude/skills/sm-orchestrator/references/classification-guide.md`
 
-````markdown
+```markdown
 # Profile Classification Guide
 
 Pick exactly one profile. If two fit, ask the user (Spanish) presenting the two best.
 
-| Signal in the request | Profile |
-|-----------------------|---------|
-| Present failure, bug, exception, regression, red test, prod incident | corrective |
-| External change: deprecation, dependency upgrade, new platform/OS, new API, regulation | adaptive |
-| Quality opportunity: slow, complex, smelly, refactor, optimize (no behavior change) | perfective |
+| Signal in the request                                                                       | Profile    |
+| ------------------------------------------------------------------------------------------- | ---------- |
+| Present failure, bug, exception, regression, red test, prod incident                        | corrective |
+| External change: deprecation, dependency upgrade, new platform/OS, new API, regulation      | adaptive   |
+| Quality opportunity: slow, complex, smelly, refactor, optimize (no behavior change)         | perfective |
 | Future risk: audit, hardening, fragility, recurring defect class, missing critical coverage | preventive |
 
 ## Tie-breakers
+
 - "Optimize a broken thing" → corrective first (restore), perfective later (improve).
 - "Migrate and improve" → adaptive (compatibility is the gating concern).
 - "Audit because something failed" → corrective for the failure, preventive for the class.
 
 ## Case mode (full vs consolidated) — set after picking the profile
+
 - **full** (default): one artifact per phase. Use whenever the cause/solution is not unequivocally
   known up front, or the change is non-localized.
 - **consolidated**: phases write subsections inside case.md instead of separate files. Reserve for
@@ -1330,7 +1371,7 @@ Pick exactly one profile. If two fit, ask the user (Spanish) presenting the two 
   typo, renaming an internal symbol).
 - `corrective` defaults to **full**: a defect's cause is not known in advance and may need several
   hypothesis rounds. Only fully localized, trivial corrective cases justify consolidated.
-````
+```
 
 ### 12.5 Referencia — `.claude/skills/sm-orchestrator/references/artifact-conventions.md`
 
@@ -1338,6 +1379,7 @@ Pick exactly one profile. If two fit, ask the user (Spanish) presenting the two 
 # Artifact Conventions
 
 ## Naming
+
 - Case folder: `maintenance-cases/<case-id>/` with `case-id = YYYYMMDD-<slug>`.
 - If `maintenance-cases/<case-id>/` already exists, append an incremental suffix: `-2`, `-3`, etc.
   (e.g. `20260606-login-timeout-2`). Concurrent locking is out of scope by deliberate design choice.
@@ -1345,6 +1387,7 @@ Pick exactly one profile. If two fit, ask the user (Spanish) presenting the two 
 - Consolidated mode: phase content lives in `## NN — <Phase>` subsections of `case.md`. No separate artifacts.
 
 ## Frontmatter (phase artifact)
+
 ```yaml
 ---
 case_id: <id>
@@ -1355,22 +1398,25 @@ timestamp: <ISO-8601 UTC>
 status: <pending|in_progress|done|superseded>
 inputs: [<prior artifacts>]
 produces: <this file>
-links: { previous: <file>, next: <file> }   # + previous_version: <file> on the new version when it supersedes a prior one
+links: { previous: <file>, next: <file> } # + previous_version: <file> on the new version when it supersedes a prior one
 ---
 ```
 
 ## Versioning
+
 - MINOR++ when re-running a phase on the same inputs (refinement).
 - MAJOR++ when upstream inputs changed (phase redone from scratch).
 - The superseded artifact sets `status: superseded`; the new version links back to it via `links.previous_version`.
 - Fine-grained history lives in git (one commit per phase recommended).
 
 ## Commit ↔ case link (metadatos de commit)
-- Every commit for a case ends with the git commit metadata (*metadatos de commit*) `Case: <case-id>`.
+
+- Every commit for a case ends with the git commit metadata (_metadatos de commit_) `Case: <case-id>`.
 - This gives bidirectional traceability: case → commits (`git log --grep "Case: <case-id>"`) and
-  changelog entry → case (the commit metadata (*metadatos de commit*) is preserved per entry).
+  changelog entry → case (the commit metadata (_metadatos de commit_) is preserved per entry).
 
 ## Derived state (do NOT hand-edit)
+
 - CHANGELOG.md is derived from conventional commits by the on-demand generator
   (see references/changelog.md). Phase 10 runs it with `--pending`; it is idempotent without `--pending`.
 - The case index is derived from `maintenance-cases/*/case.md` + CHANGELOG.md. There is no ledger file.
@@ -1388,6 +1434,7 @@ Claude Code does NOT load MEMORY.md automatically; phase 03 reads it as an expli
 It holds non-derivable learnings — NOT case summaries (those live in the case file).
 
 ## Lesson file format
+
 ```markdown
 ---
 name: <lesson-slug>
@@ -1403,50 +1450,56 @@ Related case: maintenance-cases/<case-id>/case.md
 ```
 
 ## MEMORY.md index (one line per lesson)
+
 ```markdown
 - [connection-pool timeouts](connection-pool-timeout-regressions.md) — auth/connection-pool · corrective
 ```
 
 ## Recall protocol (phase 03)
+
 1. Derive `component` / `defect-class` from the phase-02 problem statement; take `profile` from case.md.
 2. Query MEMORY.md by those tags; open the matching lessons.
 3. Cite recalled lessons as prior art in 03-research.md.
-Recall is a PROCEDURE (which tags to query and how to incorporate), not a promise a lesson exists.
+   Recall is a PROCEDURE (which tags to query and how to incorporate), not a promise a lesson exists.
 
 ## Ownership
+
 - Phase 09 WRITES one lesson on verdict. Phase 03 READS by tags.
 - The base grows by LEARNING, not by case volume. Curate: merge redundant lessons, fix tags.
 ````
 
 #### 12.5.2 Referencia — `.claude/skills/sm-orchestrator/references/changelog.md`
 
-````markdown
+```markdown
 # Changelog (derived from conventional commits)
 
 CHANGELOG.md is DERIVED state — never hand-edited (project §2.5.1). Single source of truth: the
 repository's conventional commits (see the `conventional-commits` skill).
 
 ## Format
+
 - Keep a Changelog (https://keepachangelog.com), grouped by commit type:
   `feat → Added`, `fix → Fixed`, `perf → Changed`, `refactor → Changed`, `docs → Documentation`, etc.
-- Each entry preserves the `Case: <case-id>` commit metadata (*metadatos de commit*) for the reverse link to the case file.
+- Each entry preserves the `Case: <case-id>` commit metadata (_metadatos de commit_) for the reverse link to the case file.
 
 ## Derivation mechanism
+
 - Generated by the **on-demand generator** (sketch: see §12.14 of the design doc). Phase 10 runs it
   with `--pending "<subject>" --case <id>` and includes CHANGELOG.md in its commit. No skill or phase
   hand-writes changelog entries. Without `--pending` the generator rebuilds the full file from `git log`
   (idempotent; suitable for CI sync-checks).
-- Scope: a single project-global CHANGELOG.md, plus the `Case:` commit metadata (*metadatos de commit*) on every commit
+- Scope: a single project-global CHANGELOG.md, plus the `Case:` commit metadata (_metadatos de commit_) on every commit
   (bidirectional changelog ↔ case link).
 - Releases: if `vX.Y.Z` tags exist, entries are grouped under `## [X.Y.Z]` sections; commits after the
   latest tag appear under `## [Unreleased]`.
 
 ## Why on-demand (not a git hook)
+
 A `post-commit` git hook with `--amend` rewrites the just-created commit, which risks a re-trigger loop
 and merges derived state into the source commit. An on-demand generator called from phase 10 produces
 CHANGELOG.md as a regular file change staged alongside the case artifacts, with no `--amend` and no
 hidden side effects. See §9.4 for the full rationale.
-````
+```
 
 ### 12.6 Plantilla — `.claude/skills/sm-orchestrator/templates/case.md`
 
@@ -1458,17 +1511,19 @@ Se presentan las variantes Full (artefactos individuales por fase) y Consolidado
 case_id: <YYYYMMDD-slug>
 profile: <corrective|adaptive|perfective|preventive>
 created: <ISO-8601 UTC>
-status: in_progress           # in_progress | done | aborted
-verdict:                       # filled at consolidation
+status: in_progress # in_progress | done | aborted
+verdict: # filled at consolidation
 ---
 
 # Case Manifest — <case_id>
 
 ## Case
+
 <one-paragraph description of the maintenance request>
 
 ## Profile parameters
-<filled by the sm-profile-* skill: objective, priorities, success metrics, risk thresholds>
+
+<filled by the sm-profile-\* skill: objective, priorities, success metrics, risk thresholds>
 
 ## Canonical state (machine-readable — single source of truth)
 
@@ -1504,42 +1559,53 @@ phases:
 <!-- ── CONSOLIDATED MODE ONLY: phase content below (omit in full mode) ──── -->
 
 ## Fases
+
 <!-- Each phase produces a subsection here instead of a separate file. -->
 
 ### 01 — Observation
+
 <!-- sm-phase-observation writes here -->
 
 ### 02 — Problem Definition
+
 <!-- sm-phase-problem-definition writes here -->
 
 ### 03 — Research
+
 <!-- sm-phase-research writes here -->
 
 ### 04 — Hypothesis
+
 <!-- sm-phase-hypothesis writes here -->
 
 ### 05 — Experiment Design
+
 <!-- sm-phase-experiment-design writes here -->
 
 ### 06 — Experiment Execution
+
 <!-- sm-phase-experiment-execution writes here -->
 
 ### 07 — Data Collection
+
 <!-- sm-phase-data-collection writes here -->
 
 ### 08 — Analysis
+
 <!-- sm-phase-analysis writes here -->
 
 ### 09 — Conclusion
+
 <!-- sm-phase-conclusion writes here -->
 
 ### 10 — Communication
+
 <!-- sm-phase-communication writes here -->
 ````
 
 ### 12.7 Plantilla — `.claude/skills/sm-orchestrator/templates/phase-artifact.md`
 
-````markdown
+```markdown
 ---
 case_id: <id>
 profile: <profile>
@@ -1549,20 +1615,23 @@ timestamp: <ISO-8601 UTC>
 status: in_progress
 inputs: []
 produces: <NN-phase>.md
-links: { previous: , next: }   # add previous_version: <file> when this version supersedes a prior one
+links: { previous, next } # add previous_version: <file> when this version supersedes a prior one
 ---
 
 # <Phase title> — <case_id>
 
 ## Applied policy
+
 <echo of focus / reasoning_effort / evidence / acceptance / risk_controls read from case.md>
 
 ## Result
+
 <phase-specific content — see the phase skill>
 
 ## Acceptance check
+
 <how this artifact meets `acceptance` from the policy>
-````
+```
 
 ### 12.8 `.claude/skills/sm-profile-corrective/SKILL.md`
 
@@ -1584,9 +1653,11 @@ phase artifacts.
 <user_communication>Spanish for any user interaction. See ../artifact-structuring/SKILL.md §language_policy.</user_communication>
 
 ## Objective
+
 Restore correct behavior by removing a defect with a minimal, verified change.
 
 ## Parameters to write into case.md
+
 - Priorities: reproduce → root cause → minimal fix → no regression.
 - Success metrics: reproduction test red→green; zero regressions; time-to-resolution.
 - Risk thresholds: reject broad changes for a localized defect; reject a fix without a covering test.
@@ -1608,9 +1679,11 @@ phase_policy:
 ```
 
 ## Evidence prioritized
+
 Reproduction test (red→green), stack traces, minimal diff.
 
 ## Conclusions favored
+
 "Root cause X corrected, verified by test T, no regressions."
 ````
 
@@ -1633,9 +1706,11 @@ Policy layer. Writes parameters + phase-policy matrix into `case.md`. Never exec
 <user_communication>Spanish for any user interaction. See ../artifact-structuring/SKILL.md §language_policy.</user_communication>
 
 ## Objective
+
 Adapt the software to an external change while preserving compatibility.
 
 ## Parameters to write into case.md
+
 - Priorities: compatibility → safe migration → coverage of the new contract.
 - Success metrics: suite green on the new target; no public-contract breakage; documented migration.
 - Risk thresholds: reject non-isolated changes (no feature flag); reject irreversible migrations
@@ -1658,9 +1733,11 @@ phase_policy:
 ```
 
 ## Evidence prioritized
+
 Compatibility matrices, contract tests, version before/after.
 
 ## Conclusions favored
+
 "Adapted to Y keeping compatibility with X; migration reversible."
 ````
 
@@ -1683,10 +1760,12 @@ Policy layer. Writes parameters + phase-policy matrix into `case.md`. Never exec
 <user_communication>Spanish for any user interaction. See ../artifact-structuring/SKILL.md §language_policy.</user_communication>
 
 ## Objective
+
 Improve quality attributes (performance, readability, maintainability, UX) without changing
 functional behavior.
 
 ## Parameters to write into case.md
+
 - Priorities: measurable improvement → behavior preservation → no quality regression.
 - Success metrics: statistically significant improvement of the target metric; functional suite green.
 - Risk thresholds: reject optimization without a baseline; reject refactor without a test net; reject
@@ -1709,9 +1788,11 @@ phase_policy:
 ```
 
 ## Evidence prioritized
+
 Reproducible benchmarks, performance profiles, complexity metrics, coverage.
 
 ## Conclusions favored
+
 "Metric M improved by Δ (p<threshold) with no functional change."
 ````
 
@@ -1734,9 +1815,11 @@ Policy layer. Writes parameters + phase-policy matrix into `case.md`. Never exec
 <user_communication>Spanish for any user interaction. See ../artifact-structuring/SKILL.md §language_policy.</user_communication>
 
 ## Objective
+
 Reduce the probability or impact of future failures before they occur.
 
 ## Parameters to write into case.md
+
 - Priorities: risk identification → mitigation → residual-risk quantification.
 - Success metrics: risk demonstrably mitigated; residual risk quantified; guards/coverage added.
 - Risk thresholds: reject changes adding net risk; reject mitigation without a validating test; reject
@@ -1759,9 +1842,11 @@ phase_policy:
 ```
 
 ## Evidence prioritized
+
 Tests that provoke the risk condition, static analysis, critical-path coverage, threat models.
 
 ## Conclusions favored
+
 "Risk R mitigated by control C; residual quantified and accepted."
 ````
 
@@ -1772,7 +1857,7 @@ Las diez fases comparten el mismo esqueleto. Se incluyen completas. Todas leen s
 
 #### 12.12.1 `.claude/skills/sm-phase-observation/SKILL.md`
 
-````markdown
+```markdown
 ---
 name: sm-phase-observation
 description: >
@@ -1788,28 +1873,33 @@ Generic, profile-parameterized. Reads policy; never decides order; never consoli
 <user_communication>Spanish for user interaction. See ../artifact-structuring/SKILL.md §language_policy.</user_communication>
 
 ## Inputs
+
 - case.md (profile + phase_policy.observation)
 - The user request; access to code, logs, metrics, tests, issues.
 
 ## Procedure
+
 1. Read case.md → `phase_policy.observation` (focus, reasoning_effort, evidence, acceptance, risk_controls).
 2. Collect observable facts in line with `focus` and gather every required `evidence` item.
 3. Record facts only — no causes, no fixes. Date and source each fact.
 4. Delimit scope.
 
 ## Output
+
 Write `maintenance-cases/<case-id>/01-observation.md` from templates/phase-artifact.md with:
+
 - Applied policy (echo), Observed facts, Context, Scope, "Not interpreted" note.
 
 ## Acceptance
+
 Meets `acceptance`: facts verifiable and dated; no assumed cause; scope bounded.
 
 <constraints>No interpretation or proposed fixes. No phase ordering decisions.</constraints>
-````
+```
 
 #### 12.12.2 `.claude/skills/sm-phase-problem-definition/SKILL.md`
 
-````markdown
+```markdown
 ---
 name: sm-phase-problem-definition
 description: >
@@ -1823,25 +1913,29 @@ description: >
 <user_communication>Spanish for user interaction. See ../artifact-structuring/SKILL.md §language_policy.</user_communication>
 
 ## Inputs
+
 - case.md (phase_policy.problem-definition); 01-observation.md.
 
 ## Procedure
+
 1. Read the policy entry.
 2. Convert observations into ONE precise problem statement aligned with `focus`.
 3. Define the explicit "solved" criterion, limits, impact and severity.
 
 ## Output
+
 Write `02-problem-definition.md`: Applied policy, Problem statement, Solved criterion, Limits, Severity.
 
 ## Acceptance
+
 Falsifiable and measurable statement; explicit success criterion; single problem.
 
 <constraints>Do not formulate hypotheses or solutions here.</constraints>
-````
+```
 
 #### 12.12.3 `.claude/skills/sm-phase-research/SKILL.md`
 
-````markdown
+```markdown
 ---
 name: sm-phase-research
 description: >
@@ -1855,10 +1949,12 @@ description: >
 <user_communication>Spanish for user interaction. See ../artifact-structuring/SKILL.md §language_policy.</user_communication>
 
 ## Inputs
+
 - case.md (phase_policy.research); 02-problem-definition.md; the knowledge base (.claude/memory/ via
   MEMORY.md). See ../sm-orchestrator/references/knowledge-base.md.
 
 ## Procedure
+
 1. Read the policy entry.
 2. **Recall protocol:** derive `component`/`defect-class` from 02-problem-definition.md and take
    `profile` from case.md; query MEMORY.md by those tags; open and cite matching lessons as prior art.
@@ -1867,19 +1963,21 @@ description: >
 4. Cite every source so it is locatable. Collect required `evidence`.
 
 ## Output
+
 Write `03-research.md`: Applied policy, Recalled lessons (with links), Findings (with sources),
 Related code, Constraints.
 
 ## Acceptance
+
 Sources cited and locatable; recall executed by the relevant tags; coverage of the affected area
 sufficient.
 
 <constraints>Gather knowledge and recall lessons; do not propose hypotheses yet.</constraints>
-````
+```
 
 #### 12.12.4 `.claude/skills/sm-phase-hypothesis/SKILL.md`
 
-````markdown
+```markdown
 ---
 name: sm-phase-hypothesis
 description: >
@@ -1893,25 +1991,29 @@ description: >
 <user_communication>Spanish for user interaction. See ../artifact-structuring/SKILL.md §language_policy.</user_communication>
 
 ## Inputs
+
 - case.md (phase_policy.hypothesis); 02 and 03.
 
 ## Procedure
+
 1. Read the policy entry.
 2. Formulate one or more falsifiable hypotheses aligned with `focus`.
 3. For each, state an observable prediction and a refutation criterion. Prioritize.
 
 ## Output
+
 Write `04-hypothesis.md`: Applied policy, Prioritized hypotheses, Prediction, Refutation criterion.
 
 ## Acceptance
+
 Each hypothesis falsifiable with observable prediction; prioritization justified.
 
 <constraints>Do not design or run experiments here.</constraints>
-````
+```
 
 #### 12.12.5 `.claude/skills/sm-phase-experiment-design/SKILL.md`
 
-````markdown
+```markdown
 ---
 name: sm-phase-experiment-design
 description: >
@@ -1925,26 +2027,30 @@ description: >
 <user_communication>Spanish for user interaction. See ../artifact-structuring/SKILL.md §language_policy.</user_communication>
 
 ## Inputs
+
 - case.md (phase_policy.experiment-design); 04-hypothesis.md.
 
 ## Procedure
+
 1. Read the policy entry; honor `risk_controls` (e.g. sandbox, feature_flag, rollback).
 2. Design a reproducible procedure: variables, controls, success/failure criteria.
 3. Define an explicit rollback. Keep cost bounded by `reasoning_effort`.
 
 ## Output
+
 Write `05-experiment-design.md`: Applied policy, Procedure, Variables, Controls, Success/Failure,
 Rollback.
 
 ## Acceptance
+
 Reproducible; controls defined; rollback explicit; cost bounded.
 
 <constraints>Design only; do not execute.</constraints>
-````
+```
 
 #### 12.12.6 `.claude/skills/sm-phase-experiment-execution/SKILL.md`
 
-````markdown
+```markdown
 ---
 name: sm-phase-experiment-execution
 description: >
@@ -1958,25 +2064,29 @@ description: >
 <user_communication>Spanish for user interaction. See ../artifact-structuring/SKILL.md §language_policy.</user_communication>
 
 ## Inputs
+
 - case.md (phase_policy.experiment-execution); 05-experiment-design.md.
 
 ## Procedure
+
 1. Read the policy entry and the design.
 2. Execute exactly as designed under the required `risk_controls`. Record environment.
 3. Log commands, applied changes, raw output, and any deviation (with reason).
 
 ## Output
+
 Write `06-experiment-execution.md`: Applied policy, Commands, Changes, Deviations, Raw logs.
 
 ## Acceptance
+
 Followed the design; deviations documented; environment recorded; reversible.
 
 <constraints>Do not interpret results here; capture them.</constraints>
-````
+```
 
 #### 12.12.7 `.claude/skills/sm-phase-data-collection/SKILL.md`
 
-````markdown
+```markdown
 ---
 name: sm-phase-data-collection
 description: >
@@ -1990,25 +2100,29 @@ description: >
 <user_communication>Spanish for user interaction. See ../artifact-structuring/SKILL.md §language_policy.</user_communication>
 
 ## Inputs
+
 - case.md (phase_policy.data-collection); 06-experiment-execution.md.
 
 ## Procedure
+
 1. Read the policy entry; the `evidence` field defines mandatory data.
 2. Normalize results: metrics, test outcomes, before/after, units and conditions.
 3. Never edit raw results; record them faithfully.
 
 ## Output
+
 Write `07-data-collection.md`: Applied policy, Normalized data, Metrics, Before/after.
 
 ## Acceptance
+
 Data traceable to execution; units and conditions recorded; raw results unedited.
 
 <constraints>Collect and normalize; do not draw conclusions.</constraints>
-````
+```
 
 #### 12.12.8 `.claude/skills/sm-phase-analysis/SKILL.md`
 
-````markdown
+```markdown
 ---
 name: sm-phase-analysis
 description: >
@@ -2022,25 +2136,29 @@ description: >
 <user_communication>Spanish for user interaction. See ../artifact-structuring/SKILL.md §language_policy.</user_communication>
 
 ## Inputs
+
 - case.md (phase_policy.analysis); 04-hypothesis.md; 07-data-collection.md.
 
 ## Procedure
+
 1. Read the policy entry.
 2. Compare data to each hypothesis and to the phase-02 criterion.
 3. State confirmed/refuted, effect magnitude, threats to validity, side effects. Consider alternatives.
 
 ## Output
+
 Write `08-analysis.md`: Applied policy, Verdict on hypotheses, Magnitude, Threats to validity, Side effects.
 
 ## Acceptance
+
 Conclusion supported by data; alternatives considered; limits declared.
 
 <constraints>Analyze; the case decision belongs to phase 09.</constraints>
-````
+```
 
 #### 12.12.9 `.claude/skills/sm-phase-conclusion/SKILL.md`
 
-````markdown
+```markdown
 ---
 name: sm-phase-conclusion
 description: >
@@ -2054,10 +2172,12 @@ description: >
 <user_communication>Spanish for user interaction. See ../artifact-structuring/SKILL.md §language_policy.</user_communication>
 
 ## Inputs
+
 - case.md (phase_policy.conclusion); 02-problem-definition.md; 08-analysis.md.
 - Knowledge-base schema: ../sm-orchestrator/references/knowledge-base.md.
 
 ## Procedure
+
 1. Read the policy entry.
 2. Contrast the analysis with the phase-02 success criterion.
 3. Decide: apply / revert / escalate. Record residuals, debt, follow-ups.
@@ -2065,20 +2185,22 @@ description: >
    .claude/memory/ with tags `component`/`defect-class`/`profile`; add one line to MEMORY.md.
 
 ## Output
+
 - Write `09-conclusion.md`: Applied policy, Verdict, Decision, Residuals/Debt, Follow-up, Lesson link.
 - Write the lesson file in .claude/memory/ and index it in MEMORY.md.
 
 ## Acceptance
+
 Verdict coherent with the analysis; phase-02 criterion checked; actions actionable; lesson written with
 tags that enable phase-03 recall.
 
 <constraints>Decide and record the lesson; produce the human communication in phase 10. Do not write the
 changelog or any case ledger (both are derived).</constraints>
-````
+```
 
 #### 12.12.10 `.claude/skills/sm-phase-communication/SKILL.md`
 
-````markdown
+```markdown
 ---
 name: sm-phase-communication
 description: >
@@ -2093,26 +2215,30 @@ description: >
 See ../artifact-structuring/SKILL.md §language_policy and the conventional-commits skill.</user_communication>
 
 ## Inputs
+
 - case.md (phase_policy.communication); the full 01→09 chain.
 
 ## Procedure
+
 1. Read the policy entry.
 2. Summarize for the target audience: what changed, why, evidence, risks, links to artifacts.
 3. Draft the commit/PR message in Spanish following the repo's conventional-commits skill, ending with
-   the commit metadata (*metadatos de commit*) `Case: <case-id>` (see ../sm-orchestrator/references/changelog.md).
+   the commit metadata (_metadatos de commit_) `Case: <case-id>` (see ../sm-orchestrator/references/changelog.md).
 
 ## Output
+
 Write `10-communication.md`: Applied policy, Executive summary, Changes, Evidence (links), Risks,
-Commit/PR draft (Spanish, with `Case:` commit metadata (*metadatos de commit*)).
+Commit/PR draft (Spanish, with `Case:` commit metadata (_metadatos de commit_)).
 
 ## Acceptance
+
 Self-contained; links evidence; correct audience; no unsupported claims; commit draft carries the
-`Case:` commit metadata (*metadatos de commit*).
+`Case:` commit metadata (_metadatos de commit_).
 
 <constraints>Communicate; do not introduce new changes or conclusions. Run the changelog generator with the
 pending entry (`--pending "<subject>" --case <id>`) and include CHANGELOG.md in the commit. Never
 hand-write changelog entries.</constraints>
-````
+```
 
 ### 12.13 Memoria — base de conocimiento (patrón MEMORY.md) y registro derivado
 
@@ -2120,7 +2246,7 @@ El antiguo `memory/maintenance-ledger.md` plano **desaparece**. La memoria se ma
 
 **(a) Ejemplo de archivo de lección — `.claude/memory/connection-pool-timeout-regressions.md`**
 
-````markdown
+```markdown
 ---
 name: connection-pool-timeout-regressions
 description: A recent change to the connection-pool timeout caused intermittent 500s under load.
@@ -2135,26 +2261,26 @@ before anything else: an undersized timeout exhausts the pool and surfaces as la
 connection error. How to apply: grep recent commits touching the pool config (`git log -p -- session.ts`),
 add a load test to CI so the regression cannot recur silently.
 Related case: maintenance-cases/20260606-login-timeout/case.md
-````
+```
 
 Y su línea en el índice `.claude/memory/MEMORY.md`:
 
-````markdown
+```markdown
 - [connection-pool timeouts](connection-pool-timeout-regressions.md) — auth/connection-pool · corrective
-````
+```
 
 **(b) Registro de casos derivado (sin archivo manual).**
 No hay un archivo de registro: el índice de casos se **deriva** del filesystem y del changelog (§9.2).
 Por ejemplo, para listar casos correctivos cerrados:
 
-````bash
+```bash
 # id, perfil y veredicto desde los manifests (derivado del filesystem)
 for f in maintenance-cases/*/case.md; do
   grep -E '^(case_id|profile|verdict):' "$f"
 done
 # o, partiendo del changelog, saltar de una entrada a su expediente vía los metadatos de commit Case:
 git log --grep '^Case: ' --pretty='%s %(trailers:key=Case,valueonly)'
-````
+```
 
 ### 12.14 Generador on-demand — `CHANGELOG.md` (changelog derivado)
 
@@ -2162,7 +2288,7 @@ Esbozo del generador idempotente que la fase 10 ejecuta para actualizar `CHANGEL
 ni `--amend`; solo escribe el archivo. La fase 10 lo invoca con `--pending`/`--case` y luego incluye
 `CHANGELOG.md` en su commit normal como cualquier otro archivo modificado.
 
-````bash
+```bash
 #!/usr/bin/env bash
 # scripting/generate-changelog — regenerate CHANGELOG.md from conventional commits (Keep a Changelog).
 # Derived state: never hand-edit CHANGELOG.md. Single source of truth = git history.
@@ -2241,7 +2367,7 @@ emit_section() {
     done
   fi
 } > "$OUT"
-````
+```
 
 > Esbozo de referencia. En producción conviene endurecer el parseo del tipo de commit y los metadatos de commit
 > multi-línea. El rendimiento es O(n) en el número de commits, lo que no es un problema dado que el
@@ -2249,26 +2375,30 @@ emit_section() {
 
 ### 12.15 Ejemplo de `CHANGELOG.md` (derivado)
 
-````markdown
+```markdown
 # Changelog
 
 All notable changes are derived from conventional commits. Do not edit by hand.
 
 ## [Unreleased]
+
 ### Added
+
 - adaptar pagos a la API v2 detrás de feature flag (Case: 20260607-payments-api-v2)
 
 ### Changed
+
 - batching de queries para reducir p95 en reporting (Case: 20260608-reports-latency)
 
 ### Fixed
+
 - corregir timeout del pool de conexiones en login (Case: 20260606-login-timeout)
 - añadir error boundary para errores no manejados en el gateway (Case: 20260609-gateway-error-boundary)
-````
+```
 
 ### 12.16 Hook de Claude Code opcional (descrito) — `.claude/hooks/sm-validate-artifact.md`
 
-````markdown
+```markdown
 # Claude Code hook (optional, NOT installed) — sm-validate-artifact
 
 Purpose: validate phase-artifact frontmatter on write. This is a Claude Code hook (session event),
@@ -2280,18 +2410,19 @@ distinct from the on-demand changelog generator (invoked by phase 10). See §9.4
 
 Until installed, sm-orchestrator performs this validation as an explicit step. Installation is a user
 decision (see project CLAUDE.md §6).
-````
+```
 
 ---
 
 > **Cierre.** Esta especificación está lista para implementarse: define las 14 skills (`sm-orchestrator`
-> + 4 perfiles + 10 fases), el contrato de composición (`phase-policy schema`), los expedientes
-> versionables (`maintenance-cases/<case-id>/`), la memoria en dos niveles (base de conocimiento con
-> patrón de índice `MEMORY.md` + registro de casos **derivado**; recall explícito en fase 03), el
-> changelog **derivado** por **generador on-demand** (ejecutado por la fase 10, sin git hook, sin
-> `--amend`) con trazabilidad bidireccional vía los metadatos de commit `Case:`, el bloque YAML canónico en `case.md`
-> como única fuente de estado machine-readable, los dos modos de salida (Full / Consolidado), las dependencias
-> externas explícitas (§4.4), y los límites del runtime documentados (§3.6), sin sub-agents y sin
-> duplicación de lógica. Rige el principio **estado derivado sobre estado duplicado** (§2.5.1). La
-> evolución futura (nuevos perfiles, nuevas fases, o aislar una fase en un sub-agent) no requiere romper
-> el contrato perfil↔fase.
+>
+> - 4 perfiles + 10 fases), el contrato de composición (`phase-policy schema`), los expedientes
+>   versionables (`maintenance-cases/<case-id>/`), la memoria en dos niveles (base de conocimiento con
+>   patrón de índice `MEMORY.md` + registro de casos **derivado**; recall explícito en fase 03), el
+>   changelog **derivado** por **generador on-demand** (ejecutado por la fase 10, sin git hook, sin
+>   `--amend`) con trazabilidad bidireccional vía los metadatos de commit `Case:`, el bloque YAML canónico en `case.md`
+>   como única fuente de estado machine-readable, los dos modos de salida (Full / Consolidado), las dependencias
+>   externas explícitas (§4.4), y los límites del runtime documentados (§3.6), sin sub-agents y sin
+>   duplicación de lógica. Rige el principio **estado derivado sobre estado duplicado** (§2.5.1). La
+>   evolución futura (nuevos perfiles, nuevas fases, o aislar una fase en un sub-agent) no requiere romper
+>   el contrato perfil↔fase.

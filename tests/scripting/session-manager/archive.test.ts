@@ -1,12 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { setClaudeDirForTests } from '../../../scripting/session-manager/shared/paths.js';

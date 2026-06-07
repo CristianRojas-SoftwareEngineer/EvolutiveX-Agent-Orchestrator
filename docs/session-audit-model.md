@@ -42,29 +42,29 @@ sessions/<session-id>/
 
 ### Tabla EventBus → persistencia
 
-| Evento (`TelemetryEvent.type`) | Emisor típico | Rutas escritas por `SessionPersistence` |
-| ------------------------------ | ------------- | ---------------------------------------- |
-| `workflow_start` | Correlador (`openWorkflow`) | `workflows/NN/meta.json`; opcional `request/body.json` |
-| `workflow_spawn` | Correlador (subagente) | `…/tools/KK-slug/sub-agent/workflow/meta.json` (+ request) |
-| `step_request` | Handlers L3 / correlador | `steps/MM/request/body.json` |
-| `step_response` | Handlers L3 | `steps/MM/response/body.json`, `headers.json`, `parsed.md` |
-| `tool_call` | Correlador | `tools/KK-slug/input.json`, `meta.json` |
-| `tool_result` | Correlador / hooks | `tools/KK-slug/result.json`; actualiza `meta.json` |
-| `workflow_complete` | Cierre de workflow | `output/result.json`, `output/result.parsed.md`; `meta.json` final |
-| `workflow_cancel` | Timeout / cancelación | `meta.json` con `status: cancelled` |
-| `stream_chunk` | `AuditSseResponseHandler` | `steps/MM/response/streaming/NNNN-chunk.ndjson`; pings filtrados; tope 10 000 chunks |
-| `step_response` (con `coalescedDelegationStepIndex`) | `AuditSseResponseHandler` | además: `body.coalesced.json` + `body.coalesced.parsed.md` en el step continuation |
-| `*` (wildcard) | cualquier evento | `sessions/<id>/events.ndjson` (append-only) |
-| `workflow_start` / `workflow_complete` / `workflow_cancel` (kind=main) | Correlador / cierre | `sessions/<id>/workflows/workflow-sequence.json` (array) |
+| Evento (`TelemetryEvent.type`)                                         | Emisor típico               | Rutas escritas por `SessionPersistence`                                              |
+| ---------------------------------------------------------------------- | --------------------------- | ------------------------------------------------------------------------------------ |
+| `workflow_start`                                                       | Correlador (`openWorkflow`) | `workflows/NN/meta.json`; opcional `request/body.json`                               |
+| `workflow_spawn`                                                       | Correlador (subagente)      | `…/tools/KK-slug/sub-agent/workflow/meta.json` (+ request)                           |
+| `step_request`                                                         | Handlers L3 / correlador    | `steps/MM/request/body.json`                                                         |
+| `step_response`                                                        | Handlers L3                 | `steps/MM/response/body.json`, `headers.json`, `parsed.md`                           |
+| `tool_call`                                                            | Correlador                  | `tools/KK-slug/input.json`, `meta.json`                                              |
+| `tool_result`                                                          | Correlador / hooks          | `tools/KK-slug/result.json`; actualiza `meta.json`                                   |
+| `workflow_complete`                                                    | Cierre de workflow          | `output/result.json`, `output/result.parsed.md`; `meta.json` final                   |
+| `workflow_cancel`                                                      | Timeout / cancelación       | `meta.json` con `status: cancelled`                                                  |
+| `stream_chunk`                                                         | `AuditSseResponseHandler`   | `steps/MM/response/streaming/NNNN-chunk.ndjson`; pings filtrados; tope 10 000 chunks |
+| `step_response` (con `coalescedDelegationStepIndex`)                   | `AuditSseResponseHandler`   | además: `body.coalesced.json` + `body.coalesced.parsed.md` en el step continuation   |
+| `*` (wildcard)                                                         | cualquier evento            | `sessions/<id>/events.ndjson` (append-only)                                          |
+| `workflow_start` / `workflow_complete` / `workflow_cancel` (kind=main) | Correlador / cierre         | `sessions/<id>/workflows/workflow-sequence.json` (array)                             |
 
 ### Componentes de persistencia
 
-| Componente | Capa | Rol |
-| ---------- | ---- | --- |
-| `IEventBus` / `EventBus` | L1 / L2 | Pub/sub in-process; correlador y handlers publican telemetría |
-| `SessionPersistence` | L2 | Suscriptor que materializa el árbol en disco |
-| `IWorkflowRepository` / `WorkflowRepositoryService` | L1 / L2 | Estado en memoria; emite eventos en cada mutación |
-| `SseReconstructService` | L2 | Lee `streaming/*.ndjson` para reconstrucción y vistas coalesced |
+| Componente                                          | Capa    | Rol                                                             |
+| --------------------------------------------------- | ------- | --------------------------------------------------------------- |
+| `IEventBus` / `EventBus`                            | L1 / L2 | Pub/sub in-process; correlador y handlers publican telemetría   |
+| `SessionPersistence`                                | L2      | Suscriptor que materializa el árbol en disco                    |
+| `IWorkflowRepository` / `WorkflowRepositoryService` | L1 / L2 | Estado en memoria; emite eventos en cada mutación               |
+| `SseReconstructService`                             | L2      | Lee `streaming/*.ndjson` para reconstrucción y vistas coalesced |
 
 Índices `NN`, `MM`, `KK` usan zero-padding a 2 dígitos (`01`, `02`, …). El slug del tool se deriva de `slugifyToolName()` en `session-routing.ts`.
 
@@ -82,23 +82,23 @@ sessions/<session-id>/
 
 ### Artefactos transversales (vigentes)
 
-| Artefacto | Ubicación | Contenido |
-| --------- | --------- | --------- |
-| `session-metrics.json` | Raíz de sesión | Agregados por modelo (ver [`session-metrics-system.md`](./session-metrics-system.md)) |
-| `meta.json` | Workflow, tool o sub-workflow | Estado fusionado (`status`, `workflowKind`, timestamps, outcome, …) — **no** hay `state.json` |
-| `output/result.json` | Workflow | `IWorkflowResult` inmutable al cierre |
+| Artefacto              | Ubicación                     | Contenido                                                                                     |
+| ---------------------- | ----------------------------- | --------------------------------------------------------------------------------------------- |
+| `session-metrics.json` | Raíz de sesión                | Agregados por modelo (ver [`session-metrics-system.md`](./session-metrics-system.md))         |
+| `meta.json`            | Workflow, tool o sub-workflow | Estado fusionado (`status`, `workflowKind`, timestamps, outcome, …) — **no** hay `state.json` |
+| `output/result.json`   | Workflow                      | `IWorkflowResult` inmutable al cierre                                                         |
 
 **P2 (implementado):** `events.ndjson` (raíz de sesión), `workflows/workflow-sequence.json`, `streaming/` por step, vistas coalesced; `sse.jsonl` retirado.
 
 ### Qué delega a otros documentos
 
-| Tema | Documento |
-| ---- | --------- |
-| Métricas de sesión | [`session-metrics-system.md`](./session-metrics-system.md) |
-| Reconstrucción SSE | [`how-sse-reconstruction-works.md`](./how-sse-reconstruction-works.md) |
-| Peticiones sin sesión | [`health-check-handling.md`](./health-check-handling.md) |
-| Variables de entorno | [README § Configuración](../README.md#configuracion) |
-| Onboarding | [`how-to-start.md`](./how-to-start.md) |
+| Tema                  | Documento                                                              |
+| --------------------- | ---------------------------------------------------------------------- |
+| Métricas de sesión    | [`session-metrics-system.md`](./session-metrics-system.md)             |
+| Reconstrucción SSE    | [`how-sse-reconstruction-works.md`](./how-sse-reconstruction-works.md) |
+| Peticiones sin sesión | [`health-check-handling.md`](./health-check-handling.md)               |
+| Variables de entorno  | [README § Configuración](../README.md#configuracion)                   |
+| Onboarding            | [`how-to-start.md`](./how-to-start.md)                                 |
 
 ---
 
@@ -117,12 +117,12 @@ sessions/<id>/workflows/01/          → turno principal
 
 ### Semántica `input/` / `output/` frente a `request/` / `response/`
 
-| Nivel | Directorio | Significado |
-| ----- | ---------- | ----------- |
-| Workflow | `request/` | Cuerpo de la petición que **abrió** el workflow (fresh / side / preflight) |
-| Workflow | `output/` | Resultado del ciclo (`IWorkflowResult`), no la respuesta HTTP cruda del último hop |
-| Step | `request/` | Petición HTTP a Anthropic en ese step |
-| Step | `response/` | Respuesta HTTP (o artefactos derivados: `parsed.md`, `streaming/*.ndjson`) |
+| Nivel    | Directorio  | Significado                                                                        |
+| -------- | ----------- | ---------------------------------------------------------------------------------- |
+| Workflow | `request/`  | Cuerpo de la petición que **abrió** el workflow (fresh / side / preflight)         |
+| Workflow | `output/`   | Resultado del ciclo (`IWorkflowResult`), no la respuesta HTTP cruda del último hop |
+| Step     | `request/`  | Petición HTTP a Anthropic en ese step                                              |
+| Step     | `response/` | Respuesta HTTP (o artefactos derivados: `parsed.md`, `streaming/*.ndjson`)         |
 
 No hay `response/` en la raíz del workflow: la respuesta HTTP vive bajo `steps/MM/response/`.
 
@@ -165,12 +165,12 @@ flowchart LR
 
 La clasificación la realiza `RequestClassifierService` (dominio); `AuditWorkflowHandler` abre o continúa workflows en `IWorkflowRepository` y publica eventos.
 
-| Clasificación | Comportamiento resumido | Workflow en disco |
-| ------------- | ------------------------ | ----------------- |
-| `fresh` | Nuevo turno con `tools` no vacíos | Nuevo `workflows/NN/`, `kind: main` |
-| `continuation` | `tool_result` en el **último mensaje** hacia workflow activo | Mismo workflow; nuevo step o coalescing Agent |
-| `preflight-quota` / `preflight-warmup` | `max_tokens:1` o warm-up | Nuevo workflow; cierra al responder |
-| `side-request` | `tools: []` (p. ej. `count_tokens`) | Nuevo workflow; no desplaza el main activo |
+| Clasificación                          | Comportamiento resumido                                      | Workflow en disco                             |
+| -------------------------------------- | ------------------------------------------------------------ | --------------------------------------------- |
+| `fresh`                                | Nuevo turno con `tools` no vacíos                            | Nuevo `workflows/NN/`, `kind: main`           |
+| `continuation`                         | `tool_result` en el **último mensaje** hacia workflow activo | Mismo workflow; nuevo step o coalescing Agent |
+| `preflight-quota` / `preflight-warmup` | `max_tokens:1` o warm-up                                     | Nuevo workflow; cierra al responder           |
+| `side-request`                         | `tools: []` (p. ej. `count_tokens`)                          | Nuevo workflow; no desplaza el main activo    |
 
 **Sin sesión:** si `sessionId === '_unknown'`, el handler retorna sin escribir disco ([`health-check-handling.md`](./health-check-handling.md)).
 
@@ -194,11 +194,11 @@ Los pendientes viven en `IToolUse` del workflow padre, no en `ActiveInteraction`
 
 Los nombres `agentic`, `client-preflight` y `side-request` se conservan como **`interactionType`** en metadatos wire para compatibilidad con métricas y clasificación. En disco, todos son carpetas `workflows/NN/`.
 
-| `interactionType` | Origen típico | Cierre del workflow |
-| ----------------- | ------------- | ------------------- |
-| `agentic` | Fresh + continuations | Hook de cierre / `workflow_complete` con `IWorkflowResult` |
-| `client-preflight` | Quota o warm-up | Al recibir respuesta (inmediato) |
-| `side-request` | `tools: []` | Respuesta terminal; workflow independiente del main |
+| `interactionType`  | Origen típico         | Cierre del workflow                                        |
+| ------------------ | --------------------- | ---------------------------------------------------------- |
+| `agentic`          | Fresh + continuations | Hook de cierre / `workflow_complete` con `IWorkflowResult` |
+| `client-preflight` | Quota o warm-up       | Al recibir respuesta (inmediato)                           |
+| `side-request`     | `tools: []`           | Respuesta terminal; workflow independiente del main        |
 
 `WorkflowKind` en tipos gateway: `main` | `subagent` (sub-workflows bajo `sub-agent/workflow/`).
 
@@ -220,13 +220,13 @@ Al arranque, el proxy puede eliminar sesiones con layout flat legacy (**corte li
 
 ## 7. Entidades y tipos TypeScript
 
-| Concepto | Tipo / interfaz | Artefacto principal |
-| -------- | --------------- | ------------------- |
-| Workflow | `IWorkflow` | `workflows/NN/meta.json`, `output/result.json` |
-| Step | `IStep` | `steps/MM/request|response/` |
-| Tool use | `IToolUse` | `tools/KK-slug/input.json`, `result.json` |
-| Resultado E2E | `IWorkflowResult` | `output/result.json` |
-| Sesión (agregado) | `Session` (dominio) | `session-metrics.json` |
+| Concepto          | Tipo / interfaz     | Artefacto principal                            |
+| ----------------- | ------------------- | ---------------------------------------------- | ---------- |
+| Workflow          | `IWorkflow`         | `workflows/NN/meta.json`, `output/result.json` |
+| Step              | `IStep`             | `steps/MM/request                              | response/` |
+| Tool use          | `IToolUse`          | `tools/KK-slug/input.json`, `result.json`      |
+| Resultado E2E     | `IWorkflowResult`   | `output/result.json`                           |
+| Sesión (agregado) | `Session` (dominio) | `session-metrics.json`                         |
 
 ### `IWorkflowResult` (campos clave)
 
@@ -251,13 +251,13 @@ Todo lo demás (incluido SSE vía `stream_chunk`): `eventBus.publish(...)` → `
 
 ### Handlers relevantes
 
-| Handler | Rol |
-| ------- | --- |
-| `AuditWorkflowHandler` | Clasificación, apertura/continuación de workflows, wire steps |
-| `AuditSseResponseHandler` | Stream SSE + reconstrucción; publica `step_response` / cierre |
-| `AuditStandardResponseHandler` | Respuestas no-SSE |
-| `AuditWorkflowClosureHandler` | Coordinación de cierre + métricas; delega proyección al bus |
-| `AuditUpstreamErrorHandler` | Errores upstream |
+| Handler                        | Rol                                                           |
+| ------------------------------ | ------------------------------------------------------------- |
+| `AuditWorkflowHandler`         | Clasificación, apertura/continuación de workflows, wire steps |
+| `AuditSseResponseHandler`      | Stream SSE + reconstrucción; publica `step_response` / cierre |
+| `AuditStandardResponseHandler` | Respuestas no-SSE                                             |
+| `AuditWorkflowClosureHandler`  | Coordinación de cierre + métricas; delega proyección al bus   |
+| `AuditUpstreamErrorHandler`    | Errores upstream                                              |
 
 ### Cierre de workflow
 
@@ -282,22 +282,22 @@ sessions/<session-id>/
     interaction-sequence.json   # contadores separados
 ```
 
-| Árbol legacy | Tipo semántico |
-| ------------ | -------------- |
-| `main-agent/interactions/` | `agentic` |
-| `side-interactions/` | `client-preflight`, `side-request` |
+| Árbol legacy               | Tipo semántico                     |
+| -------------------------- | ---------------------------------- |
+| `main-agent/interactions/` | `agentic`                          |
+| `side-interactions/`       | `client-preflight`, `side-request` |
 
 En memoria, el modelo legacy usaba `ActiveInteraction` → `InteractionMetadata` en `meta.json` al cerrar, con `WorkflowResultProjector` proyectando `IWorkflowResult` al shape flat. P1 retiró `ISessionStore`, `IAuditWriter` y el projector; la proyección causal es exclusiva de `SessionPersistence`.
 
 ### Equivalencias aproximadas
 
-| Legacy | Causal P1 |
-| ------ | --------- |
-| `main-agent/interactions/NN/` | `workflows/NN/` (`kind: main`) |
-| `side-interactions/MM/` | `workflows/NN/` (otro índice; mismo árbol) |
-| `steps/YY/sub-agent-01/` | `steps/MM/tools/KK-Agent/sub-agent/workflow/` |
-| `state.json` | Estado en `meta.json` (`status: running` hasta cierre) |
-| `interaction-sequence.json` | Secuencia en correlador; **P2:** `workflow-sequence.json` en disco |
+| Legacy                        | Causal P1                                                          |
+| ----------------------------- | ------------------------------------------------------------------ |
+| `main-agent/interactions/NN/` | `workflows/NN/` (`kind: main`)                                     |
+| `side-interactions/MM/`       | `workflows/NN/` (otro índice; mismo árbol)                         |
+| `steps/YY/sub-agent-01/`      | `steps/MM/tools/KK-Agent/sub-agent/workflow/`                      |
+| `state.json`                  | Estado en `meta.json` (`status: running` hasta cierre)             |
+| `interaction-sequence.json`   | Secuencia en correlador; **P2:** `workflow-sequence.json` en disco |
 
 ---
 

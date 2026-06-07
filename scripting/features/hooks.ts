@@ -66,9 +66,9 @@ export function resolveCommandPlaceholders(command: string, scpRoot: string): st
 export function resolveHooksBlock(hooks: HooksBlock, scpRoot: string): HooksBlock {
   const resolved: HooksBlock = {};
   for (const [key, blocks] of Object.entries(hooks)) {
-    resolved[key] = blocks.map(block => ({
+    resolved[key] = blocks.map((block) => ({
       ...block,
-      hooks: block.hooks.map(entry => ({
+      hooks: block.hooks.map((entry) => ({
         ...entry,
         command: resolveCommandPlaceholders(entry.command, scpRoot),
       })),
@@ -111,9 +111,9 @@ export function isScpManagedCommand(command: string | undefined, scpRoot: string
  */
 export function classifyKey(blocks: HookBlock[] | undefined, scpRoot: string): KeyClassification {
   if (!blocks || blocks.length === 0) return 'user-only';
-  const commands = blocks.flatMap(b => b.hooks.map(h => h.command));
+  const commands = blocks.flatMap((b) => b.hooks.map((h) => h.command));
   if (commands.length === 0) return 'user-only';
-  const scpCount = commands.filter(c => isScpManagedCommand(c, scpRoot)).length;
+  const scpCount = commands.filter((c) => isScpManagedCommand(c, scpRoot)).length;
   if (scpCount === 0) return 'user-only';
   if (scpCount === commands.length) return 'scp-only';
   return 'mixed';
@@ -192,8 +192,8 @@ export function mergeHooks(
       nextHooks[key] = canonicalBlocks;
     } else {
       // mixed: preservar bloques con comandos ajenos, agregar los de SCP
-      const userBlocks = (existing ?? []).filter(
-        b => b.hooks.some(h => !isScpManagedCommand(h.command, scpRoot)),
+      const userBlocks = (existing ?? []).filter((b) =>
+        b.hooks.some((h) => !isScpManagedCommand(h.command, scpRoot)),
       );
       nextHooks[key] = [...userBlocks, ...canonicalBlocks];
     }
@@ -223,8 +223,8 @@ export function unmergeHooks(
   for (const key of Object.keys(canonical)) {
     const existing = nextHooks[key];
     if (!existing) continue;
-    const filtered = existing.filter(
-      b => b.hooks.some(h => !isScpManagedCommand(h.command, scpRoot)),
+    const filtered = existing.filter((b) =>
+      b.hooks.some((h) => !isScpManagedCommand(h.command, scpRoot)),
     );
     if (filtered.length === 0) {
       delete nextHooks[key];
@@ -262,6 +262,8 @@ export function validateScpRoot(scpRoot: string): void {
     }
   }
   if (missing.length > 0) {
-    throw new Error(`No se encontraron los siguientes archivos en la raíz del proxy: ${missing.join(', ')}`);
+    throw new Error(
+      `No se encontraron los siguientes archivos en la raíz del proxy: ${missing.join(', ')}`,
+    );
   }
 }

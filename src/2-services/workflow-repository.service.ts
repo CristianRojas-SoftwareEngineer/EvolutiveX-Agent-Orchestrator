@@ -22,7 +22,10 @@ export class WorkflowRepositoryService implements IWorkflowRepository {
   // Índice de lifecycle (G2): workflowId → Workflow
   private readonly workflows = new Map<string, Workflow>();
   // Pendientes de correlación: workflowId → (toolUseId → { stepId, toolUse })
-  private readonly pendingToolUses = new Map<string, Map<string, { stepId: string; toolUse: IToolUse }>>();
+  private readonly pendingToolUses = new Map<
+    string,
+    Map<string, { stepId: string; toolUse: IToolUse }>
+  >();
   // Secuencias por sesión.
   private readonly sequences = new Map<string, number>();
   // Índice de layout NN por sesión (wire audit).
@@ -60,7 +63,9 @@ export class WorkflowRepositoryService implements IWorkflowRepository {
       agentId,
       ...(agentCtx.parentAgentId ? { parentAgentId: agentCtx.parentAgentId } : {}),
       ...(existing?.confirmed !== undefined ? { confirmed: existing.confirmed } : {}),
-      ...(existing?.triggeringToolUseId ? { triggeringToolUseId: existing.triggeringToolUseId } : {}),
+      ...(existing?.triggeringToolUseId
+        ? { triggeringToolUseId: existing.triggeringToolUseId }
+        : {}),
     };
     if (agentCtx.agentId) {
       this.index.set(agentCtx.agentId, entry);
@@ -267,7 +272,19 @@ export class WorkflowRepositoryService implements IWorkflowRepository {
     const workflow = this.workflows.get(workflowId);
     if (!workflow) {
       // No debería ocurrir si el caller verifica getWorkflow antes; devolver resultado vacío
-      return buildWorkflowResult({ id: workflowId, sessionId: hook.sessionId, kind: 'main', status: 'failed', steps: [], startedAt: new Date() }, [], [], hook);
+      return buildWorkflowResult(
+        {
+          id: workflowId,
+          sessionId: hook.sessionId,
+          kind: 'main',
+          status: 'failed',
+          steps: [],
+          startedAt: new Date(),
+        },
+        [],
+        [],
+        hook,
+      );
     }
     // Idempotencia §28: si ya está cerrado, devolver el resultado existente
     if (workflow.result != null) return workflow.result;
@@ -422,7 +439,10 @@ export class WorkflowRepositoryService implements IWorkflowRepository {
     return this.findWorkflowWithPendingToolUse(sessionId, toolUseId)?.workflow;
   }
 
-  public consumeFirstPendingToolUseByName(workflowId: string, toolName: string): IToolUse | undefined {
+  public consumeFirstPendingToolUseByName(
+    workflowId: string,
+    toolName: string,
+  ): IToolUse | undefined {
     const pendings = this.pendingToolUses.get(workflowId);
     if (!pendings) return undefined;
     const normalized = toolName.toLowerCase().replace(/_/g, '');
@@ -460,7 +480,10 @@ export class WorkflowRepositoryService implements IWorkflowRepository {
 
   public withSessionLock<T>(sessionId: string, fn: () => Promise<T>): Promise<T> {
     const prev = this.sessionLocks.get(sessionId) ?? Promise.resolve();
-    const next = prev.then(() => fn(), () => fn());
+    const next = prev.then(
+      () => fn(),
+      () => fn(),
+    );
     this.sessionLocks.set(
       sessionId,
       next.then(

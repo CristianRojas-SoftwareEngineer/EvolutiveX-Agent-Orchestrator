@@ -17,8 +17,7 @@ const STOP_FAILURE_ERROR_MAP: Record<string, string> = {
 // Firma de mojibake: bytes de continuación UTF-8 (0x80-0xBF) precedidos por un
 // byte líder válido (2 bytes: C2-DF; 3 bytes: E0-EF), tal como aparecen cuando
 // una cadena UTF-8 se decodifica erróneamente como Latin-1/CP1252.
-const MOJIBAKE_SIGNATURE =
-  /[Â-ß][-¿]|[à-ï][-¿]{2}/;
+const MOJIBAKE_SIGNATURE = /[Â-ß][-¿]|[à-ï][-¿]{2}/;
 
 /**
  * Repara mojibake "UTF-8 leído como Latin-1" (p. ej. `Â¿quÃ©` → `¿qué`).

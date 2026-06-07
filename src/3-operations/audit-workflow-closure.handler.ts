@@ -17,11 +17,7 @@ export class AuditWorkflowClosureHandler {
   public async execute(ctx: AuditWorkflowClosureContext): Promise<void> {
     if (ctx.workflow.kind !== 'main') return;
     const closedSteps = ctx.workflow.steps.filter((s) => s.closedAt != null);
-    await this.sessionMetrics.finalizeWorkflowMetrics(
-      ctx.sessionDir,
-      ctx.workflow.id,
-      closedSteps,
-    );
+    await this.sessionMetrics.finalizeWorkflowMetrics(ctx.sessionDir, ctx.workflow.id, closedSteps);
   }
 }
 

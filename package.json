@@ -21,7 +21,7 @@
     "test:watch": "vitest --config configs/vitest.config.ts",
     "clean:all": "concurrently \"npm run clean:dist\" \"npm run clean:modules\" \"npm run clean:sessions\" \"npm run clean:logs\"",
     "clean:dist": "rimraf dist",
-    "clean:modules": "rimraf node_modules",
+    "clean:modules": "tsx scripting/clean-modules.ts",
     "clean:sessions": "rimraf sessions",
     "clean:logs": "rimraf server",
     "configure:provider": "tsx scripting/configure-provider.ts",

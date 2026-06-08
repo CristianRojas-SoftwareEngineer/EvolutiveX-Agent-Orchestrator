@@ -1,6 +1,6 @@
 # Nuevo diseño: Mantenimiento Científico con dos cadenas secuenciales
 
-> **Estado:** propuesta de migración (no implementado) · **Versión:** v0.5 · **Reemplaza a:**
+> **Estado:** propuesta de migración (no implementado) · **Versión:** v0.6 · **Reemplaza a:**
 > `scientific-maintenance.md` v1.0 cuando sea aprobado · **Sistema vigente actual:** 15 skills `sm-*`
 > descritas en `docs/proposals/scientific-maintenance.md` v1.0
 
@@ -89,7 +89,7 @@ objeto de un plan de migración aparte.
     - [10.5c Corrida 1 — pausa post-solución (C2 o C3)](#105c-corrida-1--pausa-post-solución-c2-o-c3)
 11. [Recomendaciones de implementación](#11-recomendaciones-de-implementación)
 12. [Referencias cruzadas](#12-referencias-cruzadas)
-    - [12.2.4 Modos de integración SM↔OpenSpec (v0.5)](#1224-modos-de-integración-smopenspec-v05)
+    - [12.2.4 Modos de integración SM↔OpenSpec (v0.6)](#1224-modos-de-integración-smopenspec-v06)
 
 ---
 
@@ -211,6 +211,14 @@ El Bucle B (bucle batch comparativo de solución) es **asimétrico** con el Bucl
   | Contexto de re-apertura | `ctx-a`, `ctx-b`, `ctx-c` | Qué aporta el usuario al reabrir |
   | Rutas terminales de cierre | **(a)**, **(b)**, **(c)** | Solo §5.3 — veredicto de la fase 17 |
 
+  **Emparejamiento sugerido disparador → contexto de re-apertura:**
+
+  | Disparador | Contexto sugerido | Rationale |
+  | ---------- | ----------------- | --------- |
+  | **`C1`** | **`ctx-a`** | Más investigación/recall tras agotar causas |
+  | **`C2`** | **`ctx-b`** | Información nueva del usuario tras agotar soluciones |
+  | **`C3`** | **`ctx-a`** o **`ctx-c`** | Ampliar recall del espacio (`ctx-a`) o cambiar perfil/política (`ctx-c`) |
+
 - **Acción:** la fase 17 escribe la lección destilada, fija el estado del caso como `pausado` en
   `case.md` (campo nuevo `case_paused_at: <ISO-8601 UTC>`), y emite el veredicto "no resuelto"
   hacia la fase 18. La fase 18 comunica el estado al usuario y al changelog.
@@ -224,7 +232,10 @@ El Bucle B (bucle batch comparativo de solución) es **asimétrico** con el Bucl
   post-solución.
 - **Alcance de la re-apertura:** si el usuario acepta, el orquestador re-ejecuta **03–08** con el
   nuevo contexto. Las fases 01–02 **no** se re-ejecutan: la observación y la definición del problema
-  siguen siendo válidas (es un caso pausado, no un caso nuevo).
+  siguen siendo válidas (es un caso pausado, no un caso nuevo). Si la aceptación usa **`ctx-c`**
+  (perfil distinto), el orquestador **re-invoca** el skill de perfil correspondiente, actualiza
+  `profile` y la matrix `phase_policy` (16 entries) en `case.md`, valida el esquema (§5.4) y **luego**
+  re-ejecuta 03–08 con la nueva política.
 - **Corrida posterior:** al aceptar la re-apertura, el orquestador incrementa `case_run` (entero ≥
   1; inicial 1), fija `case_resumed_at` y re-ejecuta 03–08. Si la causa se confirma, la cadena de
   solución (11–16) abre en **esa corrida** (`case_run` actual), no dentro del ciclo 03–08 del Bucle C.
@@ -306,8 +317,10 @@ cada skill de fase:
   secuenciales (12 requiere 11, 13 requiere 12, etc.).
 - **Cierre (17–18):** la fase 17 requiere que la fase 08 esté `done`; la fase 16 solo es
   precondición de 17 **si el estado de la cadena de solución es `completa_12-16`** (ver §5.2 y §5.3);
-  la fase 18 requiere 17 `done`. Un artefacto `17-conclusion.md` con `phases.conclusion: done` en el
-  expediente **no** implica `case.status: done` si la ruta fue **(c)** (`case.status: pausado`).
+  la fase 18 requiere 17 `done`. En ruta **(c)**, la fase 17 marca `phases.conclusion: done` (fase
+  ejecutada, artefacto emitido) **y** `case.status: pausado` — no son contradictorios. Un artefacto
+  `17-conclusion.md` con `phases.conclusion: done` **no** implica `case.status: done` si la ruta fue
+  **(c)**.
 
 Si una precondición falla, el orquestador se detiene y reporta (o enruta al atajo documentado en
 §5.2 / §5.3).
@@ -328,7 +341,7 @@ El orquestador y la fase 17 usan exactamente uno de estos estados por corrida:
 | ------ | ---------- | ---------------- |
 | `no_abierta` | `08` sin `## Causa confirmada`; fase 11 no invocada | 01–08 (causa) |
 | `parcial_11` | Fase 11 invocada pero validación §7.9 fallida (`<2` viables) | 01–08, 11 |
-| `completa_12-16` | Al menos la fase 12 alcanzada (11 válida o Bucle B en curso/completado) | 01–08, 11–16 |
+| `completa_12-16` | Fase 11 validada (≥2 viables); cadena 11–16 abierta, en curso, Bucle B o completada | 01–08, 11 (válida) y 12–16 según avance |
 
 **Bucle A y `08-analysis.md`:** la fase 08 emite **exactamente una** de `## Causa confirmada` o
 `## Causa refutada` por iteración. Si emite `## Causa refutada` y quedan candidatas `pending` en
@@ -360,8 +373,8 @@ es `completa_12-16` — es la **única** fuente de `## Solución ganadora`.
 
 El orquestador (paso 8 §13.5) y la fase 17 aplican este orden **sin solapamiento**:
 
-1. Si `08` carece de `## Causa confirmada` → ruta **(c)** (`no_abierta`; `pause_reason:
-   candidatas_agotadas`; **`C1`**).
+1. Tras **agotar el Bucle A** (sin candidatas `pending` en `04`), si `08` carece de
+   `## Causa confirmada` → ruta **(c)** (`no_abierta`; `pause_reason: candidatas_agotadas`; **`C1`**).
 2. Si estado `parcial_11` → ruta **(c)** (`no_viable_solution_space`; **`C3`**) **sin** consultar 16.
 3. Si estado `completa_12-16` sin `## Solución ganadora` → ruta **(c)** (`candidatas_agotadas`;
    **`C2`**).
@@ -468,7 +481,7 @@ phase_policy:
   solution-experiment-design: { focus: "experimento comparativo con test de no-regresión obligatorio",      reasoning_effort: medium, evidence: [procedimiento, controles, rollback],   acceptance: "experimento reproducible",            risk_controls: [sandbox, feature_flag] }
   solution-execution:     { focus: "ejecución con rollback explícito entre hipótesis",                        reasoning_effort: medium, evidence: [comandos, logs, cambios_rollback],      acceptance: "ejecución limpia; rollback probado",   risk_controls: [sandbox, reversible] }
   solution-data-collection: { focus: "pass/fail del test de reproducción por hipótesis; deltas de no-regresión", reasoning_effort: medium, evidence: [tabla_normalizada, pass_fail],     acceptance: "tabla con ≥1 fila por hipótesis",       risk_controls: [] }
-  solution-analysis:      { focus: "veredicto de ganadora con diff mínimo citado; descarte justificado",        reasoning_effort: medium, evidence: [veredicto, descartadas_con_razon],      acceptance: "ganadora con justificación cuantitativa", risk_controls: [] }
+  solution-analysis:      { focus: "veredicto de ganadora con diff mínimo citado; descarte justificado",        reasoning_effort: medium, evidence: [veredicto, descartadas_con_razon],      acceptance: "ganadora con justificación cuantitativa si aplica; descartadas + batch note si no", risk_controls: [] }
   conclusion:             { focus: "veredicto: causa confirmada + solución ganadora + diff mínimo",           reasoning_effort: medium, evidence: [veredicto, decision, deuda, seguimiento], acceptance: "veredicto coherente con análisis",    risk_controls: [] }
   communication:          { focus: "causa raíz y prueba de no-regresión; diff mínimo",                        reasoning_effort: medium, evidence: [resumen, cambios, evidencia, commit],  acceptance: "commit con metadatos Case: y entrada changelog", risk_controls: [] }
 ```
@@ -515,7 +528,7 @@ phase_policy:
   solution-experiment-design: { focus: "experiment comparativo con contract tests v_old y v_new",            reasoning_effort: medium, evidence: [procedimiento, contract_tests],        acceptance: "experimento reproduce ambos contratos", risk_controls: [feature_flag, sandbox] }
   solution-execution:     { focus: "ejecutar con feature flag; rollback = flag off",                           reasoning_effort: medium, evidence: [comandos, contract_results_ambas],    acceptance: "ejecución limpia; rollback probado",   risk_controls: [feature_flag, reversible] }
   solution-data-collection: { focus: "matriz de compatibilidad normalizada por hipótesis",                     reasoning_effort: medium, evidence: [tabla_normalizada, contract_pass],     acceptance: "tabla con filas por hipótesis",        risk_controls: [] }
-  solution-analysis:      { focus: "veredicto de ganadora reversible con ruta de migración citada",           reasoning_effort: medium, evidence: [veredicto, ruta_migracion, descartes], acceptance: "ganadora reversible con justificación", risk_controls: [] }
+  solution-analysis:      { focus: "veredicto de ganadora reversible con ruta de migración citada",           reasoning_effort: medium, evidence: [veredicto, ruta_migracion, descartes], acceptance: "ganadora reversible con justificación si aplica; descartadas + batch note si no", risk_controls: [] }
   conclusion:             { focus: "adaptación compatible + ruta de migración reversible",                    reasoning_effort: medium, evidence: [veredicto, plan_retirada, deuda],       acceptance: "veredicto coherente con análisis",     risk_controls: [] }
   communication:          { focus: "compatibilidad y migración; guía de migración adjunta",                    reasoning_effort: medium, evidence: [resumen, cambios, guia, commit],        acceptance: "commit con metadatos Case: y changelog", risk_controls: [] }
 ```
@@ -561,7 +574,7 @@ phase_policy:
   solution-experiment-design: { focus: "benchmark A/B por hipótesis; baseline N runs; igualdad funcional",  reasoning_effort: medium, evidence: [procedimiento, benchmark, baseline],    acceptance: "experimento A/B ejecutable",           risk_controls: [aislamiento_carga, sandbox] }
   solution-execution:     { focus: "ejecutar cada hipótesis con aislamiento de carga y snapshot funcional",    reasoning_effort: medium, evidence: [runs, metricas, snapshots],              acceptance: "ejecución limpia; snapshots tomados", risk_controls: [aislamiento_carga] }
   solution-data-collection: { focus: "deltas con varianza normalizados; tabla comparativa de métricas",         reasoning_effort: medium, evidence: [tabla_normalizada, p_values],            acceptance: "tabla con varianza por hipótesis",     risk_controls: [] }
-  solution-analysis:      { focus: "veredicto con significancia estadística citada; descartes con razón",       reasoning_effort: medium, evidence: [veredicto, p_value, descartes],          acceptance: "ganadora con significancia",          risk_controls: [] }
+  solution-analysis:      { focus: "veredicto con significancia estadística citada; descartes con razón",       reasoning_effort: medium, evidence: [veredicto, p_value, descartes],          acceptance: "ganadora con significancia si aplica; descartadas + batch note si no", risk_controls: [] }
   conclusion:             { focus: "mejora medible + comportamiento invariante",                               reasoning_effort: medium, evidence: [veredicto, delta, igualdad_funcional],   acceptance: "veredicto cuantitativo",              risk_controls: [] }
   communication:          { focus: "delta de métricas con números; reproducibilidad del benchmark",             reasoning_effort: medium, evidence: [resumen, deltas, benchmark, commit],    acceptance: "commit con metadatos Case: y changelog", risk_controls: [] }
 ```
@@ -608,7 +621,7 @@ phase_policy:
   solution-experiment-design: { focus: "pruebas comparativas que provocan la condición en sandbox",            reasoning_effort: medium, evidence: [procedimiento, inyeccion, baseline],     acceptance: "experimento inyecta el riesgo",       risk_controls: [sandbox, aislamiento_estricto] }
   solution-execution:     { focus: "ejecutar con aislamiento estricto; verificar que la mitigación sostiene",   reasoning_effort: medium, evidence: [comandos, inyeccion, resultado, rollback], acceptance: "ejecución limpia; rollback trivial", risk_controls: [sandbox, aislamiento_estricto] }
   solution-data-collection: { focus: "tabla normalizada: presencia/ausencia de riesgo por hipótesis",            reasoning_effort: medium, evidence: [tabla_normalizada, cobertura],            acceptance: "tabla con cobertura por hipótesis",    risk_controls: [] }
-  solution-analysis:      { focus: "veredicto con cobertura de vías y riesgo residual cuantificado",            reasoning_effort: medium, evidence: [veredicto, cobertura, residual],          acceptance: "ganadora con cobertura + residual",    risk_controls: [] }
+  solution-analysis:      { focus: "veredicto con cobertura de vías y riesgo residual cuantificado",            reasoning_effort: medium, evidence: [veredicto, cobertura, residual],          acceptance: "ganadora con cobertura + residual si aplica; descartadas + batch note si no", risk_controls: [] }
   conclusion:             { focus: "riesgo mitigado + residual cuantificado + vías cubiertas",                  reasoning_effort: medium, evidence: [veredicto, residual, cobertura, deuda],    acceptance: "veredicto cuantitativo",               risk_controls: [] }
   communication:          { focus: "riesgo evitado y residual; cobertura de vías; prueba que provocaba",        reasoning_effort: medium, evidence: [resumen, riesgo, residual, commit],       acceptance: "commit con metadatos Case: y changelog", risk_controls: [] }
 ```
@@ -823,12 +836,15 @@ se adapta según el perfil. La adaptación es **siempre** vía la `phase_policy 
   de **solución ganadora** con justificación cuantitativa + lista de hipótesis descartadas con
   razón de descarte.
 - **Entradas:** `12-solution-hypothesis.md`, `15-solution-data-collection.md`.
-- **Salidas / artefacto:** `16-solution-analysis.md` con **sección obligatoria
-  `## Solución ganadora`** y sección obligatoria `## Hipótesis descartadas`. La sección ganadora
-  incluye: nombre de la ganadora, métricas comparativas clave, justificación cuantitativa, diff
-  predicho. La sección de descartadas incluye: nombre, métricas, razón de descarte.
-- **Validación:** la sección `## Solución ganadora` existe y cita al menos una métrica
-  cuantitativa; la sección `## Hipótesis descartadas` existe y cada descarte cita su razón; no
+- **Salidas / artefacto:** `16-solution-analysis.md` con sección **`## Hipótesis descartadas`**
+  (obligatoria tras cada batch) y sección **`## Solución ganadora`** (condicional: solo si al menos
+  una hipótesis supera los criterios del perfil). La sección ganadora incluye: nombre de la ganadora,
+  métricas comparativas clave, justificación cuantitativa, diff predicho. La sección de descartadas
+  incluye: nombre, métricas, razón de descarte; si no hay ganadora, un párrafo **Batch sin ganadora**
+  bajo descartadas documenta por qué ninguna hipótesis alcanzó el veredicto.
+- **Validación (bifurcada):** si hay ganadora → `## Solución ganadora` existe y cita al menos una
+  métrica cuantitativa; si no hay ganadora → **omitir** `## Solución ganadora` y exigir
+  `## Hipótesis descartadas` con nota de batch. En ambos casos cada descarte cita su razón; no
   existen ganadoras con cero evidencia.
 - **Adaptación por perfil:** ver `phase_policy.solution-analysis` en §6.
 - **Outputs de 16 (no rutas terminales — el emisor del veredicto es la fase 17, §5.3):**
@@ -848,8 +864,10 @@ se adapta según el perfil. La adaptación es **siempre** vía la `phase_policy 
 
 - **Propósito:** decidir el resultado del caso y la acción resultante, y **destilar una lección
   generalizable** hacia la base de conocimiento.
-- **Entradas:** `02`, `08` (causa); **`16` solo si el estado de cadena es `completa_12-16`** (ver §5.2);
-  no requiere `16` si el estado es `no_abierta` o `parcial_11`; `case_paused_at` (si existe).
+- **Entradas:** `02`, `08` (causa); **`16` solo si el estado de cadena es `completa_12-16`** (ver §5.2;
+  el estado se fija tras validar 11 — no exige 16 `done` para enrutar; rutas **(a)/(b)** sí requieren
+  `## Solución ganadora` en 16); no requiere `16` si el estado es `no_abierta` o `parcial_11`;
+  `case_paused_at` (si existe).
 - **Salidas / artefacto:** `17-conclusion.md` — veredicto, decisión (aplicar/revertir/escalar),
   residuos, deuda, seguimiento; y **una lección** escrita como archivo bajo `.claude/memory/`
   (frontmatter + tags `component`/`defect-class`/`profile`, índice en `MEMORY.md`).
@@ -885,15 +903,18 @@ se adapta según el perfil. La adaptación es **siempre** vía la `phase_policy 
 
 - **Propósito:** producir la comunicación final para humanos (PR, changelog, informe, commit).
 - **Entradas:** `17`; cadena de causa `01–08` siempre; cadena de solución `11–16` **solo si** el
-  estado es `completa_12-16` o `parcial_11` (en `parcial_11`, solo `11` aplica).
+  estado es `completa_12-16` o `parcial_11` (en `parcial_11`, solo `11` aplica). En
+  `completa_12-16`, incluir artefactos 12–16 alcanzados (no es obligatorio que 16 exista si el
+  batch aún no cerró con ganadora).
 - **Salidas / artefacto:** `18-communication.md` — resumen ejecutivo, cambios, evidencia, riesgos,
   enlaces a artefactos; borrador de mensaje de commit/PR (en español, conventional commits del
   repo) **con metadatos de commit `Case: <case-id>`**.
 - **Cambios respecto a v1.0 (NUEVO):** el mensaje de commit cita explícitamente la solución
   ganadora de 16 (no el primer fix que apareció); si la fase 17 pausó el caso, 18 emite
   comunicación de "no resuelto" con la lección y la **oferta canónica** de re-apertura Bucle C
-  (texto y contexto sugerido). El orquestador no re-emite la oferta en el paso Bucle C: solo
-  confirma aceptación o rechazo del usuario (ver §13.5 paso 13).
+  (texto, contexto sugerido `ctx-a`/`ctx-b`/`ctx-c` según tabla §3.1.3; **`ctx-c`** implica cambio
+  de perfil y matrix `phase_policy` en re-apertura). El orquestador no re-emite la oferta en el paso
+  Bucle C: solo confirma aceptación o rechazo del usuario (ver §13.5 paso 13).
 - **Changelog derivado:** sin cambios respecto a v1.0 — esta fase **no redacta** el
   `CHANGELOG.md` a mano; ejecuta el generador on-demand con `--pending` e incluye el archivo en su
   commit.
@@ -984,7 +1005,7 @@ ausente, pero escribirlo explícito facilita la auditoría y la separación fís
 | `13-solution-experiment-design.md` | Solución | Procedimiento único comparativo, métricas comunes, condiciones iniciales idénticas, rollback entre ejecuciones |
 | `14-solution-execution.md`         | Solución | Sub-entradas por hipótesis, comandos, cambios, rollback, logs crudos (en `experiments/solution-<id>/`)        |
 | `15-solution-data-collection.md`   | Solución | Tabla comparativa de métricas (filas = hipótesis, columnas = métricas normalizadas)                            |
-| `16-solution-analysis.md`          | Solución | `## Solución ganadora` (obligatoria) + `## Hipótesis descartadas` (obligatoria)                                 |
+| `16-solution-analysis.md`          | Solución | `## Solución ganadora` (condicional: solo con ganadora) + `## Hipótesis descartadas` (obligatoria tras batch) |
 | `17-conclusion.md`                 | Cierre   | Veredicto, decisión, residuos, deuda, seguimiento; `case_run` en frontmatter; cita ganadora de 16 si aplica     |
 | `18-communication.md`              | Cierre   | Resumen, cambios, evidencia, riesgos, `case_run` en frontmatter; borrador commit/PR con metadatos `Case:`        |
 
@@ -1128,6 +1149,9 @@ orden de evaluación: **ver §5.3**.
 | **(c) Pausa** | `no_abierta`, `parcial_11`, o `completa_12-16` sin ganadora | `pausado` | Sin spec; oferta Bucle C (documentada en fase 18) |
 
 **Precedencia y `pause_reason`:** ver §5.3 (orden de evaluación y tokens canónicos).
+
+**Dualidad `phases.conclusion` vs `case.status` (ruta (c)):** ver §5.1 — la fase 17 marca
+`phases.conclusion: done` al emitir `17-conclusion.md` aunque `case.status` pase a `pausado`.
 
 **Distinción `done`:** con spec (ruta **(a)**) vs investigativo Solo-SM (ruta **(b)**) — ambos son
 `status: done`, pero solo **(a)** dispara Etapa B OpenSpec.
@@ -1328,7 +1352,7 @@ cubre 100% pero con más código. 15 normaliza cobertura. 16 emite **Solución g
 | Fase | Resultado clave                                                                                     | Artefacto                    |
 | ---- | --------------------------------------------------------------------------------------------------- | ---------------------------- |
 | 17   | veredicto: "no resuelto"; `status: pausado`; `case_paused_at: 2026-06-08T16:30:00Z`; `case_run: 1` en frontmatter; lección: `intermittent-failures-no-repro` | `17-conclusion.md`           |
-| 18   | comunicación: caso pausado, oferta al usuario de re-apertura con nuevo contexto (instrumentación adicional, log sampling, datos de producción) | `18-communication.md` (`case_run: 1`) |
+| 18   | comunicación: caso pausado, oferta Bucle C con contexto sugerido **`ctx-a`** (instrumentación adicional, log sampling, datos de producción) | `18-communication.md` (`case_run: 1`) |
 
 > **Commit de corrida 1:** los pasos 10–12 del orquestador (fase 18 + consolidate + commit) **cierran**
 > la pausa en git antes de que el usuario pueda aceptar re-apertura (`case_run++` en paso 13).
@@ -1695,28 +1719,38 @@ OpenSpec se redactan alimentándose **principalmente** de la especificación val
 | `design.md`        | `17-conclusion.md` (sección "Decisiones arquitectónicas") + `11-solution-research.md` | _How_: decisiones + alternativas ya descartadas |
 | `tasks.md`         | `17-conclusion.md` (sección "Criterios de aceptación")                  | _What exactly_: pasos accionables                |
 
-Tras `openspec-apply` → `openspec-verify`, una re-ejecución de la fase 16 es **solo**
-refinamiento MINOR (ingiere la salida de verify en `16-solution-analysis.md`); **no** dispara el
-Bucle B ni una nueva ronda batch 12–16.
+**Etapa B — bucle apply/verify (paso 9 del orquestador, ítems 5–7).** Tras crear el change
+OpenSpec y `openspec-apply` → `openspec-verify`, el orquestador ejecuta un **árbol único**:
+
+- **6a — Converge:** `openspec-verify` sin CRITICALs pendientes → re-ejecutar fase 16 (MINOR,
+  ingiere salida de verify en `16-solution-analysis.md`); repetir apply/verify si hace falta hasta
+  convergencia. **No** dispara Bucle B ni nueva ronda 12–16. → Etapa C rama **(iii)**.
+- **6b — Verify refutada:** verify no converge o CRITICALs persisten tras apply completo →
+  re-invocar fase 17 (MINOR, paso 9 ítem 7) con deuda/residuos y ruta de `git revert`; mantener
+  `status: done`. → Etapa C rama **(iv)**.
+
+Si el usuario **rechaza** el checkpoint de frontera (spec lista, ¿proceder a OpenSpec?) en modos
+**Completo**/**Rápido**: omitir Etapa B; cierre **investigativo** (`status: done` sin spec ni
+OpenSpec) → Etapa C con la misma semántica que rama **(ii)** (sin sync/archive).
 
 **Etapa C — Comunicación y consolidación (SM 18).** El orquestador evalúa **una** rama exclusiva
-tras la fase 17 y, si aplica, Etapa B + paso 9.7 (re-run MINOR de 17 si verify refutada; §13.5):
+tras la fase 17 y, si aplica, Etapa B (§13.5 paso 9):
 
 1. **Ruta (c) — `pausado`:** fase 18 documenta oferta Bucle C (`C1`–`C3`); changelog `--pending`;
    commit con trailer `Case:`; **omite** sync/archive (aplica en **Completo**, **Rápido** y **Solo-SM**).
-2. **Ruta (b) — Solo-SM `done`:** fase 18 + changelog + commit; **omite** sync/archive.
-3. **Ruta (a) — verify OK** (`openspec-verify` sin CRITICALs pendientes): fase 18 → `openspec-sync`
-   → `openspec-archive` → changelog → commit (con `OpenSpec-Change:` si archivado).
-4. **Verify refutada** (ruta **(a)** tras apply, verify no converge): re-invocar fase 17 (MINOR,
-   paso 9.7) con deuda/residuos; fase 18 documenta `git revert` del apply (usuario ejecuta); mantener
-   `status: done`; **omite** sync/archive.
+2. **Ruta (b) — cierre investigativo `done`:** Solo-SM con ganadora, **o** Completo/Rápido con
+   checkpoint rechazado; fase 18 + changelog + commit; **omite** sync/archive.
+3. **Ruta (a) — verify OK** (árbol 6a converge): fase 18 → `openspec-sync` → `openspec-archive`
+   → changelog → commit (con `OpenSpec-Change:` si archivado).
+4. **Verify refutada** (árbol 6b): fase 17 ya actualizada en paso 9 ítem 7; fase 18 documenta
+   deuda y `git revert` del apply (usuario ejecuta); `status: done`; **omite** sync/archive.
 
 En todas las ramas: confirma/indexa la lección de fase 17; la fase 18 no redacta la lección desde
 cero.
 
 #### 12.2.3 Diferencias respecto a la integración v0.3
 
-| Aspecto                                | v0.3 (sistema v1.0, 1 cadena con modos)   | v0.5 (sistema de dos cadenas)                            |
+| Aspecto                                | v0.3 (sistema v1.0, 1 cadena con modos)   | v0.6 (sistema de dos cadenas)                            |
 | -------------------------------------- | ----------------------------------------- | -------------------------------------------------------- |
 | Frontera Etapa B (spec → OpenSpec)     | Fase 09 (conclusión)                      | **Fase 17** (conclusión del sistema de dos cadenas)      |
 | Datos en la spec validada              | Solo cadena de causa (01–08)              | **Ambas cadenas** (causa confirmada en 08 + ganadora en 16) |
@@ -1724,12 +1758,12 @@ cero.
 | Precondición para emitir spec           | `## Solution comparison` en `08-analysis.md` | `## Solución ganadora` en `16-solution-analysis.md` (§5.3) |
 | Caso pausado                           | No existe; "no resuelto" es estado terminal | Estado `pausado` con re-apertura (Bucle C) — §3.1.3, §9.5 |
 
-Esta subsección es la **versión v0.5 de la integración** adaptada al sistema de dos cadenas.
+Esta subsección es la **versión v0.6 de la integración** adaptada al sistema de dos cadenas.
 El doc `scientific-method-and-openspec-integration.md` v0.3 queda **inconsistente** con el
-diseño nuevo (cita "fase 09"); la actualización del mismo a v0.5 es una de las tareas del
+diseño nuevo (cita "fase 09"); la actualización del mismo a v0.6 es una de las tareas del
 plan de migración (§11.2) y se ejecuta en el mismo commit que actualiza el sistema `sm-*`.
 
-#### 12.2.4 Modos de integración SM↔OpenSpec (v0.5)
+#### 12.2.4 Modos de integración SM↔OpenSpec (v0.6)
 
 Matriz autocontenida de `integration_mode` (el orquestador la consulta en el paso 2; ver §13.5):
 
@@ -1748,6 +1782,10 @@ que todo caso termine en `pausado`.
 **Completo / Rápido — ruta (c):** igual que Solo-SM en Etapa C: fase 18 + changelog + commit; sin
 Etapa B ni sync/archive. La diferencia es que **(a)** sí dispara Etapa B cuando hay ganadora y el
 modo lo permite.
+
+**Completo / Rápido — checkpoint rechazado:** si el usuario declina proceder a OpenSpec tras la
+frontera de Etapa B, cierre investigativo (`done` sin spec) — Etapa C como rama **(ii)**, sin
+sync/archive.
 
 **Solo-OpenSpec:** no invocar `sm-orchestrator`; el flujo OpenSpec (`openspec-propose`, etc.) es el
 entrypoint. Los casos SM en disco no aplican.
@@ -2084,8 +2122,9 @@ description: >
   hypotheses using the normalized table; emits the winning-solution verdict with quantitative
   justification; lists discarded hypotheses with their discard reason. Produces
   16-solution-analysis.md. Adapts via case.md phase_policy.solution-analysis. The
-  `## Solución ganadora` section is MANDATORY when the solution chain completes with a winner;
-  feeds route **(a)** spec via phase 17; route **(b)** cites winner without spec block (§5.3).
+  `## Solución ganadora` section is emitted only when at least one hypothesis wins the batch;
+  without a winner, emit `## Hipótesis descartadas` plus a batch note (§7.14). Feeds route **(a)**
+  spec via phase 17 when winner exists; route **(b)** cites winner without spec block (§5.3).
 ---
 
 # Phase 16 — Solution Analysis
@@ -2109,13 +2148,15 @@ closure routes **(a)/(b)/(c)** are decided in phase 17 (§5.3).
    adaptive weights reversibility + flag isolation + contract preservation).
 3. For each hypothesis, compute its score against the weighted criteria. State the score and
    the column-level breakdown.
-4. Identify the winner (highest weighted score; tie-breakers per profile).
-5. **Emit the MANDATORY section `## Solución ganadora`** with: winner name, mechanism, key
-   metrics from the normalized table, quantitative justification (the score + breakdown),
-   predicted diff / change description.
-6. **Emit the MANDATORY section `## Hipótesis descartadas`** with: each discarded hypothesis
-   name, its score, the reason for discard (which criterion it failed, or which column tipped
-   the weighting against it).
+4. Identify whether any hypothesis wins (highest weighted score meets profile acceptance;
+   tie-breakers per profile). If **none** win → no `## Solución ganadora` (orchestrator may
+   trigger Bucle B or route **(c)** via phase 17).
+5. **If a winner exists:** emit `## Solución ganadora` with winner name, mechanism, key metrics
+   from the normalized table, quantitative justification (score + breakdown), predicted diff /
+   change description.
+6. **Always after a batch:** emit `## Hipótesis descartadas` with each hypothesis name, score,
+   and discard reason. If **no winner**, add a **Batch sin ganadora** paragraph under descartadas
+   explaining why no hypothesis met the profile threshold.
 7. State threats to validity (what could invalidate the verdict; e.g. small N, environment
    drift, untested edge cases).
 8. **Idempotence (Bucle B):** a new batch round starts only after exhausting `pending` candidates
@@ -2128,13 +2169,13 @@ closure routes **(a)/(b)/(c)** are decided in phase 17 (§5.3).
 Write `16-solution-analysis.md` from templates/phase-artifact.md with `chain: solution` in the
 frontmatter:
 - Applied policy, Weighted score table (rows: hypothesis; columns: shared metrics, weighted
-  score, breakdown), `## Solución ganadora` (mandatory), `## Hipótesis descartadas` (mandatory),
-  Threats to validity.
+  score, breakdown), `## Solución ganadora` (only when winner exists), `## Hipótesis descartadas`
+  (mandatory), Threats to validity.
 
 ## Acceptance
-`## Solución ganadora` exists and cites at least one quantitative metric; `## Hipótesis
-descartadas` exists and each discard cites a reason; no winner with zero evidence. The verdict
-feeds route **(a)** spec via phase 17; route **(b)** cites winner without spec block.
+If winner: `## Solución ganadora` cites at least one quantitative metric. Always: `## Hipótesis
+descartadas` with each discard reason; if no winner, batch note present. No winner with zero
+evidence. Winner feeds route **(a)**/**(b)** via phase 17; no winner → phase 17 route **(c)** or Bucle B.
 
 <constraints>Analyze; the case decision belongs to phase 17.</constraints>
 ````
@@ -2466,8 +2507,8 @@ description: >
   sm-orchestrator. Decides the case outcome and resulting action, and distills a lesson into
   the knowledge base. Consumes data from BOTH chains: 02, 08 (cause) and 16 (solution). Adapts
   via case.md phase_policy.conclusion. Produces 17-conclusion.md. The MANDATORY
-  `## Solución ganadora` section in 16-solution-analysis.md is the precondition for emitting
-  the spec (§5.3 route **(a)** only). Handles routes **(a)/(b)/(c)**: Solo-SM investigativo close
+  `## Solución ganadora` in 16 when present is the precondition for emitting the spec (§5.3 route
+  **(a)** only). Handles routes **(a)/(b)/(c)**: Solo-SM investigativo close
   (`done` without spec, even with winner), pause (`pausado`), and Bucle C with `case_run`.
 ---
 
@@ -2497,8 +2538,8 @@ Closes the case by deciding the outcome and the action. Consumes data from both 
 ## Procedure
 1. Read the policy entry.
 2. **Route decision** (§5.3 order; execute **one** branch only):
-   a. If `08` lacks `## Causa confirmada` → route **(c)** (`no_abierta`, `pause_reason:
-      candidatas_agotadas`, Bucle C **`C1`**).
+   a. After Bucle A is exhausted (no `pending` in `04`), if `08` lacks `## Causa confirmada` →
+      route **(c)** (`no_abierta`, `pause_reason: candidatas_agotadas`, Bucle C **`C1`**).
    b. Else if chain state `parcial_11` → route **(c)** (`no_viable_solution_space`, **`C3`**; do
       NOT read 16).
    c. Else if `completa_12-16` and `16` lacks `## Solución ganadora` → route **(c)**
@@ -2512,11 +2553,13 @@ Closes the case by deciding the outcome and the action. Consumes data from both 
    `status: done` in case.md. → go to step 4.
 4. **Branch (b) — investigativo close (Solo-SM):** cite `## Solución ganadora` from 16 if present;
    set `status: done`; do NOT emit validated spec or trigger Etapa B. → go to step 5.
-5. **Branch (c) — pause:** set `status: pausado` and `case_paused_at: <ISO-8601 UTC>` in case.md.
-   Pause note: `pause_reason` token (`candidatas_agotadas` or `no_viable_solution_space`) and
-   Bucle C trigger (`C1`, `C2`, or `C3`). Offer documented in phase 18. → go to step 6.
-6. **Common final (all branches):** distill one lesson into `.claude/memory/` with tags; index in
-   `MEMORY.md`; write `17-conclusion.md` per Output below.
+5. **Branch (c) — pause:** set `status: pausado` and `case_paused_at: <ISO-8601 UTC>` in case.md;
+   set `phases.conclusion: done` (phase executed — distinct from `case.status`). Pause note:
+   `pause_reason` token (`candidatas_agotadas` or `no_viable_solution_space`) and Bucle C trigger
+   (`C1`, `C2`, or `C3`). Offer documented in phase 18. → go to step 6.
+6. **Common final (all branches):** set `phases.conclusion: done` in the canonical block if not
+   already set; distill one lesson into `.claude/memory/` with tags; index in `MEMORY.md`; write
+   `17-conclusion.md` per Output below.
 </phase_procedure>
 
 ## Output
@@ -2580,9 +2623,10 @@ skill.</user_communication>
    evidence from both chains, risks, links to artifacts.
 3. **Pause path (`status: pausado`):** emit a "no resuelto" communication summarizing what was
    tried (cause candidates explored, solution candidates explored if the chain opened),
-   what the lesson learned, and the **canonical Bucle C offer** (text + suggested context for
-   re-execute 03–08, preserving 01–02). The orchestrator does not re-offer; step 13 processes
-   user acceptance after commit.
+   what the lesson learned, and the **canonical Bucle C offer** (text + suggested context
+   `ctx-a`/`ctx-b`/`ctx-c` per §3.1.3 mapping: `C1`→`ctx-a`, `C2`→`ctx-b`, `C3`→`ctx-a` or
+   `ctx-c`; note that `ctx-c` triggers profile re-selection on acceptance). The orchestrator does
+   not re-offer; step 13 processes user acceptance after commit.
 4. Draft the commit/PR message in Spanish following the repo's conventional-commits skill,
    ending with the git commit metadata (*trailer*) `Case: <case-id>` (see
    ../sm-orchestrator/references/changelog.md).
@@ -2665,10 +2709,10 @@ phase_policy:
   solution-experiment-design:{ focus: "experimento comparativo + test de no-regresión obligatorio", reasoning_effort: medium, evidence: [procedimiento, controles, rollback],              acceptance: "experimento reproducible",                           risk_controls: [sandbox, feature_flag] }
   solution-execution:        { focus: "ejecución con rollback explícito entre hipótesis",         reasoning_effort: medium, evidence: [comandos, logs, cambios_rollback],                   acceptance: "ejecución limpia; rollback probado",                risk_controls: [sandbox, reversible] }
   solution-data-collection:  { focus: "pass/fail del test por hipótesis; deltas de no-regresión",  reasoning_effort: medium, evidence: [tabla_normalizada, pass_fail],                        acceptance: "tabla con ≥1 fila por hipótesis",                    risk_controls: [] }
-  solution-analysis:         { focus: "veredicto de ganadora con diff mínimo citado",              reasoning_effort: medium, evidence: [veredicto, descartadas_con_razon],                   acceptance: "## Solución ganadora con justificación cuantitativa", risk_controls: [] }
+  solution-analysis:         { focus: "veredicto de ganadora con diff mínimo citado",              reasoning_effort: medium, evidence: [veredicto, descartadas_con_razon],                   acceptance: "ganadora con justificación cuantitativa si aplica; descartadas + batch note si no", risk_controls: [] }
   # ── Cierre (17–18) ───────────────────────────────────────────────────────
   conclusion:                { focus: "veredicto: causa confirmada + solución ganadora + diff mínimo", reasoning_effort: medium, evidence: [veredicto, decision, deuda, seguimiento],      acceptance: "veredicto coherente con análisis",                   risk_controls: [] }
-  communication:             { focus: "causa raíz + prueba de no-regresión; diff mínimo",         reasoning_effort: medium, evidence: [resumen, cambios, evidencia, commit],                 acceptance: "commit con metadatos Case: + cita 16 ## Solución ganadora", risk_controls: [] }
+  communication:             { focus: "causa raíz + prueba de no-regresión; diff mínimo",         reasoning_effort: medium, evidence: [resumen, cambios, evidencia, commit],                 acceptance: "commit con metadatos Case:; cita 16 ## Solución ganadora solo en rutas con ganadora", risk_controls: [] }
 ```
 
 ## Evidence prioritized
@@ -2727,10 +2771,10 @@ phase_policy:
   solution-experiment-design:{ focus: "experimento comparativo con contract tests v_old y v_new", reasoning_effort: medium, evidence: [procedimiento, contract_tests],                     acceptance: "experimento reproduce ambos contratos",               risk_controls: [feature_flag, sandbox] }
   solution-execution:        { focus: "ejecutar con feature flag; rollback = flag off",          reasoning_effort: medium, evidence: [comandos, contract_results_ambas],                     acceptance: "ejecución limpia; rollback probado",                  risk_controls: [feature_flag, reversible] }
   solution-data-collection:  { focus: "matriz de compatibilidad normalizada por hipótesis",       reasoning_effort: medium, evidence: [tabla_normalizada, contract_pass],                     acceptance: "tabla con filas por hipótesis",                       risk_controls: [] }
-  solution-analysis:         { focus: "veredicto de ganadora reversible con ruta de migración", reasoning_effort: medium, evidence: [veredicto, ruta_migracion, descartes],                  acceptance: "## Solución ganadora reversible con justificación",    risk_controls: [] }
+  solution-analysis:         { focus: "veredicto de ganadora reversible con ruta de migración", reasoning_effort: medium, evidence: [veredicto, ruta_migracion, descartes],                  acceptance: "ganadora reversible con justificación si aplica; descartadas + batch note si no", risk_controls: [] }
   # ── Cierre (17–18) ───────────────────────────────────────────────────────
   conclusion:                { focus: "adaptación compatible + ruta de migración reversible",   reasoning_effort: medium, evidence: [veredicto, plan_retirada, deuda],                       acceptance: "veredicto coherente con análisis",                    risk_controls: [] }
-  communication:             { focus: "compatibilidad y migración; guía adjunta",               reasoning_effort: medium, evidence: [resumen, cambios, guia, commit],                       acceptance: "commit con metadatos Case: + cita 16 ## Solución ganadora + guía migración", risk_controls: [] }
+  communication:             { focus: "compatibilidad y migración; guía adjunta",               reasoning_effort: medium, evidence: [resumen, cambios, guia, commit],                       acceptance: "commit con metadatos Case:; cita 16 ## Solución ganadora + guía solo con ganadora", risk_controls: [] }
 ```
 
 ## Evidence prioritized
@@ -2791,10 +2835,10 @@ phase_policy:
   solution-experiment-design:{ focus: "benchmark A/B por hipótesis; baseline N runs",             reasoning_effort: medium, evidence: [procedimiento, benchmark, baseline],                   acceptance: "experimento A/B ejecutable",                            risk_controls: [aislamiento_carga, sandbox] }
   solution-execution:        { focus: "ejecutar cada hipótesis con aislamiento y snapshot",       reasoning_effort: medium, evidence: [runs, metricas, snapshots],                              acceptance: "ejecución limpia; snapshots tomados",                  risk_controls: [aislamiento_carga] }
   solution-data-collection:  { focus: "deltas con varianza normalizados; tabla comparativa",       reasoning_effort: medium, evidence: [tabla_normalizada, p_values],                            acceptance: "tabla con varianza por hipótesis",                     risk_controls: [] }
-  solution-analysis:         { focus: "veredicto con significancia estadística citada",         reasoning_effort: medium, evidence: [veredicto, p_value, descartes],                          acceptance: "## Solución ganadora con significancia",                 risk_controls: [] }
+  solution-analysis:         { focus: "veredicto con significancia estadística citada",         reasoning_effort: medium, evidence: [veredicto, p_value, descartes],                          acceptance: "ganadora con significancia si aplica; descartadas + batch note si no", risk_controls: [] }
   # ── Cierre (17–18) ───────────────────────────────────────────────────────
   conclusion:                { focus: "mejora medible + comportamiento invariante",              reasoning_effort: medium, evidence: [veredicto, delta, igualdad_funcional],                   acceptance: "veredicto cuantitativo",                               risk_controls: [] }
-  communication:             { focus: "delta de métricas con números; reproducibilidad",        reasoning_effort: medium, evidence: [resumen, deltas, benchmark, commit],                     acceptance: "commit con metadatos Case: + cita 16 ## Solución ganadora con números", risk_controls: [] }
+  communication:             { focus: "delta de métricas con números; reproducibilidad",        reasoning_effort: medium, evidence: [resumen, deltas, benchmark, commit],                     acceptance: "commit con metadatos Case:; cita 16 ## Solución ganadora con números solo con ganadora", risk_controls: [] }
 ```
 
 ## Evidence prioritized
@@ -2854,10 +2898,10 @@ phase_policy:
   solution-experiment-design:{ focus: "pruebas comparativas que provocan la condición en sandbox", reasoning_effort: high, evidence: [procedimiento, inyeccion, baseline],                 acceptance: "experimento inyecta el riesgo",                       risk_controls: [sandbox, aislamiento_estricto] }
   solution-execution:        { focus: "ejecutar con aislamiento estricto; verificar mitigación", reasoning_effort: medium, evidence: [comandos, inyeccion, resultado, rollback],         acceptance: "ejecución limpia; rollback trivial",                  risk_controls: [sandbox, aislamiento_estricto] }
   solution-data-collection:  { focus: "tabla normalizada: presencia/ausencia de riesgo",         reasoning_effort: medium, evidence: [tabla_normalizada, cobertura],                          acceptance: "tabla con cobertura por hipótesis",                    risk_controls: [] }
-  solution-analysis:         { focus: "veredicto con cobertura de vías y residual cuantificado", reasoning_effort: high,   evidence: [veredicto, cobertura, residual],                      acceptance: "## Solución ganadora con cobertura + residual",         risk_controls: [] }
+  solution-analysis:         { focus: "veredicto con cobertura de vías y residual cuantificado", reasoning_effort: high,   evidence: [veredicto, cobertura, residual],                      acceptance: "ganadora con cobertura + residual si aplica; descartadas + batch note si no", risk_controls: [] }
   # ── Cierre (17–18) ───────────────────────────────────────────────────────
   conclusion:                { focus: "riesgo mitigado + residual cuantificado + vías cubiertas", reasoning_effort: medium, evidence: [veredicto, residual, cobertura, deuda],            acceptance: "veredicto cuantitativo",                                risk_controls: [] }
-  communication:             { focus: "riesgo evitado y residual; cobertura de vías",           reasoning_effort: medium, evidence: [resumen, riesgo, residual, commit],                    acceptance: "commit con metadatos Case: + cita 16 ## Solución ganadora con residual", risk_controls: [] }
+  communication:             { focus: "riesgo evitado y residual; cobertura de vías",           reasoning_effort: medium, evidence: [resumen, riesgo, residual, commit],                    acceptance: "commit con metadatos Case:; cita 16 ## Solución ganadora con residual solo con ganadora", risk_controls: [] }
 ```
 
 ## Evidence prioritized
@@ -2886,8 +2930,9 @@ description: >
   no_abierta/parcial_11/completa_12-16 (§5.2); closure routes (a)/(b)/(c) (§5.3); Bucle C
   triggers C1–C3 with ctx-a/b/c re-opening (§3.1.3). Pick a maintenance profile and case mode
   (full/consolidated); run 16 specialized phases in order with 3 loops (cause refutation, solution
-  batch loop, post-no-resuelto re-opening); consolidate a verdict; re-run phase 17 (MINOR) on
-  verify refutada (step 9.7); exclusive Etapa C tree (step 10); distill a lesson; run OpenSpec
+  batch loop, post-no-resuelto re-opening); consolidate a verdict; apply/verify tree (step 9 items
+  6a/6b); re-run phase 17 (MINOR) on verify refutada (step 9 item 7); exclusive Etapa C tree
+  (step 10); distill a lesson; run OpenSpec
   Etapa B/C when integration_mode allows; changelog generator; commit with `Case:` trailer.
   Use when the user asks
   to maintain, fix a bug, correct a regression, optimize,
@@ -2943,8 +2988,9 @@ artifacts' machine fields in English. Canonical policy: ../artifact-structuring/
    within 11–16, sequential preconditions (§5.1). After invoking phase 11, if the artifact does NOT
    meet acceptance (§7.9 — e.g. fewer than ≥2 viable candidates) → set chain state `parcial_11`;
    skip to step 8 with `no_viable_solution_space` (**`C3`**); do NOT open 12–16 or Bucle B.
-   Otherwise set `completa_12-16` and phase 13
-   designs ONE comparative experiment; 14–16 execute batch and emit `## Solución ganadora` or not.
+   Otherwise set chain state `completa_12-16` **immediately** (phase 11 passed §7.9 validation,
+   before invoking 12). Phase 13 designs ONE comparative experiment; 14–16 execute batch and emit
+   `## Solución ganadora` or not.
 
    **Bucle B — solution batch loop.** If phase 16 does NOT emit `## Solución ganadora`:
    mark 13–16 `superseded` (MAJOR++); preserve 11–12. Consult `11-solution-research.md` for
@@ -2953,45 +2999,49 @@ artifacts' machine fields in English. Canonical policy: ../artifact-structuring/
    and initial conditions, else **redesign** 13. Repeat until `## Solución ganadora` OR `pending`
    is empty in map 11.
 8. **Run phase 17 (conclusion).** Consumes `02`, `08`, and `16` only when chain state is
-   `completa_12-16` (§5.2). Route evaluation (§5.3 order): (1) **(c)** if `no_abierta` (`08` lacks
-   `## Causa confirmada`); (2) **(c)** if `parcial_11` (`no_viable_solution_space`, do NOT read 16);
+   `completa_12-16` (§5.2).    Route evaluation (§5.3 order): (1) **(c)** if Bucle A exhausted and `08` lacks
+   `## Causa confirmada`; (2) **(c)** if `parcial_11` (`no_viable_solution_space`, do NOT read 16);
    (3) **(c)** if `completa_12-16` without `## Solución ganadora`; (4) **(b)** if Solo-SM and
    winner exists; (5) **(a)** otherwise with winner. Distills lesson in all paths.
 9. **Etapa B — OpenSpec formalization (orchestrator-owned; §12.2, §12.2.4).** Skip in `Solo-SM`
    (routes **(b)** and **(c)**) and on the pause path. For `Completo`/`Rápido` on route **(a)** only:
    1. Precondition: `17-conclusion.md` carries validated spec AND `16-solution-analysis.md` has
       `## Solución ganadora` with discard justifications.
-   2. **Boundary checkpoint:** present to the user in Spanish that the spec is ready; proceed to
-      `openspec-propose` only with explicit OK.
+   2. **Boundary checkpoint:** present to the user in Spanish that the spec is ready; proceed only
+      with explicit OK. **If user declines:** skip Etapa B; keep `status: done`; proceed to step 10
+      branch **(ii)** (investigativo close — same as Solo-SM Etapa C).
    3. Derive the 4 OpenSpec artifacts from `17-conclusion.md` (+ `11-solution-research.md` for
       design.md alternatives).
    4. Create the OpenSpec change: if `integration_mode: Rápido` → `openspec-continue` when
       `openspec_change` in case.md is **non-empty**; `openspec-ff` when **empty**; if `Completo` →
       `openspec-propose`. Record name in `openspec_change`.
    5. `openspec-apply` → `openspec-verify`.
-   6. Re-run phase 16 (MINOR refinement only) to ingest verify output if needed; repeat apply/verify
-      until convergence. This re-run does NOT trigger Bucle B or a new batch round 12–16.
-   7. **Verify refutada:** if `openspec-verify` does not converge or CRITICALs remain after apply,
-      re-invoke phase 17 (MINOR) to update `17-conclusion.md` with debt/residuals and documented
-      revert path; then proceed to step 10 branch (iv).
-   8. **CRITICALs gate:** on the verify-OK path only — no unaccepted CRITICALs before Etapa C sync/archive.
-10. **Run phase 18 (Etapa C — communication).** Exclusive tree evaluated **after** steps 9–9.7
+   6. **Apply/verify tree (§12.2.2):**
+      - **6a — Converge:** re-run phase 16 (MINOR) to ingest verify output; repeat apply/verify until
+        `openspec-verify` has no unaccepted CRITICALs. Does NOT trigger Bucle B. → step 10 **(iii)**.
+      - **6b — Verify refutada:** if verify does not converge or CRITICALs persist after a full
+        apply cycle → re-invoke phase 17 (MINOR, item 7) with debt/residuals and revert path →
+        step 10 **(iv)**.
+10. **Run phase 18 (Etapa C — communication).** Exclusive tree evaluated **after** step 9
     (§12.2.2); exactly **one** branch:
     - **(i) Route (c) `pausado`:** run phase 18; document `case_paused_at` and canonical Bucle C
       offer (`C1`–`C3`); changelog `--pending`; commit with `Case:` trailer; **omit** sync/archive.
-    - **(ii) Route (b) Solo-SM `done`:** run phase 18; changelog `--pending`; commit; cite winner
-      from 16 when present; **omit** sync/archive.
-    - **(iii) Route (a) and verify OK:** run phase 18; `openspec-sync` + `openspec-archive`;
+    - **(ii) Investigativo `done`:** Solo-SM **(b)**, or Completo/Rápido with checkpoint declined;
+      run phase 18; changelog `--pending`; commit; cite winner from 16 when present; **omit**
+      sync/archive.
+    - **(iii) Route (a) and verify OK (tree 6a):** run phase 18; `openspec-sync` + `openspec-archive`;
       changelog `--pending`; cite winner from 16.
-    - **(iv) Verify refutada** (route **(a)** only): phase 17 already updated in step 9.7; run
-      phase 18; keep `status: done`; document debt and `git revert` of apply; changelog `--pending`;
-      **omit** sync/archive.
+    - **(iv) Verify refutada (tree 6b):** phase 17 already updated in step 9 item 7; run phase 18;
+      keep `status: done`; document debt and `git revert` of apply; changelog `--pending`; **omit**
+      sync/archive.
 11. **Consolidate.** Write verdict into case.md; confirm lesson in `.claude/memory/`.
 12. **Commit (mandatory before Bucle C).** Phase 18 includes CHANGELOG.md; never hand-edit derived
     state. The paused run MUST be committed before step 13 can increment `case_run`.
 13. **Bucle C — re-opening on `pausado` (after commit).** When status is `pausado`, read the offer
     from `18-communication.md` and **process user acceptance** (do NOT re-OFFER). If accepted:
-    increment `case_run`, set `case_resumed_at`, move `status` to `in_progress`; re-run 03–08 only
+    increment `case_run`, set `case_resumed_at`, move `status` to `in_progress`. **If acceptance
+    uses `ctx-c` (profile change):** re-run step 2 classification + invoke matching `sm-profile-*`;
+    rewrite 16-entry `phase_policy` in case.md; validate schema (step 4). Then re-run 03–08 only
     (01–02 preserved). If `## Causa confirmada` in 08 → continue at **step 6** (solution chain in
     current `case_run`); otherwise → step 8 (pause again). Prior 17–18 become `superseded` only when
     emitting new closure artifacts (§8.4).
@@ -3022,10 +3072,11 @@ resuelto") when the cause is not confirmed.
   NOT re-invoked. Failure of phase 11 acceptance (§7.9) routes to pause (`no_viable_solution_space`),
   not Bucle B.
 - **Bucle C (re-opening on `pausado`):** after phase 18 documents the offer and step 12 commits the
-  paused run, step 13 processes user acceptance (no duplicate offer). If accepted: increments
-  `case_run`, re-runs phases 03–08 only (01–02 preserved). Solution chain opens at step 6 in the new
-  `case_run` if cause is confirmed — never inside the same 03–08 cycle. Prior 17–18 superseded when
-  new closure artifacts are emitted (§8.4).
+  paused run, step 13 processes user acceptance (no duplicate offer). If accepted with `ctx-c`:
+  re-run profile skill and rewrite `phase_policy` before 03–08. Otherwise: increments `case_run`,
+  re-runs phases 03–08 only (01–02 preserved). Solution chain opens at step 6 in the new `case_run`
+  if cause is confirmed — never inside the same 03–08 cycle. Prior 17–18 superseded when new
+  closure artifacts are emitted (§8.4).
 
 ## References
 
@@ -3503,7 +3554,7 @@ phases:
 <!-- sm-phase-solution-data-collection writes here -->
 
 ### 16 — Solution Analysis
-<!-- sm-phase-solution-analysis writes here; mandatory `## Solución ganadora` for phase 17 to emit spec -->
+<!-- sm-phase-solution-analysis writes here; `## Solución ganadora` only when batch has winner (§7.14) -->
 
 ### 17 — Conclusion
 <!-- sm-phase-conclusion writes here; consumes 02, 08, 16 -->
@@ -3576,16 +3627,18 @@ data from both chains. Treat every maintenance request as a *case* driven by `sm
   when applicable, ≠ Solo-SM), **(b)** Solo-SM investigativo (`done` without spec, even with winner
   in 16), **(c)** pause (`pausado`). Without `## Causa confirmada` → **(c)** in all modes.
 - Each case declares `case_run`, `integration_mode` and `openspec_change` in the canonical block.
-  Etapa B runs after phase 17 only on route **(a)** (`Completo`/`Rápido`); `Rápido`: non-empty
-  `openspec_change` → `openspec-continue`, empty → `openspec-ff`. Etapa C (step 10): Solo-SM **(b)**
-  and pause **(c)** omit sync/archive; verify refuted after apply → `done` with debt documented,
-  no sync/archive. `Solo-OpenSpec` terminates the orchestrator at step 2. Never cross the Etapa B
+  Etapa B runs after phase 17 only on route **(a)** (`Completo`/`Rápido`); checkpoint declined →
+  investigativo close (step 10 branch ii). `Rápido`: non-empty `openspec_change` →
+  `openspec-continue`, empty → `openspec-ff`. Etapa C (step 10): investigativo **(ii)** and pause
+  **(c)** omit sync/archive; verify refuted (step 9 tree 6b) → `done` with debt, no sync/archive.
+  `Solo-OpenSpec` terminates the orchestrator at step 2. Never cross the Etapa B
   boundary without explicit user authorization (§12.2, §12.2.4).
 - Chain states §5.2: `no_abierta`, `parcial_11`, `completa_12-16`. Bucle C triggers `C1`–`C3`;
   re-opening context `ctx-a`/`ctx-b`/`ctx-c` (§3.1.3). Phase 18 documents the Bucle C offer;
-  commit (step 12) closes the paused run before step 13. Step 9.7 re-runs phase 17 (MINOR) on
-  verify refutada. Step 10 is an exclusive tree: **(i)** pause **(c)**, **(ii)** Solo-SM **(b)**,
-  **(iii)** verify OK **(a)**, **(iv)** verify refutada — no overlap between pause and skipped Etapa B.
+  commit (step 12) closes the paused run before step 13. Step 9 item 7 re-runs phase 17 (MINOR) on
+  verify refutada (tree 6b). Step 10 is an exclusive tree: **(i)** pause **(c)**, **(ii)**
+  investigativo **(b)** / checkpoint declined, **(iii)** verify OK **(a)**, **(iv)** verify refutada
+  — no overlap between pause and skipped Etapa B.
 - Derived state over duplicated state. `CHANGELOG.md` and the case index are DERIVED (from
   commits and the filesystem); never hand-edit them. Only lessons are persisted deliberately.
 

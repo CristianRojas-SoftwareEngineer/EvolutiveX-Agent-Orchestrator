@@ -549,11 +549,11 @@ soluciones. El bucle de soluciones nunca se abre antes de tener la causa confirm
 Flujo completo — causa confirmada primero, luego solución
 ═════════════════════════════════════════════════════════
 
-  BUCLE DE CAUSA (04→08)
-  04-hypothesis.md  →  H1, H2... (cause hypotheses)
+  BUCLE DE CAUSA (04→08, primera pasada)
+  04-hypothesis.md  →  H1, H2... (cause hypotheses) + §Solution hypotheses (S1, S2, S3...)
           │
           ▼
-  05-experiment-design.md  →  repro experiment
+  05-experiment-design.md  →  repro experiment (cause mode)
           │
           ▼
   06-experiment-execution.md  →  run, record
@@ -564,16 +564,16 @@ Flujo completo — causa confirmada primero, luego solución
           ▼
   08-analysis.md  →  causa confirmada o refutada
           │
-          ├── refutada → volver a 04 con siguiente hipótesis de causa
+          ├── refutada → volver a 04 (append siguiente hipótesis de causa; no overwrite)
+          │             → repetir 05→06→07→08
           │
           └── confirmada
                   │
-                  ▼  AHORA se abre el BUCLE DE SOLUCIONES
-                  │
-  04-hypothesis.md §Solution hypotheses  →  S1, S2, S3... (from 03-research)
-          │
-          ▼
-  05-experiment-design.md  →  comparative procedure (same metrics for all)
+                  ▼  BUCLE DE SOLUCIONES (05→08, segunda pasada)
+                      Las hipótesis de solución ya están en 04-hypothesis.md §Solution hypotheses.
+                      NO se re-invoca fase 04 — Would overwrite cause hypotheses.
+                      │
+  05-experiment-design.md  →  comparative procedure (solution mode)
           │
           ▼
   06-experiment-execution.md  →  run S1 → S2 → S3 sequentially (rollback between)

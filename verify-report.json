@@ -1,14 +1,14 @@
 {
   "schemaVersion": 1,
-  "startedAt": "2026-06-07T22:55:57.361Z",
-  "finishedAt": "2026-06-07T22:57:52.580Z",
+  "startedAt": "2026-06-07T23:08:16.435Z",
+  "finishedAt": "2026-06-07T23:10:07.781Z",
   "steps": [
     {
       "id": "help",
       "script": "help",
       "kind": "blocking",
       "status": "pass",
-      "durationMs": 1053,
+      "durationMs": 923,
       "failureReason": null,
       "skippedReason": null
     },
@@ -17,7 +17,7 @@
       "script": "configure:provider",
       "kind": "blocking",
       "status": "pass",
-      "durationMs": 1039,
+      "durationMs": 976,
       "failureReason": null,
       "skippedReason": null
     },
@@ -26,7 +26,7 @@
       "script": "setup:install",
       "kind": "blocking",
       "status": "pass",
-      "durationMs": 1041,
+      "durationMs": 934,
       "failureReason": null,
       "skippedReason": null
     },
@@ -35,7 +35,7 @@
       "script": "setup:uninstall",
       "kind": "blocking",
       "status": "pass",
-      "durationMs": 1103,
+      "durationMs": 926,
       "failureReason": null,
       "skippedReason": null
     },
@@ -44,7 +44,7 @@
       "script": "statusline:router-details:on",
       "kind": "blocking",
       "status": "pass",
-      "durationMs": 1060,
+      "durationMs": 926,
       "failureReason": null,
       "skippedReason": null
     },
@@ -53,7 +53,7 @@
       "script": "statusline:router-details:off",
       "kind": "blocking",
       "status": "pass",
-      "durationMs": 1579,
+      "durationMs": 924,
       "failureReason": null,
       "skippedReason": null
     },
@@ -62,7 +62,7 @@
       "script": "statusline:router-details:toggle",
       "kind": "blocking",
       "status": "pass",
-      "durationMs": 1047,
+      "durationMs": 943,
       "failureReason": null,
       "skippedReason": null
     },
@@ -71,7 +71,7 @@
       "script": "create:agents-reference",
       "kind": "blocking",
       "status": "pass",
-      "durationMs": 1028,
+      "durationMs": 928,
       "failureReason": null,
       "skippedReason": null
     },
@@ -89,7 +89,7 @@
       "script": "notifications:register",
       "kind": "blocking",
       "status": "pass",
-      "durationMs": 1006,
+      "durationMs": 938,
       "failureReason": null,
       "skippedReason": null
     },
@@ -98,7 +98,7 @@
       "script": "lint",
       "kind": "blocking",
       "status": "pass",
-      "durationMs": 3167,
+      "durationMs": 3123,
       "failureReason": null,
       "skippedReason": null
     },
@@ -107,7 +107,7 @@
       "script": "typecheck",
       "kind": "blocking",
       "status": "pass",
-      "durationMs": 3576,
+      "durationMs": 3419,
       "failureReason": null,
       "skippedReason": null
     },
@@ -116,7 +116,7 @@
       "script": "test:unit",
       "kind": "blocking",
       "status": "pass",
-      "durationMs": 4765,
+      "durationMs": 4340,
       "failureReason": null,
       "skippedReason": null
     },
@@ -125,7 +125,7 @@
       "script": "test:integration",
       "kind": "blocking",
       "status": "pass",
-      "durationMs": 4507,
+      "durationMs": 4256,
       "failureReason": null,
       "skippedReason": null
     },
@@ -134,7 +134,7 @@
       "script": "format",
       "kind": "blocking",
       "status": "pass",
-      "durationMs": 4331,
+      "durationMs": 4174,
       "failureReason": null,
       "skippedReason": null
     },
@@ -143,7 +143,7 @@
       "script": "lint:fix",
       "kind": "blocking",
       "status": "pass",
-      "durationMs": 3221,
+      "durationMs": 3053,
       "failureReason": null,
       "skippedReason": null
     },
@@ -152,7 +152,7 @@
       "script": "clean:dist",
       "kind": "destructive",
       "status": "pass",
-      "durationMs": 762,
+      "durationMs": 723,
       "failureReason": null,
       "skippedReason": null
     },
@@ -161,7 +161,7 @@
       "script": "build:js",
       "kind": "blocking",
       "status": "pass",
-      "durationMs": 1163,
+      "durationMs": 1124,
       "failureReason": null,
       "skippedReason": null
     },
@@ -170,7 +170,7 @@
       "script": "build:types",
       "kind": "blocking",
       "status": "pass",
-      "durationMs": 2794,
+      "durationMs": 2676,
       "failureReason": null,
       "skippedReason": null
     },
@@ -179,7 +179,7 @@
       "script": "build",
       "kind": "blocking",
       "status": "pass",
-      "durationMs": 4558,
+      "durationMs": 4445,
       "failureReason": null,
       "skippedReason": null
     },
@@ -188,7 +188,7 @@
       "script": "test:quick",
       "kind": "blocking",
       "status": "pass",
-      "durationMs": 4962,
+      "durationMs": 4680,
       "failureReason": null,
       "skippedReason": null
     },
@@ -197,7 +197,7 @@
       "script": "test",
       "kind": "blocking",
       "status": "pass",
-      "durationMs": 4897,
+      "durationMs": 4813,
       "failureReason": null,
       "skippedReason": null
     },
@@ -206,34 +206,34 @@
       "script": "start",
       "kind": "background",
       "status": "pass",
-      "durationMs": 3040,
+      "durationMs": 3021,
       "failureReason": null,
-      "skippedReason": "Coincidió patrón 'listening'; proceso arrancado en puerto 18906 y terminado."
+      "skippedReason": "Coincidió patrón 'listening'; proceso arrancado en puerto 10689 y terminado."
     },
     {
       "id": "dev",
       "script": "dev",
       "kind": "background",
       "status": "pass",
-      "durationMs": 3548,
+      "durationMs": 3546,
       "failureReason": null,
-      "skippedReason": "Coincidió patrón 'listening'; proceso arrancado en puerto 16228 y terminado."
+      "skippedReason": "Coincidió patrón 'listening'; proceso arrancado en puerto 13439 y terminado."
     },
     {
       "id": "test-watch",
       "script": "test:watch",
       "kind": "background",
       "status": "pass",
-      "durationMs": 3040,
+      "durationMs": 3038,
       "failureReason": null,
-      "skippedReason": "Coincidió patrón 'RUN'; proceso arrancado en puerto 17885 y terminado."
+      "skippedReason": "Coincidió patrón 'RUN'; proceso arrancado en puerto 16865 y terminado."
     },
     {
       "id": "sessions-list",
       "script": "sessions:list",
       "kind": "blocking",
       "status": "pass",
-      "durationMs": 2135,
+      "durationMs": 1846,
       "failureReason": null,
       "skippedReason": null
     },
@@ -242,7 +242,7 @@
       "script": "sessions:list-archived",
       "kind": "blocking",
       "status": "pass",
-      "durationMs": 1007,
+      "durationMs": 966,
       "failureReason": null,
       "skippedReason": null
     },
@@ -251,7 +251,7 @@
       "script": "sessions:sanitize:scan",
       "kind": "blocking",
       "status": "pass",
-      "durationMs": 1328,
+      "durationMs": 1345,
       "failureReason": null,
       "skippedReason": null
     },
@@ -260,7 +260,7 @@
       "script": "sessions:archive",
       "kind": "blocking",
       "status": "pass",
-      "durationMs": 972,
+      "durationMs": 969,
       "failureReason": null,
       "skippedReason": null
     },
@@ -269,7 +269,7 @@
       "script": "sessions:restore",
       "kind": "blocking",
       "status": "pass",
-      "durationMs": 1027,
+      "durationMs": 959,
       "failureReason": null,
       "skippedReason": null
     },
@@ -278,7 +278,7 @@
       "script": "sessions:delete",
       "kind": "blocking",
       "status": "pass",
-      "durationMs": 992,
+      "durationMs": 963,
       "failureReason": null,
       "skippedReason": null
     },
@@ -287,7 +287,7 @@
       "script": "sessions:sanitize",
       "kind": "blocking",
       "status": "pass",
-      "durationMs": 1021,
+      "durationMs": 968,
       "failureReason": null,
       "skippedReason": null
     },
@@ -296,7 +296,7 @@
       "script": "sessions:sanitize:all",
       "kind": "blocking",
       "status": "pass",
-      "durationMs": 1569,
+      "durationMs": 1521,
       "failureReason": null,
       "skippedReason": null
     },
@@ -305,7 +305,7 @@
       "script": "clean:sessions",
       "kind": "destructive",
       "status": "pass",
-      "durationMs": 1142,
+      "durationMs": 1826,
       "failureReason": null,
       "skippedReason": null
     },
@@ -314,7 +314,7 @@
       "script": "clean:logs",
       "kind": "destructive",
       "status": "pass",
-      "durationMs": 725,
+      "durationMs": 807,
       "failureReason": null,
       "skippedReason": null
     },
@@ -323,7 +323,7 @@
       "script": "clean:modules",
       "kind": "destructive",
       "status": "pass",
-      "durationMs": 6248,
+      "durationMs": 6203,
       "failureReason": null,
       "skippedReason": null
     },
@@ -332,7 +332,7 @@
       "script": "",
       "kind": "restore",
       "status": "pass",
-      "durationMs": 10679,
+      "durationMs": 10866,
       "failureReason": null,
       "skippedReason": null
     },
@@ -341,7 +341,7 @@
       "script": "clean:all",
       "kind": "destructive",
       "status": "pass",
-      "durationMs": 7687,
+      "durationMs": 7411,
       "failureReason": null,
       "skippedReason": null
     },
@@ -350,7 +350,7 @@
       "script": "",
       "kind": "restore",
       "status": "pass",
-      "durationMs": 11649,
+      "durationMs": 11146,
       "failureReason": null,
       "skippedReason": null
     },
@@ -359,7 +359,7 @@
       "script": "build",
       "kind": "restore",
       "status": "pass",
-      "durationMs": 4730,
+      "durationMs": 4685,
       "failureReason": null,
       "skippedReason": null
     }

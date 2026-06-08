@@ -41,14 +41,17 @@ cada uno con sus propias fases especializadas, sin bifurcación interna por modo
 El contrato `phase-policy-schema.md` (`{ focus, reasoning_effort, evidence, acceptance,
 risk_controls }`) **no cambia**; lo que cambia es la cantidad de entries en la `phase_policy matrix`
 por caso (de 10 a 16, con rango numérico `01..18`). El `case_mode` (`full`/`consolidated`)
-**no cambia**. El `CHANGELOG.md`
-derivado **no cambia**. La integración con OpenSpec (Etapas A/B/C) **no cambia** en este plan; la
-referencia a "fase 09" como frontera de Etapa B se ajustará a "fase 17" solo cuando el usuario
-apruebe el diseño.
+**no cambia**. El `CHANGELOG.md` derivado **no cambia**. La integración con OpenSpec **se
+corrige en este mismo documento** (§12.2): la frontera de Etapa B pasa de "fase 09" a
+"fase 17", y el cambio se aplica en el mismo plan de migración que toca el sistema `sm-*`.
 
-**Este documento describe, no implementa.** Las 15 skills `sm-*` actuales, las plantillas, las
-referencias, el doc de integración y la lesson permanecen **intactos** hasta que el usuario apruebe
-el diseño. La implementación, cuando se apruebe, será objeto de un plan de migración aparte.
+**Este documento es completamente autocontenido.** Embebe el código fuente de las 16 skills
+que define (§13), las 5 referencias del orquestador (§13.6), las 2 plantillas (§13.7),
+`.claude/CLAUDE.md` (§13.8), la lesson que motiva el rediseño (§12.1) y la corrección a la
+integración con OpenSpec (§12.2). **Describe, no implementa:** las 15 skills `sm-*` actuales,
+las plantillas, las referencias, el doc de integración y la lesson permanecen **intactos**
+en disco hasta que el usuario apruebe el diseño. La implementación, cuando se apruebe, será
+objeto de un plan de migración aparte.
 
 ---
 
@@ -149,17 +152,13 @@ causa; el bucle B itera hipótesis de solución; el bucle C re-abre el caso tras
 - **Independencia del perfil:** este bucle aplica igual bajo cualquier perfil (corrective, adaptive,
   perfective, preventive).
 
-#### 3.1.2 Bucle B — iteración del espacio de soluciones
+#### 3.1.2 Bucle B — iteración del espacio de soluciones (batch comparativo)
 
-- **Disparador:** la fase 16 (análisis comparativo de soluciones) refuta la solución activa porque
-  la tabla normalizada de 15 muestra que la candidata activa no cumple los criterios de veredicto
-  (efecto, blast radius, reversibilidad, riesgo residual, o la métrica dominante del perfil).
-- **Acción:** marcar los artefactos `12`–`16` de esa solución como `superseded` (incrementando
-  versión). **No** se toca 11 (la investigación del espacio de soluciones se conserva como mapa del
-  espacio de búsqueda, aunque una candidata concreta se descarte).
-- **Reanudación:** el orquestador re-ejecuta la fase 12 con la siguiente candidata de
-  `12-solution-hypothesis.md`. El experimento comparativo de 13 puede **re-utilizarse** sin cambios
-  (las hipótesis descartadas ya estaban contempladas en el diseño); si no, 13 se rehace.
+El Bucle B es **asimétrico** con el Bucle A: mientras la cadena de causa prueba una hipótesis a la vez (iterativo), la cadena de solución ejecuta un **experimento comparativo batch** que abarata el coste de rollback entre hipótesis.
+
+- **Disparador:** la fase 16 (análisis comparativo de soluciones) **no** emite `## Solución ganadora` porque la tabla normalizada de 15 muestra que **ninguna hipótesis** alcanza el veredicto de ganadora (todas fallan los criterios de efecto, blast radius, reversibilidad, riesgo residual, o la métrica dominante del perfil).
+- **Acción:** el orquestador marca los artefactos `13`–`16` con `status: superseded` (el diseño 13 y los resultados 14–16 ya no aplican) **pero preserva** `11-solution-research.md` (el mapa del espacio) y `12-solution-hypothesis.md` (las hipótesis descartadas son audit trail; se append con nuevas candidatas). El orquestador re-ejecuta fase 12 con **nuevas candidatas** del mapa de fase 11 que no estaban formuladas en la ronda anterior.
+- **Reanudación:** el orquestador re-invoca fase 12 para appendear las candidatas no exploradas; fase 13 puede reutilizarse sin cambios si las nuevas hipótesis encajan en el diseño comparativo existente, o rediseñarse si requieren métricas diferentes.
 - **Terminación:** una solución gana el veredicto de 16, o se agotan las candidatas. Si se agotan,
   la fase 17 emite "no resuelto" + estado `pausado` (Bucle C, ver §3.1.3).
 - **Independencia del perfil:** este bucle aplica igual bajo cualquier perfil. La política de qué
@@ -1181,10 +1180,10 @@ entender el diseño):
 | 7  | `.claude/skills/sm-phase-problem-definition/SKILL.md` (Fase 02)    | Sin cambios                                                                         | §13.2.2   |
 | 8  | `.claude/skills/sm-phase-research/SKILL.md` (Fase 03)              | Sin cambios                                                                         | §13.2.3   |
 | 9  | `.claude/skills/sm-phase-hypothesis/SKILL.md` (Fase 04)            | Sin cambios                                                                         | §13.2.4   |
-| 10 | `.claude/skills/sm-phase-experiment-design/SKILL.md` (Fase 05)     | Sin cambios                                                                         | §13.2.5   |
-| 11 | `.claude/skills/sm-phase-experiment-execution/SKILL.md` (Fase 06)  | Sin cambios                                                                         | §13.2.6   |
-| 12 | `.claude/skills/sm-phase-data-collection/SKILL.md` (Fase 07)       | Sin cambios                                                                         | §13.2.7   |
-| 13 | `.claude/skills/sm-phase-analysis/SKILL.md` (Fase 08)              | Emite la sección `## Causa confirmada` (obligatoria)                                 | §13.2.8   |
+| 10 | `.claude/skills/sm-phase-experiment-design/SKILL.md` (Fase 05)     | Elimina lógica de modo `solution-mode`; solo procedimiento de causa                 | §13.2.5   |
+| 11 | `.claude/skills/sm-phase-experiment-execution/SKILL.md` (Fase 06)  | Elimina lógica de modo `solution-mode`; solo procedimiento de causa                 | §13.2.6   |
+| 12 | `.claude/skills/sm-phase-data-collection/SKILL.md` (Fase 07)       | Elimina lógica de modo `solution-mode`; solo procedimiento de causa                 | §13.2.7   |
+| 13 | `.claude/skills/sm-phase-analysis/SKILL.md` (Fase 08)              | Emite la sección `## Causa confirmada` (obligatoria); elimina lógica de modo          | §13.2.8   |
 | 14 | `.claude/skills/sm-phase-solution-research/SKILL.md` (Fase 11)     | **NUEVO**                                                                          | §13.1.1   |
 | 15 | `.claude/skills/sm-phase-solution-hypothesis/SKILL.md` (Fase 12)   | **NUEVO**                                                                          | §13.1.2   |
 | 16 | `.claude/skills/sm-phase-solution-experiment-design/SKILL.md` (13) | **NUEVO**                                                                          | §13.1.3   |
@@ -1202,13 +1201,17 @@ entender el diseño):
 | 28 | `.claude/skills/sm-orchestrator/references/changelog.md`           | Sin cambios                                                                          | §13.6.5   |
 | 29 | `.claude/CLAUDE.md`                                                | Rango 01..18; estado `pausado`; precondiciones de cadena y cierre                    | §13.8     |
 
-Adicionalmente, **fuera del sistema `sm-*`** se modificará (cuando el usuario apruebe el diseño):
+Adicionalmente, **fuera del sistema `sm-*`** se modificará **en el mismo plan de migración**
+(cuando el usuario apruebe el diseño), no en commits separados:
 
 - `.claude/skills/sm-orchestrator/references/artifact-conventions.md` — campo `chain` en
   frontmatter; rango `NN ∈ 01..18`.
-- `docs/proposals/scientific-method-and-openspec-integration.md` — referencia a "fase 09" como
-  frontera de Etapa B pasa a "fase 17". Este cambio se hace en un commit aparte, **después** de
-  que la migración esté completa.
+- `docs/proposals/scientific-method-and-openspec-integration.md` — la v0.3 cita "fase 09" como
+  frontera de Etapa B. La corrección a "fase 17" se aplica **en este mismo plan** (no en un
+  commit aparte posterior) renumerando el documento a v0.4 con la sección §12.2 de este
+  documento como contenido de la nueva subsección "Adaptación al sistema de dos cadenas".
+  Esto elimina el gap temporal en el que el sistema emitiría conclusiones en fase 17 pero el
+  doc de integración las llamaría "fase 09".
 
 ### 11.3 Dependencias externas
 
@@ -1231,29 +1234,259 @@ migración. La aprobación se documenta en un commit aparte con mensaje aproxima
 
 ---
 
-## 12. Referencias cruzadas
+## 12. Referencias cruzadas, recursos embebidos y contexto derivado
 
-Este documento es **completamente autocontenido**: el código fuente de las 16 skills que
-define, las 5 referencias del orquestador, las 2 plantillas y `.claude/CLAUDE.md` están
-**embebidos en §13**. La siguiente tabla lista los recursos externos que **no** están
-embebidos (porque no son parte del código del sistema) y cuyo conocimiento sí es relevante
-para entender el rediseño.
+Este documento es **completamente autocontenido**: todo el conocimiento necesario para
+entender, implementar y migrar el sistema de dos cadenas está dentro de este archivo. Esto
+incluye:
 
-| Documento / Recurso                                                                 | Relación                                                                                                                                  |
-| ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `docs/proposals/scientific-maintenance.md` (v1.0)                                  | Sistema vigente actual (1 cadena × 10 fases con modos). Sigue siendo el contrato hasta que el usuario apruebe este diseño. El nuevo diseño lo reemplaza conceptualmente, pero no se elimina hasta la migración. |
-| `docs/proposals/scientific-method-and-openspec-integration.md` (v0.3)              | Integración con OpenSpec. La frontera de Etapa B (que cita "fase 09") se ajustará a "fase 17" cuando se apruebe el diseño. Sin cambio ahora. La decisión sobre cómo interactúa este nuevo diseño de 2 cadenas con OpenSpec queda fuera del alcance de este documento — se redactará en un plan aparte si el usuario lo requiere. |
-| `maintenance-cases/20260607-clean-modules-windows/`                                | Caso de referencia del gap. NO es un ejemplo del nuevo diseño (se ejecutó con el workflow antiguo); sirve como evidencia del gap que el rediseño corrige. |
-| `.claude/skills/artifact-structuring/SKILL.md`                                     | Política de idioma (inglés en cuerpos, español en interacción). Sin cambios.                                                              |
-| `.claude/skills/conventional-commits/SKILL.md`                                     | Formato de mensajes de commit. Sin cambios.                                                                                                 |
-| `.claude/memory/clean-modules-windows-atomicity-2026-06.md`                        | Lección que motivó el rediseño. Documenta el gap metodológico (fase 09 emitió decisiones sin medir) y la transición a dos cadenas. **Su contenido NO se embebe aquí** porque es una lección (memoria), no código del sistema. |
+- El **código fuente de las 16 skills que define** (6 nuevas de solución + 8 de causa
+  actualizadas + 2 de cierre renumeradas) — embebido en §13.
+- Las **5 referencias del orquestador** (phase-policy-schema, classification-guide,
+  artifact-conventions, knowledge-base, changelog) — embebidas en §13.6.
+- Las **2 plantillas** (`case.md` con 16 entries y `phase-artifact.md` con campo `chain`) —
+  embebidas en §13.7.
+- El **`.claude/CLAUDE.md`** actualizado para dos cadenas y estado `pausado` — embebido en §13.8.
+- La **lesson que motiva el rediseño** (`clean-modules-windows-atomicity-2026-06.md`) —
+  embebida en §12.1 (abajo).
+- La **interacción concreta con OpenSpec** — embebida en §12.2 (abajo), incluyendo el
+  renumerado de la frontera de Etapa B de "fase 09" a "fase 17".
 
-> **Nota sobre los archivos en `.claude/`:** los archivos de código del sistema `sm-*`
-> (skills, plantillas, referencias) y `.claude/CLAUDE.md` **no se referencian como archivos
-> externos**; su contenido está embebido en §13. Esto es deliberado: este documento describe
-> el sistema, y un documento que describe un sistema no debe delegar su especificación a
-> archivos que pueden cambiar independientemente. La fase de migración (§11) es la que
-> efectivamente escribirá esos archivos en disco, partiendo del código embebido.
+### 12.1 Lesson embebida: `clean-modules-windows-atomicity-2026-06.md`
+
+Esta lesson documenta el **origen del gap** que el rediseño corrige y la historia de la
+transición desde la "solución de modos" hacia las dos cadenas. Se embebe completa para que
+el documento sea trazable al defecto específico que motiva el cambio.
+
+````markdown
+---
+name: clean-modules-windows-atomicity-2026-06
+description: rimraf en Windows 11 no es transaccional (defecto de atomicity); el flujo SM previo no iteraba el espacio de soluciones antes de emitir la spec (gap metodológico); la corrección correcta es separar causa y solución en dos cadenas especializadas, no en modos internos. Solución: script dedicado que mata procesos con handles (esbuild, vitest; no node para evitar cascada al gateway) antes de rimraf y verifica estado post-borrado.
+metadata:
+  type: defect-class
+  component: scripting/clean-modules
+  defect-class: atomicity
+  profile: corrective
+---
+
+# Lección: rimraf no garantiza atomicidad transaccional en Windows
+
+## Root cause
+
+`rimraf` en Windows 11 (v6.1.3) no garantiza atomicidad transaccional. Cuando el borrado de
+`node_modules/` falla por un lock (archivo en uso por proceso con handle abierto), el
+directorio queda en **estado parcial** — parcialmente borrado, corrupto. rimraf sale con
+código 1 pero no revierte lo ya borrado.
+
+El comportamiento en el experimento:
+- 1 archivo bloqueado por proceso PowerShell detached.
+- `npm run clean:modules` → exit code 1, 350 items restantes de ~1000.
+- `node_modules/` corrupto, `node_modules/.bin/` vacío.
+
+## Por qué no es silent failure
+
+La hipótesis original H1 ("`fixEPERM` silently gives up") fue refinada: rimraf sí propagó el
+error (exit 1). El problema no es que rimraf silenciosamente ignore el error — es que **no
+hay rollback transaccional**. Cuando falla a mitad, ya borró 650 items y no puede
+revertirlos.
+
+## Cómo aplicar la solución
+
+1. **Crear `scripting/clean-modules.ts`** dedicado que:
+   - En Windows: mate procesos con handles (`esbuild`, `vitest` — el script no mata `node`
+     para evitar cascadear al gateway de Claude Code) antes de rimraf.
+   - Ejecute rimraf.
+   - Verifique estado post-borrado: si `node_modules/` existe con items restantes, ejecutar
+     `npm install` y reportar.
+   - En otros entornos: delegar directamente a rimraf.
+
+2. **Actualizar `package.json`**:
+   ```json
+   "clean:modules": "tsx scripting/clean-modules.ts"
+   ```
+
+3. **Actualizar `verify-config.ts`**:
+   - El step `clean-modules` ya usa `verifier: 'path-absent-node-modules'` — sigue
+     funcionando con el nuevo script si este garantiza que el directorio se elimina
+     completamente o falla con exit no-cero.
+
+## Nota sobre retry de rimraf
+
+`retryBusy` tiene `MAXRETRIES = 10` para `EBUSY`/`EMFILE`/`ENFILE` con backoff máximo de
+200ms. El problema no es la cantidad de retries sino la falta de rollback cuando todas las
+retries se agotan.
+
+**Why:** El mecanismo de retry de rimraf funciona para locks transitorios, pero cuando el
+lock persiste más allá de los retries, el directorio queda corrupto. La solución correcta
+es prevenir los locks antes de rimraf (matando procesos) y detectar el estado corrupto
+post-borrado.
+
+## Gap metodológico detectado
+
+El caso `20260607-clean-modules-windows` recorrió las diez fases del flujo SM con rigor formal
+pero su fase 09 emitió decisiones arquitectónicas (qué procesos matar, cómo recuperarse) sin
+haber medido trade-offs entre alternativas. La consecuencia fue que la implementación
+divergió del plan en Etapa B: las decisiones D2/D3 de la fase 09 chocaron con la realidad
+(cascada al gateway, bloqueo del padre) en `openspec-apply`, obligando a divergir del plan y
+dejando los artefactos sin sincronizar con el código.
+
+**Causa raíz del gap:** las fases 03–08 estaban diseñadas para iterar el espacio de causas
+(qué produjo el defecto), no el de soluciones. Cuando la causa quedó confirmada, el agente
+saltó a la primera idea de fix sin haber comparado alternativas.
+
+**Regla a futuro:** la fase 09 no debe emitir la spec validada si `08-analysis.md` no
+contiene una sección `## Solution comparison` con veredicto de ganadora y justificaciones de
+descarte. Esta precondición está ahora documentada en:
+- `sm-orchestrator` paso 6.1 (precondición de Etapa B)
+- `sm-phase-conclusion` procedimiento paso 6 (verificación antes de emitir spec)
+- `docs/proposals/scientific-method-and-openspec-integration.md` §5.4.1 (bucle del espacio
+  de soluciones como sub-bucle paralelo)
+
+El campo `solution_hypotheses` en `case.md` (plantilla) y la sección `## Solution comparison`
+en `08-analysis.md` son los mecanismos que hacen cumplir esta regla.
+
+## Transición a dos cadenas (2026-06-08)
+
+La "solución de modos" (commits `46de4ea`, `ca0b86e`, `3c42a93`) fue el primer intento de cerrar
+el gap metodológico descrito arriba. La idea era extender las fases 03–08 con un modo dinámico
+detectado desde el estado del artefacto: cuando 03–08 operaban sobre el espacio de causas,
+eran "causa-mode"; cuando operaban sobre el espacio de soluciones, eran "solution-mode". El
+mismo `SKILL.md` bifurcaba su lógica internamente.
+
+El resultado fue insuficiente. Las fases bifurcaban su lógica internamente (violación del
+principio §2.1 de separación estricta de roles), las re-entry rules del Bucle A y del nuevo
+bucle de soluciones eran distintas y se solapaban, la sección `## Solution comparison` quedaba
+como contenido condicional dentro de `08-analysis.md` (a veces presente, a veces no), y el modo
+se detectaba dinámicamente desde el estado del artefacto —lo que hacía al sistema frágil
+ante refutaciones que cruzaban ambos espacios.
+
+La corrección correcta, propuesta en `docs/proposals/new-scientific-maintenance.md` v0.1
+(borrador, embebido completo en este documento), es **separar físicamente las dos búsquedas
+en dos cadenas de fases especializadas**:
+
+- **Cadena de causa (01–08):** método científico sobre el espacio de hipótesis de causa. Sin
+  cambios estructurales. Bucle de refutación interna (Bucle A) preserva el comportamiento v1.0.
+- **Cadena de solución (11–16):** segundo método científico, especializado y físicamente
+  separado, sobre el espacio de hipótesis de solución. Cada fase tiene su propio `SKILL.md`,
+  su propio artefacto, su propio contrato. Cero modos internos. Bucle de refutación interna
+  de solución (Bucle B) opera solo sobre 12–16.
+- **Cierre global (17–18):** conclusión y comunicación únicas al final, con datos de ambas
+  cadenas. Las antiguas 09 y 10 se renumeran a 17 y 18.
+- **Re-apertura post "no resuelto" (Bucle C):** caso en estado `pausado`; el orquestador
+  ofrece re-ejecutar 03–08 con nuevo contexto, conservando 01–02.
+
+El contrato `phase-policy-schema.md` no cambia; el `case_mode` no cambia; el `CHANGELOG.md`
+derivado no cambia. Lo que cambia es la cantidad de entries en `phase_policy matrix` (de 10
+a 16) y los archivos del sistema `sm-*` (6 skills nuevas + 1 orquestador modificado + 4
+perfiles ampliados + 2 skills renumeradas + plantillas y referencias actualizadas). La
+implementación se materializará en un plan de migración aparte, **solo cuando el usuario
+apruebe el diseño** del nuevo documento. Hasta entonces, el sistema v1.0 sigue siendo el
+contrato vigente.
+````
+
+### 12.2 Interacción con OpenSpec — embebida
+
+El sistema de mantenimiento científico (`sm-*`) **convive** con el flujo OpenSpec (ya
+implementado en `.claude/skills/openspec-*/`). El sistema de dos cadenas **no redefine** la
+integración: la hereda del doc `scientific-method-and-openspec-integration.md` v0.3 y aplica
+**una sola corrección obligatoria** a la luz de la renumeración: la frontera de Etapa B,
+que en v0.3 cita "fase 09", pasa a citar "fase 17". Esta subsección documenta esa corrección
+y la aplica, sin delegarla a un commit futuro.
+
+#### 12.2.1 Correspondencia fase SM → rol en la integración (renumerada)
+
+| Fase SM            | Propósito SM                                          | Rol en la integración                                   |
+| ------------------ | ----------------------------------------------------- | ------------------------------------------------------- |
+| 01 Observación     | Recoger señales del sistema                           | Pre-OpenSpec: contexto inicial del caso                 |
+| 02 Definición del problema | Enmarcar el problema                            | Pre-OpenSpec: alimenta la especificación validada       |
+| 03 Investigación   | Explorar el espacio, levantar alternativas            | Pre-OpenSpec: identificar N hipótesis candidatas        |
+| 04 Hipótesis       | Formular alternativas con criterios de éxito          | Pre-OpenSpec: qué se va a probar                        |
+| 05 Diseño experimental | Planificar cómo se ejecutan las pruebas            | Pre-OpenSpec: diseño del set experimental               |
+| 06 Ejecución       | Ejecutar los experimentos (scripts, ramas throwaway)  | Pre-OpenSpec: producir datos de cada alternativa        |
+| 07 Recolección     | Capturar resultados de cada experimento               | Pre-OpenSpec: dataset para comparación                  |
+| 08 Análisis        | Comparar alternativas, descartar inviables, trade-offs| Pre-OpenSpec: seleccionar la ganadora con justificación |
+| **11 Investigación de soluciones** | Mapear espacio de soluciones viables  | Pre-OpenSpec (cadena de solución): alternativas a comparar |
+| **12 Hipótesis de solución** | Formular hipótesis falsables de solución  | Pre-OpenSpec (cadena de solución): qué solución probar   |
+| **13 Diseño experimental comparativo** | Plan comparativo de las hipótesis de solución  | Pre-OpenSpec (cadena de solución): set experimental    |
+| **14 Ejecución secuencial** | Ejecutar las hipótesis con rollback       | Pre-OpenSpec (cadena de solución): datos por solución    |
+| **15 Recolección y normalización** | Tabla normalizada comparativa         | Pre-OpenSpec (cadena de solución): dataset comparable   |
+| **16 Análisis comparativo** | Veredicto cuantitativo de solución ganadora  | Pre-OpenSpec (cadena de solución): ganadora con datos  |
+| **17 Conclusión**  | Veredicto final + **especificación validada**         | **Frontera**: artefacto que alimenta OpenSpec (Etapa B)  |
+| 18 Comunicación    | Documentar, archivar, consolidar conocimiento         | Post-OpenSpec: cierre del caso y del change             |
+
+**Punto clave:** la **frontera única** entre SM y OpenSpec es la fase 17 (no la fase 09 como
+en v0.3). La spec validada que alimenta OpenSpec sale de la fase 17 con datos de **ambas
+cadenas** (causa confirmada en 08 + solución ganadora en 16).
+
+#### 12.2.2 Etapas A, B y C (adaptadas a dos cadenas)
+
+**Etapa A — Investigación científica completa (SM 01–16).** Comprende la cadena de causa
+(01–08) y, si la causa se confirma, la cadena de solución (11–16). La Etapa A **no produce
+nada en OpenSpec**: vive entera en `maintenance-cases/<case-id>/`. La especificación validada
+la emite la fase 17 (cierre de SM), no la fase 09 como en v0.3.
+
+**Etapa B — Formalización e implementación (OpenSpec).** El orquestador SM, previa
+autorización del usuario en la frontera, ejecuta `openspec-propose` (o `openspec-ff` /
+`openspec-continue` según el modo) para crear el change. Los cuatro artefactos OpenSpec se
+redactan alimentándose **principalmente** de la especificación validada de la fase 17:
+
+| Artefacto OpenSpec | Fuente                                                                  | Contenido clave                                  |
+| ------------------ | ----------------------------------------------------------------------- | ------------------------------------------------ |
+| `proposal.md`      | `17-conclusion.md` (sección "Problema")                                 | _Why_: problema, motivación, alcance, impacto    |
+| `specs/`           | `17-conclusion.md` (sección "Comportamiento esperado")                  | _What_: delta normativo (ADDED/MODIFIED/REMOVED) |
+| `design.md`        | `17-conclusion.md` (sección "Decisiones arquitectónicas") + `11-solution-research.md` | _How_: decisiones + alternativas ya descartadas |
+| `tasks.md`         | `17-conclusion.md` (sección "Criterios de aceptación")                  | _What exactly_: pasos accionables                |
+
+**Etapa C — Comunicación y consolidación (SM 18).** El orquestador SM ejecuta la fase 18
+con la siguiente secuencia:
+
+- **Si la hipótesis quedó confirmada** (la implementación cumple `specs/` y `openspec-verify`
+  no dejó CRITICALs pendientes): ejecuta `openspec-sync` y luego `openspec-archive`.
+- **Si la hipótesis quedó refutada**: documenta el `git revert` del apply como paso de cierre
+  (lo ejecuta el usuario, no el sistema); omite `openspec-sync` y `openspec-archive`.
+- Ejecuta el generador on-demand con `--pending "<subject>" --case <id>` para actualizar
+  `CHANGELOG.md`.
+- Escribe la lección destilada en `.claude/memory/<lesson-slug>.md` y la añade al índice
+  `MEMORY.md`.
+- Crea el commit unificado con trailer `Case: <case-id>` y, si el change fue archivado,
+  `OpenSpec-Change: <name>`.
+
+#### 12.2.3 Diferencias respecto a la integración v0.3
+
+| Aspecto                                | v0.3 (sistema v1.0, 1 cadena con modos)   | v0.4 (sistema de dos cadenas)                            |
+| -------------------------------------- | ----------------------------------------- | -------------------------------------------------------- |
+| Frontera Etapa B (spec → OpenSpec)     | Fase 09 (conclusión)                      | **Fase 17** (conclusión del sistema de dos cadenas)      |
+| Datos en la spec validada              | Solo cadena de causa (01–08)              | **Ambas cadenas** (causa confirmada en 08 + ganadora en 16) |
+| Bucle del espacio de soluciones        | Sub-bucle dentro de 04–08 (modo dinámico) | **Cadena separada 11–16** con Bucle B propio            |
+| Precondición para emitir spec           | `## Solution comparison` en `08-analysis.md` | `## Solución ganadora` en `16-solution-analysis.md` (§5.3) |
+| Caso pausado                           | No existe; "no resuelto" es estado terminal | Estado `pausado` con re-apertura (Bucle C) — §3.1.3, §9.5 |
+
+Esta subsección es la **versión v0.4 de la integración** adaptada al sistema de dos cadenas.
+El doc `scientific-method-and-openspec-integration.md` v0.3 queda **inconsistente** con el
+diseño nuevo (cita "fase 09"); la actualización del mismo a v0.4 es una de las tareas del
+plan de migración (§11.2) y se ejecuta en el mismo commit que actualiza el sistema `sm-*`.
+
+### 12.3 Recursos externos (contexto derivado, no delegación)
+
+A diferencia de los recursos embebidos arriba, los siguientes son **contexto derivado**:
+este documento los cita para situar al lector, pero **no depende de ellos** para ser
+comprensible. Si cambian, este documento sigue siendo válido (puede requerir una nota de
+revisión, no una reescritura).
+
+| Recurso                                                                          | Relación                                                                                                                                |
+| -------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `docs/proposals/scientific-maintenance.md` (v1.0)                                | Sistema **vigente actual** (1 cadena × 10 fases con modos). Sigue siendo el contrato hasta que el usuario apruebe este diseño. El sistema nuevo lo reemplaza conceptualmente, pero el archivo no se elimina hasta la migración (§11.1). |
+| `maintenance-cases/20260607-clean-modules-windows/`                              | Caso de referencia del gap. NO es un ejemplo del nuevo diseño (se ejecutó con el workflow antiguo); sirve como evidencia histórica del gap que el rediseño corrige. |
+| `.claude/skills/artifact-structuring/SKILL.md`                                   | Política de idioma (inglés en cuerpos, español en interacción). El sistema nuevo hereda esta política sin cambios.                      |
+| `.claude/skills/conventional-commits/SKILL.md`                                   | Formato de mensajes de commit. El sistema nuevo hereda este formato sin cambios.                                                       |
+
+> **Nota sobre el principio de autocontención:** un documento que describe un sistema no
+> debe delegar su especificación a archivos que pueden cambiar independientemente. Por eso
+> este documento embebe el código fuente de todas las skills que define (§13), las
+> referencias (§13.6), las plantillas (§13.7), `CLAUDE.md` (§13.8), la lesson motivadora
+> (§12.1) y la corrección a la integración OpenSpec (§12.2). Los recursos listados en
+> §12.3 son **contexto histórico o dependencias operativas**, no partes de la
+> especificación: si se modifican, este documento no requiere reescritura.
 
 ---
 
@@ -1356,15 +1589,16 @@ Narrows the solution space to falsifiable hypotheses. Operates on the SOLUTION a
 ## Inputs
 - case.md (phase_policy.solution-hypothesis).
 - `11-solution-research.md`.
-- On re-invocation (Bucle B, solution refutation): the existing `12-solution-hypothesis.md`.
+- On re-invocation (Bucle B, solution refutation): the existing `12-solution-hypothesis.md`
+  and the set of pending candidates from `11-solution-research.md` that were not yet formulated.
 
 ## Procedure
 1. Read the policy entry.
-2. **If 12-solution-hypothesis.md already exists (re-invocation for solution refutation):** read
-   the artifact, append the next solution candidate as a new hypothesis; do NOT overwrite or
-   remove previously refuted hypotheses — they are the audit trail of the solution-space
-   iteration. The new hypothesis addresses the refutation criterion of the previously rejected
-   one.
+2. **If 12-solution-hypothesis.md already exists (re-invocation for solution refutation):** identify
+   the unformulated candidates from the solution map (11) that were not included in the previous
+   batch run; append them as new hypotheses to the existing artifact. Do NOT overwrite or remove
+   previously tested hypotheses — they are the audit trail of the solution-space iteration (the batch
+   comparison in 16 already weighed them and concluded none won).
 3. **If 12-solution-hypothesis.md does not exist (first pass):** for each viable solution from
    `11-solution-research.md`, formulate a hypothesis: name, mechanism, **observable prediction**
    (what the experiment will measure if the solution wins), **refutation criterion** (what
@@ -1615,13 +1849,12 @@ verdict is the input phase 17 consumes to emit the spec.
 <constraints>Analyze; the case decision belongs to phase 17.</constraints>
 ````
 
-### 13.2 Las 8 skills de causa (sin cambios respecto a v1.0)
+### 13.2 Las 8 skills de causa (eliminan modos internos)
 
-Las 8 fases de la cadena de causa (01–08) se mantienen **idénticas** al sistema v1.0. No se
-renombran, no se renumeran, no se modifica su procedimiento. El único cambio que las afecta
-es **externo**: la sección `## Causa confirmada` en `08-analysis.md` pasa a ser **obligatoria**
-para que la cadena de solución abra (ver §5.2). A continuación, el código fuente tal cual
-queda en el sistema v1.0 (copiado para que este documento sea autocontenido).
+Las 8 fases de la cadena de causa (01–08) en este documento están **limpias de lógica de modo
+interno** `solution-mode` — operan únicamente sobre su axis de causa. Esto es la diferencia clave
+con el sistema v1.0 en disco, donde 05–07 bifurcaban su procedimiento y 08 detectaba su modo
+desde el estado del artefacto. El código embebido a continuación representa el estado POST-migración.
 
 #### 13.2.1 `sm-phase-observation` (Fase 01)
 
@@ -1997,7 +2230,7 @@ Closes the case by deciding the outcome and the action. Consumes data from both 
   - **Validated specification** (only on the close path, step 3a): problem (→ proposal),
     bounded scope, expected behavior delta, key architectural decisions, acceptance
     criteria, experimental evidence (refs to 06/07/08/14/15/16 + experiments/), **Solución
-    seleccionada (vs alternativas)** — winner cited from 16-analysis.md ## Solución
+    seleccionada (vs alternativas)** — winner cited from 16-solution-analysis.md ## Solución
     ganadora; each discarded alternative cited with its discard reason. Cross-reference
     mandatory.
   - **Pause note** (only on the pause path, step 3b): explicit "no resuelto" verdict; reason
@@ -2065,7 +2298,7 @@ skill.</user_communication>
 ## Output
 Write `18-communication.md`: Applied policy, Executive summary, Changes (or pause note),
 Evidence (links to both chains), Risks, Commit/PR draft (Spanish, with `Case:` commit
-metadata, citing 16-analysis.md ## Solución ganadora on the close path, or
+metadata, citing 16-solution-analysis.md ## Solución ganadora on the close path, or
 case_paused_at + Bucle C offer on the pause path).
 
 ## Acceptance
@@ -2414,15 +2647,16 @@ artifacts' machine fields in English. Canonical policy: ../artifact-structuring/
    emits the MANDATORY `## Solución ganadora` section.
 
    **Bucle B — solution refutation loop (only exception to linear order within the solution
-   chain).** If phase 16 refutes the active solution (the comparative table shows the active
-   hypothesis does not meet the criteria): mark 12–16 artifacts `superseded` (bump version);
-   re-invoke `sm-phase-solution-hypothesis` to append the next candidate; re-run 13–16 on it.
-   Phase 11 is NOT re-invoked — the solution space map is preserved as audit trail. Repeat
-   until a solution wins or candidates are exhausted. If candidates are exhausted, route the
-   case to phase 17 with verdict "no resuelto" (Bucle C offered by phase 18 in step 10).
-8. **Run the CLOSURE (phases 17–18).** Phase 17 (conclusion) consumes data from BOTH chains:
+   chain).** If phase 16 does NOT emit `## Solución ganadora` (the comparative table shows NO
+   hypothesis meets the criteria): mark artifacts 13–16 `superseded` (bump version); 11 and
+   12 are preserved (the map and the tested hypotheses as audit trail). Re-invoke
+   `sm-phase-solution-hypothesis` to append the remaining unformulated candidates from the
+   solution space map (11); re-run phases 13–16 if the design fits, or redesign 13 if needed.
+   Repeat until a solution wins or candidates are exhausted. If exhausted, route the case to
+   phase 17 with verdict "no resuelto" (Bucle C offered by phase 18 in step 10).
+ 8. **Run the CLOSURE (phases 17–18).** Phase 17 (conclusion) consumes data from BOTH chains:
    `02`, `08` (cause), and `16` (solution). It emits the validated spec — but only if
-   `## Solución ganadora` exists in 16-analysis.md (§5.3). If the cause was not confirmed or
+   `## Solución ganadora` exists in 16-solution-analysis.md (§5.3). If the cause was not confirmed or
    the solution was not won, phase 17 emits "no resuelto" + lesson + `case_paused_at` (no
    spec). Phase 17 also distills the lesson. Phase 18 (communication) drafts the close-out,
    runs the changelog generator, and commits with the `Case:` commit metadata (*trailer*).
@@ -2694,9 +2928,10 @@ the chain separation auditable at a glance.
 - The superseded artifact sets `status: superseded`; the new version links back to it via
   `links.previous_version`.
 - In the cause refutation loop (Bucle A), the 04–08 artifacts of the refuted hypothesis go
-  `superseded`. In the solution refutation loop (Bucle B), the 12–16 artifacts of the
-  refuted solution go `superseded`. In both cases the new version is MAJOR (upstream
-  inputs changed).
+  `superseded`. In the solution refutation loop (Bucle B), the 13–16 artifacts go `superseded`
+  (the design and results are replaced); `11-solution-research.md` and `12-solution-hypothesis.md`
+  are preserved as audit trail (the map and discarded hypotheses, respectively). In both cases the
+  new version is MAJOR (upstream inputs changed, or new hypotheses appended for solution chain).
 - Fine-grained history lives in git (one commit per phase recommended).
 
 ## Commit ↔ case link (commit metadata)

@@ -1,6 +1,6 @@
 # Nuevo diseño: Mantenimiento Científico con dos cadenas secuenciales
 
-> **Estado:** propuesta de migración (no implementado) · **Versión:** v0.1 (borrador) · **Reemplaza a:**
+> **Estado:** propuesta de migración (no implementado) · **Versión:** v0.4 · **Reemplaza a:**
 > `scientific-maintenance.md` v1.0 cuando sea aprobado · **Sistema vigente actual:** 15 skills `sm-*`
 > descritas en `docs/proposals/scientific-maintenance.md` v1.0
 
@@ -34,9 +34,14 @@ cada uno con sus propias fases especializadas, sin bifurcación interna por modo
 - **Cierre global (fases 17–18):** conclusión y comunicación únicas al final, que consumen datos de
   **ambas cadenas**. Las antiguas fases 09 y 10 se renumeran a 17 y 18.
 - **Re-apertura post "no resuelto" (Bucle C):** si la cadena de causa no confirma una causa, la fase
-  17 emite "no resuelto" + lección + estado `pausado`. El orquestador ofrece al usuario re-ejecutar
+  17 emite "no resuelto" + lección + estado `pausado`. La fase 18 documenta la oferta de re-apertura;
+  tras commit de la corrida pausada, el orquestador procesa la aceptación del usuario y re-ejecuta
   03–08 con nuevo contexto (más recall, información nueva), conservando 01–02. La cadena de
-  solución **nunca** se abre en este bucle.
+  solución **nunca** se abre dentro del mismo ciclo 03–08 del Bucle C: si tras la re-apertura se
+  confirma causa, la cadena 11–16 abre en una **corrida posterior** del caso (`case_run`
+  incrementado; ver §3.1.3 y §9.5). En modo **Solo-SM**, el cierre investigativo (`done` sin spec)
+  puede incluir ganadora citada desde 16; la pausa por causa no confirmada aplica igual que en otros
+  modos.
 
 El contrato `phase-policy-schema.md` (`{ focus, reasoning_effort, evidence, acceptance,
 risk_controls }`) **no cambia**; lo que cambia es la cantidad de entries en la `phase_policy matrix`
@@ -75,10 +80,13 @@ objeto de un plan de migración aparte.
    - [7.17–7.18 Cierre global (fases 17–18)](#7-especificación-de-cada-fase)
 8. [Artefactos](#8-artefactos)
 9. [Memoria, changelog y hooks](#9-memoria-changelog-y-hooks)
+   - [9.5 Veredictos terminales](#veredictos-terminales)
 10. [Ejemplos de uso](#10-ejemplos-de-uso)
-    - [10.5 Ejemplo de caso "no resuelto" con pausa y re-apertura](#105-ejemplo-de-caso-no-resuelto-con-pausa-y-re-apertura)
+    - [10.5a Corrida 1 — pausa](#105a-corrida-1--pausa)
+    - [10.5b Corrida 2 — solución y cierre](#105b-corrida-2--solución-y-cierre)
 11. [Recomendaciones de implementación](#11-recomendaciones-de-implementación)
 12. [Referencias cruzadas](#12-referencias-cruzadas)
+    - [12.2.4 Modos de integración SM↔OpenSpec (v0.4)](#1224-modos-de-integración-smopenspec-v04)
 
 ---
 
@@ -87,7 +95,8 @@ objeto de un plan de migración aparte.
 Las secciones obligatorias para entender el diseño son §3, §4 y §5 (proceso, numeración,
 precondiciones). Las secciones §6 y §7 son la especificación de skills (perfiles y fases, con la
 misma profundidad que el doc original). Las secciones §8 y §9 describen los artefactos y la
-memoria. Las secciones §10 y §10.5 son ejemplos de uso que muestran las dos cadenas en la práctica.
+memoria. Las secciones §10, §10.5a y §10.5b son ejemplos de uso que muestran las dos cadenas y el
+Bucle C en la práctica.
 Las secciones §11 y §12 son la hoja de ruta de migración y las referencias cruzadas con el sistema
 vigente.
 
@@ -116,7 +125,7 @@ Cadena de causa (01–08)
                                                           │
 Cadena de solución (11–16)                                │
 ─────────────────────────────────────────────────────────▼──
-                                          11 → 12 ⇆(refut. B) → 13 → 14 → 15 → 16
+                                          11 → 12 ⇆(batch B) → 13 → 14 → 15 → 16
                                                                                     │
                                                                                     ▼
 Cierre global (17–18)                                                              │
@@ -129,10 +138,11 @@ La frontera horizontal **"causa confirmada"** no es un artefacto: es una **preco
 la fase 17 emite el veredicto "no resuelto" y la fase 18 lo comunica. La cadena de causa es, por
 tanto, el único camino obligatorio; la cadena de solución es condicional a la confirmación de causa.
 
-Las flechas `⇆(refut. A)` y `⇆(refut. B)` representan los dos bucles de refutación interna. El
-**Bucle C** (re-apertura post "no resuelto") opera a nivel de caso completo y se documenta en
-§3.1.3; no aparece en el grafo porque pausa y reanuda el caso, no un re-flujo dentro de la misma
-corrida.
+Las flechas `⇆(refut. A)` y `⇆(batch B)` representan los bucles A (refutación interna de causa, 1-a-1)
+y B (bucle batch comparativo de solución: nueva ronda 12–16 cuando ninguna hipótesis gana el batch;
+**no** es refutación 1-a-1). El **Bucle C** (re-apertura post "no resuelto") opera a nivel de caso
+completo y se documenta en §3.1.3; no aparece en el grafo porque pausa y reanuda el caso, no un
+re-flujo dentro de la misma corrida.
 
 ### 3.1 Los tres bucles del workflow
 
@@ -158,9 +168,9 @@ causa; el bucle B itera hipótesis de solución; el bucle C re-abre el caso tras
 - **Independencia del perfil:** este bucle aplica igual bajo cualquier perfil (corrective, adaptive,
   perfective, preventive).
 
-#### 3.1.2 Bucle B — iteración del espacio de soluciones (batch comparativo)
+#### 3.1.2 Bucle B — bucle batch comparativo de solución
 
-El Bucle B es **asimétrico** con el Bucle A: mientras la cadena de causa prueba una hipótesis a la vez (iterativo), la cadena de solución ejecuta un **experimento comparativo batch** que abarata el coste de rollback entre hipótesis.
+El Bucle B (bucle batch comparativo de solución) es **asimétrico** con el Bucle A: mientras la cadena de causa prueba una hipótesis a la vez (iterativo), la cadena de solución ejecuta un **experimento comparativo batch** que abarata el coste de rollback entre hipótesis.
 
 - **Disparador:** la fase 16 (análisis comparativo de soluciones) **no** emite `## Solución ganadora` porque la tabla normalizada de 15 muestra que **ninguna hipótesis** alcanza el veredicto de ganadora (todas fallan los criterios de efecto, blast radius, reversibilidad, riesgo residual, o la métrica dominante del perfil).
 - **Acción:** el orquestador marca los artefactos `13`–`16` con `status: superseded` (el diseño 13 y los resultados 14–16 ya no aplican) **pero preserva** `11-solution-research.md` (el mapa del espacio) y `12-solution-hypothesis.md` (las hipótesis descartadas son audit trail; se append con nuevas candidatas). El orquestador re-ejecuta fase 12 con **nuevas candidatas** del mapa de fase 11 que no estaban formuladas en la ronda anterior.
@@ -185,21 +195,26 @@ El Bucle B es **asimétrico** con el Bucle A: mientras la cadena de causa prueba
 - **Acción:** la fase 17 escribe la lección destilada, fija el estado del caso como `pausado` en
   `case.md` (campo nuevo `case_paused_at: <ISO-8601 UTC>`), y emite el veredicto "no resuelto"
   hacia la fase 18. La fase 18 comunica el estado al usuario y al changelog.
-- **Re-apertura:** el orquestador, al recibir el veredicto, **ofrece al usuario** re-abrir el caso
-  con nuevo contexto: (a) más investigación/recall de la base de conocimiento, (b) información
-  nueva del usuario sobre el problema, (c) sugerencia de un perfil distinto.
+- **Re-apertura:** tras la fase 18 (comunicación de pausa con oferta documentada en
+  `18-communication.md`), el orquestador **procesa la aceptación** del usuario (no re-emite la
+  oferta; ver §7.16 y §13.5 paso 13). Contexto sugerido: (a) más investigación/recall, (b)
+  información nueva del usuario, (c) perfil distinto.
 - **Alcance de la re-apertura:** si el usuario acepta, el orquestador re-ejecuta **03–08** con el
   nuevo contexto. Las fases 01–02 **no** se re-ejecutan: la observación y la definición del problema
   siguen siendo válidas (es un caso pausado, no un caso nuevo).
+- **Corrida posterior:** al aceptar la re-apertura, el orquestador incrementa `case_run` (entero ≥
+  1; inicial 1), fija `case_resumed_at` y re-ejecuta 03–08. Si la causa se confirma, la cadena de
+  solución (11–16) abre en **esa corrida** (`case_run` actual), no dentro del ciclo 03–08 del Bucle C.
 - **Cadena de solución en la re-apertura:** la cadena de solución (11–16) **nunca** se abre
-  dentro del Bucle C. Aunque la causa se confirme tras la re-apertura, la cadena de solución abre
-  en una **corrida posterior** del caso (con un nuevo `case_resumed_at` registrado). Esto evita
-  mezclar dos ciclos de vida en el mismo expediente y mantiene la trazabilidad limpia.
-- **Campos de control:** el bloque canónico de `case.md` registra `case_paused_at` (cuándo se
-  pausó) y, si se re-abre, `case_resumed_at` (cuándo se reabrió). El estado pasa por los valores
-  `in_progress` → `pausado` → `in_progress` → `done` o `aborted`.
-- **Múltiples pausas:** un caso puede pausarse y re-abrirse varias veces. Cada par pausa/re-apertura
-  queda registrado en el bloque canónico.
+  dentro del mismo ciclo 03–08 del Bucle C. Aunque la causa se confirme tras la re-apertura, la
+  cadena de solución abre solo tras completar 03–08 en la corrida incrementada. Esto evita mezclar
+  dos ciclos de vida en el mismo expediente y mantiene la trazabilidad limpia.
+- **Campos de control:** el bloque canónico de `case.md` registra `case_run`, `case_paused_at`
+  (cuándo se pausó) y `case_resumed_at` (cuándo se reabrió por última vez). El estado pasa por los
+  valores `in_progress` → `pausado` → `in_progress` → `done` o `aborted`.
+- **Múltiples pausas:** un caso puede pausarse y re-abrirse varias veces. Solo el último par escalar
+  `case_paused_at` / `case_resumed_at` es vigente; el historial completo se conserva en commits git
+  (ver §9.5).
 
 ---
 
@@ -242,6 +257,12 @@ El **contrato de una fase** no cambia respecto al sistema actual: cada fase lee 
 artefacto y actualiza el estado. Lo que cambia es la cantidad de entries en `phase_policy`: pasa de
 10 a 16.
 
+**Convención de conteo:** «fase» = skill ejecutable (**16** en total). «Número de fase» ∈ `01..18`
+(los números 09–10 están reservados/vacantes). `phase_policy` y `phases` en `case.md` tienen **16
+entries** cada uno. En modo Full, el expediente incluye `case.md` más hasta **16** archivos
+`NN-*.md` según las fases completadas (no confundir el rango numérico `01..18` con un conteo de 18
+fases activas).
+
 ---
 
 ## 5. Precondiciones y validaciones
@@ -274,18 +295,45 @@ Si la fase 08 no contiene esa sección, el orquestador **no** invoca la fase 11:
 directamente a la fase 17 para emitir "no resuelto" + estado `pausado`. Esta precondición es
 **estructural**, no convencional: la fase 11 no puede ejecutarse si su input no existe.
 
+Si la fase 11 **sí** se invoca pero **no** cumple su validación (§7.9 — p. ej. menos de
+`≥2 candidatas viables`), el orquestador **no** abre las fases 12–16 ni activa el Bucle B: enruta
+directamente a la fase 17 con veredicto pause y motivo `no_viable_solution_space` (ver §5.3).
+
 ### 5.3 Precondición del cierre (NUEVA)
 
-**Cuando la cadena de solución abrió** (ver §5.2), la fase 17 **solo** emite la spec validada si
-`16-solution-analysis.md` existe y contiene una sección `## Solución ganadora` con veredicto
-explícito (solución elegida + justificación cuantitativa). Sin esa sección — porque el Bucle B
-agotó las candidatas sin veredicto — la fase 17 emite "no resuelto" + lección + estado `pausado`.
-La precondición es estructural: el artefacto de la fase 16 es la **única** fuente de la solución
-ganadora.
+La fase 17 emite exactamente **una** de tres rutas terminales por corrida (ver tabla «Veredictos de
+cierre»). La precondición estructural es que `16-solution-analysis.md` — cuando la cadena de
+solución abrió — es la **única** fuente de `## Solución ganadora`.
 
-**Si la cadena de solución no abrió** (porque la fase 08 no confirmó causa), la precondición de
-`## Solución ganadora` **no aplica**; la fase 17 emite directamente "no resuelto" + lección +
-`pausado` (Bucle C, ver §3.1.3).
+- **Ruta (a) — cierre con spec:** cadena de solución abrió, `16` tiene `## Solución ganadora` **y**
+  `integration_mode` ≠ `Solo-SM` → spec validada en 17; Etapa B si el modo lo permite; `status: done`.
+- **Ruta (b) — cierre investigativo Solo-SM:** `integration_mode: Solo-SM` **y** `16` tiene
+  `## Solución ganadora` → 17 cita ganadora **sin** bloque spec OpenSpec ni Etapa B; `status: done`.
+- **Ruta (c) — pausa:** causa no confirmada en 08; cadena abrió pero Bucle B agotado sin ganadora;
+  fase 11 sin espacio viable (`no_viable_solution_space`); u otro fracaso documentado → "no resuelto"
+  + lección + `status: pausado` (Bucle C, ver §3.1.3).
+
+**Precedencia:** sin `## Causa confirmada` en 08 → **(c)** en **todos** los modos. Cadena abrió sin
+`## Solución ganadora` (Bucle B agotado) → **(c)** en **todos** los modos, **incluido Solo-SM**; **(b)**
+no sustituye a **(c)** por agotamiento del Bucle A ni del Bucle B.
+
+#### Veredictos de cierre
+
+La fase 17 emite exactamente uno de estos resultados terminales de corrida (salvo `aborted` explícito
+del usuario):
+
+| Ruta | Condición | `status` en `case.md` | Spec / Etapa B |
+| ---- | --------- | --------------------- | -------------- |
+| **(a) Cierre con spec** | Cadena de solución abrió, `16` tiene `## Solución ganadora` **y** `integration_mode` ≠ `Solo-SM` | `done` | Spec validada; Etapa B si `integration_mode` lo permite |
+| **(b) Cierre investigativo (Solo-SM)** | `integration_mode: Solo-SM` **y** `16` tiene `## Solución ganadora` — 17 cita ganadora, **sin** bloque spec OpenSpec ni Etapa B | `done` | Sin spec; lección escrita en 17 |
+| **(c) Pausa** | Cualquier fracaso: causa no confirmada, Bucle B agotado, fase 11 sin espacio viable (`no_viable_solution_space`), etc. | `pausado` | Sin spec; oferta Bucle C (documentada en fase 18) |
+
+**Precedencia de rutas (resumen):** **(c)** gana sobre **(b)** cuando falta `## Causa confirmada` o
+cuando la cadena abrió sin `## Solución ganadora`. La ruta **(b)** aplica **solo** con
+`integration_mode: Solo-SM` **y** ganadora en 16.
+
+El cierre investigativo **(b)** es distinto de la pausa **(c)**: en Solo-SM con ganadora, el caso
+cierra en `done` sin spec; sin ganadora (Bucle B agotado) → **(c)** `pausado`, igual que otros modos.
 
 ### 5.4 Validación de esquema YAML
 
@@ -296,8 +344,9 @@ valida que las 16 claves estén presentes y que cada entry cumpla el contrato
 `experiment-execution`, `data-collection`, `analysis`, `solution-research`, `solution-hypothesis`,
 `solution-experiment-design`, `solution-execution`, `solution-data-collection`, `solution-analysis`,
 `conclusion`, `communication`. El campo `phases` del bloque canónico también tiene 16 entries (no
-10). Los campos opcionales `case_paused_at` y `case_resumed_at` se añaden al bloque canónico
-(strings ISO-8601 UTC o vacío `""`). Ver §9.5 para semántica y transiciones.
+10). Los campos `case_run` (entero ≥1, inicial 1), `case_paused_at` y `case_resumed_at` se añaden al
+bloque canónico (`case_run` entero; pausa/reanudación como strings ISO-8601 UTC o vacío `""`). Ver
+§9.5 para semántica y transiciones.
 La validación de esquema sigue siendo un **paso obligatorio** del orquestador (no se debilita por
 ampliar el rango de claves).
 
@@ -643,7 +692,8 @@ se adapta según el perfil. La adaptación es **siempre** vía la `phase_policy 
   citadas.
 - **Validación:** ≥2 soluciones viables enumeradas; cada candidata con descripción y trade-offs
   predichos; recall ejecutado por tags `component`/`defect-class`; lecciones citadas como
-  antecedentes.
+  antecedentes. Si el artefacto **no** cumple esta validación, el orquestador **no** abre 12–16 ni
+  activa el Bucle B: enruta a la fase 17 con pause y motivo `no_viable_solution_space` (§5.2).
 - **Adaptación por perfil:** ver `phase_policy.solution-research` en §6.
 - **Idempotencia:** la fase 11 es **idempotente**: re-ejecutada (por ejemplo, tras un Bucle B
   extenso) no destruye el mapa del espacio, sino que lo amplía con nuevas candidatas.
@@ -716,27 +766,53 @@ se adapta según el perfil. La adaptación es **siempre** vía la `phase_policy 
   cuantitativa; la sección `## Hipótesis descartadas` existe y cada descarte cita su razón; no
   existen ganadoras con cero evidencia.
 - **Adaptación por perfil:** ver `phase_policy.solution-analysis` en §6.
-- **Precondición del cierre:** la sección `## Solución ganadora` es la **única** fuente que la fase
-  17 consulta para emitir la spec (ver §5.3).
+- **Precondición del cierre (rutas §5.3):**
+
+  | Ruta | `status` | Spec / Etapa B |
+  | ---- | -------- | -------------- |
+  | **(a)** | `done` | Spec validada; Etapa B si ≠ Solo-SM |
+  | **(b)** | `done` | Solo-SM + `## Solución ganadora`; sin spec |
+  | **(c)** | `pausado` | Sin spec; oferta Bucle C en fase 18 |
+
+  `## Solución ganadora` es la **única** fuente de la ganadora. Alimenta la spec solo en ruta **(a)**;
+  en **(b)** la fase 17 cita la ganadora sin bloque spec.
 
 ### 7.15 Fase 17 — Conclusión (`sm-phase-conclusion`)
 
 - **Propósito:** decidir el resultado del caso y la acción resultante, y **destilar una lección
   generalizable** hacia la base de conocimiento.
-- **Entradas:** `02`, `08` (causa), **`16` (solución — NUEVO)**, `case_paused_at` (si existe).
+- **Entradas:** `02`, `08` (causa), **`16` (solución — solo si la cadena de solución abrió; ver §5.2)**,
+  `case_paused_at` (si existe).
 - **Salidas / artefacto:** `17-conclusion.md` — veredicto, decisión (aplicar/revertir/escalar),
   residuos, deuda, seguimiento; y **una lección** escrita como archivo bajo `.claude/memory/`
   (frontmatter + tags `component`/`defect-class`/`profile`, índice en `MEMORY.md`).
-- **Precondición crítica (NUEVA):** cuando la cadena de solución abrió (ver §5.2), la sección
-  `## Solución ganadora` de `16-solution-analysis.md` debe existir y citar la ganadora para emitir
-  la spec. Sin esa sección, 17 emite "no resuelto" + `pausado` (ver §5.3). Si la cadena no abrió,
-  la precondición no aplica.
-- **Caso pausado (NUEVO):** si el veredicto es "no resuelto", 17 fija `case_paused_at` en el bloque
-  canónico de `case.md` y deja el caso en estado `pausado`. La lección se escribe igual (es
-  aprendizaje no derivable).
+- **Precondición crítica (NUEVA):**
+  - **Ruta (a):** cuando la cadena de solución abrió (ver §5.2) **y** `integration_mode` ≠ `Solo-SM`,
+    la sección `## Solución ganadora` de `16-solution-analysis.md` debe existir para emitir spec
+    validada. Sin esa sección → ruta **(c)** `pausado` (ver §5.3).
+  - **Ruta (b):** con `integration_mode: Solo-SM` **y** `## Solución ganadora` en 16, 17 cita
+    ganadora **sin** bloque spec OpenSpec ni Etapa B.
+  - Si la cadena de solución no abrió, ninguna precondición de spec aplica; 17 emite directamente
+    ruta **(c)**.
+- **Rutas de veredicto (NUEVO):**
+
+  | Ruta | `status` | Spec / Etapa B |
+  | ---- | -------- | -------------- |
+  | **(a)** | `done` | Spec validada; Etapa B si ≠ Solo-SM |
+  | **(b)** | `done` | Solo-SM + `## Solución ganadora`; sin spec |
+  | **(c)** | `pausado` | Sin spec; oferta Bucle C en fase 18 |
+
+  - **(a) Cierre con spec:** cadena abrió, `16` tiene `## Solución ganadora`, `integration_mode` ≠
+    `Solo-SM` → spec validada; `status: done`.
+  - **(b) Cierre investigativo Solo-SM:** `integration_mode: Solo-SM` **y** `## Solución ganadora` en
+    16 → 17 cita ganadora, lección escrita, **sin** spec ni Etapa B → `status: done`.
+  - **(c) Pausa:** "no resuelto" → `status: pausado`, `case_paused_at` poblado. Motivos en la pause
+    note: `candidatas_agotadas` (Bucle A o B) o `no_viable_solution_space` (fase 11).
+- **Caso pausado:** en la ruta pause, 17 fija `case_paused_at` en el bloque canónico. La lección se
+  escribe igual (es aprendizaje no derivable).
 - **Validación:** veredicto coherente con el análisis; criterio de la fase 02 contrastado; acciones
-  accionables; lección con tags que permitan el recall; la spec solo se emite si la solución
-  ganadora existe.
+  accionables; lección con tags que permitan el recall; la spec solo se emite en ruta **(a)** si
+  existe `## Solución ganadora` y `integration_mode` ≠ `Solo-SM`.
 - **Adaptación por perfil:** ver `phase_policy.conclusion` en §6.
 - **Cambios respecto a v1.0:** consume datos de **ambas cadenas**; la spec validada se cita desde
   `16`, no desde la primera idea del agente.
@@ -750,7 +826,9 @@ se adapta según el perfil. La adaptación es **siempre** vía la `phase_policy 
   repo) **con metadatos de commit `Case: <case-id>`**.
 - **Cambios respecto a v1.0 (NUEVO):** el mensaje de commit cita explícitamente la solución
   ganadora de 16 (no el primer fix que apareció); si la fase 17 pausó el caso, 18 emite
-  comunicación de "no resuelto" con la lección y la oferta de re-apertura del Bucle C.
+  comunicación de "no resuelto" con la lección y la **oferta canónica** de re-apertura Bucle C
+  (texto y contexto sugerido). El orquestador no re-emite la oferta en el paso Bucle C: solo
+  confirma aceptación o rechazo del usuario (ver §13.5 paso 13).
 - **Changelog derivado:** sin cambios respecto a v1.0 — esta fase **no redacta** el
   `CHANGELOG.md` a mano; ejecuta el generador on-demand con `--pending` e incluye el archivo en su
   commit.
@@ -773,7 +851,7 @@ el modelo de "1 cadena con modos internos" (fases que bifurcaban su lógica inte
 - Carpeta por caso: `maintenance-cases/<case-id>/` donde `case-id = YYYYMMDD-<slug>` (p. ej.
   `20260606-login-timeout`). Si la carpeta ya existe, añadir sufijo incremental: `-2`, `-3`, etc.
 - Manifest del expediente: `case.md` (contiene el bloque YAML canónico con `case_mode`,
-  `phase_policy`, `phases`, `case_paused_at`, `case_resumed_at`).
+  `phase_policy`, `phases`, `case_run`, `case_paused_at`, `case_resumed_at`).
 - **Modo Full** (por defecto): artefactos de fase como archivos individuales `NN-<phase>.md` con
   `NN` ∈ `01..18`. Los números 09 y 10 ya no se usan (fueron renumerados a 17 y 18; el rango
   efectivo es 16 fases).
@@ -787,11 +865,12 @@ el modelo de "1 cadena con modos internos" (fases que bifurcaban su lógica inte
 Markdown con **frontmatter YAML** obligatorio + cuerpo estructurado. El `case.md` contiene además
 un **bloque YAML canónico** machine-readable (sección "Canonical state") que es la **única fuente
 de estado del caso**: incluye `case_mode`, `phase_policy` (16 entries), `phases` (16 entries),
-`case_paused_at` y `case_resumed_at` (opcionales, ISO-8601 UTC o `""`). Ejemplo mínimo del bloque
-canónico en `case.md`:
+`case_run`, `case_paused_at` y `case_resumed_at` (`case_run` entero ≥1; pausa/reanudación ISO-8601
+UTC o `""`). Ejemplo mínimo del bloque canónico en `case.md`:
 
 ```yaml
 status: in_progress
+case_run: 1
 case_paused_at: ""
 case_resumed_at: ""
 ```
@@ -824,7 +903,7 @@ ausente, pero escribirlo explícito facilita la auditoría y la separación fís
 
 | Artefacto                          | Cadena   | Secciones mínimas                                                                                              |
 | ---------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------- |
-| `case.md`                          | (meta)   | Caso, perfil, parámetros del perfil, bloque YAML canónico (`case_mode` + `phase_policy` 16 entries + `phases` 16 entries + `case_paused_at` + `case_resumed_at`), veredicto |
+| `case.md`                          | (meta)   | Caso, perfil, parámetros del perfil, bloque YAML canónico (`case_mode` + `phase_policy` 16 entries + `phases` 16 entries + `case_run` + `case_paused_at` + `case_resumed_at`), veredicto |
 | `01-observation.md`                | Causa    | Hechos observados, contexto, alcance, lo que NO se interpreta                                                  |
 | `02-problem-definition.md`         | Causa    | Enunciado, criterio de "resuelto", límites, severidad                                                          |
 | `03-research.md`                   | Causa    | Hallazgos con fuentes (`file:línea`/URL/commit), restricciones                                                 |
@@ -856,6 +935,17 @@ ausente, pero escribirlo explícito facilita la auditoría y la separación fís
   **11–12** se **preservan** sin `superseded`: 11 es el mapa del espacio; 12 hace append de nuevas
   candidatas → **MINOR++** en 12 cuando solo se añaden filas al mismo mapa 11.
 
+#### Cierre por corrida (`case_run`)
+
+Los artefactos de cierre **17–18** llevan `case_run` en el frontmatter (mismo valor que el bloque
+canónico de `case.md` en el momento de emitirlos). Al **emitir** los nuevos `17-conclusion.md` y
+`18-communication.md` de la corrida posterior, los artefactos 17–18 de la corrida anterior pasan a
+`status: superseded` con `links.previous_version` apuntando a la versión vigente de la corrida nueva.
+Durante la re-apertura Bucle C (re-ejecución 03–08 tras `case_run++`), los 17–18 de pausa de la
+corrida anterior **permanecen vigentes** hasta el nuevo cierre. Al emitir 17–18 de la corrida
+posterior con veredicto distinto (p. ej. de `pausado` a `done`), la nueva versión incrementa
+**MAJOR**; refinamientos dentro de la misma corrida siguen la regla **MINOR** habitual.
+
 ### 8.5 Relación entre artefactos y auditoría posterior
 
 La cadena **causa 01–08 + solución 11–16 + cierre 17–18** más `case.md` constituye el **expediente
@@ -869,8 +959,8 @@ del caso**. La separación física de las dos cadenas hace que la trazabilidad s
 
 Una auditoría posterior puede:
 
-1. Abrir `case.md` para ver perfil, veredicto, estado, `case_paused_at` y `case_resumed_at` (si
-   existen).
+1. Abrir `case.md` para ver perfil, veredicto, estado, `case_run`, `case_paused_at` y
+   `case_resumed_at` (si existen).
 2. Recorrer la cadena de causa (01→08) hasta `## Causa confirmada`.
 3. Si la cadena de solución abrió (11→16), recorrerla hasta `## Solución ganadora`.
 4. Verificar que la fase 17 cita la ganadora de 16 (no el primer fix del agente).
@@ -907,7 +997,7 @@ Sin cambios: derivado del filesystem y del changelog (ver §9.2).
 
 Sin cambios respecto a v1.0. El índice histórico se deriva bajo demanda de `maintenance-cases/`
 y `CHANGELOG.md`. El estado del caso en el registro refleja los nuevos campos: `case_mode`,
-`case_paused_at`, `case_resumed_at` (cuando aplique).
+`case_run`, `case_paused_at`, `case_resumed_at` (cuando aplique).
 
 ### 9.3 Changelog (derivado)
 
@@ -931,27 +1021,50 @@ modela así en el bloque canónico de `case.md`:
 ```yaml
 # Bloque canónico (extensión):
 status: pausado            # in_progress | pausado | done | aborted
+case_run: 1                # entero ≥1; incrementa en cada re-apertura Bucle C aceptada
 case_paused_at: 2026-06-08T15:42:00Z   # ISO-8601 UTC, vacío si no aplica
 case_resumed_at: ""                     # ISO-8601 UTC, vacío si no se ha re-abierto
 ```
 
 Reglas:
 
+- **`case_run`:** contador de corrida del caso (entero ≥1, inicial 1). **Corrida posterior** =
+  `case_run` incrementado tras aceptar re-apertura Bucle C. Los artefactos 17–18 llevan `case_run` en
+  frontmatter; al **emitir** los nuevos 17–18 de la corrida posterior, los de la corrida anterior
+  quedan `superseded` (§8.4) — no al incrementar el contador.
 - **Transición a `pausado`:** solo la fase 17 puede fijar `status: pausado` y poblar
   `case_paused_at`. La transición va siempre acompañada de una lección (incluso si "no resuelto"
   es aprendizaje).
 - **Transición a `in_progress` (re-apertura, Bucle C):** el orquestador, al recibir la confirmación
-  del usuario, fija `case_resumed_at` con el timestamp actual, mueve `status` a `in_progress` y
-  re-ejecuta 03–08 (no 01–02). El par pausa/re-apertura se preserva en el expediente.
-- **Múltiples pausas:** permitidas. El expediente puede tener varios pares `case_paused_at` /
-  `case_resumed_at` (el último es el vigente); el historial completo se conserva en commits
-  git del caso.
+  del usuario, incrementa `case_run`, fija `case_resumed_at` con el timestamp actual, mueve `status` a
+  `in_progress` y re-ejecuta 03–08 (no 01–02).
+- **Múltiples pausas:** permitidas. Solo el último par escalar `case_paused_at` / `case_resumed_at`
+  es vigente; el historial completo se conserva en commits git del caso.
 - **Cadena de solución y Bucle C:** la cadena de solución (11–16) **nunca** se abre dentro del
-  Bucle C. Aunque la causa se confirme tras una re-apertura, la cadena de solución abre en una
-  **corrida posterior** del caso, no en la misma. Esto evita mezclar dos ciclos de vida en el
-  mismo expediente.
+  mismo ciclo 03–08 del Bucle C. Tras confirmar causa en la corrida incrementada, la cadena abre en
+  esa corrida (`case_run` actual).
 - **Estados terminales:** `done` (caso cerrado con éxito) y `aborted` (caso cancelado
   explícitamente por el usuario) son terminales. Un caso `pausado` no es terminal.
+
+#### Veredictos terminales
+
+Espejo de §5.3 — la fase 17 emite exactamente una de estas rutas por corrida:
+
+| Ruta | Condición | `status` | Spec / Etapa B |
+| ---- | --------- | -------- | -------------- |
+| **(a) Cierre con spec** | Cadena de solución abrió, `16` tiene `## Solución ganadora` **y** `integration_mode` ≠ `Solo-SM` | `done` | Spec validada; Etapa B si `integration_mode` lo permite |
+| **(b) Cierre investigativo (Solo-SM)** | `integration_mode: Solo-SM` **y** `16` tiene `## Solución ganadora` — 17 cita ganadora, **sin** bloque spec OpenSpec ni Etapa B | `done` | Sin spec; lección escrita en 17 |
+| **(c) Pausa** | Cualquier fracaso: causa no confirmada, Bucle B agotado, fase 11 sin espacio viable (`no_viable_solution_space`), etc. | `pausado` | Sin spec; oferta Bucle C (documentada en fase 18) |
+
+**Precedencia:** sin `## Causa confirmada` en 08 → **(c)** en todos los modos. Cadena abrió sin
+`## Solución ganadora` → **(c)** en todos los modos, **incluido Solo-SM**. **(b)** no sustituye a **(c)**
+por agotamiento del Bucle A ni del Bucle B. La ruta **(b)** aplica **solo** con Solo-SM **y** ganadora en 16.
+
+**Tokens de pause note (`pause_reason`):** `candidatas_agotadas` (Bucle A o B),
+`no_viable_solution_space` (fase 11 sin ≥2 candidatas viables).
+
+**Distinción `done`:** con spec (ruta **(a)**) vs investigativo Solo-SM (ruta **(b)**) — ambos son
+`status: done`, pero solo **(a)** dispara Etapa B OpenSpec.
 
 ---
 
@@ -1003,8 +1116,9 @@ Sirve como evidencia del gap que el nuevo diseño corrige, no como ejemplo del f
 | 17 Conclusión     | veredicto: aplicar solución A (citada desde 16); decisión: aplicar + añadir test de carga al CI; lección: `connection-pool-timeout-regressions` (tags: `auth`/`connection-pool`/`corrective`) | `17-conclusion.md`   |
 | 18 Comunicación   | PR `fix(auth): restaurar timeout del pool` con metadatos de commit `Case:`; changelog derivado (Fixed)   | `18-communication.md`|
 
-- **Artefactos del caso:** `maintenance-cases/20260606-login-timeout/case.md` + `01..08-*.md` +
-  `11..16-*.md` + `17..18-*.md` (18 artefactos, 9 por cadena).
+- **Artefactos del caso (modo Full):** `case.md` + hasta 16 archivos `NN-*.md` (`01..08`, `11..16`,
+  `17..18`; números 09–10 vacantes). En este ejemplo: 8 de causa + 6 de solución + 2 de cierre = 16
+  archivos de fase más `case.md` (ver convención de conteo §4).
 - **Commit (fuente de verdad):**
 
 ```text
@@ -1103,11 +1217,12 @@ cubre 100% pero con más código. 15 normaliza cobertura. 16 emite **Solución g
 **Cierre global (17–18):** 17 aplica A y cuantifica residual (paths no cubiertos = backlog);
 18 redacta `fix(gateway): error boundary` con nota de riesgo residual y metadatos `Case:`.
 
-### 10.5 Ejemplo de caso "no resuelto" con pausa y re-apertura
+### 10.5a Corrida 1 — pausa
 
 - **Entrada:** _"Hay un fallo intermitente en el endpoint `/orders` que no reproduce en local."_
 - **Perfil:** `corrective`.
 - **Modo:** `full`.
+- **`case_run`:** `1`.
 
 **Cadena de causa (01–08):**
 
@@ -1146,12 +1261,18 @@ cubre 100% pero con más código. 15 normaliza cobertura. 16 emite **Solución g
 
 | Fase | Resultado clave                                                                                     | Artefacto                    |
 | ---- | --------------------------------------------------------------------------------------------------- | ---------------------------- |
-| 17   | veredicto: "no resuelto"; `status: pausado`; `case_paused_at: 2026-06-08T16:30:00Z`; lección: `intermittent-failures-no-repro` (qué aprendimos: el recall no fue suficiente; falta instrumentación en producción) | `17-conclusion.md`           |
-| 18   | comunicación: caso pausado, oferta al usuario de re-apertura con nuevo contexto (instrumentación adicional, log sampling, datos de producción) | `18-communication.md`        |
+| 17   | veredicto: "no resuelto"; `status: pausado`; `case_paused_at: 2026-06-08T16:30:00Z`; `case_run: 1` en frontmatter; lección: `intermittent-failures-no-repro` | `17-conclusion.md`           |
+| 18   | comunicación: caso pausado, oferta al usuario de re-apertura con nuevo contexto (instrumentación adicional, log sampling, datos de producción) | `18-communication.md` (`case_run: 1`) |
 
-**Bucle C — re-apertura:** el usuario acepta re-abrir; el orquestador fija
-`case_resumed_at: 2026-06-09T09:15:00Z` y re-ejecuta **03–08** con el nuevo contexto (recall
-ampliado + acceso a logs de producción):
+> **Commit de corrida 1:** los pasos 10–12 del orquestador (fase 18 + consolidate + commit) **cierran**
+> la pausa en git antes de que el usuario pueda aceptar re-apertura (`case_run++` en paso 13).
+
+### 10.5b Corrida 2 — solución y cierre
+
+**Bucle C — re-apertura:** el usuario acepta re-abrir; el orquestador incrementa `case_run` a `2`,
+fija `case_resumed_at: 2026-06-09T09:15:00Z` y re-ejecuta **03–08** con el nuevo contexto (recall
+ampliado + acceso a logs de producción). Los artefactos `17-conclusion.md` y `18-communication.md`
+de la corrida 1 pasan a `status: superseded` al emitir el cierre de corrida 2.
 
 | Fase | Resultado clave                                                                                     | Artefacto                    |
 | ---- | --------------------------------------------------------------------------------------------------- | ---------------------------- |
@@ -1168,12 +1289,12 @@ ampliado + acceso a logs de producción):
 | ---- | --------------------------------------------------------------------------------------------------- | -------------------------------------- |
 | 11   | 3 candidatas: (A) NTP estricto, (B) timestamp lógico, (C) reescritura del cache                     | `11-solution-research.md`              |
 | 12–16 | experimento comparativo; **Solución ganadora: A** (justificación cuantitativa)                      | `12..16-*.md`                          |
-| 17   | veredicto: aplicar A; cierre definitivo del caso; `status: done`                                     | `17-conclusion.md`                     |
-| 18   | commit `fix(orders): sincronización NTP en cluster` con metadatos `Case:`                            | `18-communication.md`                  |
+| 17   | veredicto: aplicar A; cierre definitivo; `status: done`; `case_run: 2` en frontmatter              | `17-conclusion.md` (v2; corrida 1 → `superseded`) |
+| 18   | commit `fix(orders): sincronización NTP en cluster` con metadatos `Case:`                            | `18-communication.md` (`case_run: 2`)  |
 
-- **Salida final del caso (post re-apertura):** causa confirmada en la segunda vuelta del Bucle A,
-  solución elegida por análisis comparativo de la fase 16, expediente completo con dos pausas
-  documentadas. El registro de casos y el changelog quedan **derivados**.
+- **Salida final del caso (corrida 2):** causa confirmada tras re-apertura, solución elegida por
+  análisis comparativo de la fase 16, expediente con una pausa (corrida 1) y cierre `done` (corrida
+  2). El registro de casos y el changelog quedan **derivados**.
 
 ---
 
@@ -1199,7 +1320,7 @@ diseño**. El orden propuesto es:
    `sm-profile-perfective`, `sm-profile-preventive`) con `phase_policy matrix` de 16 entries
    cada uno (8 de causa + 6 de solución + 2 de cierre).
 5. **Actualizar `templates/case.md`:** la `phase_policy` crece de 10 a 16 entries; el bloque
-   `phases` crece de 10 a 16 entries; se añaden `case_paused_at`, `case_resumed_at`,
+   `phases` crece de 10 a 16 entries; se añaden `case_run`, `case_paused_at`, `case_resumed_at`,
    `integration_mode` y `openspec_change` al bloque canónico.
 6. **Actualizar `references/phase-policy-schema.md`:** el campo `phase_policy` admite 16 claves
    válidas (ver §5.4). El schema por entry **no cambia**.
@@ -1273,7 +1394,7 @@ migración. La aprobación se documenta en un commit aparte con mensaje aproxima
 
 - El sistema actual (15 skills v1.0) sigue siendo el **contrato vigente**.
 - `docs/proposals/scientific-maintenance.md` (v1.0) sigue siendo el documento canónico.
-- Este `new-scientific-maintenance.md` (v0.1) es una **propuesta de migración**, no un contrato.
+- Este `new-scientific-maintenance.md` (v0.4) es una **propuesta de migración**, no un contrato.
 
 ---
 
@@ -1377,16 +1498,10 @@ dejando los artefactos sin sincronizar con el código.
 (qué produjo el defecto), no el de soluciones. Cuando la causa quedó confirmada, el agente
 saltó a la primera idea de fix sin haber comparado alternativas.
 
-**Regla a futuro:** la fase 09 no debe emitir la spec validada si `08-analysis.md` no
-contiene una sección `## Solution comparison` con veredicto de ganadora y justificaciones de
-descarte. Esta precondición está ahora documentada en:
-- `sm-orchestrator` paso 6.1 (precondición de Etapa B)
-- `sm-phase-conclusion` procedimiento paso 6 (verificación antes de emitir spec)
-- `docs/proposals/scientific-method-and-openspec-integration.md` §5.4.1 (bucle del espacio
-  de soluciones como sub-bucle paralelo)
-
-El campo `solution_hypotheses` en `case.md` (plantilla) y la sección `## Solution comparison`
-en `08-analysis.md` son los mecanismos que hacen cumplir esta regla.
+> **Histórico pre-v0.4:** la regla v1.0 exigía `## Solution comparison` en `08-analysis.md` y el
+> campo `solution_hypotheses` en `case.md`. Sustituida por la cadena de solución 11–16, la
+> precondición `## Solución ganadora` en `16-solution-analysis.md` (§5.3) y los veredictos de
+> cierre documentados en §5.3.
 
 ## Transición a dos cadenas (2026-06-08)
 
@@ -1403,7 +1518,7 @@ como contenido condicional dentro de `08-analysis.md` (a veces presente, a veces
 se detectaba dinámicamente desde el estado del artefacto —lo que hacía al sistema frágil
 ante refutaciones que cruzaban ambos espacios.
 
-La corrección correcta, propuesta en `docs/proposals/new-scientific-maintenance.md` v0.1
+La corrección correcta, propuesta en `docs/proposals/new-scientific-maintenance.md` v0.4
 (borrador, embebido completo en este documento), es **separar físicamente las dos búsquedas
 en dos cadenas de fases especializadas**:
 
@@ -1411,12 +1526,13 @@ en dos cadenas de fases especializadas**:
   cambios estructurales. Bucle de refutación interna (Bucle A) preserva el comportamiento v1.0.
 - **Cadena de solución (11–16):** segundo método científico, especializado y físicamente
   separado, sobre el espacio de hipótesis de solución. Cada fase tiene su propio `SKILL.md`,
-  su propio artefacto, su propio contrato. Cero modos internos. Bucle de refutación interna
-  de solución (Bucle B) opera solo sobre 12–16.
+  su propio artefacto, su propio contrato. Cero modos internos. Bucle batch comparativo de solución
+  (Bucle B) opera sobre 12–16.
 - **Cierre global (17–18):** conclusión y comunicación únicas al final, con datos de ambas
   cadenas. Las antiguas 09 y 10 se renumeran a 17 y 18.
-- **Re-apertura post "no resuelto" (Bucle C):** caso en estado `pausado`; el orquestador
-  ofrece re-ejecutar 03–08 con nuevo contexto, conservando 01–02.
+- **Re-apertura post "no resuelto" (Bucle C):** caso en estado `pausado`; la fase 18 documenta la
+  oferta de re-apertura; tras commit de la corrida pausada, el orquestador (paso 13) procesa la
+  aceptación del usuario y re-ejecuta 03–08 con nuevo contexto, conservando 01–02.
 
 El contrato `phase-policy-schema.md` no cambia; el `case_mode` no cambia; el `CHANGELOG.md`
 derivado no cambia. Lo que cambia es la cantidad de entries en `phase_policy matrix` (de 10
@@ -1454,8 +1570,8 @@ y la aplica, sin delegarla a un commit futuro.
 | **14 Ejecución secuencial** | Ejecutar las hipótesis con rollback       | Pre-OpenSpec (cadena de solución): datos por solución    |
 | **15 Recolección y normalización** | Tabla normalizada comparativa         | Pre-OpenSpec (cadena de solución): dataset comparable   |
 | **16 Análisis comparativo** | Veredicto cuantitativo de solución ganadora  | Pre-OpenSpec (cadena de solución): ganadora con datos  |
-| **17 Conclusión**  | Veredicto final + **especificación validada**         | **Frontera**: artefacto que alimenta OpenSpec (Etapa B)  |
-| 18 Comunicación    | Documentar, archivar, consolidar conocimiento         | Post-OpenSpec: cierre del caso y del change             |
+| **17 Conclusión**  | Veredicto final según ruta §5.3 **(a)/(b)/(c)**       | Etapa B solo en ruta **(a)**; spec validada alimenta OpenSpec |
+| 18 Comunicación    | Comunicación y consolidación según ruta §5.3          | Etapa C vía fase 18 en todas las rutas terminales       |
 
 **Punto clave:** la **frontera única** entre SM y OpenSpec es la fase 17 (no la fase 09 como
 en v0.3). La spec validada que alimenta OpenSpec sale de la fase 17 con datos de **ambas
@@ -1470,8 +1586,10 @@ la emite la fase 17 (cierre de SM), no la fase 09 como en v0.3.
 
 **Etapa B — Formalización e implementación (OpenSpec).** El orquestador SM, previa
 autorización del usuario en la frontera, ejecuta `openspec-propose` (o `openspec-ff` /
-`openspec-continue` según el modo) para crear el change. Los cuatro artefactos OpenSpec se
-redactan alimentándose **principalmente** de la especificación validada de la fase 17:
+`openspec-continue` según el modo) para crear el change. En modo **Rápido**: si `openspec_change`
+en `case.md` está **poblado** → `openspec-continue`; si está **vacío** → `openspec-ff`. Los cuatro
+artefactos OpenSpec se redactan alimentándose **principalmente** de la especificación validada de la
+fase 17:
 
 | Artefacto OpenSpec | Fuente                                                                  | Contenido clave                                  |
 | ------------------ | ----------------------------------------------------------------------- | ------------------------------------------------ |
@@ -1480,17 +1598,26 @@ redactan alimentándose **principalmente** de la especificación validada de la 
 | `design.md`        | `17-conclusion.md` (sección "Decisiones arquitectónicas") + `11-solution-research.md` | _How_: decisiones + alternativas ya descartadas |
 | `tasks.md`         | `17-conclusion.md` (sección "Criterios de aceptación")                  | _What exactly_: pasos accionables                |
 
+Tras `openspec-apply` → `openspec-verify`, una re-ejecución de la fase 16 es **solo**
+refinamiento MINOR (ingiere la salida de verify en `16-solution-analysis.md`); **no** dispara el
+Bucle B ni una nueva ronda batch 12–16.
+
 **Etapa C — Comunicación y consolidación (SM 18).** El orquestador SM ejecuta la fase 18
 con la siguiente secuencia:
 
+- **Si `integration_mode: Solo-SM`** (rutas **(b)** o **(c)**): ejecuta el generador
+  changelog on-demand con `--pending` y commit con trailer `Case:`; **omite** `openspec-sync` y
+  `openspec-archive` (ver §12.2.4).
 - **Si la hipótesis quedó confirmada** (la implementación cumple `specs/` y `openspec-verify`
   no dejó CRITICALs pendientes): ejecuta `openspec-sync` y luego `openspec-archive`.
-- **Si la hipótesis quedó refutada**: documenta el `git revert` del apply como paso de cierre
-  (lo ejecuta el usuario, no el sistema); omite `openspec-sync` y `openspec-archive`.
+- **Si la hipótesis quedó refutada** (`openspec-verify` no converge o CRITICALs no resueltos tras
+  apply): mantener `status: done` con deuda/residuos documentados en 17–18; documentar el
+  `git revert` del apply como paso de cierre (lo ejecuta el usuario, no el sistema); omitir
+  `openspec-sync` y `openspec-archive`.
 - Ejecuta el generador on-demand con `--pending "<subject>" --case <id>` para actualizar
   `CHANGELOG.md`.
-- Escribe la lección destilada en `.claude/memory/<lesson-slug>.md` y la añade al índice
-  `MEMORY.md`.
+- **Confirma/indexa** la lección ya escrita en la fase 17 (`.claude/memory/<lesson-slug>.md` y
+  línea en `MEMORY.md`); la fase 18 no redacta la lección desde cero.
 - Crea el commit unificado con trailer `Case: <case-id>` y, si el change fue archivado,
   `OpenSpec-Change: <name>`.
 
@@ -1500,7 +1627,7 @@ con la siguiente secuencia:
 | -------------------------------------- | ----------------------------------------- | -------------------------------------------------------- |
 | Frontera Etapa B (spec → OpenSpec)     | Fase 09 (conclusión)                      | **Fase 17** (conclusión del sistema de dos cadenas)      |
 | Datos en la spec validada              | Solo cadena de causa (01–08)              | **Ambas cadenas** (causa confirmada en 08 + ganadora en 16) |
-| Bucle del espacio de soluciones        | Sub-bucle dentro de 04–08 (modo dinámico) | **Cadena separada 11–16** con Bucle B propio            |
+| Bucle del espacio de soluciones        | Sub-bucle dentro de 04–08 (modo dinámico) | **Cadena separada 11–16** con bucle batch comparativo (Bucle B) |
 | Precondición para emitir spec           | `## Solution comparison` en `08-analysis.md` | `## Solución ganadora` en `16-solution-analysis.md` (§5.3) |
 | Caso pausado                           | No existe; "no resuelto" es estado terminal | Estado `pausado` con re-apertura (Bucle C) — §3.1.3, §9.5 |
 
@@ -1508,6 +1635,25 @@ Esta subsección es la **versión v0.4 de la integración** adaptada al sistema 
 El doc `scientific-method-and-openspec-integration.md` v0.3 queda **inconsistente** con el
 diseño nuevo (cita "fase 09"); la actualización del mismo a v0.4 es una de las tareas del
 plan de migración (§11.2) y se ejecuta en el mismo commit que actualiza el sistema `sm-*`.
+
+#### 12.2.4 Modos de integración SM↔OpenSpec (v0.4)
+
+Matriz autocontenida de `integration_mode` (el orquestador la consulta en el paso 2; ver §13.5):
+
+| Modo | Cuándo usarlo | Etapas SM (01–18) | Etapa B (OpenSpec) | Etapa C (18 + sync/archive) | `case_mode` sugerido |
+| ---- | ------------- | ----------------- | ------------------ | --------------------------- | -------------------- |
+| **Completo** | Cambio con spec formal, apply y verify | 01–18 completas | Sí, tras close con spec | Sí: sync + archive si verify OK | `full` |
+| **Rápido** | Cambio acotado; propose/apply acelerado | 01–18 completas | Sí (ff/continue según contexto) | Sí, con mismos gates | `full` o `consolidated` si trivial |
+| **Solo-SM** | Investigación o decisión sin implementar en OpenSpec | 01–18; cierre **sin** spec | **No** | Parcial: changelog + commit; sin sync/archive | `full` |
+| **Solo-OpenSpec** | El usuario ya opera solo con OpenSpec | **No** usar `sm-orchestrator` | N/A (entrypoint OpenSpec directo) | N/A | N/A |
+
+**Solo-SM — veredictos:** con `## Solución ganadora` en 16 → ruta **(b)** (17 cita ganadora, sin
+spec OpenSpec). Sin ganadora (Bucle B agotado) o causa no confirmada → ruta **(c)** (precedencia §5.3).
+En ruta **(c)**, `status: pausado` + oferta Bucle C (documentada en fase 18). Solo-SM **no** implica
+que todo caso termine en `pausado`.
+
+**Solo-OpenSpec:** no invocar `sm-orchestrator`; el flujo OpenSpec (`openspec-propose`, etc.) es el
+entrypoint. Los casos SM en disco no aplican.
 
 ### 12.3 Recursos externos (contexto derivado, no delegación)
 
@@ -1619,7 +1765,7 @@ description: >
   Invoked by sm-orchestrator after phase 11. For each viable solution from the solution space,
   formulates a falsifiable hypothesis with observable prediction and refutation criterion. Produces
   12-solution-hypothesis.md. Adapts via case.md phase_policy.solution-hypothesis. Idempotent:
-  re-invoked by the Solution Refutation Loop (Bucle B), appends new hypotheses without
+  re-invoked by the solution batch loop (Bucle B), appends new hypotheses without
   overwriting refuted ones.
 ---
 
@@ -1633,12 +1779,12 @@ Narrows the solution space to falsifiable hypotheses. Operates on the SOLUTION a
 ## Inputs
 - case.md (phase_policy.solution-hypothesis).
 - `11-solution-research.md`.
-- On re-invocation (Bucle B, solution refutation): the existing `12-solution-hypothesis.md`
+- On re-invocation (Bucle B, solution batch loop): the existing `12-solution-hypothesis.md`
   and the set of pending candidates from `11-solution-research.md` that were not yet formulated.
 
 ## Procedure
 1. Read the policy entry.
-2. **If 12-solution-hypothesis.md already exists (re-invocation for solution refutation):** read
+2. **If 12-solution-hypothesis.md already exists (re-invocation for solution batch loop):** read
    `11-solution-research.md` for candidates with `status: pending` not yet formulated in 12;
    append them as new hypothesis rows. Do NOT overwrite or remove previously tested hypotheses —
    they are the audit trail (batch comparison in 16 already concluded none won). Mark appended
@@ -1841,12 +1987,21 @@ description: >
   hypotheses using the normalized table; emits the winning-solution verdict with quantitative
   justification; lists discarded hypotheses with their discard reason. Produces
   16-solution-analysis.md. Adapts via case.md phase_policy.solution-analysis. The
-  `## Solución ganadora` section is MANDATORY for phase 17 to emit the spec (§5.3).
+  `## Solución ganadora` section is MANDATORY when the solution chain completes with a winner;
+  feeds route **(a)** spec via phase 17; route **(b)** cites winner without spec block (§5.3).
 ---
 
 # Phase 16 — Solution Analysis
 
 Compares normalized trade-offs; emits the winning verdict. Operates on the SOLUTION axis.
+
+## Closure routes (phase 17 consumes this verdict — §5.3)
+
+| Route | `status` | Spec / Etapa B |
+| ----- | -------- | -------------- |
+| **(a)** | `done` | Validated spec; Etapa B if ≠ Solo-SM |
+| **(b)** | `done` | Solo-SM + `## Solución ganadora`; no spec |
+| **(c)** | `pausado` | No spec; Bucle C offer in phase 18 |
 
 <user_communication>Spanish for user interaction. See ../artifact-structuring/SKILL.md §language_policy.</user_communication>
 
@@ -1873,9 +2028,10 @@ Compares normalized trade-offs; emits the winning verdict. Operates on the SOLUT
    the weighting against it).
 7. State threats to validity (what could invalidate the verdict; e.g. small N, environment
    drift, untested edge cases).
-8. This phase is idempotent: re-runnable if a hypothesis is later refuted under new evidence
-   (Bucle B). The verdict is replaced with version bump; the previous verdict is preserved as
-   `superseded` with its reason.
+8. **Idempotence (Bucle B):** a new batch round starts only after exhausting `pending` candidates
+   in map 11 (orchestrator re-invokes 12–16). When 13–16 are marked `superseded` for a new round,
+   any prior `16-solution-analysis.md` is also `superseded` with `links.previous_version`; the new
+   verdict replaces it with a version bump.
 </phase_procedure>
 
 ## Output
@@ -1887,8 +2043,8 @@ frontmatter:
 
 ## Acceptance
 `## Solución ganadora` exists and cites at least one quantitative metric; `## Hipótesis
-descartadas` exists and each discard cites a reason; no winner with zero evidence. The
-verdict is the input phase 17 consumes to emit the spec.
+descartadas` exists and each discard cites a reason; no winner with zero evidence. The verdict
+feeds route **(a)** spec via phase 17; route **(b)** cites winner without spec block.
 
 <constraints>Analyze; the case decision belongs to phase 17.</constraints>
 ````
@@ -2223,13 +2379,21 @@ description: >
   the knowledge base. Consumes data from BOTH chains: 02, 08 (cause) and 16 (solution). Adapts
   via case.md phase_policy.conclusion. Produces 17-conclusion.md. The MANDATORY
   `## Solución ganadora` section in 16-solution-analysis.md is the precondition for emitting
-  the spec (§5.3). Handles the `pausado` state for the Solution Refutation Loop (Bucle B) and
-  the Re-opening Loop (Bucle C).
+  the spec (§5.3 route **(a)** only). Handles routes **(a)/(b)/(c)**: Solo-SM investigativo close
+  (`done` without spec, even with winner), pause (`pausado`), and Bucle C with `case_run`.
 ---
 
 # Phase 17 — Conclusion
 
 Closes the case by deciding the outcome and the action. Consumes data from both chains.
+
+## Closure routes (§5.3)
+
+| Route | `status` | Spec / Etapa B |
+| ----- | -------- | -------------- |
+| **(a)** | `done` | Validated spec; Etapa B if ≠ Solo-SM |
+| **(b)** | `done` | Solo-SM + `## Solución ganadora`; no spec |
+| **(c)** | `pausado` | No spec; Bucle C offer in phase 18 |
 
 <user_communication>Spanish for user interaction. See ../artifact-structuring/SKILL.md §language_policy.</user_communication>
 
@@ -2239,56 +2403,51 @@ Closes the case by deciding the outcome and the action. Consumes data from both 
 - `02-problem-definition.md` (problem statement + success criterion).
 - `08-analysis.md` (cause verdict — either `## Causa confirmada` present, or refutation in
   which case the case routes to `pausado`).
-- `16-solution-analysis.md` with the MANDATORY `## Solución ganadora` section (precondition
-  §5.3) — only when the solution chain opened (i.e. the cause was confirmed).
+- `16-solution-analysis.md` — only when the solution chain opened (i.e. the cause was confirmed).
 - Knowledge-base schema: ../sm-orchestrator/references/knowledge-base.md.
 
 ## Procedure
 1. Read the policy entry.
-2. **Route decision:**
-   a. If `08-analysis.md` lacks `## Causa confirmada` → verdict is "no resuelto" → go to
-      step 3b (pause).
-   b. If `16-solution-analysis.md` lacks `## Solución ganadora` (because the solution chain
-      was refuted — Bucle B exhausted candidates) → verdict is "no resuelto" → go to step
-      3b (pause).
-   c. Otherwise → proceed to step 3a (close with verified spec).
-3. **Close (3a):** contrast the analysis with the phase-02 success criterion; decide apply /
-   revert / escalate; record residuals, debt, follow-ups; produce the validated specification
-   (the conclusion is not just a verdict but a complete spec of the change, citing the
-   winning solution from `16-solution-analysis.md ## Solución ganadora` and each discarded
-   alternative from `## Hipótesis descartadas` with its discard reason). Set
-   `status: done` in case.md.
-   **Pause (3b):** set `status: pausado` and `case_paused_at: <ISO-8601 UTC>` in the
-   canonical block of case.md. The orchestrator will offer the user re-opening (Bucle C)
-   for re-execution of phases 03–08 with new context.
-4. **Distill one lesson** (the non-derivable learning, not a case summary) into a new file
-   under `.claude/memory/` with tags `component`/`defect-class`/`profile`; add one line to
-   `MEMORY.md`. **The lesson is written in both close and pause paths** — even a "no
-   resuelto" is non-derivable learning.
-5. **Verify the §5.3 precondition:** confirm `16-solution-analysis.md` contains
-   `## Solución ganadora` with a winning verdict and discard justifications, before emitting
-   the spec. If absent, halt — the spec cannot be emitted without comparative evidence.
+2. **Route decision** (evaluate in order; execute **one** branch only):
+   a. If `08-analysis.md` lacks `## Causa confirmada` → route **(c)** pause.
+   b. Else if the solution chain opened and `16-solution-analysis.md` lacks `## Solución ganadora`
+      (Bucle B exhausted or phase 11 routed `no_viable_solution_space`) → route **(c)** pause.
+   c. Else if `integration_mode` is `Solo-SM` → route **(b)** investigativo close.
+   d. Else → route **(a)** close with verified spec.
+3. **Branch (a) — close with spec:** contrast the analysis with the phase-02 success criterion;
+   decide apply / revert / escalate; record residuals, debt, follow-ups. Verify
+   `16-solution-analysis.md` contains `## Solución ganadora` with discard justifications (§5.3).
+   Produce the validated specification citing the winner and each discarded alternative. Set
+   `status: done` in case.md. → go to step 4.
+4. **Branch (b) — investigativo close (Solo-SM):** cite `## Solución ganadora` from 16 if present;
+   set `status: done`; do NOT emit validated spec or trigger Etapa B. → go to step 5.
+5. **Branch (c) — pause:** set `status: pausado` and `case_paused_at: <ISO-8601 UTC>` in case.md.
+   Pause note reason: `candidatas_agotadas` (Bucle A/B) or `no_viable_solution_space` (phase 11).
+   Bucle C offer is documented in phase 18 (orchestrator processes acceptance later). → go to step 6.
+6. **Common final (all branches):** distill one lesson into `.claude/memory/` with tags; index in
+   `MEMORY.md`; write `17-conclusion.md` per Output below.
 </phase_procedure>
 
 ## Output
 - Write `17-conclusion.md` with:
   - **Verdict** — winning cause (from 08), winning solution (from 16 — when both exist),
     discarded hypotheses (with justification), confidence level, known residual risks.
-  - **Validated specification** (only on the close path, step 3a): problem (→ proposal),
-    bounded scope, expected behavior delta, key architectural decisions, acceptance
-    criteria, experimental evidence (refs to 06/07/08/14/15/16 + experiments/), **Solución
-    seleccionada (vs alternativas)** — winner cited from 16-solution-analysis.md ## Solución
-    ganadora; each discarded alternative cited with its discard reason. Cross-reference
-    mandatory.
-  - **Pause note** (only on the pause path, step 3b): explicit "no resuelto" verdict; reason
-    (cause refutation exhausted / solution refutation exhausted / no viable solution);
-    `case_paused_at` timestamp.
+  - **Validated specification** (only on route **(a)**): problem (→ proposal), bounded scope,
+    expected behavior delta, key architectural decisions, acceptance criteria, experimental
+    evidence (refs to 06/07/08/14/15/16 + experiments/), **Solución seleccionada (vs
+    alternativas)** — winner cited from 16-solution-analysis.md ## Solución ganadora; each
+    discarded alternative cited with its discard reason. Cross-reference mandatory.
+  - **Pause note** (only on route **(c)**): explicit "no resuelto" verdict; reason
+    `candidatas_agotadas` or `no_viable_solution_space`; `case_paused_at` timestamp.
+  - **Investigativo note** (route **(b)**): investigation closed without spec; may cite
+    `## Solución ganadora` from 16 when present — no "Validated specification" block.
   - **References** — case, expediente, experiments/, lesson link.
 - Write the lesson file in `.claude/memory/` and index it in `MEMORY.md`.
 
 ## Acceptance
 Verdict coherent with the analysis; phase-02 criterion checked; actions actionable;
-validated-spec structure present on the close path; pause note present on the pause path;
+validated-spec structure present on close-with-spec path; investigativo note on Solo-SM close;
+pause note present on the pause path;
 lesson written with tags that enable phase-03 / phase-11 recall in both paths.
 
 <constraints>Decide, write the validated spec (close) or the pause note (pause), and the
@@ -2306,8 +2465,8 @@ description: >
   sm-orchestrator. Produces the final human-facing communication (PR, changelog, report,
   commit draft), adapting via case.md phase_policy.communication. Produces 18-communication.md.
   The commit cites the winning solution from 16-solution-analysis.md (not the agent's first
-  idea). Handles the `pausado` state: emits a "no resuelto" communication offering Bucle C
-  re-opening to the user.
+  idea).   Handles the `pausado` state: emits the canonical Bucle C re-opening offer in
+  `18-communication.md` (orchestrator step 13 processes acceptance only).
 ---
 
 # Phase 18 — Communication
@@ -2329,8 +2488,9 @@ skill.</user_communication>
    evidence from both chains, risks, links to artifacts.
 3. **Pause path (`status: pausado`):** emit a "no resuelto" communication summarizing what was
    tried (cause candidates explored, solution candidates explored if the chain opened),
-   what the lesson learned, and the offer of Bucle C re-opening (re-execute 03–08 with new
-   context, preserving 01–02).
+   what the lesson learned, and the **canonical Bucle C offer** (text + suggested context for
+   re-execute 03–08, preserving 01–02). The orchestrator does not re-offer; step 13 processes
+   user acceptance after commit.
 4. Draft the commit/PR message in Spanish following the repo's conventional-commits skill,
    ending with the git commit metadata (*trailer*) `Case: <case-id>` (see
    ../sm-orchestrator/references/changelog.md).
@@ -2619,9 +2779,10 @@ models.
 ### 13.5 El orquestador (modificado con 16 fases y 3 bucles)
 
 `sm-orchestrator` se modifica para conocer las 16 fases (rango `01..18` con 09–10 vacantes) y
-los **3 bucles** del workflow: A (refutación interna de causa), B (refutación interna de
-solución), C (re-apertura post "no resuelto"). Las precondiciones de cadena (§5.2) y de
-cierre (§5.3) son pasos obligatorios; el manejo del estado `pausado` se añade al flujo.
+los **3 bucles** del workflow: A (refutación interna de causa), B (bucle batch comparativo de
+solución), C (re-apertura post "no resuelto" con `case_run`). Las precondiciones de cadena (§5.2)
+y de cierre (§5.3) son pasos obligatorios; el manejo del estado `pausado` y `case_run` se añade al
+flujo.
 
 ````markdown
 ---
@@ -2631,7 +2792,7 @@ description: >
   chain (phases 01–08) and the SOLUTION chain (phases 11–16, opened only when phase 08 confirms
   a cause), with a CLOSURE phase (17–18) that consumes data from both chains. Pick a maintenance
   profile and case mode (full/consolidated); run 16 specialized phases in order with 3
-  possible loops (cause refutation, solution refutation, post-no-resuelto re-opening);
+  possible loops (cause refutation, solution batch loop, post-no-resuelto re-opening);
   consolidate a verdict (apply/revert/pause); distill a lesson; run OpenSpec Etapa B/C when
   integration_mode allows; run the changelog generator; commit with a `Case:` commit metadata
   (*trailer*) (changelog and case index are derived, never hand-edited). Use when the user asks
@@ -2658,8 +2819,10 @@ artifacts' machine fields in English. Canonical policy: ../artifact-structuring/
    from `maintenance-cases/<case-id>/case.md`.
 2. **Classify the profile and integration mode.** Use references/classification-guide.md to
    pick one of corrective, adaptive, perfective, preventive. If ambiguous, ask the user in
-   Spanish (offer the 2 best fits). Then pick the SM↔OpenSpec `integration_mode` (§12.2;
-   integration doc §7): `Completo`, `Rápido`, `Solo-SM`, or `Solo-OpenSpec`.
+   Spanish (offer the 2 best fits). Then pick the SM↔OpenSpec `integration_mode` (§12.2.4):
+   `Completo`, `Rápido`, `Solo-SM`, or `Solo-OpenSpec`. If `Solo-OpenSpec`: inform the user in
+   Spanish that the entrypoint is the OpenSpec flow directly (`openspec-propose`, etc.); **terminate**
+   the orchestrator without creating `case.md`.
 3. **Create the manifest.** Copy templates/case.md to `maintenance-cases/<case-id>/case.md`;
    fill case_id, profile, case_mode (consolidated for trivial/localized fixes, full otherwise),
    `integration_mode`, `openspec_change: ""`, and the 16 phases as `pending` in the canonical
@@ -2668,8 +2831,8 @@ artifacts' machine fields in English. Canonical policy: ../artifact-structuring/
    the **16-entry** phase-policy matrix into the canonical YAML block in case.md. **Validate
    the schema** (mandatory): confirm case_mode, integration_mode, and openspec_change are set;
    all 16 phase_policy entries are present; all 16 phases entries exist with valid status values;
-   `case_paused_at` and `case_resumed_at` keys exist (empty allowed). Do not proceed until
-   validation passes.
+   `case_run` (integer ≥1), `case_paused_at` and `case_resumed_at` keys exist (empty allowed for
+   pause/resume). Do not proceed until validation passes.
 5. **Run the CAUSE chain (phases 01–08).** Apply preconditions **by chain** (§5.1): within
    01–08, phase N requires the previous phase in the chain `done`. For each phase, invoke the
    matching `sm-phase-*` skill. After each phase: confirm artifact exists; mark `done` and
@@ -2684,42 +2847,58 @@ artifacts' machine fields in English. Canonical policy: ../artifact-structuring/
    `08-analysis.md` contains `## Causa confirmada`. Otherwise skip 11–16 and proceed to step 8
    (phase 17 will emit "no resuelto" + `pausado`).
 7. **Run the SOLUTION chain (phases 11–16).** Phase 11 requires 08 `done` + `## Causa confirmada`;
-   within 11–16, sequential preconditions (§5.1). Phase 13 designs ONE comparative experiment;
-   14–16 execute batch and emit `## Solución ganadora` or not.
+   within 11–16, sequential preconditions (§5.1). After invoking phase 11, if the artifact does NOT
+   meet acceptance (§7.9 — e.g. fewer than ≥2 viable candidates) → skip to step 8 (pause path) with
+   pause reason `no_viable_solution_space`; do NOT open 12–16 or Bucle B. Otherwise phase 13
+   designs ONE comparative experiment; 14–16 execute batch and emit `## Solución ganadora` or not.
 
-   **Bucle B — solution batch refutation loop.** If phase 16 does NOT emit `## Solución ganadora`:
+   **Bucle B — solution batch loop.** If phase 16 does NOT emit `## Solución ganadora`:
    mark 13–16 `superseded` (MAJOR++); preserve 11–12. Consult `11-solution-research.md` for
    candidates still `pending` and not yet formulated in 12. If `pending` ≠ ∅: re-invoke phase 12
    to append them; re-run 13–16 — **reuse** existing design 13 if new hypotheses share metrics
    and initial conditions, else **redesign** 13. Repeat until `## Solución ganadora` OR `pending`
    is empty in map 11.
 8. **Run phase 17 (conclusion).** Consumes `02`, `08`, and `16` (when solution chain opened).
-   Close path: validated spec only if `## Solución ganadora` exists (§5.3). Pause path: "no
-   resuelto" + lesson + `case_paused_at`. Distills lesson in both paths.
-9. **Etapa B — OpenSpec formalization (orchestrator-owned; §12.2).** Skip in `Solo-SM` and on
-   the pause path. For `Completo`/`Rápido` on the close path:
+   Route evaluation (§5.3): (1) pause **(c)** if `08` lacks `## Causa confirmada`; (2) pause **(c)**
+   if solution chain opened without `## Solución ganadora`; (3) investigativo **(b)** if
+   `integration_mode: Solo-SM`; (4) close with spec **(a)** only if ≠ Solo-SM and winner exists.
+   Distills lesson in all paths.
+9. **Etapa B — OpenSpec formalization (orchestrator-owned; §12.2, §12.2.4).** Skip in `Solo-SM`
+   (routes **(b)** and **(c)**) and on the pause path. For `Completo`/`Rápido` on route **(a)** only:
    1. Precondition: `17-conclusion.md` carries validated spec AND `16-solution-analysis.md` has
       `## Solución ganadora` with discard justifications.
    2. **Boundary checkpoint:** present to the user in Spanish that the spec is ready; proceed to
       `openspec-propose` only with explicit OK.
    3. Derive the 4 OpenSpec artifacts from `17-conclusion.md` (+ `11-solution-research.md` for
       design.md alternatives).
-   4. `openspec-propose` once; record name in `openspec_change`.
+   4. Create the OpenSpec change: if `integration_mode: Rápido` → `openspec-continue` when
+      `openspec_change` in case.md is **non-empty**; `openspec-ff` when **empty**; if `Completo` →
+      `openspec-propose`. Record name in `openspec_change`.
    5. `openspec-apply` → `openspec-verify`.
-   6. Re-run phase 16 (MINOR refinement) to ingest verify output if needed; repeat apply/verify
-      until convergence.
+   6. Re-run phase 16 (MINOR refinement only) to ingest verify output if needed; repeat apply/verify
+      until convergence. This re-run does NOT trigger Bucle B or a new batch round 12–16.
    7. **CRITICALs gate:** no unaccepted CRITICALs before Etapa C.
-10. **Run phase 18 (Etapa C — communication).** Draft close-out; on confirmed path with archived
-    change: `openspec-sync` + `openspec-archive`; commit with `Case:` and `OpenSpec-Change:` if
-    archived. On pause path: document `case_paused_at` and Bucle C offer. Run changelog generator
-    with `--pending`; cite `16-solution-analysis.md ## Solución ganadora` on close path.
-11. **Bucle C — re-opening on `pausado` (after phase 18).** When status is `pausado`, OFFER
-    re-opening. If accepted: set `case_resumed_at`; re-run 03–08 only (01–02 preserved). Solution
-    chain opens in a SUBSEQUENT case running, never inside Bucle C.
-12. **Consolidate.** Write verdict into case.md; confirm lesson in `.claude/memory/`.
-13. **Commit.** Phase 18 includes CHANGELOG.md; never hand-edit derived state.
+10. **Run phase 18 (Etapa C — communication).** Branch by closure route (§5.3, §12.2.2):
+    - **(i) Route (b) Solo-SM** or Etapa B skipped: run phase 18; changelog `--pending`; commit with
+      `Case:` trailer; **omit** `openspec-sync` and `openspec-archive`; cite `## Solución ganadora`
+      from 16 when present.
+    - **(ii) Route (a) and verify OK** (no pending CRITICALs): run phase 18; `openspec-sync` +
+      `openspec-archive`; changelog `--pending`; cite winner from 16.
+    - **(iii) Route (c) `pausado`:** document `case_paused_at` and the **canonical Bucle C offer**
+      in `18-communication.md`; changelog `--pending`.
+    - **(iv) Verify refuted** after apply (hypothesis not confirmed): keep `status: done`; document
+      debt/residuals and `git revert` of apply in 17–18; changelog `--pending`; **omit** sync/archive.
+11. **Consolidate.** Write verdict into case.md; confirm lesson in `.claude/memory/`.
+12. **Commit (mandatory before Bucle C).** Phase 18 includes CHANGELOG.md; never hand-edit derived
+    state. The paused run MUST be committed before step 13 can increment `case_run`.
+13. **Bucle C — re-opening on `pausado` (after commit).** When status is `pausado`, read the offer
+    from `18-communication.md` and **process user acceptance** (do NOT re-OFFER). If accepted:
+    increment `case_run`, set `case_resumed_at`, move `status` to `in_progress`; re-run 03–08 only
+    (01–02 preserved). If `## Causa confirmada` in 08 → continue at **step 6** (solution chain in
+    current `case_run`); otherwise → step 8 (pause again). Prior 17–18 become `superseded` only when
+    emitting new closure artifacts (§8.4).
 14. **Report to the user** in Spanish: profile, integration_mode, verdict, key artifacts, lesson,
-    follow-ups or Bucle C offer.
+    follow-ups; on `pausado`, reference the offer in 18 and whether re-opening was accepted.
 
 ## Phase order (fixed, 16 phases)
 
@@ -2738,15 +2917,17 @@ resuelto") when the cause is not confirmed.
 - **Bucle A (cause refutation):** triggered by phase 08 refuting the cause. Re-invokes phase 04
   to APPEND the next `pending` candidate in `04-hypothesis.md`; re-runs 05–08. Terminates when
   `## Causa confirmada` is written OR no `pending` remain. 01–03 are NOT re-invoked.
-- **Bucle B (solution batch refutation):** triggered when phase 16 does NOT emit
+- **Bucle B (solution batch loop):** triggered when phase 16 does NOT emit
   `## Solución ganadora` (no hypothesis wins the batch). Preserves 11–12; marks 13–16
   `superseded`; appends `pending` candidates from map 11 into 12; re-runs 13–16 (reuse or
   redesign 13). Terminates when a winner exists OR map 11 has no `pending` left. Phase 11 is
-  NOT re-invoked.
-- **Bucle C (re-opening on `pausado`):** triggered by the user accepting re-opening after
-  phase 18 reports a `pausado` case. Re-runs phases 03–08 only (01–02 preserved). The
-  solution chain never opens inside a Bucle C re-opening; it opens in a SUBSEQUENT CASE
-  RUNNING if a cause is confirmed.
+  NOT re-invoked. Failure of phase 11 acceptance (§7.9) routes to pause (`no_viable_solution_space`),
+  not Bucle B.
+- **Bucle C (re-opening on `pausado`):** after phase 18 documents the offer and step 12 commits the
+  paused run, step 13 processes user acceptance (no duplicate offer). If accepted: increments
+  `case_run`, re-runs phases 03–08 only (01–02 preserved). Solution chain opens at step 6 in the new
+  `case_run` if cause is confirmed — never inside the same 03–08 cycle. Prior 17–18 superseded when
+  new closure artifacts are emitted (§8.4).
 
 ## References
 
@@ -2754,9 +2935,9 @@ resuelto") when the cause is not confirmed.
 |------|--------------|
 | references/phase-policy-schema.md | The profile↔phase contract (16 keys, range 01..18) — always, before step 4 |
 | references/classification-guide.md | Choosing the profile (step 2) |
-| references/artifact-conventions.md | Naming, frontmatter (with `chain`), versioning, `Case:` commit metadata (*trailer*) (steps 3–11) |
-| references/knowledge-base.md | Lesson schema + recall protocol (steps 5, 7, 12) |
-| references/changelog.md | Keep a Changelog format + derivation from commits (step 13) |
+| references/artifact-conventions.md | Naming, frontmatter (with `chain`), versioning, `Case:` commit metadata (*trailer*) (steps 3–13) |
+| references/knowledge-base.md | Lesson schema + recall protocol (phases 03, 11; lesson write phase 17) |
+| references/changelog.md | Keep a Changelog format + derivation from commits (step 12) |
 | docs/proposals/scientific-method-and-openspec-integration.md | SM↔OpenSpec modes, Etapa B boundary (steps 2, 9, 10) |
 | templates/case.md | Manifest skeleton with 16 phases + pause/resume fields (step 3) |
 | templates/phase-artifact.md | Phase artifact skeleton (with `chain`) — passed to phases |
@@ -2767,9 +2948,11 @@ resuelto") when the cause is not confirmed.
 - Artifacts are the source of truth; never keep case state only in conversation.
 - Derived state over duplicated state: never hand-edit CHANGELOG.md or a case ledger.
 - The solution chain (11–16) opens ONLY when phase 08 emitted `## Causa confirmada`.
-- Phase 17 emits the validated spec ONLY when phase 16 emitted `## Solución ganadora` AND the
-  solution chain opened (§5.3).
-- Bucle C re-opening runs ONLY phases 03–08; the solution chain never opens inside it.
+- Phase 17 route **(a)** (validated spec) requires `## Solución ganadora`, solution chain opened,
+  and `integration_mode` ≠ `Solo-SM` (§5.3). Route **(b)** Solo-SM closes without spec even with
+  winner. Route **(c)** pause when cause not confirmed or solution exhausted.
+- Bucle C: phase 18 documents the offer; commit (step 12) before acceptance (step 13). Re-opening
+  runs ONLY phases 03–08 first; solution chain opens at step 6 in the incremented `case_run`.
 - Never cross the SM→OpenSpec boundary (Etapa B) without explicit user checkpoint; no bridge skill.
 - No sub-agents.
 </constraints>
@@ -2803,7 +2986,7 @@ never read a profile skill; profiles never read a phase skill.
 ## Location in case.md
 
 `phase_policy` lives inside the **canonical state block** of `case.md` (section "Canonical
-state"), alongside `case_mode`, `phases`, `case_paused_at`, `case_resumed_at`,
+state"), alongside `case_mode`, `phases`, `case_run`, `case_paused_at`, `case_resumed_at`,
 `integration_mode`, and `openspec_change`. There is no separate markdown table for phase
 status — the YAML block is the single machine-readable source.
 Schema validation of this block is a mandatory step of the orchestrator.
@@ -2827,6 +3010,7 @@ NOT per-phase policy fields and never appear inside `phase_policy.<phase>`:
 
 | Field | Type | Meaning |
 |-------|------|---------|
+| `case_run` | integer ≥1 | Run counter for the case (initial 1). Incremented by the orchestrator on each accepted Bucle C re-opening. Closure artifacts 17–18 carry this value in frontmatter. |
 | `case_paused_at` | string (ISO-8601 UTC) or `""` | Timestamp of the pause (set by phase 17 on the pause path). Empty until the case pauses. |
 | `case_resumed_at` | string (ISO-8601 UTC) or `""` | Timestamp of the latest re-opening (set by the orchestrator when the user accepts Bucle C). Empty until the first re-opening. |
 | `integration_mode` | enum | SM↔OpenSpec mode: `Completo`, `Rápido`, `Solo-SM`, `Solo-OpenSpec` (set in orchestrator step 2). |
@@ -2835,8 +3019,9 @@ NOT per-phase policy fields and never appear inside `phase_policy.<phase>`:
 ```yaml
 # Inside the canonical state block in case.md (16-entry matrix):
 case_mode: full   # full | consolidated
-integration_mode: Completo   # Completo | Rápido | Solo-SM | Solo-OpenSpec
+integration_mode: Completo   # Completo | Rápido | Solo-SM | Solo-OpenSpec (Solo-OpenSpec → early exit step 2)
 openspec_change: ""
+case_run: 1          # integer ≥1; increments on Bucle C re-opening
 case_paused_at: ""   # ISO-8601 UTC or empty
 case_resumed_at: ""  # ISO-8601 UTC or empty
 
@@ -2970,10 +3155,13 @@ the chain separation auditable at a glance.
 - The superseded artifact sets `status: superseded`; the new version links back to it via
   `links.previous_version`.
 - In the cause refutation loop (Bucle A), the 04–08 artifacts of the refuted hypothesis go
-  `superseded`. In the solution refutation loop (Bucle B), the 13–16 artifacts go `superseded`
+  `superseded`. In the solution batch loop (Bucle B), the 13–16 artifacts go `superseded`
   (the design and results are replaced); `11-solution-research.md` and `12-solution-hypothesis.md`
   are preserved as audit trail (the map and discarded hypotheses, respectively). In both cases the
   new version is MAJOR (upstream inputs changed, or new hypotheses appended for solution chain).
+- After Bucle C re-opening, closure artifacts 17–18 from the prior run go `superseded` when new
+  17–18 are emitted (not on `case_run` increment; frontmatter `case_run` must match the canonical
+  block).
 - Fine-grained history lives in git (one commit per phase recommended).
 
 ## Commit ↔ case link (commit metadata)
@@ -3101,7 +3289,7 @@ rationale.
 
 ### 13.7 Las 2 plantillas (actualizadas)
 
-#### 13.7.1 `templates/case.md` (16 phases, `case_paused_at`, `case_resumed_at`)
+#### 13.7.1 `templates/case.md` (16 phases, `case_run`, pause/resume)
 
 ````markdown
 ---
@@ -3124,8 +3312,9 @@ verdict:                       # filled at consolidation
 
 ```yaml
 case_mode: full                # full | consolidated
-integration_mode: Completo     # Completo | Rápido | Solo-SM | Solo-OpenSpec
-openspec_change: ""              # filled after openspec-propose in Etapa B
+integration_mode: Completo     # Completo | Rápido | Solo-SM | Solo-OpenSpec (Solo-OpenSpec → orchestrator early exit step 2)
+openspec_change: ""              # filled after openspec-propose/ff/continue in Etapa B
+case_run: 1                    # integer ≥1; increments on each Bucle C re-opening
 case_paused_at: ""             # ISO-8601 UTC; empty until phase 17 pauses the case
 case_resumed_at: ""            # ISO-8601 UTC; empty until the first Bucle C re-opening
 
@@ -3252,8 +3441,9 @@ links: { previous: , next: }   # add previous_version: <file> when this version 
 <!-- ── MANDATORY SECTIONS (when applicable) ── -->
 <!-- Phase 08 (cause analysis): -->
 <!-- ## Causa confirmada — REQUIRED for solution chain to open (§5.2) -->
-<!-- Phase 16 (solution analysis): -->
-<!-- ## Solución ganadora — REQUIRED for phase 17 to emit the spec (§5.3) -->
+<!-- Phase 16 (solution analysis) — closure routes §5.3: -->
+<!-- (a) done + spec if ≠ Solo-SM | (b) done Solo-SM + winner, no spec | (c) pausado -->
+<!-- ## Solución ganadora — REQUIRED for routes (a) and (b); feeds (a) spec, (b) cite only -->
 <!-- ## Hipótesis descartadas — REQUIRED for phase 16 acceptance -->
 
 ## Acceptance check
@@ -3285,15 +3475,18 @@ data from both chains. Treat every maintenance request as a *case* driven by `sm
 - The SOLUTION chain (phases 11–16) opens ONLY when `08-analysis.md` contains the mandatory
   `## Causa confirmada` section. Without it, phase 17 routes the case to "no resuelto" and
   pauses the case.
-- The CLOSURE phase (17) emits the validated spec ONLY when the solution chain opened AND
-  `16-solution-analysis.md` contains `## Solución ganadora` (§5.3). Without it, phase 17
-  emits "no resuelto" + `pausado`.
-- Each case declares `integration_mode` and `openspec_change` in the canonical block. Etapa B
-  (OpenSpec) runs at the orchestrator after phase 17 on the close path (`Completo`/`Rápido`);
-  never cross the boundary without explicit user authorization (§12.2).
-- The case may enter a `pausado` state (no resuelto) which the orchestrator can re-open
-  (Bucle C) by re-executing phases 03–08 with new context. The solution chain never opens
-  inside a Bucle C re-opening.
+- The CLOSURE phase (17) has three terminal routes (§5.3): **(a)** close with spec (`done` + Etapa B
+  when applicable, ≠ Solo-SM), **(b)** Solo-SM investigativo (`done` without spec, even with winner
+  in 16), **(c)** pause (`pausado`). Without `## Causa confirmada` → **(c)** in all modes.
+- Each case declares `case_run`, `integration_mode` and `openspec_change` in the canonical block.
+  Etapa B runs after phase 17 only on route **(a)** (`Completo`/`Rápido`); `Rápido`: non-empty
+  `openspec_change` → `openspec-continue`, empty → `openspec-ff`. Etapa C (step 10): Solo-SM **(b)**
+  and pause **(c)** omit sync/archive; verify refuted after apply → `done` with debt documented,
+  no sync/archive. `Solo-OpenSpec` terminates the orchestrator at step 2. Never cross the Etapa B
+  boundary without explicit user authorization (§12.2, §12.2.4).
+- The case may enter `pausado` (no resuelto); phase 18 documents the Bucle C offer; commit (step 12)
+  closes the paused run before step 13 processes acceptance. Bucle C increments `case_run`,
+  re-executes 03–08, then opens the solution chain at orchestrator step 6 if cause is confirmed.
 - Derived state over duplicated state. `CHANGELOG.md` and the case index are DERIVED (from
   commits and the filesystem); never hand-edit them. Only lessons are persisted deliberately.
 

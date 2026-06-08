@@ -1,0 +1,380 @@
+---
+name: anthropic-api-protocol
+description: >
+  Complete reference for the Anthropic API protocol (Messages API), including request structure, response structure, SSE events, and basic cost calculation concepts.
+  Use this skill for general protocol reference: field definitions, event types, API routes, stop reasons, extended thinking, and tool use.
+  For detailed cost estimation, pricing resolution, or session aggregation, use the specialized skill `anthropic-api-cost-estimation`.
+  Trigger when asking about Anthropic API structure, request/response schemas, SSE events, protocol concepts, or field definitions.
+  Also use it when working with Smart Code Proxy audit logs, statuslines, or consumption metrics that come from the Anthropic API.
+---
+
+# Anthropic API Protocol
+
+<overview>
+Complete reference for the Anthropic API protocol (Messages API): request/response structure, SSE events, and conceptual cost calculation.
+</overview>
+
+<user_communication>
+Ask, confirm, and respond to the user in **Spanish** (native Spanish-speaking audience). Keep this artifact's instructions in **English** for token efficiency. Canonical policy: `<language_policy>` in [artifact-structuring](../artifact-structuring/SKILL.md). User-facing rules: [AGENTS.md](../../AGENTS.md) §0. Keep standard technical terms in English when clarity benefits (e.g. streaming, SSE, tokens, cache hits).
+</user_communication>
+
+<request_schema>
+## Request Structure
+
+### AnthropicRequest
+
+The main body of a request to `POST /v1/messages`:
+
+```typescript
+interface AnthropicRequest {
+  model: string;                    // Model identifier (e.g., "claude-3-5-sonnet-20241022")
+  messages: AnthropicMessage[];     // Array of conversation messages
+  system?: string | AnthropicContentBlock[];  // System instructions
+  max_tokens: number;               // Maximum tokens to generate
+  metadata?: {
+    user_id?: string;
+    [key: string]: unknown;
+  };
+  stop_sequences?: string[];        // Sequences that stop generation
+  stream?: boolean;                 // true to enable SSE streaming
+  temperature?: number;             // Randomness control (0-1)
+  top_p?: number;                   // Nucleus sampling
+  top_k?: number;                   // Top-k sampling
+  tools?: unknown[];                // Available tool definitions
+  tool_choice?: unknown;            // Tool selection strategy
+}
+```
+
+### AnthropicMessage
+
+Represents an individual message in the conversation:
+
+```typescript
+interface AnthropicMessage {
+  role: 'user' | 'assistant';       // Message role
+  content: string | AnthropicContentBlock[];  // Message content
+}
+```
+
+### AnthropicContentBlock
+
+Supported content block types:
+
+```typescript
+type AnthropicBlockType =
+  | 'text'              // Plain text
+  | 'image'             // Base64-encoded image
+  | 'tool_use'          // Tool invocation
+  | 'tool_result'       // Tool result
+  | 'thinking'          // Internal reasoning (extended thinking)
+  | 'redacted_thinking'; // Redacted reasoning
+
+interface AnthropicContentBlock {
+  type: AnthropicBlockType;
+  text?: string;                  // For 'text' type
+  source?: {                      // For 'image' type
+    type: 'base64';
+    media_type: string;
+    data: string;
+  };
+  id?: string;                    // Block ID (tool_use)
+  name?: string;                  // Tool name
+  input?: unknown;                // Tool input (dynamic)
+  tool_use_id?: string;           // tool_use ID for tool_result
+  is_error?: boolean;             // Indicates error in tool_result
+  thinking?: string;              // Reasoning content
+  signature?: string;             // Signature of redacted reasoning
+}
+```
+</request_schema>
+
+<response_schema>
+## Response Structure
+
+### AnthropicResponse
+
+Complete standard response (non-SSE):
+
+```typescript
+interface AnthropicResponse {
+  id: string;                     // Unique message ID
+  type: 'message';                // Response type
+  role: 'assistant';              // Sender role
+  content: AnthropicContentBlock[];  // Generated content
+  model: string;                  // Model used
+  stop_reason: string | null;     // Stop reason
+  stop_sequence: string | null;   // Sequence that caused stop
+  usage: AnthropicUsage;          // Consumption metrics
+}
+```
+
+### AnthropicUsage
+
+Token usage metrics:
+
+```typescript
+interface AnthropicUsage {
+  input_tokens: number;                              // Total input tokens (cacheable + non-cacheable)
+  cache_creation_input_tokens?: number;             // Tokens written to cache for the first time
+  cache_read_input_tokens?: number;                 // Tokens read from existing cache
+  cache_creation?: {
+    ephemeral_5m_input_tokens?: number;            // 5-minute cache write
+    ephemeral_1h_input_tokens?: number;            // 1-hour cache write
+  };
+  output_tokens: number;                            // Tokens generated by the model
+  service_tier?: string;                            // Service tier
+  inference_geo?: string;                           // Geographic restriction
+}
+```
+
+**Field relationship:**
+
+- `input_tokens`: Always includes ALL prompt tokens (cacheable + non-cacheable)
+- `cache_creation_input_tokens`: Only cacheable tokens written to cache for the first time
+- `cache_read_input_tokens`: Only cacheable tokens read from existing cache
+- Non-cacheable tokens are always billed as `input_tokens` and never enter cache
+
+**Cacheable vs non-cacheable content:**
+
+**Cacheable content** (can be stored in prompt cache):
+- System prompt (`system` field)
+- User/assistant text messages
+- Tool definitions (`tools` field)
+- Documentation and reference text
+- Codebases and large text blocks
+
+**Non-cacheable content** (always billed as input tokens):
+- Images and media (base64-encoded images, audio, video)
+- Tool results (`tool_result` blocks)
+- Certain specialized message types
+- Dynamic content unique per request
+
+**Breakdown relationship:**
+- `cache_creation_input_tokens` ≈ `cache_creation.ephemeral_5m_input_tokens` + `cache_creation.ephemeral_1h_input_tokens`
+- Without prompt caching: all cache fields are 0
+
+**Billing categories:**
+Each field represents a separate billing category. Do not treat `input_tokens + cache_* + output_tokens` as a single count of total prompt size. Each category is billed with its own price per MTok.
+
+**Flow example:**
+
+**Request 1** (no prior cache, 100K tokens: 80K cacheable documentation + 20K non-cacheable images):
+```typescript
+{
+  input_tokens: 100_000,                    // 80K cacheable + 20K non-cacheable
+  cache_creation_input_tokens: 80_000,      // 80K documentation written to cache
+  cache_read_input_tokens: 0,               // Nothing read from cache yet
+  output_tokens: 10_000
+}
+```
+
+**Request 2** (conversation continuation: same documentation + new user message):
+```typescript
+{
+  input_tokens: 105_000,                    // 80K from cache + 20K non-cacheable + 5K new message
+  cache_creation_input_tokens: 5_000,       // Only the 5K new message written to cache
+  cache_read_input_tokens: 80_000,          // 80K documentation read from cache
+  output_tokens: 10_000
+}
+```
+
+**Request 3** (same documentation, different question with new image):
+```typescript
+{
+  input_tokens: 110_000,                    // 80K from cache + 30K non-cacheable (new image)
+  cache_creation_input_tokens: 0,           // No new cacheable content
+  cache_read_input_tokens: 80_000,          // 80K documentation read from cache
+  output_tokens: 12_000
+}
+```
+
+**Key insight:** Prompt caching provides value when there is **shared context** (documentation, codebase, system prompt) that persists across multiple requests. The delta (new user messages, new questions, new images) is typically small, making cache reads much cheaper than re-processing the entire prompt.
+
+</response_schema>
+
+<sse_events>
+## SSE Protocol (Server-Sent Events)
+
+When `stream: true`, the API sends SSE events. The event order is:
+
+### SSE Events
+
+```typescript
+// 1. Message start
+interface AnthropicSseMessageStart {
+  type: 'message_start';
+  message: AnthropicResponse;  // Initial response with preliminary usage
+}
+
+// 2. Content block start
+interface AnthropicSseContentBlockStart {
+  type: 'content_block_start';
+  index: number;
+  content_block: AnthropicContentBlock;
+}
+
+// 3. Content deltas (repeated per block)
+interface AnthropicSseContentBlockDelta {
+  type: 'content_block_delta';
+  index: number;
+  delta: {
+    type: 'text_delta' | 'signature_delta' | 'thinking_delta' | 'input_json_delta';
+    text?: string;              // For text
+    signature?: string;         // For redacted thinking
+    thinking?: string;          // For reasoning
+    partial_json?: string;      // For tool input
+  };
+}
+
+// 4. Content block stop
+interface AnthropicSseContentBlockStop {
+  type: 'content_block_stop';
+  index: number;
+}
+
+// 5. Message delta (final)
+interface AnthropicSseMessageDelta {
+  type: 'message_delta';
+  delta: {
+    stop_reason: string | null;
+    stop_sequence: string | null;
+  };
+  usage: {
+    output_tokens: number;
+    input_tokens?: number;
+    cache_creation_input_tokens?: number;
+    cache_read_input_tokens?: number;
+  };
+}
+
+// 6. Message stop
+interface AnthropicSseMessageStop {
+  type: 'message_stop';
+}
+
+// 7. Ping (keep-alive)
+interface AnthropicSsePing {
+  type: 'ping';
+}
+```
+
+**Typical event order:**
+```
+message_start →
+content_block_start → content_block_delta* → content_block_stop →
+[repeat for each block] →
+message_delta → message_stop
+```
+</sse_events>
+
+<cost_calculation>
+## Cost Calculation
+
+**Note:** This section provides the conceptual cost equation and pricing categories.
+
+### Cost Equation per Interaction
+
+Cost is calculated as a sum of products by category:
+
+```
+cost_in =
+    (input_tokens / 1e6) * price.input.base
+  + (cache_creation.ephemeral_5m_input_tokens / 1e6) * price.input.cacheWrite5m
+  + (cache_creation.ephemeral_1h_input_tokens / 1e6) * price.input.cacheWrite1h
+  + (cache_read_input_tokens / 1e6) * price.input.cacheRead
+
+cost_out = (output_tokens / 1e6) * price.output
+
+total_cost = cost_in + cost_out
+```
+
+### inference_geo Modifier (optional)
+
+If `inference_geo` indicates US residency and the model applies a surcharge:
+
+```
+final_cost = total_cost * inference_geo_us_multiplier
+```
+
+Typical multiplier value: 1.1× for US-only inference.
+
+### Prices by Category
+
+Prices are expressed in USD per million tokens (MTok):
+
+| Category          | Field in usage                | Field in prices       |
+| ------------------ | ----------------------------- | ---------------------- |
+| Base input        | `input_tokens`                | `costs.input.base`    |
+| 5m cache write    | `cache_creation.ephemeral_5m_input_tokens` | `costs.input.cacheWrite5m` |
+| 1h cache write    | `cache_creation.ephemeral_1h_input_tokens` | `costs.input.cacheWrite1h` |
+| Cache read        | `cache_read_input_tokens`     | `costs.input.cacheRead` |
+| Output            | `output_tokens`               | `costs.output`        |
+
+**Conceptual multipliers on base price:**
+- 5m cache write: 1.25×
+- 1h cache write: 2×
+- Cache read: 0.1×
+</cost_calculation>
+
+<gateway_usage_aggregation>
+When aggregating `usage` across multiple Messages API calls (e.g. tool loop):
+- Sum each billing field per hop for total billed consumption and cost estimation.
+- Do not treat summed `input_tokens` as unique context size; the last hop's `input_tokens` approximates prompt size for that request only.
+- Smart Code Proxy gateway: `WorkflowResult.usage` — see `docs/proposals/new-diseno-dominio-gateway-observabilidad.md` §7.7.1.
+- Per-hop billing categories: `docs/how-to-calculate-anthropic-api-costs.md` §4 and §4.1.
+</gateway_usage_aggregation>
+
+<api_routes>
+## API Routes
+
+| Route                              | Generates usage? | Billable?              |
+| --------------------------------- | -------------- | ---------------------- |
+| `POST /v1/messages` (streaming)   | Yes            | Yes                    |
+| `POST /v1/messages` (no-streaming)| Yes            | Yes                    |
+| `POST /v1/messages/count_tokens`  | Yes            | No (currently free)    |
+</api_routes>
+
+<stop_reasons>
+## Stop Reasons
+
+Common `stop_reason` values:
+- `end_turn`: The model completed the message normally
+- `max_tokens`: Token limit was reached
+- `stop_sequence`: A stop sequence was detected
+- `tool_use`: The model requested to use a tool
+- `null`: Error or interruption
+</stop_reasons>
+
+<extended_thinking>
+## Extended Thinking
+
+When the model uses extended reasoning:
+- `thinking` blocks contain internal reasoning
+- `redacted_thinking` blocks contain redacted reasoning with signature
+- These blocks appear before normal text content
+- `usage.output_tokens` may include reasoning tokens depending on the model
+</extended_thinking>
+
+<tool_use>
+## Tool Use
+
+For tool invocations:
+- `tool_use` block defines the invocation (id, name, input)
+- `tool_result` block returns the result (tool_use_id, content, is_error)
+- `stop_reason: 'tool_use'` indicates the model expects a tool_result
+- `input_json_delta` in SSE builds the input progressively
+</tool_use>
+
+<references>
+## Additional References
+
+For specific implementation in the Smart Code Proxy project:
+- TypeScript types: `src/1-domain/types/anthropic.types.ts`
+- SSE reconstruction: `docs/how-sse-reconstruction-works.md`
+
+For official Anthropic documentation:
+- Messages API: https://docs.anthropic.com/en/api/messages
+- Streaming: https://docs.anthropic.com/en/api/messages-streaming
+- Prompt Caching: https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching
+- Pricing: https://platform.claude.com/docs/en/about-claude/pricing
+</references>

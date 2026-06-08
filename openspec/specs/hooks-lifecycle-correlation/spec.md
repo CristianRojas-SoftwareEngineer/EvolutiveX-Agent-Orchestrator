@@ -260,7 +260,7 @@ El repositorio SHALL NOT configurar para `Stop` múltiples comandos en paralelo 
 
 `scripting/stop-work-summary-notification.ts` SHALL ser un módulo import-only (sin entry point CLI propio). El único entry point del hook `Stop` SHALL ser `scripting/stop-hook-ux.ts`, que deriva la raíz de SCP de `import.meta.url` y NO SHALL usar `CLAUDE_PROJECT_DIR` ni otra variable de runtime de Claude Code para resolver `projectDir`.
 
-**Documentación operativa (no normativa de comportamiento, referencia):** [`docs/notifications.md`](../../docs/notifications.md) § Hook Stop, [`README.md`](../../README.md) § Configuración de hooks. El directorio `.claude/` está en `.gitignore`; el fragmento JSON canónico vive en la guía de notificaciones.
+**Documentación operativa (no normativa de comportamiento, referencia):** [`docs/notifications.md`](../../docs/notifications.md) § Hook Stop, [`README.md`](../../README.md) § Configuración de hooks. Solo `.claude/settings.json` está en `.gitignore`; skills y comandos bajo `.claude/` se versionan. El fragmento JSON canónico de hooks vive en [`configs/hooks.json`](../../configs/hooks.json) y en la guía de notificaciones.
 
 #### Scenario: `Stop` con payload válido → `POST /hooks` y toast único con continuidad
 

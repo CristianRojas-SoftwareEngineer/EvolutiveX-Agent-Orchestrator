@@ -37,7 +37,7 @@ Flags: `--dry-run`, `--force` (sobrescribe hooks ajenos en esas claves), `--unin
 
 Requisitos: `npm install` en la raíz del proxy (para `tsx` en `node_modules`). Tras mover el repositorio, vuelva a ejecutar el instalador. En Windows, branding opcional: `npm run notifications:register -- --install`.
 
-**Nota:** el [`.claude/settings.json`](../../.claude/settings.json) del **proyecto** puede definir las mismas claves de hook (p. ej. lifecycle con `POST /hooks`); el merge de Claude Code da prioridad al proyecto y puede anular toasts globales en esas claves dentro de este repo. Para toasts + gateway en Smart Code Proxy, ampliar el settings del proyecto según [hooks-lifecycle-correlation](../openspec/specs/hooks-lifecycle-correlation/spec.md). El directorio `.claude/` está en `.gitignore`: la configuración del proyecto no se versiona; los fragmentos canónicos viven en esta guía y en el [README § Configuración de hooks](../README.md#configuracion-de-hooks).
+**Nota:** el [`.claude/settings.json`](../../.claude/settings.json) del **proyecto** puede definir las mismas claves de hook (p. ej. lifecycle con `POST /hooks`); el merge de Claude Code da prioridad al proyecto y puede anular toasts globales en esas claves dentro de este repo. Para toasts + gateway en Smart Code Proxy, ampliar el settings del proyecto según [hooks-lifecycle-correlation](../openspec/specs/hooks-lifecycle-correlation/spec.md). Solo `.claude/settings.json` está en `.gitignore` (configuración local del proyecto); skills, comandos y memoria bajo `.claude/` sí se versionan. Los fragmentos canónicos de hooks viven en [`configs/hooks.json`](../configs/hooks.json), esta guía y el [README § Configuración de hooks](../README.md#configuracion-de-hooks).
 
 ## Hook `Stop`: mensaje de continuidad con modelo
 
@@ -714,15 +714,17 @@ es versionable aquí). El plazo de deprecación de **3 meses** desde N2
 (2026-06-02 → 2026-09-01) da margen para migrar cualquier llamante
 externo que aún dependa del script.
 
-## Restricción operativa: `.claude/` está en `.gitignore`
+## Restricción operativa: `.claude/settings.json` está en `.gitignore`
 
 El archivo `.claude/settings.json` del proyecto **no entra en commits**
-(línea 29 del `.gitignore`). Esto significa que:
+(`.gitignore`). El resto de `.claude/` (skills, comandos, memoria,
+`CLAUDE.md`) sí se versiona. Esto significa que:
 
-- El archivo se mantiene por instalación local; quien clone el repo
-  no recibe la configuración de hooks automáticamente.
+- Quien clone el repo recibe el harness de agente pero no la
+  configuración de hooks del proyecto hasta materializarla localmente.
 - La materialización local debe reproducir el contrato descrito en
-  esta página y en la spec `hooks-lifecycle-correlation`.
+  esta página, en [`configs/hooks.json`](../configs/hooks.json) y en la
+  spec `hooks-lifecycle-correlation`.
 - Cualquier cambio a la cobertura (añadir/quitar entradas, cambiar
   matchers) se documenta primero en spec y docs; el archivo local
   se sincroniza después.

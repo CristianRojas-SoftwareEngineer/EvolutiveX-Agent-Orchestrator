@@ -26,4 +26,4 @@ routing/providers/*/secrets.json
 
 # Claude/Windsurf config
 .windsurf/
-.claude/
+.claude/settings.json

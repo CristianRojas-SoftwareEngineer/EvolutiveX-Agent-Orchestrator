@@ -652,10 +652,8 @@ Todos los artefactos completos. Cambios preservados.
 ```
 <type>(<scope>): <imperative Spanish, ≤72 chars, sin punto final>
 
-Motivación
-<por qué fue necesario el cambio, condensado de proposal.md «Why»>
-
 Propósito
+<por qué fue necesario el cambio, condensado de proposal.md «Why»>
 <qué se busca lograr, de proposal.md «What Changes»>
 
 Objetivos

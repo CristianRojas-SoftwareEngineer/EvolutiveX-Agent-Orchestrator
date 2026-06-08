@@ -4,7 +4,10 @@
 > (`scientific-maintenance.md`) y el flujo de trabajo de OpenSpec definido en
 > `.claude/skills/openspec-specialist/SKILL.md`.
 >
-> **Estado:** propuesta de diseño · **Versión:** v0.2
+> **Estado:** propuesta de diseño · **Versión:** v0.3
+> **Cambios en v0.3:** añadir §5.4.1 con el bucle del espacio de soluciones; el caso
+> `20260607-clean-modules-windows` evidenció que la fase 09 emitía decisiones de diseño sin
+> comparativo de fase 08.
 > **Madurez de los sistemas:** OpenSpec está **completamente implementado** (skills activos en
 > `.claude/skills/openspec-*/`). SM es **solo una propuesta de diseño** — ningún skill `sm-*`
 > existe todavía. Este documento integra un sistema en producción con uno que aún está por
@@ -533,6 +536,43 @@ marca la fase como `in_progress` durante la iteración y `done` al cierre con la
 enteramente dentro de SM. `openspec-propose` se ejecuta una sola vez por caso (el change se
 crea una sola vez); `openspec-apply` y `openspec-verify` pueden repetirse dentro de Etapa B
 hasta que la especificación y la implementación converjan.
+
+#### 5.4.1 Bucle del espacio de soluciones — sub-bucle paralelo
+
+El bucle de iteración de §5.4 opera sobre el **espacio de causas** (hipótesis de causa raíz).
+Dentro de las mismas fases 03–08 existe un segundo bucle simétrico sobre el **espacio de
+soluciones** (alternativas de fix). Ambos bucles son independientes y pueden reabrirse
+dentro de su fase sin alterar el orden externo de fases.
+
+```
+Fases 03–08 — Espacio de soluciones (paralelo al bucle de causa)
+─────────────────────────────────────────────────────────────────
+04-hypothesis.md  →  enumerate solution candidates (S1, S2, S3…)
+        │
+        ▼
+05-experiment-design.md  →  comparative procedure (same metrics for all)
+        │
+        ▼
+06-experiment-execution.md  →  run S1 → S2 → S3 sequentially (rollback between)
+        │
+        ▼
+07-data-collection.md  →  comparative metrics table
+        │
+        ▼
+08-analysis.md §Solution comparison  →  winner verdict + discard reasons
+        │
+        ▼  (only if winner exists)
+09-conclusion.md  →  spec cites §Solution comparison (cross-reference mandatory)
+```
+
+**Regla:** la fase 09 no emite la spec validada si `08-analysis.md` no contiene una sección
+`## Solution comparison` con veredicto de ganadora. El Orchestrator verifica esta precondición
+antes de cruzar a Etapa B. Si la sección falta, la fase 09 debe halt — el caso no puede
+avanzar sin comparativo de soluciones.
+
+Este bucle responde a la pregunta: *"de las alternativas viables para eliminar el defecto,
+¿cuál produce el mejor trade-off y por qué?"* — frente al bucle de causa que responde:
+*"¿qué produjo el defecto?"*.
 
 ---
 

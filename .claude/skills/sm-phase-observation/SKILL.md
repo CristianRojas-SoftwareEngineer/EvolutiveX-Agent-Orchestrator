@@ -25,7 +25,8 @@ Generic, profile-parameterized. Reads policy; never decides order; never consoli
 </phase_procedure>
 
 ## Output
-Write `maintenance-cases/<case-id>/01-observation.md` from templates/phase-artifact.md with:
+Write `maintenance-cases/<case-id>/01-observation.md` from templates/phase-artifact.md with
+`chain: cause` in the frontmatter:
 - Applied policy (echo), Observed facts, Context, Scope, "Not interpreted" note.
 
 ## Acceptance

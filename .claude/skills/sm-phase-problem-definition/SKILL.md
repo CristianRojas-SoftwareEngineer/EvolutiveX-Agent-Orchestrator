@@ -21,7 +21,8 @@ description: >
 </phase_procedure>
 
 ## Output
-Write `02-problem-definition.md`: Applied policy, Problem statement, Solved criterion, Limits, Severity.
+Write `02-problem-definition.md` with `chain: cause` in the frontmatter: Applied policy,
+Problem statement, Solved criterion, Limits, Severity.
 
 ## Acceptance
 Falsifiable and measurable statement; explicit success criterion; single problem.

@@ -4,15 +4,18 @@
 > (`scientific-maintenance.md`) y el flujo de trabajo de OpenSpec definido en
 > `.claude/skills/openspec-specialist/SKILL.md`.
 >
-> **Estado:** propuesta de diseño · **Versión:** v0.3
+> **Estado:** propuesta de diseño · **Versión:** v0.6
+> **Cambios en v0.6:** adaptación al sistema de dos cadenas (causa 01–08, solución 11–16,
+> cierre 17–18); frontera Etapa B en fase 17 (no fase 09); estado `pausado` y Bucle C;
+> precondición de spec: `## Solución ganadora` en `16-solution-analysis.md`.
 > **Cambios en v0.3:** añadir §5.4.1 con el bucle del espacio de soluciones; el caso
-> `20260607-clean-modules-windows` evidenció que la fase 09 emitía decisiones de diseño sin
-> comparativo de fase 08.
+> `20260607-clean-modules-windows` evidenció que la fase 17 (antes 09) emitía decisiones de diseño sin
+> comparativo formal de soluciones.
 > **Madurez de los sistemas:** OpenSpec está **completamente implementado** (skills activos en
 > `.claude/skills/openspec-*/`). SM es **solo una propuesta de diseño** — ningún skill `sm-*`
 > existe todavía. Este documento integra un sistema en producción con uno que aún está por
 > construir.
-> **Cambio estructural respecto a v0.1:** OpenSpec se invoca únicamente al cierre de la fase SM 09
+> **Cambio estructural respecto a v0.1:** OpenSpec se invoca únicamente al cierre de la fase SM 17
 > (conclusión validada), nunca durante la experimentación. La incertidumbre y el ensayo y error
 > quedan contenidos dentro del proceso científico; OpenSpec formaliza e implementa cambios que ya
 > cuentan con validación previa por evidencia.
@@ -33,11 +36,11 @@
 4. [Mapeo entre flujos](#4-mapeo-entre-flujos)
    - [4.1 Correspondencia fase SM → rol en la integración](#41-correspondencia-fase-sm-rol-en-la-integración)
    - [4.2 Correspondencia artefacto SM → artefacto OpenSpec](#42-correspondencia-artefacto-sm-artefacto-openspec)
-   - [4.3 El nuevo artefacto: especificación validada](#43-el-nuevo-artefacto-especificación-validada-de-sm-09)
+   - [4.3 El nuevo artefacto: especificación validada](#43-el-nuevo-artefacto-especificación-validada-de-sm-17)
 5. [Flujo integrado paso a paso](#5-flujo-integrado-paso-a-paso)
-   - [5.1 Etapa A — Investigación científica completa (SM 01–09)](#51-etapa-a-investigación-científica-completa-sm-0109)
+   - [5.1 Etapa A — Investigación científica completa (SM 01–16)](#51-etapa-a-investigación-científica-completa-sm-0116)
    - [5.2 Etapa B — Formalización e implementación (OpenSpec)](#52-etapa-b-formalización-e-implementación-openspec)
-   - [5.3 Etapa C — Comunicación y consolidación (SM 10)](#53-etapa-c-comunicación-y-consolidación-sm-10)
+   - [5.3 Etapa C — Comunicación y consolidación (SM 18)](#53-etapa-c-comunicación-y-consolidación-sm-18)
    - [5.4 Bucle de iteración: dentro de SM, no entre SM y OpenSpec](#54-bucle-de-iteración-dentro-de-sm-no-entre-sm-y-openspec)
 6. [Dónde viven los artefactos de experimentación](#6-dónde-viven-los-artefactos-de-experimentación)
    - [6.1 Naturaleza efímera de los experimentos](#61-naturaleza-efímera-de-los-experimentos)
@@ -72,6 +75,34 @@
 
 ---
 
+## Adaptación al sistema de dos cadenas
+
+El sistema de mantenimiento científico opera con **dos cadenas secuenciales** más cierre global:
+
+| Cadena | Fases | Rol en la integración |
+|--------|-------|------------------------|
+| Causa | 01–08 | Investigación y confirmación de causa (`## Causa confirmada` en fase 08) |
+| Solución | 11–16 | Comparativo batch de alternativas; ganadora en `16-solution-analysis.md` |
+| Cierre | 17–18 | Spec validada (fase 17) → OpenSpec Etapa B; comunicación (fase 18) |
+
+**Frontera Etapa B:** la spec validada que alimenta OpenSpec se emite en **fase 17** (no fase 09).
+La spec incorpora causa confirmada (08) + solución ganadora (16).
+
+**Tres bucles ortogonales:**
+
+- **Bucle A** — refutación de causa (04→08, 1-a-1).
+- **Bucle B** — batch comparativo de solución (12→16; preserva 11–12).
+- **Bucle C** — re-apertura post-`pausado` (re-ejecuta 03–08; incrementa `case_run`).
+
+**Estado `pausado`:** la fase 17 ruta **(c)** fija `case.status: pausado`; la fase 18 documenta
+la oferta de re-apertura Bucle C (`C1`–`C3`).
+
+**Modos de integración** (`integration_mode`): `Completo`, `Rápido`, `Solo-SM`, `Solo-OpenSpec`.
+Solo-SM cierra en ruta **(b)** con ganadora sin spec; Completo/Rápido disparan Etapa B en ruta **(a)**.
+Ver matriz completa en `docs/proposals/new-scientific-maintenance.md` §12.2.4.
+
+---
+
 ## 1. Resumen ejecutivo
 
 Este documento propone la integración formal entre dos flujos de trabajo diseñados para operar sobre
@@ -80,14 +111,14 @@ el mismo proyecto:
 - **Sistema de Mantenimiento Científico (SM)** — investiga, experimenta y valida con rigor
   científico qué cambio es necesario, comparando alternativas y descartando las que no producen
   resultados satisfactorios, hasta emitir un veredicto respaldado por evidencia. Usa perfiles de
-  mantenimiento (corrective, adaptive, perfective, preventive) y diez fases del método científico.
+  mantenimiento (corrective, adaptive, perfective, preventive) y dieciséis fases del método científico.
 
 - **OpenSpec** — formaliza e implementa de forma trazable y verificable un cambio que ya fue
   decidido en otra parte, produciendo los artefactos canónicos `proposal → specs → design → tasks
 → apply → verify → sync → archive`.
 
 **Decisión arquitectónica central de esta propuesta:** OpenSpec se invoca **únicamente al cierre de
-la fase SM 09** (conclusión validada), nunca durante la experimentación. El resultado de la
+la fase SM 17** (conclusión validada), nunca durante la experimentación. El resultado de la
 investigación científica es la especificación del cambio correcto; OpenSpec implementa ese cambio
 sin investigar ni experimentar por su cuenta.
 
@@ -98,15 +129,15 @@ Esta separación tiene tres consecuencias directas:
    changes de OpenSpec. El `archive/` de OpenSpec queda reservado a cambios que efectivamente
    llegaron a producción.
 2. **Los cambios en OpenSpec nunca se proponen "a ciegas".** Toda propuesta de OpenSpec se
-   alimenta de una especificación validada (SM 09) con evidencia experimental previa.
+   alimenta de una especificación validada (SM 17) con evidencia experimental previa.
 3. **El modo "Solo SM" deja de ser un caso especial.** Es la trayectoria natural cuando la
    investigación no produce un cambio listo para implementar: "se investigó, no se implementó
    (todavía)".
 
 La integración preserva los contratos internos de ambos sistemas: SM sigue usando su `case.md`,
-sus 10 artefactos por fase y su carpeta `experiments/`. OpenSpec sigue usando
+sus 16 artefactos por fase y su carpeta `experiments/`. OpenSpec sigue usando
 `openspec/changes/<name>/` con sus cuatro artefactos canónicos. El puente entre ambos es **un
-único corte de ida** entre SM 09 y `openspec-propose`; el flujo solo lo cruza de vuelta para un
+único corte de ida** entre SM 17 y `openspec-propose`; el flujo solo lo cruza de vuelta para un
 caso acotado de corrección de especificación (§5.4), nunca para re-investigar.
 
 ---
@@ -127,7 +158,7 @@ caso acotado de corrección de especificación (§5.4), nunca para re-investigar
 
 **Usando solo SM** en un caso de mantenimiento:
 
-- Las fases 05–09 (experimento, ejecución, datos, análisis, conclusión) producen artefactos de
+- Las fases 05–17 (experimento, ejecución, datos, análisis, solución, conclusión) producen artefactos de
   investigación valiosos pero no hay un mecanismo de especificación normativa para el cambio que
   sale de la conclusión.
 - La verificación es ad-hoc; no hay una capa de `specs/` que defina qué debe ser verdad después
@@ -140,12 +171,12 @@ caso acotado de corrección de especificación (§5.4), nunca para re-investigar
 | ------------------------------------------------------ | ---------------------------------------------------------------------------------------------- |
 | Observación de señales y encuadre del problema         | SM fases 01–02                                                                                 |
 | Investigación, hipótesis y experimentación comparativa | SM fases 03–08                                                                                 |
-| Veredicto respaldado por evidencia                     | SM fase 09                                                                                     |
-| Especificación normativa del cambio validado           | OpenSpec `specs/` (alimentado por SM 09)                                                       |
+| Veredicto respaldado por evidencia                     | SM fase 17                                                                                     |
+| Especificación normativa del cambio validado           | OpenSpec `specs/` (alimentado por SM 17)                                                       |
 | Ejecución estructurada y trazable                      | OpenSpec `apply`                                                                               |
 | Verificación formal contra requisitos                  | OpenSpec `verify`                                                                              |
-| Conclusión científica sobre el resultado del cambio    | SM fase 10 (cierra `09-conclusion.md` con el veredicto final, incorporando output de `verify`) |
-| Cierre, changelog, lección y archivo del change        | SM fase 10 + OpenSpec `sync` + `archive`                                                       |
+| Conclusión científica sobre el resultado del cambio    | SM fase 18 (cierra `17-conclusion.md` con el veredicto final, incorporando output de `verify`) |
+| Cierre, changelog, lección y archivo del change        | SM fase 18 + OpenSpec `sync` + `archive`                                                       |
 
 Notar el orden: la investigación SM va primero, sin OpenSpec. La formalización OpenSpec va después,
 sobre la base de una especificación validada. El cierre es conjunto.
@@ -187,9 +218,9 @@ SM responde: **¿qué cambio es necesario, qué alternativas existen, cuál es l
   **conclusión validada por evidencia**.
 - El proceso incluye **exploración activa**: típicamente se formulan varias hipótesis
   alternativas, se ejecutan como experimentos, se miden sus resultados, se comparan y se
-  descartan las que no funcionan. La fase 09 emite un veredicto que identifica la alternativa
+  descartan las que no funcionan. La fase 17 emite un veredicto que identifica la alternativa
   ganadora (o la decisión de no implementar nada).
-- El output de las fases 01–09 es la base de evidencia que justifica el cambio: el problema
+- El output de las fases 01–16 es la base de evidencia que justifica el cambio: el problema
   está bien definido, las alternativas fueron comparadas, los riesgos son conocidos y la
   solución seleccionada está respaldada por datos.
 
@@ -198,7 +229,7 @@ SM responde: **¿qué cambio es necesario, qué alternativas existen, cuál es l
 OpenSpec responde: **¿qué debe ser verdad después del cambio y cómo lo implementamos de forma
 trazable y verificable?**
 
-- Parte de un cambio ya decidido y especificado (input: la conclusión de SM 09) y produce
+- Parte de un cambio ya decidido y especificado (input: la conclusión de SM 17) y produce
   artefactos normativos (`specs/`), técnicos (`design.md`) y ejecutables (`tasks.md`).
 - La cadena `proposal → specs → design → tasks → apply → verify → sync → archive` está
   optimizada para implementar cambios de forma trazable y verificable, no para investigar.
@@ -210,14 +241,14 @@ trazable y verificable?**
 
 ```
            ┌──────────────────────────────────────────────────────┐
-           │  INVESTIGACIÓN Y VALIDACIÓN (SM phases 01–09)          │
+           │  INVESTIGACIÓN Y VALIDACIÓN (SM phases 01–16)          │
            │                                                        │
            │  • Observar · Definir · Investigar · Hipotetizar       │
            │  • Experimentar · Medir · Analizar · Comparar          │
            │  • Descartar alternativas inviables                    │
            │  • Seleccionar cambio ganador con evidencia            │
            │                                                        │
-           │  Output: 09-conclusion.md + especificación validada    │
+           │  Output: 17-conclusion.md + especificación validada    │
            │          + expediente completo del caso                │
            └──────────────────────────┬───────────────────────────┘
                                       │  frontera única
@@ -238,7 +269,7 @@ trazable y verificable?**
                                       │  (verificado → comunicación)
                                       ▼
            ┌──────────────────────────────────────────────────────┐
-           │  COMUNICACIÓN Y CONSOLIDACIÓN (SM phase 10)            │
+           │  COMUNICACIÓN Y CONSOLIDACIÓN (SM phase 18)            │
            │                                                        │
            │  • Veredicto final sobre la hipótesis                  │
            │  • Lección destilada → base de conocimiento            │
@@ -254,15 +285,15 @@ Hay **una sola frontera operativa principal** entre los dos sistemas: la entrega
 especificación validada al inicio del flujo OpenSpec. Esta frontera es **direccional para
 investigación** (SM → OpenSpec; el flujo no atraviesa la frontera al revés para re-investigar).
 Sí admite un **cruce de corrección acotado**: si `openspec-verify` revela que el error es de
-especificación (no de implementación), se vuelve a SM 09 para refinar el documento, no para
+especificación (no de implementación), se vuelve a SM 17 para refinar el documento, no para
 re-investigar (ver §5.4). La frontera inferior no es entre sistemas sino entre dos fases del
-mismo sistema (OpenSpec verify → SM 10 comunicación). Esta arquitectura es más limpia que la
+mismo sistema (OpenSpec verify → SM 18 comunicación). Esta arquitectura es más limpia que la
 v0.1, que tenía dos costuras (diagnóstico→planificación y verificación→conclusión) y mezclaba
 las responsabilidades en el medio.
 
 La frontera respeta el principio de responsabilidad única: SM no define requisitos normativos,
 OpenSpec no diagnostica causas. La "interfaz" entre ambos es un documento concreto — la
-especificación validada producida por SM 09 — cuyo contenido se detalla en §4.3.
+especificación validada producida por SM 17 — cuyo contenido se detalla en §4.3.
 
 **Nota — los dos sentidos de "invocar" y la regla canónica de la frontera.** A lo largo de este
 documento "invocar `openspec-*`" tiene dos sentidos que conviene distinguir para evitar
@@ -278,7 +309,7 @@ contradicciones aparentes (p. ej. entre §5.3 y §11.2):
 
 Regla canónica: **SM nunca crea automatización programática a través de la frontera; el orquestador
 (el agente) puede continuar a OpenSpec previa autorización del usuario en la frontera.** En v0.2 esa
-autorización es **siempre un checkpoint explícito** (el orquestador se detiene tras la fase 09,
+autorización es **siempre un checkpoint explícito** (el orquestador se detiene tras la fase 17,
 presenta la spec lista y el siguiente paso, y solo continúa con el OK del usuario). Pre-autorizar la
 pausa por perfil (p. ej. Rápido/corrective) es una optimización diferida a v0.3, coherente con §12.7
 ("validar el flujo manual en 3–5 casos antes de automatizar").
@@ -298,9 +329,10 @@ pausa por perfil (p. ej. Rápido/corrective) es una optimización diferida a v0.
 | 05 Diseño experimental     | Planificar cómo se ejecutan las pruebas                       | Pre-OpenSpec: diseño del set experimental               |
 | 06 Ejecución               | Ejecutar los experimentos (scripts, ramas throwaway, sandbox) | Pre-OpenSpec: producir datos de cada alternativa        |
 | 07 Recolección             | Capturar resultados de cada experimento                       | Pre-OpenSpec: dataset para comparación                  |
-| 08 Análisis                | Comparar alternativas, descartar inviables, trade-offs        | Pre-OpenSpec: seleccionar la ganadora con justificación |
-| 09 Conclusión              | Veredicto + especificación validada del cambio                | **Frontera**: artefacto que alimenta OpenSpec           |
-| 10 Comunicación            | Documentar, archivar, consolidar conocimiento                 | Post-OpenSpec: cierre del caso y del change             |
+| 08 Análisis                | Confirmar o refutar la causa activa (`## Causa confirmada` / `## Causa refutada`) | Pre-OpenSpec: precondición para abrir cadena de solución |
+| 11–16 Solución             | Comparativo batch de alternativas; ganadora en fase 16        | Pre-OpenSpec: cadena de solución                        |
+| 17 Conclusión              | Veredicto + especificación validada del cambio                | **Frontera**: artefacto que alimenta OpenSpec           |
+| 18 Comunicación            | Documentar, archivar, consolidar conocimiento                 | Post-OpenSpec: cierre del caso y del change             |
 
 Notar la diferencia respecto a v0.1: las fases 06–08 ya **no** se equiparan con
 `openspec-apply`/`openspec-verify`. Son actividades de investigación que viven en el expediente
@@ -323,25 +355,26 @@ de implementación. Esta nota se mantiene desde v0.1 sin cambios.
 | `05-experiment-design.md`    | —                                                   | Idem; planificación experimental                                                                                                                                                                    |
 | `06-experiment-execution.md` | —                                                   | **No** equivalente a `openspec-apply`; es ejecución experimental                                                                                                                                    |
 | `07-data-collection.md`      | —                                                   | **No** equivalente a `openspec-verify`; son datos crudos                                                                                                                                            |
-| `08-analysis.md`             | —                                                   | Análisis comparativo interno; no alimenta specs directamente. Recibe (no aporta) el output de `openspec-verify` en Etapa B (ver §5.2)                                                               |
-| `09-conclusion.md`           | `proposal.md` + `specs/` + `design.md` + `tasks.md` | **Fuente directa de los 4 artefactos OpenSpec**                                                                                                                                                     |
-| `10-communication.md`        | post `openspec-sync` + `archive`                    | Cierre conjunto                                                                                                                                                                                     |
+| `08-analysis.md`             | —                                                   | Análisis de causa; no alimenta specs directamente                                                                                                                                    |
+| `16-solution-analysis.md`    | —                                                   | Comparativo batch de soluciones; recibe (no aporta) el output de `openspec-verify` en Etapa B (ver §5.2)                                                                               |
+| `17-conclusion.md`           | `proposal.md` + `specs/` + `design.md` + `tasks.md` | **Fuente directa de los 4 artefactos OpenSpec**                                                                                                                                                     |
+| `18-communication.md`        | post `openspec-sync` + `archive`                    | Cierre conjunto                                                                                                                                                                                     |
 | `case.md`                    | `.openspec.yaml` + metadatos del change             | Manifests paralelos pero **asimétricos**: `case.md` es la única fuente de verdad del estado del caso (validada por el orquestador SM); `.openspec.yaml` es metadata auxiliar del change de OpenSpec |
 | `experiments/*`              | —                                                   | Artefactos de experimentación, efímeros, no se promueven                                                                                                                                            |
 
-El cambio principal respecto a v0.1: **toda la alimentación de OpenSpec se concentra en SM 09**.
+El cambio principal respecto a v0.1: **toda la alimentación de OpenSpec se concentra en SM 17**.
 Las fases 01–08 producen insumos para la conclusión, pero no se traducen una a una en artefactos
 OpenSpec. Esto refleja la realidad: la especificación final emerge de la síntesis, no de un mapeo
 mecánico fase a fase.
 
-### 4.3 El nuevo artefacto: especificación validada de SM 09
+### 4.3 El nuevo artefacto: especificación validada de SM 17
 
-La conclusión de SM fase 09 no es solo un veredicto: es una **especificación completa del cambio
+La conclusión de SM fase 17 no es solo un veredicto: es una **especificación completa del cambio
 que se va a implementar**, lista para alimentar los cuatro artefactos de OpenSpec. Su estructura
 mínima es:
 
 ```markdown
-# 09-conclusion.md — Especificación validada
+# 17-conclusion.md — Especificación validada
 
 ## Veredicto
 
@@ -366,7 +399,7 @@ mínima es:
 - Experiments: maintenance-cases/<case-id>/experiments/
 ```
 
-Esta estructura es la **interfaz contractual** entre los dos sistemas. SM 09 la produce;
+Esta estructura es la **interfaz contractual** entre los dos sistemas. SM 17 la produce;
 OpenSpec la consume. La calidad de la propuesta OpenSpec depende directamente de la calidad de
 esta especificación.
 
@@ -377,10 +410,11 @@ esta especificación.
 El flujo integrado tiene **tres etapas** (A, B, C) y un **único bucle de iteración** que vive
 dentro de la Etapa A, no entre SM y OpenSpec.
 
-### 5.1 Etapa A — Investigación científica completa (SM 01–09)
+### 5.1 Etapa A — Investigación científica completa (SM 01–16)
 
-**Objetivo:** producir una especificación validada del cambio, respaldada por evidencia
-experimental.
+**Objetivo:** confirmar la causa raíz (cadena 01–08) y, si aplica, seleccionar la solución
+ganadora mediante comparativo batch (cadena 11–16), respaldado por evidencia experimental.
+La especificación validada se emite en fase 17 (frontera con Etapa B; ver §5.2).
 
 1. El usuario o el sistema detecta una señal de mantenimiento (fallo, degradación, deuda, riesgo).
 2. `sm-orchestrator` clasifica el caso → elige perfil → crea `maintenance-cases/<case-id>/case.md`.
@@ -401,12 +435,21 @@ experimental.
    `maintenance-cases/<case-id>/experiments/` (ver §6). Output: `06-experiment-execution.md`.
 10. **Fase 07 — Recolección de datos:** captura los resultados de cada experimento. Output:
     `07-data-collection.md`.
-11. **Fase 08 — Análisis:** interpreta los datos, compara alternativas, descarta las inviables
-    con justificación, evalúa trade-offs entre las viables. Output: `08-analysis.md`.
-12. **Fase 09 — Conclusión:** emite el veredicto y produce la **especificación validada**
-    (estructura en §4.3). Output: `09-conclusion.md` con la especificación lista para OpenSpec.
+11. **Fase 08 — Análisis de causa:** interpreta los datos y emite exactamente una de
+    `## Causa confirmada` o `## Causa refutada`. Output: `08-analysis.md`.
+12. **Fase 11 — Investigación de soluciones** (solo si fase 08 confirmó causa): mapea el
+    espacio de soluciones viables (≥2 candidatas). Output: `11-solution-research.md`.
+13. **Fase 12 — Hipótesis de solución:** formula hipótesis falsables por candidata.
+    Output: `12-solution-hypothesis.md`.
+14. **Fase 13 — Diseño experimental comparativo:** planifica un experimento batch único.
+    Output: `13-solution-experiment-design.md`.
+15. **Fase 14 — Ejecución:** ejecuta el batch comparativo. Output: `14-solution-execution.md`.
+16. **Fase 15 — Recolección de datos:** captura resultados del batch. Output:
+    `15-solution-data-collection.md`.
+17. **Fase 16 — Análisis de soluciones:** compara hipótesis, emite `## Solución ganadora` o
+    batch sin ganadora. Output: `16-solution-analysis.md`.
 
-**Precondición para pasar a la Etapa B:** `09-conclusion.md` contiene una especificación con
+**Precondición para pasar a la Etapa B:** fase 17 produce `17-conclusion.md` con una especificación con
 problema definido, alcance acotado, comportamiento esperado, criterios de aceptación y
 evidencia experimental. Si la conclusión es "no implementar" o "implementación diferida", el
 caso sigue la trayectoria de Modo Solo SM (ver §7.3) y no se abre ningún change en OpenSpec.
@@ -415,15 +458,15 @@ caso sigue la trayectoria de Modo Solo SM (ver §7.3) y no se abre ningún chang
 
 ### 5.2 Etapa B — Formalización e implementación (OpenSpec)
 
-**Objetivo:** traducir la especificación validada de SM 09 en un change formal y ejecutarlo de
+**Objetivo:** traducir la especificación validada de SM 17 en un change formal y ejecutarlo de
 forma trazable y verificable.
 
 **Quién conduce la Etapa B.** Toda la Etapa B —derivar los 4 artefactos OpenSpec desde
-`09-conclusion.md`, ejecutar `openspec-propose`/`apply`/`verify` y re-ejecutar `08-analysis.md` con
-el output de verify— la conduce el **orquestador SM** (el agente), **no** la fase 09 ni la fase 08.
+`17-conclusion.md`, ejecutar `openspec-propose`/`apply`/`verify` y re-ejecutar `16-solution-analysis.md` con
+el output de verify— la conduce el **orquestador SM** (el agente), **no** la fase 17 ni la fase 16.
 Las fases solo deben quedar re-ejecutables e idempotentes; el disparo y la ingesta los hace el
 orquestador. El cruce de la frontera requiere autorización del usuario: en v0.2, un **checkpoint
-explícito** tras la fase 09 (ver la nota de §3.3). Con esa autorización el orquestador continúa sin
+explícito** tras la fase 17 (ver la nota de §3.3). Con esa autorización el orquestador continúa sin
 crear ninguna automatización programática nueva.
 
 1. El orquestador SM, **previa autorización del usuario en la frontera**, ejecuta
@@ -432,15 +475,15 @@ crear ninguna automatización programática nueva.
    `case-id`).
 2. Los cuatro artefactos de OpenSpec se redactan alimentándose **principalmente** de la
    especificación validada. `proposal.md`, `specs/` y `tasks.md` se redactan exclusivamente
-   desde `09-conclusion.md`; `design.md` puede referenciar también `03-research.md` para
+   desde `17-conclusion.md`; `design.md` puede referenciar también `03-research.md` para
    documentar las alternativas descartadas en la fase de investigación:
 
    | Artefacto OpenSpec | Fuente                                                                       | Contenido clave                                  |
    | ------------------ | ---------------------------------------------------------------------------- | ------------------------------------------------ |
-   | `proposal.md`      | `09-conclusion.md` (sección "Problema")                                      | _Why_: problema, motivación, alcance, impacto    |
-   | `specs/`           | `09-conclusion.md` (sección "Comportamiento esperado")                       | _What_: delta normativo (ADDED/MODIFIED/REMOVED) |
-   | `design.md`        | `09-conclusion.md` (sección "Decisiones arquitectónicas") + `03-research.md` | _How_: decisiones, alternativas ya descartadas   |
-   | `tasks.md`         | `09-conclusion.md` (sección "Criterios de aceptación")                       | _What exactly_: pasos accionables                |
+   | `proposal.md`      | `17-conclusion.md` (sección "Problema")                                      | _Why_: problema, motivación, alcance, impacto    |
+   | `specs/`           | `17-conclusion.md` (sección "Comportamiento esperado")                       | _What_: delta normativo (ADDED/MODIFIED/REMOVED) |
+   | `design.md`        | `17-conclusion.md` (sección "Decisiones arquitectónicas") + `03-research.md` | _How_: decisiones, alternativas ya descartadas   |
+   | `tasks.md`         | `17-conclusion.md` (sección "Criterios de aceptación")                       | _What exactly_: pasos accionables                |
 
 3. Se establece la referencia cruzada bidireccional:
    - En `proposal.md` se añade una sección `## Contexto SM` con el `case-id` y enlace al
@@ -450,28 +493,27 @@ crear ninguna automatización programática nueva.
 4. **`openspec-apply`:** ejecuta `tasks.md` y deja el código en producción.
 5. **`openspec-verify`:** comprueba la implementación contra los artefactos OpenSpec, especialmente
    `specs/`. El output de verify (CRITICAL/WARNING/SUGGESTION) se incorpora como una
-   **re-ejecución de `08-analysis.md`** (bump de versión MINOR), según la convención de
+   **re-ejecución de `16-solution-analysis.md`** (bump de versión MINOR), según la convención de
    versionado de SM §8.4 (MINOR++ al re-ejecutar una fase sobre los mismos insumos
-   ampliados). No se toca `07-data-collection.md`: los datos crudos de experimentación
-   (fase 07) son distintos del output de verificación, que es material de análisis
-   (coherente con §4.2 y §8.1). El bloque `phases` del `case.md` marca la fase 08 como
+   ampliados). No dispara Bucle B ni nueva ronda 12–16; sincroniza el artefacto con el estado
+   post-verify (coherente con §4.2 y §8.1). El bloque `phases` del `case.md` marca la fase 16 como
    `done` con la versión actualizada.
 
 **Precondición para pasar a la Etapa C:** `openspec-verify` no emite CRITICALs, o los CRITICALs
 emitidos son aceptados por el usuario como fuera del alcance de este caso (en cuyo caso se
-documentan explícitamente en `08-analysis.md`).
+documentan explícitamente en `16-solution-analysis.md`).
 
 ---
 
-### 5.3 Etapa C — Comunicación y consolidación (SM 10)
+### 5.3 Etapa C — Comunicación y consolidación (SM 18)
 
 **Objetivo:** cerrar el ciclo científico y archivar el change de OpenSpec de forma unificada.
 
-1. El orquestador SM, **previa autorización del usuario en la frontera**, ejecuta la fase 10 con la
+1. El orquestador SM, **previa autorización del usuario en la frontera**, ejecuta la fase 18 con la
    siguiente secuencia (los pasos que cruzan a OpenSpec —`sync`/`archive`— quedan cubiertos por esa
    misma autorización; el orquestador no crea automatización programática nueva, ver §3.3):
-   - Cierra `08-analysis.md` y `09-conclusion.md` con el veredicto final sobre la hipótesis
-     (confirmada, refutada parcialmente, refutada).
+   - Cierra `16-solution-analysis.md` y `17-conclusion.md` con el veredicto final sobre la
+     solución ganadora (confirmada en implementación, refutada parcialmente, refutada).
    - **Si la hipótesis quedó confirmada** (la implementación cumple `specs/` y `openspec-verify`
      no dejó CRITICALs pendientes, o los CRITICALs fueron aceptados como fuera de alcance):
      - Ejecuta **`openspec-sync`** para mergear los deltas en `openspec/specs/`.
@@ -500,25 +542,25 @@ documentan explícitamente en `08-analysis.md`).
 ### 5.4 Bucle de iteración: dentro de SM, no entre SM y OpenSpec
 
 Si durante la Etapa A la evidencia experimental no sostiene la hipótesis seleccionada, el
-orquestador SM itera **dentro de las fases 06–09** sin involucrar a OpenSpec:
+orquestador SM itera **dentro de las fases 06–17** sin involucrar a OpenSpec:
 
 ```
 08-analysis.md (hipótesis no sostenida)
   └─► revisar 04-hypothesis.md: ¿se mantiene la hipótesis? ¿se reformula? ¿se descarta?
   └─► revisar 05-experiment-design.md: ¿faltan experimentos? ¿hay que probar otra cosa?
   └─► repetir fases 06–08 (o, si la hipótesis se descarta, volver a 04 con una nueva candidata)
-  └─► emitir nueva 09-conclusion.md
+  └─► emitir nueva 17-conclusion.md
 ```
 
 Si durante la Etapa B `openspec-verify` emite CRITICALs, el orquestador evalúa la causa:
 
-- **Error de implementación** (el código no cumple lo que `09-conclusion.md` especificaba): se
+- **Error de implementación** (el código no cumple lo que `17-conclusion.md` especificaba): se
   reabre `openspec-apply` y se corrige. Los artefactos del change no cambian; solo se re-ejecuta
   el apply con la corrección.
 
-- **Error de especificación** (SM 09 estaba incompleta o era incorrecta y el verify lo reveló):
-  1. Producir `09-conclusion.md` v1.1 con la especificación corregida.
-  2. Actualizar los artefactos del change **en place** desde SM 09 v1.1: `proposal.md`,
+- **Error de especificación** (SM 17 estaba incompleta o era incorrecta y el verify lo reveló):
+  1. Producir `17-conclusion.md` v1.1 con la especificación corregida.
+  2. Actualizar los artefactos del change **en place** desde SM 17 v1.1: `proposal.md`,
      `specs/`, `tasks.md`; `design.md` si cambió alguna decisión arquitectónica. No se crea un
      nuevo change ni se vuelve a ejecutar `openspec-propose`.
   3. Re-ejecutar `openspec-apply` → `openspec-verify`.
@@ -537,65 +579,41 @@ enteramente dentro de SM. `openspec-propose` se ejecuta una sola vez por caso (e
 crea una sola vez); `openspec-apply` y `openspec-verify` pueden repetirse dentro de Etapa B
 hasta que la especificación y la implementación converjan.
 
-#### 5.4.1 Bucle del espacio de soluciones — sub-bucle secuencial
+#### 5.4.1 Bucle del espacio de soluciones — cadena separada 11–16
 
-El bucle de iteración de §5.4 opera sobre el **espacio de causas** (hipótesis de causa raíz).
-Cuando la causa raíz es confirmada en fase 08, se abre un segundo bucle sobre el **espacio de
-soluciones** (alternativas de fix). El orden es estrictamente secuencial: primero se recorre
-el espacio de causas, luego —solo si la causa fue confirmada— se recorre el espacio de
-soluciones. El bucle de soluciones nunca se abre antes de tener la causa confirmada.
+El **Bucle A** (§5.4) opera sobre el espacio de causas (fases 04–08). Cuando la causa se
+confirma en fase 08 (`## Causa confirmada`), se abre la **cadena de solución** (fases 11–16)
+como cadena física separada — sin modos internos en 05–08.
 
 ```
-Flujo completo — causa confirmada primero, luego solución
-═════════════════════════════════════════════════════════
+Flujo completo — dos cadenas secuenciales
+═════════════════════════════════════════
 
-  BUCLE DE CAUSA (04→08, primera pasada)
-  04-hypothesis.md  →  H1, H2... (cause hypotheses) + §Solution hypotheses (S1, S2, S3...)
+  BUCLE A — CAUSA (04→08)
+  04-hypothesis.md → 05→06→07→08
           │
-          ▼
-  05-experiment-design.md  →  repro experiment (cause mode)
+          ├── refutada → volver a 04 (append; Bucle A)
           │
-          ▼
-  06-experiment-execution.md  →  run, record
-          │
-          ▼
-  07-data-collection.md  →  normalize
-          │
-          ▼
-  08-analysis.md  →  causa confirmada o refutada
-          │
-          ├── refutada → volver a 04 (append siguiente hipótesis de causa; no overwrite)
-          │             → repetir 05→06→07→08
-          │
-          └── confirmada
+          └── ## Causa confirmada
                   │
-                  ▼  BUCLE DE SOLUCIONES (05→08, segunda pasada)
-                      Las hipótesis de solución ya están en 04-hypothesis.md §Solution hypotheses.
-                      NO se re-invoca fase 04 — Would overwrite cause hypotheses.
-                      │
-  05-experiment-design.md  →  comparative procedure (solution mode)
+                  ▼  CADENA DE SOLUCIÓN (11→16)
+  11-solution-research.md  →  mapa de candidatas
+  12-solution-hypothesis.md →  hipótesis falsables
+  13→14→15→16  →  experimento comparativo batch
           │
-          ▼
-  06-experiment-execution.md  →  run S1 → S2 → S3 sequentially (rollback between)
+          ├── sin ganadora → Bucle B (preserva 11–12; re-ejecuta 12–16)
           │
-          ▼
-  07-data-collection.md  →  comparative metrics table
-          │
-          ▼
-  08-analysis.md §Solution comparison  →  winner verdict + discard reasons
-          │
-          ▼  (only if winner exists)
-  09-conclusion.md  →  spec cites §Solution comparison (cross-reference mandatory)
+          └── ## Solución ganadora en 16-solution-analysis.md
+                  │
+                  ▼
+  17-conclusion.md  →  spec validada (cita ganadora de fase 16)
 ```
 
-**Regla:** la fase 09 no emite la spec validada si `08-analysis.md` no contiene una sección
-`## Solution comparison` con veredicto de ganadora. El Orchestrator verifica esta precondición
-antes de cruzar a Etapa B. Si la sección falta, la fase 09 debe halt — el caso no puede
-avanzar sin comparativo de soluciones.
+**Regla:** la fase 17 no emite la spec validada en ruta **(a)** si `16-solution-analysis.md`
+no contiene `## Solución ganadora`. El orquestador verifica esta precondición antes de Etapa B.
 
-El bucle de soluciones responde a la pregunta: *"de las alternativas viables para eliminar
-el defecto, ¿cuál produce el mejor trade-off y por qué?"* — frente al bucle de causa que
-responde: *"¿qué produjo el defecto?"*.
+El bucle de soluciones (Bucle B) responde: *"de las alternativas viables, ¿cuál produce el
+mejor trade-off?"* — frente al Bucle A: *"¿qué produjo el defecto?"*.
 
 ---
 
@@ -630,8 +648,8 @@ maintenance-cases/<case-id>/
 ├── 06-experiment-execution.md
 ├── 07-data-collection.md
 ├── 08-analysis.md
-├── 09-conclusion.md
-├── 10-communication.md
+├── 17-conclusion.md
+├── 18-communication.md
 └── experiments/
     ├── hypothesis-A/
     │   ├── script.sh            # script del experimento
@@ -656,7 +674,7 @@ artefactos dentro son autoexplicativos y están versionados junto con el resto d
   git throwaway** con nombre `exp/<case-id>/hypothesis-X`. Los commits llevan los metadatos de commit
   `Case: <case-id>` pero no se mergean; la rama queda en el historial como referencia. Al
   cerrar el caso, la decisión de borrar o conservar la rama se documenta en
-  `09-conclusion.md`.
+  `17-conclusion.md`.
 - **Datos voluminosos** (cientos de MB o más): no se commitean; se almacenan externamente y
   `experiments/hypothesis-X/data-location.md` registra la ruta y el método de acceso.
 - **Análisis intermedios** (notebooks, sketches): se commitean en la subcarpeta de la hipótesis
@@ -664,10 +682,10 @@ artefactos dentro son autoexplicativos y están versionados junto con el resto d
 
 ### 6.4 Qué se conserva y qué se descarta al cierre
 
-Al cierre del caso (fase 10), la decisión sobre qué artefactos de `experiments/` se conservan a
-largo plazo queda registrada en `10-communication.md`:
+Al cierre del caso (fase 18), la decisión sobre qué artefactos de `experiments/` se conservan a
+largo plazo queda registrada en `18-communication.md`:
 
-- **Se conservan** los scripts y datos que sustentan evidencia citada en `09-conclusion.md`
+- **Se conservan** los scripts y datos que sustentan evidencia citada en `17-conclusion.md`
   (necesarios para auditoría posterior).
 - **Se conservan** las notas de análisis si contienen insights reutilizables.
 - **Se descartan** los artefactos efímeros cuyo valor era solo operacional (logs de ejecución,
@@ -692,12 +710,13 @@ mantenimiento y la complejidad del problema. Los cuatro modos son:
 perfective. Múltiples alternativas a comparar.
 
 ```
-SM 01 → 02 → 03 → 04 (N hipótesis) → 05 → 06 → 07 → 08 (descartes + comparación)
-     → 09 (especificación validada) → OpenSpec propose → apply → verify
-     → SM 10 → OpenSpec sync + archive
+SM 01 → 02 → 03 → 04 (N hipótesis) → 05 → 06 → 07 → 08 (causa confirmada)
+     → 11 → 12 → 13 → 14 → 15 → 16 (comparativo batch)
+     → 17 (especificación validada) → OpenSpec propose → apply → verify
+     → SM 18 → OpenSpec sync + archive
 ```
 
-**Artefactos producidos:** 10 artefactos SM + subcarpeta `experiments/` con N hipótesis + 4
+**Artefactos producidos:** 16 artefactos SM + subcarpeta `experiments/` con N hipótesis + 4
 artefactos OpenSpec + specs actualizadas.
 
 ### 7.2 Modo Rápido (corrective)
@@ -708,14 +727,14 @@ Tipicamente una sola hipótesis, evidencia mínima.
 ```
 SM 01(low) → 02(low) → 03(low) → 04(1 hipótesis) → 05(low)
           → 06(1 experimento breve) → 07(low) → 08(low)
-          → 09 (especificación validada mínima) → OpenSpec propose (ff)
-          → apply → verify → SM 10(low) → OpenSpec sync + archive
+          → 11–16(low, batch mínimo) → 17 (especificación validada mínima) → OpenSpec propose (ff)
+          → apply → verify → SM 18(low) → OpenSpec sync + archive
 ```
 
 **Diferencia clave respecto al Modo Completo:** SM opera con dos dimensiones ortogonales:
-`case_mode: consolidated` (un único `case.md` con subsecciones por fase en lugar de 10 archivos
+`case_mode: consolidated` (un único `case.md` con subsecciones por fase en lugar de 16 archivos
 independientes) y `reasoning_effort: low` por fase (artefactos breves; convención de §9.5). La
-especificación validada (SM 09) puede ser mínima pero sigue siendo el puente obligatorio con
+especificación validada (SM 17) puede ser mínima pero sigue siendo el puente obligatorio con
 OpenSpec. La investigación se minimiza; la implementación se acelera.
 
 ### 7.3 Modo Solo SM (investigación sin cambio listo)
@@ -725,8 +744,8 @@ OpenSpec. La investigación se minimiza; la implementación se acelera.
 amerita un cambio).
 
 ```
-SM 01 → 02 → 03 → 04 → 05 → 06 → 07 → 08 → 09 ("diferido" o "no implementar")
-     → SM 10 (solo changelog + lección; SIN OpenSpec)
+SM 01 → 02 → 03 → 04 → 05 → 06 → 07 → 08 → 11–16 (si aplica)
+     → 17 ("diferido" o "no implementar") → SM 18 (solo changelog + lección; SIN OpenSpec)
 ```
 
 No se abre ningún change en OpenSpec. El caso SM queda como registro de la investigación para
@@ -747,7 +766,7 @@ OpenSpec propose → apply → verify → sync → archive
 
 Opcionalmente: si el cambio reveló algo inesperado, la lección puede registrarse manualmente
 en `.claude/memory/`. **Limitación:** el generador de CHANGELOG y la escritura de lecciones
-son mecanismos de SM fase 10 y no están disponibles como operaciones autónomas sin un
+son mecanismos de SM fase 18 y no están disponibles como operaciones autónomas sin un
 expediente SM (`--case <id>` no aplica). No se crea un expediente SM completo.
 
 ### 7.5 Matriz modo × perfil
@@ -774,10 +793,10 @@ repo/
 │   └── changes/
 │       ├── <case-id>/                      # change activo (nombre = case-id o slug derivado)
 │       │   ├── .openspec.yaml
-│       │   ├── proposal.md                 ◄── alimentado por SM 09 (sección "Problema")
-│       │   ├── design.md                   ◄── alimentado por SM 09 (decisiones) + 03
-│       │   ├── tasks.md                    ◄── alimentado por SM 09 (criterios)
-│       │   └── specs/                      ◄── alimentado por SM 09 (comportamiento esperado)
+│       │   ├── proposal.md                 ◄── alimentado por SM 17 (sección "Problema")
+│       │   ├── design.md                   ◄── alimentado por SM 17 (decisiones) + 03
+│       │   ├── tasks.md                    ◄── alimentado por SM 17 (criterios)
+│       │   └── specs/                      ◄── alimentado por SM 17 (comportamiento esperado)
 │       └── archive/                        # changes archivados
 │
 ├── maintenance-cases/
@@ -790,9 +809,15 @@ repo/
 │       ├── 05-experiment-design.md
 │       ├── 06-experiment-execution.md      ◄── registra ejecución de experiments/
 │       ├── 07-data-collection.md           ◄── captura datos de experiments/
-│       ├── 08-analysis.md                  ◄── análisis + output de openspec-verify
-│       ├── 09-conclusion.md                ◄── ESPECIFICACIÓN VALIDADA (interfaz con OpenSpec)
-│       ├── 10-communication.md
+│       ├── 08-analysis.md                  ◄── causa confirmada o refutada
+│       ├── 11-solution-research.md
+│       ├── 12-solution-hypothesis.md
+│       ├── 13-solution-experiment-design.md
+│       ├── 14-solution-execution.md
+│       ├── 15-solution-data-collection.md
+│       ├── 16-solution-analysis.md         ◄── comparativo batch + output de openspec-verify
+│       ├── 17-conclusion.md                ◄── ESPECIFICACIÓN VALIDADA (interfaz con OpenSpec)
+│       ├── 18-communication.md
 │       └── experiments/                    # artefactos de experimentación (efímeros)
 │           ├── hypothesis-A/
 │           ├── hypothesis-B/
@@ -845,9 +870,10 @@ maintenance-cases/<case-id>/case.md       [creado por sm-orchestrator]
   │
   ├──► 06-experiment-execution.md          ◄── registra qué se ejecutó
   ├──► 07-data-collection.md               ◄── captura resultados
-  ├──► 08-analysis.md                      ◄── compara y descarta
+  ├──► 08-analysis.md                      ◄── causa confirmada o refutada
+  ├──► 11-solution-research.md … 16-solution-analysis.md  ◄── cadena de solución (si aplica)
   │
-  └──► 09-conclusion.md  ◄───────────────┐
+  └──► 17-conclusion.md  ◄───────────────┐
                                         │  [ESPECIFICACIÓN VALIDADA]
                                         │   (interfaz con OpenSpec)
                                         │
@@ -860,14 +886,14 @@ maintenance-cases/<case-id>/case.md       [creado por sm-orchestrator]
                   │  [openspec-apply]
                   │  [openspec-verify]
                   │
-   ├──► 08-analysis.md (actualizado con output de verify)
-   └──► 09-conclusion.md (veredicto final)
+   ├──► 16-solution-analysis.md (actualizado con output de verify)
+   └──► 17-conclusion.md (veredicto final)
          │
          ├── hipótesis confirmada ──► [openspec-sync] ──► openspec/specs/ actualizado
          │                       └──► [openspec-archive] ──► archive/
          └── hipótesis refutada ──► no sync · no archive · caso cerrado con lección
   │
-  └──► 10-communication.md
+  └──► 18-communication.md
          ├── generador on-demand ──► CHANGELOG.md
          ├── lección ──► .claude/memory/<slug>.md
          └── commit de cierre: Case: <case-id>  (+ OpenSpec-Change: <name> solo si archivado)
@@ -877,12 +903,12 @@ maintenance-cases/<case-id>/case.md       [creado por sm-orchestrator]
 
 | Tipo de artefacto                  | Mantenimiento                                                                    | Versionado                                         | Quién lo modifica    |
 | ---------------------------------- | -------------------------------------------------------------------------------- | -------------------------------------------------- | -------------------- |
-| `case.md` y 01–10                  | Curado por SM (orquestador + perfil + fases)                                     | Git normal; bloque YAML canónico valida            | Orquestador SM       |
-| `experiments/*`                    | Creado durante fase 06; revisado en fase 08; decisión de conservación en fase 10 | Git para scripts/notas; externo para datos grandes | Equipo del caso      |
+| `case.md` y 01–08, 11–18           | Curado por SM (orquestador + perfil + fases)                                     | Git normal; bloque YAML canónico valida            | Orquestador SM       |
+| `experiments/*`                    | Creado durante fase 06; revisado en fase 08; decisión de conservación en fase 18 | Git para scripts/notas; externo para datos grandes | Equipo del caso      |
 | Ramas `exp/<case-id>/hypothesis-X` | Throwaway; decisión de merge/borrar documentada                                  | Git (rama, no merge)                               | Equipo del caso      |
 | `openspec/changes/<case-id>/*`     | Curado por OpenSpec                                                              | Git normal; validado por `openspec validate`       | Orquestador OpenSpec |
 | `openspec/specs/*`                 | Actualizado por `openspec-sync`                                                  | Git; fuente de verdad normativa                    | Agente de sync       |
-| `.claude/memory/*`                 | Escrito por SM fase 10                                                           | Git; una lección por archivo                       | Orquestador SM       |
+| `.claude/memory/*`                 | Escrito por SM fase 18                                                           | Git; una lección por archivo                       | Orquestador SM       |
 | `CHANGELOG.md`                     | Derivado on-demand                                                               | Git; regenerable desde git log                     | Generador            |
 
 ---
@@ -947,10 +973,10 @@ hay urgencia; el valor se acumula en el tiempo.
 
 ```
 Corrective:  01(low)→02(low)→03(low)→04(1 hipótesis)→05(low)→06(1 breve)→07(low)→08(low)
-            →09→[OpenSpec ff]→10(low)
-Adaptive:    01→02→03→04(1-3)→05→06→07→08→09→[OpenSpec ff/continue]→10
-Perfective:  01→02→03(+explore)→04(múltiples)→05→06(completa)→07→08→09→[OpenSpec continue]→10
-Preventive:  01→02→03(high+explore)→04(múltiples)→05→06(extensa)→07→08(high)→09→[OpenSpec continue]→10
+            →11–16(low)→17→[OpenSpec ff]→18(low)
+Adaptive:    01→02→03→04(1-3)→05→06→07→08→11–16→17→[OpenSpec ff/continue]→18
+Perfective:  01→02→03(+explore)→04(múltiples)→05→06(completa)→07→08→11–16→17→[OpenSpec continue]→18
+Preventive:  01→02→03(high+explore)→04(múltiples)→05→06(extensa)→07→08(high)→11–16→17→[OpenSpec continue]→18
 ```
 
 (`low`/`medium`/`high` = esfuerzo creciente; las secuencias muestran solo los
@@ -971,7 +997,7 @@ señal de mantenimiento
   └─► case-id (SM)
         └─► expediente SM (maintenance-cases/<case-id>/)
               └─► experiments/ (evidencia de la investigación)
-              └─► 09-conclusion.md (especificación validada)
+              └─► 17-conclusion.md (especificación validada)
                     └─► change name en OpenSpec (= case-id)
                           └─► openspec/changes/<case-id>/ (proposal, specs, design, tasks)
                                 └─► commit de cierre con metadatos de commit Case: <case-id> + OpenSpec-Change: <name> (camino archivado)
@@ -995,7 +1021,7 @@ el caso al change y desde el change al caso.
 4. Los metadatos de commit `OpenSpec-Change: <name>` aparecen únicamente en el commit de cierre de Etapa C, y
    solo si el change fue archivado (hipótesis confirmada → `openspec-archive`). Ningún commit de
    Etapas A o B lo lleva (ver §5.3 y §10.3).
-5. La entrada del changelog generada por SM fase 10 referencia tanto el `case-id` como el nombre
+5. La entrada del changelog generada por SM fase 18 referencia tanto el `case-id` como el nombre
    del change archivado en OpenSpec.
 6. La convención de nomenclatura `case-id = change name` se aplica siempre que ambos expedientes
    existan; en Modo Solo SM no hay change, y en Modo Solo OpenSpec no hay case-id.
@@ -1046,7 +1072,7 @@ archivado (ver §5.3 y reglas 3 y 4 de §10.2).
   `proposal.md` son convenciones editoriales, no enlaces estructurados.
 - **Sin gestión de conflictos entre cases SM simultáneos.** Si dos cases SM modifican el mismo
   delta de specs en OpenSpec, la resolución de conflictos en `openspec-sync` es manual.
-- **La refutación de una hipótesis no revierte automáticamente el apply.** SM fase 10 puede
+- **La refutación de una hipótesis no revierte automáticamente el apply.** SM fase 18 puede
   concluir que la hipótesis fue refutada tras `openspec-verify`, pero el rollback del código es
   responsabilidad del usuario (`git revert`). SM documenta la decisión; no la ejecuta.
 - **La experimentación puede ser costosa en tiempo y recursos.** El diseño no impone límites al
@@ -1071,7 +1097,7 @@ archivado (ver §5.3 y reglas 3 y 4 de §10.2).
   reales; no implementar en v0.2. Requiere aprobación explícita antes de cualquier diseño
   detallado.
 - **Limpieza automática de `experiments/`.** La decisión de qué conservar y qué descartar es
-  humana, registrada en `10-communication.md`. No hay poda automática.
+  humana, registrada en `18-communication.md`. No hay poda automática.
 - **Sincronización bidireccional de manifests.** `case.md` y `.openspec.yaml` siguen siendo
   documentos paralelos; cualquier sincronización sería fuente de bugs y deuda de coherencia.
 
@@ -1094,14 +1120,14 @@ el change en OpenSpec; queda vacío en Modo Solo SM.
 
 **3. Sección `## Contexto SM` en `proposal.md`**
 En v0.2 la sección `## Contexto SM` (con `case_id` y ruta al expediente) la escribe **el
-orquestador SM** al derivar `proposal.md` desde `09-conclusion.md`, en la Etapa B (lado SM). No se
+orquestador SM** al derivar `proposal.md` desde `17-conclusion.md`, en la Etapa B (lado SM). No se
 toca la configuración de OpenSpec en esta fase. El enfoque alternativo —añadir la instrucción en
 `openspec/config.yaml` bajo `rules.proposal` para que OpenSpec la solicite por su cuenta— queda como
 **optimización futura fuera de alcance** (acopla los dos sistemas a través de la config de OpenSpec).
 Si no hay case SM asociado, la sección se omite.
 
 **4. Estructura de la especificación validada (nuevo artefacto)**
-Documentar y/o formalizar la estructura de `09-conclusion.md` propuesta en §4.3 como plantilla
+Documentar y/o formalizar la estructura de `17-conclusion.md` propuesta en §4.3 como plantilla
 reutilizable. Considerar incluirla en
 `.claude/skills/sm-orchestrator/templates/case.md` o en un template nuevo
 `conclusion-spec.md`. Esta es la interfaz contractual entre los dos sistemas y su
@@ -1122,7 +1148,7 @@ Aplicar el Modo Completo (§7.1) en el próximo caso perfective o preventive, y 
 Rápido (§7.2) en el próximo corrective. Documentar las fricciones como lecciones en la base
 de conocimiento SM. Las fricciones más probables son:
 
-- Resistencia del usuario a ejecutar las 10 fases de SM antes de implementar (mitigación:
+- Resistencia del usuario a ejecutar las 16 fases de SM antes de implementar (mitigación:
   mostrar que el Modo Rápido cubre los casos triviales).
 - Ambigüedad en qué constituye "evidencia suficiente" para emitir la especificación
   validada (mitigación: documentar en cada caso el criterio usado).
@@ -1131,6 +1157,6 @@ de conocimiento SM. Las fricciones más probables son:
 
 **8. Política de conservación de `experiments/`**
 Definir y documentar una política por defecto para la retención de artefactos
-experimentales (p. ej. "todo lo que sustenta evidencia en 09-conclusion.md se conserva; el
+experimentales (p. ej. "todo lo que sustenta evidencia en 17-conclusion.md se conserva; el
 resto se descarta al cierre"). Esta política debe quedar en una referencia del orquestador
 SM.

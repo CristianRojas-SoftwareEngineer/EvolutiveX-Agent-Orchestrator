@@ -22,3 +22,9 @@ Pick exactly one profile. If two fit, ask the user (Spanish) presenting the two 
   typo, renaming an internal symbol).
 - `corrective` defaults to **full**: a defect's cause is not known in advance and may need several
   hypothesis rounds. Only fully localized, trivial corrective cases justify consolidated.
+
+## Note on the two-chain system
+The profile choice happens BEFORE either chain opens (step 2 of the orchestrator's workflow).
+The profile is NOT re-selected per chain — the same profile projects its `phase_policy` over
+all 16 phases (8 of cause + 6 of solution + 2 of closure). Re-selection of a different
+profile is only possible via a Bucle C re-opening of the case.

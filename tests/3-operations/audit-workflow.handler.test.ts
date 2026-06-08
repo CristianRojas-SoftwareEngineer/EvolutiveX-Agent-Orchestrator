@@ -269,6 +269,16 @@ describe('AuditWorkflowHandler', () => {
     expect(eventBus.events.filter((e) => e.type === 'step_request').length).toBeGreaterThanOrEqual(
       1,
     );
+    // Fallback sin PostToolUse: continuation completa el tool desde tool_result en body.
+    const toolResults = eventBus.events.filter((e) => e.type === 'tool_result');
+    expect(toolResults.length).toBeGreaterThanOrEqual(1);
+    const closedTool = wf!.steps
+      .flatMap((s) => s.toolUses)
+      .find((t) => t.id === 'tool-x');
+    expect(closedTool?.status).toBe('completed');
+    expect(closedTool?.result).toEqual(
+      expect.objectContaining({ isError: false, result: 'ok' }),
+    );
   });
 
   it('debería clasificar preflight-quota: workflow sin request top-level', async () => {

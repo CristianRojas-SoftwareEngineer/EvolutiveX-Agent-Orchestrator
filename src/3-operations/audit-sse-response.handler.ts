@@ -17,6 +17,7 @@ import {
   registerWireStepInCorrelator,
 } from './gateway-wire-step.util.js';
 import { persistBillableStepMetricsIfNeeded } from './persist-billable-step-metrics.util.js';
+import { resolveSessionDir } from './audit-workflow-closure.handler.js';
 
 /** Fase de un chunk SSE según el rol en el step coalesced. */
 type ChunkPhase = SsePhase;
@@ -241,6 +242,16 @@ export class AuditSseResponseHandler {
       wireStep,
       assembled.stopReason,
     );
+    const workflowAfterClose = this.workflowRepo.getWorkflow(workflow.id);
+    if (workflowAfterClose?.result != null) {
+      const sessionDir = resolveSessionDir(this.auditBaseDir, workflow.sessionId);
+      const closedSteps = workflowAfterClose.steps.filter((s) => s.closedAt != null);
+      void this.sessionMetrics.finalizeWorkflowMetrics(
+        sessionDir,
+        workflow.id,
+        closedSteps,
+      );
+    }
     return wireStep;
   }
 }

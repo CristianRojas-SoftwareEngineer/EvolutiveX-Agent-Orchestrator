@@ -19,7 +19,15 @@ export function classifyRequestBody(bodyBuffer: Buffer): RequestClassification {
   return { type: 'fresh' };
 }
 
-export function extractToolResultIdsFromRequestBody(bodyBuffer: Buffer): string[] {
+export interface ToolResultBlockExtract {
+  toolUseId: string;
+  content: unknown;
+  isError: boolean;
+}
+
+export function extractToolResultBlocksFromRequestBody(
+  bodyBuffer: Buffer,
+): ToolResultBlockExtract[] {
   const parsed = safeParse(bodyBuffer);
   if (!parsed) return [];
   const messages = parsed.messages;
@@ -28,15 +36,23 @@ export function extractToolResultIdsFromRequestBody(bodyBuffer: Buffer): string[
   if (!lastMsg || typeof lastMsg !== 'object') return [];
   const content = (lastMsg as Record<string, unknown>).content;
   if (!Array.isArray(content)) return [];
-  const ids: string[] = [];
+  const blocks: ToolResultBlockExtract[] = [];
   for (const item of content) {
     if (!item || typeof item !== 'object') continue;
     const block = item as Record<string, unknown>;
     if (block.type === 'tool_result' && typeof block.tool_use_id === 'string') {
-      ids.push(block.tool_use_id);
+      blocks.push({
+        toolUseId: block.tool_use_id,
+        content: block.content ?? null,
+        isError: block.is_error === true,
+      });
     }
   }
-  return ids;
+  return blocks;
+}
+
+export function extractToolResultIdsFromRequestBody(bodyBuffer: Buffer): string[] {
+  return extractToolResultBlocksFromRequestBody(bodyBuffer).map((b) => b.toolUseId);
 }
 
 export function extractModelFromRequestBody(bodyBuffer: Buffer): string | null {

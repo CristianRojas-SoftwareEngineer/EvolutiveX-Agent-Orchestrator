@@ -11,6 +11,7 @@ import type { IToolUse } from '../1-domain/interfaces/gateway/IToolUse.js';
 import {
   classifyRequestBody,
   extractModelFromRequestBody,
+  extractToolResultBlocksFromRequestBody,
   isWebFetchImplementationRequestBody,
 } from '../1-domain/services/request-classifier.service.js';
 import {
@@ -629,6 +630,8 @@ export class AuditWorkflowHandler {
       awaitingSince: undefined,
     });
 
+    this.completeClientToolResultsFromContinuation(auditSessionId, parentWorkflow, params.rawBody);
+
     const agentContinuationTarget = this.resolveAgentContinuationTarget(parentWorkflow, toolUseIds);
     if (agentContinuationTarget) {
       const body = params.rawBody ?? Buffer.alloc(0);
@@ -810,6 +813,26 @@ export class AuditWorkflowHandler {
       'client-preflight',
       1,
     );
+  }
+
+  /**
+   * Completa tools client-side (Bash/Read/…) desde bloques `tool_result` del body HTTP
+   * cuando el hook PostToolUse no llegó al proxy (p. ej. settings sin relay instalado).
+   */
+  private completeClientToolResultsFromContinuation(
+    sessionId: string,
+    parentWorkflow: IWorkflow,
+    rawBody: Buffer,
+  ): void {
+    const blocks = extractToolResultBlocksFromRequestBody(rawBody);
+    for (const block of blocks) {
+      const workflow =
+        this.workflowRepo.findWorkflowByToolUseId(sessionId, block.toolUseId) ?? parentWorkflow;
+      this.workflowRepo.completeToolUse(workflow.id, block.toolUseId, {
+        isError: block.isError,
+        result: block.content,
+      });
+    }
   }
 
   private extractToolUseIdsFromBody(body: Buffer): string[] {

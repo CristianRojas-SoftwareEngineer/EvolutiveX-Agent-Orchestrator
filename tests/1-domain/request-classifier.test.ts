@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   classifyRequestBody,
   extractModelFromRequestBody,
+  extractToolResultBlocksFromRequestBody,
   extractToolResultIdsFromRequestBody,
   isWebFetchImplementationRequestBody,
 } from '../../src/1-domain/services/request-classifier.service.js';
@@ -140,6 +141,29 @@ describe('classifyRequestBody', () => {
       }),
     );
     expect(classifyRequestBody(body)).toEqual({ type: 'preflight-warmup' });
+  });
+});
+
+describe('extractToolResultBlocksFromRequestBody', () => {
+  it('extrae bloques con content e isError', () => {
+    const body = Buffer.from(
+      JSON.stringify({
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'tool_result', tool_use_id: 'tool-1', content: 'ok' },
+              { type: 'tool_result', tool_use_id: 'tool-2', content: 'fail', is_error: true },
+            ],
+          },
+        ],
+      }),
+    );
+
+    expect(extractToolResultBlocksFromRequestBody(body)).toEqual([
+      { toolUseId: 'tool-1', content: 'ok', isError: false },
+      { toolUseId: 'tool-2', content: 'fail', isError: true },
+    ]);
   });
 });
 

@@ -295,15 +295,14 @@ describe('WorkflowRepositoryService — emisión al EventBus', () => {
     expect((ev[0].payload as Record<string, unknown>).parentToolUseId).toBe('tu-1');
   });
 
-  it('registerStep emite step_request con stepIndex y request', () => {
+  it('registerStep no emite step_request (lo emiten los handlers L3 con body HTTP real)', () => {
     const bus = new SpyBus();
     const repo = new WorkflowRepositoryService(bus);
     const wf = repo.openWorkflow('s1', { agentId: 'a', isSubagentRequest: false });
     repo.registerStep(wf.id, makeStep('step-1', wf.id, false, 0));
     const ev = bus.ofType('step_request');
-    expect(ev).toHaveLength(1);
-    expect((ev[0].payload as Record<string, unknown>).stepIndex).toBe(0);
-    expect((ev[0].payload as Record<string, unknown>).request).toBeDefined();
+    expect(ev).toHaveLength(0);
+    expect(repo.getWorkflow(wf.id)?.steps).toHaveLength(1);
   });
 
   it('registerToolUse emite tool_call', () => {
@@ -435,6 +434,18 @@ describe('WorkflowRepositoryService — forceClose', () => {
     const result = repo.getWorkflow(wf.id)!.result!;
     expect(result.outcome).toBe('upstream-error');
     expect(result.closedByEvent).toBeUndefined();
+  });
+
+  it('forceClose con outcome success marca workflow completed', () => {
+    const repo = new WorkflowRepositoryService();
+    const wf = repo.openWorkflow(
+      's-ok',
+      { agentId: 'a', isSubagentRequest: false },
+      { forceNew: true },
+    );
+    repo.forceClose(wf.id, 'success', { stepCount: 1, finalText: 'ok' });
+    expect(repo.getWorkflow(wf.id)!.status).toBe('completed');
+    expect(repo.getWorkflow(wf.id)!.result!.outcome).toBe('success');
   });
 
   it('forceClose es idempotente — segunda llamada no muta el resultado', () => {

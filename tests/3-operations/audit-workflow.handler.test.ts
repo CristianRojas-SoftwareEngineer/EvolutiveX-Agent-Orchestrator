@@ -294,7 +294,7 @@ describe('AuditWorkflowHandler', () => {
     expect(headers['content-type']).toBe('application/json');
   });
 
-  it('debería emitir step_request para fresh (simetría steps/01)', async () => {
+  it('debería emitir step_request para fresh con stepIndex causal 0-based', async () => {
     const { handler, eventBus } = createTestStack();
     await handler.execute({
       headers: { 'x-cc-audit-session': 'test' },
@@ -302,9 +302,9 @@ describe('AuditWorkflowHandler', () => {
       requestId: 'req-1',
     });
     const stepReqs = eventBus.events.filter((e) => e.type === 'step_request');
-    expect(stepReqs.length).toBeGreaterThanOrEqual(1);
+    expect(stepReqs).toHaveLength(1);
     const lastStep = stepReqs[stepReqs.length - 1]!.payload as { stepIndex: number };
-    expect(lastStep.stepIndex).toBeGreaterThanOrEqual(1);
+    expect(lastStep.stepIndex).toBe(0);
   });
 
   it('debería clasificar side-request con workflowKind side-request', async () => {

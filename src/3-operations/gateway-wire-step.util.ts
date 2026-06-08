@@ -8,6 +8,7 @@ import type {
   AnthropicUsage,
 } from '../1-domain/types/anthropic.types.js';
 import type { AssembledInference } from '../2-services/ports/step-assembler.port.js';
+import { aggregateWorkflowUsage } from '../1-domain/services/gateway/aggregate-workflow-usage.js';
 
 export interface BuildWireStepParams {
   workflow: IWorkflow;
@@ -81,7 +82,43 @@ export function registerWireStepInCorrelator(
 
   if (isTerminal) {
     repo.closeStep(step.workflowId, step.id);
+    closeWireWorkflowOnTerminalStop(repo, workflow, stopReason, step);
   }
+}
+
+/** Extrae texto plano de bloques `text` del mensaje assistant ensamblado. */
+function extractTextFromAssistantMessage(message: AnthropicMessage): string | undefined {
+  if (!Array.isArray(message.content)) return undefined;
+  const parts: string[] = [];
+  for (const block of message.content) {
+    if (block.type === 'text' && typeof block.text === 'string' && block.text.length > 0) {
+      parts.push(block.text);
+    }
+  }
+  return parts.length > 0 ? parts.join('') : undefined;
+}
+
+/**
+ * Cierra workflows wire (HTTP interceptados) al recibir stop terminal en SSE.
+ * El workflow de sesión (`workflowId === sessionId`) se cierra vía hook Stop.
+ */
+function closeWireWorkflowOnTerminalStop(
+  repo: IWorkflowRepository,
+  workflow: IWorkflow,
+  stopReason: string | undefined,
+  step: IStep,
+): void {
+  if (workflow.id === workflow.sessionId) return;
+  if (workflow.result != null) return;
+
+  const closedSteps = workflow.steps.filter((s) => s.closedAt != null);
+  const finalText = extractTextFromAssistantMessage(step.assistantMessage);
+  repo.forceClose(workflow.id, 'success', {
+    stepCount: closedSteps.length,
+    ...(finalText ? { finalText } : {}),
+    usage: aggregateWorkflowUsage(closedSteps, []),
+    closedByStopReason: stopReason,
+  });
 }
 
 /** Indica si el cierre de meta.json debe ir por hooks (workflow abierto en correlador). */

@@ -110,17 +110,20 @@ export class SessionPersistence {
     const p = event.payload as {
       workflowId: string;
       kind?: string;
+      workflowKind?: string;
       request?: unknown;
       layoutIndex?: number;
     };
     const index =
       typeof p.layoutIndex === 'number' ? p.layoutIndex : this.allocWorkflowIndex(event.sessionId);
     const baseDir = getWorkflowDir(event.sessionId, index);
-    const workflowKind = p.kind ?? 'main';
+    const structuralKind = p.kind ?? 'main';
+    const interactionType = p.workflowKind ?? structuralKind;
     const meta: Record<string, unknown> = {
       workflowId: p.workflowId,
       sessionId: event.sessionId,
-      workflowKind,
+      workflowKind: structuralKind,
+      interactionType,
       status: 'running',
       layoutVersion: LAYOUT_VERSION,
       startedAt: event.timestamp,
@@ -138,7 +141,7 @@ export class SessionPersistence {
       this.writeJson(`${baseDir}request/body.json`, p.request);
     }
     // Actualizar workflow-sequence.json solo para workflows main
-    if (workflowKind === 'main') {
+    if (structuralKind === 'main') {
       this.upsertWorkflowSequence(event.sessionId, p.workflowId, index, {
         startedAt: event.timestamp,
         status: 'running',

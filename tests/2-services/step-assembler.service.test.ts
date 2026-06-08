@@ -91,6 +91,20 @@ describe('StepAssemblerService', () => {
     expect(result.toolUseBlocks[0].prompt).toBe('hola');
   });
 
+  it('ensambla bloque text', () => {
+    const assembler = new StepAssemblerService();
+    feed(assembler, [
+      { type: 'content_block_start', index: 0, content_block: { type: 'text' } },
+      { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'hola ' } },
+      { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'mundo' } },
+      { type: 'content_block_stop', index: 0 },
+    ]);
+    const result = assembler.result();
+    const content = result.assistantMessage.content as Array<{ type: string; text?: string }>;
+    const textBlock = content.find((b) => b.type === 'text');
+    expect(textBlock?.text).toBe('hola mundo');
+  });
+
   it('ensambla bloque thinking', () => {
     const assembler = new StepAssemblerService();
     feed(assembler, [

@@ -3,9 +3,7 @@
 ## Purpose
 
 Suscriptor del `EventBus` que proyecta eventos del correlador y handlers a disco bajo la estructura `causal-workflows-v1` (`workflows/NN/steps/MM/tools/KK/`). Reemplaza la escritura directa desde handlers de capa 3 (`SessionStoreService`, `WorkflowResultProjector`). P1 (2026-05-30): árbol causal estructural. P2 (2026-06-01): chunks SSE (`streaming/`), `events.ndjson`, `workflow-sequence.json`, vistas coalesced; retiro de `ISseAuditWriter`.
-
 ## Requirements
-
 ### Requirement: SessionPersistence — suscripción al bus y proyección a disco
 
 El sistema SHALL proveer `SessionPersistence` en `src/2-services/session-persistence.service.ts` como suscriptor del `EventBus` que, al recibir eventos del correlador y handlers, proyecta la estructura de directorios y archivos del layout `causal-workflows-v1` bajo `sessions/`.
@@ -25,64 +23,22 @@ El sistema SHALL proveer `SessionPersistence` en `src/2-services/session-persist
 | `stream_chunk` | Escribir `steps/MM/response/streaming/NNNN-chunk.ndjson`; al cierre del step con `coalescedDelegationStepIndex`, generar `body.coalesced.json` y `body.coalesced.parsed.md` |
 | `*` (wildcard) | Append-only a `sessions/<sessionId>/events.ndjson` por cada evento recibido |
 
-#### Scenario: workflow_start crea directorio y meta.json inicial
+En `workflow_start`, `meta.json` SHALL incluir `workflowKind` (estructural: `main` | `subagent`) y `interactionType` (semántico: `agentic` | `side-request` | `client-preflight`, desde payload `workflowKind` del correlador).
 
-- **GIVEN** una sesión `'sess-1'` sin directorio de workflow
-- **WHEN** `SessionPersistence` recibe un evento `{ type: 'workflow_start', sessionId: 'sess-1', payload: { workflowId: 'wf-1', kind: 'main' } }`
-- **THEN** SHALL crearse el directorio `sessions/sess-1/workflows/00/`
-- **AND** SHALL escribirse `meta.json` con `status: 'running'`, `workflowKind: 'main'`, `layoutVersion: 'causal-workflows-v1'`
+El evento `step_request` emitido por handlers L3 SHALL transportar el body HTTP parseado completo. El correlador (`registerStep`) NO SHALL emitir `step_request` con `inferenceRequest` sintético (`messages: []`).
 
-#### Scenario: workflow_start con request escribe request/body.json
+#### Scenario: workflow_start persiste interactionType semántico
 
-- **GIVEN** una sesión `'sess-1'`
-- **WHEN** `SessionPersistence` recibe `{ type: 'workflow_start', sessionId: 'sess-1', payload: { workflowId: 'wf-1', kind: 'main', request: { model: 'claude-sonnet-4-6', messages: [...] } } }`
-- **THEN** SHALL escribirse `request/body.json` con el contenido del request
+- **GIVEN** un evento `workflow_start` con `kind: 'main'` y `workflowKind: 'side-request'`
+- **WHEN** `SessionPersistence` procesa el evento
+- **THEN** `meta.json` SHALL contener `workflowKind: 'main'` y `interactionType: 'side-request'`
 
-#### Scenario: step_request crea directorio y request/body.json
+#### Scenario: step_request de continuación preserva messages con tool_result
 
-- **GIVEN** un workflow `'wf-1'` en sesión `'sess-1'`
-- **WHEN** `SessionPersistence` recibe un evento `{ type: 'step_request', payload: { workflowId: 'wf-1', stepIndex: 0, step: {...}, request: { model: 'claude-sonnet-4-6', messages: [...] } } }`
-- **THEN** SHALL crearse el directorio `sessions/sess-1/workflows/00/steps/00/request/`
-- **AND** SHALL escribirse `request/body.json` con el contenido del request
-
-#### Scenario: step_response escribe contenido de respuesta
-
-- **GIVEN** un step en workflow `'wf-1'`
-- **WHEN** `SessionPersistence` recibe `{ type: 'step_response', payload: { workflowId: 'wf-1', stepIndex: 0, response: { body: {...} }, headers: { 'content-type': '...' }, markdown: '...' } }`
-- **THEN** SHALL escribirse `response/body.json` si `response` está presente
-- **AND** SHALL escribirse `response/headers.json` si `headers` está presente
-- **AND** SHALL escribirse `response/parsed.md` si `markdown` está presente
-
-#### Scenario: tool_call crea directorio con slug y archivos input/meta
-
-- **GIVEN** un step en workflow `'wf-1'`
-- **WHEN** `SessionPersistence` recibe un evento `{ type: 'tool_call', payload: { workflowId: 'wf-1', stepIndex: 0, toolUseId: 'tu-1', toolName: 'Read', input: { file_path: '/tmp/a.ts' } } }`
-- **THEN** SHALL crearse el directorio `sessions/sess-1/workflows/00/steps/00/tools/00-Read/`
-- **AND** SHALL escribirse `input.json` con el input del tool
-- **AND** SHALL escribirse `meta.json` con `toolUseId`, `toolName` y `status: 'running'`
-
-#### Scenario: tool_result escribe result.json y actualiza meta.json
-
-- **GIVEN** un tool `'tu-1'` registrado en el correlador
-- **WHEN** `SessionPersistence` recibe un evento `{ type: 'tool_result', payload: { workflowId: 'wf-1', toolUseId: 'tu-1', result: { isError: false, result: 'contenido' } } }`
-- **THEN** SHALL escribirse `result.json` con `{ isError: false, result: 'contenido' }`
-- **AND** `meta.json` del tool SHALL actualizarse con `status: 'completed'`
-
-#### Scenario: workflow_complete escribe output/result.json y actualiza meta.json
-
-- **GIVEN** un workflow `'wf-1'` con steps cerrados
-- **WHEN** `SessionPersistence` recibe un evento `{ type: 'workflow_complete', payload: { workflowId: 'wf-1', result: { outcome: 'success', finalText: 'Listo', usage: {...}, steps: [...] } } }`
-- **THEN** SHALL actualizarse `meta.json` con `status: 'completed'` y `completedAt`
-- **AND** SHALL escribirse `output/result.json` con el `IWorkflowResult` completo
-- **AND** SHALL escribirse `output/result.parsed.md` con la vista Markdown
-
-#### Scenario: workflow_cancel actualiza meta.json con status cancelled
-
-- **GIVEN** un workflow `'wf-1'` activo
-- **WHEN** `SessionPersistence` recibe un evento `{ type: 'workflow_cancel', payload: { workflowId: 'wf-1', cancellationReason: 'user_abort' } }`
-- **THEN** `meta.json` SHALL actualizarse con `status: 'cancelled'` y `cancellationReason: 'user_abort'`
-
----
+- **GIVEN** un handler L3 que emite `step_request` con `request.messages` conteniendo bloques `tool_result`
+- **WHEN** `SessionPersistence` escribe `steps/MM/request/body.json`
+- **THEN** el archivo SHALL contener el array `messages` completo del body HTTP
+- **AND** NO SHALL quedar `messages: []` cuando el body upstream incluye historial
 
 ### Requirement: Escritura atómica de archivos de sesión
 
@@ -204,3 +160,4 @@ Para steps con flujo coalesced (multi-fase SSE), `SessionPersistence` SHALL gene
 - **WHEN** el step se cierra
 - **THEN** SHALL existir `body.coalesced.json` bajo `response/`
 - **AND** NO SHALL existir `response/sse.jsonl`
+

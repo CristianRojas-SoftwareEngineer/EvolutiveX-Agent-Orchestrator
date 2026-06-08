@@ -200,11 +200,9 @@ export class WorkflowRepositoryService implements IWorkflowRepository {
     const workflow = this.workflows.get(workflowId);
     if (!workflow) return;
     workflow.steps.push(step);
-    this.emit('step_request', workflowId, {
-      stepIndex: step.index,
-      step,
-      request: step.inferenceRequest,
-    });
+    // La emisión de `step_request` con el body HTTP real la realizan los handlers L3
+    // (`registerWireStepRequest`). Emitir aquí con `inferenceRequest` (messages: [])
+    // sobrescribía request/body.json en disco.
   }
 
   public closeStep(workflowId: string, stepId: string): void {
@@ -323,7 +321,7 @@ export class WorkflowRepositoryService implements IWorkflowRepository {
     };
     workflow.result = result;
     workflow.completedAt = new Date();
-    workflow.status = 'failed';
+    workflow.status = outcome === 'success' ? 'completed' : 'failed';
     this.emit('workflow_complete', workflowId, { result, outcome, ...(resultExtras ?? {}) });
     this.wireMeta.delete(workflowId);
     this.clearToolUseIndexFor(workflowId);

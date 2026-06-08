@@ -208,7 +208,7 @@ export class AuditWorkflowHandler {
       timestamp: new Date().toISOString(),
       payload: {
         workflowId: workflow.id,
-        stepIndex: workflow.steps.length,
+        stepIndex: step.index,
         step,
         request: parsed ?? undefined,
         headers: headersForAudit,

@@ -15,6 +15,10 @@ interface ThinkingTracker {
   textAcc: string;
 }
 
+interface TextTracker {
+  textAcc: string;
+}
+
 /**
  * Ensambla en RAM la respuesta de una inferencia SSE Anthropic (StepBuffer §26).
  * Efímero por inferencia: instanciar uno por stream.
@@ -31,7 +35,9 @@ export class StepAssemblerService implements IStepAssembler {
   };
   private readonly toolUseTracker = new Map<number, ToolUseTracker>();
   private readonly thinkingTracker = new Map<number, ThinkingTracker>();
+  private readonly textTracker = new Map<number, TextTracker>();
   private readonly thinkingTexts: string[] = [];
+  private readonly textBlocks: string[] = [];
   private readonly toolUseBlocks: AssembledToolUseBlock[] = [];
 
   public onEvent(evt: unknown): void {
@@ -82,6 +88,13 @@ export class StepAssemblerService implements IStepAssembler {
       this.thinkingTracker.set(e.index, { textAcc: '' });
     }
     if (
+      e.type === 'content_block_start' &&
+      (e.content_block as Record<string, unknown>)?.type === 'text' &&
+      typeof e.index === 'number'
+    ) {
+      this.textTracker.set(e.index, { textAcc: '' });
+    }
+    if (
       e.type === 'content_block_delta' &&
       (e.delta as Record<string, unknown>)?.type === 'thinking_delta' &&
       typeof e.index === 'number' &&
@@ -90,6 +103,17 @@ export class StepAssemblerService implements IStepAssembler {
       const tracked = this.thinkingTracker.get(e.index);
       if (tracked) {
         tracked.textAcc += (e.delta as Record<string, unknown>).thinking as string;
+      }
+    }
+    if (
+      e.type === 'content_block_delta' &&
+      (e.delta as Record<string, unknown>)?.type === 'text_delta' &&
+      typeof e.index === 'number' &&
+      typeof (e.delta as Record<string, unknown>).text === 'string'
+    ) {
+      const tracked = this.textTracker.get(e.index);
+      if (tracked) {
+        tracked.textAcc += (e.delta as Record<string, unknown>).text as string;
       }
     }
 
@@ -162,6 +186,14 @@ export class StepAssemblerService implements IStepAssembler {
         }
         this.thinkingTracker.delete(e.index);
       }
+
+      const textTracked = this.textTracker.get(e.index);
+      if (textTracked) {
+        if (textTracked.textAcc) {
+          this.textBlocks.push(textTracked.textAcc);
+        }
+        this.textTracker.delete(e.index);
+      }
     }
   }
 
@@ -170,6 +202,9 @@ export class StepAssemblerService implements IStepAssembler {
 
     for (const text of this.thinkingTexts) {
       content.push({ type: 'thinking', thinking: text });
+    }
+    for (const text of this.textBlocks) {
+      content.push({ type: 'text', text });
     }
     for (const block of this.toolUseBlocks) {
       content.push({

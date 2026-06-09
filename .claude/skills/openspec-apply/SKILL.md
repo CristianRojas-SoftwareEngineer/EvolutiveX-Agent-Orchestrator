@@ -30,12 +30,12 @@ Ask, confirm, and respond to the user in **Spanish** (native Spanish-speaking au
 Workflow delivery in this repo: `.claude/skills/openspec-apply/` only. Invocation: see `<invocation_model>` in [openspec-specialist](../openspec-specialist/SKILL.md).
 
 <delegation_map>
-The skill runs mostly inline; only the archive step is delegated. Reasoning:
+All steps run inline. Reasoning:
 
 - **verify** (inline): a single change produces bounded context; the main thread needs the findings to drive the gate decision and to feed the commit message. Delegation would add round-trip latency for the verdict without freeing significant context.
 - **sync specs** (inline): the existing `openspec-sync` is already agent-driven; re-delegating to a sub-agent would re-launch the same logic in a different thread. Inline reuses the active context.
 - **sync docs** (inline): no dedicated skill exists; this is bespoke and must use the active context (Impact section + grep results).
-- **archive** (delegated via Task tool): encapsulates its own status check, sync re-prompt, and `mv`. The main thread just needs the resulting summary. Delegation prevents the apply workflow from re-implementing archive logic.
+- **archive** (inline via openspec-archive): the procedure is defined in `openspec-archive/SKILL.md` and executed inline — same thread, no subagent. Steps 1–4 of that skill (selection, artifact check, task check, sync assessment) are skipped because Steps 1–5 of this workflow already cover them. Only openspec-archive Steps 5–6 (the actual `mv` and summary) run.
 - **commit** (inline): the conventional-commits message must reflect the change's own diff; this is part of the apply context.
 </delegation_map>
 </repo_context>
@@ -290,37 +290,24 @@ There is no dedicated skill; this step is **inline and bespoke**.
 
 ---
 
-### Step 6 — archive (DELEGATED)
+### Step 6 — archive (INLINE via openspec-archive)
 
-6.1. **Why delegate**: `openspec-archive` encapsulates its own status
-     check, sync re-prompt, and dated `mv`. Re-implementing it inline
-     would duplicate the skill and miss the sync re-prompt UX. Reasoning
-     in `<delegation_map>`.
+6.1. **Inline, no subagent.** Run the archive procedure from
+     [openspec-archive](../openspec-archive/SKILL.md) directly in the
+     current thread. Reasoning in `<delegation_map>`.
 
-6.2. **Delegate via Task tool** with:
+6.2. **Skip openspec-archive Steps 1–4** (change selection, artifact
+     completion check, task completion check, delta spec sync assessment)
+     — all of those have already been handled by Steps 1–5 of this
+     workflow.
 
-   - `subagent_type`: `"general-purpose"`.
-   - `prompt`: a Spanish template instructing the sub-agent to:
-     1. `Skill` → `openspec-archive` for change `<name>`.
-     2. Pass it the fact that delta specs have **already been synced in
-        Step 4** — so the archive's Step 4 sync re-prompt should appear
-        as «no delta specs pendientes» / «specs ya sincronizadas».
-     3. Return: the archive's final summary (change name, schema,
-        target path `openspec/changes/archive/YYYY-MM-DD-<name>/`, sync
-        result, and any warnings).
-   - **Sub-agent must NOT** re-run the apply workflow or commit — only
-     archive and report.
+6.3. **Execute openspec-archive Steps 5–6 directly**:
+   - Step 5: perform the archive (collision check, `mkdir -p`, `mv`).
+   - Step 6: display the archive summary.
 
-6.3. **Archive gate (from the delegated result)**:
-   - **Archive failed** (target collision, missing artifacts after
-     re-check) → **PAUSE_BLOCK**.
-   - **Warnings from archive** (incomplete tasks, incomplete artifacts
-     at the moment of archive) → preserve the archive skill's own
-     behaviour: warn + confirm. The user may accept the archive as-is
-     or cancel and return to a previous step.
-   - **Clean** → continue.
-
-6.4. **Render `archive_complete_block`**.
+6.4. **Archive gate**:
+   - `mv` fails or target collision → **PAUSE_BLOCK** (CRITICAL).
+   - **Clean** → render `archive_complete_block` and continue.
 
 ---
 
@@ -738,9 +725,8 @@ are filled by the step that invokes the pause.
 - **Step 5 (doc sync)**: **edit existing docs only**. AGENTS.md §6
   forbids creating new files under `docs/` without explicit approval;
   surface the request to the user instead of writing a new file.
-- **Step 6 (archive)**: delegate to `openspec-archive` via Task tool
-  (`subagent_type: "general-purpose"`). Pass it the fact that Step 4 has
-  already synced delta specs, so its own sync re-prompt is a no-op.
+- **Step 6 (archive)**: run inline. Get today's date, check for collision,
+  run `mkdir -p` + `mv`. No sync re-prompt needed — Step 4 already handled it.
 - **Step 7 (commit)**:
   - First line ≤72 chars, imperative, no trailing period.
   - Four Spanish blocks: **Motivación**, **Propósito**, **Objetivos**,
@@ -764,9 +750,8 @@ are filled by the step that invokes the pause.
   during doc sync without explicit user approval (AGENTS.md §6).
 - Do not bypass a CRITICAL gate by editing the gate table; fix the
   finding.
-- Do not collapse Steps 4 and 6: sync first, then archive. Archive's
-  own sync re-prompt is preserved; it should be a no-op after Step 4,
-  but the prompt itself stays.
+- Do not collapse Steps 4 and 6: sync first (Step 4), then archive (Step 6).
+  Step 6 does not re-sync — that is Step 4's responsibility.
 - Do not auto-select an ambiguous change (Steps 1, 2, 3, 4, 5, 6) —
   always use **AskUserQuestion** when the input is vague.
 - Do not over-engineer the commit message scope: a noisy scope is

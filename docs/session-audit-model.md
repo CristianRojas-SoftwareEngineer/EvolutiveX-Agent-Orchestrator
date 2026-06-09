@@ -50,22 +50,22 @@ sessions/<session-id>/
 | `step_response`                                                        | Handlers L3                 | `steps/MM/response/body.json`, `headers.json`, `parsed.md`                           |
 | `tool_call`                                                            | Correlador                  | `tools/KK-slug/input.json`, `meta.json`                                              |
 | `tool_result`                                                          | Correlador / hooks          | `tools/KK-slug/result.json`; actualiza `meta.json`                                   |
-
-**Precedencia `completionAuthority` (determinista, fijada al registrar el tool):**
-
-| Autoridad       | Canal de registro                         | Tools típicos                         | Emisor de `tool_result`                         |
-| --------------- | ----------------------------------------- | ------------------------------------- | ----------------------------------------------- |
-| `continuation`  | `registerToolUse`                         | Bash, Read, Grep, Glob, Edit, Write   | `handleContinuation` → body HTTP `tool_result`  |
-| `continuation`  | `registerPendingToolUse` + nombre `Agent` | Agent (subagente)                     | Continuation del padre (coalescing)             |
-| `hook`          | `registerPendingToolUse` + web_*          | `web_search`, `web_fetch`             | `AuditHookEventHandler` (`PostToolUse` / failure) |
-
-`PostToolUse` **no** completa tools con autoridad `continuation` aunque llegue antes que la continuation HTTP. Un único `tool_result` por `tool_call` (idempotencia de `completeToolUse`).
 | `workflow_complete`                                                    | Cierre de workflow          | `output/result.json`, `output/result.parsed.md`; `meta.json` final                   |
 | `workflow_cancel`                                                      | Timeout / cancelación       | `meta.json` con `status: cancelled`                                                  |
 | `stream_chunk`                                                         | `AuditSseResponseHandler`   | `steps/MM/response/streaming/NNNN-chunk.ndjson`; pings filtrados; tope 10 000 chunks |
 | `step_response` (con `coalescedDelegationStepIndex`)                   | `AuditSseResponseHandler`   | además: `body.coalesced.json` + `body.coalesced.parsed.md` en el step continuation   |
 | `*` (wildcard)                                                         | cualquier evento            | `sessions/<id>/events.ndjson` (append-only)                                          |
 | `workflow_start` / `workflow_complete` / `workflow_cancel` (kind=main) | Correlador / cierre         | `sessions/<id>/workflows/workflow-sequence.json` (array)                             |
+
+**Precedencia `completionAuthority` (determinista, fijada al registrar el tool):**
+
+| Autoridad      | Canal de registro                         | Tools típicos                       | Emisor de `tool_result`                        |
+| -------------- | ----------------------------------------- | ----------------------------------- | ---------------------------------------------- |
+| `continuation` | `registerToolUse`                         | Bash, Read, Grep, Glob, Edit, Write | `handleContinuation` → body HTTP `tool_result` |
+| `continuation` | `registerPendingToolUse` + nombre `Agent` | Agent (subagente)                   | Continuation del padre (coalescing)            |
+| `hook`         | `registerPendingToolUse` + web_*          | `web_search`, `web_fetch`           | `AuditHookEventHandler` (`PostToolUse` / failure) |
+
+`PostToolUse` **no** completa tools con autoridad `continuation` aunque llegue antes que la continuation HTTP. Un único `tool_result` por `tool_call` (idempotencia de `completeToolUse`).
 
 ### Componentes de persistencia
 
@@ -86,7 +86,7 @@ sessions/<session-id>/
 
 - Modelo conceptual: sesión → workflows → steps → tools → sub-workflows.
 - Layout `causal-workflows-v1` y reglas de nomenclatura.
-- Clasificación HTTP (`fresh`, `continuation`, preflights, `side-request`) y su apertura como **workflow**.
+- Clasificación HTTP (`fresh`, `continuation`, preflights, `side-request`) y su proyección como **steps** bajo el turno activo (o exclusión para preflights).
 - Entidades gateway (`IWorkflow`, `IStep`, `IToolUse`, `IWorkflowResult`) y artefactos en disco.
 - Correlación de subagentes, tools pendientes y hooks.
 
@@ -187,6 +187,17 @@ La clasificación la realiza `RequestClassifierService` (dominio); `AuditWorkflo
 
 **Sin sesión:** si `sessionId === '_unknown'`, el handler retorna sin escribir disco ([`health-check-handling.md`](./health-check-handling.md)).
 
+**Preflights — proxy activo vs auditoría:** omitir la proyección causal **no** interrumpe el wire; el upstream recibe la petición con normalidad:
+
+```text
+Preflight HTTP
+  → RequestClassifier: preflight-quota | preflight-warmup
+  → AuditWorkflowHandler.execute(): return null   (sin correlador ni disco)
+  → Proxy upstream: reenvío normal a Anthropic
+```
+
+Los preflights no consumen `layoutIndex`; el primer turno de usuario ocupa siempre `workflows/01/`.
+
 ### 4.1 Correlación de subagentes
 
 - **Plano A (cabeceras):** `X-Claude-Code-Agent-Id` / `X-Claude-Code-Parent-Agent-Id` → correlación determinista (`correlationMethod: 'agent-headers'`).
@@ -216,6 +227,24 @@ El turno de usuario es un workflow con **`interactionType: agentic`** (`workflow
 `end_turn` en SSE cierra solo el **step** abierto; el workflow E2E del turno no hace `forceClose` en SSE.
 
 `WorkflowKind` estructural: `main` | `subagent` (sub-workflows bajo `sub-agent/workflow/`).
+
+### 5.1 Cierre de step vs cierre de workflow
+
+| Señal | Cierra step | Cierra workflow de turno |
+| ----- | ----------- | ------------------------ |
+| Respuesta HTTP terminal de `side-request` | Sí | No |
+| SSE `stop_reason: tool_use` | Sí | No |
+| SSE `stop_reason: end_turn` | Sí | No |
+| Hook `Stop` / `StopFailure` | — | Sí |
+| Hook `SubagentStop` (sub-workflow) | — | Sí (sub-workflow anidado) |
+
+`IWorkflowResult.finalText` proviene del hook (`last_assistant_message`); si el hook no lo incluye queda `undefined` (sin fallback desde steps).
+
+### 5.2 Invariantes del turno
+
+- Como máximo **un** workflow de turno `running` por `sessionId` con `id === sessionId`.
+- **Lazy open:** si el primer hop HTTP (`side-request` o `fresh`) llega antes de `UserPromptSubmit`, se abre el turno implícito y el hop se registra como step.
+- Mutaciones HTTP del turno se serializan con `withSessionLock(sessionId)` en `AuditWorkflowHandler` (evita cross-wiring cuando `side-request` y `agentic` arrancan en paralelo).
 
 ---
 
@@ -268,7 +297,7 @@ Todo lo demás (incluido SSE vía `stream_chunk`): `eventBus.publish(...)` → `
 
 | Handler                        | Rol                                                           |
 | ------------------------------ | ------------------------------------------------------------- |
-| `AuditWorkflowHandler`         | Clasificación, apertura/continuación de workflows, wire steps |
+| `AuditWorkflowHandler`         | Clasificación, apertura/continuación de turnos, wire steps; `withSessionLock` por sesión |
 | `AuditSseResponseHandler`      | Stream SSE + reconstrucción; publica `step_response` / cierre |
 | `AuditStandardResponseHandler` | Respuestas no-SSE                                             |
 | `AuditWorkflowClosureHandler`  | Coordinación de cierre + métricas; delega proyección al bus   |
@@ -314,9 +343,16 @@ En memoria, el modelo legacy usaba `ActiveInteraction` → `InteractionMetadata`
 | `state.json`                  | Estado en `meta.json` (`status: running` hasta cierre)             |
 | `interaction-sequence.json`   | Secuencia en correlador; **P2:** `workflow-sequence.json` en disco |
 
+### Apéndice B — Layout intermedio `session-shell` (lectura histórica)
+
+Entre P1 y `unify-turn-workflow` (junio 2026) algunas sesiones fragmentaban un turno en **tres workflows hermanos**: `workflows/00` (`session-shell`), `workflows/01` (`side-request`) y `workflows/02` (`agentic`). Las sesiones nuevas usan **un workflow por turno** (`workflows/01/` con `interactionType: agentic` y hops como `steps/MM/`). No hay migración automática; al analizar capturas antiguas, distinguir este layout del modelo vigente.
+
+Change de referencia: `openspec/changes/archive/2026-06-08-unify-turn-workflow/`.
+
 ---
 
 ## Referencias cruzadas
 
 - Arquitectura del gateway: [`gateway-architecture.md`](./gateway-architecture.md)
+- Fusión turno unificado (implementado): `openspec/changes/archive/2026-06-08-unify-turn-workflow/`
 - OpenSpec: `openspec/specs/session-persistence/`, `event-bus/`, `session-routing/`, `gateway-audit-projection/`

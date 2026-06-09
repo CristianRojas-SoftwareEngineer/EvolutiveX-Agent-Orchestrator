@@ -6,7 +6,7 @@ import type { IContextExtractor, SessionMessage } from '../../1-domain/ports/ICo
 interface TranscriptLine {
   message?: {
     role?: string;
-    content?: Array<{ type?: string; text?: string }>;
+    content?: string | Array<{ type?: string; text?: string }>;
   };
 }
 
@@ -29,14 +29,22 @@ export class TranscriptContextExtractor implements IContextExtractor {
         try {
           const row = JSON.parse(trimmed) as TranscriptLine;
           const role = row.message?.role;
-          if (!role || !Array.isArray(row.message?.content)) continue;
+          if (!role) continue;
           if (role !== 'user' && role !== 'assistant' && role !== 'system') continue;
 
-          const text = row.message.content
-            .filter((b) => b.type === 'text' && typeof b.text === 'string')
-            .map((b) => (b.text as string).trim())
-            .filter(Boolean)
-            .join(' ');
+          const raw = row.message?.content;
+          let text: string;
+          if (typeof raw === 'string') {
+            text = raw.trim();
+          } else if (Array.isArray(raw)) {
+            text = raw
+              .filter((b) => b.type === 'text' && typeof b.text === 'string')
+              .map((b) => (b.text as string).trim())
+              .filter(Boolean)
+              .join(' ');
+          } else {
+            continue;
+          }
 
           if (text) {
             all.push({ role: role as SessionMessage['role'], text });

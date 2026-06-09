@@ -6,6 +6,7 @@ import {
   buildInferenceRequestSnapshot,
   buildWireStep,
   enrichOpenWireStepWithResponse,
+  enrichWireStepWithResponseByIndex,
   registerWireStepInCorrelator,
 } from './gateway-wire-step.util.js';
 import { persistBillableStepMetricsIfNeeded } from './persist-billable-step-metrics.util.js';
@@ -99,11 +100,19 @@ export class AuditStandardResponseHandler {
             ? { cache_read_input_tokens: bodyUsage.cache_read_input_tokens }
             : {}),
         };
+        const responsePatch = { assistantMessage, usage, stopReason, closedAt: now };
         const wireStep =
+          enrichWireStepWithResponseByIndex(
+            this.workflowRepo,
+            workflow.id,
+            context.assignedStepIndex,
+            responsePatch,
+            stopReason,
+          ) ??
           enrichOpenWireStepWithResponse(
             this.workflowRepo,
             workflow.id,
-            { assistantMessage, usage, stopReason, closedAt: now },
+            responsePatch,
             stopReason,
           ) ??
           (() => {

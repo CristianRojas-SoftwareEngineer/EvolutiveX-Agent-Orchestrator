@@ -3,6 +3,7 @@ import { WorkflowRepositoryService } from '../../src/2-services/workflow-reposit
 import type { IStep } from '../../src/1-domain/interfaces/gateway/IStep.js';
 import {
   enrichOpenWireStepWithResponse,
+  enrichWireStepWithResponseByIndex,
   registerWireStepInCorrelator,
   resolveOpenWireStepIndex,
   buildWireStep,
@@ -184,6 +185,88 @@ describe('gateway-wire-step.util', () => {
     expect(registered?.closedAt).toBeDefined();
     expect(repo.getWorkflow(wf.id)!.steps).toHaveLength(1);
     expect(repo.getWorkflow(wf.id)!.steps[0].closedAt).toBeDefined();
+  });
+
+  it('enrichWireStepWithResponseByIndex: dos steps abiertos enriquece el índice correcto', () => {
+    const repo = new WorkflowRepositoryService();
+    const wf = repo.openWorkflow('session-conc', { agentId: undefined, isSubagentRequest: false }, {
+      forceNew: true,
+      layoutIndex: 1,
+      workflowKind: 'agentic',
+    });
+
+    repo.registerStep(wf.id, makeRequestStep(wf.id, 1));
+    repo.registerStep(wf.id, makeRequestStep(wf.id, 2));
+
+    const titleResponse = enrichWireStepWithResponseByIndex(
+      repo,
+      wf.id,
+      1,
+      {
+        assistantMessage: {
+          role: 'assistant',
+          content: [{ type: 'text', text: '{"title": "Investigar commit"}' }],
+        },
+        usage: { input_tokens: 5, output_tokens: 3 },
+        stopReason: 'end_turn',
+        closedAt: new Date(),
+      },
+      'end_turn',
+    );
+
+    const bashResponse = enrichWireStepWithResponseByIndex(
+      repo,
+      wf.id,
+      2,
+      {
+        assistantMessage: {
+          role: 'assistant',
+          content: [{ type: 'tool_use', id: 'tu-bash', name: 'Bash', input: { command: 'git show' } }],
+        },
+        usage: { input_tokens: 10, output_tokens: 5 },
+        stopReason: 'tool_use',
+        closedAt: new Date(),
+      },
+      'tool_use',
+    );
+
+    expect(titleResponse?.index).toBe(1);
+    expect(bashResponse?.index).toBe(2);
+
+    const updated = repo.getWorkflow(wf.id)!;
+    expect(updated.steps[0].assistantMessage.content[0]).toMatchObject({ type: 'text' });
+    expect(updated.steps[1].assistantMessage.content[0]).toMatchObject({
+      type: 'tool_use',
+      name: 'Bash',
+    });
+  });
+
+  it('enrichOpenWireStepWithResponse: con dos abiertos enriquece el último (heurística fallback)', () => {
+    const repo = new WorkflowRepositoryService();
+    const wf = repo.openWorkflow('session-heur', { agentId: undefined, isSubagentRequest: false }, {
+      forceNew: true,
+      layoutIndex: 2,
+      workflowKind: 'agentic',
+    });
+
+    repo.registerStep(wf.id, makeRequestStep(wf.id, 1));
+    repo.registerStep(wf.id, makeRequestStep(wf.id, 2));
+
+    enrichOpenWireStepWithResponse(
+      repo,
+      wf.id,
+      {
+        assistantMessage: { role: 'assistant', content: [{ type: 'text', text: 'last-open' }] },
+        usage: { input_tokens: 1, output_tokens: 1 },
+        stopReason: 'end_turn',
+        closedAt: new Date(),
+      },
+      'end_turn',
+    );
+
+    const updated = repo.getWorkflow(wf.id)!;
+    expect(updated.steps[1].assistantMessage.content[0]).toMatchObject({ type: 'text', text: 'last-open' });
+    expect(updated.steps[0].assistantMessage.content).toHaveLength(0);
   });
 
   it('resolveOpenWireStepIndex: apunta al step abierto, no a steps.length', () => {

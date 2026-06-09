@@ -122,14 +122,28 @@ Tras P2, el sistema SHALL NOT exponer ni usar `ISseAuditWriter` ni `AuditWriterS
 
 Los eventos publicados al `EventBus` (`stream_chunk`, `step_response`, `tool_call`) y las mutaciones al `IWorkflowRepository` (`registerStep`, `closeStep`, `registerToolUse`, `completeToolUse`, `registerPendingToolUse`) SHALL atribuirse al `workflowId` presente en el `AuditWorkflowContext`, no al workflow main de la sesión.
 
-Los eventos `stream_chunk` SHALL usar `stepIndex` del step abierto por ingress (`resolveOpenWireStepIndex`), no `workflow.steps.length`, para que chunks y `step_response` proyecten al mismo `steps/MM/`.
+Los eventos `stream_chunk` y `step_response` SHALL usar `stepIndex` igual a `context.assignedStepIndex` — el índice fijado en ingress por `registerWireStepRequest` para esa request HTTP — de modo que chunks y respuesta proyecten al mismo `steps/MM/` que el `step_request` correspondiente, **incluso cuando existan otros steps abiertos en el mismo workflow**.
 
-#### Scenario: stream_chunk usa índice del step abierto
+`enrichOpenWireStepWithResponse` (heurística del último step abierto) MAY usarse solo como fallback cuando no exista step en el índice asignado (edge case sin ingress previo).
 
-- **GIVEN** `registerWireStepRequest` registró un step en índice 0
+#### Scenario: stream_chunk usa assignedStepIndex del context
+
+- **GIVEN** `registerWireStepRequest` registró un step en índice 1 para la request actual
+- **AND** `AuditWorkflowContext.assignedStepIndex` es 1
 - **WHEN** `AuditSseResponseHandler` emite `stream_chunk` durante el stream
-- **THEN** `payload.stepIndex` SHALL ser 0
-- **AND** NO SHALL ser 1 (`workflow.steps.length` tras ingress)
+- **THEN** `payload.stepIndex` SHALL ser 1
+- **AND** NO SHALL derivarse de `workflow.steps.length` ni del último step abierto si difiere de 1
+
+#### Scenario: Hops concurrentes no cruzan response entre steps
+
+- **GIVEN** un workflow de turno con step 1 (`side-request`) y step 2 (`agentic`) abiertos simultáneamente
+- **AND** step 1 tiene `request/body.json` con prompt `ai-title`
+- **AND** step 2 tiene `request/body.json` con prompt agentic del usuario
+- **WHEN** la respuesta SSE del hop 1 finaliza con `assignedStepIndex: 1`
+- **AND** la respuesta SSE del hop 2 finaliza con `assignedStepIndex: 2`
+- **THEN** `step_response` del hop 1 SHALL enriquecer step 1 (contenido coherente con `ai-title`)
+- **AND** `step_response` del hop 2 SHALL enriquecer step 2 (contenido coherente con inferencia agentic)
+- **AND** NO SHALL intercambiarse las respuestas entre `steps/01/response/` y `steps/02/response/`
 
 #### Scenario: SSE handler atribuye chunks al workflowId del context
 

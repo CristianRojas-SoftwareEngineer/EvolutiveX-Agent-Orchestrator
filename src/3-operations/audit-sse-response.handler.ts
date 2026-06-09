@@ -15,8 +15,8 @@ import {
   buildInferenceRequestSnapshot,
   buildWireStep,
   enrichOpenWireStepWithResponse,
+  enrichWireStepWithResponseByIndex,
   registerWireStepInCorrelator,
-  resolveOpenWireStepIndex,
 } from './gateway-wire-step.util.js';
 import { persistBillableStepMetricsIfNeeded } from './persist-billable-step-metrics.util.js';
 import { resolveSessionDir } from './audit-workflow-closure.handler.js';
@@ -49,8 +49,8 @@ export class AuditSseResponseHandler {
     if (!workflow) return;
 
     const isCoalescedAgentContinuation = context.coalescedAgentContinuation !== undefined;
-    // projectedStepIndex: step abierto por registerWireStepRequest (mismo índice request/response)
-    const projectedStepIndex = resolveOpenWireStepIndex(workflow);
+    // Índice fijado en ingress para esta request HTTP (estable bajo hops concurrentes)
+    const projectedStepIndex = context.assignedStepIndex;
     const chunkPhase: ChunkPhase = isCoalescedAgentContinuation ? 'continuation' : 'delegation';
     const assembler = this.createStepAssembler();
 
@@ -161,7 +161,7 @@ export class AuditSseResponseHandler {
         }
 
         const assembled = assembler.result();
-        const wireStep = this.registerWireInference(workflow, assembled);
+        const wireStep = this.registerWireInference(workflow, assembled, context.assignedStepIndex);
 
         if (wireStep) {
           for (const block of assembled.toolUseBlocks) {
@@ -224,19 +224,31 @@ export class AuditSseResponseHandler {
     });
   }
 
-  private registerWireInference(workflow: IWorkflow, assembled: AssembledInference) {
+  private registerWireInference(
+    workflow: IWorkflow,
+    assembled: AssembledInference,
+    assignedStepIndex: number,
+  ) {
     const inferenceRequest = buildInferenceRequestSnapshot(workflow, assembled);
     const now = new Date();
+    const responsePatch = {
+      assistantMessage: assembled.assistantMessage,
+      usage: assembled.usage,
+      stopReason: assembled.stopReason,
+      closedAt: now,
+    };
     const wireStep =
+      enrichWireStepWithResponseByIndex(
+        this.workflowRepo,
+        workflow.id,
+        assignedStepIndex,
+        responsePatch,
+        assembled.stopReason,
+      ) ??
       enrichOpenWireStepWithResponse(
         this.workflowRepo,
         workflow.id,
-        {
-          assistantMessage: assembled.assistantMessage,
-          usage: assembled.usage,
-          stopReason: assembled.stopReason,
-          closedAt: now,
-        },
+        responsePatch,
         assembled.stopReason,
       ) ??
       (() => {

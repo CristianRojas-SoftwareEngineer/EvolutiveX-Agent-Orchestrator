@@ -7,6 +7,7 @@ import type { IWorkflow } from '../../src/1-domain/interfaces/gateway/IWorkflow.
 import { StepAssemblerService } from '../../src/2-services/step-assembler.service.js';
 import { WorkflowRepositoryService } from '../../src/2-services/workflow-repository.service.js';
 import { AuditWorkflowContext } from '../../src/1-domain/types/audit.types.js';
+import type { IStep } from '../../src/1-domain/interfaces/gateway/IStep.js';
 import { makeTestConfig as makeConfig } from '../helpers/test-config.js';
 import type { SessionMetricsService } from '../../src/2-services/session-metrics.service.js';
 
@@ -101,6 +102,41 @@ function makeSseHandler(
     makeSessionMetrics(),
   );
 }
+
+function makeOpenRequestStep(workflowId: string, index: number, text: string): IStep {
+  return {
+    id: `step-req-${index}`,
+    workflowId,
+    index,
+    inferenceRequest: {
+      model: 'claude-test',
+      messages: [{ role: 'user', content: text }],
+      max_tokens: 1024,
+    },
+    assistantMessage: { role: 'assistant', content: [] },
+    toolUses: [],
+    startedAt: new Date(),
+  };
+}
+
+const SSE_TITLE_JSON = [
+  'data: {"type":"message_start","message":{"usage":{"input_tokens":5,"output_tokens":0}}}',
+  'data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}',
+  'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"{\\"title\\": \\"Investigar commit\\"}"}}',
+  'data: {"type":"content_block_stop","index":0}',
+  'data: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":3}}',
+  'data: {"type":"message_stop"}',
+  '',
+].join('\n');
+
+const SSE_BASH_TOOL = [
+  'data: {"type":"message_start","message":{"usage":{"input_tokens":5,"output_tokens":0}}}',
+  'data: {"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"tu-bash","name":"Bash","input":{"command":"git show"}}}',
+  'data: {"type":"content_block_stop","index":0}',
+  'data: {"type":"message_delta","delta":{"stop_reason":"tool_use"},"usage":{"output_tokens":3}}',
+  'data: {"type":"message_stop"}',
+  '',
+].join('\n');
 
 const SSE_END_TURN = [
   'event: message_start',
@@ -389,6 +425,54 @@ describe('AuditSseResponseHandler', () => {
     expect(registerPendingToolUse).toHaveBeenCalled();
     const [wfId] = (registerPendingToolUse as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(wfId).toBe('session-1-wire-1');
+  });
+
+  it('atribuye response SSE al assignedStepIndex con hops concurrentes abiertos', async () => {
+    const repo = new WorkflowRepositoryService();
+    const wf = repo.openWorkflow('session-conc', { agentId: undefined, isSubagentRequest: false });
+    repo.registerStep(wf.id, makeOpenRequestStep(wf.id, 1, 'ai-title prompt'));
+    repo.registerStep(wf.id, makeOpenRequestStep(wf.id, 2, 'agentic user prompt'));
+
+    const publish = vi.fn();
+    const handler = makeSseHandler(undefined, undefined, repo, makeEventBus({ publish }));
+
+    const streamTitle = new PassThrough();
+    handler.execute(
+      streamTitle,
+      makeContext({ workflowId: wf.id, auditSessionId: wf.sessionId, assignedStepIndex: 1 }),
+      {},
+    );
+    streamTitle.write(Buffer.from(SSE_TITLE_JSON));
+    streamTitle.end();
+
+    const streamBash = new PassThrough();
+    handler.execute(
+      streamBash,
+      makeContext({ workflowId: wf.id, auditSessionId: wf.sessionId, assignedStepIndex: 2 }),
+      {},
+    );
+    streamBash.write(Buffer.from(SSE_BASH_TOOL));
+    streamBash.end();
+
+    await wait(120);
+
+    const updated = repo.getWorkflow(wf.id)!;
+    const blocks1 = updated.steps[0].assistantMessage.content;
+    const blocks2 = updated.steps[1].assistantMessage.content;
+    expect(Array.isArray(blocks1) && Array.isArray(blocks2)).toBe(true);
+    if (!Array.isArray(blocks1) || !Array.isArray(blocks2)) return;
+
+    const step1Text = blocks1.find((b) => b.type === 'text');
+    const step2Tool = blocks2.find((b) => b.type === 'tool_use');
+    expect(step1Text).toBeDefined();
+    expect(step1Text && 'text' in step1Text && step1Text.text).toContain('title');
+    expect(step2Tool).toMatchObject({ type: 'tool_use', name: 'Bash' });
+
+    const chunkIndexes = (publish as ReturnType<typeof vi.fn>).mock.calls
+      .filter(([e]) => e.type === 'stream_chunk')
+      .map(([e]) => e.payload.stepIndex);
+    expect(chunkIndexes.some((i) => i === 1)).toBe(true);
+    expect(chunkIndexes.some((i) => i === 2)).toBe(true);
   });
 
   it('stream.on("error") invoca clearToolUseIndexFor con el workflowId correcto', async () => {

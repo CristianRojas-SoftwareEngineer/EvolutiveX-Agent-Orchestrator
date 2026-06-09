@@ -63,9 +63,63 @@ export interface WireStepResponsePatch {
   closedAt: Date;
 }
 
+/** Aplica patch de respuesta wire a un step ya abierto y ejecuta cierre según stopReason. */
+function applyWireStepResponseToStep(
+  repo: IWorkflowRepository,
+  workflow: IWorkflow,
+  openStep: IStep,
+  patch: WireStepResponsePatch,
+  stopReason: string | undefined,
+): IStep {
+  openStep.assistantMessage = patch.assistantMessage;
+  openStep.usage = patch.usage;
+  openStep.stopReason = patch.stopReason;
+
+  if (stopReason === 'tool_use') {
+    openStep.closedAt = patch.closedAt;
+    repo.closeStep(workflow.id, openStep.id);
+    return openStep;
+  }
+
+  const isTerminal =
+    stopReason === 'end_turn' ||
+    stopReason === 'max_tokens' ||
+    stopReason == null ||
+    stopReason === '';
+
+  if (isTerminal) {
+    openStep.closedAt = patch.closedAt;
+    repo.closeStep(workflow.id, openStep.id);
+    closeWireWorkflowOnTerminalStop(repo, workflow, stopReason, openStep);
+  }
+
+  return openStep;
+}
+
+/**
+ * Enriquece el step abierto en el índice asignado en ingress (`assignedStepIndex`).
+ * Evita cross-wiring cuando varios hops del mismo workflow están abiertos en paralelo.
+ */
+export function enrichWireStepWithResponseByIndex(
+  repo: IWorkflowRepository,
+  workflowId: string,
+  stepIndex: number,
+  patch: WireStepResponsePatch,
+  stopReason: string | undefined,
+): IStep | undefined {
+  const workflow = repo.getWorkflow(workflowId);
+  if (!workflow) return undefined;
+
+  const openStep = workflow.steps.find((s) => s.index === stepIndex && s.closedAt == null);
+  if (!openStep) return undefined;
+
+  return applyWireStepResponseToStep(repo, workflow, openStep, patch, stopReason);
+}
+
 /**
  * Enriquece el último step abierto del workflow con la respuesta HTTP.
  * Alineado a session-audit-model: un hop → un `steps/MM/` con request/ y response/.
+ * Fallback cuando no hay step en el índice asignado (edge case sin ingress previo).
  */
 export function enrichOpenWireStepWithResponse(
   repo: IWorkflowRepository,
@@ -79,29 +133,7 @@ export function enrichOpenWireStepWithResponse(
   const openStep = [...workflow.steps].reverse().find((s) => s.closedAt == null);
   if (!openStep) return undefined;
 
-  openStep.assistantMessage = patch.assistantMessage;
-  openStep.usage = patch.usage;
-  openStep.stopReason = patch.stopReason;
-
-  if (stopReason === 'tool_use') {
-    openStep.closedAt = patch.closedAt;
-    repo.closeStep(workflowId, openStep.id);
-    return openStep;
-  }
-
-  const isTerminal =
-    stopReason === 'end_turn' ||
-    stopReason === 'max_tokens' ||
-    stopReason == null ||
-    stopReason === '';
-
-  if (isTerminal) {
-    openStep.closedAt = patch.closedAt;
-    repo.closeStep(workflowId, openStep.id);
-    closeWireWorkflowOnTerminalStop(repo, workflow, stopReason, openStep);
-  }
-
-  return openStep;
+  return applyWireStepResponseToStep(repo, workflow, openStep, patch, stopReason);
 }
 
 /**

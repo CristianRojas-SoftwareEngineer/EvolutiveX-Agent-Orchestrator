@@ -28,8 +28,6 @@ export interface SubagentSummary {
   dirName: string;
   /** ID del tool_use Agent que originó este subagente, si puede correlacionarse */
   toolUseId: string | null;
-  /** Indica si la correlación con toolUseId fue inferida por orden, no explícita */
-  inferredByOrder: boolean;
   /** Descripción del subagente extraída del tool_use Agent */
   description: string;
   /** Prompt del subagente extraído del tool_use Agent */
@@ -105,52 +103,6 @@ export type RequestClassification =
   | { type: 'fresh' }
   | { type: 'continuation' }
   | { type: 'side-request' };
-
-/**
- * Metadatos de un step individual dentro de un turno.
- */
-export interface StepMeta {
-  stepIndex: number;
-  label?: string;
-  sse: boolean;
-  statusCode: number | null;
-  sseLineCount?: number;
-  stopReason?: string;
-  toolCalls?: string[];
-  /** IDs de tool_use emitidos en este step; usados para correlacionar continuations con su turno padre. */
-  toolUseIds?: string[];
-  cacheCreationInputTokens?: number;
-  cacheReadInputTokens?: number;
-  inputTokens?: number;
-  outputTokens?: number;
-  /** Bytes crudos SSE escritos en disco para este step. */
-  sseRawBytesWritten?: number;
-  /** True si el volcado crudo de SSE de este step fue truncado por límite. */
-  sseRawTruncatedByLimit?: boolean;
-  /**
-   * ID del mensaje de Anthropic (message.id) extraído de la respuesta.
-   * Permite correlacionar con logs de Claude Code que incluyen este ID.
-   * @example "msg_01SweCL7ReWWANWSRsPc8mfn"
-   */
-  anthropicMessageId?: string;
-  /** True si el step contiene al menos un bloque de extended thinking. */
-  hasThinking?: boolean;
-  /** Número de bloques de thinking detectados en el step. */
-  thinkingBlockCount?: number;
-  coalescedAgentContinuation?: {
-    toolUseIds: string[];
-    sseLineCount?: number;
-    stopReason?: string;
-    statusCode: number | null;
-    inputTokens?: number;
-    outputTokens?: number;
-    cacheCreationInputTokens?: number;
-    cacheReadInputTokens?: number;
-    sseRawBytesWritten?: number;
-    sseRawTruncatedByLimit?: boolean;
-    anthropicMessageId?: string;
-  };
-}
 
 /**
  * Clasificación del tipo de request HTTP según el contenido del body.
@@ -253,55 +205,6 @@ export interface PendingAgentToolUse {
 }
 
 /**
- * Entrada que tracquea un tool_use `WebSearch` emitido por el SSE del padre y aún
- * no correlacionado con la llamada de implementación correspondiente. Cada entrada
- * se consume al recibir el request fresh de implementación del harness.
- */
-export interface PendingWebSearchToolUse {
-  /** Step del padre donde se emitió el tool_use. */
-  stepIndex: number;
-  /** Identificador único del tool_use bloque emitido por Anthropic. */
-  toolUseId: string;
-}
-
-/**
- * Entrada que tracquea un tool_use `WebFetch` emitido por el SSE del padre y aún
- * no correlacionado con la llamada de implementación correspondiente. Cada entrada
- * se consume al recibir el request fresh de implementación del harness.
- */
-export interface PendingWebFetchToolUse {
-  /** Step del padre donde se emitió el tool_use. */
-  stepIndex: number;
-  /** Identificador único del tool_use bloque emitido por Anthropic. */
-  toolUseId: string;
-}
-
-/**
- * Resolución de una herramienta interna (WebSearch/WebFetch) que fue observada
- * en la auditoría. Distingue entre resoluciones por request interna del harness
- * y resoluciones por tool_result en continuation.
- */
-export interface ResolvedInternalTool {
-  /** Identificador único del tool_use. */
-  toolUseId: string;
-  /** Nombre de la herramienta. */
-  toolName: 'WebSearch' | 'WebFetch';
-  /** Step donde se emitió el tool_use original. */
-  originalStepIndex: number;
-  /**
-   * Modo de resolución observado.
-   * - 'internal_request': Se observó una request de implementación del harness.
-   * - 'tool_result_in_continuation': El resultado llegó como tool_result en una continuation.
-   */
-  resolutionMode: 'internal_request' | 'tool_result_in_continuation';
-  /**
-   * Step donde se observó la resolución (para tool_result_in_continuation).
-   * Nulo para internal_request porque la resolución es un step separado.
-   */
-  resolvedInStepIndex?: number;
-}
-
-/**
  * Subtipo de side-request para diferenciar requests de naming de sesión.
  */
 export type SideRequestKind = 'session-naming' | 'generic';
@@ -323,12 +226,6 @@ export interface SseReconstructOptions {
   originalUrl?: string;
   /** Cabeceras originales de la petición (para detectar anthropic-beta). */
   headers?: Record<string, string | string[] | undefined>;
-  /** @deprecated Informativo: campo legacy retenido para compatibilidad de llamada. */
-  sseRawBytesWritten: number;
-  /** @deprecated Informativo: campo legacy retenido para compatibilidad de llamada. */
-  sseRawTruncatedByLimit: boolean;
-  /** @deprecated Informativo: campo legacy retenido para compatibilidad de llamada. */
-  sseRawWriteError: boolean;
   /** Contexto posicional para enriquecer el body.parsed.md generado. */
   context?: MarkdownRenderContext;
 }

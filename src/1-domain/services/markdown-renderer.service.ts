@@ -334,7 +334,7 @@ export class MarkdownRendererService {
           this.heading(headingLevel + 1, `Subagente ${subagent.index}: ${subagent.description}`),
         );
         parts.push(
-          `**ID tool_use:** \`${subagent.toolUseId || 'no correlacionado'}\`${subagent.inferredByOrder ? ' (inferido por orden - legacy)' : ''}`,
+          `**ID tool_use:** \`${subagent.toolUseId || 'no correlacionado'}\``,
         );
         parts.push(`**Tipo:** ${subagent.subagentType || 'general-purpose'}`);
         parts.push(`**Estado:** ${this.formatOutcome(subagent.outcome)}`);

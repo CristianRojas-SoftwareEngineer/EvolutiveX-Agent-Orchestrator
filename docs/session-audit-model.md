@@ -277,9 +277,22 @@ Al arranque, el proxy puede eliminar sesiones con layout flat legacy (**corte li
 - `outcome`, `finalText?`, `usage?`, `stepCount`, `closedByEvent`, `sessionId`
 - Construido en cierre vía `buildWorkflowResult()`; proyectado por `SessionPersistence` en `workflow_complete`
 
-### Tipos wire y clasificación legacy
+### Tipos auxiliares en `audit.types.ts` (clasificación wire)
 
-`StepMeta`, `InteractionType`, `InteractionOutcome`, `SideRequestKind`, `AuditInteractionContext` en `audit.types.ts` — **activos por diseño** (clasificación de request, campos wire transitorios). **No** representan el modelo en memoria activo (sustituido por `IWorkflow` / `IStep` / `IToolUse`). `InteractionMetadata` retirado en el cierre del orquestador (2026-06-01).
+Tipos **activos** en `src/1-domain/types/audit.types.ts` para clasificación HTTP y correlación (no sustituyen el modelo en memoria `IWorkflow` / `IStep` / `IToolUse`):
+
+| Tipo | Uso |
+| ---- | --- |
+| `WorkflowRequestKind`, `StepKind` | Clasificación semántica del request y del hop |
+| `RequestClassification` | Resultado de `classifyRequestBody()` |
+| `SideRequestKind` | Subtipo de `side-request` (p. ej. naming de sesión) |
+| `PendingAgentToolUse`, `CorrelationMethod`, `ParentContext` | Correlación subagente ↔ tool_use |
+| `CoalescedAgentStepResponse`, `SubagentSummary` | Contrato persistido en steps coalesced |
+| `SseReconstructOptions` | Reconstrucción SSE → `body.json` (sin campos legacy `sseRaw*`) |
+
+**Retirados en P1/P2** (no exportar ni reintroducir): `StepMeta`, `InteractionType`, `InteractionOutcome`, `AuditInteractionContext`, `InteractionMetadata`, `PendingWebSearchToolUse`, `PendingWebFetchToolUse`, `ResolvedInternalTool`, módulo `audit-paths.ts` (routing canónico: `session-routing.ts`).
+
+Fuente normativa: [`openspec/specs/gateway-domain-types/spec.md`](../openspec/specs/gateway-domain-types/spec.md).
 
 ---
 

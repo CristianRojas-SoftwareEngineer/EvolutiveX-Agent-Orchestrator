@@ -79,9 +79,6 @@ describe('Test de Integración - SseReconstructService (fuente: sse.jsonl)', () 
       stepCount: 1,
       originalUrl: 'https://api.anthropic.com/v1/messages',
       headers: {},
-      sseRawBytesWritten: 1024,
-      sseRawTruncatedByLimit: false,
-      sseRawWriteError: false,
     });
 
     expect(result.sseResponseBodyAttempted).toBe(true);
@@ -186,9 +183,6 @@ describe('SseReconstructService - resiliencia frente a sse.txt corrupto', () => 
       stepDir,
       workflowDir: interactionDir,
       stepCount: 1,
-      sseRawBytesWritten: 1,
-      sseRawTruncatedByLimit: false,
-      sseRawWriteError: false,
     });
 
     expect(result.sseResponseBodyAttempted).toBe(true);
@@ -211,9 +205,6 @@ describe('SseReconstructService - resiliencia frente a sse.txt corrupto', () => 
       stepDir,
       workflowDir: interactionDir,
       stepCount: 1,
-      sseRawBytesWritten: 0,
-      sseRawTruncatedByLimit: true,
-      sseRawWriteError: true,
     });
     expect(result.sseResponseBodyWritten).toBe(true);
   });
@@ -267,9 +258,6 @@ describe('SseReconstructService - fixture real (sessions/ histórico)', () => {
       stepDir,
       workflowDir: interactionDir,
       stepCount: 1,
-      sseRawBytesWritten: 1349,
-      sseRawTruncatedByLimit: false,
-      sseRawWriteError: false,
     });
     expect(result.sseResponseBodyAttempted).toBe(true);
     expect(result.sseResponseBodyWritten).toBe(true);

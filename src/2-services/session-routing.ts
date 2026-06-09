@@ -1,6 +1,6 @@
 /**
  * Funciones puras de mapeo de eventos a rutas del layout `causal-workflows-v1`.
- * Reemplazan las constantes flat de `audit-paths.ts`.
+ * Módulo canónico de routing de sesión (el antiguo `audit-paths.ts` fue retirado en P1).
  *
  * Las rutas se construyen con separador `/` (no `path.join`) para producir
  * salidas deterministas e independientes de la plataforma; `fs` en Windows

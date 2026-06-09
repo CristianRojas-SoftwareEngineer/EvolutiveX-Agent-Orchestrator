@@ -14,7 +14,7 @@ export interface BuildWireStepParams {
   workflow: IWorkflow;
   inferenceRequest: AnthropicRequest;
   assistantMessage: AnthropicMessage;
-  usage: AnthropicUsage;
+  usage?: AnthropicUsage;
   stopReason?: string;
   startedAt: Date;
   closedAt: Date;

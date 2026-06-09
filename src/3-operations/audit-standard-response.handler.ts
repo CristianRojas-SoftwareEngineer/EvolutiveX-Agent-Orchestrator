@@ -86,21 +86,28 @@ export class AuditStandardResponseHandler {
           // Body no es JSON válido — no hay usage ni stopReason
         }
 
-        if (!bodyUsage) return;
+        if (parsedBody === undefined) return;
 
         const inferenceRequest = buildInferenceRequestSnapshot(workflow);
         const now = new Date();
-        const usage = {
-          input_tokens: bodyUsage.input_tokens ?? 0,
-          output_tokens: bodyUsage.output_tokens ?? 0,
-          ...(bodyUsage.cache_creation_input_tokens != null
-            ? { cache_creation_input_tokens: bodyUsage.cache_creation_input_tokens }
-            : {}),
-          ...(bodyUsage.cache_read_input_tokens != null
-            ? { cache_read_input_tokens: bodyUsage.cache_read_input_tokens }
-            : {}),
+        const usage = bodyUsage
+          ? {
+              input_tokens: bodyUsage.input_tokens ?? 0,
+              output_tokens: bodyUsage.output_tokens ?? 0,
+              ...(bodyUsage.cache_creation_input_tokens != null
+                ? { cache_creation_input_tokens: bodyUsage.cache_creation_input_tokens }
+                : {}),
+              ...(bodyUsage.cache_read_input_tokens != null
+                ? { cache_read_input_tokens: bodyUsage.cache_read_input_tokens }
+                : {}),
+            }
+          : undefined;
+        const responsePatch = {
+          assistantMessage,
+          ...(usage ? { usage } : {}),
+          stopReason,
+          closedAt: now,
         };
-        const responsePatch = { assistantMessage, usage, stopReason, closedAt: now };
         const wireStep =
           enrichWireStepWithResponseByIndex(
             this.workflowRepo,
@@ -120,7 +127,7 @@ export class AuditStandardResponseHandler {
               workflow,
               inferenceRequest,
               assistantMessage,
-              usage,
+              ...(usage ? { usage } : {}),
               stopReason,
               startedAt: now,
               closedAt: now,
@@ -150,13 +157,15 @@ export class AuditStandardResponseHandler {
           }
         }
 
-        void persistBillableStepMetricsIfNeeded(
-          this.sessionMetrics,
-          this.auditBaseDir,
-          workflow,
-          wireStep,
-          stopReason,
-        );
+        if (bodyUsage) {
+          void persistBillableStepMetricsIfNeeded(
+            this.sessionMetrics,
+            this.auditBaseDir,
+            workflow,
+            wireStep,
+            stopReason,
+          );
+        }
 
         this.eventBus.publish({
           type: 'step_response',

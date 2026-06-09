@@ -4,6 +4,7 @@ import { AuditStandardResponseHandler } from '../../src/3-operations/audit-stand
 import type { IEventBus } from '../../src/1-domain/repositories/IEventBus.js';
 import type { IWorkflowRepository } from '../../src/1-domain/repositories/IWorkflowRepository.js';
 import type { IWorkflow } from '../../src/1-domain/interfaces/gateway/IWorkflow.js';
+import type { IStep } from '../../src/1-domain/interfaces/gateway/IStep.js';
 import { AuditWorkflowContext } from '../../src/1-domain/types/audit.types.js';
 import { makeTestConfig as makeConfig } from '../helpers/test-config.js';
 import type { SessionMetricsService } from '../../src/2-services/session-metrics.service.js';
@@ -64,6 +65,23 @@ function makeWorkflowRepo(overrides: Partial<IWorkflowRepository> = {}): IWorkfl
 
 function stubWorkflow(id = 'session-1'): IWorkflow {
   return { id, sessionId: id, kind: 'main', status: 'running', steps: [], startedAt: new Date() };
+}
+
+function stubWorkflowWithOpenStep(index: number, id = 'session-1'): IWorkflow {
+  return {
+    ...stubWorkflow(id),
+    steps: [
+      {
+        id: 'step-uuid',
+        workflowId: id,
+        index,
+        inferenceRequest: { model: 'claude-test', messages: [], max_tokens: 8192 },
+        assistantMessage: { role: 'assistant', content: [] },
+        toolUses: [],
+        startedAt: new Date(),
+      },
+    ],
+  };
 }
 
 function makeContext(overrides: Partial<AuditWorkflowContext> = {}): AuditWorkflowContext {
@@ -185,10 +203,14 @@ describe('AuditStandardResponseHandler', () => {
     expect(publish).not.toHaveBeenCalled();
   });
 
-  it('no emite step_response si el body no tiene usage', async () => {
-    const wf = stubWorkflow();
+  it('emite step_response con stop_reason sin usage', async () => {
+    const wf = stubWorkflowWithOpenStep(1);
     const publish = vi.fn();
-    const repo = makeWorkflowRepo({ getWorkflow: vi.fn(() => wf) });
+    const closeStep = vi.fn();
+    const repo = makeWorkflowRepo({
+      getWorkflow: vi.fn(() => wf),
+      closeStep,
+    });
     const handler = new AuditStandardResponseHandler(
       makeEventBus({ publish }),
       makeConfig(),
@@ -198,12 +220,143 @@ describe('AuditStandardResponseHandler', () => {
     );
 
     const stream = new PassThrough();
-    handler.execute(stream, makeContext(), 'application/json');
+    handler.execute(stream, makeContext({ assignedStepIndex: 1 }), 'application/json');
     stream.write(Buffer.from('{"id":"msg_1","stop_reason":"end_turn"}'));
     stream.end();
     await wait();
 
-    expect(publish).not.toHaveBeenCalled();
+    expect(publish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'step_response',
+        payload: expect.objectContaining({
+          stepIndex: 1,
+          response: { id: 'msg_1', stop_reason: 'end_turn' },
+        }),
+      }),
+    );
+    expect(closeStep).toHaveBeenCalled();
+  });
+
+  it('emite step_response para count_tokens sin usage', async () => {
+    const wf = stubWorkflowWithOpenStep(5);
+    const publish = vi.fn();
+    const closeStep = vi.fn();
+    const repo = makeWorkflowRepo({
+      getWorkflow: vi.fn(() => wf),
+      closeStep,
+    });
+    const handler = new AuditStandardResponseHandler(
+      makeEventBus({ publish }),
+      makeConfig(),
+      repo,
+      AUDIT_BASE,
+      makeSessionMetrics(),
+    );
+
+    const stream = new PassThrough();
+    handler.execute(
+      stream,
+      makeContext({ assignedStepIndex: 5, url: '/v1/messages/count_tokens' }),
+      'application/json',
+    );
+    stream.write(Buffer.from('{"input_tokens": 42444}'));
+    stream.end();
+    await wait();
+
+    expect(publish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'step_response',
+        payload: expect.objectContaining({
+          stepIndex: 5,
+          response: { input_tokens: 42444 },
+        }),
+      }),
+    );
+    expect(closeStep).toHaveBeenCalled();
+  });
+
+  it('no invoca updateFromStep sin usage', async () => {
+    const wf = stubWorkflowWithOpenStep(1);
+    const publish = vi.fn();
+    const sessionMetrics = makeSessionMetrics();
+    const repo = makeWorkflowRepo({
+      getWorkflow: vi.fn(() => wf),
+      closeStep: vi.fn(),
+    });
+    const handler = new AuditStandardResponseHandler(
+      makeEventBus({ publish }),
+      makeConfig(),
+      repo,
+      AUDIT_BASE,
+      sessionMetrics,
+    );
+
+    const stream = new PassThrough();
+    handler.execute(stream, makeContext({ assignedStepIndex: 1 }), 'application/json');
+    stream.write(Buffer.from('{"input_tokens": 100}'));
+    stream.end();
+    await wait();
+
+    expect(publish).toHaveBeenCalled();
+    expect(sessionMetrics.updateFromStep).not.toHaveBeenCalled();
+  });
+
+  it('respuesta sin usage en índice 5 no enriquece step abierto en índice 6', async () => {
+    const id = 'session-1';
+    const step5: IStep = {
+      id: 'step-5',
+      workflowId: id,
+      index: 5,
+      inferenceRequest: { model: 'claude-test', messages: [], max_tokens: 8192 },
+      assistantMessage: { role: 'assistant', content: [] },
+      toolUses: [],
+      startedAt: new Date(),
+    };
+    const step6: IStep = {
+      id: 'step-6',
+      workflowId: id,
+      index: 6,
+      inferenceRequest: { model: 'claude-test', messages: [], max_tokens: 8192 },
+      assistantMessage: { role: 'assistant', content: [] },
+      toolUses: [],
+      startedAt: new Date(),
+    };
+    const wf: IWorkflow = {
+      ...stubWorkflow(id),
+      steps: [step5, step6],
+    };
+    const closeStep = vi.fn();
+    const publish = vi.fn();
+    const repo = makeWorkflowRepo({
+      getWorkflow: vi.fn(() => wf),
+      closeStep,
+    });
+    const handler = new AuditStandardResponseHandler(
+      makeEventBus({ publish }),
+      makeConfig(),
+      repo,
+      AUDIT_BASE,
+      makeSessionMetrics(),
+    );
+
+    const stream = new PassThrough();
+    handler.execute(
+      stream,
+      makeContext({ assignedStepIndex: 5, url: '/v1/messages/count_tokens' }),
+      'application/json',
+    );
+    stream.write(Buffer.from('{"input_tokens": 42444}'));
+    stream.end();
+    await wait();
+
+    expect(publish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: expect.objectContaining({ stepIndex: 5 }),
+      }),
+    );
+    expect(closeStep).toHaveBeenCalledWith(id, 'step-5');
+    expect(closeStep).not.toHaveBeenCalledWith(id, 'step-6');
+    expect(step6.closedAt).toBeUndefined();
   });
 
   it('trunca el buffer en memoria al superar MAX_RESPONSE_BUFFER_BYTES', async () => {
@@ -230,7 +383,7 @@ describe('AuditStandardResponseHandler', () => {
     stream.end();
     await wait();
 
-    // El body truncado no es JSON válido → sin usage → sin emit
+    // El body truncado no es JSON válido → sin step_response
     expect(publish).not.toHaveBeenCalled();
   });
 

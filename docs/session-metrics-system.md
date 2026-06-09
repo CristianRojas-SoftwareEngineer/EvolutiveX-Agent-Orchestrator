@@ -73,7 +73,7 @@ Ambos métodos usan cola `writeQueue`, `writeJsonAtomic` y escriben métricas + 
 | Componente                                                 | Rol                                                                                    |
 | ---------------------------------------------------------- | -------------------------------------------------------------------------------------- |
 | `AuditHookEventHandler`                                    | `close()` + `finalizeWorkflowMetrics` (solo main)                                      |
-| `AuditSseResponseHandler` / `AuditStandardResponseHandler` | `registerStep` / `closeStep` + `persistBillableStepMetricsIfNeeded` → `updateFromStep` |
+| `AuditSseResponseHandler` / `AuditStandardResponseHandler` | `registerStep` / `closeStep`; `persistBillableStepMetricsIfNeeded` → `updateFromStep` solo cuando el step tiene `usage` (p. ej. hops `count_tokens` proyectan `step_response` sin métricas) |
 | `persist-billable-step-metrics.util.ts`                    | G16 + `isStepBillableForSessionMetrics` antes de `updateFromStep`                      |
 
 Los `client-preflight` no actualizan métricas de sesión.

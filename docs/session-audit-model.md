@@ -50,6 +50,16 @@ sessions/<session-id>/
 | `step_response`                                                        | Handlers L3                 | `steps/MM/response/body.json`, `headers.json`, `parsed.md`                           |
 | `tool_call`                                                            | Correlador                  | `tools/KK-slug/input.json`, `meta.json`                                              |
 | `tool_result`                                                          | Correlador / hooks          | `tools/KK-slug/result.json`; actualiza `meta.json`                                   |
+
+**Precedencia `completionAuthority` (determinista, fijada al registrar el tool):**
+
+| Autoridad       | Canal de registro                         | Tools típicos                         | Emisor de `tool_result`                         |
+| --------------- | ----------------------------------------- | ------------------------------------- | ----------------------------------------------- |
+| `continuation`  | `registerToolUse`                         | Bash, Read, Grep, Glob, Edit, Write   | `handleContinuation` → body HTTP `tool_result`  |
+| `continuation`  | `registerPendingToolUse` + nombre `Agent` | Agent (subagente)                     | Continuation del padre (coalescing)             |
+| `hook`          | `registerPendingToolUse` + web_*          | `web_search`, `web_fetch`             | `AuditHookEventHandler` (`PostToolUse` / failure) |
+
+`PostToolUse` **no** completa tools con autoridad `continuation` aunque llegue antes que la continuation HTTP. Un único `tool_result` por `tool_call` (idempotencia de `completeToolUse`).
 | `workflow_complete`                                                    | Cierre de workflow          | `output/result.json`, `output/result.parsed.md`; `meta.json` final                   |
 | `workflow_cancel`                                                      | Timeout / cancelación       | `meta.json` con `status: cancelled`                                                  |
 | `stream_chunk`                                                         | `AuditSseResponseHandler`   | `steps/MM/response/streaming/NNNN-chunk.ndjson`; pings filtrados; tope 10 000 chunks |

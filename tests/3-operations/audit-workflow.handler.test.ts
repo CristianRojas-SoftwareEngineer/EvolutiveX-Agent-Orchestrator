@@ -1,5 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
+import { AuditHookEventHandler } from '../../src/3-operations/audit-hook-event.handler.js';
 import { AuditWorkflowHandler } from '../../src/3-operations/audit-workflow.handler.js';
+import type { SessionMetricsService } from '../../src/2-services/session-metrics.service.js';
 import { SessionResolverService } from '../../src/1-domain/services/session-resolver.service.js';
 import { WorkflowRepositoryService } from '../../src/2-services/workflow-repository.service.js';
 import type { IEventBus } from '../../src/1-domain/repositories/IEventBus.js';
@@ -90,6 +92,74 @@ function seedParentWithAgentPending(
   };
   repo.registerPendingToolUse(wf.id, stepId, toolUse);
   return { workflow: wf, parentDir: `${AUDIT_BASE}/${sessionId}/workflows/01` };
+}
+
+function makeSessionMetrics(): SessionMetricsService {
+  return {
+    updateFromStep: vi.fn().mockResolvedValue(undefined),
+    finalizeWorkflowMetrics: vi.fn().mockResolvedValue(undefined),
+  } as unknown as SessionMetricsService;
+}
+
+function seedClientSideTool(
+  repo: WorkflowRepositoryService,
+  sessionId: string,
+  toolUseId: string,
+  toolName: string,
+): IWorkflow {
+  const wf = repo.openWorkflow(
+    sessionId,
+    { isSubagentRequest: false, agentId: undefined },
+    { forceNew: true, layoutIndex: 1, workflowKind: 'agentic' },
+  );
+  const stepId = 'step-parent-1';
+  wf.steps.push({
+    id: stepId,
+    workflowId: wf.id,
+    index: 1,
+    inferenceRequest: { model: 'claude-3-5-sonnet', messages: [], max_tokens: 4096 },
+    assistantMessage: { role: 'assistant', content: [] },
+    toolUses: [],
+    startedAt: new Date(),
+  });
+  repo.patchWireMeta(wf.id, {
+    layoutIndex: 1,
+    requestSequence: 1,
+    requestBodyOmitted: false,
+    requestBodyBytes: 100,
+    workflowKind: 'agentic',
+  });
+  repo.registerToolUse(wf.id, {
+    id: toolUseId,
+    stepId,
+    name: toolName,
+    arguments: {},
+    status: 'running',
+    toolUseBlock: { type: 'tool_use', id: toolUseId, name: toolName, input: {} } as never,
+  });
+  return wf;
+}
+
+function continuationBody(toolUseId: string, content: string, isError = false): Buffer {
+  return Buffer.from(
+    JSON.stringify({
+      model: 'claude-3-5-sonnet',
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'tool_result',
+              tool_use_id: toolUseId,
+              content,
+              ...(isError ? { is_error: true } : {}),
+            },
+          ],
+        },
+      ],
+      max_tokens: 4096,
+    }),
+  );
 }
 
 function lastSubWorkflowMeta(repo: WorkflowRepositoryService): ParentContext | undefined {
@@ -269,7 +339,7 @@ describe('AuditWorkflowHandler', () => {
     expect(eventBus.events.filter((e) => e.type === 'step_request').length).toBeGreaterThanOrEqual(
       1,
     );
-    // Fallback sin PostToolUse: continuation completa el tool desde tool_result en body.
+    // Vía canónica: continuation completa el tool desde tool_result en body.
     const toolResults = eventBus.events.filter((e) => e.type === 'tool_result');
     expect(toolResults.length).toBeGreaterThanOrEqual(1);
     const closedTool = wf!.steps
@@ -449,4 +519,108 @@ describe('AuditWorkflowHandler', () => {
     });
     expect(result).toBeNull();
   });
+
+  it('carrera: PostToolUse ignorado + continuation Bash → un solo tool_result con stdout real', async () => {
+    const sessionId = 'race-session';
+    const toolUseId = 'tool-bash-race';
+    const { handler, workflowRepo, eventBus } = createTestStack((repo) => {
+      seedClientSideTool(repo, sessionId, toolUseId, 'Bash');
+    });
+
+    const hookHandler = new AuditHookEventHandler(
+      workflowRepo,
+      AUDIT_BASE,
+      makeSessionMetrics(),
+    );
+    hookHandler.execute({
+      eventName: 'PostToolUse',
+      sessionId,
+      toolUseId,
+    });
+
+    const wfBefore = workflowRepo.getWorkflowBySessionId(sessionId)!;
+    const toolBefore = wfBefore.steps.flatMap((s) => s.toolUses).find((t) => t.id === toolUseId);
+    expect(toolBefore?.status).toBe('running');
+    expect(eventBus.events.filter((e) => e.type === 'tool_result')).toHaveLength(0);
+
+    await handler.execute({
+      headers: { 'x-cc-audit-session': sessionId },
+      rawBody: continuationBody(toolUseId, 'stdout real del harness'),
+      requestId: 'req-race',
+    });
+
+    const toolResults = eventBus.events.filter((e) => e.type === 'tool_result');
+    expect(toolResults).toHaveLength(1);
+    expect((toolResults[0].payload as { result: { result: string } }).result).toEqual({
+      isError: false,
+      result: 'stdout real del harness',
+    });
+    const toolAfter = workflowRepo
+      .getWorkflow(wfBefore.id)!
+      .steps.flatMap((s) => s.toolUses)
+      .find((t) => t.id === toolUseId);
+    expect(toolAfter?.status).toBe('completed');
+    expect(toolAfter?.result?.result).toBe('stdout real del harness');
+  });
+});
+
+describe('fixture golden sesión 8c440211 — Bash continuation', () => {
+  const GOLDEN_CASES = [
+    {
+      toolUseId: 'call_13b871734f694ea9a07ef3f5',
+      content:
+        'commit 0585d9196ecbb73ef4dcdc5d17f70b37dcfce9a7\nAuthor: Cristian Rojas <cristian.rojas.software.engineer@gmail.com>\nDate',
+      isError: false,
+    },
+    {
+      toolUseId: 'call_1a6edc0673034ef08fef6277',
+      content: 'Exit code 128\nfatal: unrecognized argument: --no-stat',
+      isError: true,
+    },
+    {
+      toolUseId: 'call_f106cf20b4fc476c8bfb6bc1',
+      content:
+        'refactor(session-metrics)!: alinear Tabla 2 con ejecuciones agénticas\n\nPropósito\nLa Tabla 2 del statusline debía refleja',
+      isError: false,
+    },
+  ] as const;
+
+  for (const tc of GOLDEN_CASES) {
+    it(`continuation ${tc.toolUseId} → result.json con contenido real (no null ni PostToolUseFailure)`, async () => {
+      const sessionId = `golden-${tc.toolUseId}`;
+      const { handler, workflowRepo, eventBus } = createTestStack((repo) => {
+        seedClientSideTool(repo, sessionId, tc.toolUseId, 'Bash');
+      });
+
+      const hookHandler = new AuditHookEventHandler(
+        workflowRepo,
+        AUDIT_BASE,
+        makeSessionMetrics(),
+      );
+      hookHandler.execute({
+        eventName: tc.isError ? 'PostToolUseFailure' : 'PostToolUse',
+        sessionId,
+        toolUseId: tc.toolUseId,
+      });
+      expect(eventBus.events.filter((e) => e.type === 'tool_result')).toHaveLength(0);
+
+      await handler.execute({
+        headers: { 'x-cc-audit-session': sessionId },
+        rawBody: continuationBody(tc.toolUseId, tc.content, tc.isError),
+        requestId: `req-${tc.toolUseId}`,
+      });
+
+      const tool = workflowRepo
+        .getWorkflowBySessionId(sessionId)!
+        .steps.flatMap((s) => s.toolUses)
+        .find((t) => t.id === tc.toolUseId);
+      expect(tool?.result?.result).toBe(tc.content);
+      expect(tool?.result?.isError).toBe(tc.isError);
+      expect(tool?.result?.result).not.toBeNull();
+      if (tc.isError) {
+        expect(tool?.result?.result).not.toEqual({ error: 'PostToolUseFailure' });
+      }
+      expect(eventBus.events.filter((e) => e.type === 'tool_result')).toHaveLength(1);
+    });
+  }
 });

@@ -1,5 +1,8 @@
 import type { AnthropicContentBlock } from '../../types/anthropic.types.js';
-import type { ToolUseStatus } from '../../types/gateway/tool-use.types.js';
+import type {
+  ToolCompletionAuthority,
+  ToolUseStatus,
+} from '../../types/gateway/tool-use.types.js';
 
 /** Registro de observabilidad de una invocación de herramienta. */
 export interface IToolUse {
@@ -13,6 +16,8 @@ export interface IToolUse {
   arguments: unknown;
   /** Estado de resolución. */
   status: ToolUseStatus;
+  /** Canal canónico de completación; asignado al registrar en el repositorio. */
+  completionAuthority?: ToolCompletionAuthority;
   /** Bloque `type: 'tool_use'` del mensaje assistant. */
   toolUseBlock: AnthropicContentBlock;
   /** Bloque `type: 'tool_result'` con el resultado. Ausente hasta completar. */

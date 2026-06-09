@@ -9,6 +9,7 @@ import type { ClaudeHookEvent } from '../types/hook.types.js';
 import type { IWorkflow } from '../interfaces/gateway/IWorkflow.js';
 import type { IStep } from '../interfaces/gateway/IStep.js';
 import type { IToolUse } from '../interfaces/gateway/IToolUse.js';
+import type { ToolCompletionAuthority } from '../types/gateway/tool-use.types.js';
 import type { IWorkflowResult } from '../interfaces/gateway/IWorkflowResult.js';
 import type { WorkflowOutcome } from '../types/gateway/workflow.types.js';
 
@@ -118,6 +119,12 @@ export interface IWorkflowRepository {
     toolUseId: string,
     result: { isError: boolean; result: unknown },
   ): void;
+
+  /** Autoridad de completación del tool_use, o `undefined` si no existe. */
+  getToolCompletionAuthority(
+    workflowId: string,
+    toolUseId: string,
+  ): ToolCompletionAuthority | undefined;
 
   /** Evalúa si el workflow puede cerrarse según §15.4. Sin efectos secundarios. */
   readyToClose(workflowId: string, hook: ClaudeHookEvent): boolean;

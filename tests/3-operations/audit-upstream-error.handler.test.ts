@@ -17,6 +17,7 @@ function makeRepo(overrides: Partial<IWorkflowRepository> = {}): IWorkflowReposi
     readyToClose: vi.fn(),
     close: vi.fn(),
     completeToolUse: vi.fn(),
+    getToolCompletionAuthority: vi.fn(),
     getWorkflowBySessionId: vi.fn(),
     findWorkflowWithPendingToolUse: vi.fn(),
     registerPendingToolUse: vi.fn(),

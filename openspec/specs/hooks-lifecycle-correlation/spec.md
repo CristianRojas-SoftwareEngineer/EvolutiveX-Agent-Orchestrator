@@ -66,18 +66,20 @@ donde `HookEventName` es la unión de los 8 nombres de evento del lifecycle:
 
 ### Requirement: Mapeo de eventos al correlador (`AuditHookEventHandler`)
 
-El sistema SHALL implementar un handler `AuditHookEventHandler` en capa 3 (`src/3-operations/`) que reciba un `ClaudeHookEvent` parseado y despache cada uno de los 8 eventos del lifecycle. En G2, los eventos de cierre y apertura ejecutan mutaciones reales en el repo; solo los eventos de estado de `ToolUse` permanecen como stubs:
+El sistema SHALL implementar un handler `AuditHookEventHandler` en capa 3 (`src/3-operations/`) que reciba un `ClaudeHookEvent` parseado y despache cada uno de los 8 eventos del lifecycle:
 
-| Evento | Acción en G2 |
-|--------|-------------|
+| Evento | Acción |
+|--------|--------|
 | `UserPromptSubmit` | **Abre o confirma el workflow main en el repo** (idempotente; ver `gateway-workflow-lifecycle`) |
 | `SubagentStart` | **`confirmSubagentFromHook(agentId, toolUseId?)`** (sin cambio respecto a C3) |
 | `Stop` | **`readyToClose` → si true: `close`** (§15.4) |
 | `SubagentStop` | **`readyToClose` para sub-workflow → si true: `close`** (§15.4) |
 | `StopFailure` | **`close` directamente** (§15.4: siempre cierra en error) |
-| `PreToolUse` | Stub — log "recibido; `ToolUse.status = running` diferido a G4" |
-| `PostToolUse` | Stub — log "recibido; `ToolUse.status = completed` diferido a G4" |
-| `PostToolUseFailure` | Stub — log "recibido; `ToolUse.status = error` diferido a G4" |
+| `PreToolUse` | Log informativo; no muta `IToolUse` |
+| `PostToolUse` | **`completeToolUse` solo si `completionAuthority === 'hook'`**; ignorar para tools `continuation` |
+| `PostToolUseFailure` | **`completeToolUse` con `isError: true` solo si `completionAuthority === 'hook'`**; ignorar para tools `continuation` |
+
+Los hooks `PostToolUse` / `PostToolUseFailure` siguen recibiéndose en `POST /hooks` (relay activo); la restricción es sobre **mutación de estado**, no sobre recepción del evento.
 
 #### Scenario: `SubagentStart` → `confirmSubagentFromHook` invocado (sin cambio)
 
@@ -102,7 +104,20 @@ El sistema SHALL implementar un handler `AuditHookEventHandler` en capa 3 (`src/
 - **THEN** el handler SHALL invocar `close` directamente sin `readyToClose`
 - **AND** el workflow SHALL quedar cerrado con `outcome: 'api_error'`
 
-#### Scenario: `PreToolUse` → stub reconocido, sin mutación de estado (sin cambio)
+#### Scenario: PostToolUse para Bash client-side no muta el tool
+
+- **GIVEN** un tool `Bash` con `completionAuthority: continuation` y `status: running`
+- **WHEN** `AuditHookEventHandler` procesa `PostToolUse` para ese `tool_use_id`
+- **THEN** `completeToolUse` NO SHALL invocarse
+- **AND** el tool SHALL permanecer `running`
+
+#### Scenario: PostToolUse para WebFetch con autoridad hook completa el tool
+
+- **GIVEN** un tool `WebFetch` con `completionAuthority: hook` y `status: running`
+- **WHEN** `AuditHookEventHandler` procesa `PostToolUse` con `lastAssistantMessage: 'summary'`
+- **THEN** `completeToolUse` SHALL invocarse con `isError: false` y `result: 'summary'`
+
+#### Scenario: `PreToolUse` → log informativo, sin mutación de estado
 
 - **GIVEN** un `ClaudeHookEvent` con `eventName: 'PreToolUse'`, `sessionId: 's1'`, `toolUseId: 'tu-xyz'`
 - **WHEN** `AuditHookEventHandler.execute(event)` se invoca

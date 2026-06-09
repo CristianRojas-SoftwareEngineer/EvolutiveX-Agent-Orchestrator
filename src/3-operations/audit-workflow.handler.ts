@@ -830,6 +830,7 @@ export class AuditWorkflowHandler {
    * Completa tools client-side (Bash/Read/…) desde bloques `tool_result` del body HTTP
    * cuando el hook PostToolUse no llegó al proxy (p. ej. settings sin relay instalado).
    */
+  /** Vía canónica de completación para tools con autoridad `continuation`. */
   private completeClientToolResultsFromContinuation(
     sessionId: string,
     parentWorkflow: IWorkflow,

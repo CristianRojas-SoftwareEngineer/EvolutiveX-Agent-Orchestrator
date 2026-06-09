@@ -1,16 +1,18 @@
 ---
 name: proxy-tool-result-continuation-fallback
-description: Completar tools client-side desde tool_result en continuation cuando PostToolUse no llega al proxy
+description: Completar tools client-side desde tool_result en continuation HTTP (vía canónica, no fallback)
 tags:
   component: gateway
   defect-class: audit-projection
   profile: corrective
 ---
 
-La persistencia de `tool_result` depende del hook `PostToolUse` en `~/.claude/settings.json` (matcher `*`, `post-hook-event.ts`). Si la clave falta, `completeToolUse` nunca corre aunque `registerToolUse` sí emitió `tool_call`.
+Los tools client-side (`registerToolUse`: Bash, Read, …) tienen `completionAuthority: continuation`. Su `tool_result` canónico llega en el body de la siguiente request HTTP; `handleContinuation` → `completeClientToolResultsFromContinuation` es la **única** vía de completación.
 
-El body de continuación HTTP ya incluye bloques `tool_result` en el último mensaje user. `handleContinuation` debe invocar `completeToolUse` desde `extractToolResultBlocksFromRequestBody` como fallback resiliente.
+`AuditHookEventHandler` ignora `PostToolUse`/`PostToolUseFailure` para autoridad `continuation`. Completar desde el hook con `result: null` o `{ error: 'PostToolUseFailure' }` bloqueaba el backfill real por idempotencia de `completeToolUse`.
 
-Además: `finalizeWorkflowMetrics` solo corría en hook Stop del workflow sesión; workflows wire cierran por SSE `forceClose` y requieren finalize explícito en `AuditSseResponseHandler`.
+Tools `web_search` / `web_fetch` mantienen autoridad `hook` (sin `tool_result` estándar en continuation). Agent (pending) usa `continuation` (resultado del subagente en continuation del padre).
 
-Related case: maintenance-cases/20260608-proxy-audit-residual-gaps/case.md
+Operador: `PostToolUse` en `~/.claude/settings.json` sigue útil para métricas del harness, pero ya no es requisito para persistir stdout de Bash.
+
+Related case: maintenance-cases/20260608-proxy-audit-residual-gaps/case.md; OpenSpec `fix-client-tool-result-backfill`.

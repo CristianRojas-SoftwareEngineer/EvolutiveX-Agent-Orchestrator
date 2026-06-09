@@ -18,6 +18,7 @@ function makeRepo(overrides: Partial<IWorkflowRepository> = {}): IWorkflowReposi
     readyToClose: vi.fn(),
     close: vi.fn(),
     completeToolUse: vi.fn(),
+    getToolCompletionAuthority: vi.fn(),
     getWorkflowBySessionId: vi.fn(),
     findWorkflowWithPendingToolUse: vi.fn(),
     registerPendingToolUse: vi.fn(),
@@ -204,11 +205,12 @@ describe('AuditHookEventHandler', () => {
     );
   });
 
-  it('PostToolUse → completeToolUse con isError false', () => {
+  it('PostToolUse con autoridad hook → completeToolUse con isError false', () => {
     const wf = stubWorkflow();
     const completeToolUse = vi.fn();
     const findWorkflowByToolUseId = vi.fn().mockReturnValue(wf);
-    const repo = makeRepo({ findWorkflowByToolUseId, completeToolUse });
+    const getToolCompletionAuthority = vi.fn().mockReturnValue('hook');
+    const repo = makeRepo({ findWorkflowByToolUseId, getToolCompletionAuthority, completeToolUse });
     const handler = makeHandler(repo);
 
     handler.execute({
@@ -224,13 +226,35 @@ describe('AuditHookEventHandler', () => {
     });
   });
 
-  it('PostToolUseFailure → completeToolUse con isError true', () => {
+  it('PostToolUse con autoridad continuation (Bash) → no completa', () => {
+    const wf = stubWorkflow();
+    const completeToolUse = vi.fn();
+    const findWorkflowByToolUseId = vi.fn().mockReturnValue(wf);
+    const getToolCompletionAuthority = vi.fn().mockReturnValue('continuation');
+    const repo = makeRepo({ findWorkflowByToolUseId, getToolCompletionAuthority, completeToolUse });
+    const handler = makeHandler(repo);
+
+    handler.execute({
+      eventName: 'PostToolUse',
+      sessionId: 'session-1',
+      toolUseId: 'tu-bash',
+    });
+
+    expect(completeToolUse).not.toHaveBeenCalled();
+  });
+
+  it('PostToolUseFailure con autoridad hook (WebFetch) → completeToolUse con isError true', () => {
     const wf = stubWorkflow();
     const completeToolUse = vi.fn();
     const findWorkflowWithPendingToolUse = vi
       .fn()
       .mockReturnValue({ workflow: wf, toolUse: { id: 'tu-1' } });
-    const repo = makeRepo({ findWorkflowWithPendingToolUse, completeToolUse });
+    const getToolCompletionAuthority = vi.fn().mockReturnValue('hook');
+    const repo = makeRepo({
+      findWorkflowWithPendingToolUse,
+      getToolCompletionAuthority,
+      completeToolUse,
+    });
     const handler = makeHandler(repo);
 
     handler.execute({

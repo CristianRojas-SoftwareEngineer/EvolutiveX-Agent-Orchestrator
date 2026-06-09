@@ -341,6 +341,27 @@ describe('WorkflowRepositoryService — completeToolUse', () => {
     expect(bus.ofType('tool_result')).toHaveLength(0);
   });
 
+  it('registerToolUse asigna completionAuthority continuation', () => {
+    const repo = new WorkflowRepositoryService();
+    const wf = repo.openWorkflow('s1', { agentId: 'a', isSubagentRequest: false });
+    repo.registerStep(wf.id, makeStep('step-1', wf.id));
+    repo.registerToolUse(wf.id, makeToolUse('tu-1', 'step-1', 'Bash'));
+    expect(repo.getWorkflow(wf.id)!.steps[0].toolUses[0].completionAuthority).toBe('continuation');
+    expect(repo.getToolCompletionAuthority(wf.id, 'tu-1')).toBe('continuation');
+  });
+
+  it('registerPendingToolUse asigna autoridad por nombre de tool', () => {
+    const repo = new WorkflowRepositoryService();
+    const wf = repo.openWorkflow('s1', { agentId: 'a', isSubagentRequest: false });
+    repo.registerStep(wf.id, makeStep('step-1', wf.id));
+    repo.registerPendingToolUse(wf.id, 'step-1', makeToolUse('tu-agent', 'step-1', 'Agent'));
+    repo.registerPendingToolUse(wf.id, 'step-1', makeToolUse('tu-ws', 'step-1', 'web_search'));
+    repo.registerPendingToolUse(wf.id, 'step-1', makeToolUse('tu-wf', 'step-1', 'web_fetch'));
+    expect(repo.getToolCompletionAuthority(wf.id, 'tu-agent')).toBe('continuation');
+    expect(repo.getToolCompletionAuthority(wf.id, 'tu-ws')).toBe('hook');
+    expect(repo.getToolCompletionAuthority(wf.id, 'tu-wf')).toBe('hook');
+  });
+
   it('doble completeToolUse emite un solo tool_result', () => {
     const bus = new SpyBus();
     const repo = new WorkflowRepositoryService(bus);

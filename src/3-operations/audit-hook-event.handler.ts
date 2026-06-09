@@ -119,6 +119,10 @@ export class AuditHookEventHandler {
       match?.workflow ?? this.workflowRepo.findWorkflowByToolUseId(event.sessionId, toolUseId);
     if (!workflow) return;
 
+    if (this.workflowRepo.getToolCompletionAuthority(workflow.id, toolUseId) !== 'hook') {
+      return;
+    }
+
     const resultPayload =
       event.lastAssistantMessage != null && event.lastAssistantMessage !== ''
         ? event.lastAssistantMessage

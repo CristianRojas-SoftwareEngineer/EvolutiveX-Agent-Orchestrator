@@ -13,6 +13,7 @@ import type { IToolUse } from '../1-domain/interfaces/gateway/IToolUse.js';
 import type { IWorkflowResult } from '../1-domain/interfaces/gateway/IWorkflowResult.js';
 import type { IEventBus } from '../1-domain/repositories/IEventBus.js';
 import type { WorkflowOutcome } from '../1-domain/types/gateway/workflow.types.js';
+import type { ToolCompletionAuthority } from '../1-domain/types/gateway/tool-use.types.js';
 import { Workflow } from '../1-domain/models/gateway/Workflow.js';
 import { buildWorkflowResult } from '../1-domain/services/gateway/build-workflow-result.js';
 
@@ -212,11 +213,38 @@ export class WorkflowRepositoryService implements IWorkflowRepository {
     if (step) step.closedAt = new Date();
   }
 
+  /** Asigna autoridad de completación según canal de registro y nombre de tool. */
+  private resolvePendingToolCompletionAuthority(toolName: string): ToolCompletionAuthority {
+    const normalized = toolName.toLowerCase().replace(/_/g, '');
+    if (normalized === 'agent') return 'continuation';
+    if (
+      normalized === 'websearch' ||
+      normalized === 'webfetch' ||
+      normalized === 'websearchtool' ||
+      normalized === 'webfetchtool'
+    ) {
+      return 'hook';
+    }
+    return 'hook';
+  }
+
+  private findToolUse(workflowId: string, toolUseId: string): IToolUse | undefined {
+    const workflow = this.workflows.get(workflowId);
+    if (workflow) {
+      for (const step of workflow.steps) {
+        const toolUse = step.toolUses.find((t) => t.id === toolUseId);
+        if (toolUse) return toolUse;
+      }
+    }
+    return this.pendingToolUses.get(workflowId)?.get(toolUseId)?.toolUse;
+  }
+
   public registerToolUse(workflowId: string, toolUse: IToolUse): void {
     const workflow = this.workflows.get(workflowId);
     if (!workflow) return;
     const step = workflow.steps.find((s) => s.id === toolUse.stepId);
     if (!step) return;
+    toolUse.completionAuthority = 'continuation';
     step.toolUses.push(toolUse);
     // El workflow es dueño de este tool_use → indexar para lookup de continuation
     // (consistente con `registerPendingToolUse`). No toca `pendingToolUses`, así que
@@ -230,22 +258,19 @@ export class WorkflowRepositoryService implements IWorkflowRepository {
     });
   }
 
+  public getToolCompletionAuthority(
+    workflowId: string,
+    toolUseId: string,
+  ): ToolCompletionAuthority | undefined {
+    return this.findToolUse(workflowId, toolUseId)?.completionAuthority;
+  }
+
   public completeToolUse(
     workflowId: string,
     toolUseId: string,
     result: { isError: boolean; result: unknown },
   ): void {
-    const workflow = this.workflows.get(workflowId);
-    if (!workflow) return;
-    let toolUse: IToolUse | undefined;
-    for (const step of workflow.steps) {
-      toolUse = step.toolUses.find((t) => t.id === toolUseId);
-      if (toolUse) break;
-    }
-    // También puede estar registrado como pendiente.
-    if (!toolUse) {
-      toolUse = this.pendingToolUses.get(workflowId)?.get(toolUseId)?.toolUse;
-    }
+    const toolUse = this.findToolUse(workflowId, toolUseId);
     if (!toolUse) return; // no-op defensivo
     if (toolUse.status === 'completed' || toolUse.status === 'error') return;
     toolUse.result = result;
@@ -354,6 +379,7 @@ export class WorkflowRepositoryService implements IWorkflowRepository {
 
   public registerPendingToolUse(workflowId: string, stepId: string, toolUse: IToolUse): void {
     if (!this.workflows.has(workflowId)) return;
+    toolUse.completionAuthority = this.resolvePendingToolCompletionAuthority(toolUse.name);
     let pendings = this.pendingToolUses.get(workflowId);
     if (!pendings) {
       pendings = new Map();

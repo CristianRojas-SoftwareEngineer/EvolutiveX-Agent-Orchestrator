@@ -1,5 +1,8 @@
 import type { AnthropicContentBlock } from '../../types/anthropic.types.js';
-import type { ToolUseStatus } from '../../types/gateway/tool-use.types.js';
+import type {
+  ToolCompletionAuthority,
+  ToolUseStatus,
+} from '../../types/gateway/tool-use.types.js';
 import type { IToolUse } from '../../interfaces/gateway/IToolUse.js';
 
 export class ToolUse implements IToolUse {
@@ -8,6 +11,7 @@ export class ToolUse implements IToolUse {
   name: string;
   arguments: unknown;
   status: ToolUseStatus;
+  completionAuthority?: ToolCompletionAuthority;
   toolUseBlock: AnthropicContentBlock;
   toolResultBlock?: AnthropicContentBlock;
   childWorkflowId?: string;
@@ -20,6 +24,7 @@ export class ToolUse implements IToolUse {
     this.name = data.name;
     this.arguments = data.arguments;
     this.status = data.status;
+    this.completionAuthority = data.completionAuthority;
     this.toolUseBlock = data.toolUseBlock;
     this.toolResultBlock = data.toolResultBlock;
     this.childWorkflowId = data.childWorkflowId;

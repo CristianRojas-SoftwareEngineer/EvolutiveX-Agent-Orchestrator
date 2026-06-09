@@ -16,6 +16,8 @@ import { AuditSseResponseHandler } from '../3-operations/audit-sse-response.hand
 import { AuditStandardResponseHandler } from '../3-operations/audit-standard-response.handler.js';
 import { AuditUpstreamErrorHandler } from '../3-operations/audit-upstream-error.handler.js';
 import { FilterToolsHandler } from '../3-operations/filter-tools.handler.js';
+import { SapiTTSService } from '../2-services/tts/sapi-tts.service.js';
+import { TranscriptContextExtractor } from '../2-services/tts/transcript-extractor.service.js';
 import { ProxyEnvironmentConfig } from '../1-domain/types/config.types.js';
 import type { Logger } from '../1-domain/types/logger.types.js';
 
@@ -83,11 +85,28 @@ export async function createProxyDependencies(
   );
   const auditUpstreamErrorHandler = new AuditUpstreamErrorHandler(workflowRepo);
   const filterToolsHandler = new FilterToolsHandler(config);
+
+  // Servicios de TTS — opcionales; se desactivan si TTS_ENABLED=false
+  const ttsEnabled = config.TTS_ENABLED !== false;
+  const ttsService = ttsEnabled ? new SapiTTSService() : undefined;
+  const contextExtractor = ttsEnabled ? new TranscriptContextExtractor() : undefined;
+
+  if (ttsService) {
+    // Inicializar en segundo plano para no bloquear el arranque del servidor
+    void ttsService.initialize().catch((err: unknown) => {
+      const msg = err instanceof Error ? err.message : String(err);
+      logger.warn({ err: msg }, '[TTS] Fallo en la inicialización del motor Kokoro; TTS desactivado');
+    });
+  }
+
   const hookEventHandler = new AuditHookEventHandler(
     workflowRepo,
     auditBaseDir,
     sessionMetrics,
     logger,
+    ttsService,
+    contextExtractor,
+    config.TTS_CONTEXT_N ?? 3,
   );
 
   return {

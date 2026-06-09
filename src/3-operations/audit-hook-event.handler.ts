@@ -25,10 +25,14 @@ export class AuditHookEventHandler {
         break;
 
       case 'UserPromptSubmit':
-        this.workflowRepo.openWorkflow(event.sessionId, {
-          agentId: event.agentId,
-          isSubagentRequest: false,
-        });
+        this.workflowRepo.openWorkflow(
+          event.sessionId,
+          {
+            agentId: event.agentId,
+            isSubagentRequest: false,
+          },
+          { workflowKind: 'session-shell' },
+        );
         break;
 
       case 'Stop': {

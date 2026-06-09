@@ -247,6 +247,7 @@ export class WorkflowRepositoryService implements IWorkflowRepository {
       toolUse = this.pendingToolUses.get(workflowId)?.get(toolUseId)?.toolUse;
     }
     if (!toolUse) return; // no-op defensivo
+    if (toolUse.status === 'completed' || toolUse.status === 'error') return;
     toolUse.result = result;
     toolUse.status = result.isError ? 'error' : 'completed';
     toolUse.completedAt = new Date();

@@ -213,7 +213,7 @@ describe('WorkflowRepositoryService — lifecycle: close', () => {
 
     expect(result.outcome).toBe('success');
     expect(result.closedByEvent).toBe('Stop');
-    expect(result.finalText).toBe('Listo');
+    expect('finalText' in result).toBe(false);
     expect(wf.status).toBe('completed');
     expect(wf.result).toBe(result);
     expect(wf.completedAt).toBeDefined();
@@ -264,7 +264,7 @@ describe('WorkflowRepositoryService — lifecycle: close', () => {
     const result2 = repo.close('session-1', hook2);
 
     expect(result2).toBe(result1);
-    expect(result2.finalText).toBe('primera');
+    expect('finalText' in result2).toBe(false);
   });
 });
 
@@ -360,6 +360,23 @@ describe('WorkflowRepositoryService — completeToolUse', () => {
     const wf = repo.openWorkflow('s1', { agentId: 'a', isSubagentRequest: false });
     repo.completeToolUse(wf.id, 'tu-999', { isError: false, result: 'ok' });
     expect(bus.ofType('tool_result')).toHaveLength(0);
+  });
+
+  it('doble completeToolUse emite un solo tool_result', () => {
+    const bus = new SpyBus();
+    const repo = new WorkflowRepositoryService(bus);
+    const wf = repo.openWorkflow('s1', { agentId: 'a', isSubagentRequest: false });
+    repo.registerStep(wf.id, makeStep('step-1', wf.id));
+    repo.registerToolUse(wf.id, makeToolUse('tu-1', 'step-1'));
+
+    repo.completeToolUse(wf.id, 'tu-1', { isError: false, result: 'ok' });
+    repo.completeToolUse(wf.id, 'tu-1', { isError: false, result: 'ok-again' });
+
+    expect(bus.ofType('tool_result')).toHaveLength(1);
+    expect(repo.getWorkflow(wf.id)!.steps[0].toolUses[0].result).toEqual({
+      isError: false,
+      result: 'ok',
+    });
   });
 });
 

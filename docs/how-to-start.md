@@ -193,7 +193,7 @@ Abre tu flujo habitual (proyecto, chat, lo que use la API). Las peticiones pasar
 **Estructura bajo cada sesión (P1)**
 
 - **`workflows/NN/`** — Cada ciclo auditado: `meta.json`, `steps/MM/`, `tools/KK-slug/`, `output/result.json` al cerrar.
-- El tipo semántico (`agentic`, `client-preflight`, `side-request`) queda en metadatos del workflow, no en carpetas `main-agent/` / `side-interactions/` (layout flat retirado; ver Apéndice A del modelo de auditoría).
+- El tipo semántico (`session-shell`, `agentic`, `client-preflight`, `side-request`) queda en metadatos del workflow, no en carpetas `main-agent/` / `side-interactions/` (layout flat retirado; ver Apéndice A del modelo de auditoría).
 
 **`session-metrics.json`** (en la raíz de `sessions/<sessionId>/`) agrega tokens por modelo a medida que se cierran turnos; sirve para consultas rápidas (p. ej. statusline) sin reescanear todos los `meta.json`. Esquema y motivación en [`session-metrics-system.md`](./session-metrics-system.md).
 

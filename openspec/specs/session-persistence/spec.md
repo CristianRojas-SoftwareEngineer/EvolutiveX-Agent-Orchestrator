@@ -23,7 +23,7 @@ El sistema SHALL proveer `SessionPersistence` en `src/2-services/session-persist
 | `stream_chunk` | Escribir `steps/MM/response/streaming/NNNN-chunk.ndjson`; al cierre del step con `coalescedDelegationStepIndex`, generar `body.coalesced.json` y `body.coalesced.parsed.md` |
 | `*` (wildcard) | Append-only a `sessions/<sessionId>/events.ndjson` por cada evento recibido |
 
-En `workflow_start`, `meta.json` SHALL incluir `workflowKind` (estructural: `main` | `subagent`) y `interactionType` (semántico: `agentic` | `side-request` | `client-preflight`, desde payload `workflowKind` del correlador).
+En `workflow_start`, `meta.json` SHALL incluir `workflowKind` (estructural: `main` | `subagent`) y `interactionType` (semántico: `agentic` | `side-request` | `client-preflight` | `session-shell`, desde payload `workflowKind` del correlador).
 
 El evento `step_request` emitido por handlers L3 SHALL transportar el body HTTP parseado completo. El correlador (`registerStep`) NO SHALL emitir `step_request` con `inferenceRequest` sintético (`messages: []`).
 
@@ -41,6 +41,12 @@ Para un hop HTTP completo, `step_request` y `step_response` del mismo hop SHALL 
 - **GIVEN** un evento `workflow_start` con `kind: 'main'` y `workflowKind: 'side-request'`
 - **WHEN** `SessionPersistence` procesa el evento
 - **THEN** `meta.json` SHALL contener `workflowKind: 'main'` y `interactionType: 'side-request'`
+
+#### Scenario: Shell de sesión persiste session-shell
+
+- **WHEN** el correlador emite `workflow_start` para el workflow contenedor (`workflowId === sessionId`) con `workflowKind: 'session-shell'` en payload
+- **THEN** `meta.json` SHALL contener `workflowKind: 'main'` y `interactionType: 'session-shell'`
+- **AND** SHALL NOT usar `interactionType: 'main'` como fallback semántico
 
 #### Scenario: step_request de continuación preserva messages con tool_result
 

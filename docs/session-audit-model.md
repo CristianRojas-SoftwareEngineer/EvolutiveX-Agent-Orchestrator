@@ -192,10 +192,11 @@ Los pendientes viven en `IToolUse` del workflow padre, no en `ActiveInteraction`
 
 ## 5. Tipos de interacción (semántica → workflow)
 
-Los nombres `agentic`, `client-preflight` y `side-request` se conservan como **`interactionType`** en metadatos wire para compatibilidad con métricas y clasificación. En disco, todos son carpetas `workflows/NN/`.
+Los nombres `agentic`, `client-preflight`, `side-request` y `session-shell` se conservan como **`interactionType`** en metadatos wire para compatibilidad con métricas y clasificación. En disco, todos son carpetas `workflows/NN/`.
 
 | `interactionType`  | Origen típico         | Cierre del workflow                                        |
 | ------------------ | --------------------- | ---------------------------------------------------------- |
+| `session-shell`    | `UserPromptSubmit`    | Hook `Stop` (contenedor lifecycle de la sesión)            |
 | `agentic`          | Fresh + continuations | Hook de cierre / `workflow_complete` con `IWorkflowResult` |
 | `client-preflight` | Quota o warm-up       | Al recibir respuesta (inmediato)                           |
 | `side-request`     | `tools: []`           | Respuesta terminal; workflow independiente del main        |

@@ -43,6 +43,18 @@ async function exists(rel: string): Promise<boolean> {
 }
 
 describe('SessionPersistence', () => {
+  it('workflow_start con session-shell persiste interactionType session-shell', async () => {
+    emit('workflow_start', 'sess-1', {
+      workflowId: 'sess-1',
+      kind: 'main',
+      workflowKind: 'session-shell',
+    });
+    await persistence.flush();
+    const meta = await readJson('sessions/sess-1/workflows/00/meta.json');
+    expect(meta.interactionType).toBe('session-shell');
+    expect(meta.workflowKind).toBe('main');
+  });
+
   it('workflow_start crea directorio y meta.json inicial', async () => {
     emit('workflow_start', 'sess-1', { workflowId: 'wf-1', kind: 'main' });
     await persistence.flush();

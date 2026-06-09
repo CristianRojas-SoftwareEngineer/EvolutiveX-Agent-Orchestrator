@@ -92,10 +92,12 @@ describe('gateway-wire-step.util', () => {
     for (const step of updated.steps) {
       expect(step.inferenceRequest.messages.length).toBeGreaterThan(0);
       expect(step.assistantMessage.content.length).toBeGreaterThan(0);
+      expect(step.closedAt).toBeDefined();
     }
+    expect(updated.result?.stepCount).toBe(3);
   });
 
-  it('tool_use: enriquece sin cerrar el step', () => {
+  it('tool_use: cierra el step al completar el hop', () => {
     const repo = new WorkflowRepositoryService();
     const wf = repo.openWorkflow('session-tu', { agentId: undefined, isSubagentRequest: false }, {
       forceNew: true,
@@ -119,8 +121,69 @@ describe('gateway-wire-step.util', () => {
       'tool_use',
     );
 
-    expect(enriched?.closedAt).toBeUndefined();
+    expect(enriched?.closedAt).toBeDefined();
     expect(repo.getWorkflow(wf.id)!.steps).toHaveLength(1);
+  });
+
+  it('registerWireStepInCorrelator: 3× tool_use + end_turn → stepCount 4', () => {
+    const repo = new WorkflowRepositoryService();
+    const wf = repo.openWorkflow('session-4hop', { agentId: undefined, isSubagentRequest: false }, {
+      forceNew: true,
+      layoutIndex: 2,
+      workflowKind: 'agentic',
+    });
+
+    for (let hop = 0; hop < 4; hop++) {
+      repo.registerStep(wf.id, makeRequestStep(wf.id, hop));
+      const isLast = hop === 3;
+      const stopReason = isLast ? 'end_turn' : 'tool_use';
+      const responseStep = buildWireStep({
+        workflow: wf,
+        inferenceRequest: { model: 'm', messages: [], max_tokens: 1 },
+        assistantMessage: {
+          role: 'assistant',
+          content: isLast
+            ? [{ type: 'text', text: 'done' }]
+            : [{ type: 'tool_use', id: `tu-${hop}`, name: 'Bash', input: {} }],
+        },
+        usage: { input_tokens: 1, output_tokens: 1 },
+        stopReason,
+        startedAt: new Date(),
+        closedAt: new Date(),
+      });
+      registerWireStepInCorrelator(repo, responseStep, stopReason);
+    }
+
+    const updated = repo.getWorkflow(wf.id)!;
+    expect(updated.steps).toHaveLength(4);
+    expect(updated.result?.stepCount).toBe(4);
+  });
+
+  it('registerWireStepInCorrelator fallback: tool_use sin step previo cierra el step', () => {
+    const repo = new WorkflowRepositoryService();
+    const wf = repo.openWorkflow('session-fb', { agentId: undefined, isSubagentRequest: false }, {
+      forceNew: true,
+      layoutIndex: 3,
+      workflowKind: 'agentic',
+    });
+
+    const responseStep = buildWireStep({
+      workflow: wf,
+      inferenceRequest: { model: 'm', messages: [], max_tokens: 1 },
+      assistantMessage: {
+        role: 'assistant',
+        content: [{ type: 'tool_use', id: 'tu-fb', name: 'Bash', input: {} }],
+      },
+      usage: { input_tokens: 1, output_tokens: 1 },
+      stopReason: 'tool_use',
+      startedAt: new Date(),
+      closedAt: new Date(),
+    });
+
+    const registered = registerWireStepInCorrelator(repo, responseStep, 'tool_use');
+    expect(registered?.closedAt).toBeDefined();
+    expect(repo.getWorkflow(wf.id)!.steps).toHaveLength(1);
+    expect(repo.getWorkflow(wf.id)!.steps[0].closedAt).toBeDefined();
   });
 
   it('resolveOpenWireStepIndex: apunta al step abierto, no a steps.length', () => {

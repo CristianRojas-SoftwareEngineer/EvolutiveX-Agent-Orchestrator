@@ -84,6 +84,8 @@ export function enrichOpenWireStepWithResponse(
   openStep.stopReason = patch.stopReason;
 
   if (stopReason === 'tool_use') {
+    openStep.closedAt = patch.closedAt;
+    repo.closeStep(workflowId, openStep.id);
     return openStep;
   }
 
@@ -131,6 +133,8 @@ export function registerWireStepInCorrelator(
   repo.registerStep(step.workflowId, step);
 
   if (stopReason === 'tool_use') {
+    step.closedAt = step.closedAt ?? new Date();
+    repo.closeStep(step.workflowId, step.id);
     return step;
   }
 

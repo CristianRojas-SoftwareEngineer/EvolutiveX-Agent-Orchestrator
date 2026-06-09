@@ -1,7 +1,6 @@
 /**
  * Indica si un hop de inferencia debe contabilizarse en session-metrics.json (per-step).
- * Debe alinearse con la rama terminal de registerWireStepInCorrelator (closeStep).
- * No usar step.closedAt: buildWireStep siempre asigna closedAt al crear el step.
+ * Los hops tool_use se cierran en correlador pero no son billables; solo stops terminales.
  */
 export function isStepBillableForSessionMetrics(stopReason: string | undefined): boolean {
   if (stopReason === 'tool_use') {

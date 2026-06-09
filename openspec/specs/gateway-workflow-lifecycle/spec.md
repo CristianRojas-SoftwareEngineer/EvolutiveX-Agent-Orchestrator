@@ -266,7 +266,7 @@ El warning de orphan SHALL quedar reservado para casos genuinos: continuation si
 
 `AuditSseResponseHandler` y `AuditStandardResponseHandler` (egress) SHALL enriquecer el último step sin `closedAt` del workflow mediante `enrichOpenWireStepWithResponse`, asignando `assistantMessage`, `usage` y `stopReason` desde el ensamblaje. NO SHALL invocar `registerStep` para un segundo `IStep` cuando existe step abierto del mismo hop.
 
-Cuando el step es terminal (`stopReason === 'end_turn'` o equivalente), el handler SHALL invocar `closeStep` tras el enriquecimiento. Cuando el step termina con `tool_use`, el handler SHALL enriquecer pero NO SHALL invocar `closeStep` hasta el cierre diferido. Si no hay step abierto (edge case), egress MAY registrar un step nuevo como fallback.
+Cuando el step es terminal (`stopReason === 'end_turn'` o equivalente), el handler SHALL invocar `closeStep` tras el enriquecimiento. Cuando el step termina con `tool_use`, el handler SHALL enriquecer y SHALL invocar `closeStep` (hop HTTP completo). Si no hay step abierto (edge case), egress MAY registrar un step nuevo como fallback con la misma regla de cierre en `tool_use`.
 
 Referencia: [§38 gateway-architecture.md](../../../docs/gateway-architecture.md#38-capa-3--operations), [session-audit-model.md](../../../docs/session-audit-model.md#2-principio-de-diseño).
 
@@ -278,16 +278,42 @@ Referencia: [§38 gateway-architecture.md](../../../docs/gateway-architecture.md
 - **AND** `workflow.steps.length` SHALL permanecer igual (no +1)
 - **AND** SHALL invocarse `closeStep` con el `stepId` del step enriquecido
 
-#### Scenario: Inferencia SSE con tool_use enriquece sin cerrar
+#### Scenario: Inferencia SSE con tool_use cierra el hop
 
 - **GIVEN** un workflow wire con step abierto de ingress
 - **WHEN** `AuditSseResponseHandler` completa con `stopReason: 'tool_use'`
-- **THEN** el step enriquecido SHALL permanecer sin `closedAt`
+- **THEN** el step enriquecido SHALL tener `closedAt` definido
 - **AND** `registerStep` NO SHALL añadir un segundo step
+- **AND** el workflow wire SHALL permanecer `running` hasta `end_turn`
 
 #### Scenario: Tres hops producen tres steps
 
 - **GIVEN** un workflow wire con tres ciclos request+response
 - **WHEN** cada egress enriquece el step abierto de su hop
 - **THEN** `workflow.steps.length` SHALL ser 3, no 6
+
+---
+
+### Requirement: buildWorkflowResult para cierre por hook
+
+`buildWorkflowResult` SHALL construir `IWorkflowResult` al recibir un hook de cierre (`Stop`, `SubagentStop`, `StopFailure`) con `outcome`, `usage`, `stepCount`, `closedByEvent` y `sessionId`.
+
+Cuando el workflow cerrado es el contenedor de sesión (`workflow.id === hook.sessionId`), el resultado SHALL **omitir** el campo `finalText`, reservando el texto final del turno agentic al workflow wire que posee la evidencia SSE.
+
+#### Scenario: Shell sesión sin finalText duplicado
+
+- **GIVEN** un workflow con `id === sessionId` (shell) y un workflow wire agentic del mismo turno
+- **WHEN** el hook `Stop` cierra el shell vía `buildWorkflowResult`
+- **THEN** `IWorkflowResult` del shell SHALL NOT incluir `finalText`
+- **AND** el workflow wire SHALL conservar `finalText` en su `workflow_complete` vía SSE
+
+### Requirement: Apertura de workflow sesión en UserPromptSubmit
+
+Al procesar `UserPromptSubmit`, `AuditHookEventHandler` SHALL abrir el workflow de sesión con `workflowKind: 'session-shell'` (semántico) además del kind estructural `main`.
+
+#### Scenario: UserPromptSubmit etiqueta session-shell
+
+- **WHEN** llega un hook `UserPromptSubmit` para `sessionId` S
+- **THEN** `openWorkflow` SHALL recibir `workflowKind: 'session-shell'`
+- **AND** el evento `workflow_start` SHALL incluir ese valor en payload para persistencia
 

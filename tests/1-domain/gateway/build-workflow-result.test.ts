@@ -97,4 +97,18 @@ describe('buildWorkflowResult', () => {
     expect(result.closedByEvent).toBe('StopFailure');
     expect(result.outcome).toBe('unknown');
   });
+
+  it('shell de sesión omite finalText', () => {
+    const wf = makeWorkflow({ id: 'sess1', sessionId: 'sess1' });
+    const hook = makeHook({ sessionId: 'sess1', lastAssistantMessage: 'Texto duplicado' });
+    const result = buildWorkflowResult(wf, [], [], hook);
+    expect('finalText' in result).toBe(false);
+  });
+
+  it('workflow wire conserva finalText', () => {
+    const wf = makeWorkflow({ id: 'wf-wire', sessionId: 'sess1' });
+    const hook = makeHook({ sessionId: 'sess1', lastAssistantMessage: 'Respuesta wire' });
+    const result = buildWorkflowResult(wf, [], [], hook);
+    expect(result.finalText).toBe('Respuesta wire');
+  });
 });

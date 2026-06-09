@@ -156,7 +156,11 @@ export interface StepMeta {
  * Clasificación del tipo de request HTTP según el contenido del body.
  * Tipo canónico para la clasificación semántica del request en el proxy.
  */
-export type WorkflowRequestKind = 'client-preflight' | 'agentic' | 'side-request';
+export type WorkflowRequestKind =
+  | 'client-preflight'
+  | 'agentic'
+  | 'side-request'
+  | 'session-shell';
 
 /**
  * Referencia de parentezco entre una interacción de subagente y el step del

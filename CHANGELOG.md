@@ -3,9 +3,6 @@
 All notable changes are derived from conventional commits. Do not edit by hand.
 
 ## [Unreleased]
-### Fixed
-- unificar request/response en un IStep por hop wire (Case: 20260608-proxy-step-request-response-split)
-
 ### Added
 - migrar SM a dos cadenas
 - versionar harness de agente en .claude/
@@ -110,6 +107,7 @@ All notable changes are derived from conventional commits. Do not edit by hand.
 - reemplazar 'any' por tipos estrictos del SDK de Anthropic
 
 ### Fixed
+- unificar request/response en un IStep por hop wire (Case: 20260608-proxy-step-request-response-split)
 - persistir tool_result y métricas wire residuales
 - corregir gaps de proyección causal en workflows wire (Case: 20260608-proxy-audit-discrepancies)
 - aplicar 7 correcciones a los artefactos del change

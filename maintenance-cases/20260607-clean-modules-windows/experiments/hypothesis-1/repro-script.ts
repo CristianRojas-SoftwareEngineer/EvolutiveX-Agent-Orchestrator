@@ -5,9 +5,9 @@
  * un archivo de node_modules/ mientras rimraf intenta borrar el directorio.
  * Ejecutar desde la raíz del proyecto:
  *
- *   npx tsx scripting/clean-modules-repro.ts
+ *   npx tsx maintenance-cases/20260607-clean-modules-windows/experiments/hypothesis-1/repro-script.ts
  */
-import { existsSync, readFileSync, writeFileSync, unlinkSync } from 'fs';
+import { existsSync, writeFileSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { execSync, spawn } from 'child_process';
 
@@ -45,25 +45,19 @@ await new Promise(r => setTimeout(r, 2000));
 console.log('[3] Verificando que el archivo existe:', existsSync(testFilePath) ? 'SÍ' : 'NO');
 
 console.log('[4] Ejecutando npm run clean:modules...');
-let exitCode = null;
-let stdout = '';
-let stderr = '';
+let exitCode = 0;
 
 try {
-  const result = execSync('npm run clean:modules', {
+  execSync('npm run clean:modules', {
     cwd: projectRoot,
     encoding: 'utf-8',
     stdio: 'pipe',
     timeout: 30000,
   });
-  exitCode = 0;
-  stdout = result;
   console.log('   rimraf exit code: 0 (sin excepción)');
 } catch (error: unknown) {
-  const err = error as { status?: number; stdout?: string; stderr?: string };
+  const err = error as { status?: number };
   exitCode = err.status ?? 1;
-  stdout = err.stdout ?? '';
-  stderr = err.stderr ?? '';
   console.log(`   rimraf exit code: ${exitCode} (capturado)`);
 }
 
@@ -96,4 +90,4 @@ try {
 
 console.log('');
 console.log('=== Fin experimento ===');
-process.exit(exitCode ?? 0);
+process.exit(exitCode);

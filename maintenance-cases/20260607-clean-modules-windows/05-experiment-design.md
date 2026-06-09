@@ -42,7 +42,7 @@ Si no existe, ejecutar `npm install`.
 
 Crear un script que simule la condición de lock:
 
-**`scripting/clean-modules-repro.ts`**:
+**`maintenance-cases/20260607-clean-modules-windows/experiments/hypothesis-1/repro-script.ts`**:
 
 ```typescript
 import { execSync } from 'child_process';
@@ -101,7 +101,7 @@ console.log('=== Fin experimento ===');
 ### Paso 2 — Ejecutar reproductor y observar
 
 ```bash
-npx tsx scripting/clean-modules-repro.ts
+npx tsx maintenance-cases/20260607-clean-modules-windows/experiments/hypothesis-1/repro-script.ts
 ```
 
 Observar:

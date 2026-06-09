@@ -93,7 +93,6 @@ if (!IS_WINDOWS) {
 // Windows: pre-limpieza + rimraf + verificación + auto-recuperación
 windowsPreCleanup();
 
-let rimrafFailed = false;
 try {
   execSync('npx rimraf node_modules', {
     stdio: 'pipe',
@@ -102,7 +101,6 @@ try {
     windowsHide: true,
   });
 } catch (err) {
-  rimrafFailed = true;
   console.error('[clean-modules] rimraf falló:', err);
 }
 

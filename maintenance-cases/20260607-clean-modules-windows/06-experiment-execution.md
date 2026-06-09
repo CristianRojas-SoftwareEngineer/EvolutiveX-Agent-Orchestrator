@@ -29,7 +29,7 @@ links: { previous: "05-experiment-design.md", next: }
 ls node_modules/.bin/tsx && echo "entorno OK"
 
 # Experimento H1
-npx tsx scripting/clean-modules-repro.ts
+npx tsx maintenance-cases/20260607-clean-modules-windows/experiments/hypothesis-1/repro-script.ts
 
 # Restauración (rollback)
 npm install
@@ -37,7 +37,7 @@ npm install
 
 ## Changes
 
-- **`scripting/clean-modules-repro.ts`** (creado): script de reproducción del bug H1. Mantiene un archivo de `node_modules/.bin/` abierto con un proceso PowerShell detached, ejecuta `npm run clean:modules`, y verifica si `node_modules/` queda incompleto.
+- **`experiments/hypothesis-1/repro-script.ts`** (creado): script de reproducción del bug H1. Mantiene un archivo de `node_modules/.bin/` abierto con un proceso PowerShell detached, ejecuta `npm run clean:modules`, y verifica si `node_modules/` queda incompleto.
 
 ## Deviations
 

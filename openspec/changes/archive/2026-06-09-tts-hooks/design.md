@@ -1,4 +1,4 @@
-# Diseño: Integración de TTS Local (kokoro-js) con Memoria Contextual
+# Diseño: Integración de TTS con Memoria Contextual
 
 ## Arquitectura y Flujo PKA
 El diseño de la integración incorpora la memoria contextual y la generación de locuciones dinámicas mediante un LLM antes de invocar la síntesis de voz:

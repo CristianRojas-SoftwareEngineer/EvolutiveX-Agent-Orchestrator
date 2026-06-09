@@ -95,7 +95,7 @@ export async function createProxyDependencies(
     // Inicializar en segundo plano para no bloquear el arranque del servidor
     void ttsService.initialize().catch((err: unknown) => {
       const msg = err instanceof Error ? err.message : String(err);
-      logger.warn({ err: msg }, '[TTS] Fallo en la inicialización del motor Kokoro; TTS desactivado');
+      logger.warn({ err: msg }, '[TTS] Fallo en la inicialización del motor TTS; TTS desactivado');
     });
   }
 

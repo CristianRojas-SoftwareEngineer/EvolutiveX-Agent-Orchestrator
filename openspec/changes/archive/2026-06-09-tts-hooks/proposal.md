@@ -1,4 +1,4 @@
-# Propuesta: Integración de TTS Local (kokoro-js) con Memoria Contextual en Smart Code Proxy
+# Propuesta: Integración de TTS con Memoria Contextual en Smart Code Proxy
 
 ## Problema y Motivación
 Actualmente, el proxy de observabilidad "Smart Code Proxy" cuenta con un flujo de hooks para interceptar el ciclo de vida de Claude Code. Sin embargo, no dispone de una interfaz de salida de voz local (Text-to-Speech) que permita al desarrollador recibir notificaciones por voz inteligentes y contextuales sobre el estado de la ejecución.

@@ -5,6 +5,7 @@ import type { AnthropicMessage } from '../1-domain/types/anthropic.types.js';
 import {
   buildInferenceRequestSnapshot,
   buildWireStep,
+  enrichOpenWireStepWithResponse,
   registerWireStepInCorrelator,
 } from './gateway-wire-step.util.js';
 import { persistBillableStepMetricsIfNeeded } from './persist-billable-step-metrics.util.js';
@@ -88,25 +89,36 @@ export class AuditStandardResponseHandler {
 
         const inferenceRequest = buildInferenceRequestSnapshot(workflow);
         const now = new Date();
-        const wireStep = buildWireStep({
-          workflow,
-          inferenceRequest,
-          assistantMessage,
-          usage: {
-            input_tokens: bodyUsage.input_tokens ?? 0,
-            output_tokens: bodyUsage.output_tokens ?? 0,
-            ...(bodyUsage.cache_creation_input_tokens != null
-              ? { cache_creation_input_tokens: bodyUsage.cache_creation_input_tokens }
-              : {}),
-            ...(bodyUsage.cache_read_input_tokens != null
-              ? { cache_read_input_tokens: bodyUsage.cache_read_input_tokens }
-              : {}),
-          },
-          stopReason,
-          startedAt: now,
-          closedAt: now,
-        });
-        registerWireStepInCorrelator(this.workflowRepo, wireStep, stopReason);
+        const usage = {
+          input_tokens: bodyUsage.input_tokens ?? 0,
+          output_tokens: bodyUsage.output_tokens ?? 0,
+          ...(bodyUsage.cache_creation_input_tokens != null
+            ? { cache_creation_input_tokens: bodyUsage.cache_creation_input_tokens }
+            : {}),
+          ...(bodyUsage.cache_read_input_tokens != null
+            ? { cache_read_input_tokens: bodyUsage.cache_read_input_tokens }
+            : {}),
+        };
+        const wireStep =
+          enrichOpenWireStepWithResponse(
+            this.workflowRepo,
+            workflow.id,
+            { assistantMessage, usage, stopReason, closedAt: now },
+            stopReason,
+          ) ??
+          (() => {
+            const fallback = buildWireStep({
+              workflow,
+              inferenceRequest,
+              assistantMessage,
+              usage,
+              stopReason,
+              startedAt: now,
+              closedAt: now,
+            });
+            return registerWireStepInCorrelator(this.workflowRepo, fallback, stopReason);
+          })();
+        if (!wireStep) return;
 
         // Paridad con el camino SSE: registrar los `tool_use` client-side observados
         // en el body para emitir `tool_call` e indexar el linkage de continuation.

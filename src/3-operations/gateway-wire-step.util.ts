@@ -55,23 +55,36 @@ export function buildWireStep(params: BuildWireStepParams): IStep {
   };
 }
 
-/**
- * Registra el step en el correlador; cierra si el stopReason es terminal.
- * No-op si el workflow no existe.
- */
-export function registerWireStepInCorrelator(
-  repo: IWorkflowRepository,
-  step: IStep,
-  stopReason: string | undefined,
-): void {
-  const workflow = repo.getWorkflow(step.workflowId);
-  if (!workflow) return;
+/** Datos de respuesta HTTP para enriquecer el step abierto en egress. */
+export interface WireStepResponsePatch {
+  assistantMessage: AnthropicMessage;
+  usage?: AnthropicUsage;
+  stopReason?: string;
+  closedAt: Date;
+}
 
-  step.index = workflow.steps.length;
-  repo.registerStep(step.workflowId, step);
+/**
+ * Enriquece el último step abierto del workflow con la respuesta HTTP.
+ * Alineado a session-audit-model: un hop → un `steps/MM/` con request/ y response/.
+ */
+export function enrichOpenWireStepWithResponse(
+  repo: IWorkflowRepository,
+  workflowId: string,
+  patch: WireStepResponsePatch,
+  stopReason: string | undefined,
+): IStep | undefined {
+  const workflow = repo.getWorkflow(workflowId);
+  if (!workflow) return undefined;
+
+  const openStep = [...workflow.steps].reverse().find((s) => s.closedAt == null);
+  if (!openStep) return undefined;
+
+  openStep.assistantMessage = patch.assistantMessage;
+  openStep.usage = patch.usage;
+  openStep.stopReason = patch.stopReason;
 
   if (stopReason === 'tool_use') {
-    return;
+    return openStep;
   }
 
   const isTerminal =
@@ -81,9 +94,65 @@ export function registerWireStepInCorrelator(
     stopReason === '';
 
   if (isTerminal) {
+    openStep.closedAt = patch.closedAt;
+    repo.closeStep(workflowId, openStep.id);
+    closeWireWorkflowOnTerminalStop(repo, workflow, stopReason, openStep);
+  }
+
+  return openStep;
+}
+
+/**
+ * Registra la respuesta wire en el correlador enriqueciendo el step abierto por ingress.
+ * Fallback: registra un step nuevo si no hay step abierto (edge case).
+ */
+export function registerWireStepInCorrelator(
+  repo: IWorkflowRepository,
+  step: IStep,
+  stopReason: string | undefined,
+): IStep | undefined {
+  const workflow = repo.getWorkflow(step.workflowId);
+  if (!workflow) return undefined;
+
+  const enriched = enrichOpenWireStepWithResponse(
+    repo,
+    step.workflowId,
+    {
+      assistantMessage: step.assistantMessage,
+      usage: step.usage,
+      stopReason: step.stopReason,
+      closedAt: step.closedAt ?? new Date(),
+    },
+    stopReason,
+  );
+  if (enriched) return enriched;
+
+  step.index = workflow.steps.length;
+  repo.registerStep(step.workflowId, step);
+
+  if (stopReason === 'tool_use') {
+    return step;
+  }
+
+  const isTerminal =
+    stopReason === 'end_turn' ||
+    stopReason === 'max_tokens' ||
+    stopReason == null ||
+    stopReason === '';
+
+  if (isTerminal) {
+    step.closedAt = step.closedAt ?? new Date();
     repo.closeStep(step.workflowId, step.id);
     closeWireWorkflowOnTerminalStop(repo, workflow, stopReason, step);
   }
+
+  return step;
+}
+
+/** Índice del step abierto para proyección SSE (request ya registrado en ingress). */
+export function resolveOpenWireStepIndex(workflow: IWorkflow): number {
+  const openStep = [...workflow.steps].reverse().find((s) => s.closedAt == null);
+  return openStep?.index ?? workflow.steps.length;
 }
 
 /** Extrae texto plano de bloques `text` del mensaje assistant ensamblado. */

@@ -27,6 +27,15 @@ En `workflow_start`, `meta.json` SHALL incluir `workflowKind` (estructural: `mai
 
 El evento `step_request` emitido por handlers L3 SHALL transportar el body HTTP parseado completo. El correlador (`registerStep`) NO SHALL emitir `step_request` con `inferenceRequest` sintético (`messages: []`).
 
+Para un hop HTTP completo, `step_request` y `step_response` del mismo hop SHALL compartir el mismo `stepIndex`, produciendo `steps/MM/request/` y `steps/MM/response/` bajo el mismo directorio `MM` según `docs/session-audit-model.md`.
+
+#### Scenario: Hop unificado en disco
+
+- **GIVEN** ingress emitió `step_request` con `stepIndex: 0` y egress emitió `step_response` con `stepIndex: 0`
+- **WHEN** `SessionPersistence` proyecta ambos eventos
+- **THEN** SHALL existir `steps/00/request/body.json` y `steps/00/response/body.json`
+- **AND** NO SHALL existir `steps/01/response/` solo para la response de ese hop
+
 #### Scenario: workflow_start persiste interactionType semántico
 
 - **GIVEN** un evento `workflow_start` con `kind: 'main'` y `workflowKind: 'side-request'`

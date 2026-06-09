@@ -14,7 +14,9 @@ import type { Logger } from '../1-domain/types/logger.types.js';
 import {
   buildInferenceRequestSnapshot,
   buildWireStep,
+  enrichOpenWireStepWithResponse,
   registerWireStepInCorrelator,
+  resolveOpenWireStepIndex,
 } from './gateway-wire-step.util.js';
 import { persistBillableStepMetricsIfNeeded } from './persist-billable-step-metrics.util.js';
 import { resolveSessionDir } from './audit-workflow-closure.handler.js';
@@ -47,8 +49,8 @@ export class AuditSseResponseHandler {
     if (!workflow) return;
 
     const isCoalescedAgentContinuation = context.coalescedAgentContinuation !== undefined;
-    // projectedStepIndex: índice causal (0-based) que coincide con wireStep.index
-    const projectedStepIndex = workflow.steps.length;
+    // projectedStepIndex: step abierto por registerWireStepRequest (mismo índice request/response)
+    const projectedStepIndex = resolveOpenWireStepIndex(workflow);
     const chunkPhase: ChunkPhase = isCoalescedAgentContinuation ? 'continuation' : 'delegation';
     const assembler = this.createStepAssembler();
 
@@ -225,16 +227,34 @@ export class AuditSseResponseHandler {
   private registerWireInference(workflow: IWorkflow, assembled: AssembledInference) {
     const inferenceRequest = buildInferenceRequestSnapshot(workflow, assembled);
     const now = new Date();
-    const wireStep = buildWireStep({
-      workflow,
-      inferenceRequest,
-      assistantMessage: assembled.assistantMessage,
-      usage: assembled.usage,
-      stopReason: assembled.stopReason,
-      startedAt: now,
-      closedAt: now,
-    });
-    registerWireStepInCorrelator(this.workflowRepo, wireStep, assembled.stopReason);
+    const wireStep =
+      enrichOpenWireStepWithResponse(
+        this.workflowRepo,
+        workflow.id,
+        {
+          assistantMessage: assembled.assistantMessage,
+          usage: assembled.usage,
+          stopReason: assembled.stopReason,
+          closedAt: now,
+        },
+        assembled.stopReason,
+      ) ??
+      (() => {
+        const fallback = buildWireStep({
+          workflow,
+          inferenceRequest,
+          assistantMessage: assembled.assistantMessage,
+          usage: assembled.usage,
+          stopReason: assembled.stopReason,
+          startedAt: now,
+          closedAt: now,
+        });
+        return registerWireStepInCorrelator(
+          this.workflowRepo,
+          fallback,
+          assembled.stopReason,
+        );
+      })();
     void persistBillableStepMetricsIfNeeded(
       this.sessionMetrics,
       this.auditBaseDir,

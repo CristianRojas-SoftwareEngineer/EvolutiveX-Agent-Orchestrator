@@ -122,7 +122,14 @@ Tras P2, el sistema SHALL NOT exponer ni usar `ISseAuditWriter` ni `AuditWriterS
 
 Los eventos publicados al `EventBus` (`stream_chunk`, `step_response`, `tool_call`) y las mutaciones al `IWorkflowRepository` (`registerStep`, `closeStep`, `registerToolUse`, `completeToolUse`, `registerPendingToolUse`) SHALL atribuirse al `workflowId` presente en el `AuditWorkflowContext`, no al workflow main de la sesión.
 
-Esta atribución garantiza que la proyección a disco vía `SessionPersistence` refleje la causalidad correcta: los `stream_chunks`, el `step_response`, y los `tool_call` de una inferencia se proyectan contra el workflow específico que abrió el `AuditWorkflowHandler` para esa request (incluyendo wire-N de continuations, subagentes, etc.), no contra el main estable con `id == sessionId`.
+Los eventos `stream_chunk` SHALL usar `stepIndex` del step abierto por ingress (`resolveOpenWireStepIndex`), no `workflow.steps.length`, para que chunks y `step_response` proyecten al mismo `steps/MM/`.
+
+#### Scenario: stream_chunk usa índice del step abierto
+
+- **GIVEN** `registerWireStepRequest` registró un step en índice 0
+- **WHEN** `AuditSseResponseHandler` emite `stream_chunk` durante el stream
+- **THEN** `payload.stepIndex` SHALL ser 0
+- **AND** NO SHALL ser 1 (`workflow.steps.length` tras ingress)
 
 #### Scenario: SSE handler atribuye chunks al workflowId del context
 
@@ -143,8 +150,6 @@ Esta atribución garantiza que la proyección a disco vía `SessionPersistence` 
 - **THEN** `findWorkflowByToolUseId('session', 'tu-abc')` SHALL devolver el workflow `session-wire-3`
 - **AND** el `handleContinuation` SHALL registrar el step contra `session-wire-3` (no contra el main)
 - **AND** NO SHALL emitirse el warning `[audit] No se encontró workflow padre para continuation`
-
----
 
 ### Requirement: Registro de tool_use client-side observados en respuestas wire
 

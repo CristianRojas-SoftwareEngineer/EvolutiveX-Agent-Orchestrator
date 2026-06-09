@@ -1,0 +1,246 @@
+# Changelog
+
+All notable changes are derived from conventional commits. Do not edit by hand.
+
+## [Unreleased]
+### Fixed
+- unificar request/response en un IStep por hop wire (Case: 20260608-proxy-step-request-response-split)
+
+### Added
+- migrar SM a dos cadenas
+- versionar harness de agente en .claude/
+- agregar generador on-demand del changelog (§12.14)
+- notificación al iniciar tareas del TaskList
+- métricas de sesión per-step para Tabla 2 del statusline
+- instalador universal con patrón seguro S1-S5 promovido a todas las features
+- instalador seguro de hooks de SCP con merge selectivo
+- relay Stop con mensaje de continuidad generado por modelo
+- toggle de visibilidad de la Tabla 2 vía settings.env
+- relay Stop unificado con resumen y doble toast
+- anclar ancho de Tabla 2 al bloque Tabla 1 + Tabla 3
+- agregar # Workflows en Tabla 2 y corregir Stop handler
+- separar cache en columnas Cache Creación y Cache Lectura
+- reordenar layout T1|T3 arriba y T2 abajo
+- instalador unificado de statusline, notificaciones y voz
+- instalar hooks globales en ~/.claude
+- copy por evento y mensajes dinámicos stdin
+- sonidos WinRT, sync de imágenes y assets 256
+- perfiles por evento con imagen y sonido
+- añadir branding (appId/icon) y helper de AUMID
+- extender notificaciones de UX a SubagentStart/SubagentStop y añadir TaskCreated/TaskCompleted
+- reapuntar hooks al entry point del servicio interno (N2)
+- migrar servicio de notificaciones al repositorio (N1)
+- registrar las 8 entradas del lifecycle en .claude/settings.json del proyecto (H1)
+- añadir session-manager npm para sesiones Claude Code
+- añadir MiniMax M3 y eliminar pricing_rules inerte
+- cerrar migración completa — archivar P2 y orquestador, retirar InteractionMetadata
+- implementar persistencia y forensia SSE completa
+- cerrar fase P1 con layout causal y gobernanza
+- completar migración de 5 handlers y nueva interfaz forceClose
+- integrar proveedor MiniMax en configure:provider
+- cablear EventBus/SessionPersistence y corte limpio en composition root
+- conectar el correlador al EventBus y ampliar lookups
+- añadir adaptadores L2 del EventBus y SessionPersistence
+- añadir pila de dominio L1 del EventBus
+- crear change de segundo nivel y corregir consistencia documental
+- crear spike de análisis y corregir consistencia documental
+- eliminar esqueleto inerte de costo en USD por tokens
+- propuesta OpenSpec para eliminar lógica de costo en USD por tokens
+- implementar ProviderCatalog — port IProviderCatalog (capa 1) + adapter ProviderCatalogService (capa 2)
+- proyección audit y session-metrics en cierre
+- implementar lifecycle completo de IWorkflowRepository — apertura, cierre y correlación de workflows
+- implementar capa 1 gateway — tipos, interfaces, modelos y servicios puros de cierre
+- implementar borde hooks con endpoint POST /hooks y AuditHookEventHandler
+- implementar join determinista tool_use_id↔subagente con política FIFO (plano B §23)
+- implementar correlación determinista por cabeceras de agente (plano A)
+- instalador de statusline y resolución SMART_CODE_PROXY_ROOT
+- crear espejos faltantes entre Claude Code y Windsurf
+- mejorar legibilidad, consistencia y observabilidad de body.parsed.md
+- mostrar Tabla 2 con placeholders vacíos al inicio de sesión
+- flash de valores actualizados en Tabla 2 de métricas
+- introducir session-metrics.json con actualización atómica por turno
+- caché de porcentaje de uso por sesión para soporte de sesiones paralelas
+- colores dinámicos en barra de progreso por rangos
+- layout de dos columnas para tabla 1 y tabla 2
+- refactor del statusline de Claude Code con integración cross-platform
+- proxy transparente dinámico multi-proveedor
+- agregar clean:all, test:quick y optimizar test con paralelización
+- crear script multiplataforma de hardlink AGENTS.md → CLAUDE.md
+- logging dual-transport, directorio routing/ y actualización de docs
+- migrar scripts PowerShell/JS a TypeScript multiplataforma
+- implementar correlación Context Sync vía hook PostToolUse + caché por htmlHash
+- instrumentación con logging estructurado para diagnóstico Context Sync
+- anidar invocaciones de Task/Agent como sub-interactions con parentContext
+- soporte de turnos concurrentes para subagentes paralelos
+- respuestas multi-step consolidadas en top-level
+- transform body.parsed.md to conversational format
+- implementa PROXY_UNREDACT_THINKING para capturar thinking legible
+- migración a arquitectura SOLID con Fastify y documentación completa en español
+- initial commit for Fastify + TypeScript SOLID API
+
+### Changed
+- ajustar cobertura y eliminar drift de config
+- alinear script y comando vía config TS compartida
+- eliminar copia de assets a LOCALAPPDATA
+- renombrar título de la Tabla 2 a 'Trabajo por niveles de razonamiento'
+- eliminar opción autoSubmit del instalador de voz
+- mover changes de fases gateway a phases/ dentro del orquestador
+- absorber changes complementarios en sus fases de migración gateway
+- renombrar Interaction→Workflow en todo el codebase
+- higiene legacy pre-P2 sin dependencia de streaming
+- extraer StepAssembler y propagar languageModelId
+- disolver fase C4 e integrar cierre E2E en bloque G
+- renombrar lib a shared para settings compartidos
+- reducir superficie de variables de entorno del proxy
+- renombrar archivos de comandos y workflows a inglés
+- eliminar sistemas legacy builtin-tool-execution y context-sync-cache
+- reestructurar sistema de directorios de auditoría
+- unificar terminología "Turn" → "Interaction" en todo el código fuente
+- layout simétrico de columna izquierda (Tabla 1 + Tabla 3) en pasada única
+- simplificar Tabla 3 de rate limits y sincronizar documentación
+- establecer settings.json como única fuente de verdad para variables gestionadas
+- robustecer y simplificar eliminación de variables de entorno en Windows
+- renombrar directorio de logs a server y archivo a logs.jsonl
+- consolidar scripts eliminando utils/
+- reorganizar dependencias y robustecer procedimiento de verificación
+- aplanar estructura de directorios scripting/src → scripting
+- simplificar escritura de body.json eliminando body.formatted.json duplicado
+- migra a API dir-based y elimina métodos legacy
+- implementar PKA de 6 capas, ports, inyección de dependencias y hardening de tooling
+- reemplazar 'any' por tipos estrictos del SDK de Anthropic
+
+### Fixed
+- persistir tool_result y métricas wire residuales
+- corregir gaps de proyección causal en workflows wire (Case: 20260608-proxy-audit-discrepancies)
+- aplicar 7 correcciones a los artefactos del change
+- alinear todas las skills sm-* con el flujo causa→solución secuencial (Case: 20260607-clean-modules-windows)
+- corregir flujo secuencial causa→solución, no simultáneo (Case: 20260607-clean-modules-windows)
+- garantizar eliminación transaccional de node_modules en Windows (Case: 20260607-clean-modules-windows)
+- clasificar continuation por el último mensaje, no por el historial
+- threading de continuations client-side — eliminar orphans residuales
+- retry atómico en EPERM para rename cross-platform en Windows
+- cerrar Drift #2 eliminando entry point directo de stop-work-summary-notification
+- corregir atribución de workflows en continuations — fix-continuation-orphan-workflow-attribution
+- reparar mojibake de doble codificación UTF-8 en hooks de Cursor
+- relays unificados de stdin para toasts UTF-8
+- rutas POSIX-absolutas y hook Stop auto-suficiente
+- normalizar BOM y trim en stdin JSON del CLI
+- resolver display name en Tabla 2 con matching flexible de modelId
+- mostrar etiquetas genéricas en celda Modelo para slots vacíos
+- fallback heurístico en classifyModelWithEnv para provider default
+- corregir error de tipos y warning de import sin usar
+- relay TypeScript para POST /hooks compatible con PowerShell
+- rutas absolutas POSIX en comandos npx tsx
+- titulo del toast = nombre del hook
+- exponer el flag CLI como --stdin-json (kebab-case)
+- añadir scenarios al requirement de delegación de cierre
+- corregir referencias cruzadas tras reorganización en phases/
+- renombrar columna '# Interacciones' → '# Steps' y título
+- eliminar instancia huérfana de RedactService
+- añadir escenario faltante en spec gateway-audit-projection
+- alinear router-status con propuesta §3.2, §4 y §10
+- alinear router-status con propuesta de rediseño
+- tratar FILTERED_TOOLS vacío como sin filtrado
+- corregir clasificación errónea de web_search y eliminar hook zombie del Context Sync Cache
+- corregir desfase en layout side-by-side cuando Tabla 3 es visible
+- extraer tokens de entrada desde message_delta para proveedores como Xiaomi
+- serializar escrituras a session-metrics.json con withSessionLock
+- reemplazar nombres de modelos hardcodeados por resolución dinámica
+- persistir porcentaje de uso entre renders
+- oscurecer verde de barra de progreso
+- mostrar barra vacía en 0% en vez de "N/A"
+- eliminar texto "calculando..." de la barra de progreso
+- corregir errores de typecheck, lint y formateo
+- corregir alineación de celdas fusionadas en tabla de métricas
+- alinear títulos con ancho exacto de cada tabla
+- centrar headers de tabla según ancho calculado
+- usar displayName del modelo y ajustar ancho header
+- capitalizar proveedor y renombrar columnas
+- evitar parpadeo de barra de uso en turno inicial
+- tablas Unicode con bordes redondeados y anchos calculados
+- formato de tablas tipo markdown con colores ANSI
+- crear variable ANTHROPIC_API_KEY vacía en el registro para Gateways
+- corregir acceso a proveedores bearer (Xiaomi/OpenRouter) mediante ruteo via proxy y traducción de headers
+- corregir metodo de autenticacion para provider anthropic
+- actualizar @anthropic-ai/sdk a v0.92.0 para parchear CVE-2026-41686
+- corregir MarkdownRendererService para vistas body.parsed.md semánticas
+- actualizar content-length al filtrar tools del body
+- corregir omisión de cuerpos de petición en logs de auditoría
+- migrar ts-node a tsx por compatibilidad con Node.js 24
+
+### Documentation
+- integrar logs de runtime en análisis
+- pulir coherencia v6 en new-scientific-maintenance
+- pulir coherencia v5 en new-scientific-maintenance
+- pulir coherencia v2-v4 en new-scientific-maintenance
+- resolver hallazgos de coherencia en new-scientific-maintenance
+- reescribir análisis con 6 hallazgos y opciones de solución
+- embebee lesson y OpenSpec en new-scientific-maintenance
+- embeber código fuente de las 16 skills en §13
+- añadir new-scientific-maintenance.md con dos cadenas
+- promover spec clean-modules-transactional a specs principales
+- añadir bucle del espacio de soluciones §5.4.1 (Case: 20260607-clean-modules-windows)
+- documentar divergencias en design.md archivado (Case: 20260607-clean-modules-windows)
+- añadir análisis estructural de create-plan
+- renombrar 'trailer' a 'metadatos de commit' en los dos documentos
+- reconciliar contradicción §5.2/§5.3/§11.2 (Goal 2a)
+- propagar eliminación de xhigh al doc de integración
+- dejar SM base autosuficiente y coherente para implementar
+- corregir alcance del perfil corrective y modelar iteración de hipótesis
+- renombrar «trailer» → «metadato de commit» y «light» → «lite»
+- pulir consistencia y alineación en integración SM↔OpenSpec
+- corregir inconsistencias propagadas y pulido visual en integración SM↔OpenSpec
+- correcciones Grupo 2/3 — A4, M4, M5 en doc de integración SM↔OpenSpec
+- correcciones Grupo 2 — A1 y A3 (B2 descartado como falso positivo)
+- terminología y correcciones factuales en doc de integración SM↔OpenSpec
+- renombrar terminología SM — reasoning_effort y modo Consolidado
+- integración SM→OpenSpec con OpenSpec al cierre de SM 09
+- agregar propuesta de sistema de mantenimiento científico
+- documentar notifications:register en el panel de ayuda
+- bump 13→14 claves y deduplicar spec de hooks-lifecycle
+- archivar CONTINUATION-ORPHAN-DRIFT — todos los drifts resueltos
+- actualizar documentación de relays y recuento de claves — fix-notification-stdin-hook-relays
+- especificar relay Stop unificado y doble toast
+- corregir asimetría install:voice y skills legacy
+- sincronizar documentación con el instalador unificado setup
+- cerrar migración y documentar sessions:*
+- sincronizar change add-notifications-branding con la implementación real
+- sincronizar spec y docs con la cobertura de 14 entradas
+- alinear comandos de UserPromptSubmit y Stop con --stdin-json
+- actualizar §18 al estado post-N2
+- promover gateway-design a gateway-architecture as-built
+- añadir informe de drift de artefactos Claude Code
+- sincronizar delta specs y archivar rename-interaction-to-workflow
+- corregir rutas del spike P0 archivado
+- archivar change P0 y actualizar registro del orquestador
+- fijar diseño del layout causal-workflows-v1 antes de las fases P
+- corregir spec de gobernanza y proposal del orquestador para bloque P
+- actualizar documentación P0/P1/P2 tras ratificar Opción A del bus de eventos
+- corregir inconsistencias residuales en definición de P0/P1/P2
+- corregir objetivo del bloque P — reescritura de proyección, no migración de datos
+- resolver tres tensiones menores del documento de diseño
+- Se refina el documento de diseño propuesto.
+- agregar tabla de contenidos para navegación
+- hacer documento autocontenido y definir causal-workflows-v1
+- unificar diseño gateway en documento único
+- promover especificación canónica en router-statusline.md
+- alinear propuesta de rediseño con router-status.ts
+- documentar módulo shared/claude-settings
+- alinear documentación con superficie de env reducida
+- consolidar modelo de auditoría en session-audit-model.md
+- renombrar directorio references a external-references
+- sincronizar documentación canónica con el comportamiento actual
+- alinear how-to-start con comportamiento real
+- sincronizar documentación con estado actual del código
+- actualizar propuesta principal y eliminar documentación zombie
+- uniformizar comentarios del arbol de providers
+- limpieza de documentación legacy y rutas rotas
+- reestructurar para prueba exhaustiva sin skipping de scripts
+- integrar active-issues.md en context-sync-cache.md y eliminar archivo legacy
+- actualizar verify-scripts.md para incluir typecheck, clean:logs y configure:provider
+- agregar scripts build:js y build:types faltantes en help.ts
+- auditoría y corrección de documentación — 18 hallazgos corregidos
+- sincronizar documentación con correcciones del MarkdownRendererService
+- agregar CLAUDE.md con pautas de comportamiento para agentes LLM
+- auditoría, sincronización y validación final del Smart Code Proxy
+

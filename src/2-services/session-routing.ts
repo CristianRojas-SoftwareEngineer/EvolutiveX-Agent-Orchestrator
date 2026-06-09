@@ -27,12 +27,12 @@ export function slugifyToolName(toolName: string): string {
     .slice(0, 32);
 }
 
-/** `sessions/<sessionId>/workflows/<NN>/`. */
+/** `sessions/<sessionId>/workflows/<NN>/` — `workflowIndex` base 1 (primer turno → `01`). */
 export function getWorkflowDir(sessionId: string, workflowIndex: number): string {
   return `${SESSIONS_ROOT}/${sessionId}/workflows/${pad(workflowIndex)}/`;
 }
 
-/** `sessions/<sessionId>/workflows/<NN>/steps/<MM>/`. */
+/** `sessions/<sessionId>/workflows/<NN>/steps/<MM>/` — índices base 1. */
 export function getStepDir(sessionId: string, workflowIndex: number, stepIndex: number): string {
   return `${getWorkflowDir(sessionId, workflowIndex)}steps/${pad(stepIndex)}/`;
 }
@@ -42,7 +42,7 @@ export function getToolsDir(sessionId: string, workflowIndex: number, stepIndex:
   return `${getStepDir(sessionId, workflowIndex, stepIndex)}tools/`;
 }
 
-/** `sessions/<sessionId>/workflows/<NN>/steps/<MM>/tools/<KK-slug>/`. */
+/** `sessions/<sessionId>/workflows/<NN>/steps/<MM>/tools/<KK-slug>/` — índices base 1. */
 export function getToolDir(
   sessionId: string,
   workflowIndex: number,

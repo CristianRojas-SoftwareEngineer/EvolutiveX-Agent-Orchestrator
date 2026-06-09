@@ -53,7 +53,7 @@ function seedParentWithAgentPending(
   const wf = repo.openWorkflow(
     sessionId,
     { isSubagentRequest: false, agentId: undefined },
-    { forceNew: true, layoutIndex: 0, workflowKind: 'agentic' },
+    { forceNew: true, layoutIndex: 1, workflowKind: 'agentic' },
   );
   let stepId = 'step-parent-1';
   for (let i = 0; i < parentStepIndex; i++) {
@@ -61,7 +61,7 @@ function seedParentWithAgentPending(
     wf.steps.push({
       id: stepId,
       workflowId: wf.id,
-      index: i,
+      index: i + 1,
       inferenceRequest: { model: 'claude-3-5-sonnet', messages: [], max_tokens: 4096 },
       assistantMessage: { role: 'assistant', content: [] },
       toolUses: [],
@@ -69,7 +69,7 @@ function seedParentWithAgentPending(
     });
   }
   repo.patchWireMeta(wf.id, {
-    layoutIndex: 0,
+    layoutIndex: 1,
     requestSequence: 1,
     requestBodyOmitted: false,
     requestBodyBytes: 100,
@@ -141,13 +141,13 @@ describe('AuditWorkflowHandler', () => {
     expect(result!.workflowKind).toBe('agentic');
     expect(result!.requestClassification).toEqual({ type: 'fresh' });
     expect(result!.auditWorkflowDir).toContain('workflows');
-    expect(result!.workflowId).toContain('my-session-wire');
+    expect(result!.workflowId).toBe('my-session');
     expect(workflowRepo.getWorkflow(result!.workflowId)?.steps.length).toBe(1);
     expect(eventBus.events.some((e) => e.type === 'workflow_start')).toBe(true);
     expect(eventBus.events.some((e) => e.type === 'step_request')).toBe(true);
   });
 
-  it('dos fresh concurrentes crean dos workflows independientes', async () => {
+  it('dos fresh concurrentes bajo el mismo turno comparten workflow', async () => {
     const { handler, workflowRepo } = createTestStack();
     const [r1, r2] = await Promise.all([
       handler.execute({
@@ -161,10 +161,10 @@ describe('AuditWorkflowHandler', () => {
         requestId: 'req-2',
       }),
     ]);
-    expect(r1!.workflowId).not.toBe(r2!.workflowId);
-    expect(r1!.auditWorkflowDir).not.toBe(r2!.auditWorkflowDir);
-    const running = workflowRepo.getAllRunningWorkflows().filter((w) => w.sessionId === 's');
-    expect(running.length).toBeGreaterThanOrEqual(2);
+    expect(r1!.workflowId).toBe(r2!.workflowId);
+    expect(r1!.auditWorkflowDir).toBe(r2!.auditWorkflowDir);
+    const turn = workflowRepo.getWorkflowBySessionId('s');
+    expect(turn?.steps.length).toBe(2);
   });
 
   it('debería clasificar continuation: routear al workflow padre por tool_use_id', async () => {
@@ -216,20 +216,20 @@ describe('AuditWorkflowHandler', () => {
       const wf = repo.openWorkflow(
         'test-session',
         { isSubagentRequest: false, agentId: undefined },
-        { forceNew: true, layoutIndex: 0, workflowKind: 'agentic' },
+        { forceNew: true, layoutIndex: 1, workflowKind: 'agentic' },
       );
       const stepId = 'step-parent-1';
       wf.steps.push({
         id: stepId,
         workflowId: wf.id,
-        index: 0,
+        index: 1,
         inferenceRequest: { model: 'claude-3-5-sonnet', messages: [], max_tokens: 4096 },
         assistantMessage: { role: 'assistant', content: [] },
         toolUses: [],
         startedAt: new Date(),
       });
       repo.patchWireMeta(wf.id, {
-        layoutIndex: 0,
+        layoutIndex: 1,
         requestSequence: 1,
         requestBodyOmitted: false,
         requestBodyBytes: 100,
@@ -281,16 +281,15 @@ describe('AuditWorkflowHandler', () => {
     );
   });
 
-  it('debería clasificar preflight-quota: workflow sin request top-level', async () => {
+  it('debería ignorar preflight-quota sin proyección causal', async () => {
     const { handler, eventBus } = createTestStack();
     const result = await handler.execute({
       headers: { 'x-cc-audit-session': 'test-session' },
       rawBody: QUOTA_BODY,
       requestId: 'req-1',
     });
-    expect(result!.workflowKind).toBe('client-preflight');
-    const start = eventBus.events.find((e) => e.type === 'workflow_start');
-    expect((start?.payload as Record<string, unknown>).request).toBeUndefined();
+    expect(result).toBeNull();
+    expect(eventBus.events.some((e) => e.type === 'workflow_start')).toBe(false);
   });
 
   it('debería eliminar la cabecera de sesión antes de reenviar al upstream', async () => {
@@ -304,7 +303,7 @@ describe('AuditWorkflowHandler', () => {
     expect(headers['content-type']).toBe('application/json');
   });
 
-  it('debería emitir step_request para fresh con stepIndex causal 0-based', async () => {
+  it('debería emitir step_request para fresh con stepIndex base 1', async () => {
     const { handler, eventBus } = createTestStack();
     await handler.execute({
       headers: { 'x-cc-audit-session': 'test' },
@@ -313,19 +312,25 @@ describe('AuditWorkflowHandler', () => {
     });
     const stepReqs = eventBus.events.filter((e) => e.type === 'step_request');
     expect(stepReqs).toHaveLength(1);
-    const lastStep = stepReqs[stepReqs.length - 1]!.payload as { stepIndex: number };
-    expect(lastStep.stepIndex).toBe(0);
+    const lastStep = stepReqs[stepReqs.length - 1]!.payload as {
+      stepIndex: number;
+      stepKind?: string;
+    };
+    expect(lastStep.stepIndex).toBe(1);
+    expect(lastStep.stepKind).toBe('agentic');
   });
 
-  it('debería clasificar side-request con workflowKind side-request', async () => {
-    const { handler, workflowRepo } = createTestStack();
+  it('debería registrar side-request como step bajo turno agentic', async () => {
+    const { handler, workflowRepo, eventBus } = createTestStack();
     const result = await handler.execute({
       headers: { 'x-cc-audit-session': 'test' },
       rawBody: SIDE_REQUEST_BODY,
       requestId: 'req-side',
     });
-    expect(result!.workflowKind).toBe('side-request');
-    expect(workflowRepo.getWireMeta(result!.workflowId)?.workflowKind).toBe('side-request');
+    expect(result!.workflowKind).toBe('agentic');
+    expect(workflowRepo.getWireMeta(result!.workflowId)?.workflowKind).toBe('agentic');
+    const stepReq = eventBus.events.find((e) => e.type === 'step_request');
+    expect((stepReq?.payload as { stepKind?: string }).stepKind).toBe('side-request');
   });
 
   it('fresh con pending Agent único → unique-pending y consume pending', async () => {

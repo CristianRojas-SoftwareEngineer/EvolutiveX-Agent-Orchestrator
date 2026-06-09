@@ -44,7 +44,7 @@ export function buildWireStep(params: BuildWireStepParams): IStep {
   return {
     id: randomUUID(),
     workflowId,
-    index: 0,
+    index: 1,
     inferenceRequest: params.inferenceRequest,
     assistantMessage: params.assistantMessage,
     toolUses: [],
@@ -129,7 +129,7 @@ export function registerWireStepInCorrelator(
   );
   if (enriched) return enriched;
 
-  step.index = workflow.steps.length;
+  step.index = workflow.steps.length + 1;
   repo.registerStep(step.workflowId, step);
 
   if (stopReason === 'tool_use') {
@@ -156,7 +156,7 @@ export function registerWireStepInCorrelator(
 /** Índice del step abierto para proyección SSE (request ya registrado en ingress). */
 export function resolveOpenWireStepIndex(workflow: IWorkflow): number {
   const openStep = [...workflow.steps].reverse().find((s) => s.closedAt == null);
-  return openStep?.index ?? workflow.steps.length;
+  return openStep?.index ?? workflow.steps.length + 1;
 }
 
 /** Extrae texto plano de bloques `text` del mensaje assistant ensamblado. */
@@ -172,8 +172,9 @@ function extractTextFromAssistantMessage(message: AnthropicMessage): string | un
 }
 
 /**
- * Cierra workflows wire (HTTP interceptados) al recibir stop terminal en SSE.
- * El workflow de sesión (`workflowId === sessionId`) se cierra vía hook Stop.
+ * Tras stop terminal en SSE: el step ya cerró. Workflows E2E (turno main o subagente)
+ * no hacen forceClose aquí — cierran vía hook Stop / SubagentStop.
+ * Workflows wire huérfanos (id !== sessionId, kind main) sí cierran en SSE.
  */
 function closeWireWorkflowOnTerminalStop(
   repo: IWorkflowRepository,
@@ -182,6 +183,7 @@ function closeWireWorkflowOnTerminalStop(
   step: IStep,
 ): void {
   if (workflow.id === workflow.sessionId) return;
+  if (workflow.kind === 'subagent') return;
   if (workflow.result != null) return;
 
   const closedSteps = workflow.steps.filter((s) => s.closedAt != null);

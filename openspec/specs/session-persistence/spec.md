@@ -23,30 +23,44 @@ El sistema SHALL proveer `SessionPersistence` en `src/2-services/session-persist
 | `stream_chunk` | Escribir `steps/MM/response/streaming/NNNN-chunk.ndjson`; al cierre del step con `coalescedDelegationStepIndex`, generar `body.coalesced.json` y `body.coalesced.parsed.md` |
 | `*` (wildcard) | Append-only a `sessions/<sessionId>/events.ndjson` por cada evento recibido |
 
-En `workflow_start`, `meta.json` SHALL incluir `workflowKind` (estructural: `main` | `subagent`) y `interactionType` (semántico: `agentic` | `side-request` | `client-preflight` | `session-shell`, desde payload `workflowKind` del correlador).
+En `workflow_start`, `meta.json` SHALL incluir `workflowKind` (estructural: `main` | `subagent`) y `interactionType` (semántico: `agentic` | `side-request`, desde payload `workflowKind` del correlador). Los valores `session-shell` y `client-preflight` SHALL NOT persistirse como `interactionType`.
 
-El evento `step_request` emitido por handlers L3 SHALL transportar el body HTTP parseado completo. El correlador (`registerStep`) NO SHALL emitir `step_request` con `inferenceRequest` sintético (`messages: []`).
+Los índices `NN`, `MM`, `KK` en rutas de disco SHALL ser **base 1** (`01`, `02`, …), alineados con `layoutIndex`, `stepIndex` y `toolIndex` de los eventos sin offset oculto.
+
+`workflow-sequence.json` SHALL registrar **una** fila por turno de usuario (un `workflow_start` de turno por ciclo `UserPromptSubmit` → `Stop`).
+
+El evento `step_request` emitido por handlers L3 SHALL transportar el body HTTP parseado completo y `stepKind` cuando aplique. El correlador (`registerStep`) NO SHALL emitir `step_request` con `inferenceRequest` sintético (`messages: []`).
 
 Para un hop HTTP completo, `step_request` y `step_response` del mismo hop SHALL compartir el mismo `stepIndex`, produciendo `steps/MM/request/` y `steps/MM/response/` bajo el mismo directorio `MM` según `docs/session-audit-model.md`.
 
-#### Scenario: Hop unificado en disco
+`SessionPersistence` SHALL NOT mantener un contador `nextWorkflowIndex` independiente del correlador salvo fallback defensivo inicializado en `1` y resincronizado tras `workflow_start` con `layoutIndex` explícito.
 
-- **GIVEN** ingress emitió `step_request` con `stepIndex: 0` y egress emitió `step_response` con `stepIndex: 0`
+#### Scenario: Hop unificado en disco base 1
+
+- **GIVEN** ingress emitió `step_request` con `stepIndex: 1` y egress emitió `step_response` con `stepIndex: 1`
 - **WHEN** `SessionPersistence` proyecta ambos eventos
-- **THEN** SHALL existir `steps/00/request/body.json` y `steps/00/response/body.json`
-- **AND** NO SHALL existir `steps/01/response/` solo para la response de ese hop
+- **THEN** SHALL existir `steps/01/request/body.json` y `steps/01/response/body.json`
+- **AND** NO SHALL existir `steps/02/response/` solo para la response de ese hop
 
-#### Scenario: workflow_start persiste interactionType semántico
+#### Scenario: workflow_start persiste interactionType agentic para turno
 
-- **GIVEN** un evento `workflow_start` con `kind: 'main'` y `workflowKind: 'side-request'`
+- **GIVEN** un evento `workflow_start` con `kind: 'main'` y `workflowKind: 'agentic'` (turno de usuario)
 - **WHEN** `SessionPersistence` procesa el evento
-- **THEN** `meta.json` SHALL contener `workflowKind: 'main'` y `interactionType: 'side-request'`
+- **THEN** `meta.json` SHALL contener `workflowKind: 'main'` y `interactionType: 'agentic'`
+- **AND** la carpeta SHALL ser `workflows/01/` para el primer turno de la sesión
 
-#### Scenario: Shell de sesión persiste session-shell
+#### Scenario: workflow-sequence una fila por turno
 
-- **WHEN** el correlador emite `workflow_start` para el workflow contenedor (`workflowId === sessionId`) con `workflowKind: 'session-shell'` en payload
-- **THEN** `meta.json` SHALL contener `workflowKind: 'main'` y `interactionType: 'session-shell'`
-- **AND** SHALL NOT usar `interactionType: 'main'` como fallback semántico
+- **GIVEN** un turno con side-request + agentic fresh + continuation bajo un único workflow
+- **WHEN** el turno cierra con `workflow_complete`
+- **THEN** `workflow-sequence.json` SHALL contener una sola entrada para ese `layoutIndex`
+- **AND** `workflowIndex` SHALL ser base 1
+
+#### Scenario: step_request persiste stepKind
+
+- **GIVEN** un evento `step_request` con `stepKind: 'side-request'`
+- **WHEN** `SessionPersistence` escribe el meta del step
+- **THEN** el meta del step SHALL incluir `stepKind: 'side-request'`
 
 #### Scenario: step_request de continuación preserva messages con tool_result
 

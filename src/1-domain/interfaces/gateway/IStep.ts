@@ -3,6 +3,7 @@ import type {
   AnthropicRequest,
   AnthropicUsage,
 } from '../../types/anthropic.types.js';
+import type { StepKind } from '../../types/audit.types.js';
 import type { IToolUse } from './IToolUse.js';
 
 /** Unidad de observabilidad: agrupa inferencia, respuesta y ejecución de tools de un ciclo. */
@@ -11,8 +12,10 @@ export interface IStep {
   id: string;
   /** Workflow al que pertenece. */
   workflowId: string;
-  /** Posición 0-based dentro del workflow. */
+  /** Posición base 1 dentro del workflow (alineada con `steps/MM/` en disco). */
   index: number;
+  /** Tipo semántico del hop HTTP (`agentic` | `side-request`). */
+  stepKind?: StepKind;
   /** Snapshot del request de inferencia al abrir el step. */
   inferenceRequest: AnthropicRequest;
   /** Respuesta consolidada del modelo (`role: 'assistant'`). */

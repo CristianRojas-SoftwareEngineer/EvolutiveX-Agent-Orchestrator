@@ -1,10 +1,4 @@
-# session-routing Specification
-
-## Purpose
-
-Funciones puras de mapeo de eventos a rutas de directorio para el layout `causal-workflows-v1`. Reemplaza las constantes flat retiradas de `audit-paths.ts` (`DIR_MAIN_AGENT`, `DIR_INTERACTIONS`). Implementado en fase P1 (2026-05-30).
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Funciones de routing de sesión
 
@@ -36,19 +30,3 @@ Las funciones SHALL formatear el entero recibido directamente con `pad()` **sin*
 
 - **WHEN** se invoca `getWorkflowDir('sess-1', 10)`
 - **THEN** el resultado SHALL contener `'workflows/10/'` (sin padding adicional para >= 10)
-
----
-
-### Requirement: Normalización de slug de tool name
-
-El sistema SHALL normalizar el nombre del tool para el slug del directorio: convertir a lowercase, reemplazar caracteres no alfanuméricos por guiones, y truncar a 32 caracteres. El formato SHALL ser `<KK>-<slug>` donde KK es el índice con zero-padding de 2 dígitos.
-
-#### Scenario: Tool name con caracteres especiales
-
-- **WHEN** se invoca `getToolDir('s', 1, 1, 2, 'my_custom.tool')`
-- **THEN** el slug SHALL ser `'02-my-custom-tool'`
-
-#### Scenario: Tool name largo se trunca
-
-- **WHEN** se invoca `getToolDir('s', 1, 1, 1, 'A'.repeat(50))`
-- **THEN** el slug SHALL tener máximo 35 caracteres (índice + guión + 32 de slug)

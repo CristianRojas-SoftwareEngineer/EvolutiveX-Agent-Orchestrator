@@ -55,25 +55,25 @@ en `src/1-domain/services/gateway/build-workflow-result.ts`.
 Contrato:
 - Firma: `buildWorkflowResult(workflow: IWorkflow, closedSteps: IStep[], childResults: IWorkflowResult[], hook: ClaudeHookEvent): IWorkflowResult`
 - Recibe el workflow actual, los steps cerrados, los results de child workflows y el hook de cierre.
-- Devuelve `IWorkflowResult` con: `outcome` (via `deriveOutcome`), `finalText` (via `deriveFinalText` **salvo** contenedor de sesión; ver abajo), `closedByEvent` (mapeo de `hook.eventName` a `WorkflowClosedByEvent`; fallback conservador si no es uno de los tres valores válidos), `sessionId: hook.sessionId`, `stepCount: closedSteps.length`, `usage` (via `aggregateWorkflowUsage`).
-- Cuando el workflow cerrado es el contenedor de sesión (`workflow.id === hook.sessionId`), el resultado SHALL **omitir** el campo `finalText`. El texto final del turno agentic SHALL residir únicamente en el `IWorkflowResult` del workflow wire cerrado por SSE.
+- Devuelve `IWorkflowResult` con: `outcome` (via `deriveOutcome`), `finalText` (via `deriveFinalText` desde `last_assistant_message` del hook), `closedByEvent` (mapeo de `hook.eventName` a `WorkflowClosedByEvent`; fallback conservador si no es uno de los tres valores válidos), `sessionId: hook.sessionId`, `stepCount: closedSteps.length`, `usage` (via `aggregateWorkflowUsage`).
+- `finalText` SHALL provenir **únicamente** del hook de cierre. Si `last_assistant_message` está ausente → `undefined`. SHALL NOT reconstruirse desde `Step.assistantMessage` ni desde el último hop `end_turn`.
 - La función SHALL ser pura: sin I/O, sin efectos secundarios, sin mutación de argumentos.
 - El cierre del workflow SHALL expresarse como llamada a esta función desde el handler de capa 3, NO como un método `Workflow.complete()` con efectos.
 
 Referencia técnica: [§36 gateway-architecture.md](../../../docs/gateway-architecture.md#36-capa-1--domain).
 Semántica en §9.6–§9.7 de `docs/gateway-architecture.md`.
 
-#### Scenario: Construcción correcta de WorkflowResult (workflow wire o subagent)
+#### Scenario: Construcción correcta de WorkflowResult (turno o subagent)
 
-- **GIVEN** un `IWorkflow` con `id !== hook.sessionId` (wire agentic o subagente), steps cerrados y hook de cierre
+- **GIVEN** un `IWorkflow` con steps cerrados y hook de cierre con `last_assistant_message`
 - **WHEN** se invoca `buildWorkflowResult(workflow, steps, [], hook)`
 - **THEN** el resultado SHALL tener `outcome` derivado del hook, `finalText` extraído vía `deriveFinalText` y tokens agregados de los steps
 
-#### Scenario: Shell de sesión omite finalText
+#### Scenario: Workflow de turno incluye finalText del hook
 
-- **GIVEN** un workflow contenedor con `workflow.id === hook.sessionId`
-- **WHEN** se invoca `buildWorkflowResult(workflow, steps, [], hook)` tras hook `Stop`
-- **THEN** el resultado SHALL NOT incluir la propiedad `finalText`
+- **GIVEN** un workflow de turno con `workflow.id === hook.sessionId`
+- **WHEN** se invoca `buildWorkflowResult(workflow, steps, [], hook)` tras hook `Stop` con `last_assistant_message`
+- **THEN** el resultado SHALL incluir `finalText` con el valor del hook
 - **AND** SHALL conservar `outcome`, `stepCount`, `usage` y `closedByEvent`
 
 #### Scenario: Inclusión de child workflows en el resultado

@@ -23,11 +23,9 @@ export function buildWorkflowResult(
     ? (hook.eventName as WorkflowClosedByEvent)
     : 'StopFailure'; // fallback conservador: evento desconocido se trata como fallo
 
-  const isSessionShell = workflow.id === hook.sessionId;
-
   return {
     outcome: deriveOutcome(hook),
-    ...(isSessionShell ? {} : { finalText: deriveFinalText(hook) }),
+    finalText: deriveFinalText(hook),
     usage: aggregateWorkflowUsage(closedSteps, childResults),
     stepCount: closedSteps.length,
     closedByEvent,

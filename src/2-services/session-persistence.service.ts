@@ -132,7 +132,7 @@ export class SessionPersistence {
       sessionId: event.sessionId,
       workflowIndex: index,
       baseDir,
-      toolCounter: 0,
+      toolCounter: 1,
       tools: new Map(),
       meta,
     });
@@ -178,7 +178,7 @@ export class SessionPersistence {
       sessionId: event.sessionId,
       workflowIndex: -1,
       baseDir,
-      toolCounter: 0,
+      toolCounter: 1,
       tools: new Map(),
       meta,
     });
@@ -189,11 +189,24 @@ export class SessionPersistence {
   }
 
   private onStepRequest(event: TelemetryEvent): void {
-    const p = event.payload as { workflowId: string; stepIndex: number; request?: unknown };
+    const p = event.payload as {
+      workflowId: string;
+      stepIndex: number;
+      request?: unknown;
+      stepKind?: string;
+      workflowRequest?: unknown;
+    };
     const entry = this.workflows.get(p.workflowId);
     if (!entry) return;
+    if (p.workflowRequest !== undefined) {
+      this.writeJson(`${entry.baseDir}request/body.json`, p.workflowRequest);
+    }
+    const stepDir = this.stepDir(entry, p.stepIndex);
+    if (p.stepKind) {
+      const stepMeta: Record<string, unknown> = { stepKind: p.stepKind };
+      this.writeMeta(stepDir, stepMeta);
+    }
     if (p.request !== undefined) {
-      const stepDir = this.stepDir(entry, p.stepIndex);
       this.writeJson(`${stepDir}request/body.json`, p.request);
     }
   }
@@ -394,7 +407,7 @@ export class SessionPersistence {
   // ── Helpers de routing ──────────────────────────────────────────────────────
 
   private allocWorkflowIndex(sessionId: string): number {
-    const next = this.nextWorkflowIndex.get(sessionId) ?? 0;
+    const next = this.nextWorkflowIndex.get(sessionId) ?? 1;
     this.nextWorkflowIndex.set(sessionId, next + 1);
     return next;
   }

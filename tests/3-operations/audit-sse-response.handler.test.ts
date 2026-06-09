@@ -158,7 +158,7 @@ describe('AuditSseResponseHandler', () => {
     expect(chunkCalls.length).toBeGreaterThan(0);
     const firstChunk = chunkCalls[0][0];
     expect(firstChunk.payload.chunk).toHaveProperty('line');
-    expect(firstChunk.payload).toHaveProperty('stepIndex', 0);
+    expect(firstChunk.payload).toHaveProperty('stepIndex', 1);
   });
 
   it('registra wire step en correlador al final del stream', async () => {

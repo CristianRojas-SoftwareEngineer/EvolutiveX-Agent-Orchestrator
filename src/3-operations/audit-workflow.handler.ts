@@ -17,6 +17,7 @@ import {
 import {
   AgentContext,
   CorrelationMethod,
+  StepKind,
   WorkflowRequestKind,
   ParentContext,
   RequestClassification,
@@ -97,68 +98,73 @@ export class AuditWorkflowHandler {
       }
     }
 
-    if (classification.type === 'side-request') {
-      return this.handleSideRequest(params, headersForAudit, auditSessionId, classification);
+    if (
+      classification.type === 'preflight-quota' ||
+      classification.type === 'preflight-warmup'
+    ) {
+      return null;
     }
 
-    if (classification.type === 'fresh') {
-      await this.closeOrphanWorkflows(auditSessionId);
-
-      const webSearchPending = this.findPendingWebSearch(auditSessionId);
-      if (webSearchPending) {
-        return this.handleWebSearchStep(
-          params,
-          headersForAudit,
-          auditSessionId,
-          classification,
-          webSearchPending,
-        );
+    return this.workflowRepo.withSessionLock(auditSessionId, async () => {
+      if (classification.type === 'side-request') {
+        return this.handleSideRequest(params, headersForAudit, auditSessionId, classification);
       }
 
-      const webFetchPending = this.findPendingWebFetch(auditSessionId);
-      if (webFetchPending) {
-        return this.handleWebFetchStep(
-          params,
-          headersForAudit,
-          auditSessionId,
-          classification,
-          webFetchPending,
-        );
+      if (classification.type === 'fresh') {
+        await this.closeOrphanWorkflows(auditSessionId);
+
+        const webSearchPending = this.findPendingWebSearch(auditSessionId);
+        if (webSearchPending) {
+          return this.handleWebSearchStep(
+            params,
+            headersForAudit,
+            auditSessionId,
+            classification,
+            webSearchPending,
+          );
+        }
+
+        const webFetchPending = this.findPendingWebFetch(auditSessionId);
+        if (webFetchPending) {
+          return this.handleWebFetchStep(
+            params,
+            headersForAudit,
+            auditSessionId,
+            classification,
+            webFetchPending,
+          );
+        }
+
+        const pendingMatch = this.findPendingAgents(auditSessionId);
+        if (pendingMatch) {
+          const agentCtx = resolveAgentContext(headersForAudit);
+          return this.handleSubagent(
+            params,
+            headersForAudit,
+            auditSessionId,
+            classification,
+            pendingMatch,
+            agentCtx,
+          );
+        }
+        return this.handleFresh(params, headersForAudit, auditSessionId, classification);
       }
 
-      const pendingMatch = this.findPendingAgents(auditSessionId);
-      if (pendingMatch) {
-        const agentCtx = resolveAgentContext(headersForAudit);
-        return this.handleSubagent(
-          params,
-          headersForAudit,
-          auditSessionId,
-          classification,
-          pendingMatch,
-          agentCtx,
-        );
+      if (classification.type === 'continuation') {
+        return this.handleContinuation(params, headersForAudit, auditSessionId, classification);
       }
-      return this.handleFresh(params, headersForAudit, auditSessionId, classification);
-    }
 
-    if (classification.type === 'continuation') {
-      return this.handleContinuation(params, headersForAudit, auditSessionId, classification);
-    }
-
-    if (classification.type === 'preflight-quota') {
-      return this.handlePreflightQuota(params, headersForAudit, auditSessionId, classification);
-    }
-
-    if (classification.type === 'preflight-warmup') {
-      return this.handlePreflightWarmup(params, headersForAudit, auditSessionId, classification);
-    }
-
-    return this.handleFresh(params, headersForAudit, auditSessionId, { type: 'fresh' });
+      return this.handleFresh(params, headersForAudit, auditSessionId, { type: 'fresh' });
+    });
   }
 
   private workflowDirAbs(sessionId: string, layoutIndex: number): string {
-    const nn = String(layoutIndex + 1).padStart(2, '0');
+    const nn = String(layoutIndex).padStart(2, '0');
     return path.join(this.auditBaseDir, sessionId, 'workflows', nn);
+  }
+
+  private nextStepIndex(workflow: IWorkflow): number {
+    return workflow.steps.length + 1;
   }
 
   private parseRequestPayload(rawBody: Buffer): { parsed: JsonValue | null; omitted: boolean } {
@@ -186,16 +192,18 @@ export class AuditWorkflowHandler {
 
   private registerWireStepRequest(
     workflow: IWorkflow,
-    stepIndex: number,
     headersForAudit: Record<string, string | string[] | undefined>,
     rawBody: Buffer,
-    _interactionType: WorkflowRequestKind,
-  ): { step: IStep; omitted: boolean } {
+    stepKind: StepKind,
+    options: { workflowRequest?: JsonValue } = {},
+  ): { step: IStep; omitted: boolean; stepIndex: number } {
     const { parsed, omitted } = this.parseRequestPayload(rawBody);
+    const stepIndex = this.nextStepIndex(workflow);
     const step: IStep = {
       id: randomUUID(),
       workflowId: workflow.id,
-      index: workflow.steps.length,
+      index: stepIndex,
+      stepKind,
       inferenceRequest: this.buildInferenceRequest(rawBody),
       assistantMessage: { role: 'assistant', content: [] },
       toolUses: [],
@@ -209,13 +217,57 @@ export class AuditWorkflowHandler {
       timestamp: new Date().toISOString(),
       payload: {
         workflowId: workflow.id,
-        stepIndex: step.index,
+        stepIndex,
+        stepKind,
         step,
         request: parsed ?? undefined,
         headers: headersForAudit,
+        ...(options.workflowRequest !== undefined
+          ? { workflowRequest: options.workflowRequest }
+          : {}),
       },
     });
-    return { step, omitted };
+    return { step, omitted, stepIndex };
+  }
+
+  private async ensureTurnWorkflow(
+    auditSessionId: string,
+    rawBody: Buffer,
+    options: { request?: JsonValue; skipWorkflowRequest?: boolean } = {},
+  ): Promise<{ workflow: IWorkflow; layoutIndex: number; isNew: boolean; omitted: boolean }> {
+    const existing = this.workflowRepo.getWorkflowBySessionId(auditSessionId);
+    if (existing) {
+      const meta = this.workflowRepo.getWireMeta(existing.id);
+      return {
+        workflow: existing,
+        layoutIndex: meta?.layoutIndex ?? 1,
+        isNew: false,
+        omitted: false,
+      };
+    }
+
+    const layoutIndex = await this.workflowRepo.allocLayoutIndex(auditSessionId);
+    const { parsed, omitted } = this.parseRequestPayload(rawBody);
+    const agentCtx: AgentContext = { agentId: undefined, isSubagentRequest: false };
+
+    const workflow = this.workflowRepo.openWorkflow(auditSessionId, agentCtx, {
+      layoutIndex,
+      workflowKind: 'agentic',
+      request: options.skipWorkflowRequest ? undefined : (options.request ?? parsed ?? undefined),
+      skipWorkflowRequest: options.skipWorkflowRequest,
+    });
+
+    const seq = await this.workflowRepo.nextSequence(auditSessionId);
+    this.workflowRepo.patchWireMeta(workflow.id, {
+      layoutIndex,
+      requestSequence: seq,
+      requestBodyOmitted: omitted,
+      requestBodyBytes: rawBody.length,
+      workflowKind: 'agentic',
+      modelId: extractModelFromRequestBody(rawBody) ?? undefined,
+    });
+
+    return { workflow, layoutIndex, isNew: true, omitted };
   }
 
   private async openWireWorkflow(
@@ -254,10 +306,9 @@ export class AuditWorkflowHandler {
 
     const stepResult = this.registerWireStepRequest(
       workflow,
-      1,
       headersForAudit,
       rawBody,
-      workflowKind,
+      workflowKind === 'side-request' ? 'side-request' : 'agentic',
     );
 
     return {
@@ -297,20 +348,31 @@ export class AuditWorkflowHandler {
     auditSessionId: string,
     classification: RequestClassification,
   ): Promise<AuditWorkflowResult> {
-    const { workflow, layoutIndex, seq, omitted } = await this.openWireWorkflow(
+    const { parsed } = this.parseRequestPayload(params.rawBody);
+    const { workflow, layoutIndex, isNew, omitted: wfOmitted } = await this.ensureTurnWorkflow(
       auditSessionId,
-      'agentic',
       params.rawBody,
+      { request: parsed ?? undefined },
+    );
+    const meta = this.workflowRepo.getWireMeta(workflow.id);
+    const seq = meta?.requestSequence ?? (await this.workflowRepo.nextSequence(auditSessionId));
+    const materializeWorkflowRequest =
+      !isNew && workflow.steps.length === 0 ? (parsed ?? undefined) : undefined;
+    const { stepIndex, omitted: stepOmitted } = this.registerWireStepRequest(
+      workflow,
       headersForAudit,
+      params.rawBody,
+      'agentic',
+      { workflowRequest: materializeWorkflowRequest },
     );
     return this.resultFromWorkflow(
       workflow,
       layoutIndex,
       seq,
-      omitted,
+      wfOmitted || stepOmitted,
       classification,
       'agentic',
-      1,
+      stepIndex,
     );
   }
 
@@ -366,10 +428,9 @@ export class AuditWorkflowHandler {
     match: { workflow: IWorkflow; pendings: IToolUse[] },
     agentCtx?: AgentContext,
   ): Promise<AuditWorkflowResult> {
-    return this.workflowRepo.withSessionLock(auditSessionId, async () => {
       const parentWorkflow = match.workflow;
       const parentMeta = this.workflowRepo.getWireMeta(parentWorkflow.id);
-      const parentLayoutIndex = parentMeta?.layoutIndex ?? 0;
+      const parentLayoutIndex = parentMeta?.layoutIndex ?? 1;
       const parentWorkflowDir = this.workflowDirAbs(auditSessionId, parentLayoutIndex);
 
       const parentStepIndex = match.pendings.reduce(
@@ -432,7 +493,7 @@ export class AuditWorkflowHandler {
         },
       );
 
-      const subLayoutIndex = this.workflowRepo.getWireMeta(subWorkflow.id)?.layoutIndex ?? 0;
+      const subLayoutIndex = this.workflowRepo.getWireMeta(subWorkflow.id)?.layoutIndex ?? 1;
       this.workflowRepo.patchWireMeta(subWorkflow.id, {
         layoutIndex: subLayoutIndex,
         requestSequence: subSeq,
@@ -443,7 +504,7 @@ export class AuditWorkflowHandler {
         modelId: extractModelFromRequestBody(params.rawBody) ?? undefined,
       });
 
-      this.registerWireStepRequest(subWorkflow, 1, headersForAudit, params.rawBody, 'agentic');
+      this.registerWireStepRequest(subWorkflow, headersForAudit, params.rawBody, 'agentic');
 
       return {
         auditWorkflowDir: this.workflowDirAbs(auditSessionId, subLayoutIndex),
@@ -455,12 +516,11 @@ export class AuditWorkflowHandler {
         requestClassification: classification,
         assignedStepIndex: 1,
       };
-    });
   }
 
   private stepIndexForToolUse(workflow: IWorkflow, toolUse: IToolUse): number {
     const step = workflow.steps.find((s) => s.id === toolUse.stepId);
-    return (step?.index ?? 0) + 1;
+    return step?.index ?? 1;
   }
 
   private readSubagentType(toolUse: IToolUse): string | undefined {
@@ -477,36 +537,32 @@ export class AuditWorkflowHandler {
     parentWorkflow: IWorkflow;
     consumePending: () => IToolUse | undefined;
     onConsumed?: (toolUse: IToolUse, stepIndex: number) => void;
-  }): Promise<AuditWorkflowResult> {
-    return this.workflowRepo.withSessionLock(params.auditSessionId, async () => {
-      const pending = params.consumePending();
-      const parentMeta = this.workflowRepo.getWireMeta(params.parentWorkflow.id);
-      const layoutIndex = parentMeta?.layoutIndex ?? 0;
-      const stepIndex = params.parentWorkflow.steps.length + 1;
+  }  ): Promise<AuditWorkflowResult> {
+    const pending = params.consumePending();
+    const parentMeta = this.workflowRepo.getWireMeta(params.parentWorkflow.id);
+    const layoutIndex = parentMeta?.layoutIndex ?? 1;
 
-      this.registerWireStepRequest(
-        params.parentWorkflow,
-        stepIndex,
-        params.headersForAudit,
-        params.rawBody,
-        'agentic',
-      );
+    const { stepIndex } = this.registerWireStepRequest(
+      params.parentWorkflow,
+      params.headersForAudit,
+      params.rawBody,
+      'agentic',
+    );
 
-      if (pending && params.onConsumed) {
-        params.onConsumed(pending, stepIndex);
-      }
+    if (pending && params.onConsumed) {
+      params.onConsumed(pending, stepIndex);
+    }
 
-      return this.resultFromWorkflow(
-        params.parentWorkflow,
-        layoutIndex,
-        parentMeta?.requestSequence ?? 0,
-        false,
-        params.classification,
-        'agentic',
-        stepIndex,
-        { isInternalToolStep: true },
-      );
-    });
+    return this.resultFromWorkflow(
+      params.parentWorkflow,
+      layoutIndex,
+      parentMeta?.requestSequence ?? 0,
+      false,
+      params.classification,
+      'agentic',
+      stepIndex,
+      { isInternalToolStep: true },
+    );
   }
 
   private async tryHandleInternalToolStep(params: {
@@ -517,39 +573,35 @@ export class AuditWorkflowHandler {
     parentWorkflow: IWorkflow;
     consumePending: () => IToolUse | undefined;
     onConsumed?: (toolUse: IToolUse, stepIndex: number) => void;
-  }): Promise<AuditWorkflowResult | null> {
-    return this.workflowRepo.withSessionLock(params.auditSessionId, async () => {
-      const pending = params.consumePending();
-      if (!pending) {
-        return null;
-      }
-      const parentMeta = this.workflowRepo.getWireMeta(params.parentWorkflow.id);
-      const layoutIndex = parentMeta?.layoutIndex ?? 0;
-      const stepIndex = params.parentWorkflow.steps.length + 1;
+  }  ): Promise<AuditWorkflowResult | null> {
+    const pending = params.consumePending();
+    if (!pending) {
+      return null;
+    }
+    const parentMeta = this.workflowRepo.getWireMeta(params.parentWorkflow.id);
+    const layoutIndex = parentMeta?.layoutIndex ?? 1;
 
-      this.registerWireStepRequest(
-        params.parentWorkflow,
-        stepIndex,
-        params.headersForAudit,
-        params.rawBody,
-        'agentic',
-      );
+    const { stepIndex } = this.registerWireStepRequest(
+      params.parentWorkflow,
+      params.headersForAudit,
+      params.rawBody,
+      'agentic',
+    );
 
-      if (params.onConsumed) {
-        params.onConsumed(pending, stepIndex);
-      }
+    if (params.onConsumed) {
+      params.onConsumed(pending, stepIndex);
+    }
 
-      return this.resultFromWorkflow(
-        params.parentWorkflow,
-        layoutIndex,
-        parentMeta?.requestSequence ?? 0,
-        false,
-        params.classification,
-        'agentic',
-        stepIndex,
-        { isInternalToolStep: true },
-      );
-    });
+    return this.resultFromWorkflow(
+      params.parentWorkflow,
+      layoutIndex,
+      parentMeta?.requestSequence ?? 0,
+      false,
+      params.classification,
+      'agentic',
+      stepIndex,
+      { isInternalToolStep: true },
+    );
   }
 
   private async handleWebSearchStep(
@@ -623,7 +675,7 @@ export class AuditWorkflowHandler {
     }
 
     const parentMeta = this.workflowRepo.getWireMeta(parentWorkflow.id);
-    const layoutIndex = parentMeta?.layoutIndex ?? 0;
+    const layoutIndex = parentMeta?.layoutIndex ?? 1;
 
     this.workflowRepo.patchWireMeta(parentWorkflow.id, {
       awaitingContinuation: false,
@@ -672,13 +724,11 @@ export class AuditWorkflowHandler {
       );
     }
 
-    const stepIndex = parentWorkflow.steps.length + 1;
-    this.registerWireStepRequest(
+    const { stepIndex } = this.registerWireStepRequest(
       parentWorkflow,
-      stepIndex,
       headersForAudit,
       params.rawBody,
-      parentMeta?.workflowKind ?? 'agentic',
+      'agentic',
     );
 
     for (const toolUseId of toolUseIds) {
@@ -721,30 +771,6 @@ export class AuditWorkflowHandler {
     };
   }
 
-  private async handlePreflightQuota(
-    params: { rawBody: Buffer; requestId: string },
-    headersForAudit: Record<string, string | string[] | undefined>,
-    auditSessionId: string,
-    classification: RequestClassification,
-  ): Promise<AuditWorkflowResult> {
-    const { workflow, layoutIndex, seq, omitted } = await this.openWireWorkflow(
-      auditSessionId,
-      'client-preflight',
-      params.rawBody,
-      headersForAudit,
-      { skipWorkflowRequest: true },
-    );
-    return this.resultFromWorkflow(
-      workflow,
-      layoutIndex,
-      seq,
-      omitted,
-      classification,
-      'client-preflight',
-      1,
-    );
-  }
-
   private async handleSideRequest(
     params: { rawBody: Buffer; requestId: string },
     headersForAudit: Record<string, string | string[] | undefined>,
@@ -755,21 +781,30 @@ export class AuditWorkflowHandler {
       auditSessionId,
       params.rawBody,
     );
-    const { workflow, layoutIndex, seq, omitted } = await this.openWireWorkflow(
+    const { workflow, layoutIndex, omitted: wfOmitted } = await this.ensureTurnWorkflow(
       auditSessionId,
-      'side-request',
       params.rawBody,
+      { skipWorkflowRequest: true },
+    );
+    if (isSessionNaming) {
+      this.workflowRepo.patchWireMeta(workflow.id, { sideRequestKind: 'session-naming' });
+    }
+    const meta = this.workflowRepo.getWireMeta(workflow.id);
+    const seq = meta?.requestSequence ?? (await this.workflowRepo.nextSequence(auditSessionId));
+    const { stepIndex, omitted: stepOmitted } = this.registerWireStepRequest(
+      workflow,
       headersForAudit,
-      { sideRequestKind: isSessionNaming ? 'session-naming' : 'generic' },
+      params.rawBody,
+      'side-request',
     );
     return this.resultFromWorkflow(
       workflow,
       layoutIndex,
       seq,
-      omitted,
+      wfOmitted || stepOmitted,
       classification,
-      'side-request',
-      1,
+      'agentic',
+      stepIndex,
     );
   }
 
@@ -789,30 +824,6 @@ export class AuditWorkflowHandler {
     } catch {
       return false;
     }
-  }
-
-  private async handlePreflightWarmup(
-    params: { rawBody: Buffer; requestId: string },
-    headersForAudit: Record<string, string | string[] | undefined>,
-    auditSessionId: string,
-    classification: RequestClassification,
-  ): Promise<AuditWorkflowResult> {
-    const { workflow, layoutIndex, seq, omitted } = await this.openWireWorkflow(
-      auditSessionId,
-      'client-preflight',
-      params.rawBody,
-      headersForAudit,
-      { skipWorkflowRequest: true },
-    );
-    return this.resultFromWorkflow(
-      workflow,
-      layoutIndex,
-      seq,
-      omitted,
-      classification,
-      'client-preflight',
-      1,
-    );
   }
 
   /**

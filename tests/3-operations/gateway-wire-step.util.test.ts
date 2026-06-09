@@ -33,7 +33,7 @@ describe('gateway-wire-step.util', () => {
       workflowKind: 'agentic',
     });
 
-    const requestStep = makeRequestStep(wf.id, 0);
+    const requestStep = makeRequestStep(wf.id, 1);
     repo.registerStep(wf.id, requestStep);
 
     const now = new Date();
@@ -67,7 +67,7 @@ describe('gateway-wire-step.util', () => {
     });
 
     for (let hop = 0; hop < 3; hop++) {
-      repo.registerStep(wf.id, makeRequestStep(wf.id, hop));
+      repo.registerStep(wf.id, makeRequestStep(wf.id, hop + 1));
       const isLast = hop === 2;
       const stopReason = isLast ? 'end_turn' : 'tool_use';
       const responseStep = buildWireStep({
@@ -104,7 +104,7 @@ describe('gateway-wire-step.util', () => {
       layoutIndex: 0,
       workflowKind: 'agentic',
     });
-    repo.registerStep(wf.id, makeRequestStep(wf.id, 0));
+    repo.registerStep(wf.id, makeRequestStep(wf.id, 1));
 
     const enriched = enrichOpenWireStepWithResponse(
       repo,
@@ -134,7 +134,7 @@ describe('gateway-wire-step.util', () => {
     });
 
     for (let hop = 0; hop < 4; hop++) {
-      repo.registerStep(wf.id, makeRequestStep(wf.id, hop));
+      repo.registerStep(wf.id, makeRequestStep(wf.id, hop + 1));
       const isLast = hop === 3;
       const stopReason = isLast ? 'end_turn' : 'tool_use';
       const responseStep = buildWireStep({
@@ -193,9 +193,9 @@ describe('gateway-wire-step.util', () => {
       layoutIndex: 0,
       workflowKind: 'agentic',
     });
-    repo.registerStep(wf.id, makeRequestStep(wf.id, 0));
+    repo.registerStep(wf.id, makeRequestStep(wf.id, 1));
 
-    expect(resolveOpenWireStepIndex(repo.getWorkflow(wf.id)!)).toBe(0);
+    expect(resolveOpenWireStepIndex(repo.getWorkflow(wf.id)!)).toBe(1);
     expect(wf.steps.length).toBe(1);
   });
 });

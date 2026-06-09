@@ -134,19 +134,22 @@ No hay `response/` en la raíz del workflow: la respuesta HTTP vive bajo `steps/
 
 ```text
 Sesión
-└─ Workflow principal (kind: main)
-   ├─ request/body.json              → prompt inicial (fresh)
-   ├─ steps/01/                      → compute
-   ├─ steps/02/
+└─ Workflow de turno (kind: main, interactionType: agentic) — workflows/01/
+   ├─ request/body.json              → prompt del usuario (primer hop agentic)
+   ├─ steps/01/  stepKind: side-request  → naming / count_tokens (si aplica)
+   ├─ steps/02/  stepKind: agentic       → fresh / compute
+   ├─ steps/03/
    │  └─ tools/01-Agent/
    │     └─ sub-agent/workflow/      → sub-workflow (kind: subagent)
    │        ├─ steps/01/ …
    │        └─ output/result.json
-   ├─ steps/03/                      → continuation (tool_result)
-   └─ output/result.json             → cierre E2E
+   ├─ steps/04/  stepKind: agentic       → continuation (tool_result)
+   └─ output/result.json             → cierre E2E (hook Stop)
 ```
 
-Preflights (`client-preflight`) y `side-request` son **workflows hermanos** bajo `workflows/NN/` (índice propio), no un árbol `side-interactions/` paralelo. El tipo semántico queda en `meta.json` / metadatos wire (`interactionType`).
+Un **único workflow por turno** agrupa todos los hops HTTP entre `UserPromptSubmit` y `Stop`. Los índices `NN`, `MM` y `KK` son **base 1** (primer turno → `workflows/01/`, primer step → `steps/01/`).
+
+Los **preflights** (`preflight-quota`, `preflight-warmup`) se reenvían al upstream pero **no** se proyectan al árbol causal (sin carpeta en disco). El tipo de hop auxiliar vs agentic queda en `stepKind` del step (`agentic` | `side-request`).
 
 ### 3.2 Flujo de persistencia (P1)
 
@@ -165,12 +168,12 @@ flowchart LR
 
 La clasificación la realiza `RequestClassifierService` (dominio); `AuditWorkflowHandler` abre o continúa workflows en `IWorkflowRepository` y publica eventos.
 
-| Clasificación                          | Comportamiento resumido                                      | Workflow en disco                             |
+| Clasificación                          | Comportamiento resumido                                      | Proyección en disco                           |
 | -------------------------------------- | ------------------------------------------------------------ | --------------------------------------------- |
-| `fresh`                                | Nuevo turno con `tools` no vacíos                            | Nuevo `workflows/NN/`, `kind: main`           |
-| `continuation`                         | `tool_result` en el **último mensaje** hacia workflow activo | Mismo workflow; nuevo step o coalescing Agent |
-| `preflight-quota` / `preflight-warmup` | `max_tokens:1` o warm-up                                     | Nuevo workflow; cierra al responder           |
-| `side-request`                         | `tools: []` (p. ej. `count_tokens`)                          | Nuevo workflow; no desplaza el main activo    |
+| `fresh`                                | Hop agentic con `tools` no vacíos                            | Step `stepKind: agentic` bajo turno activo   |
+| `continuation`                         | `tool_result` en el **último mensaje** hacia workflow activo | Mismo turno; nuevo step o coalescing Agent    |
+| `preflight-quota` / `preflight-warmup` | `max_tokens:1` o warm-up                                     | **Excluido** (proxy activo, sin auditoría)    |
+| `side-request`                         | `tools: []` (p. ej. naming)                                  | Step `stepKind: side-request` bajo turno      |
 
 **Sin sesión:** si `sessionId === '_unknown'`, el handler retorna sin escribir disco ([`health-check-handling.md`](./health-check-handling.md)).
 
@@ -192,16 +195,17 @@ Los pendientes viven en `IToolUse` del workflow padre, no en `ActiveInteraction`
 
 ## 5. Tipos de interacción (semántica → workflow)
 
-Los nombres `agentic`, `client-preflight`, `side-request` y `session-shell` se conservan como **`interactionType`** en metadatos wire para compatibilidad con métricas y clasificación. En disco, todos son carpetas `workflows/NN/`.
+El turno de usuario es un workflow con **`interactionType: agentic`** (`workflows/NN/`, `NN` base 1). Se abre en `UserPromptSubmit` (hook) o lazy-open en el primer hop HTTP, y cierra en hook `Stop` / `StopFailure` con `IWorkflowResult` (`finalText` desde el hook).
 
-| `interactionType`  | Origen típico         | Cierre del workflow                                        |
+| Campo              | Valores activos       | Notas                                                      |
 | ------------------ | --------------------- | ---------------------------------------------------------- |
-| `session-shell`    | `UserPromptSubmit`    | Hook `Stop` (contenedor lifecycle de la sesión)            |
-| `agentic`          | Fresh + continuations | Hook de cierre / `workflow_complete` con `IWorkflowResult` |
-| `client-preflight` | Quota o warm-up       | Al recibir respuesta (inmediato)                           |
-| `side-request`     | `tools: []`           | Respuesta terminal; workflow independiente del main        |
+| `interactionType`  | `agentic`             | Workflow de turno; subagentes usan `kind: subagent`      |
+| `stepKind`         | `agentic`, `side-request` | Diferencia hops auxiliares vs inferencia dentro del turno |
+| Preflights         | —                     | Excluidos del árbol causal; no persisten `interactionType` |
 
-`WorkflowKind` en tipos gateway: `main` | `subagent` (sub-workflows bajo `sub-agent/workflow/`).
+`end_turn` en SSE cierra solo el **step** abierto; el workflow E2E del turno no hace `forceClose` en SSE.
+
+`WorkflowKind` estructural: `main` | `subagent` (sub-workflows bajo `sub-agent/workflow/`).
 
 ---
 

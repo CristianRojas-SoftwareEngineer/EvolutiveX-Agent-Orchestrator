@@ -8,7 +8,7 @@ import {
 
 describe('session-routing', () => {
   it('getWorkflowDir genera ruta correcta', () => {
-    expect(getWorkflowDir('sess-abc', 0)).toBe('sessions/sess-abc/workflows/00/');
+    expect(getWorkflowDir('sess-abc', 1)).toBe('sessions/sess-abc/workflows/01/');
   });
 
   it('getStepDir genera ruta correcta', () => {
@@ -16,12 +16,12 @@ describe('session-routing', () => {
   });
 
   it('getToolsDir genera ruta correcta', () => {
-    expect(getToolsDir('sess-abc', 0, 0)).toBe('sessions/sess-abc/workflows/00/steps/00/tools/');
+    expect(getToolsDir('sess-abc', 1, 1)).toBe('sessions/sess-abc/workflows/01/steps/01/tools/');
   });
 
   it('getToolDir genera ruta con slug normalizado', () => {
-    expect(getToolDir('sess-abc', 0, 0, 0, 'Read')).toBe(
-      'sessions/sess-abc/workflows/00/steps/00/tools/00-Read/',
+    expect(getToolDir('sess-abc', 1, 1, 1, 'Read')).toBe(
+      'sessions/sess-abc/workflows/01/steps/01/tools/01-Read/',
     );
   });
 
@@ -30,13 +30,13 @@ describe('session-routing', () => {
   });
 
   it('tool name con caracteres especiales se normaliza a slug con guiones', () => {
-    expect(getToolDir('s', 0, 0, 2, 'my_custom.tool')).toBe(
-      'sessions/s/workflows/00/steps/00/tools/02-my-custom-tool/',
+    expect(getToolDir('s', 1, 1, 2, 'my_custom.tool')).toBe(
+      'sessions/s/workflows/01/steps/01/tools/02-my-custom-tool/',
     );
   });
 
   it('tool name largo se trunca a 32 caracteres de slug (máx 35 con índice)', () => {
-    const dir = getToolDir('s', 0, 0, 0, 'A'.repeat(50));
+    const dir = getToolDir('s', 1, 1, 1, 'A'.repeat(50));
     const slug = dir.split('tools/')[1].replace(/\/$/, '');
     expect(slug.length).toBeLessThanOrEqual(35);
   });

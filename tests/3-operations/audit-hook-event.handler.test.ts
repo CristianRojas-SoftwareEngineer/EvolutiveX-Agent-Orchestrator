@@ -201,7 +201,7 @@ describe('AuditHookEventHandler', () => {
     expect(openWorkflow).toHaveBeenCalledWith(
       'session-1',
       expect.objectContaining({ isSubagentRequest: false }),
-      { workflowKind: 'session-shell' },
+      { workflowKind: 'agentic' },
     );
   });
 

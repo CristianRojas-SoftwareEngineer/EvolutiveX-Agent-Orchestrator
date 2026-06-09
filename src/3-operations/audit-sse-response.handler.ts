@@ -255,13 +255,15 @@ export class AuditSseResponseHandler {
           assembled.stopReason,
         );
       })();
-    void persistBillableStepMetricsIfNeeded(
-      this.sessionMetrics,
-      this.auditBaseDir,
-      workflow,
-      wireStep,
-      assembled.stopReason,
-    );
+    if (wireStep) {
+      void persistBillableStepMetricsIfNeeded(
+        this.sessionMetrics,
+        this.auditBaseDir,
+        workflow,
+        wireStep,
+        assembled.stopReason,
+      );
+    }
     const workflowAfterClose = this.workflowRepo.getWorkflow(workflow.id);
     if (workflowAfterClose?.result != null) {
       const sessionDir = resolveSessionDir(this.auditBaseDir, workflow.sessionId);

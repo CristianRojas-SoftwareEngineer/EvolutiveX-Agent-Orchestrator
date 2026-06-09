@@ -159,8 +159,10 @@ export interface StepMeta {
 export type WorkflowRequestKind =
   | 'client-preflight'
   | 'agentic'
-  | 'side-request'
-  | 'session-shell';
+  | 'side-request';
+
+/** Semántica del hop HTTP dentro de un workflow de turno. */
+export type StepKind = 'agentic' | 'side-request';
 
 /**
  * Referencia de parentezco entre una interacción de subagente y el step del

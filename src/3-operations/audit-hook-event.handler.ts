@@ -31,7 +31,7 @@ export class AuditHookEventHandler {
             agentId: event.agentId,
             isSubagentRequest: false,
           },
-          { workflowKind: 'session-shell' },
+          { workflowKind: 'agentic' },
         );
         break;
 

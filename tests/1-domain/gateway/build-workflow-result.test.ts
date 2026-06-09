@@ -98,11 +98,11 @@ describe('buildWorkflowResult', () => {
     expect(result.outcome).toBe('unknown');
   });
 
-  it('shell de sesión omite finalText', () => {
+  it('turno unificado incluye finalText del hook Stop', () => {
     const wf = makeWorkflow({ id: 'sess1', sessionId: 'sess1' });
-    const hook = makeHook({ sessionId: 'sess1', lastAssistantMessage: 'Texto duplicado' });
+    const hook = makeHook({ sessionId: 'sess1', lastAssistantMessage: 'Texto del turno' });
     const result = buildWorkflowResult(wf, [], [], hook);
-    expect('finalText' in result).toBe(false);
+    expect(result.finalText).toBe('Texto del turno');
   });
 
   it('workflow wire conserva finalText', () => {

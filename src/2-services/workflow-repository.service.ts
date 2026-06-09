@@ -110,7 +110,7 @@ export class WorkflowRepositoryService implements IWorkflowRepository {
     const layoutIndex =
       options.layoutIndex ??
       (() => {
-        const next = this.layoutIndices.get(sessionId) ?? 0;
+        const next = this.layoutIndices.get(sessionId) ?? 1;
         this.layoutIndices.set(sessionId, next + 1);
         return next;
       })();
@@ -157,7 +157,7 @@ export class WorkflowRepositoryService implements IWorkflowRepository {
     const layoutIndex =
       options.layoutIndex ??
       (() => {
-        const next = this.layoutIndices.get(sessionId) ?? 0;
+        const next = this.layoutIndices.get(sessionId) ?? 1;
         this.layoutIndices.set(sessionId, next + 1);
         return next;
       })();
@@ -466,7 +466,7 @@ export class WorkflowRepositoryService implements IWorkflowRepository {
   }
 
   public async allocLayoutIndex(sessionId: string): Promise<number> {
-    const next = this.layoutIndices.get(sessionId) ?? 0;
+    const next = this.layoutIndices.get(sessionId) ?? 1;
     this.layoutIndices.set(sessionId, next + 1);
     return next;
   }

@@ -213,7 +213,7 @@ describe('WorkflowRepositoryService — lifecycle: close', () => {
 
     expect(result.outcome).toBe('success');
     expect(result.closedByEvent).toBe('Stop');
-    expect('finalText' in result).toBe(false);
+    expect(result.finalText).toBe('Listo');
     expect(wf.status).toBe('completed');
     expect(wf.result).toBe(result);
     expect(wf.completedAt).toBeDefined();
@@ -264,7 +264,7 @@ describe('WorkflowRepositoryService — lifecycle: close', () => {
     const result2 = repo.close('session-1', hook2);
 
     expect(result2).toBe(result1);
-    expect('finalText' in result2).toBe(false);
+    expect(result2.finalText).toBe('primera');
   });
 });
 

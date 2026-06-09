@@ -43,22 +43,23 @@ async function exists(rel: string): Promise<boolean> {
 }
 
 describe('SessionPersistence', () => {
-  it('workflow_start con session-shell persiste interactionType session-shell', async () => {
+  it('workflow_start con turno agentic persiste interactionType agentic', async () => {
     emit('workflow_start', 'sess-1', {
       workflowId: 'sess-1',
       kind: 'main',
-      workflowKind: 'session-shell',
+      workflowKind: 'agentic',
+      layoutIndex: 1,
     });
     await persistence.flush();
-    const meta = await readJson('sessions/sess-1/workflows/00/meta.json');
-    expect(meta.interactionType).toBe('session-shell');
+    const meta = await readJson('sessions/sess-1/workflows/01/meta.json');
+    expect(meta.interactionType).toBe('agentic');
     expect(meta.workflowKind).toBe('main');
   });
 
   it('workflow_start crea directorio y meta.json inicial', async () => {
     emit('workflow_start', 'sess-1', { workflowId: 'wf-1', kind: 'main' });
     await persistence.flush();
-    const meta = await readJson('sessions/sess-1/workflows/00/meta.json');
+    const meta = await readJson('sessions/sess-1/workflows/01/meta.json');
     expect(meta.status).toBe('running');
     expect(meta.workflowKind).toBe('main');
     expect(meta.layoutVersion).toBe('causal-workflows-v1');
@@ -71,7 +72,7 @@ describe('SessionPersistence', () => {
       request: { model: 'claude-sonnet-4-6', messages: [] },
     });
     await persistence.flush();
-    const body = await readJson('sessions/sess-1/workflows/00/request/body.json');
+    const body = await readJson('sessions/sess-1/workflows/01/request/body.json');
     expect(body.model).toBe('claude-sonnet-4-6');
   });
 
@@ -79,11 +80,11 @@ describe('SessionPersistence', () => {
     emit('workflow_start', 'sess-1', { workflowId: 'wf-1', kind: 'main' });
     emit('step_request', 'sess-1', {
       workflowId: 'wf-1',
-      stepIndex: 0,
+      stepIndex: 1,
       request: { model: 'claude-sonnet-4-6', messages: [] },
     });
     await persistence.flush();
-    const body = await readJson('sessions/sess-1/workflows/00/steps/00/request/body.json');
+    const body = await readJson('sessions/sess-1/workflows/01/steps/01/request/body.json');
     expect(body.model).toBe('claude-sonnet-4-6');
   });
 
@@ -91,16 +92,16 @@ describe('SessionPersistence', () => {
     emit('workflow_start', 'sess-1', { workflowId: 'wf-1', kind: 'main' });
     emit('step_response', 'sess-1', {
       workflowId: 'wf-1',
-      stepIndex: 0,
+      stepIndex: 1,
       response: { body: { ok: true } },
       headers: { 'content-type': 'application/json' },
       markdown: '# respuesta',
     });
     await persistence.flush();
-    expect(await exists('sessions/sess-1/workflows/00/steps/00/response/body.json')).toBe(true);
-    expect(await exists('sessions/sess-1/workflows/00/steps/00/response/headers.json')).toBe(true);
+    expect(await exists('sessions/sess-1/workflows/01/steps/01/response/body.json')).toBe(true);
+    expect(await exists('sessions/sess-1/workflows/01/steps/01/response/headers.json')).toBe(true);
     const md = await fs.readFile(
-      path.join(rootDir, 'sessions/sess-1/workflows/00/steps/00/response/parsed.md'),
+      path.join(rootDir, 'sessions/sess-1/workflows/01/steps/01/response/parsed.md'),
       'utf8',
     );
     expect(md).toContain('# respuesta');
@@ -110,13 +111,13 @@ describe('SessionPersistence', () => {
     emit('workflow_start', 'sess-1', { workflowId: 'wf-1', kind: 'main' });
     emit('tool_call', 'sess-1', {
       workflowId: 'wf-1',
-      stepIndex: 0,
+      stepIndex: 1,
       toolUseId: 'tu-1',
       toolName: 'Read',
       input: { file_path: '/tmp/a.ts' },
     });
     await persistence.flush();
-    const dir = 'sessions/sess-1/workflows/00/steps/00/tools/00-Read';
+    const dir = 'sessions/sess-1/workflows/01/steps/01/tools/01-Read';
     const input = await readJson(`${dir}/input.json`);
     expect(input.file_path).toBe('/tmp/a.ts');
     const meta = await readJson(`${dir}/meta.json`);
@@ -129,7 +130,7 @@ describe('SessionPersistence', () => {
     emit('workflow_start', 'sess-1', { workflowId: 'wf-1', kind: 'main' });
     emit('tool_call', 'sess-1', {
       workflowId: 'wf-1',
-      stepIndex: 0,
+      stepIndex: 1,
       toolUseId: 'tu-1',
       toolName: 'Read',
       input: {},
@@ -140,7 +141,7 @@ describe('SessionPersistence', () => {
       result: { isError: false, result: 'contenido' },
     });
     await persistence.flush();
-    const dir = 'sessions/sess-1/workflows/00/steps/00/tools/00-Read';
+    const dir = 'sessions/sess-1/workflows/01/steps/01/tools/01-Read';
     const result = await readJson(`${dir}/result.json`);
     expect(result.result).toBe('contenido');
     const meta = await readJson(`${dir}/meta.json`);
@@ -154,19 +155,19 @@ describe('SessionPersistence', () => {
       result: { outcome: 'success', finalText: 'Listo', stepCount: 1 },
     });
     await persistence.flush();
-    const meta = await readJson('sessions/sess-1/workflows/00/meta.json');
+    const meta = await readJson('sessions/sess-1/workflows/01/meta.json');
     expect(meta.status).toBe('completed');
     expect(meta.completedAt).toBeDefined();
-    const result = await readJson('sessions/sess-1/workflows/00/output/result.json');
+    const result = await readJson('sessions/sess-1/workflows/01/output/result.json');
     expect(result.outcome).toBe('success');
-    expect(await exists('sessions/sess-1/workflows/00/output/result.parsed.md')).toBe(true);
+    expect(await exists('sessions/sess-1/workflows/01/output/result.parsed.md')).toBe(true);
   });
 
   it('workflow_cancel actualiza meta.json con status cancelled', async () => {
     emit('workflow_start', 'sess-1', { workflowId: 'wf-1', kind: 'main' });
     emit('workflow_cancel', 'sess-1', { workflowId: 'wf-1', cancellationReason: 'user_abort' });
     await persistence.flush();
-    const meta = await readJson('sessions/sess-1/workflows/00/meta.json');
+    const meta = await readJson('sessions/sess-1/workflows/01/meta.json');
     expect(meta.status).toBe('cancelled');
     expect(meta.cancellationReason).toBe('user_abort');
   });
@@ -175,19 +176,19 @@ describe('SessionPersistence', () => {
     emit('workflow_start', 'sess-1', { workflowId: 'wf-1', kind: 'main' });
     emit('step_request', 'sess-1', {
       workflowId: 'wf-1',
-      stepIndex: 0,
+      stepIndex: 1,
       request: { model: 'm', messages: [] },
     });
     await persistence.flush();
-    expect(await exists('sessions/sess-1/workflows/00/steps/00/request')).toBe(true);
-    expect(await exists('sessions/sess-1/workflows/00/steps/00/tools')).toBe(false);
+    expect(await exists('sessions/sess-1/workflows/01/steps/01/request')).toBe(true);
+    expect(await exists('sessions/sess-1/workflows/01/steps/01/tools')).toBe(false);
   });
 
   it('sub-agente se anida bajo el tool invocador', async () => {
     emit('workflow_start', 'sess-1', { workflowId: 'wf-main', kind: 'main' });
     emit('tool_call', 'sess-1', {
       workflowId: 'wf-main',
-      stepIndex: 0,
+      stepIndex: 1,
       toolUseId: 'tu-task',
       toolName: 'Task',
       input: {},
@@ -199,7 +200,7 @@ describe('SessionPersistence', () => {
     });
     await persistence.flush();
     const meta = await readJson(
-      'sessions/sess-1/workflows/00/steps/00/tools/00-Task/sub-agent/workflow/meta.json',
+      'sessions/sess-1/workflows/01/steps/01/tools/01-Task/sub-agent/workflow/meta.json',
     );
     expect(meta.workflowKind).toBe('subagent');
   });
@@ -212,7 +213,7 @@ describe('SessionPersistence — P2-b stream_chunk', () => {
     emit('workflow_start', 'sess-1', { workflowId: 'wf-1', kind: 'main' });
     emit('stream_chunk', 'sess-1', {
       seq: 1,
-      stepIndex: 0,
+      stepIndex: 1,
       workflowId: 'wf-1',
       chunk: {
         i: 1,
@@ -222,14 +223,14 @@ describe('SessionPersistence — P2-b stream_chunk', () => {
       },
     });
     await persistence.flush();
-    expect(await exists('sessions/sess-1/workflows/00/steps/00/response/streaming')).toBe(false);
+    expect(await exists('sessions/sess-1/workflows/01/steps/01/response/streaming')).toBe(false);
   });
 
   it('línea SSE real se persiste como NNNN-chunk.ndjson', async () => {
     emit('workflow_start', 'sess-1', { workflowId: 'wf-1', kind: 'main' });
     emit('stream_chunk', 'sess-1', {
       seq: 1,
-      stepIndex: 0,
+      stepIndex: 1,
       workflowId: 'wf-1',
       chunk: {
         i: 1,
@@ -239,7 +240,7 @@ describe('SessionPersistence — P2-b stream_chunk', () => {
       },
     });
     await persistence.flush();
-    const chunkPath = 'sessions/sess-1/workflows/00/steps/00/response/streaming/0001-chunk.ndjson';
+    const chunkPath = 'sessions/sess-1/workflows/01/steps/01/response/streaming/0001-chunk.ndjson';
     expect(await exists(chunkPath)).toBe(true);
     const raw = await fs.readFile(path.join(rootDir, chunkPath), 'utf8');
     const parsed = JSON.parse(raw.trim()) as Record<string, unknown>;
@@ -251,7 +252,7 @@ describe('SessionPersistence — P2-b stream_chunk', () => {
     emit('workflow_start', 'sess-1', { workflowId: 'wf-1', kind: 'main' });
     emit('stream_chunk', 'sess-1', {
       seq: 10001,
-      stepIndex: 0,
+      stepIndex: 1,
       workflowId: 'wf-1',
       chunk: {
         i: 10001,
@@ -261,7 +262,7 @@ describe('SessionPersistence — P2-b stream_chunk', () => {
       },
     });
     await persistence.flush();
-    expect(await exists('sessions/sess-1/workflows/00/steps/00/response/streaming')).toBe(false);
+    expect(await exists('sessions/sess-1/workflows/01/steps/01/response/streaming')).toBe(false);
   });
 });
 
@@ -377,40 +378,40 @@ describe('SessionPersistence — P2-g vistas coalesced', () => {
     });
 
     emit('workflow_start', 'sess-1', { workflowId: 'wf-1', kind: 'main' });
-    // Delegation step (index 0): step_response sin coalescedDelegationStepIndex
+    // Delegation step (index 1): step_response sin coalescedDelegationStepIndex
     bus.publish({
       type: 'step_response',
       sessionId: 'sess-1',
       timestamp: '2026-01-01T00:00:00Z',
       payload: {
         workflowId: 'wf-1',
-        stepIndex: 0,
+        stepIndex: 1,
         response: delegMsg,
       },
     });
-    // Continuation step (index 1): step_response con coalescedDelegationStepIndex = 0
+    // Continuation step (index 2): step_response con coalescedDelegationStepIndex = 1
     bus.publish({
       type: 'step_response',
       sessionId: 'sess-1',
       timestamp: '2026-01-01T00:00:01Z',
       payload: {
         workflowId: 'wf-1',
-        stepIndex: 1,
+        stepIndex: 2,
         response: contMsg,
-        coalescedDelegationStepIndex: 0,
+        coalescedDelegationStepIndex: 1,
       },
     });
 
     await persistenceWithCoalesced.flush();
 
     // body.coalesced.json debe existir en el step de continuación
-    const coalescedPath = 'sessions/sess-1/workflows/00/steps/01/response/body.coalesced.json';
+    const coalescedPath = 'sessions/sess-1/workflows/01/steps/02/response/body.coalesced.json';
     expect(await exists(coalescedPath)).toBe(true);
     const body = await readJson(coalescedPath);
     expect(body.type).toBe('coalesced-agent-step-response');
 
     // sse.jsonl NO debe existir (fue reemplazado por streaming/)
-    expect(await exists('sessions/sess-1/workflows/00/steps/01/response/sse.jsonl')).toBe(false);
-    expect(await exists('sessions/sess-1/workflows/00/steps/00/response/sse.jsonl')).toBe(false);
+    expect(await exists('sessions/sess-1/workflows/01/steps/02/response/sse.jsonl')).toBe(false);
+    expect(await exists('sessions/sess-1/workflows/01/steps/01/response/sse.jsonl')).toBe(false);
   });
 });

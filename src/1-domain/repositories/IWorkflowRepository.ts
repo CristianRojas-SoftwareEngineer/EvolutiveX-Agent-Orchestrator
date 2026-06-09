@@ -142,12 +142,6 @@ export interface IWorkflowRepository {
    */
   clearToolUseIndexFor(workflowId: string): void;
 
-  /**
-   * Fija `languageModelId` con el primer modelo observado (idempotente).
-   * No-op si el workflowId no existe.
-   */
-  setWorkflowModel(workflowId: string, modelId: string): void;
-
   // ── Métodos de lookup (migración de handlers L3) ──────────────────────────
 
   /** Recupera el workflow principal (`kind: 'main'`) de una sesión. */

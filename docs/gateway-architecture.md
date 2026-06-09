@@ -256,7 +256,6 @@ Provider
 Session (raíz de continuidad)
   └── Workflow[]
         ├── kind, agentType?, agentId?
-        ├── languageModelId? (ref)
         ├── WorkflowResult? (valor al cerrar; usage? consumo facturado E2E §9.6; finalText? §9.7)
         └── Step[]
               ├── inferenceRequest  → IAnthropicRequest (snapshot)
@@ -353,7 +352,6 @@ Un **Step** no es solo una llamada HTTP aislada: incluye la fase de tools observ
 | `kind`              | `WorkflowKind`   | `'main' \| 'subagent'`                         |
 | `agentType?`        | `string`         | De hook `agent_type` / `SubagentStart`         |
 | `agentId?`          | `string`         | De hook `agent_id` (subagentes)                |
-| `languageModelId?`  | `string`         | Último o dominante en Steps                    |
 | `prompt?`           | `string`         | De `UserPromptSubmit.prompt` o input subagente |
 | `status`            | `WorkflowStatus` | Ver §13                                        |
 | `steps`             | `Step[]`         | Steps correlacionados en orden                 |
@@ -2617,7 +2615,7 @@ La capa 1 contiene tipos primitivos, interfaces DTO, modelos de clase anémicos,
 | `WorkflowRepositoryService` (memoria) | `Session`, workflows activos, steps abiertos, índices `tool_use_id`; emite eventos al bus                                                                        | Correlador §14                                 |
 | `EventBusService`                     | Adapter async in-process del port `IEventBus`; pub/sub unidireccional                                                                                            | Bus de eventos §23                             |
 | `SessionPersistenceService`           | Suscriptor del bus; proyecta eventos de telemetría a disco `sessions/` (`causal-workflows-v1`)                                                                   | §23, Parte IV                                  |
-| `SessionMetricsService`               | Escritura atómica de `session-metrics.json` agrupada por modelo (`models`, `session_totals`, `cache_efficiency`); solo workflows `kind: 'main'` (invariante G16) | §28.2                                          |
+| `SessionMetricsService`               | Escritura atómica de `session-metrics.json` (`billable_hops`, `finalized_runs`, tokens); workflows agénticos `main` y `subagent` (G16′) | §28.2                                          |
 | `StepAssemblerService`                | RAM: SSE → `assistantMessage`, `usage`, `stopReason`; callback `onInferenceComplete`                                                                             | StepBuffer §20                                 |
 | `SseReconstructService`               | Forense / `response/body.json` desde chunks SSE                                                                                                                  | Complemento; no sustituye `finalText` de hooks |
 | `StreamTeeService`                    | Reenvío transparente + rama auditoría                                                                                                                            | §19                                            |

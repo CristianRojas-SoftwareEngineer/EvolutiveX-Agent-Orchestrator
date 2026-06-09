@@ -134,7 +134,7 @@ export class AuditHookEventHandler {
 
   private async delegateClosure(sessionId: string, workflowId: string): Promise<void> {
     const workflow = this.workflowRepo.getWorkflow(workflowId);
-    if (!workflow || workflow.kind !== 'main') return;
+    if (!workflow || (workflow.kind !== 'main' && workflow.kind !== 'subagent')) return;
 
     const sessionDir = resolveSessionDir(this.auditBaseDir, sessionId);
     const closedSteps = workflow.steps.filter((s) => s.closedAt != null);

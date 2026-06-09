@@ -45,22 +45,26 @@ interface ModelMetadata {
   displayName?: string;
 }
 
-/** Entrada por modelo en session-metrics.json (camelCase legacy o snake_case G4). */
+/** Entrada por modelo en session-metrics.json (schema canónico). */
 interface SessionModelMetricsEntry {
-  count: number;
-  workflow_count?: number;
-  inputTokens?: number;
-  cacheReadInputTokens?: number;
-  cacheCreationInputTokens?: number;
-  outputTokens?: number;
-  input_tokens?: number;
-  cache_read_input_tokens?: number;
-  cache_creation_input_tokens?: number;
-  output_tokens?: number;
+  billable_hops: number;
+  finalized_runs: number;
+  input_tokens: number;
+  cache_read_input_tokens: number;
+  cache_creation_input_tokens: number;
+  output_tokens: number;
 }
 
-interface SessionMetrics {
+interface SessionMetricsFile {
   models: Record<string, SessionModelMetricsEntry>;
+  session_totals?: {
+    billable_hops: number;
+    finalized_runs: number;
+    input_tokens: number;
+    cache_read_input_tokens: number;
+    cache_creation_input_tokens: number;
+    output_tokens: number;
+  };
 }
 
 interface TokenMetrics {
@@ -68,9 +72,25 @@ interface TokenMetrics {
   cacheCreationInputTokens: number;
   cacheReadInputTokens: number;
   outputTokens: number;
-  count: number;
-  workflowCount: number;
+  billableHops: number;
+  finalizedRuns: number;
   modelName: string;
+}
+
+export interface SessionTotalsSnapshot {
+  billableHops: number;
+  finalizedRuns: number;
+  inputTokens: number;
+  cacheCreationInputTokens: number;
+  cacheReadInputTokens: number;
+  outputTokens: number;
+}
+
+export interface AggregatedSessionMetrics {
+  lite: TokenMetrics;
+  standard: TokenMetrics;
+  reasoning: TokenMetrics;
+  sessionTotals: SessionTotalsSnapshot;
 }
 
 // ── Rutas resueltas (cwd o inyectables en tests) ─────────────────
@@ -418,8 +438,8 @@ function renderSideBySide(
 // ── Caché del statusline (por sesión) ───────────────────────────
 
 interface LevelMetricsSnapshot {
-  count: number;
-  workflowCount: number;
+  billableHops: number;
+  finalizedRuns: number;
   inputTokens: number;
   cacheCreationInputTokens: number;
   cacheReadInputTokens: number;
@@ -616,8 +636,8 @@ function createEmptyMetrics(
     cacheCreationInputTokens: 0,
     cacheReadInputTokens: 0,
     outputTokens: 0,
-    count: 0,
-    workflowCount: 0,
+    billableHops: 0,
+    finalizedRuns: 0,
     modelName: '',
   };
   const haiku = settingsEnv['ANTHROPIC_DEFAULT_HAIKU_MODEL'];
@@ -639,47 +659,73 @@ function createEmptyMetrics(
   };
 }
 
+function isCanonicalSessionMetrics(data: SessionMetricsFile): boolean {
+  for (const m of Object.values(data.models ?? {})) {
+    if (m != null && typeof m === 'object' && 'billable_hops' in m) return true;
+  }
+  return data.session_totals != null && 'billable_hops' in data.session_totals;
+}
+
+function emptySessionTotals(): SessionTotalsSnapshot {
+  return {
+    billableHops: 0,
+    finalizedRuns: 0,
+    inputTokens: 0,
+    cacheCreationInputTokens: 0,
+    cacheReadInputTokens: 0,
+    outputTokens: 0,
+  };
+}
+
 export function aggregateSessionMetrics(
   sessionPath: string,
   settingsEnv: ClaudeSettingsEnv,
   routingPath: string,
-): {
-  lite: TokenMetrics;
-  standard: TokenMetrics;
-  reasoning: TokenMetrics;
-} {
+): AggregatedSessionMetrics {
   const metrics = createEmptyMetrics(settingsEnv, routingPath);
+  const sessionTotals = emptySessionTotals();
 
   const metricsPath = join(sessionPath, 'session-metrics.json');
-  if (!existsSync(metricsPath)) return metrics;
+  if (!existsSync(metricsPath)) {
+    return { ...metrics, sessionTotals };
+  }
 
   try {
-    const data = JSON.parse(readFileSync(metricsPath, 'utf-8')) as SessionMetrics;
+    const data = JSON.parse(readFileSync(metricsPath, 'utf-8')) as SessionMetricsFile;
+    if (!isCanonicalSessionMetrics(data)) {
+      return { ...metrics, sessionTotals };
+    }
 
-    for (const [modelId, m] of Object.entries(data.models)) {
+    for (const [modelId, entry] of Object.entries(data.models ?? {})) {
       const level = classifyModelWithEnv(modelId, settingsEnv);
       if (!level) continue;
       const levelMetrics = metrics[level];
-      const entry = m;
 
       levelMetrics.modelName = loadDisplayName(modelId, routingPath);
-      levelMetrics.count += coerceMetricNumber(entry.count);
-      levelMetrics.workflowCount += coerceMetricNumber(entry.workflow_count);
-      // G4 escribe snake_case (§33.2); sesiones antiguas pueden usar camelCase
-      levelMetrics.inputTokens += coerceMetricNumber(entry.input_tokens ?? entry.inputTokens);
-      levelMetrics.cacheCreationInputTokens += coerceMetricNumber(
-        entry.cache_creation_input_tokens ?? entry.cacheCreationInputTokens,
+      levelMetrics.billableHops += coerceMetricNumber(entry.billable_hops);
+      levelMetrics.finalizedRuns += coerceMetricNumber(entry.finalized_runs);
+      levelMetrics.inputTokens += coerceMetricNumber(entry.input_tokens);
+      levelMetrics.cacheCreationInputTokens += coerceMetricNumber(entry.cache_creation_input_tokens);
+      levelMetrics.cacheReadInputTokens += coerceMetricNumber(entry.cache_read_input_tokens);
+      levelMetrics.outputTokens += coerceMetricNumber(entry.output_tokens);
+    }
+
+    const totals = data.session_totals;
+    if (totals) {
+      sessionTotals.billableHops = coerceMetricNumber(totals.billable_hops);
+      sessionTotals.finalizedRuns = coerceMetricNumber(totals.finalized_runs);
+      sessionTotals.inputTokens = coerceMetricNumber(totals.input_tokens);
+      sessionTotals.cacheCreationInputTokens = coerceMetricNumber(
+        totals.cache_creation_input_tokens,
       );
-      levelMetrics.cacheReadInputTokens += coerceMetricNumber(
-        entry.cache_read_input_tokens ?? entry.cacheReadInputTokens,
-      );
-      levelMetrics.outputTokens += coerceMetricNumber(entry.output_tokens ?? entry.outputTokens);
+      sessionTotals.cacheReadInputTokens = coerceMetricNumber(totals.cache_read_input_tokens);
+      sessionTotals.outputTokens = coerceMetricNumber(totals.output_tokens);
     }
   } catch {
     // session-metrics.json corrupto — retornar métricas vacías
   }
 
-  return metrics;
+  return { ...metrics, sessionTotals };
 }
 
 function cellColor(
@@ -819,11 +865,7 @@ function computeRateLimitReferenceWidth(): number {
 }
 
 function renderTokenTable(
-  metrics: {
-    lite: TokenMetrics;
-    standard: TokenMetrics;
-    reasoning: TokenMetrics;
-  },
+  metrics: AggregatedSessionMetrics,
   previous: MetricsSnapshot | null,
   targetWidth?: number,
 ): { lines: string[]; width: number } {
@@ -834,8 +876,9 @@ function renderTokenTable(
     return ' '.repeat(pad) + text;
   }
 
+  type LevelKey = 'lite' | 'standard' | 'reasoning';
   const levels: Array<{
-    key: keyof typeof metrics;
+    key: LevelKey;
     label: string;
     color: string;
   }> = [
@@ -844,14 +887,15 @@ function renderTokenTable(
     { key: 'reasoning', label: 'Reasoning', color: C.reasoning },
   ];
 
-  let totalInput = 0;
-  let totalCacheCreation = 0;
-  let totalCacheRead = 0;
-  let totalOutput = 0;
-  let totalCount = 0;
-  let totalWorkflows = 0;
+  const { sessionTotals } = metrics;
+  const totalInput = sessionTotals.inputTokens;
+  const totalCacheCreation = sessionTotals.cacheCreationInputTokens;
+  const totalCacheRead = sessionTotals.cacheReadInputTokens;
+  const totalOutput = sessionTotals.outputTokens;
+  const totalBillableHops = sessionTotals.billableHops;
+  const totalFinalizedRuns = sessionTotals.finalizedRuns;
 
-  // Primera pasada: acumular totales y medir anchos naturales de columnas no-Modelo
+  // Primera pasada: medir anchos naturales de columnas no-Modelo
   let w0nat = visibleLength('Nivel');
   let w2nat = visibleLength('# Workflows');
   let w3nat = visibleLength('# Steps');
@@ -861,25 +905,19 @@ function renderTokenTable(
   let w7nat = visibleLength('Output (tks)');
 
   for (const level of levels) {
-    const m = metrics[level.key];
-    totalInput += m.inputTokens;
-    totalCacheCreation += m.cacheCreationInputTokens;
-    totalCacheRead += m.cacheReadInputTokens;
-    totalOutput += m.outputTokens;
-    totalCount += m.count;
-    totalWorkflows += m.workflowCount;
+    const m: TokenMetrics = metrics[level.key];
 
     w0nat = Math.max(w0nat, visibleLength(level.label));
-    w2nat = Math.max(w2nat, visibleLength(String(m.workflowCount)));
-    w3nat = Math.max(w3nat, visibleLength(String(m.count)));
+    w2nat = Math.max(w2nat, visibleLength(String(m.finalizedRuns)));
+    w3nat = Math.max(w3nat, visibleLength(String(m.billableHops)));
     w4nat = Math.max(w4nat, visibleLength(formatTokens(m.inputTokens)));
     w5nat = Math.max(w5nat, visibleLength(formatTokens(m.cacheCreationInputTokens)));
     w6nat = Math.max(w6nat, visibleLength(formatTokens(m.cacheReadInputTokens)));
     w7nat = Math.max(w7nat, visibleLength(formatTokens(m.outputTokens)));
   }
-  // Incluir totales en el cálculo de anchos de columnas numéricas
-  w2nat = Math.max(w2nat, visibleLength(String(totalWorkflows)));
-  w3nat = Math.max(w3nat, visibleLength(String(totalCount)));
+  // Incluir totales estructurales en el cálculo de anchos de columnas numéricas
+  w2nat = Math.max(w2nat, visibleLength(String(totalFinalizedRuns)));
+  w3nat = Math.max(w3nat, visibleLength(String(totalBillableHops)));
   w4nat = Math.max(w4nat, visibleLength(formatTokens(totalInput)));
   w5nat = Math.max(w5nat, visibleLength(formatTokens(totalCacheCreation)));
   w6nat = Math.max(w6nat, visibleLength(formatTokens(totalCacheRead)));
@@ -901,9 +939,10 @@ function renderTokenTable(
   const rows: string[][] = [];
 
   for (const level of levels) {
-    const m = metrics[level.key];
+    const levelKey: LevelKey = level.key;
+    const m: TokenMetrics = metrics[levelKey];
     const cc = (field: keyof LevelMetricsSnapshot, value: number) =>
-      cellColor(level.key, field, value, previous);
+      cellColor(levelKey, field, value, previous);
 
     const rawName = m.modelName || '-';
     const modelName = w1Max !== undefined ? truncate(rawName, w1Max) : rawName;
@@ -911,8 +950,8 @@ function renderTokenTable(
     rows.push([
       `${level.color}${level.label}${C.reset}`,
       `${level.color}${modelName}${C.reset}`,
-      `${cc('workflowCount', m.workflowCount)}${m.workflowCount}${C.reset}`,
-      `${cc('count', m.count)}${m.count}${C.reset}`,
+      `${cc('finalizedRuns', m.finalizedRuns)}${m.finalizedRuns}${C.reset}`,
+      `${cc('billableHops', m.billableHops)}${m.billableHops}${C.reset}`,
       `${cc('inputTokens', m.inputTokens)}${formatTokens(m.inputTokens)}${C.reset}`,
       `${cc('cacheCreationInputTokens', m.cacheCreationInputTokens)}${formatTokens(m.cacheCreationInputTokens)}${C.reset}`,
       `${cc('cacheReadInputTokens', m.cacheReadInputTokens)}${formatTokens(m.cacheReadInputTokens)}${C.reset}`,
@@ -970,20 +1009,20 @@ function renderTokenTable(
   const totalMerged = padRight(totalText, mergedContentWidth);
 
   const tcWorkflows = totalColor(
-    'workflowCount',
+    'finalizedRuns',
     {
-      lite: metrics.lite.workflowCount,
-      standard: metrics.standard.workflowCount,
-      reasoning: metrics.reasoning.workflowCount,
+      lite: metrics.lite.finalizedRuns,
+      standard: metrics.standard.finalizedRuns,
+      reasoning: metrics.reasoning.finalizedRuns,
     },
     previous,
   );
-  const totals = {
-    lite: metrics.lite.count,
-    standard: metrics.standard.count,
-    reasoning: metrics.reasoning.count,
+  const hopTotals = {
+    lite: metrics.lite.billableHops,
+    standard: metrics.standard.billableHops,
+    reasoning: metrics.reasoning.billableHops,
   };
-  const tcCount = totalColor('count', totals, previous);
+  const tcCount = totalColor('billableHops', hopTotals, previous);
   const tcInput = totalColor(
     'inputTokens',
     {
@@ -1021,7 +1060,7 @@ function renderTokenTable(
     previous,
   );
 
-  const totalRow = `${C.border}${B.v}${C.reset} ${totalMerged} ${C.border}${B.v}${C.reset} ${alignRight(`${tcWorkflows}${totalWorkflows}${C.reset}`, w2)} ${C.border}${B.v}${C.reset} ${alignRight(`${tcCount}${totalCount}${C.reset}`, w3)} ${C.border}${B.v}${C.reset} ${alignRight(`${tcInput}${formatTokens(totalInput)}${C.reset}`, w4)} ${C.border}${B.v}${C.reset} ${alignRight(`${tcCacheCreation}${formatTokens(totalCacheCreation)}${C.reset}`, w5)} ${C.border}${B.v}${C.reset} ${alignRight(`${tcCacheRead}${formatTokens(totalCacheRead)}${C.reset}`, w6)} ${C.border}${B.v}${C.reset} ${alignRight(`${tcOutput}${formatTokens(totalOutput)}${C.reset}`, w7)} ${C.border}${B.v}${C.reset}`;
+  const totalRow = `${C.border}${B.v}${C.reset} ${totalMerged} ${C.border}${B.v}${C.reset} ${alignRight(`${tcWorkflows}${totalFinalizedRuns}${C.reset}`, w2)} ${C.border}${B.v}${C.reset} ${alignRight(`${tcCount}${totalBillableHops}${C.reset}`, w3)} ${C.border}${B.v}${C.reset} ${alignRight(`${tcInput}${formatTokens(totalInput)}${C.reset}`, w4)} ${C.border}${B.v}${C.reset} ${alignRight(`${tcCacheCreation}${formatTokens(totalCacheCreation)}${C.reset}`, w5)} ${C.border}${B.v}${C.reset} ${alignRight(`${tcCacheRead}${formatTokens(totalCacheRead)}${C.reset}`, w6)} ${C.border}${B.v}${C.reset} ${alignRight(`${tcOutput}${formatTokens(totalOutput)}${C.reset}`, w7)} ${C.border}${B.v}${C.reset}`;
 
   // Borde inferior de la tabla con columna fusionada
   // w0+2 (col0) + 1 (┴) + w1+2 (col1) = w0+w1+5
@@ -1158,24 +1197,24 @@ export function buildStatuslineOutput(
       writeStatuslineCache(sessionPath, {
         metricsSnapshot: {
           lite: {
-            count: metrics.lite.count,
-            workflowCount: metrics.lite.workflowCount,
+            billableHops: metrics.lite.billableHops,
+            finalizedRuns: metrics.lite.finalizedRuns,
             inputTokens: metrics.lite.inputTokens,
             cacheCreationInputTokens: metrics.lite.cacheCreationInputTokens,
             cacheReadInputTokens: metrics.lite.cacheReadInputTokens,
             outputTokens: metrics.lite.outputTokens,
           },
           standard: {
-            count: metrics.standard.count,
-            workflowCount: metrics.standard.workflowCount,
+            billableHops: metrics.standard.billableHops,
+            finalizedRuns: metrics.standard.finalizedRuns,
             inputTokens: metrics.standard.inputTokens,
             cacheCreationInputTokens: metrics.standard.cacheCreationInputTokens,
             cacheReadInputTokens: metrics.standard.cacheReadInputTokens,
             outputTokens: metrics.standard.outputTokens,
           },
           reasoning: {
-            count: metrics.reasoning.count,
-            workflowCount: metrics.reasoning.workflowCount,
+            billableHops: metrics.reasoning.billableHops,
+            finalizedRuns: metrics.reasoning.finalizedRuns,
             inputTokens: metrics.reasoning.inputTokens,
             cacheCreationInputTokens: metrics.reasoning.cacheCreationInputTokens,
             cacheReadInputTokens: metrics.reasoning.cacheReadInputTokens,
@@ -1185,7 +1224,7 @@ export function buildStatuslineOutput(
       });
     } else {
       table2 = renderTokenTable(
-        createEmptyMetrics(settingsEnv, paths.routingPath),
+        { ...createEmptyMetrics(settingsEnv, paths.routingPath), sessionTotals: emptySessionTotals() },
         null,
         targetWidth,
       );

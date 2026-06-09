@@ -261,12 +261,6 @@ export class WorkflowRepositoryService implements IWorkflowRepository {
     return true;
   }
 
-  public setWorkflowModel(workflowId: string, modelId: string): void {
-    const workflow = this.workflows.get(workflowId);
-    if (!workflow || workflow.languageModelId !== undefined) return;
-    workflow.languageModelId = modelId;
-  }
-
   public close(workflowId: string, hook: ClaudeHookEvent): IWorkflowResult {
     const workflow = this.workflows.get(workflowId);
     if (!workflow) {

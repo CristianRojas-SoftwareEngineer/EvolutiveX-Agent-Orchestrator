@@ -9,7 +9,6 @@ export class Workflow implements IWorkflow {
   kind: WorkflowKind;
   agentType?: string;
   agentId?: string;
-  languageModelId?: string;
   prompt?: string;
   status: WorkflowStatus;
   steps: IStep[];
@@ -26,7 +25,6 @@ export class Workflow implements IWorkflow {
     this.kind = data.kind;
     this.agentType = data.agentType;
     this.agentId = data.agentId;
-    this.languageModelId = data.languageModelId;
     this.prompt = data.prompt;
     this.status = data.status;
     this.steps = data.steps;

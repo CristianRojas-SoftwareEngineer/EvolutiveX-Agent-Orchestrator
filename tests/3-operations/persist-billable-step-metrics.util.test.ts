@@ -38,16 +38,20 @@ function makeSessionMetrics(): SessionMetricsService {
 }
 
 describe('persistBillableStepMetricsIfNeeded', () => {
-  it('subagent + terminal → updateFromStep no llamado', async () => {
+  it('subagent + terminal + usage → updateFromStep llamado (G16′)', async () => {
     const sessionMetrics = makeSessionMetrics();
+    const step = makeStep();
     await persistBillableStepMetricsIfNeeded(
       sessionMetrics,
       '/tmp/sessions',
       makeWorkflow('subagent'),
-      makeStep(),
+      step,
       'end_turn',
     );
-    expect(sessionMetrics.updateFromStep).not.toHaveBeenCalled();
+    expect(sessionMetrics.updateFromStep).toHaveBeenCalledWith(
+      path.join('/tmp/sessions', 'session-1'),
+      step,
+    );
   });
 
   it('main + tool_use → updateFromStep no llamado', async () => {

@@ -92,12 +92,21 @@ describe('buildStatuslineOutput con ROOT en settingsEnv', () => {
       JSON.stringify({
         models: {
           'p/m1-haiku': {
-            count: 2,
-            inputTokens: 100,
-            cacheReadInputTokens: 0,
-            cacheCreationInputTokens: 0,
-            outputTokens: 20,
+            billable_hops: 2,
+            finalized_runs: 0,
+            input_tokens: 100,
+            cache_read_input_tokens: 0,
+            cache_creation_input_tokens: 0,
+            output_tokens: 20,
           },
+        },
+        session_totals: {
+          billable_hops: 2,
+          finalized_runs: 0,
+          input_tokens: 100,
+          output_tokens: 20,
+          cache_read_input_tokens: 0,
+          cache_creation_input_tokens: 0,
         },
       }),
       'utf-8',

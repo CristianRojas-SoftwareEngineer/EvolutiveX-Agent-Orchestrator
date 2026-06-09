@@ -95,12 +95,21 @@ describe('buildStatuslineOutput', () => {
       JSON.stringify({
         models: {
           'x/m1-haiku': {
-            count: 1,
-            inputTokens: 10,
-            cacheReadInputTokens: 0,
-            cacheCreationInputTokens: 0,
-            outputTokens: 5,
+            billable_hops: 1,
+            finalized_runs: 0,
+            input_tokens: 10,
+            cache_read_input_tokens: 0,
+            cache_creation_input_tokens: 0,
+            output_tokens: 5,
           },
+        },
+        session_totals: {
+          billable_hops: 1,
+          finalized_runs: 0,
+          input_tokens: 10,
+          output_tokens: 5,
+          cache_read_input_tokens: 0,
+          cache_creation_input_tokens: 0,
         },
       }),
       'utf-8',
@@ -127,12 +136,21 @@ describe('buildStatuslineOutput', () => {
       JSON.stringify({
         models: {
           'p/m1-haiku': {
-            count: 2,
-            inputTokens: 100,
-            cacheReadInputTokens: 0,
-            cacheCreationInputTokens: 0,
-            outputTokens: 20,
+            billable_hops: 2,
+            finalized_runs: 0,
+            input_tokens: 100,
+            cache_read_input_tokens: 0,
+            cache_creation_input_tokens: 0,
+            output_tokens: 20,
           },
+        },
+        session_totals: {
+          billable_hops: 2,
+          finalized_runs: 0,
+          input_tokens: 100,
+          output_tokens: 20,
+          cache_read_input_tokens: 0,
+          cache_creation_input_tokens: 0,
         },
       }),
       'utf-8',
@@ -141,9 +159,27 @@ describe('buildStatuslineOutput', () => {
       join(sessionDir, '.statusline-state.json'),
       JSON.stringify({
         metricsSnapshot: {
-          lite: { count: 1, inputTokens: 50, cacheReadInputTokens: 0, outputTokens: 10 },
-          standard: { count: 0, inputTokens: 0, cacheReadInputTokens: 0, outputTokens: 0 },
-          reasoning: { count: 0, inputTokens: 0, cacheReadInputTokens: 0, outputTokens: 0 },
+          lite: {
+            billableHops: 1,
+            finalizedRuns: 0,
+            inputTokens: 50,
+            cacheReadInputTokens: 0,
+            outputTokens: 10,
+          },
+          standard: {
+            billableHops: 0,
+            finalizedRuns: 0,
+            inputTokens: 0,
+            cacheReadInputTokens: 0,
+            outputTokens: 0,
+          },
+          reasoning: {
+            billableHops: 0,
+            finalizedRuns: 0,
+            inputTokens: 0,
+            cacheReadInputTokens: 0,
+            outputTokens: 0,
+          },
         },
       }),
       'utf-8',
@@ -176,7 +212,7 @@ describe('buildStatuslineOutput', () => {
     expect(out).toContain('Trabajo por niveles de razonamiento');
   });
 
-  it('Tabla 2 refleja count per-step con workflow_count aún en 0', () => {
+  it('Tabla 2 refleja billable_hops per-step con finalized_runs aún en 0', () => {
     const root = emptySessionsRoot();
     const sessionId = 'per-step-mid';
     const sessionDir = join(root, sessionId);
@@ -186,8 +222,8 @@ describe('buildStatuslineOutput', () => {
       JSON.stringify({
         models: {
           'p/m1-haiku': {
-            count: 1,
-            workflow_count: 0,
+            billable_hops: 1,
+            finalized_runs: 0,
             input_tokens: 42,
             output_tokens: 7,
             cache_creation_input_tokens: 0,
@@ -200,8 +236,8 @@ describe('buildStatuslineOutput', () => {
           output_tokens: 7,
           cache_creation_input_tokens: 0,
           cache_read_input_tokens: 0,
-          total_steps: 1,
-          total_workflows: 0,
+          billable_hops: 1,
+          finalized_runs: 0,
         },
       }),
       'utf-8',

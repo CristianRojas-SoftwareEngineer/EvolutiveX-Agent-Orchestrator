@@ -25,12 +25,24 @@ export function resolveWorkflowIdForInteraction(workflow: IWorkflow): string {
   return workflow.id;
 }
 
-/** Snapshot mínimo del request para el correlador (modelo desde ensamblaje o turno). */
+export interface BuildInferenceRequestSnapshotOptions {
+  assembled?: Pick<AssembledInference, 'model'>;
+  /** Step abierto en correlador (p. ej. por `assignedStepIndex` en ingress). */
+  step?: IStep;
+  /** Modelo extraído del body HTTP del hop actual. */
+  requestModel?: string;
+}
+
+/** Snapshot mínimo del request para el correlador (D8: sin agregado en workflow). */
 export function buildInferenceRequestSnapshot(
-  workflow: IWorkflow,
-  assembled?: Pick<AssembledInference, 'model'>,
+  _workflow: IWorkflow,
+  options?: BuildInferenceRequestSnapshotOptions,
 ): AnthropicRequest {
-  const model = assembled?.model ?? workflow.languageModelId ?? 'unknown';
+  const model =
+    options?.assembled?.model ??
+    options?.step?.inferenceRequest.model ??
+    options?.requestModel ??
+    'unknown';
   return {
     model,
     messages: [],

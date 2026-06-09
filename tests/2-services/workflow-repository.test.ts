@@ -232,27 +232,6 @@ describe('WorkflowRepositoryService — lifecycle: close', () => {
     expect(wf?.status).toBe('failed');
   });
 
-  it('setWorkflowModel fija languageModelId con el primer modelo', () => {
-    const repo = new WorkflowRepositoryService();
-    repo.openWorkflow('session-1', { agentId: 'agent-root', isSubagentRequest: false });
-    repo.setWorkflowModel('session-1', 'claude-sonnet-4-6');
-    expect(repo.getWorkflow('session-1')?.languageModelId).toBe('claude-sonnet-4-6');
-  });
-
-  it('setWorkflowModel no sobrescribe un modelo ya fijado', () => {
-    const repo = new WorkflowRepositoryService();
-    repo.openWorkflow('session-1', { agentId: 'agent-root', isSubagentRequest: false });
-    repo.setWorkflowModel('session-1', 'model-a');
-    repo.setWorkflowModel('session-1', 'model-b');
-    expect(repo.getWorkflow('session-1')?.languageModelId).toBe('model-a');
-  });
-
-  it('setWorkflowModel es no-op si el workflow no existe', () => {
-    const repo = new WorkflowRepositoryService();
-    expect(() => repo.setWorkflowModel('missing', 'model-x')).not.toThrow();
-    expect(repo.getWorkflow('missing')).toBeUndefined();
-  });
-
   it('segundo hook de cierre ignorado — idempotencia §28', () => {
     const repo = new WorkflowRepositoryService();
     repo.openWorkflow('session-1', { agentId: 'agent-root', isSubagentRequest: false });

@@ -2,24 +2,20 @@
 
 ### Motivación
 
-Antes de este sistema, el statusline calculaba las métricas de la Tabla 2 ("Interacciones por nivel de razonamiento") mediante un escaneo completo de todos los `meta.json` + `body.json` de la sesión en cada invocación (`aggregateSessionMetrics`). Esto producía tres problemas:
+Antes de este sistema, el statusline calculaba las métricas de la Tabla 2 ("Trabajo por niveles de razonamiento") mediante un escaneo completo de todos los `meta.json` + `body.json` de la sesión en cada invocación. Esto producía race conditions, rescan O(N) y acoplamiento innecesario con artefactos del proxy.
 
-1. **Race condition proxy/statusline**: El proxy escribe `meta.json` en un callback `stream.on('end')` posterior al último chunk SSE. Claude Code puede re-invocar el statusline antes de que `meta.json` exista — el turno recién completado era invisible.
-2. **Rescan O(N)**: La función crecía linealmente con el número de interacciones de la sesión.
-3. **Acoplamiento innecesario**: El statusline duplicaba lógica de lectura de artefactos del proxy (meta.json, body.json) cuando el proxy ya tenía toda la información al cerrar cada turno.
-
-### Diseño actual (post-G4)
+### Diseño actual (schema canónico)
 
 #### Archivo `session-metrics.json`
 
-Se escribe a nivel de sesión (`sessions/<session-id>/session-metrics.json`). El esquema canónico sigue [§28.2 de `gateway-architecture.md`](./gateway-architecture.md#282-session-metricsjson-raíz-de-sesión):
+Se escribe a nivel de sesión (`sessions/<session-id>/session-metrics.json`):
 
 ```json
 {
   "models": {
     "claude-opus-4-5": {
-      "count": 3,
-      "workflow_count": 2,
+      "billable_hops": 3,
+      "finalized_runs": 1,
       "input_tokens": 12400,
       "output_tokens": 950,
       "cache_creation_input_tokens": 3100,
@@ -32,76 +28,66 @@ Se escribe a nivel de sesión (`sessions/<session-id>/session-metrics.json`). El
     "output_tokens": 950,
     "cache_creation_input_tokens": 3100,
     "cache_read_input_tokens": 8200,
-    "total_steps": 3,
-    "total_workflows": 2
+    "billable_hops": 3,
+    "finalized_runs": 1
   }
 }
 ```
 
-> **`workflow_count`:** número de workflows main cerrados (`kind: 'main'`) que usaron ese `modelId` en la sesión. Se incrementa en 1 por cada cierre de workflow main que incluya ese modelo (invariante G16). Los sub-workflows no contribuyen a este contador. Siempre se cumple `count ≥ workflow_count` (cada workflow tiene ≥ 1 step).
+| Campo canónico | Columna Tabla 2 | Semántica |
+|----------------|-----------------|-----------|
+| `models[*].billable_hops` | `# Steps` por nivel | Hops cerrados con `usage` (main y subagent) |
+| `models[*].finalized_runs` | `# Workflows` por nivel | Ejecuciones agénticas finalizadas atribuidas a ese `modelId` |
+| `session_totals.billable_hops` | `# Steps` fila Totales | Σ `billable_hops` por modelo |
+| `session_totals.finalized_runs` | `# Workflows` fila Totales | `finalized_workflow_ids.length` (conteo estructural) |
 
-Cada clave en `models` es el `modelId` (`step.inferenceRequest.model` en el correlador). Los valores son contadores acumulados desde el inicio de la sesión. Los campos `duration_ms` y `outcome` a nivel de archivo están diferidos (no se escriben en G4).
+> **`finalized_runs`:** +1 por ejecución agéntica (`kind: 'main'` o `kind: 'subagent'`) al cierre E2E, atribuida al modelo del **primer hop `stepKind: 'agentic'` con `usage`** (orden por `index`). Un main multi-modelo cuenta **una** ejecución en el slot del hop agéntico primario, no +1 por cada modelo que participó en hops.
 
-Sesiones creadas antes de G4 pueden conservar entradas en **camelCase** (`inputTokens`, etc.) sin `session_totals`; el statusline acepta ambos formatos al leer.
+Cada clave en `models` es el `modelId` (`step.inferenceRequest.model`). Los nombres G4 (`count`, `workflow_count`, `total_steps`, `total_workflows`) están retirados; sesiones con JSON antiguo no se migran — el statusline trata schema inválido como métricas vacías hasta el primer hop/cierre post-deploy.
 
 #### Tipos de dominio
 
-- **Canónico (G4):** `ISessionMetrics` e `IModelSessionMetrics` en `src/1-domain/types/gateway/session-metrics.types.ts`.
-- **Legacy:** `SessionMetrics` / `SessionModelMetrics` en `audit.types.ts` son alias `@deprecated` hacia los tipos gateway.
+`ISessionMetrics` e `IModelSessionMetrics` en `src/1-domain/types/gateway/session-metrics.types.ts`. `resolveAttributedModelId` en `src/1-domain/services/gateway/resolve-attributed-model-id.ts`.
 
-`InteractionMetadata` (y tipos `@deprecated` en `audit.types.ts`) conservan `modelId?: string` solo para proyección offline / shim SSE; **no** hay `ActiveInteraction` en memoria tras P1 (`IWorkflow` en `IWorkflowRepository`).
+#### Escritura (`SessionMetricsService`)
 
-#### Escritura (`SessionMetricsService`, G4 + per-step)
+| Método | Cuándo | Qué actualiza |
+|--------|--------|---------------|
+| `updateFromStep(sessionDir, step)` | Tras hop agéntico contable (main o subagent; stop terminal + `usage`) | `billable_hops`, tokens, `cache_efficiency`, `session_totals.billable_hops`; **no** `finalized_runs` |
+| `finalizeWorkflowMetrics(sessionDir, workflowId, closedSteps)` | Hook `Stop` / `StopFailure` / `SubagentStop` en workflow agéntico (G16′) | `finalized_runs` (+1 al modelo atribuido); `billable_hops`/tokens solo para steps no volcados per-step |
 
-`updateSessionMetrics()` en `AuditWriterService` fue **retirado** en G4. La actualización la realiza `SessionMetricsService` (`src/2-services/session-metrics.service.ts`) con dos operaciones:
+**Invariante G16′:** escriben métricas los workflows `kind: 'main'` y `kind: 'subagent'`. Preflights y side-requests standalone no cierran ejecución agéntica (aunque un side-request con `usage` sí suma en `billable_hops` vía `updateFromStep`).
 
-| Método                                                         | Cuándo                                                           | Qué actualiza                                                                                    |
-| -------------------------------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `updateFromStep(sessionDir, step)`                             | Tras hop main **contable** en wire (stop terminal + `usage`)     | `count`, tokens, `cache_efficiency`, `session_totals`; **no** `workflow_count`                   |
-| `finalizeWorkflowMetrics(sessionDir, workflowId, closedSteps)` | Hook `Stop` / `StopFailure` en workflow **`kind: 'main'`** (G16) | `workflow_count` (+1 por modelo del workflow); tokens/count solo para steps no volcados per-step |
+**Idempotencia:** sidecar `session-metrics-applied.json` con `applied_step_ids` y `finalized_workflow_ids`.
 
-Los sub-workflows **nunca** escriben `session-metrics.json`.
-
-**Idempotencia:** sidecar `sessions/<session-id>/session-metrics-applied.json` con `applied_step_ids` y `finalized_workflow_ids` (snake_case). No modifica el schema §28.2 de `session-metrics.json`.
-
-**Steps contables:** misma condición que `closeStep` en wire (`end_turn`, `max_tokens`, `null`, `''`). Hops `tool_use` no cuentan hasta un hop terminal posterior.
-
-**Fallback en cierre:** si un workflow main cierra con steps con `usage` que no pasaron por `updateFromStep` (p. ej. brownfield o `StopFailure`), `finalizeWorkflowMetrics` hace merge de tokens/count solo para esos steps no listados en `applied_step_ids`.
-
-Ambos métodos usan cola `writeQueue`, `writeJsonAtomic` y escriben métricas + sidecar en la misma operación encolada.
-
-| Componente                                                 | Rol                                                                                    |
-| ---------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| `AuditHookEventHandler`                                    | `close()` + `finalizeWorkflowMetrics` (solo main)                                      |
-| `AuditSseResponseHandler` / `AuditStandardResponseHandler` | `registerStep` / `closeStep`; `persistBillableStepMetricsIfNeeded` → `updateFromStep` solo cuando el step tiene `usage` (p. ej. hops `count_tokens` proyectan `step_response` sin métricas) |
-| `persist-billable-step-metrics.util.ts`                    | G16 + `isStepBillableForSessionMetrics` antes de `updateFromStep`                      |
-
-Los `client-preflight` no actualizan métricas de sesión.
+| Componente | Rol |
+|------------|-----|
+| `AuditHookEventHandler` | `close()` + `finalizeWorkflowMetrics` (main y subagent) |
+| `AuditSseResponseHandler` / `AuditStandardResponseHandler` | `persistBillableStepMetricsIfNeeded` → `updateFromStep` |
+| `persist-billable-step-metrics.util.ts` | G16′ + `isStepBillableForSessionMetrics` |
 
 #### Lectura en el statusline (`scripting/router-status.ts`)
 
-`aggregateSessionMetrics` lee `session-metrics.json` en O(1):
+`aggregateSessionMetrics` lee **solo** el schema canónico (`billable_hops`, `finalized_runs`, tokens en snake_case). La fila **Totales** toma `# Workflows` y `# Steps` desde `session_totals`, no desde la suma de columnas por nivel.
+
+#### Mapeo Tabla 2
 
 ```
-session-metrics.json → classifyModelWithEnv(modelId, settingsEnv) → acumular en lite / standard / reasoning
+Por fila (Lite / Standard / Reasoning):
+  # Steps     ← Σ models[modelId].billable_hops   (modelId clasificado en ese nivel)
+  # Workflows ← Σ models[modelId].finalized_runs
+
+Fila Totales:
+  # Steps     ← session_totals.billable_hops
+  # Workflows ← session_totals.finalized_runs
 ```
-
-Acepta contadores en **snake_case** (G4) o **camelCase** (sesiones antiguas). Si el archivo no existe, retorna métricas en cero. No hay fallback a escaneo de `interactions/*/meta.json`. Al leer, normaliza `null` o no numéricos a `0` (véase §10 de [`router-statusline.md`](./router-statusline.md)).
-
-Para el layout de sesión e interacciones, véase [`session-audit-model.md`](./session-audit-model.md) (§5, §6.1 y §8.3 G4).
-
-#### Contabilización de subagentes
-
-Solo el workflow **main** escribe en `session-metrics.json` al cierre (G16). Los sub-workflows consumen API en sus propios turnos, pero su uso agregado entra en el `WorkflowResult` del padre vía `aggregateWorkflowUsage`; no se duplica en el archivo de sesión al cerrar un subagente.
-
-Cada turno sigue teniendo su propio `meta.json` y `stepsMeta`; la agregación de sesión refleja los cierres de workflows main con steps registrados en el correlador.
 
 #### Semántica de los totales
 
-`session-metrics.json` acumula consumo **facturado por hop** al cerrar workflows main (steps cerrados en el correlador), alineado con [§9.6.1 del gateway](./gateway-architecture.md#961-semántica-facturado-por-hop-vs-cardinalidad-de-contexto). No representa el tamaño de contexto de un único request.
+`session-metrics.json` acumula consumo **facturado por hop** al cerrar steps con `usage` en el correlador. No representa el tamaño de contexto de un único request.
 
 #### Validez multi-proveedor
 
-El sistema depende del campo `"model"` del request body, no de APIs propietarias. La clasificación lite/standard/reasoning en el statusline (`classifyModelWithEnv`) usa las variables `ANTHROPIC_DEFAULT_*_MODEL` del entorno de Claude Code; registros sin coincidencia no se suman (véase [`router-statusline.md`](./router-statusline.md)).
+El sistema depende del campo `"model"` del request body. La clasificación lite/standard/reasoning usa `ANTHROPIC_DEFAULT_*_MODEL`; registros sin coincidencia no se suman (véase [`router-statusline.md`](./router-statusline.md)).
 
 ---

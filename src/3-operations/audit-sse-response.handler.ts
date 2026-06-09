@@ -229,7 +229,7 @@ export class AuditSseResponseHandler {
     assembled: AssembledInference,
     assignedStepIndex: number,
   ) {
-    const inferenceRequest = buildInferenceRequestSnapshot(workflow, assembled);
+    const inferenceRequest = buildInferenceRequestSnapshot(workflow, { assembled });
     const now = new Date();
     const responsePatch = {
       assistantMessage: assembled.assistantMessage,

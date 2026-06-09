@@ -307,16 +307,6 @@ export interface ResolvedInternalTool {
 export type SideRequestKind = 'session-naming' | 'generic';
 
 /**
- * @deprecated Usar `IModelSessionMetrics` en `types/gateway/session-metrics.types.ts` (G4).
- */
-export type { IModelSessionMetrics as SessionModelMetrics } from './gateway/session-metrics.types.js';
-
-/**
- * @deprecated Usar `ISessionMetrics` en `types/gateway/session-metrics.types.ts` (G4).
- */
-export type { ISessionMetrics as SessionMetrics } from './gateway/session-metrics.types.js';
-
-/**
  * Opciones para la reconstrucción del cuerpo de respuesta desde bytes SSE.
  */
 export interface SseReconstructOptions {

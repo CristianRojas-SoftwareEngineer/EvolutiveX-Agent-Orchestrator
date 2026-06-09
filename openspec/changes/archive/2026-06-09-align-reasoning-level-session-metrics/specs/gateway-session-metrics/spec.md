@@ -1,10 +1,5 @@
-# gateway-session-metrics Specification
+## MODIFIED Requirements
 
-## Purpose
-
-Métricas agregadas de sesión en `session-metrics.json` (§33.2): tipos gateway `ISessionMetrics`,
-`SessionMetricsService` e invariante G16′ (workflows `kind: 'main'` y `kind: 'subagent'`). Implementado en fase G4 (2026-05-29); alineación de contadores y subagentes en change align-reasoning-level-session-metrics.
-## Requirements
 ### Requirement: ISessionMetrics — tipo de dominio para session-metrics.json
 
 El sistema SHALL definir `ISessionMetrics` y tipos asociados en `src/1-domain/types/gateway/session-metrics.types.ts` (capa 1). El schema SHALL alinearse con [§28.2](../../../docs/gateway-architecture.md#282-session-metricsjson-raíz-de-sesión) **con los nombres de contadores actualizados**:
@@ -111,6 +106,52 @@ El sistema SHALL proveer `SessionMetricsService` en `src/2-services/session-metr
 - **THEN** `finalized_runs` del modelo SHALL ser `2`
 - **AND** `session_totals.finalized_runs` SHALL ser `2`
 
+## REMOVED Requirements
+
+### Requirement: workflow_count en IModelSessionMetrics
+
+**Reason**: Reemplazado por `finalized_runs`.
+
+**Migration**: Sustituido por `finalized_runs`; sin alias de lectura.
+
+### Requirement: total_workflows en ISessionTotals
+
+**Reason**: Reemplazado por `session_totals.finalized_runs` estructural.
+
+**Migration**: Sustituido por `finalized_runs`; sin alias de lectura.
+
+### Requirement: total_steps en ISessionTotals
+
+**Reason**: Reemplazado por `session_totals.billable_hops`.
+
+**Migration**: Sustituido por `billable_hops`; sin alias de lectura.
+
+### Requirement: count en IModelSessionMetrics
+
+**Reason**: Reemplazado por `billable_hops` per-modelo.
+
+**Migration**: Sustituido por `billable_hops`; sin alias de lectura.
+
+### Requirement: Alias deprecated SessionMetrics en audit.types
+
+**Reason**: Tipos canónicos únicos en `session-metrics.types.ts`; sin consumidores del alias.
+
+**Migration**: Eliminar reexports de `audit.types.ts`.
+
+### Requirement: Invariante G16 — solo workflows main actualizan métricas de sesión
+
+**Reason**: Sustituido por G16′ — subagentes deben contribuir a la Tabla 2 por nivel de razonamiento.
+
+**Migration**: Actualizar `persistBillableStepMetricsIfNeeded`, `delegateClosure` y escenarios de spec que citen G16.
+
+### Requirement: Finalize métricas al cierre terminal SSE de workflow wire
+
+**Reason**: El requisito mezclaba cierre SSE wire con conteo por modelo participante; la semántica de finalize queda unificada en el requisito de escritura atómica con atribución 1:1 y G16′.
+
+**Migration**: Los paths SSE que invocan `finalizeWorkflowMetrics` SHALL seguir la misma regla de atribución y G16′; escenarios específicos pasan al requisito de escritura atómica.
+
+## ADDED Requirements
+
 ### Requirement: finalized_runs en IModelSessionMetrics
 
 `IModelSessionMetrics` SHALL incluir `finalized_runs: number`: número de ejecuciones agénticas (`kind: 'main'` o `kind: 'subagent'`) cerradas y atribuidas a ese `modelId` en la sesión.
@@ -198,13 +239,3 @@ El servicio SHALL NOT incrementar `finalized_runs` para más de un `modelId` por
 - **GIVEN** un hop clasificado como preflight sin proyección causal
 - **WHEN** completa upstream
 - **THEN** `session-metrics.json` NO SHALL modificarse por ese hop
-
-### Requirement: Retiro de updateSessionMetrics legacy
-
-El método `updateSessionMetrics()` en `audit-writer.service.ts` y su declaración en `audit-writer.port.ts` SHALL permanecer eliminados. La actualización de sesión SHALL concentrarse en `SessionMetricsService` vía actualización **per-step** (`billable_hops` y tokens) y vía cierre de ejecución agéntica (`finalized_runs`), no en handlers wire legacy ni en escaneo de artefactos.
-
-#### Scenario: audit-writer sin updateSessionMetrics
-
-- **WHEN** se inspecciona el shim `ISseAuditWriter` / `AuditWriterService` tras este change
-- **THEN** `updateSessionMetrics` NO SHALL estar en el port
-- **AND** la actualización per-step NO SHALL reintroducirse en `AuditWriterService`

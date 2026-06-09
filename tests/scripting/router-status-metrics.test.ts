@@ -16,6 +16,30 @@ const configuredEnv: ClaudeSettingsEnv = {
 
 const routingPath = join(process.cwd(), 'routing', 'providers');
 
+function canonicalMetrics(overrides: Record<string, unknown> = {}) {
+  return {
+    models: {
+      'provider/m1-haiku': {
+        billable_hops: 2,
+        finalized_runs: 0,
+        input_tokens: 300,
+        cache_read_input_tokens: 50,
+        cache_creation_input_tokens: 0,
+        output_tokens: 120,
+      },
+    },
+    session_totals: {
+      billable_hops: 2,
+      finalized_runs: 0,
+      input_tokens: 300,
+      output_tokens: 120,
+      cache_read_input_tokens: 50,
+      cache_creation_input_tokens: 0,
+    },
+    ...overrides,
+  };
+}
+
 describe('coerceMetricNumber', () => {
   it('devuelve 0 para null, undefined y no numérico', () => {
     expect(coerceMetricNumber(null)).toBe(0);
@@ -44,54 +68,85 @@ describe('aggregateSessionMetrics', () => {
   it('retorna ceros si session-metrics.json no existe', () => {
     const dir = sessionDir();
     const m = aggregateSessionMetrics(dir, configuredEnv, routingPath);
-    expect(m.lite.count).toBe(0);
+    expect(m.lite.billableHops).toBe(0);
     expect(m.standard.inputTokens).toBe(0);
     expect(m.reasoning.outputTokens).toBe(0);
+    expect(m.sessionTotals.finalizedRuns).toBe(0);
   });
 
   it('retorna ceros si session-metrics.json está malformado', () => {
     const dir = sessionDir();
     writeFileSync(join(dir, 'session-metrics.json'), '{ invalid', 'utf-8');
     const m = aggregateSessionMetrics(dir, configuredEnv, routingPath);
-    expect(m.lite.count).toBe(0);
+    expect(m.lite.billableHops).toBe(0);
   });
 
-  it('no suma modelId sin coincidencia en ANTHROPIC_DEFAULT_*', () => {
-    const dir = sessionDir();
-    writeFileSync(
-      join(dir, 'session-metrics.json'),
-      JSON.stringify({
-        models: {
-          'unknown-model': {
-            count: 99,
-            inputTokens: 1000,
-            cacheReadInputTokens: 0,
-            cacheCreationInputTokens: 0,
-            outputTokens: 500,
-          },
-        },
-      }),
-      'utf-8',
-    );
-    const m = aggregateSessionMetrics(dir, configuredEnv, routingPath);
-    expect(m.lite.count + m.standard.count + m.reasoning.count).toBe(0);
-  });
-
-  it('trata cacheReadInputTokens null como 0 (§10)', () => {
+  it('retorna ceros para JSON solo G4 (count/workflow_count sin billable_hops)', () => {
     const dir = sessionDir();
     writeFileSync(
       join(dir, 'session-metrics.json'),
       JSON.stringify({
         models: {
           'provider/m1-haiku': {
-            count: 1,
-            inputTokens: 100,
-            cacheReadInputTokens: null,
-            cacheCreationInputTokens: 0,
-            outputTokens: 50,
+            count: 99,
+            workflow_count: 2,
+            input_tokens: 1000,
+            cache_read_input_tokens: 0,
+            cache_creation_input_tokens: 0,
+            output_tokens: 500,
           },
         },
+        session_totals: { total_steps: 99, total_workflows: 2 },
       }),
+      'utf-8',
+    );
+    const m = aggregateSessionMetrics(dir, configuredEnv, routingPath);
+    expect(m.lite.billableHops + m.standard.billableHops + m.reasoning.billableHops).toBe(0);
+    expect(m.sessionTotals.billableHops).toBe(0);
+  });
+
+  it('no suma modelId sin coincidencia en ANTHROPIC_DEFAULT_*', () => {
+    const dir = sessionDir();
+    writeFileSync(
+      join(dir, 'session-metrics.json'),
+      JSON.stringify(
+        canonicalMetrics({
+          models: {
+            'unknown-model': {
+              billable_hops: 99,
+              finalized_runs: 1,
+              input_tokens: 1000,
+              cache_read_input_tokens: 0,
+              cache_creation_input_tokens: 0,
+              output_tokens: 500,
+            },
+          },
+        }),
+      ),
+      'utf-8',
+    );
+    const m = aggregateSessionMetrics(dir, configuredEnv, routingPath);
+    expect(m.lite.billableHops + m.standard.billableHops + m.reasoning.billableHops).toBe(0);
+  });
+
+  it('trata cache_read_input_tokens null como 0 (§10)', () => {
+    const dir = sessionDir();
+    writeFileSync(
+      join(dir, 'session-metrics.json'),
+      JSON.stringify(
+        canonicalMetrics({
+          models: {
+            'provider/m1-haiku': {
+              billable_hops: 1,
+              finalized_runs: 0,
+              input_tokens: 100,
+              cache_read_input_tokens: null,
+              cache_creation_input_tokens: 0,
+              output_tokens: 50,
+            },
+          },
+        }),
+      ),
       'utf-8',
     );
     const m = aggregateSessionMetrics(dir, configuredEnv, routingPath);
@@ -100,25 +155,11 @@ describe('aggregateSessionMetrics', () => {
     expect(Number.isNaN(m.lite.cacheReadInputTokens)).toBe(false);
   });
 
-  it('acumula con contadores snake_case (esquema G4 §33.2)', () => {
+  it('acumula billable_hops y tokens del schema canónico', () => {
     const dir = sessionDir();
-    writeFileSync(
-      join(dir, 'session-metrics.json'),
-      JSON.stringify({
-        models: {
-          'provider/m1-haiku': {
-            count: 2,
-            input_tokens: 300,
-            cache_read_input_tokens: 50,
-            cache_creation_input_tokens: 0,
-            output_tokens: 120,
-          },
-        },
-      }),
-      'utf-8',
-    );
+    writeFileSync(join(dir, 'session-metrics.json'), JSON.stringify(canonicalMetrics()), 'utf-8');
     const m = aggregateSessionMetrics(dir, configuredEnv, routingPath);
-    expect(m.lite.count).toBe(2);
+    expect(m.lite.billableHops).toBe(2);
     expect(m.lite.inputTokens).toBe(300);
     expect(m.lite.cacheReadInputTokens).toBe(50);
     expect(m.lite.outputTokens).toBe(120);
@@ -128,21 +169,33 @@ describe('aggregateSessionMetrics', () => {
     const dir = sessionDir();
     writeFileSync(
       join(dir, 'session-metrics.json'),
-      JSON.stringify({
-        models: {
-          'provider/m2-sonnet': {
-            count: 3,
-            inputTokens: 200,
-            cacheReadInputTokens: 10,
-            cacheCreationInputTokens: 0,
-            outputTokens: 80,
+      JSON.stringify(
+        canonicalMetrics({
+          models: {
+            'provider/m2-sonnet': {
+              billable_hops: 3,
+              finalized_runs: 1,
+              input_tokens: 200,
+              cache_read_input_tokens: 10,
+              cache_creation_input_tokens: 0,
+              output_tokens: 80,
+            },
           },
-        },
-      }),
+          session_totals: {
+            billable_hops: 3,
+            finalized_runs: 1,
+            input_tokens: 200,
+            output_tokens: 80,
+            cache_read_input_tokens: 10,
+            cache_creation_input_tokens: 0,
+          },
+        }),
+      ),
       'utf-8',
     );
     const m = aggregateSessionMetrics(dir, configuredEnv, routingPath);
-    expect(m.standard.count).toBe(3);
+    expect(m.standard.billableHops).toBe(3);
+    expect(m.standard.finalizedRuns).toBe(1);
     expect(m.standard.inputTokens).toBe(200);
     expect(m.standard.cacheReadInputTokens).toBe(10);
   });
@@ -152,50 +205,40 @@ describe('aggregateSessionMetrics', () => {
     const missingSession = join(tempDir, 'no-such-session');
     mkdirSync(tempDir, { recursive: true });
     const m = aggregateSessionMetrics(missingSession, configuredEnv, routingPath);
-    expect(m.lite.count).toBe(0);
+    expect(m.lite.billableHops).toBe(0);
   });
 
-  it('lee workflow_count y lo acumula en workflowCount', () => {
+  it('lee finalized_runs por nivel y session_totals.finalized_runs para totales', () => {
     const dir = sessionDir();
     writeFileSync(
       join(dir, 'session-metrics.json'),
-      JSON.stringify({
-        models: {
-          'provider/m2-sonnet': {
-            count: 4,
-            workflow_count: 2,
+      JSON.stringify(
+        canonicalMetrics({
+          models: {
+            'provider/m2-sonnet': {
+              billable_hops: 4,
+              finalized_runs: 2,
+              input_tokens: 500,
+              cache_read_input_tokens: 0,
+              cache_creation_input_tokens: 0,
+              output_tokens: 100,
+            },
+          },
+          session_totals: {
+            billable_hops: 4,
+            finalized_runs: 1,
             input_tokens: 500,
-            cache_read_input_tokens: 0,
-            cache_creation_input_tokens: 0,
             output_tokens: 100,
-          },
-        },
-      }),
-      'utf-8',
-    );
-    const m = aggregateSessionMetrics(dir, configuredEnv, routingPath);
-    expect(m.standard.workflowCount).toBe(2);
-  });
-
-  it('workflow_count ausente en JSON → workflowCount === 0', () => {
-    const dir = sessionDir();
-    writeFileSync(
-      join(dir, 'session-metrics.json'),
-      JSON.stringify({
-        models: {
-          'provider/m2-sonnet': {
-            count: 3,
-            input_tokens: 200,
             cache_read_input_tokens: 0,
             cache_creation_input_tokens: 0,
-            output_tokens: 80,
           },
-        },
-      }),
+        }),
+      ),
       'utf-8',
     );
     const m = aggregateSessionMetrics(dir, configuredEnv, routingPath);
-    expect(m.standard.workflowCount).toBe(0);
+    expect(m.standard.finalizedRuns).toBe(2);
+    expect(m.sessionTotals.finalizedRuns).toBe(1);
   });
 
   it('fallback heurístico: clasifica modelos estándar de Anthropic cuando vars están ausentes', () => {
@@ -205,27 +248,37 @@ describe('aggregateSessionMetrics', () => {
       JSON.stringify({
         models: {
           'claude-sonnet-4-6': {
-            count: 5,
-            inputTokens: 1000,
-            cacheReadInputTokens: 0,
-            cacheCreationInputTokens: 0,
-            outputTokens: 300,
+            billable_hops: 5,
+            finalized_runs: 0,
+            input_tokens: 1000,
+            cache_read_input_tokens: 0,
+            cache_creation_input_tokens: 0,
+            output_tokens: 300,
           },
           'claude-haiku-4-5-20251001': {
-            count: 3,
-            inputTokens: 400,
-            cacheReadInputTokens: 0,
-            cacheCreationInputTokens: 0,
-            outputTokens: 100,
+            billable_hops: 3,
+            finalized_runs: 0,
+            input_tokens: 400,
+            cache_read_input_tokens: 0,
+            cache_creation_input_tokens: 0,
+            output_tokens: 100,
           },
+        },
+        session_totals: {
+          billable_hops: 8,
+          finalized_runs: 0,
+          input_tokens: 1400,
+          output_tokens: 400,
+          cache_read_input_tokens: 0,
+          cache_creation_input_tokens: 0,
         },
       }),
       'utf-8',
     );
     const m = aggregateSessionMetrics(dir, {}, routingPath);
-    expect(m.standard.count).toBe(5);
-    expect(m.lite.count).toBe(3);
-    expect(m.reasoning.count).toBe(0);
+    expect(m.standard.billableHops).toBe(5);
+    expect(m.lite.billableHops).toBe(3);
+    expect(m.reasoning.billableHops).toBe(0);
     expect(m.standard.inputTokens).toBe(1000);
     expect(m.lite.inputTokens).toBe(400);
   });

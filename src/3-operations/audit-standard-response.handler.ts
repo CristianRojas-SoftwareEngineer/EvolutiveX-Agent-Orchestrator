@@ -88,7 +88,12 @@ export class AuditStandardResponseHandler {
 
         if (parsedBody === undefined) return;
 
-        const inferenceRequest = buildInferenceRequestSnapshot(workflow);
+        const openStepAtIndex = workflow.steps.find(
+          (s) => s.index === context.assignedStepIndex && s.closedAt == null,
+        );
+        const inferenceRequest = buildInferenceRequestSnapshot(workflow, {
+          step: openStepAtIndex,
+        });
         const now = new Date();
         const usage = bodyUsage
           ? {

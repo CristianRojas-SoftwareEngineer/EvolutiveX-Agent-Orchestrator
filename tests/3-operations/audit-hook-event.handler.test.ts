@@ -17,7 +17,6 @@ function makeRepo(overrides: Partial<IWorkflowRepository> = {}): IWorkflowReposi
     registerToolUse: vi.fn(),
     readyToClose: vi.fn(),
     close: vi.fn(),
-    setWorkflowModel: vi.fn(),
     completeToolUse: vi.fn(),
     getWorkflowBySessionId: vi.fn(),
     findWorkflowWithPendingToolUse: vi.fn(),
@@ -247,8 +246,8 @@ describe('AuditHookEventHandler', () => {
     });
   });
 
-  it('SubagentStop con agentId conocido usa getWorkflowByAgentId → getWorkflow para cerrar', async () => {
-    const wf = stubWorkflow('agent-child');
+  it('SubagentStop con agentId conocido cierra y finaliza métricas (G16′)', async () => {
+    const wf = { ...stubWorkflow('agent-child'), kind: 'subagent' as const };
     const readyToClose = vi.fn().mockReturnValue(true);
     const close = vi
       .fn()
@@ -258,7 +257,8 @@ describe('AuditHookEventHandler', () => {
       .mockReturnValue({ sessionId: 'session-1', agentId: 'agent-child' });
     const getWorkflow = vi.fn().mockReturnValue(wf);
     const repo = makeRepo({ getWorkflowByAgentId, getWorkflow, readyToClose, close });
-    const handler = makeHandler(repo);
+    const sessionMetrics = makeSessionMetrics();
+    const handler = makeHandler(repo, sessionMetrics);
 
     handler.execute({ eventName: 'SubagentStop', sessionId: 'session-1', agentId: 'agent-child' });
     await new Promise((r) => setTimeout(r, 50));
@@ -269,6 +269,7 @@ describe('AuditHookEventHandler', () => {
       'agent-child',
       expect.objectContaining({ eventName: 'SubagentStop' }),
     );
+    expect(sessionMetrics.finalizeWorkflowMetrics).toHaveBeenCalled();
   });
 
   it('SubagentStop con agentId desconocido no lanza excepción y no invoca close', async () => {

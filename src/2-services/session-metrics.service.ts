@@ -8,6 +8,7 @@ import type {
   ISessionTotals,
 } from '../1-domain/types/gateway/session-metrics.types.js';
 import { aggregateWorkflowUsageByModel } from '../1-domain/services/gateway/aggregate-workflow-usage-by-model.js';
+import { resolveAttributedModelId } from '../1-domain/services/gateway/resolve-attributed-model-id.js';
 import { writeJsonAtomic } from './utils/file-write.utils.js';
 
 const SESSION_METRICS_FILE = 'session-metrics.json';
@@ -33,8 +34,8 @@ function emptySessionMetrics(): ISessionMetrics {
       output_tokens: 0,
       cache_creation_input_tokens: 0,
       cache_read_input_tokens: 0,
-      total_steps: 0,
-      total_workflows: 0,
+      billable_hops: 0,
+      finalized_runs: 0,
     },
   };
 }
@@ -48,16 +49,14 @@ function recalcSessionTotals(models: Record<string, IModelSessionMetrics>): ISes
   let output_tokens = 0;
   let cache_creation_input_tokens = 0;
   let cache_read_input_tokens = 0;
-  let total_steps = 0;
-  let total_workflows = 0;
+  let billable_hops = 0;
 
   for (const m of Object.values(models)) {
     input_tokens += m.input_tokens;
     output_tokens += m.output_tokens;
     cache_creation_input_tokens += m.cache_creation_input_tokens;
     cache_read_input_tokens += m.cache_read_input_tokens;
-    total_steps += m.count;
-    total_workflows += m.workflow_count;
+    billable_hops += m.billable_hops;
   }
 
   return {
@@ -65,15 +64,15 @@ function recalcSessionTotals(models: Record<string, IModelSessionMetrics>): ISes
     output_tokens,
     cache_creation_input_tokens,
     cache_read_input_tokens,
-    total_steps,
-    total_workflows,
+    billable_hops,
+    finalized_runs: 0,
   };
 }
 
 function defaultModelMetrics(): IModelSessionMetrics {
   return {
-    count: 0,
-    workflow_count: 0,
+    billable_hops: 0,
+    finalized_runs: 0,
     input_tokens: 0,
     output_tokens: 0,
     cache_creation_input_tokens: 0,
@@ -85,8 +84,8 @@ function defaultModelMetrics(): IModelSessionMetrics {
 function mergeModelUsage(
   existing: IModelSessionMetrics,
   usage: AnthropicUsage,
-  stepCount: number,
-  workflowCountDelta: number,
+  hopCount: number,
+  finalizedRunsDelta: number,
 ): IModelSessionMetrics {
   const input_tokens = usage.input_tokens;
   const output_tokens = usage.output_tokens;
@@ -97,8 +96,8 @@ function mergeModelUsage(
   const mergedCacheRead = existing.cache_read_input_tokens + cache_read_input_tokens;
 
   return {
-    count: existing.count + stepCount,
-    workflow_count: (existing.workflow_count ?? 0) + workflowCountDelta,
+    billable_hops: existing.billable_hops + hopCount,
+    finalized_runs: existing.finalized_runs + finalizedRunsDelta,
     input_tokens: mergedInput,
     output_tokens: existing.output_tokens + output_tokens,
     cache_creation_input_tokens: existing.cache_creation_input_tokens + cache_creation_input_tokens,
@@ -153,14 +152,14 @@ async function writeMetricsAndApplied(
 }
 
 /**
- * Métricas de sesión en `session-metrics.json` (per-step + cierre de workflow main).
+ * Métricas de sesión en `session-metrics.json` (G16′: main y subagent).
  */
 export class SessionMetricsService {
   private writeQueue: Promise<void> = Promise.resolve();
 
   constructor() {}
 
-  /** Persiste consumo de un step main contable; no modifica workflow_count. */
+  /** Persiste consumo de un hop contable; no modifica finalized_runs. */
   public updateFromStep(sessionDir: string, step: IStep): Promise<void> {
     const run = async () => {
       if (step.usage == null) return;
@@ -173,7 +172,10 @@ export class SessionMetricsService {
       const existing = data.models[modelId] ?? defaultModelMetrics();
 
       data.models[modelId] = mergeModelUsage(existing, step.usage, 1, 0);
-      data.session_totals = recalcSessionTotals(data.models);
+      data.session_totals = {
+        ...recalcSessionTotals(data.models),
+        finalized_runs: applied.finalized_workflow_ids.length,
+      };
 
       applied.applied_step_ids.push(step.id);
       await writeMetricsAndApplied(sessionDir, data, applied);
@@ -184,7 +186,8 @@ export class SessionMetricsService {
   }
 
   /**
-   * Cierre de workflow main: workflow_count por modelo; tokens/count solo para steps no aplicados per-step.
+   * Cierre E2E de workflow agéntico: +1 finalized_runs al modelo del primer hop agéntico con usage (D3).
+   * Tokens/billable_hops solo para steps no aplicados per-step.
    */
   public finalizeWorkflowMetrics(
     sessionDir: string,
@@ -200,12 +203,12 @@ export class SessionMetricsService {
 
       const data = await loadMetrics(sessionDir);
 
-      const modelIdsForWorkflow = new Set(stepsWithUsage.map((s) => s.inferenceRequest.model));
-      for (const modelId of modelIdsForWorkflow) {
-        const existing = data.models[modelId] ?? defaultModelMetrics();
-        data.models[modelId] = {
+      const attributedModelId = resolveAttributedModelId(closedSteps);
+      if (attributedModelId) {
+        const existing = data.models[attributedModelId] ?? defaultModelMetrics();
+        data.models[attributedModelId] = {
           ...existing,
-          workflow_count: (existing.workflow_count ?? 0) + 1,
+          finalized_runs: existing.finalized_runs + 1,
         };
       }
 
@@ -224,8 +227,13 @@ export class SessionMetricsService {
         }
       }
 
-      data.session_totals = recalcSessionTotals(data.models);
-      applied.finalized_workflow_ids.push(workflowId);
+      if (attributedModelId) {
+        applied.finalized_workflow_ids.push(workflowId);
+      }
+      data.session_totals = {
+        ...recalcSessionTotals(data.models),
+        finalized_runs: applied.finalized_workflow_ids.length,
+      };
       await writeMetricsAndApplied(sessionDir, data, applied);
     };
 

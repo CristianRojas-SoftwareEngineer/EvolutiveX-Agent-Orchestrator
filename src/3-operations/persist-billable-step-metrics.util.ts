@@ -4,7 +4,7 @@ import { isStepBillableForSessionMetrics } from '../1-domain/services/gateway/is
 import type { SessionMetricsService } from '../2-services/session-metrics.service.js';
 import { resolveSessionDir } from './audit-workflow-closure.handler.js';
 
-/** Persiste métricas per-step para workflows main con hop terminal contable (G16). */
+/** Persiste métricas per-step para workflows agénticos con hop terminal contable (G16′). */
 export async function persistBillableStepMetricsIfNeeded(
   sessionMetrics: SessionMetricsService,
   auditBaseDir: string,
@@ -12,7 +12,7 @@ export async function persistBillableStepMetricsIfNeeded(
   step: IStep,
   stopReason: string | undefined,
 ): Promise<void> {
-  if (workflow.kind !== 'main') return;
+  if (workflow.kind !== 'main' && workflow.kind !== 'subagent') return;
   if (!isStepBillableForSessionMetrics(stopReason)) return;
   if (step.usage == null) return;
 

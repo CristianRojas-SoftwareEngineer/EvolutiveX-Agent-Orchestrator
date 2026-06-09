@@ -14,8 +14,6 @@ export interface IWorkflow {
   agentType?: string;
   /** ID del agente (de hook `agent_id` para subagentes). */
   agentId?: string;
-  /** ID del modelo de lenguaje dominante en los steps. */
-  languageModelId?: string;
   /** Prompt del usuario o input del subagente. */
   prompt?: string;
   /** Estado del ciclo de vida. */

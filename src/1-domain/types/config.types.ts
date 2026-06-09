@@ -29,4 +29,10 @@ export interface ProxyEnvironmentConfig {
    * En entorno: omitir la variable = lista por defecto; `FILTERED_TOOLS=""` = sin filtrado.
    */
   FILTERED_TOOLS: string[];
+
+  /** Activar o desactivar las notificaciones por voz (TTS). Env: `TTS_ENABLED`. */
+  TTS_ENABLED?: boolean;
+
+  /** Número de últimos mensajes a leer del transcript para contexto. Env: `TTS_CONTEXT_N`. */
+  TTS_CONTEXT_N?: number;
 }

@@ -18,6 +18,8 @@ export interface ClaudeHookEvent {
   stopHookActive?: boolean;
   backgroundTasks?: number;
   lastAssistantMessage?: string;
+  /** Ruta al transcript JSONL de la sesión, proporcionada por Claude Code en los hooks Stop/StopFailure/UserPromptSubmit. */
+  transcriptPath?: string;
 }
 
 // Mapea el payload wire (snake_case) al tipo interno (camelCase).
@@ -39,6 +41,8 @@ export function parseHookEvent(payload: unknown): ClaudeHookEvent {
     typeof p['background_tasks'] === 'number' ? p['background_tasks'] : undefined;
   const lastAssistantMessage =
     typeof p['last_assistant_message'] === 'string' ? p['last_assistant_message'] : undefined;
+  const transcriptPath =
+    typeof p['transcript_path'] === 'string' ? p['transcript_path'] : undefined;
 
   return {
     eventName,
@@ -48,5 +52,6 @@ export function parseHookEvent(payload: unknown): ClaudeHookEvent {
     stopHookActive,
     backgroundTasks,
     lastAssistantMessage,
+    transcriptPath,
   };
 }

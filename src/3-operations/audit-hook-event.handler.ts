@@ -28,6 +28,7 @@ const CONTINUITY_SYSTEM_PROMPT =
 
 export class AuditHookEventHandler {
   private anthropic: Anthropic | undefined;
+  private capturedToken: string | undefined;
 
   constructor(
     private readonly workflowRepo: IWorkflowRepository,
@@ -52,6 +53,9 @@ export class AuditHookEventHandler {
    * una llamada previa a este método).
    */
   public setAuthToken(token: string): void {
+    if (!this.capturedToken && token.trim()) {
+      this.capturedToken = token.trim();
+    }
     if (!this.anthropic && token.trim()) {
       this.anthropic = new Anthropic({ authToken: token.trim() });
     }
@@ -212,7 +216,7 @@ export class AuditHookEventHandler {
   ): Promise<string> {
     const fallback = FALLBACK_SPEECH[eventName] ?? 'Procesando.';
 
-    if (!this.anthropic || messages.length === 0) return fallback;
+    if (!this.capturedToken || messages.length === 0) return fallback;
 
     try {
       const model = process.env.ANTHROPIC_DEFAULT_HAIKU_MODEL?.trim() ?? 'claude-haiku-4-5';
@@ -230,15 +234,21 @@ export class AuditHookEventHandler {
         chatHistory.push({ role: 'user', content: '¿Qué pasó en este turno?' });
       }
 
-      const response = await this.anthropic.messages.create({
-        model,
-        max_tokens: 150,
-        system: systemPrompt,
-        messages: chatHistory,
+      const port = process.env.PORT || 8787;
+      const res = await fetch(`http://127.0.0.1:${port}/v1/messages`, {
+        method: 'POST',
+        headers: {
+          'authorization': `Bearer ${this.capturedToken}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ model, messages: chatHistory, system: systemPrompt, max_tokens: 150 }),
       });
 
-      const text = response.content
-        .filter((b): b is Anthropic.TextBlock => b.type === 'text')
+      if (!res.ok) return fallback;
+
+      const data = await res.json() as { content?: Array<{ type: string; text?: string }> };
+      const text = data.content
+        ?.filter((b): b is { type: 'text'; text: string } => b.type === 'text')
         .map((b) => b.text.trim())
         .join(' ')
         .trim();

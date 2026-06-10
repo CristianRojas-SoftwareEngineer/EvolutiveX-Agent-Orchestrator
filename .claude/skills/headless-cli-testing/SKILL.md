@@ -17,7 +17,41 @@ Ask, confirm, and respond to the user in **Spanish**. Keep this artifact's instr
 
 ---
 
-## Prerequisites
+## Isolated mode (REQUIRED when running from a live Claude Code session)
+
+If the session invoking the test is itself routed through the main proxy (port 8787),
+**never kill or restart that proxy, and never mutate `~/.claude/settings.json` or
+`configs/.env`** — doing so breaks the parent session.
+
+Use the isolated harness instead:
+
+```bash
+npm run test:headless-tts -- --no-voice-announce
+```
+
+Isolation guarantees (see `scripting/headless-tts-gateway-test/`):
+
+| Resource | Main session | Isolated harness |
+|---|---|---|
+| Proxy port | 8787 (`configs/.env`) | **8788** (`--port` to override; guard aborts if equal to main) |
+| Provider config | `~/.claude/settings.json` | In-memory env injection per subprocess (`provider-env.ts`) |
+| `configs/.env` | Read at proxy startup | Never written; overridden via subprocess env (env wins over `--env-file`) |
+| Gateway logs | `server/logs.jsonl` | `server/logs-headless-tts.jsonl` (`LOG_FILE` env var) |
+| Session audit | `sessions/` | `server/headless-tts/sessions/` (`AUDIT_BASE_DIR` env var) |
+
+How it works: the harness resolves the provider config (config.json + secrets.json +
+model metadata) in memory and injects it as environment variables into both subprocesses —
+the test proxy gets `UPSTREAM_ORIGIN`/`LOG_FILE`/`AUDIT_BASE_DIR`/credentials, and
+`claude -p` gets `ANTHROPIC_BASE_URL=http://127.0.0.1:8788` plus provider models/token.
+Env vars take precedence over `settings.json` in Claude Code, and the hook relay
+(`post-hook-event.ts`) resolves its target from `ANTHROPIC_BASE_URL`, so hooks fire into
+the test proxy automatically.
+
+---
+
+## Prerequisites (manual / standalone mode only)
+
+Only when NO live session depends on the main proxy:
 
 1. **Proxy running** — `npm run dev` (append-mode logs to `server/logs.jsonl`).
 2. **Provider fixed** — `npm run configure:provider <provider>` writes `ANTHROPIC_BASE_URL` to `~/.claude/settings.json`, which Claude Code reads automatically.

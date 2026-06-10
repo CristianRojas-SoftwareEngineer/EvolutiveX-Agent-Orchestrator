@@ -114,6 +114,7 @@ export async function createProxyDependencies(
     config.TTS_CONTEXT_N ?? 3,
     new DesktopNotificationAdapter(),
     toastBranding,
+    config.UPSTREAM_ORIGIN,
   );
 
   return {

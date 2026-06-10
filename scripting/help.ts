@@ -49,6 +49,12 @@ const scripts: NpmScript[] = [
     category: 'local',
   },
   {
+    name: 'test:headless-tts',
+    description:
+      'Pruebas headless TTS por proveedor (catálogo menos opencode/xiaomi, claude -p sin shell). Flags: --providers, --exclude-providers, --no-voice-announce, --json',
+    category: 'local',
+  },
+  {
     name: 'create:agents-reference',
     description: 'Crea hardlink AGENTS.md → CLAUDE.md (multiplataforma)',
     category: 'local',

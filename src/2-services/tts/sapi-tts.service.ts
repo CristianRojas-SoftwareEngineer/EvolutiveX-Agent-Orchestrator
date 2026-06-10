@@ -12,14 +12,16 @@ export class SapiTTSService implements ITTSService {
 
   async speak(text: string): Promise<void> {
     if (!text.trim()) return;
-    void this.synthesize(text).catch((err) => {
+    try {
+      await this.synthesize(text);
+    } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       process.stderr.write(`[SAPI TTS] Error en síntesis: ${msg}\n`);
-    });
+    }
   }
 
   private synthesize(text: string): Promise<void> {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const escaped = text.replace(/'/g, "''");
       const psCmd = [
         `Add-Type -AssemblyName System.Speech`,
@@ -32,8 +34,15 @@ export class SapiTTSService implements ITTSService {
       const child = spawn('powershell', ['-NonInteractive', '-NoProfile', '-Command', psCmd], {
         stdio: 'ignore',
       });
-      child.unref();
-      resolve();
+
+      child.on('error', reject);
+      child.on('close', (code) => {
+        if (code === 0 || code === null) {
+          resolve();
+        } else {
+          reject(new Error(`SAPI TTS terminó con código ${code}`));
+        }
+      });
     });
   }
 }

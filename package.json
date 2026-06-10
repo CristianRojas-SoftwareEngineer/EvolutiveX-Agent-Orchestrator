@@ -19,6 +19,7 @@
     "test:unit": "vitest run --config configs/vitest.config.ts",
     "test:integration": "vitest run --config configs/vitest.config.ts",
     "test:watch": "vitest --config configs/vitest.config.ts",
+    "test:headless-tts": "tsx scripting/headless-tts-gateway-test.ts",
     "clean:all": "concurrently \"npm run clean:dist\" \"npm run clean:modules\" \"npm run clean:sessions\" \"npm run clean:logs\"",
     "clean:dist": "rimraf dist",
     "clean:modules": "tsx scripting/clean-modules.ts",

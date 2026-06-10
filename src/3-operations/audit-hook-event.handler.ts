@@ -15,16 +15,9 @@ import {
   formatTaskInProgressMessage,
 } from '../2-services/notifications/hook-payload-notification-message.js';
 import { SessionMetricsService } from '../2-services/session-metrics.service.js';
+import { FALLBACK_SPEECH } from '../2-services/tts/fallback-speech.constants.js';
 import { resolveSessionDir } from './audit-workflow-closure.handler.js';
 import Anthropic from '@anthropic-ai/sdk';
-
-/** Mensajes de fallback para cada evento si falla el LLM o la extracción de contexto. */
-const FALLBACK_SPEECH: Record<string, string> = {
-  UserPromptSubmit: 'Solicitud recibida. Procesando con Claude.',
-  Stop: 'El asistente terminó su turno.',
-  SubagentStop: 'El subagente completó su trabajo.',
-  StopFailure: 'Ocurrió un error durante la ejecución.',
-};
 
 const VOICE_ASSISTANT_SYSTEM_PROMPT =
   'Eres la voz del asistente Smart Code Proxy. ' +
@@ -36,6 +29,18 @@ const CONTINUITY_SYSTEM_PROMPT =
   'En un máximo de tres oraciones cortas en español, resume: ' +
   'qué se completó, qué quedó pendiente y cuál es el estado final. ' +
   'Sin puntos al final de las oraciones. Sin markdown. Habla en primera persona.';
+
+type MessageContentBlock = { type: string; text?: string };
+
+function extractSpeakableTextFromContent(content: MessageContentBlock[] | undefined): string {
+  if (!content?.length) return '';
+  return content
+    .filter((b): b is { type: 'text'; text: string } => b.type === 'text' && typeof b.text === 'string')
+    .map((b) => b.text.trim())
+    .filter(Boolean)
+    .join(' ')
+    .trim();
+}
 
 export class AuditHookEventHandler {
   private anthropic: Anthropic | undefined;
@@ -51,6 +56,7 @@ export class AuditHookEventHandler {
     private readonly contextN: number = 3,
     private readonly notifier?: INotificationService,
     private readonly toastBranding?: { appId?: string; icon?: string },
+    private readonly upstreamOrigin: string = 'https://api.anthropic.com',
   ) {
     // Instanciar Anthropic solo si hay API key estática disponible en el entorno
     const apiKey = process.env.ANTHROPIC_API_KEY ?? process.env.ANTHROPIC_AUTH_TOKEN;
@@ -278,6 +284,31 @@ export class AuditHookEventHandler {
    * Construye el prompt para el LLM y obtiene el texto a sintetizar.
    * Si el LLM no está disponible o falla, devuelve el mensaje de fallback.
    */
+  private logTtsFallback(eventName: string, reason: string, fallbackText: string): void {
+    this.logger?.warn(
+      {
+        tag: '[TTS-FALLBACK]',
+        eventName,
+        usedFallback: true,
+        reason,
+        fallbackText,
+      },
+      '[TTS] Mensaje genérico de fallback (audio y toast)',
+    );
+  }
+
+  private logTtsDynamic(eventName: string, text: string): void {
+    this.logger?.info(
+      {
+        tag: '[TTS-SPEECH]',
+        eventName,
+        usedFallback: false,
+        textPreview: text.slice(0, 120),
+      },
+      '[TTS] Mensaje dinámico generado',
+    );
+  }
+
   private async generateSpeechText(
     eventName: string,
     messages: SessionMessage[],
@@ -285,10 +316,27 @@ export class AuditHookEventHandler {
   ): Promise<string> {
     const fallback = FALLBACK_SPEECH[eventName] ?? 'Procesando.';
 
-    if (!this.capturedToken || messages.length === 0) return fallback;
+    // Detectar provider: para bearer auth (OpenRouter, Ollama, etc.) usar env var; para OAuth usar capturedToken
+    const isAnthropic = this.upstreamOrigin.includes('api.anthropic.com');
+    const envToken = process.env.ANTHROPIC_AUTH_TOKEN?.trim();
+    const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
+    // Para Anthropic: OAuth capturado o API key estática; para otros providers: token bearer desde env
+    const token = isAnthropic
+      ? (this.capturedToken || apiKey)
+      : (envToken || this.capturedToken);
+
+    if (!token) {
+      this.logTtsFallback(eventName, 'no-token', fallback);
+      return fallback;
+    }
+    if (messages.length === 0) {
+      this.logTtsFallback(eventName, 'no-messages', fallback);
+      return fallback;
+    }
 
     try {
-      const model = process.env.ANTHROPIC_DEFAULT_HAIKU_MODEL?.trim() ?? 'claude-haiku-4-5';
+      // || (no ??): una variable vacía ('' tras trim) debe caer al modelo por defecto
+      const model = process.env.ANTHROPIC_DEFAULT_HAIKU_MODEL?.trim() || 'claude-haiku-4-5';
       const systemPrompt = mode === 'prompt' ? VOICE_ASSISTANT_SYSTEM_PROMPT : CONTINUITY_SYSTEM_PROMPT;
 
       // Construir el historial de chat con los mensajes de contexto
@@ -304,27 +352,54 @@ export class AuditHookEventHandler {
       }
 
       const port = process.env.PORT || 8787;
+
+      const baseHeaders = {
+        'authorization': `Bearer ${token}`,
+        'content-type': 'application/json',
+      };
+
+      const headers = isAnthropic
+        ? { ...baseHeaders, 'anthropic-version': '2023-06-01' }
+        : { ...baseHeaders, 'HTTP-Referer': 'https://smartcodeproxy.local', 'X-Title': 'Smart Code Proxy' };
+
+      // Los modelos thinking (MiniMax-M2.5, laguna-xs.2) consumen tokens en razonamiento
+      // antes de producir bloques text; necesitan ≥512 o devuelven empty-response.
+      // Ollama cloud rechaza max_tokens >150 (404), por eso mantiene el cap bajo.
+      // reasoning: { effort: 'none' } reduce el thinking en OpenRouter pero no lo elimina
+      // de forma fiable; MiniMax y Ollama lo ignoran sin error.
+      const isOllama = this.upstreamOrigin.includes('localhost:11434');
+      const nonAnthropicMaxTokens = isOllama ? 150 : 512;
+      const ttsBody = {
+        model,
+        messages: chatHistory,
+        system: systemPrompt,
+        max_tokens: isAnthropic ? 150 : nonAnthropicMaxTokens,
+        ...(isAnthropic ? {} : { reasoning: { effort: 'none' } }),
+      };
+
       const res = await fetch(`http://127.0.0.1:${port}/v1/messages`, {
         method: 'POST',
-        headers: {
-          'authorization': `Bearer ${this.capturedToken}`,
-          'content-type': 'application/json',
-          'anthropic-version': '2023-06-01',
-        },
-        body: JSON.stringify({ model, messages: chatHistory, system: systemPrompt, max_tokens: 150 }),
+        headers,
+        body: JSON.stringify(ttsBody),
       });
 
-      if (!res.ok) return fallback;
+      if (!res.ok) {
+        this.logTtsFallback(eventName, `http-${res.status}`, fallback);
+        return fallback;
+      }
 
-      const data = await res.json() as { content?: Array<{ type: string; text?: string }> };
-      const text = data.content
-        ?.filter((b): b is { type: 'text'; text: string } => b.type === 'text')
-        .map((b) => b.text.trim())
-        .join(' ')
-        .trim();
+      const data = await res.json() as { content?: MessageContentBlock[] };
+      const text = extractSpeakableTextFromContent(data.content);
 
-      return text || fallback;
+      if (!text) {
+        this.logTtsFallback(eventName, 'empty-response', fallback);
+        return fallback;
+      }
+
+      this.logTtsDynamic(eventName, text);
+      return text;
     } catch {
+      this.logTtsFallback(eventName, 'exception', fallback);
       return fallback;
     }
   }

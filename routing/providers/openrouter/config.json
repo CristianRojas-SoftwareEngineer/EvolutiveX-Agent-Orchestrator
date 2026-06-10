@@ -1,7 +1,7 @@
 {
   "AUTH_METHOD": "bearer",
   "ANTHROPIC_BASE_URL": "https://openrouter.ai/api",
-  "ANTHROPIC_DEFAULT_HAIKU_MODEL": "models/gemma-4-31b-it",
+  "ANTHROPIC_DEFAULT_HAIKU_MODEL": "models/laguna-xs.2",
   "ANTHROPIC_DEFAULT_SONNET_MODEL": "models/laguna-m.1",
   "ANTHROPIC_DEFAULT_OPUS_MODEL": "models/nemotron-3-ultra-550b-a55b",
   "CLAUDE_CODE_SUBAGENT_MODEL": "models/laguna-m.1"

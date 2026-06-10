@@ -41,6 +41,13 @@ export class ProxyController {
 
     request.rawBodyBytes = filteredBody.length;
 
+    // Capturar el OAuth Bearer token del primer request autenticado para TTS
+    const authHeader = (request.headers as Record<string, string | string[] | undefined>)['authorization'];
+    if (typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.slice(7).trim();
+      if (token) this.deps.hookEventHandler.setAuthToken(token);
+    }
+
     const result = await this.deps.auditWorkflowHandler.execute({
       headers: request.headers,
       rawBody: filteredBody,

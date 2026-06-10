@@ -27,7 +27,7 @@ const CONTINUITY_SYSTEM_PROMPT =
   'Sin puntos al final de las oraciones. Sin markdown. Habla en primera persona.';
 
 export class AuditHookEventHandler {
-  private readonly anthropic: Anthropic | undefined;
+  private anthropic: Anthropic | undefined;
 
   constructor(
     private readonly workflowRepo: IWorkflowRepository,
@@ -38,10 +38,22 @@ export class AuditHookEventHandler {
     private readonly contextExtractor?: IContextExtractor,
     private readonly contextN: number = 3,
   ) {
-    // Instanciar Anthropic solo si hay API key disponible
+    // Instanciar Anthropic solo si hay API key estática disponible en el entorno
     const apiKey = process.env.ANTHROPIC_API_KEY ?? process.env.ANTHROPIC_AUTH_TOKEN;
     if (apiKey?.trim()) {
       this.anthropic = new Anthropic({ apiKey: apiKey.trim() });
+    }
+  }
+
+  /**
+   * Inicializa el cliente Anthropic con un OAuth Bearer token capturado
+   * del primer request autenticado que pasa por el proxy.
+   * No-op si el cliente ya fue creado (ya sea por API key estática o por
+   * una llamada previa a este método).
+   */
+  public setAuthToken(token: string): void {
+    if (!this.anthropic && token.trim()) {
+      this.anthropic = new Anthropic({ authToken: token.trim() });
     }
   }
 

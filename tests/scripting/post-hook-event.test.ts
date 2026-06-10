@@ -1,10 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
 import { postHookEvent, resolveHooksUrl } from '../../scripting/post-hook-event.js';
-import {
-  PROJECT_GATEWAY_HOOK_COMMAND,
-  buildGatewayHookRelayCommand,
-  isGatewayHookRelayCommand,
-} from '../../scripting/shared/gateway-hook-command.js';
 
 describe('resolveHooksUrl', () => {
   it('normaliza base y añade /hooks', () => {
@@ -39,21 +34,3 @@ describe('postHookEvent', () => {
   });
 });
 
-describe('gateway-hook-command', () => {
-  it('detecta relay tsx y curl legacy', () => {
-    expect(isGatewayHookRelayCommand(PROJECT_GATEWAY_HOOK_COMMAND)).toBe(true);
-    expect(
-      isGatewayHookRelayCommand(
-        "curl -sS -X POST $ANTHROPIC_BASE_URL/hooks -H 'Content-Type: application/json' --data-binary @-",
-      ),
-    ).toBe(true);
-    expect(isGatewayHookRelayCommand('echo hi')).toBe(false);
-  });
-
-  it('genera comando con ruta absoluta POSIX', () => {
-    Object.defineProperty(process, 'platform', { value: 'win32' });
-    const cmd = buildGatewayHookRelayCommand('C:\\Proxy');
-    expect(cmd).toContain('post-hook-event.ts');
-    expect(cmd).not.toContain('--data-binary');
-  });
-});

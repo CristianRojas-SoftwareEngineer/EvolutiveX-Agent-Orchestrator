@@ -12,8 +12,7 @@ export interface ValidProxyRootOptions {
  * orquestador universal `setup.ts`:
  * - statusline: `scripting/router-status.ts` + `routing/providers/`
  * - voice: sin dependencias en disco
- * - hooks: `configs/hooks.json` + `scripting/post-hook-event.ts` +
- *   `scripting/gateway-hook-notify.ts` + `src/2-services/notifications/cli.ts`
+ * - hooks: `configs/hooks.json` + `scripting/post-hook-event.ts`
  *
  * Usado por tests del orquestador y de las features que requieren fixture
  * completo (statusline, hooks).
@@ -33,11 +32,6 @@ export function createValidProxyRoot(options: ValidProxyRootOptions = {}): strin
     'utf-8',
   );
   writeFileSync(join(root, 'scripting', 'post-hook-event.ts'), 'export {}', 'utf-8');
-  writeFileSync(join(root, 'scripting', 'gateway-hook-notify.ts'), 'export {}', 'utf-8');
-  writeFileSync(join(root, 'scripting', 'pre-tool-use-hook-ux.ts'), 'export {}', 'utf-8');
-  writeFileSync(join(root, 'scripting', 'task-in-progress-hook-ux.ts'), 'export {}', 'utf-8');
-  mkdirSync(join(root, 'src', '2-services', 'notifications'), { recursive: true });
-  writeFileSync(join(root, 'src', '2-services', 'notifications', 'cli.ts'), 'export {}', 'utf-8');
   if (options.withSessionsDir) {
     mkdirSync(join(root, 'sessions'), { recursive: true });
   }
@@ -62,11 +56,6 @@ export function createValidProxyRootForHooks(
   );
   mkdirSync(join(root, 'scripting'), { recursive: true });
   writeFileSync(join(root, 'scripting', 'post-hook-event.ts'), 'export {}', 'utf-8');
-  writeFileSync(join(root, 'scripting', 'gateway-hook-notify.ts'), 'export {}', 'utf-8');
-  writeFileSync(join(root, 'scripting', 'pre-tool-use-hook-ux.ts'), 'export {}', 'utf-8');
-  writeFileSync(join(root, 'scripting', 'task-in-progress-hook-ux.ts'), 'export {}', 'utf-8');
-  mkdirSync(join(root, 'src', '2-services', 'notifications'), { recursive: true });
-  writeFileSync(join(root, 'src', '2-services', 'notifications', 'cli.ts'), 'export {}', 'utf-8');
   return resolve(root);
 }
 

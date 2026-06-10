@@ -8,7 +8,7 @@ CLI unificado (`setup:install` / `setup:uninstall`) para instalar, configurar y 
 ## Requirements
 ### Requirement: Selección de features mediante flags explícitos
 
-El sistema SHALL proporcionar un script CLI con flags `--statusline`, `--voice` y `--hooks` que determinen qué features participan en la operación. Cuando no se pasa ningún flag de feature, la operación SHALL aplicarse sobre las tres features. Cuando se pasan uno o más flags, la operación SHALL aplicarse únicamente sobre las features seleccionadas. El flag `--notifications` NO SHALL existir: las notificaciones viven dentro del conjunto indivisible de los 14 hooks de SCP (gateway + stop UX + notificaciones) y no pueden instalarse por separado.
+El sistema SHALL proporcionar un script CLI con flags `--statusline`, `--voice` y `--hooks` que determinen qué features participan en la operación. Cuando no se pasa ningún flag de feature, la operación SHALL aplicarse sobre las tres features. Cuando se pasan uno o más flags, la operación SHALL aplicarse únicamente sobre las features seleccionadas. El flag `--notifications` NO SHALL existir: las notificaciones viven dentro del conjunto indivisible de los 13 hooks de SCP (relay único) y no pueden instalarse por separado.
 
 #### Scenario: Sin flags de feature instala todo
 
@@ -27,10 +27,10 @@ El sistema SHALL proporcionar un script CLI con flags `--statusline`, `--voice` 
 - **THEN** el script SHALL instalar statusline y voz
 - **AND** SHALL no modificar hooks existentes en `settings.json`
 
-#### Scenario: Flag --hooks instala el conjunto indivisible de 14 claves
+#### Scenario: Flag --hooks instala el conjunto unificado de 13 claves con relay único
 
 - **WHEN** el usuario ejecuta `npm run setup:install -- --hooks`
-- **THEN** el script SHALL instalar el conjunto de hooks definido en `configs/hooks.json` (14 claves: gateway, relays stdin único, notificaciones CLI y relay task-in-progress-hook-ux)
+- **THEN** el script SHALL instalar el conjunto de hooks definido en `configs/hooks.json` (13 claves con un único comando por bloque apuntando a `scripting/post-hook-event.ts`)
 - **AND** SHALL no modificar `statusLine` ni `voice*` existentes en `settings.json`
 
 ---
@@ -194,7 +194,7 @@ En modo install, el script SHALL validar únicamente las features seleccionadas 
 |---------------|---------------------------------------------------------|
 | statusline    | `scripting/router-status.ts` y `routing/providers/` existen |
 | voice         | ninguna                                                 |
-| hooks         | `configs/hooks.json`, `scripting/post-hook-event.ts`, `scripting/stop-hook-ux.ts`, `scripting/gateway-hook-notify.ts`, `scripting/pre-tool-use-hook-ux.ts` y `src/2-services/notifications/cli.ts` existen |
+| hooks         | `configs/hooks.json` y `scripting/post-hook-event.ts` existen |
 
 #### Scenario: Raíz inválida aborta sin escribir
 
@@ -237,19 +237,15 @@ La función `applyStatuslineUninstall` SHALL aceptar un parámetro `force: boole
 
 ### Requirement: Indivisibilidad de --hooks
 
-El flag `--hooks` SHALL instalar el conjunto indivisible de las **14 claves** de hooks declaradas en `configs/hooks.json`. Este conjunto cubre:
+El flag `--hooks` SHALL instalar el conjunto indivisible de las **13 claves** de hooks declaradas en `configs/hooks.json`, cada una con un único comando que apunta a `scripting/post-hook-event.ts`. Este es el patrón de relay único: el script de transporte no decide efectos (toast, TTS, audit) — solo reenvía el payload a `POST /hooks`; el gateway (`AuditHookEventHandler`) es el único punto de despacho de efectos.
 
-- **Gateway** (`scripting/post-hook-event.ts` y relays que integran `POST /hooks`).
-- **Relays stdin único** (`stop-hook-ux.ts`, `gateway-hook-notify.ts`, `pre-tool-use-hook-ux.ts`).
-- **Notificaciones CLI** (`src/2-services/notifications/cli.ts`) para entradas que no usan relay compuesto.
+No SHALL existir ningún bloque de hook en `configs/hooks.json` que use un script diferente a `post-hook-event.ts` como comando directo. Los scripts antiguos `gateway-hook-notify.ts`, `pre-tool-use-hook-ux.ts` y `task-in-progress-hook-ux.ts` fueron eliminados (sus lógicas de filtrado y formateo migraron al gateway).
 
-Las entradas de `SubagentStart`, `SubagentStop` y `StopFailure` combinan gateway y notificación en la misma clave de `settings.json`, por lo que **no es posible instalar gateway, stop UX o notificaciones por separado**. El flag SHALL instalar siempre el conjunto completo.
-
-#### Scenario: --hooks instala los tres dominios en bloque
+#### Scenario: --hooks instala el conjunto unificado de 13 claves
 
 - **WHEN** el usuario ejecuta `npm run setup:install -- --hooks`
-- **THEN** `settings.hooks` SHALL contener las 14 claves definidas en `configs/hooks.json`
-- **AND** SHALL incluir `gateway-hook-notify`, `pre-tool-use-hook-ux`, `stop-hook-ux` y `notifications/cli.ts` según corresponda
+- **THEN** `settings.hooks` SHALL contener las 13 claves definidas en `configs/hooks.json`
+- **AND** cada bloque SHALL contener un único comando apuntando a `scripting/post-hook-event.ts`
 
 #### Scenario: No existe flag para instalar solo notificaciones
 

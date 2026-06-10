@@ -485,19 +485,20 @@ Cuando el entry point `src/2-services/notifications/cli.ts` lee el payload del h
 
 ### Requirement: Relays scripting que delegan en el mismo contrato que el CLI
 
-El repositorio SHALL exponer relays en `scripting/` que reutilicen `buildEvent` y `DesktopNotificationAdapter`:
+El repositorio SHALL exponer **un único** relay en `scripting/` que reenvía el payload al gateway:
 
 | Módulo | Eventos | Secuencia |
 |--------|---------|-----------|
-| `gateway-hook-notify.ts` | `UserPromptSubmit`, `StopFailure` | stdin → `POST /hooks` → toast |
-| `pre-tool-use-hook-ux.ts` | `PreToolUse` | stdin → `POST /hooks` → toast condicional |
+| `post-hook-event.ts` | Los **13** eventos gestionados por SCP (`UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PostToolUseFailure`, `SubagentStart`, `SubagentStop`, `Stop`, `StopFailure`, `SessionStart`, `SessionEnd`, `PermissionRequest`, `TaskCreated`, `TaskCompleted`) | stdin → `POST /hooks` (el gateway decide todos los efectos: toast, TTS, audit) |
 
-Estos relays SHALL leer stdin con el mismo criterio UTF-8 que `post-hook-event.ts` (`readStdinBuffer` + `utf-8`).
+Los relays antiguos `gateway-hook-notify.ts` y `pre-tool-use-hook-ux.ts` se eliminaron en el change `consolidate-hooks-in-gateway`. Sus lógicas de formateo y filtrado migraron al gateway, que ahora es el único punto que decide qué toast emitir y qué voz sintetizar.
+
+Este relay SHALL leer stdin con el mismo criterio UTF-8 que `post-hook-event.ts` (`readStdinBuffer` + `utf-8`).
 
 #### Scenario: Caracteres españoles en formatter PreToolUse
 
 - **GIVEN** payload con `tool_input.questions[0].question` = «¿Usamos configuración regional?»
-- **WHEN** `resolveHookNotificationMessage('PreToolUse', payload)` se invoca
+- **WHEN** el gateway procesa el evento `PreToolUse` con `toolName: 'AskUserQuestion'` y construye el mensaje vía `formatPreToolUseAskMessage`
 - **THEN** el resultado SHALL contener «configuración» correctamente
 
 ---

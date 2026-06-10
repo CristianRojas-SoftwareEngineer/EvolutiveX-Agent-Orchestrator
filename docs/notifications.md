@@ -535,15 +535,15 @@ Referencias: [Enable desktop toast with AppUserModelID](https://learn.microsoft.
 `C:\AI\claude-code-notifications.ts` está marcado como **`@deprecated`**
 con fecha de retirada prevista **2026-09-01**. A partir de la fase N2
 del roadmap `claude-code-hooks-implementation`, los hooks han dejado
-de invocarlo. Los relays con toast dinámico desde stdin
-(`UserPromptSubmit`, `StopFailure`, `PreToolUse` vía
-`gateway-hook-notify.ts` y `pre-tool-use-hook-ux.ts`) y el CLI directo
-en `SubagentStart` / `SubagentStop` apuntan al servicio migrado en el
-repositorio. El evento `Stop` usa el relay genérico `post-hook-event.ts`
-y emite voz y toast desde el gateway (`AuditHookEventHandler`). Las notificaciones de UX
-(`SessionStart`, `SessionEnd`, `PermissionRequest`, `TaskCreated`,
-`TaskCompleted`) también apuntan al servicio migrado (ver
-"Notificaciones de UX no-lifecycle" más abajo).
+de invocarlo. La consolidación posterior unificó todos los hooks en un
+**único relay** (`scripting/post-hook-event.ts`) que delega en el
+gateway (`AuditHookEventHandler`) la decisión de efectos: el gateway
+es el único punto que decide qué toast emitir (estático o dinámico) y
+qué locución sintetizar. Los eventos `UserPromptSubmit`, `StopFailure`,
+`SubagentStart`, `SubagentStop`, `SessionStart`, `SessionEnd`,
+`PermissionRequest`, `TaskCreated`, `TaskCompleted` y los condicionales
+`PreToolUse[AskUserQuestion]` / `PostToolUse[TaskUpdate+in_progress]`
+llegan todos al gateway vía `POST /hooks` y disparan toast desde allí.
 
 **Ruta final del CLI** (relativa a la raíz del proyecto):
 
@@ -551,102 +551,89 @@ y emite voz y toast desde el gateway (`AuditHookEventHandler`). Las notificacion
 ./node_modules/tsx/dist/cli.mjs ./src/2-services/notifications/cli.ts
 ```
 
-**Relays al gateway (`POST /hooks`):** en [`.claude/settings.json`](../.claude/settings.json) del proyecto y en [`configs/hooks.json`](../configs/hooks.json) (plantilla canónica), los hooks de lifecycle usan relays TypeScript que leen stdin **una vez** (UTF-8) y reenvían con `fetch` a `$ANTHROPIC_BASE_URL/hooks` (sin `curl` ni `@-`, incompatible con PowerShell). Tipos de relay:
+> **Nota:** `src/2-services/notifications/cli.ts` ya no se usa como
+> comando de hook directo. Permanece en el repositorio como utilidad
+> standalone para invocación manual desde la terminal; sus formatters
+> (`formatUserPromptSubmitMessage`, `formatStopFailureMessage`,
+> `formatPermissionRequestMessage`, `formatPreToolUseAskMessage`,
+> `formatTaskInProgressMessage`) los importa el gateway para construir
+> los mensajes de toast.
 
-| Relay                                                             | Hooks                                                                               | Rol                                                    |
-| ----------------------------------------------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------ |
-| [`post-hook-event.ts`](../scripting/post-hook-event.ts)           | `PostToolUse`, `PostToolUseFailure`, `SubagentStart`, `SubagentStop`, `Stop` (1.er comando) | Solo `POST /hooks`; para `Stop`, voz y toast los emite el gateway internamente |
-| [`gateway-hook-notify.ts`](../scripting/gateway-hook-notify.ts)   | `UserPromptSubmit`, `StopFailure`                                                           | `POST /hooks` + toast con `--stdin-json`                                       |
-| [`pre-tool-use-hook-ux.ts`](../scripting/pre-tool-use-hook-ux.ts) | `PreToolUse` (`matcher: "*"`)                                                               | `POST /hooks` siempre; toast solo en `AskUserQuestion`                         |
+**Relays al gateway (`POST /hooks`):** en [`.claude/settings.json`](../.claude/settings.json) del proyecto y en [`configs/hooks.json`](../configs/hooks.json) (plantilla canónica), **todos los hooks** usan un único relay TypeScript que lee stdin **una vez** (UTF-8) y reenvía con `fetch` a `$ANTHROPIC_BASE_URL/hooks` (sin `curl` ni `@-`, incompatible con PowerShell):
 
-Instalación global con ruta absoluta: builders en [`scripting/shared/gateway-hook-command.ts`](../scripting/shared/gateway-hook-command.ts).
+| Relay                                                       | Hooks                                                  | Rol                                                                                  |
+| ----------------------------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------ |
+| [`post-hook-event.ts`](../scripting/post-hook-event.ts)     | Los **13** eventos gestionados por SCP (ver tabla siguiente) | Relay genérico: `POST /hooks` único por evento. El gateway decide todos los efectos. |
 
-**Comando canónico por hook (14 claves: 8 del lifecycle + 6 de UX):**
+Esta tabla reemplaza las anteriores (`gateway-hook-notify.ts`, `pre-tool-use-hook-ux.ts`, `task-in-progress-hook-ux.ts`): esos relays se eliminaron. La lógica que contenían (filtrado por tool/condición, formateo de mensaje) migró al gateway, que ahora es el único punto que conoce los detalles de UX.
 
-| Hook                                 | Matcher      | Comando(s)                                                                                                                                                                                                                                                                  |
-| ------------------------------------ | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| `UserPromptSubmit`                   | —            | `npx tsx scripting/gateway-hook-notify.ts --event-type UserPromptSubmit`                                                                                                                                                                                                    |
-| `PreToolUse`                         | `*`          | `npx tsx scripting/pre-tool-use-hook-ux.ts` (`POST /hooks` + toast condicional; ver justificación abajo)                                                                                                                                                                    |
-| `PostToolUse`                        | `*`          | `npx tsx scripting/post-hook-event.ts` (sin notificación; ver justificación abajo)                                                                                                                                                                                          |
-| `PostToolUse`                        | `TaskUpdate` | `npx tsx scripting/task-in-progress-hook-ux.ts` (relay UX: filtra `status === "in_progress"` + toast dinámico)                                                                                                                                                              |
-| `PostToolUseFailure`                 | —            | `npx tsx scripting/post-hook-event.ts`                                                                                                                                                                                                                                      |
-| `SubagentStart`                      | —            | `npx tsx scripting/post-hook-event.ts` + `npx tsx src/2-services/notifications/cli.ts --event-type SubagentStart --message "Subagente iniciado"`                                                                                                                            |
-| `SubagentStop`                       | —            | `npx tsx scripting/post-hook-event.ts` + `npx tsx src/2-services/notifications/cli.ts --event-type SubagentStop --message "Subagente terminado"`                                                                                                                            |
-| `Stop`                               | —            | `npx tsx scripting/post-hook-event.ts` (relay genérico; voz y toast de continuidad los emite el gateway con el token del provider activo). Ver [§ Hook Stop](#hook-stop-voz-y-toast-de-continuidad-desde-el-gateway). |
-| `StopFailure`                        | —            | `npx tsx scripting/gateway-hook-notify.ts --event-type StopFailure`                                                                                                                                                                                                         |
-| `SessionStart`                       | `startup     | resume`                                                                                                                                                                                                                                                                     | `npx tsx src/2-services/notifications/cli.ts --event-type SessionStart --message "Sesión iniciada"` |
-| `SessionEnd`                         | —            | `npx tsx src/2-services/notifications/cli.ts --event-type SessionEnd --message "Sesión finalizada"`                                                                                                                                                                         |
-| `PermissionRequest`                  | —            | `npx tsx src/2-services/notifications/cli.ts --event-type PermissionRequest --stdin-json`                                                                                                                                                                                   |
-| `TaskCreated`                        | —            | `npx tsx src/2-services/notifications/cli.ts --event-type TaskCreated --message "Tarea creada"`                                                                                                                                                                             |
-| `TaskCompleted`                      | —            | `npx tsx src/2-services/notifications/cli.ts --event-type TaskCompleted --message "Tarea completada"`                                                                                                                                                                       |
-| `TaskInProgress` (vía `PostToolUse`) | `TaskUpdate` | `npx tsx scripting/task-in-progress-hook-ux.ts` (relay: solo si `tool_input.status === "in_progress"`)                                                                                                                                                                      |
+**Comando canónico por hook (13 claves con relay único):**
 
-**Justificación de toast condicional en `PreToolUse` / sin toast en `PostToolUse`:** los
-eventos de tool tienen frecuencia alta (5–50 invocaciones por turno en
-sesiones largas). El gateway necesita `matcher: "*"` para correlacionar
-todas las tools, pero un toast por cada invocación es ruido de UX, no
-señal. `pre-tool-use-hook-ux.ts` emite toast solo cuando el formatter
-devuelve mensaje (p. ej. `AskUserQuestion` con `tool_input.questions`).
-La notificación en otras claves de lifecycle
-(`UserPromptSubmit`, `SubagentStart`, `SubagentStop`, `StopFailure`)
-usa relays de **stdin único** (`gateway-hook-notify`) o doble comando
-sin competencia por stdin (`SubagentStart` / `SubagentStop`: el CLI no
-usa `--stdin-json`). Para `Stop`, el relay es `post-hook-event.ts` y
-el gateway emite voz y toast internamente.
+| Hook                 | Matcher           | Comando                                                                                            |
+| -------------------- | ----------------- | -------------------------------------------------------------------------------------------------- |
+| `UserPromptSubmit`   | —                 | `npx tsx scripting/post-hook-event.ts` (gateway emite toast con preview del `prompt`)               |
+| `PreToolUse`         | `*`               | `npx tsx scripting/post-hook-event.ts` (gateway decide toast condicional `AskUserQuestion`)        |
+| `PostToolUse`        | `*`               | `npx tsx scripting/post-hook-event.ts` (gateway decide toast condicional `TaskUpdate+in_progress`)  |
+| `PostToolUseFailure` | —                 | `npx tsx scripting/post-hook-event.ts`                                                             |
+| `SubagentStart`      | —                 | `npx tsx scripting/post-hook-event.ts` (gateway emite toast `"Subagente iniciado"`)                 |
+| `SubagentStop`       | —                 | `npx tsx scripting/post-hook-event.ts` (gateway emite toast `"Subagente terminado"`)                |
+| `Stop`               | —                 | `npx tsx scripting/post-hook-event.ts` (gateway genera voz y toast de continuidad internamente)    |
+| `StopFailure`        | —                 | `npx tsx scripting/post-hook-event.ts` (gateway emite toast con detalle del error)                 |
+| `SessionStart`       | `startup\|resume` | `npx tsx scripting/post-hook-event.ts` (gateway emite toast `"Sesión iniciada"`)                   |
+| `SessionEnd`         | —                 | `npx tsx scripting/post-hook-event.ts` (gateway emite toast `"Sesión finalizada"`)                 |
+| `PermissionRequest`  | —                 | `npx tsx scripting/post-hook-event.ts` (gateway emite toast con `tool_name` + preview)            |
+| `TaskCreated`        | —                 | `npx tsx scripting/post-hook-event.ts` (gateway emite toast `"Tarea creada"`)                       |
+| `TaskCompleted`      | —                 | `npx tsx scripting/post-hook-event.ts` (gateway emite toast `"Tarea completada"`)                   |
+
+**Justificación del relay único:** los eventos de tool tienen frecuencia alta (5–50 invocaciones por turno en sesiones largas). El gateway necesita `matcher: "*"` para correlacionar todas las tools. Antes había 3 scripts distintos (`gateway-hook-notify.ts`, `pre-tool-use-hook-ux.ts`, `task-in-progress-hook-ux.ts`) que leían stdin y decidían efectos locales. Esto provocaba:
+- Race condition de Windows cuando dos procesos leían stdin en paralelo.
+- Lógica de decisión de efectos duplicada entre scripts y gateway.
+- Imposibilidad de extender el gateway con capacidades futuras (audit enriquecido, correlación con workflows) para los 5 eventos de sesión.
+
+La consolidación elimina los 3 scripts y mueve toda la decisión de efectos al gateway, que tiene acceso al contexto del workflow, al provider activo y al log de auditoría.
 
 ### Notificaciones de UX no-lifecycle
 
-Las 6 claves de UX `SessionStart`, `SessionEnd`, `PermissionRequest`,
-`TaskCreated`, `TaskCompleted` y `TaskInProgress` **no invocan** `POST /hooks` (el toast
-de `PreToolUse` / `AskUserQuestion` lo cubre el relay lifecycle
-`pre-tool-use-hook-ux.ts`, no una entrada UX separada): el `AuditHookEventHandler` solo procesa los 8
-`eventName` del lifecycle (`UserPromptSubmit`, `PreToolUse`,
-`PostToolUse`, `PostToolUseFailure`, `SubagentStart`, `SubagentStop`,
-`Stop`, `StopFailure`); el resto cae en `default:` y se descarta.
-Enviar `POST /hooks` desde estas claves sería ancho de banda
-desperdiciado.
+Las 5 claves de UX `SessionStart`, `SessionEnd`, `PermissionRequest`, `TaskCreated` y `TaskCompleted` **sí invocan** `POST /hooks` (al contrario de lo que indicaba la versión anterior de esta sección). El `AuditHookEventHandler` las recibe y emite toast desde el gateway. La decisión de toasts (estático vs. dinámico) la toma el gateway inspeccionando `event.toolName` y `event.toolInput` (campos añadidos a `ClaudeHookEvent` por el change `consolidate-hooks-in-gateway`).
 
 > **Nota sobre `TaskCreated` / `TaskCompleted`:** son hooks nativos de
 > Claude Code confirmados en
-> [code.claude.com/docs/en/hooks](https://code.claude.com/docs/en/hooks)
-> (parte del catálogo de eventos del lifecycle). El `AuditHookEventHandler`
-> del gateway no los procesa (su `switch` solo cubre los 8 del lifecycle
-> de correlación), por lo que son puramente UX, ortogonales al gateway.
-> Estos hooks no admiten campo `matcher` (la documentación oficial indica
-> que se ignora silenciosamente para estos eventos); las entradas omiten
-> el campo. El copy estático viene del catálogo (sin `--message` en settings). En sesiones con
-> planificación activa (p. ej. `/openspec-new`, `/openspec-apply`),
-> `TaskCreate` y `TaskUpdate(status=completed)` disparan múltiples toasts
-> por turno; el usuario asume este trade-off a cambio de feedback
-> explícito del avance de tareas. Si el ruido resulta excesivo, la única
-> mitigación nativa es retirar las entradas (no hay filtrado parcial sin
-> throttling/dedupe en el CLI).
+> [code.claude.com/docs/en/hooks](https://code.claude.com/docs/en/hooks).
+> El `AuditHookEventHandler` los procesa (su `switch` extendido los
+> cubre tras la consolidación de hooks) y emite toast estático. Estos
+> hooks no admiten campo `matcher` (la documentación oficial indica que
+> se ignora silenciosamente para estos eventos); las entradas omiten
+> el campo. En sesiones con planificación activa (p. ej.
+> `/openspec-new`, `/openspec-apply`), `TaskCreate` y
+> `TaskUpdate(status=completed)` disparan múltiples toasts por turno;
+> el usuario asume este trade-off a cambio de feedback explícito del
+> avance de tareas. Si el ruido resulta excesivo, la única mitigación
+> nativa es retirar las entradas.
 
-> **Nota sobre `TaskInProgress`:** NO es un hook nativo de Claude Code.
-> Se implementa como entrada `PostToolUse` con `matcher: "TaskUpdate"` y
-> un relay (`task-in-progress-hook-ux.ts`) que filtra por
-> `tool_input.status === "in_progress"` antes de emitir el toast. Los
-> `TaskUpdate` con `status: "completed"`, `"deleted"` u otro valor
-> provocan exit 0 silencioso (sin toast). El filtrado reduce el ruido en
-> ~75 % de las invocaciones de `TaskUpdate`, aunque las sesiones con
+> **Nota sobre `TaskInProgress` (toast en transición `pending → in_progress`):**
+> tras la consolidación, este toast ya no usa un relay externo. El
+> gateway evalúa `event.toolName === 'TaskUpdate' && event.toolInput?.status === 'in_progress'`
+> dentro de `handlePostToolUse` y emite el toast vía
+> `formatTaskInProgressMessage`. Los `TaskUpdate` con `status: "completed"`,
+> `"deleted"` u otro valor no disparan toast. El filtrado reduce el ruido
+> en ~75 % de las invocaciones de `TaskUpdate`, aunque las sesiones con
 > planificación activa siguen generando múltiples toasts por turno.
 
-### Uso de `--stdin-json` por entrada
+### Notas operativas (post-consolidación)
 
-| Entrada                                                | `--stdin-json`                            | Justificación                                                                                                                                                                           |
-| ------------------------------------------------------ | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `UserPromptSubmit`                                     | Sí                                        | Formatter: preview de `prompt`.                                                                                                                                                         |
-| `SubagentStart`                                        | No                                        | Copy estático del catálogo.                                                                                                                                                             |
-| `SubagentStop`                                         | No                                        | Copy estático del catálogo.                                                                                                                                                             |
-| `PreToolUse` (matcher `AskUserQuestion`)               | Sí                                        | Formatter: preguntas en `tool_input.questions`.                                                                                                                                         |
-| `Stop`                                                 | No — el gateway genera el texto internamente | El toast del `Stop` lo emite `AuditHookEventHandler` con el token del provider activo; el CLI no se invoca para este evento.                                                             |
-| `StopFailure`                                          | Sí                                        | Formatter: `error` + `last_assistant_message`.                                                                                                                                          |
-| `SessionStart`                                         | No                                        | Copy estático del catálogo.                                                                                                                                                             |
-| `SessionEnd`                                           | No                                        | Copy estático del catálogo.                                                                                                                                                             |
-| `PermissionRequest`                                    | Sí                                        | Formatter: `tool_name` y `tool_input`.                                                                                                                                                  |
-| `TaskCreated`                                          | No                                        | Copy estático del catálogo.                                                                                                                                                             |
-| `TaskCompleted`                                        | No                                        | Copy estático del catálogo.                                                                                                                                                             |
-| `TaskInProgress` (vía relay `PostToolUse[TaskUpdate]`) | Sí (vía relay)                            | El relay filtra `tool_input.status === "in_progress"` y pasa el payload al CLI con `--stdin-json`; el formatter extrae `tool_input.subject`.                                            |
+- **Todos los eventos llegan al gateway.** No hay ningún `eventName`
+  que el `AuditHookEventHandler` desconozca o descarte: el `switch`
+  ampliado cubre los 13 eventos gestionados por SCP.
+- **Los filtros condicionales viven en el gateway.** El filtrado por
+  `toolName` (`AskUserQuestion`, `TaskUpdate`) y por `toolInput`
+  (`questions`, `status: 'in_progress'`) lo aplica el gateway, no un
+  matcher del lado de Claude Code ni un script relay. El
+  `matcher: "*"` en `PreToolUse` y `PostToolUse` envía todos los
+  eventos al gateway; el gateway decide a posteriori si emitir toast.
+- **Cero competencia por stdin.** Un único relay (`post-hook-event.ts`)
+  por evento elimina la race condition de Windows que existía cuando
+  dos procesos leían stdin en paralelo (p. ej. `post-hook-event.ts` +
+  `cli.ts --stdin-json` en `SubagentStart` antes de la consolidación).
 
 ### Override del user-level
 

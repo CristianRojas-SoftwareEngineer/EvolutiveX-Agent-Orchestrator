@@ -8,6 +8,11 @@ export type HookEventName =
   | 'SubagentStop'
   | 'Stop'
   | 'StopFailure'
+  | 'SessionStart'
+  | 'SessionEnd'
+  | 'PermissionRequest'
+  | 'TaskCreated'
+  | 'TaskCompleted'
   | (string & {});
 
 export interface ClaudeHookEvent {
@@ -20,6 +25,12 @@ export interface ClaudeHookEvent {
   lastAssistantMessage?: string;
   /** Ruta al transcript JSONL de la sesión, proporcionada por Claude Code en los hooks Stop/StopFailure/UserPromptSubmit. */
   transcriptPath?: string;
+  /** Nombre de la tool invocada (PreToolUse, PostToolUse, PermissionRequest). */
+  toolName?: string;
+  /** Input de la tool como objeto opaco (PreToolUse, PostToolUse, PermissionRequest). */
+  toolInput?: Record<string, unknown>;
+  /** Texto del prompt en UserPromptSubmit. */
+  prompt?: string;
 }
 
 // Mapea el payload wire (snake_case) al tipo interno (camelCase).
@@ -43,6 +54,12 @@ export function parseHookEvent(payload: unknown): ClaudeHookEvent {
     typeof p['last_assistant_message'] === 'string' ? p['last_assistant_message'] : undefined;
   const transcriptPath =
     typeof p['transcript_path'] === 'string' ? p['transcript_path'] : undefined;
+  const toolName = typeof p['tool_name'] === 'string' ? p['tool_name'] : undefined;
+  const toolInput =
+    typeof p['tool_input'] === 'object' && p['tool_input'] !== null
+      ? (p['tool_input'] as Record<string, unknown>)
+      : undefined;
+  const prompt = typeof p['prompt'] === 'string' ? p['prompt'] : undefined;
 
   return {
     eventName,
@@ -53,5 +70,8 @@ export function parseHookEvent(payload: unknown): ClaudeHookEvent {
     backgroundTasks,
     lastAssistantMessage,
     transcriptPath,
+    toolName,
+    toolInput,
+    prompt,
   };
 }

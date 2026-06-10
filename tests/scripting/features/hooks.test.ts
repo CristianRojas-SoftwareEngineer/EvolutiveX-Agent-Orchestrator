@@ -28,25 +28,6 @@ describe('isScpManagedCommand', () => {
     );
   });
 
-  it('detecta stop-hook-ux', () => {
-    expect(isScpManagedCommand('npx tsx /c/repos/scripting/stop-hook-ux.ts', scpRoot)).toBe(true);
-  });
-
-  it('detecta notifications/cli.ts', () => {
-    expect(
-      isScpManagedCommand(
-        'npx tsx /c/repos/src/2-services/notifications/cli.ts --event-type Stop',
-        scpRoot,
-      ),
-    ).toBe(true);
-  });
-
-  it('detecta task-in-progress-hook-ux', () => {
-    expect(
-      isScpManagedCommand('npx tsx /c/repos/scp/scripting/task-in-progress-hook-ux.ts', scpRoot),
-    ).toBe(true);
-  });
-
   it('detecta por ruta resolved de scpRoot', () => {
     expect(
       isScpManagedCommand('echo something with /c/repos/smart-code-proxy inside', scpRoot),
@@ -66,6 +47,21 @@ describe('isScpManagedCommand', () => {
     expect(isScpManagedCommand('C:\\repos\\scp\\scripting\\post-hook-event.ts', scpRoot)).toBe(
       true,
     );
+  });
+
+  it('retorna false para scripts relay antiguos (gateway-hook-notify, pre-tool-use-hook-ux, task-in-progress-hook-ux, cli.ts)', () => {
+    expect(
+      isScpManagedCommand('npx tsx /c/repos/scp/scripting/gateway-hook-notify.ts', scpRoot),
+    ).toBe(false);
+    expect(
+      isScpManagedCommand('npx tsx /c/repos/scp/scripting/pre-tool-use-hook-ux.ts', scpRoot),
+    ).toBe(false);
+    expect(
+      isScpManagedCommand('npx tsx /c/repos/scp/scripting/task-in-progress-hook-ux.ts', scpRoot),
+    ).toBe(false);
+    expect(
+      isScpManagedCommand('npx tsx /c/repos/scp/src/2-services/notifications/cli.ts', scpRoot),
+    ).toBe(false);
   });
 });
 
@@ -159,13 +155,13 @@ describe('mergeHooks', () => {
       },
     };
     const mixedCanonical: HooksBlock = {
-      UserPromptSubmit: [{ hooks: [{ type: 'command', command: `${scpRoot}/stop-hook-ux.ts` }] }],
+      UserPromptSubmit: [{ hooks: [{ type: 'command', command: `${scpRoot}/post-hook-event.ts` }] }],
     };
     const result = mergeHooks(settings, mixedCanonical, scpRoot, false);
     const hooks = result.hooks as Record<string, HooksBlock[string]>;
     expect(hooks['UserPromptSubmit'].length).toBe(2);
     expect(hooks['UserPromptSubmit'][0].hooks[0].command).toBe('echo other');
-    expect(hooks['UserPromptSubmit'][1].hooks[0].command).toContain('stop-hook-ux.ts');
+    expect(hooks['UserPromptSubmit'][1].hooks[0].command).toContain('post-hook-event.ts');
   });
 
   it('establece SMART_CODE_PROXY_ROOT en env', () => {
@@ -178,7 +174,7 @@ describe('unmergeHooks', () => {
   const scpRoot = '/c/repos/scp';
   const canonical: HooksBlock = {
     UserPromptSubmit: [{ hooks: [{ type: 'command', command: `${scpRoot}/post-hook-event.ts` }] }],
-    Stop: [{ hooks: [{ type: 'command', command: `${scpRoot}/stop-hook-ux.ts` }] }],
+    Stop: [{ hooks: [{ type: 'command', command: `${scpRoot}/post-hook-event.ts` }] }],
   };
 
   it('elimina clave si todos los comandos son SCP', () => {
@@ -278,22 +274,27 @@ describe('readCanonicalHooks', () => {
 });
 
 describe('validateScpRoot', () => {
-  it('pasa si todos los archivos existen', () => {
+  it('pasa si existen configs/hooks.json y scripting/post-hook-event.ts', () => {
     const root = createValidProxyRootForHooks();
     expect(() => validateScpRoot(root)).not.toThrow();
     rmSync(root, { recursive: true, force: true });
   });
 
-  it('falla si falta cli.ts', () => {
-    const root = mkdtempSync(join(tmpdir(), 'scp-missing-cli-'));
+  it('falla si falta post-hook-event.ts', () => {
+    const root = mkdtempSync(join(tmpdir(), 'scp-missing-post-'));
+    mkdirSync(join(root, 'configs'), { recursive: true });
+    writeFileSync(join(root, 'configs', 'hooks.json'), JSON.stringify({ hooks: {} }), 'utf-8');
+    expect(() => validateScpRoot(root)).toThrow(/post-hook-event\.ts/);
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('pasa aunque falten scripts antiguos (gateway-hook-notify, pre-tool-use-hook-ux, task-in-progress-hook-ux, notifications/cli.ts)', () => {
+    const root = mkdtempSync(join(tmpdir(), 'scp-no-legacy-'));
     mkdirSync(join(root, 'configs'), { recursive: true });
     writeFileSync(join(root, 'configs', 'hooks.json'), JSON.stringify({ hooks: {} }), 'utf-8');
     mkdirSync(join(root, 'scripting'), { recursive: true });
     writeFileSync(join(root, 'scripting', 'post-hook-event.ts'), '', 'utf-8');
-    writeFileSync(join(root, 'scripting', 'gateway-hook-notify.ts'), '', 'utf-8');
-    writeFileSync(join(root, 'scripting', 'pre-tool-use-hook-ux.ts'), '', 'utf-8');
-    writeFileSync(join(root, 'scripting', 'task-in-progress-hook-ux.ts'), '', 'utf-8');
-    expect(() => validateScpRoot(root)).toThrow(/cli\.ts/);
+    expect(() => validateScpRoot(root)).not.toThrow();
     rmSync(root, { recursive: true, force: true });
   });
 });

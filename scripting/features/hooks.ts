@@ -1,13 +1,9 @@
 /**
  * Lógica pura de la feature "hooks" para el instalador universal.
  *
- * Cubre el conjunto indivisible de 14 entradas declaradas en
+ * Cubre el conjunto indivisible de 13 entradas declaradas en
  * `configs/hooks.json`:
- * - Gateway: `scripting/post-hook-event.ts`
- * - Gateway + toast (stdin único): `scripting/gateway-hook-notify.ts`
- * - PreToolUse (POST + toast AskUserQuestion): `scripting/pre-tool-use-hook-ux.ts`
- * - TaskInProgress (PostToolUse[TaskUpdate] + toast filtrado por status): `scripting/task-in-progress-hook-ux.ts`
- * - Notificaciones: `src/2-services/notifications/cli.ts`
+ * - Relay único: `scripting/post-hook-event.ts`
  *
  * Las funciones aquí definidas son puras (no escriben en disco). El
  * orquestador `scripting/setup.ts` se encarga de la I/O (S2 backup, S3
@@ -28,10 +24,6 @@ export { SMART_CODE_PROXY_ROOT_KEY };
 
 const HOOKS_JSON_SEGMENT = 'configs/hooks.json';
 const POST_HOOK_EVENT_SEGMENT = 'scripting/post-hook-event.ts';
-const GATEWAY_HOOK_NOTIFY_SEGMENT = 'scripting/gateway-hook-notify.ts';
-const PRE_TOOL_USE_HOOK_UX_SEGMENT = 'scripting/pre-tool-use-hook-ux.ts';
-const TASK_IN_PROGRESS_HOOK_UX_SEGMENT = 'scripting/task-in-progress-hook-ux.ts';
-const NOTIFICATIONS_CLI_SEGMENT = 'src/2-services/notifications/cli.ts';
 const PLACEHOLDER = '${SMART_CODE_PROXY_ROOT}';
 
 export interface HookEntry {
@@ -77,28 +69,15 @@ export function resolveHooksBlock(hooks: HooksBlock, scpRoot: string): HooksBloc
 
 /**
  * Determina si un comando es gestionado por SCP.
- * Un comando es de SCP si su path normalizado contiene alguno de:
+ * Un comando es de SCP si su path normalizado contiene:
  * - `post-hook-event`
- * - `stop-hook-ux`
- * - `gateway-hook-notify`
- * - `pre-tool-use-hook-ux`
- * - `task-in-progress-hook-ux`
- * - `notifications/cli.ts`
  * - La ruta resolved del repo (sin backslash)
  */
 export function isScpManagedCommand(command: string | undefined, scpRoot: string): boolean {
   if (typeof command !== 'string') return false;
   const normalized = command.replace(/\\/g, '/');
   const rootNormalized = scpRoot.replace(/\\/g, '/');
-  return (
-    normalized.includes('post-hook-event') ||
-    normalized.includes('stop-hook-ux') ||
-    normalized.includes('gateway-hook-notify') ||
-    normalized.includes('pre-tool-use-hook-ux') ||
-    normalized.includes('task-in-progress-hook-ux') ||
-    normalized.includes('notifications/cli.ts') ||
-    normalized.includes(rootNormalized)
-  );
+  return normalized.includes('post-hook-event') || normalized.includes(rootNormalized);
 }
 
 /**
@@ -244,14 +223,7 @@ export function unmergeHooks(
  * Lanza error si falta alguno.
  */
 export function validateScpRoot(scpRoot: string): void {
-  const files = [
-    HOOKS_JSON_SEGMENT,
-    POST_HOOK_EVENT_SEGMENT,
-    GATEWAY_HOOK_NOTIFY_SEGMENT,
-    PRE_TOOL_USE_HOOK_UX_SEGMENT,
-    TASK_IN_PROGRESS_HOOK_UX_SEGMENT,
-    NOTIFICATIONS_CLI_SEGMENT,
-  ];
+  const files = [HOOKS_JSON_SEGMENT, POST_HOOK_EVENT_SEGMENT];
   const missing: string[] = [];
   for (const file of files) {
     if (!existsSync(resolve(scpRoot, file))) {

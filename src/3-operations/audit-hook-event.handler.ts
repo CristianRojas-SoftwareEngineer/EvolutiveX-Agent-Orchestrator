@@ -5,7 +5,15 @@ import type { ITTSService } from '../1-domain/ports/ITTSService.js';
 import type { IContextExtractor, SessionMessage } from '../1-domain/ports/IContextExtractor.js';
 import type { INotificationService } from '../2-services/notifications/INotificationService.js';
 import type { NotificationEvent } from '../2-services/notifications/types.js';
-import { truncate, normalizeWhitespace } from '../2-services/notifications/hook-payload-notification-message.js';
+import {
+  truncate,
+  normalizeWhitespace,
+  formatUserPromptSubmitMessage,
+  formatStopFailureMessage,
+  formatPermissionRequestMessage,
+  formatPreToolUseAskMessage,
+  formatTaskInProgressMessage,
+} from '../2-services/notifications/hook-payload-notification-message.js';
 import { SessionMetricsService } from '../2-services/session-metrics.service.js';
 import { resolveSessionDir } from './audit-workflow-closure.handler.js';
 import Anthropic from '@anthropic-ai/sdk';
@@ -76,9 +84,10 @@ export class AuditHookEventHandler {
         if (event.agentId) {
           this.workflowRepo.confirmSubagentFromHook(event.agentId, event.toolUseId);
         }
+        void this.emitToast('SubagentStart', 'Subagente iniciado');
         break;
 
-      case 'UserPromptSubmit':
+      case 'UserPromptSubmit': {
         this.workflowRepo.openWorkflow(
           event.sessionId,
           {
@@ -89,7 +98,16 @@ export class AuditHookEventHandler {
         );
         // Locución asíncrona como asistente de voz
         void this.speakAsync(event, 'prompt');
+        // Toast con preview del prompt (mismo texto que el script relay)
+        const userPromptMsg =
+          event.prompt !== undefined
+            ? formatUserPromptSubmitMessage({ prompt: event.prompt } as Record<string, unknown>)
+            : null;
+        if (userPromptMsg) {
+          void this.emitToast('UserPromptSubmit', userPromptMsg);
+        }
         break;
+      }
 
       case 'Stop': {
         const wf = this.workflowRepo.getWorkflowBySessionId(event.sessionId);
@@ -135,6 +153,7 @@ export class AuditHookEventHandler {
         }
         // Resumen de cierre de subagente por voz
         void this.speakAsync(event, 'summary');
+        void this.emitToast('SubagentStop', 'Subagente terminado');
         break;
       }
 
@@ -151,12 +170,30 @@ export class AuditHookEventHandler {
         await this.delegateClosure(event.sessionId, wf.id);
         // Alerta de fallo por voz
         void this.speakAsync(event, 'summary');
+        // Toast con detalle del error (último mensaje o tipo de error)
+        const stopFailurePayload: Record<string, unknown> = {};
+        if (event.lastAssistantMessage) {
+          stopFailurePayload['last_assistant_message'] = event.lastAssistantMessage;
+        }
+        const stopFailureMsg = formatStopFailureMessage(stopFailurePayload);
+        if (stopFailureMsg) {
+          void this.emitToast('StopFailure', stopFailureMsg);
+        }
         break;
       }
 
-      case 'PreToolUse':
+      case 'PreToolUse': {
         this.logger?.info({ eventName: event.eventName }, 'hook PreToolUse recibido');
+        // Toast condicional: solo si la tool es AskUserQuestion y trae questions
+        if (event.toolName === 'AskUserQuestion' && event.toolInput) {
+          const askPayload: Record<string, unknown> = { tool_input: event.toolInput };
+          const askMsg = formatPreToolUseAskMessage(askPayload);
+          if (askMsg) {
+            void this.emitToast('PreToolUse', askMsg);
+          }
+        }
         break;
+      }
 
       case 'PostToolUse':
         this.handlePostToolUse(event, false);
@@ -165,6 +202,33 @@ export class AuditHookEventHandler {
       case 'PostToolUseFailure':
         this.handlePostToolUse(event, true);
         break;
+
+      case 'SessionStart':
+        void this.emitToast('SessionStart', 'Sesión iniciada');
+        break;
+
+      case 'SessionEnd':
+        void this.emitToast('SessionEnd', 'Sesión finalizada');
+        break;
+
+      case 'TaskCreated':
+        void this.emitToast('TaskCreated', 'Tarea creada');
+        break;
+
+      case 'TaskCompleted':
+        void this.emitToast('TaskCompleted', 'Tarea completada');
+        break;
+
+      case 'PermissionRequest': {
+        const permPayload: Record<string, unknown> = {};
+        if (event.toolName) permPayload['tool_name'] = event.toolName;
+        if (event.toolInput) permPayload['tool_input'] = event.toolInput;
+        const permMsg = formatPermissionRequestMessage(permPayload);
+        if (permMsg) {
+          void this.emitToast('PermissionRequest', permMsg);
+        }
+        break;
+      }
 
       default:
         this.logger?.info({ eventName: event.eventName }, 'hook desconocido recibido — ignorado');
@@ -311,6 +375,15 @@ export class AuditHookEventHandler {
       isError,
       result: resultPayload,
     });
+
+    // Toast condicional: solo si la tool es TaskUpdate y status === 'in_progress'
+    if (!isError && event.toolName === 'TaskUpdate' && event.toolInput?.['status'] === 'in_progress') {
+      const taskInProgressPayload: Record<string, unknown> = { tool_input: event.toolInput };
+      const taskMsg = formatTaskInProgressMessage(taskInProgressPayload);
+      if (taskMsg) {
+        void this.emitToast('TaskInProgress', taskMsg);
+      }
+    }
   }
 
   private async delegateClosure(sessionId: string, workflowId: string): Promise<void> {

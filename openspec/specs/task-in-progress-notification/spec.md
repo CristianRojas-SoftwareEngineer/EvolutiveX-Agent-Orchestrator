@@ -52,7 +52,7 @@ El formatter SHALL:
 - **GIVEN** payload `{ "tool_input": { "status": "in_progress" } }` (sin campo `subject`)
 - **WHEN** se invoca `resolveHookNotificationMessage('TaskInProgress', payload)`
 - **THEN** SHALL devolver `null`
-- **AND** el caller (CLI) SHALL usar `profile.message: 'Tarea iniciada'` del catálogo
+- **AND** el caller (gateway) SHALL usar `profile.message: 'Tarea iniciada'` del catálogo
 
 #### Scenario: `subject` largo se trunca a `MAX_TOOL_INPUT_PREVIEW_LEN`
 
@@ -75,92 +75,74 @@ El formatter SHALL:
 
 ---
 
-### Requirement: Relay `task-in-progress-hook-ux` con filtrado por `status`
+### Requirement: Filtrado en el gateway (sin relay externo)
 
-El sistema SHALL exponer un módulo `scripting/task-in-progress-hook-ux.ts` (entry point del hook `TaskInProgress`) que:
+Tras la consolidación de hooks en el gateway (change `consolidate-hooks-in-gateway`), el filtrado de `TaskUpdate+in_progress` ya no se hace en un script relay externo. El gateway (`AuditHookEventHandler.handlePostToolUse`) evalúa el filtro directamente sobre el `ClaudeHookEvent` parseado y emite el toast con `formatTaskInProgressMessage`.
 
-1. Lea stdin completo como `Buffer` UTF-8 (`readStdinBuffer` + `toString('utf-8')`), igual que `post-hook-event.ts` y `pre-tool-use-hook-ux.ts`.
-2. Haga `JSON.parse` del cuerpo; si el parse falla → escribir diagnóstico a `stderr` y terminar con código 0 (no propagar error al caller para no romper la sesión del cliente).
-3. Filtre el evento: extraiga `tool_input.status` del payload y descarte silenciosamente (exit 0) si el valor NO es exactamente la cadena `"in_progress"`. Esto cubre los casos donde Claude Code invoca `TaskUpdate` con `status: "completed"`, `"pending"` o `"deleted"`, y donde un agente externo invoca el script sin intención de notificar.
-4. Si el filtro pasa → importar `buildEvent` y `normalizeStdinJsonText` desde `src/2-services/notifications/cli.ts` e instanciar `DesktopNotificationAdapter` en el mismo proceso Node.js, **sin spawn de proceso hijo**. El relay invoca `buildEvent({eventType: 'TaskInProgress', stdinJson: true, sound: false, silent: false}, payload)` seguido de `adapter.notify(built)`. Paridad estructural exacta con `pre-tool-use-hook-ux.ts` (la referencia canónica).
-5. El relay NO SHALL invocar `POST /hooks` del proxy: `AuditHookEventHandler` no procesa eventos `TaskUpdate` (ver spec `hooks-lifecycle-correlation` § 3.2), por lo que enviar el payload al gateway sería ancho de banda desperdiciado.
+El relay externo `scripting/task-in-progress-hook-ux.ts` se eliminó; el filtro de `tool_input.status === "in_progress"` migró al handler del gateway. La entrada canónica `PostToolUse[matcher=*]` envía todos los eventos al gateway vía `post-hook-event.ts`; el gateway aplica el filtro condicionalmente.
 
-El `SMART_CODE_PROXY_ROOT` SHALL resolverse desde la ubicación del script (`import.meta.url`), no desde `CLAUDE_PROJECT_DIR` ni de variables de runtime de Claude Code (paridad con `stop-hook-ux.ts`).
+#### Scenario: `TaskUpdate(in_progress)` → gateway emite toast
 
-#### Scenario: `TaskUpdate(in_progress)` → notificación emitida
-
-- **GIVEN** payload stdin con `tool_input.status: "in_progress"` y `tool_input.subject: "X"`
-- **WHEN** se ejecuta `scripting/task-in-progress-hook-ux.ts`
-- **THEN** SHALL filtrarse correctamente (status coincide)
+- **GIVEN** un `ClaudeHookEvent` con `eventName: 'PostToolUse'`, `toolName: 'TaskUpdate'`, `toolInput.status: 'in_progress'`, `toolInput.subject: 'X'`
+- **WHEN** `AuditHookEventHandler.execute(event)` se invoca
+- **THEN** SHALL detectarse el `status === "in_progress"` (filtro satisfecho)
 - **AND** SHALL emitirse un toast con `message: "Tarea iniciada: X"`
 
 #### Scenario: `TaskUpdate(completed)` → no se emite notificación
 
-- **GIVEN** payload stdin con `tool_input.status: "completed"`
-- **WHEN** se ejecuta `scripting/task-in-progress-hook-ux.ts`
-- **THEN** SHALL detectarse el status ≠ `"in_progress"`
+- **GIVEN** un `ClaudeHookEvent` con `eventName: 'PostToolUse'`, `toolName: 'TaskUpdate'`, `toolInput.status: 'completed'`
+- **WHEN** `AuditHookEventHandler.execute(event)` se invoca
+- **THEN** SHALL detectarse el `status !== "in_progress"`
 - **AND** NO SHALL emitirse notificación
-- **AND** SHALL terminar con exit 0 (no rompe el flujo del cliente)
 
 #### Scenario: `TaskUpdate(deleted)` → no se emite notificación
 
-- **GIVEN** payload stdin con `tool_input.status: "deleted"`
-- **WHEN** se ejecuta el relay
+- **GIVEN** un `ClaudeHookEvent` con `eventName: 'PostToolUse'`, `toolName: 'TaskUpdate'`, `toolInput.status: 'deleted'`
+- **WHEN** `AuditHookEventHandler.execute(event)` se invoca
 - **THEN** NO SHALL emitirse notificación
-- **AND** SHALL terminar con exit 0
 
 #### Scenario: `TaskUpdate` sin `status` → no se emite notificación (defensa)
 
-- **GIVEN** payload stdin con `tool_input: {}` (sin `status`)
-- **WHEN** se ejecuta el relay
+- **GIVEN** un `ClaudeHookEvent` con `eventName: 'PostToolUse'`, `toolName: 'TaskUpdate'`, `toolInput: {}` (sin `status`)
+- **WHEN** `AuditHookEventHandler.execute(event)` se invoca
 - **THEN** NO SHALL emitirse notificación (defensa contra payloads malformados)
-- **AND** SHALL terminar con exit 0
 
-#### Scenario: stdin con JSON inválido → exit 0 con diagnóstico en stderr
+#### Scenario: `PostToolUse` con `toolName` distinto a `TaskUpdate` → no se evalúa el filtro
 
-- **GIVEN** stdin contiene `{ "tool_input":` (truncado, no parseable)
-- **WHEN** se ejecuta el relay
-- **THEN** SHALL escribirse un mensaje diagnóstico a `stderr` (sin propagar error al cliente)
-- **AND** SHALL terminar con exit 0
-
-#### Scenario: El relay NO invoca `POST /hooks`
-
-- **GIVEN** cualquier payload válido de `TaskUpdate`
-- **WHEN** se ejecuta el relay
-- **THEN** SHALL NO observarse ninguna request HTTP saliente hacia el proxy
+- **GIVEN** un `ClaudeHookEvent` con `eventName: 'PostToolUse'`, `toolName: 'Bash'`
+- **WHEN** `AuditHookEventHandler.execute(event)` se invoca
+- **THEN** NO SHALL evaluarse el filtro de `status` (solo aplica a `TaskUpdate`)
 
 ---
 
-### Requirement: Entrada canónica `TaskInProgress` en plantilla de hooks
+### Requirement: Entrada canónica unificada en plantilla de hooks
 
-La plantilla canónica `configs/hooks.json` SHALL contener una entrada bajo `hooks.PostToolUse` con `matcher: "TaskUpdate"` y un array `hooks` con **exactamente un** comando:
+La plantilla canónica `configs/hooks.json` SHALL contener una única entrada bajo `hooks.PostToolUse` con `matcher: "*"` apuntando a `scripting/post-hook-event.ts`. Ya NO SHALL existir la entrada separada con `matcher: "TaskUpdate"` y `scripting/task-in-progress-hook-ux.ts`: el filtrado por `toolName === 'TaskUpdate' && toolInput.status === 'in_progress'` lo hace el gateway sobre el payload parseado.
 
 ```json
 {
-  "matcher": "TaskUpdate",
+  "matcher": "*",
   "hooks": [
     {
       "type": "command",
-      "command": "npx --prefix \"${SMART_CODE_PROXY_ROOT}\" tsx \"${SMART_CODE_PROXY_ROOT}/scripting/task-in-progress-hook-ux.ts\""
+      "command": "npx --prefix \"${SMART_CODE_PROXY_ROOT}\" tsx \"${SMART_CODE_PROXY_ROOT}/scripting/post-hook-event.ts\""
     }
   ]
 }
 ```
 
-`${SMART_CODE_PROXY_ROOT}` SHALL resolverse en install-time por el instalador universal (`setup --hooks`) sustituyendo la variable de entorno con la ruta absoluta del repo. La entrada SHALL poder coexistir con la entrada `PostToolUse[matcher="*"]` ya existente (los matchers son disjuntos en Claude Code).
+`${SMART_CODE_PROXY_ROOT}` SHALL resolverse en install-time por el instalador universal (`setup --hooks`) sustituyendo la variable de entorno con la ruta absoluta del repo.
 
-#### Scenario: La entrada canónica tiene un único comando al relay
+#### Scenario: PostToolUse tiene una única entrada con matcher "*"
 
 - **GIVEN** `configs/hooks.json`
-- **WHEN** se inspecciona `hooks.PostToolUse[matcher="TaskUpdate"]`
-- **THEN** SHALL existir exactamente esa entrada
-- **AND** SHALL contener un array `hooks` con longitud 1
-- **AND** SHALL apuntar a `scripting/task-in-progress-hook-ux.ts` con la variable `${SMART_CODE_PROXY_ROOT}`
+- **WHEN** se inspecciona `hooks.PostToolUse`
+- **THEN** SHALL existir exactamente una entrada con `matcher: "*"`
+- **AND** SHALL no existir una segunda entrada separada para el matcher `TaskUpdate`
 
 #### Scenario: La entrada se distribuye en user-level tras `setup --hooks`
 
 - **GIVEN** el usuario ejecuta `npm run setup -- --hooks` en una config limpia
 - **WHEN** el instalador escribe `~/.claude/settings.json`
-- **THEN** SHALL existir `hooks.PostToolUse[matcher="TaskUpdate"]` con un único comando
-- **AND** el comando SHALL apuntar a la ruta absoluta del repo (variable resuelta)
-- **AND** la entrada existente `hooks.PostToolUse[matcher="*"]` SHALL preservarse intacta (matchers disjuntos)
+- **THEN** SHALL existir `hooks.PostToolUse[matcher="*"]` con un único comando apuntando a `post-hook-event.ts`
+- **AND** SHALL NO existir `hooks.PostToolUse[matcher="TaskUpdate"]`

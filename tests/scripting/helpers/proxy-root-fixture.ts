@@ -13,8 +13,7 @@ export interface ValidProxyRootOptions {
  * - statusline: `scripting/router-status.ts` + `routing/providers/`
  * - voice: sin dependencias en disco
  * - hooks: `configs/hooks.json` + `scripting/post-hook-event.ts` +
- *   `scripting/stop-hook-ux.ts` + `scripting/gateway-hook-notify.ts` +
- *   `src/2-services/notifications/cli.ts`
+ *   `scripting/gateway-hook-notify.ts` + `src/2-services/notifications/cli.ts`
  *
  * Usado por tests del orquestador y de las features que requieren fixture
  * completo (statusline, hooks).
@@ -34,7 +33,6 @@ export function createValidProxyRoot(options: ValidProxyRootOptions = {}): strin
     'utf-8',
   );
   writeFileSync(join(root, 'scripting', 'post-hook-event.ts'), 'export {}', 'utf-8');
-  writeFileSync(join(root, 'scripting', 'stop-hook-ux.ts'), 'export {}', 'utf-8');
   writeFileSync(join(root, 'scripting', 'gateway-hook-notify.ts'), 'export {}', 'utf-8');
   writeFileSync(join(root, 'scripting', 'pre-tool-use-hook-ux.ts'), 'export {}', 'utf-8');
   writeFileSync(join(root, 'scripting', 'task-in-progress-hook-ux.ts'), 'export {}', 'utf-8');
@@ -64,7 +62,6 @@ export function createValidProxyRootForHooks(
   );
   mkdirSync(join(root, 'scripting'), { recursive: true });
   writeFileSync(join(root, 'scripting', 'post-hook-event.ts'), 'export {}', 'utf-8');
-  writeFileSync(join(root, 'scripting', 'stop-hook-ux.ts'), 'export {}', 'utf-8');
   writeFileSync(join(root, 'scripting', 'gateway-hook-notify.ts'), 'export {}', 'utf-8');
   writeFileSync(join(root, 'scripting', 'pre-tool-use-hook-ux.ts'), 'export {}', 'utf-8');
   writeFileSync(join(root, 'scripting', 'task-in-progress-hook-ux.ts'), 'export {}', 'utf-8');

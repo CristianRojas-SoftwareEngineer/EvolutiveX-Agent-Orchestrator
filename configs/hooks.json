@@ -86,8 +86,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "npx --prefix \"${SMART_CODE_PROXY_ROOT}\" tsx \"${SMART_CODE_PROXY_ROOT}/scripting/stop-hook-ux.ts\"",
-            "timeout": 120
+            "command": "npx --prefix \"${SMART_CODE_PROXY_ROOT}\" tsx \"${SMART_CODE_PROXY_ROOT}/scripting/post-hook-event.ts\""
           }
         ]
       }

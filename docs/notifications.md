@@ -39,24 +39,23 @@ Requisitos: `npm install` en la raíz del proxy (para `tsx` en `node_modules`). 
 
 **Nota:** el [`.claude/settings.json`](../../.claude/settings.json) del **proyecto** puede definir las mismas claves de hook (p. ej. lifecycle con `POST /hooks`); el merge de Claude Code da prioridad al proyecto y puede anular toasts globales en esas claves dentro de este repo. Para toasts + gateway en Smart Code Proxy, ampliar el settings del proyecto según [hooks-lifecycle-correlation](../openspec/specs/hooks-lifecycle-correlation/spec.md). Solo `.claude/settings.json` está en `.gitignore` (configuración local del proyecto); skills, comandos y memoria bajo `.claude/` sí se versionan. Los fragmentos canónicos de hooks viven en [`configs/hooks.json`](../configs/hooks.json), esta guía y el [README § Configuración de hooks](../README.md#configuracion-de-hooks).
 
-## Hook `Stop`: mensaje de continuidad con modelo
+## Hook `Stop`: voz y toast de continuidad desde el gateway
 
-En Smart Code Proxy, el evento **`Stop`** usa un relay unificado en lugar de varios comandos en paralelo.
+En Smart Code Proxy, el evento **`Stop`** usa el relay genérico [`post-hook-event.ts`](../scripting/post-hook-event.ts) (igual que los demás eventos auditados). La voz y el toast de continuidad se generan **dentro del proceso del proxy** (`AuditHookEventHandler`).
 
-| Paso | Qué hace                                                                                                                                                                                                                                  |
-| ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1    | Lee el payload JSON del hook **una sola vez** por stdin                                                                                                                                                                                   |
-| 2    | `POST /hooks` al proxy (misma semántica que [`post-hook-event.ts`](../scripting/post-hook-event.ts))                                                                                                                                      |
-| 3    | Lee el contexto del workflow desde `transcript_path` (turno previo + turno actual)                                                                                                                                                        |
-| 4    | Genera un **mensaje de continuidad** con **Haiku** (`ANTHROPIC_*` del entorno): qué se completó, qué está abierto, dirección del siguiente prompt. Si no hay API key o falla, usa el texto del último mensaje del asistente como fallback |
-| 5    | Persiste el mensaje completo en `sessions/.last-continuity-message.txt` (punto de integración TTS)                                                                                                                                        |
-| 6    | **Toast único** — título «Stop», cuerpo = preview de hasta 250 caracteres del mensaje de continuidad (o copy del catálogo si no hay texto fuente)                                                                                         |
+| Paso | Qué hace                                                                                                                                                                                       |
+| ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1    | `post-hook-event.ts` envía `POST /hooks` al proxy (fire-and-forget; respuesta en milisegundos)                                                                                                 |
+| 2    | `AuditHookEventHandler` extrae contexto del transcript (`transcript_path`) vía `IContextExtractor`                                                                                             |
+| 3    | Genera el texto de continuidad **una sola vez** con Haiku vía `fetch()` al proxy local con el **token del provider activo** (funciona con Anthropic, Minimax, Ollama y cualquier compatible)   |
+| 4    | Emite **voz** (TTS existente) y **toast** (`INotificationService` inyectado) en paralelo desde el mismo texto                                                                                  |
+| 5    | Si el toast falla, la voz y la respuesta HTTP del hook continúan sin errores (degradación con gracia)                                                                                          |
 
-**Scripts:** [`scripting/stop-hook-ux.ts`](../scripting/stop-hook-ux.ts) (orquestador, único entry point del hook) y [`scripting/stop-work-summary-notification.ts`](../scripting/stop-work-summary-notification.ts) (módulo import-only: contexto + mensaje + toast; no ejecutable directamente). El builder de comando con ruta absoluta: `buildStopHookUxCommand` en [`scripting/shared/gateway-hook-command.ts`](../scripting/shared/gateway-hook-command.ts).
+**Sin persistencia en disco:** el archivo `sessions/.last-continuity-message.txt` se retiró. Voz y toast se emiten en memoria desde el mismo texto en el mismo proceso.
 
-**Por qué un solo proceso:** si `post-hook-event.ts`, el CLI de notificaciones y un tercer script corren en paralelo, en Windows suele quedarse solo el primero con stdin; el mensaje de continuidad no recibe JSON y no emite el toast.
+**Consistencia voz↔toast:** al usar el mismo texto generado con el token del provider activo, voz y toast siempre tienen el mismo contenido, independientemente del provider configurado.
 
-**Fragmento para `.claude/settings.json` del proyecto** (sustituye la entrada `Stop` con doble comando + `--stdin-json`):
+**Fragmento canónico para `configs/hooks.json`** (ya aplicado; sin `timeout`):
 
 ```json
 "Stop": [
@@ -64,41 +63,16 @@ En Smart Code Proxy, el evento **`Stop`** usa un relay unificado en lugar de var
     "hooks": [
       {
         "type": "command",
-        "command": "npx --prefix \"${SMART_CODE_PROXY_ROOT}\" tsx \"${SMART_CODE_PROXY_ROOT}/scripting/stop-hook-ux.ts\"",
-        "timeout": 120,
-        "statusMessage": "Generando mensaje de continuidad…"
+        "command": "npx --prefix \"${SMART_CODE_PROXY_ROOT}\" tsx \"${SMART_CODE_PROXY_ROOT}/scripting/post-hook-event.ts\""
       }
     ]
   }
 ]
 ```
 
-`${SMART_CODE_PROXY_ROOT}` es el placeholder que el instalador sustituye por la ruta POSIX absoluta al repo en install-time. El script deriva su propia raíz de `import.meta.url`; no depende de ninguna variable de runtime de Claude Code.
+**Depuración:** iniciar el proxy con logs (`npm run dev`), provocar un `Stop` desde Claude Code y observar las líneas `[TTS/Toast]` en la salida del proxy. Canal **Hooks** en Claude Code (`/hooks`) para verificar que el relay llegó.
 
-**Prueba manual** (desde la raíz del repo, con `ANTHROPIC_API_KEY` o `ANTHROPIC_AUTH_TOKEN`):
-
-```bash
-echo '{"hook_event_name":"Stop","transcript_path":"<ruta al .jsonl>","last_assistant_message":"Tests en verde."}' \
-  | npx tsx scripting/stop-hook-ux.ts
-# Esperado: 1 toast título "Stop", archivo sessions/.last-continuity-message.txt creado
-```
-
-**Prueba sin API key** (fallback a texto truncado):
-
-```bash
-echo '{"hook_event_name":"Stop","last_assistant_message":"Refactor completo."}' \
-  | npx tsx scripting/stop-hook-ux.ts
-```
-
-**Prueba sin texto fuente** (copy del catálogo):
-
-```bash
-echo '{}' | npx tsx scripting/stop-hook-ux.ts
-```
-
-**Depuración:** mensajes en stderr con prefijo `stop-hook-ux:` o `stop-work-summary-notification:`; canal **Hooks** en Claude Code (`/hooks`).
-
-Los **prompt hooks** (`type: "prompt"`) de Claude Code no pueden invocar toasts; el resumen con modelo va en el relay de comando anterior, no en un `type: "prompt"` aparte.
+Los **prompt hooks** (`type: "prompt"`) de Claude Code no pueden invocar toasts; el resumen con modelo va en el handler del gateway, no en un `type: "prompt"` aparte.
 
 ## Componentes
 
@@ -563,9 +537,10 @@ con fecha de retirada prevista **2026-09-01**. A partir de la fase N2
 del roadmap `claude-code-hooks-implementation`, los hooks han dejado
 de invocarlo. Los relays con toast dinámico desde stdin
 (`UserPromptSubmit`, `StopFailure`, `PreToolUse` vía
-`gateway-hook-notify.ts` y `pre-tool-use-hook-ux.ts`; `Stop` vía
-`stop-hook-ux.ts`) y el CLI directo en `SubagentStart` / `SubagentStop`
-apuntan al servicio migrado en el repositorio. Las notificaciones de UX
+`gateway-hook-notify.ts` y `pre-tool-use-hook-ux.ts`) y el CLI directo
+en `SubagentStart` / `SubagentStop` apuntan al servicio migrado en el
+repositorio. El evento `Stop` usa el relay genérico `post-hook-event.ts`
+y emite voz y toast desde el gateway (`AuditHookEventHandler`). Las notificaciones de UX
 (`SessionStart`, `SessionEnd`, `PermissionRequest`, `TaskCreated`,
 `TaskCompleted`) también apuntan al servicio migrado (ver
 "Notificaciones de UX no-lifecycle" más abajo).
@@ -580,10 +555,9 @@ apuntan al servicio migrado en el repositorio. Las notificaciones de UX
 
 | Relay                                                             | Hooks                                                                               | Rol                                                    |
 | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------ |
-| [`post-hook-event.ts`](../scripting/post-hook-event.ts)           | `PostToolUse`, `PostToolUseFailure`, `SubagentStart`, `SubagentStop` (1.er comando) | Solo `POST /hooks`                                     |
-| [`gateway-hook-notify.ts`](../scripting/gateway-hook-notify.ts)   | `UserPromptSubmit`, `StopFailure`                                                   | `POST /hooks` + toast con `--stdin-json`               |
-| [`pre-tool-use-hook-ux.ts`](../scripting/pre-tool-use-hook-ux.ts) | `PreToolUse` (`matcher: "*"`)                                                       | `POST /hooks` siempre; toast solo en `AskUserQuestion` |
-| [`stop-hook-ux.ts`](../scripting/stop-hook-ux.ts)                 | `Stop`                                                                              | `POST /hooks` + toast de continuidad                   |
+| [`post-hook-event.ts`](../scripting/post-hook-event.ts)           | `PostToolUse`, `PostToolUseFailure`, `SubagentStart`, `SubagentStop`, `Stop` (1.er comando) | Solo `POST /hooks`; para `Stop`, voz y toast los emite el gateway internamente |
+| [`gateway-hook-notify.ts`](../scripting/gateway-hook-notify.ts)   | `UserPromptSubmit`, `StopFailure`                                                           | `POST /hooks` + toast con `--stdin-json`                                       |
+| [`pre-tool-use-hook-ux.ts`](../scripting/pre-tool-use-hook-ux.ts) | `PreToolUse` (`matcher: "*"`)                                                               | `POST /hooks` siempre; toast solo en `AskUserQuestion`                         |
 
 Instalación global con ruta absoluta: builders en [`scripting/shared/gateway-hook-command.ts`](../scripting/shared/gateway-hook-command.ts).
 
@@ -598,7 +572,7 @@ Instalación global con ruta absoluta: builders en [`scripting/shared/gateway-ho
 | `PostToolUseFailure`                 | —            | `npx tsx scripting/post-hook-event.ts`                                                                                                                                                                                                                                      |
 | `SubagentStart`                      | —            | `npx tsx scripting/post-hook-event.ts` + `npx tsx src/2-services/notifications/cli.ts --event-type SubagentStart --message "Subagente iniciado"`                                                                                                                            |
 | `SubagentStop`                       | —            | `npx tsx scripting/post-hook-event.ts` + `npx tsx src/2-services/notifications/cli.ts --event-type SubagentStop --message "Subagente terminado"`                                                                                                                            |
-| `Stop`                               | —            | **Proyecto Smart Code Proxy:** un solo comando `stop-hook-ux.ts` (`POST /hooks` + toast de continuidad). Ver [§ Hook Stop](#hook-stop-fin-de-turno-y-resumen-con-modelo). **Instalación global / genérica:** `post-hook-event.ts` + `cli.ts --event-type Stop --stdin-json` |
+| `Stop`                               | —            | `npx tsx scripting/post-hook-event.ts` (relay genérico; voz y toast de continuidad los emite el gateway con el token del provider activo). Ver [§ Hook Stop](#hook-stop-voz-y-toast-de-continuidad-desde-el-gateway). |
 | `StopFailure`                        | —            | `npx tsx scripting/gateway-hook-notify.ts --event-type StopFailure`                                                                                                                                                                                                         |
 | `SessionStart`                       | `startup     | resume`                                                                                                                                                                                                                                                                     | `npx tsx src/2-services/notifications/cli.ts --event-type SessionStart --message "Sesión iniciada"` |
 | `SessionEnd`                         | —            | `npx tsx src/2-services/notifications/cli.ts --event-type SessionEnd --message "Sesión finalizada"`                                                                                                                                                                         |
@@ -614,10 +588,11 @@ todas las tools, pero un toast por cada invocación es ruido de UX, no
 señal. `pre-tool-use-hook-ux.ts` emite toast solo cuando el formatter
 devuelve mensaje (p. ej. `AskUserQuestion` con `tool_input.questions`).
 La notificación en otras claves de lifecycle
-(`UserPromptSubmit`, `SubagentStart`, `SubagentStop`, `Stop`,
-`StopFailure`) usa relays de **stdin único** (`gateway-hook-notify`,
-`stop-hook-ux`) o doble comando sin competencia por stdin
-(`SubagentStart` / `SubagentStop`: el CLI no usa `--stdin-json`).
+(`UserPromptSubmit`, `SubagentStart`, `SubagentStop`, `StopFailure`)
+usa relays de **stdin único** (`gateway-hook-notify`) o doble comando
+sin competencia por stdin (`SubagentStart` / `SubagentStop`: el CLI no
+usa `--stdin-json`). Para `Stop`, el relay es `post-hook-event.ts` y
+el gateway emite voz y toast internamente.
 
 ### Notificaciones de UX no-lifecycle
 
@@ -664,7 +639,7 @@ desperdiciado.
 | `SubagentStart`                                        | No                                        | Copy estático del catálogo.                                                                                                                                                             |
 | `SubagentStop`                                         | No                                        | Copy estático del catálogo.                                                                                                                                                             |
 | `PreToolUse` (matcher `AskUserQuestion`)               | Sí                                        | Formatter: preguntas en `tool_input.questions`.                                                                                                                                         |
-| `Stop`                                                 | Sí (solo si el hook usa `cli.ts` directo) | Formatter: `last_assistant_message`; si falta, catálogo. En el **proyecto**, `stop-hook-ux.ts` no usa `--stdin-json` en el CLI: el 1.er toast es catálogo y el 2.º lleva resumen Haiku. |
+| `Stop`                                                 | No — el gateway genera el texto internamente | El toast del `Stop` lo emite `AuditHookEventHandler` con el token del provider activo; el CLI no se invoca para este evento.                                                             |
 | `StopFailure`                                          | Sí                                        | Formatter: `error` + `last_assistant_message`.                                                                                                                                          |
 | `SessionStart`                                         | No                                        | Copy estático del catálogo.                                                                                                                                                             |
 | `SessionEnd`                                           | No                                        | Copy estático del catálogo.                                                                                                                                                             |

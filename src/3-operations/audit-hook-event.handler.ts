@@ -3,6 +3,9 @@ import type { Logger } from '../1-domain/types/logger.types.js';
 import type { ClaudeHookEvent } from '../1-domain/types/hook.types.js';
 import type { ITTSService } from '../1-domain/ports/ITTSService.js';
 import type { IContextExtractor, SessionMessage } from '../1-domain/ports/IContextExtractor.js';
+import type { INotificationService } from '../2-services/notifications/INotificationService.js';
+import type { NotificationEvent } from '../2-services/notifications/types.js';
+import { truncate, normalizeWhitespace } from '../2-services/notifications/hook-payload-notification-message.js';
 import { SessionMetricsService } from '../2-services/session-metrics.service.js';
 import { resolveSessionDir } from './audit-workflow-closure.handler.js';
 import Anthropic from '@anthropic-ai/sdk';
@@ -38,6 +41,8 @@ export class AuditHookEventHandler {
     private readonly tts?: ITTSService,
     private readonly contextExtractor?: IContextExtractor,
     private readonly contextN: number = 3,
+    private readonly notifier?: INotificationService,
+    private readonly toastBranding?: { appId?: string; icon?: string },
   ) {
     // Instanciar Anthropic solo si hay API key estática disponible en el entorno
     const apiKey = process.env.ANTHROPIC_API_KEY ?? process.env.ANTHROPIC_AUTH_TOKEN;
@@ -99,8 +104,8 @@ export class AuditHookEventHandler {
           this.workflowRepo.close(wf.id, event);
           await this.delegateClosure(event.sessionId, wf.id);
         }
-        // Resumen de cierre por voz
-        void this.speakAsync(event, 'summary');
+        // Resumen de cierre por voz y toast
+        void this.announceStop(event);
         break;
       }
 
@@ -256,6 +261,28 @@ export class AuditHookEventHandler {
       return text || fallback;
     } catch {
       return fallback;
+    }
+  }
+
+  private async announceStop(event: ClaudeHookEvent): Promise<void> {
+    try {
+      const messages = await this.extractContext(event.transcriptPath);
+      const text = await this.generateSpeechText('Stop', messages, 'summary');
+      await Promise.allSettled([this.tts?.speak(text), this.emitToast('Stop', text)]);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger?.error({ eventName: 'Stop', err: msg }, '[TTS/Toast] Error en announceStop');
+    }
+  }
+
+  private async emitToast(title: string, text: string): Promise<void> {
+    if (!this.notifier) return;
+    const message = truncate(normalizeWhitespace(text), 250);
+    try {
+      const notifEvent: NotificationEvent = { title, message, ...this.toastBranding };
+      await this.notifier.notify(notifEvent);
+    } catch (err) {
+      this.logger?.error({ err }, '[Toast] fallo al emitir');
     }
   }
 

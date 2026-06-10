@@ -18,6 +18,8 @@ import { AuditUpstreamErrorHandler } from '../3-operations/audit-upstream-error.
 import { FilterToolsHandler } from '../3-operations/filter-tools.handler.js';
 import { SapiTTSService } from '../2-services/tts/sapi-tts.service.js';
 import { TranscriptContextExtractor } from '../2-services/tts/transcript-extractor.service.js';
+import { DesktopNotificationAdapter } from '../2-services/notifications/DesktopNotificationAdapter.js';
+import { resolveBranding } from '../2-services/notifications/cli.js';
 import { ProxyEnvironmentConfig } from '../1-domain/types/config.types.js';
 import type { Logger } from '../1-domain/types/logger.types.js';
 
@@ -99,6 +101,9 @@ export async function createProxyDependencies(
     });
   }
 
+  // Branding por defecto para el toast del Stop (appId + icono fallback global)
+  const toastBranding = resolveBranding({ sound: false, silent: false, stdinJson: false });
+
   const hookEventHandler = new AuditHookEventHandler(
     workflowRepo,
     auditBaseDir,
@@ -107,6 +112,8 @@ export async function createProxyDependencies(
     ttsService,
     contextExtractor,
     config.TTS_CONTEXT_N ?? 3,
+    new DesktopNotificationAdapter(),
+    toastBranding,
   );
 
   return {

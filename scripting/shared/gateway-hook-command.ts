@@ -1,7 +1,6 @@
 import { buildNpxTsxCommand } from './npx-tsx-command.js';
 
 export const POST_HOOK_EVENT_SEGMENT = 'scripting/post-hook-event.ts';
-export const STOP_HOOK_UX_SEGMENT = 'scripting/stop-hook-ux.ts';
 export const GATEWAY_HOOK_NOTIFY_SEGMENT = 'scripting/gateway-hook-notify.ts';
 export const PRE_TOOL_USE_HOOK_UX_SEGMENT = 'scripting/pre-tool-use-hook-ux.ts';
 
@@ -12,11 +11,6 @@ const LEGACY_CURL_MARKERS = ['--data-binary @-', 'ANTHROPIC_BASE_URL/hooks'] as 
 
 export function buildGatewayHookRelayCommand(proxyRoot: string): string {
   return buildNpxTsxCommand(proxyRoot, POST_HOOK_EVENT_SEGMENT);
-}
-
-/** Stop: gateway + toasts (un solo proceso; evita stdin vacío con hooks paralelos). */
-export function buildStopHookUxCommand(proxyRoot: string): string {
-  return buildNpxTsxCommand(proxyRoot, STOP_HOOK_UX_SEGMENT);
 }
 
 /** POST /hooks + toast con stdin-json en un solo proceso (UserPromptSubmit, StopFailure). */

@@ -4,7 +4,6 @@
  * Cubre el conjunto indivisible de 14 entradas declaradas en
  * `configs/hooks.json`:
  * - Gateway: `scripting/post-hook-event.ts`
- * - Stop UX: `scripting/stop-hook-ux.ts`
  * - Gateway + toast (stdin único): `scripting/gateway-hook-notify.ts`
  * - PreToolUse (POST + toast AskUserQuestion): `scripting/pre-tool-use-hook-ux.ts`
  * - TaskInProgress (PostToolUse[TaskUpdate] + toast filtrado por status): `scripting/task-in-progress-hook-ux.ts`
@@ -29,7 +28,6 @@ export { SMART_CODE_PROXY_ROOT_KEY };
 
 const HOOKS_JSON_SEGMENT = 'configs/hooks.json';
 const POST_HOOK_EVENT_SEGMENT = 'scripting/post-hook-event.ts';
-const STOP_HOOK_UX_SEGMENT = 'scripting/stop-hook-ux.ts';
 const GATEWAY_HOOK_NOTIFY_SEGMENT = 'scripting/gateway-hook-notify.ts';
 const PRE_TOOL_USE_HOOK_UX_SEGMENT = 'scripting/pre-tool-use-hook-ux.ts';
 const TASK_IN_PROGRESS_HOOK_UX_SEGMENT = 'scripting/task-in-progress-hook-ux.ts';
@@ -249,7 +247,6 @@ export function validateScpRoot(scpRoot: string): void {
   const files = [
     HOOKS_JSON_SEGMENT,
     POST_HOOK_EVENT_SEGMENT,
-    STOP_HOOK_UX_SEGMENT,
     GATEWAY_HOOK_NOTIFY_SEGMENT,
     PRE_TOOL_USE_HOOK_UX_SEGMENT,
     TASK_IN_PROGRESS_HOOK_UX_SEGMENT,

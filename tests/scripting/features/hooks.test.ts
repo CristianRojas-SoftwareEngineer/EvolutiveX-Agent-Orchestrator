@@ -290,7 +290,9 @@ describe('validateScpRoot', () => {
     writeFileSync(join(root, 'configs', 'hooks.json'), JSON.stringify({ hooks: {} }), 'utf-8');
     mkdirSync(join(root, 'scripting'), { recursive: true });
     writeFileSync(join(root, 'scripting', 'post-hook-event.ts'), '', 'utf-8');
-    writeFileSync(join(root, 'scripting', 'stop-hook-ux.ts'), '', 'utf-8');
+    writeFileSync(join(root, 'scripting', 'gateway-hook-notify.ts'), '', 'utf-8');
+    writeFileSync(join(root, 'scripting', 'pre-tool-use-hook-ux.ts'), '', 'utf-8');
+    writeFileSync(join(root, 'scripting', 'task-in-progress-hook-ux.ts'), '', 'utf-8');
     expect(() => validateScpRoot(root)).toThrow(/cli\.ts/);
     rmSync(root, { recursive: true, force: true });
   });

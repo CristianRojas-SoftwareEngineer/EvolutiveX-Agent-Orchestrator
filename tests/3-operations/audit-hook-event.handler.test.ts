@@ -313,4 +313,51 @@ describe('AuditHookEventHandler', () => {
     await new Promise((r) => setTimeout(r, 50));
     expect(close).not.toHaveBeenCalled();
   });
+
+  it('Stop con notifier inyectado → notify llamado con title Stop y message no vacío', async () => {
+    const notify = vi.fn().mockResolvedValue(undefined);
+    const notifier = { notify };
+    const tts = { speak: vi.fn().mockResolvedValue(undefined), initialize: vi.fn() };
+    const wf = stubWorkflow();
+    const getWorkflowBySessionId = vi.fn().mockReturnValue(wf);
+    const readyToClose = vi.fn().mockReturnValue(false);
+    const repo = makeRepo({ getWorkflowBySessionId, readyToClose });
+    const handler = new AuditHookEventHandler(
+      repo, '/tmp/sessions', makeSessionMetrics(),
+      undefined, tts, undefined, 3, notifier,
+    );
+    handler.setAuthToken('test-token');
+
+    handler.execute({
+      eventName: 'Stop',
+      sessionId: 'session-1',
+      transcriptPath: '/tmp/fake-transcript.jsonl',
+    });
+    await new Promise((r) => setTimeout(r, 100));
+
+    expect(notify).toHaveBeenCalledOnce();
+    const call = notify.mock.calls[0][0] as { title: string; message: string };
+    expect(call.title).toBe('Stop');
+    expect(call.message.length).toBeGreaterThan(0);
+  });
+
+  it('Stop no lanza si notifier.notify rechaza y TTS sigue invocándose', async () => {
+    const notify = vi.fn().mockRejectedValue(new Error('toast fail'));
+    const notifier = { notify };
+    const speak = vi.fn().mockResolvedValue(undefined);
+    const tts = { speak, initialize: vi.fn() };
+    const wf = stubWorkflow();
+    const getWorkflowBySessionId = vi.fn().mockReturnValue(wf);
+    const readyToClose = vi.fn().mockReturnValue(false);
+    const repo = makeRepo({ getWorkflowBySessionId, readyToClose });
+    const handler = new AuditHookEventHandler(
+      repo, '/tmp/sessions', makeSessionMetrics(),
+      undefined, tts, undefined, 3, notifier,
+    );
+
+    handler.execute({ eventName: 'Stop', sessionId: 'session-1' });
+    await new Promise((r) => setTimeout(r, 100));
+
+    expect(speak).toHaveBeenCalledOnce();
+  });
 });

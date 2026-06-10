@@ -245,6 +245,7 @@ export class AuditHookEventHandler {
         headers: {
           'authorization': `Bearer ${this.capturedToken}`,
           'content-type': 'application/json',
+          'anthropic-version': '2023-06-01',
         },
         body: JSON.stringify({ model, messages: chatHistory, system: systemPrompt, max_tokens: 150 }),
       });

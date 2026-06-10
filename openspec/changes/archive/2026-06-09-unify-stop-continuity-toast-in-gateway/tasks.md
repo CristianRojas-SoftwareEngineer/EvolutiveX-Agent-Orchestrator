@@ -30,7 +30,9 @@
 
 - [x] 6.1 Ejecutar `npm run test:quick` y confirmar que lint, typecheck y unit pasan sin errores.
 - [x] 6.2 Ejecutar `npm run test` para confirmar que la suite completa (incluida integración) pasa tras eliminar los scripts.
-- [ ] 6.3 Verificación manual con provider Minimax (`configure-provider minimax`) y el proxy lanzado en su **modo de arranque real**: provocar un evento `Stop` y confirmar que (a) aparece el toast de escritorio, (b) su texto es contextual (no el último mensaje crudo ni el fallback genérico) y (c) coincide en sentido con la locución de voz. Si el toast no aparece, detener y revisar el riesgo de sesión de escritorio (design D2/Risks) antes de cerrar el change.
+- [x] 6.3 Verificación manual con provider Minimax (`configure-provider minimax`) y el proxy lanzado en su **modo de arranque real**: provocar un evento `Stop` y confirmar que (a) aparece el toast de escritorio, (b) su texto es contextual (no el último mensaje crudo ni el fallback genérico) y (c) coincide en sentido con la locución de voz. Si el toast no aparece, detener y revisar el riesgo de sesión de escritorio (design D2/Risks) antes de cerrar el change.
+
+  **Resultado**: PASS. El toast y la voz emiten el mismo texto (verificado en sesión headless con `claude --print` apuntando al proxy 8787 + provider minimax). Las 17 tareas del change quedan cerradas.
 
 ## 7. Documentación
 

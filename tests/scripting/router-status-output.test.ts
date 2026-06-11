@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
@@ -263,5 +263,138 @@ describe('buildStatuslineOutput', () => {
     const out = buildStatuslineOutput({}, settings, { sessionsRoot: emptySessionsRoot() });
     expect(out).toContain('Sesión actual');
     expect(out).not.toContain('Trabajo por niveles de razonamiento');
+  });
+
+  it('segunda invocación con mtime sin cambios produce output idéntico (cierre temprano)', () => {
+    const root = emptySessionsRoot();
+    const sessionId = 'early-exit-stable';
+    const sessionDir = join(root, sessionId);
+    mkdirSync(sessionDir, { recursive: true });
+    const metricsPath = join(sessionDir, 'session-metrics.json');
+    writeFileSync(
+      metricsPath,
+      JSON.stringify({
+        models: {
+          'p/m1-haiku': {
+            billable_hops: 1,
+            finalized_runs: 0,
+            input_tokens: 10,
+            output_tokens: 5,
+            cache_creation_input_tokens: 0,
+            cache_read_input_tokens: 0,
+          },
+        },
+        session_totals: {
+          billable_hops: 1,
+          finalized_runs: 0,
+          input_tokens: 10,
+          output_tokens: 5,
+          cache_creation_input_tokens: 0,
+          cache_read_input_tokens: 0,
+        },
+      }),
+      'utf-8',
+    );
+
+    const settings: ClaudeSettingsEnv = {
+      ANTHROPIC_DEFAULT_HAIKU_MODEL: 'm1-haiku',
+      ANTHROPIC_DEFAULT_SONNET_MODEL: 'm2-sonnet',
+      ANTHROPIC_DEFAULT_OPUS_MODEL: 'm3-opus',
+      SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS: 'on',
+    };
+
+    const ctx: ClaudeCodeContext = { session_id: sessionId };
+    const first = buildStatuslineOutput(ctx, settings, { sessionsRoot: root });
+    const second = buildStatuslineOutput(ctx, settings, { sessionsRoot: root });
+    expect(second).toBe(first);
+  });
+
+  it('re-renderiza cuando cambia el mtime de session-metrics.json', () => {
+    const root = emptySessionsRoot();
+    const sessionId = 'early-exit-mtime-change';
+    const sessionDir = join(root, sessionId);
+    mkdirSync(sessionDir, { recursive: true });
+    const metricsPath = join(sessionDir, 'session-metrics.json');
+    writeFileSync(
+      metricsPath,
+      JSON.stringify({
+        models: {
+          'p/m1-haiku': {
+            billable_hops: 1,
+            finalized_runs: 0,
+            input_tokens: 10,
+            output_tokens: 5,
+            cache_creation_input_tokens: 0,
+            cache_read_input_tokens: 0,
+          },
+        },
+        session_totals: {
+          billable_hops: 1,
+          finalized_runs: 0,
+          input_tokens: 10,
+          output_tokens: 5,
+          cache_creation_input_tokens: 0,
+          cache_read_input_tokens: 0,
+        },
+      }),
+      'utf-8',
+    );
+
+    const settings: ClaudeSettingsEnv = {
+      ANTHROPIC_DEFAULT_HAIKU_MODEL: 'm1-haiku',
+      ANTHROPIC_DEFAULT_SONNET_MODEL: 'm2-sonnet',
+      ANTHROPIC_DEFAULT_OPUS_MODEL: 'm3-opus',
+      SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS: 'on',
+    };
+
+    const ctx: ClaudeCodeContext = { session_id: sessionId };
+    const first = buildStatuslineOutput(ctx, settings, { sessionsRoot: root });
+
+    writeFileSync(
+      metricsPath,
+      JSON.stringify({
+        models: {
+          'p/m1-haiku': {
+            billable_hops: 9,
+            finalized_runs: 0,
+            input_tokens: 10,
+            output_tokens: 5,
+            cache_creation_input_tokens: 0,
+            cache_read_input_tokens: 0,
+          },
+        },
+        session_totals: {
+          billable_hops: 9,
+          finalized_runs: 0,
+          input_tokens: 10,
+          output_tokens: 5,
+          cache_creation_input_tokens: 0,
+          cache_read_input_tokens: 0,
+        },
+      }),
+      'utf-8',
+    );
+
+    const second = buildStatuslineOutput(ctx, settings, { sessionsRoot: root });
+    expect(second).not.toBe(first);
+    expect(second.split('Totales de sesión')[1] ?? '').toContain('9');
+  });
+
+  it('sin session-metrics.json persiste lastRenderedMtimeMs 0 y re-render con caché inválida', () => {
+    const root = emptySessionsRoot();
+    const sessionId = 'no-metrics-cache';
+    const sessionDir = join(root, sessionId);
+    mkdirSync(sessionDir, { recursive: true });
+    writeFileSync(join(sessionDir, '.statusline-state.json'), '{ invalid', 'utf-8');
+
+    const settings: ClaudeSettingsEnv = {
+      SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS: 'on',
+    };
+
+    buildStatuslineOutput({ session_id: sessionId }, settings, { sessionsRoot: root });
+    const cache = JSON.parse(
+      readFileSync(join(sessionDir, '.statusline-state.json'), 'utf-8'),
+    ) as { lastRenderedMtimeMs?: number };
+    expect(cache.lastRenderedMtimeMs).toBe(0);
   });
 });

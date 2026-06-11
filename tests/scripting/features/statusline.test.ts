@@ -3,10 +3,15 @@ import { rmSync } from 'node:fs';
 import {
   isSmartCodeStatusLine,
   buildStatusLineCommand,
+  buildStatusLineBlock,
   shouldOverwriteStatusLine,
   applyStatuslineInstall,
   applyStatuslineUninstall,
 } from '../../../scripting/features/statusline.js';
+import {
+  resolveRefreshInterval,
+  STATUSLINE_REFRESH_INTERVAL_KEY,
+} from '../../../scripting/shared/claude-settings.js';
 import { createValidProxyRootForStatusline } from '../helpers/proxy-root-fixture.js';
 import {
   SMART_CODE_PROXY_ROOT_KEY,
@@ -59,13 +64,26 @@ describe('shouldOverwriteStatusLine', () => {
   });
 });
 
+describe('buildStatusLineBlock', () => {
+  it('incluye refreshInterval cuando el valor no es null', () => {
+    const block = buildStatusLineBlock('cmd', 3);
+    expect(block.refreshInterval).toBe(3);
+  });
+
+  it('omite refreshInterval cuando el valor es null', () => {
+    const block = buildStatusLineBlock('cmd', null);
+    expect(block.refreshInterval).toBeUndefined();
+  });
+});
+
 describe('applyStatuslineInstall', () => {
   it('instala statusLine y env.SMART_CODE_PROXY_ROOT', () => {
     const root = createValidProxyRootForStatusline();
-    const result = applyStatuslineInstall({}, root, false);
+    const result = applyStatuslineInstall({}, root, false, 3);
     expect('error' in result).toBe(false);
     const settings = result as ClaudeSettings;
     expect(settings.statusLine?.type).toBe('command');
+    expect(settings.statusLine?.refreshInterval).toBe(3);
     expect(settings.env?.[SMART_CODE_PROXY_ROOT_KEY]).toBeTruthy();
     rmSync(root, { recursive: true, force: true });
   });
@@ -73,7 +91,7 @@ describe('applyStatuslineInstall', () => {
   it('retorna error si hay statusLine ajeno sin --force', () => {
     const root = createValidProxyRootForStatusline();
     const settings: ClaudeSettings = { statusLine: { command: 'echo other' } };
-    const result = applyStatuslineInstall(settings, root, false);
+    const result = applyStatuslineInstall(settings, root, false, 3);
     expect('error' in result).toBe(true);
     rmSync(root, { recursive: true, force: true });
   });
@@ -81,8 +99,44 @@ describe('applyStatuslineInstall', () => {
   it('instala con --force aunque haya ajeno', () => {
     const root = createValidProxyRootForStatusline();
     const settings: ClaudeSettings = { statusLine: { command: 'echo other' } };
-    const result = applyStatuslineInstall(settings, root, true);
+    const result = applyStatuslineInstall(settings, root, true, 3);
     expect('error' in result).toBe(false);
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('omite refreshInterval cuando resolveRefreshInterval retorna null (env vacío)', () => {
+    const root = createValidProxyRootForStatusline();
+    const interval = resolveRefreshInterval({ [STATUSLINE_REFRESH_INTERVAL_KEY]: '' });
+    const result = applyStatuslineInstall({}, root, false, interval);
+    const settings = result as ClaudeSettings;
+    expect(settings.statusLine?.refreshInterval).toBeUndefined();
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('omite refreshInterval cuando resolveRefreshInterval retorna null (env "0")', () => {
+    const root = createValidProxyRootForStatusline();
+    const interval = resolveRefreshInterval({ [STATUSLINE_REFRESH_INTERVAL_KEY]: '0' });
+    const result = applyStatuslineInstall({}, root, false, interval);
+    const settings = result as ClaudeSettings;
+    expect(settings.statusLine?.refreshInterval).toBeUndefined();
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('usa refreshInterval 2 cuando la env var es "2"', () => {
+    const root = createValidProxyRootForStatusline();
+    const interval = resolveRefreshInterval({ [STATUSLINE_REFRESH_INTERVAL_KEY]: '2' });
+    const result = applyStatuslineInstall({}, root, false, interval);
+    const settings = result as ClaudeSettings;
+    expect(settings.statusLine?.refreshInterval).toBe(2);
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('usa refreshInterval 3 por defecto tolerante cuando la env var no es numérica', () => {
+    const root = createValidProxyRootForStatusline();
+    const interval = resolveRefreshInterval({ [STATUSLINE_REFRESH_INTERVAL_KEY]: 'off' });
+    const result = applyStatuslineInstall({}, root, false, interval);
+    const settings = result as ClaudeSettings;
+    expect(settings.statusLine?.refreshInterval).toBe(3);
     rmSync(root, { recursive: true, force: true });
   });
 });

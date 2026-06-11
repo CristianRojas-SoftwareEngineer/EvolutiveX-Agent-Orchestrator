@@ -36,6 +36,12 @@ export const SMART_CODE_PROXY_ROOT_KEY = 'SMART_CODE_PROXY_ROOT';
 export const STATUSLINE_ROUTER_DETAILS_KEY = 'SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS';
 
 /**
+ * Clave de entorno que controla `statusLine.refreshInterval` en el instalador (segundos, mínimo 1).
+ * `0` o string vacío omiten el campo; ausente → default `3`; valor no numérico → default `3` con warning.
+ */
+export const STATUSLINE_REFRESH_INTERVAL_KEY = 'SMART_CODE_PROXY__STATUSLINE_REFRESH_INTERVAL';
+
+/**
  * Subconjunto tipado de `settings.json` que manipulan los scripts de este repo.
  * Otras claves de primer nivel (p. ej. permisos) se conservan al reescribir el objeto completo
  * solo si el caller hace spread del objeto leído antes de mutar.
@@ -48,6 +54,8 @@ export interface ClaudeSettings {
     type?: string;
     command?: string;
     padding?: number;
+    /** Re-ejecución periódica del comando (segundos, mínimo 1 según API de Claude Code). */
+    refreshInterval?: number;
   };
   [key: string]: unknown;
 }
@@ -87,6 +95,23 @@ export function readClaudeSettings(): ClaudeSettings {
  * del override de test) si no existe. Formato: JSON con indentación de 2 espacios y salto
  * de línea final, coherente con la escritura histórica del proyecto.
  */
+/**
+ * Resuelve `statusLine.refreshInterval` para el instalador desde variables de entorno.
+ * Retorna `null` para omitir el campo (solo triggers por evento en Claude Code).
+ */
+export function resolveRefreshInterval(env: NodeJS.ProcessEnv): number | null {
+  const raw = env[STATUSLINE_REFRESH_INTERVAL_KEY];
+  if (raw === undefined) return 3;
+  if (raw === '') return null;
+  const parsed = Number(raw);
+  if (parsed === 0) return null;
+  if (Number.isInteger(parsed) && parsed >= 1) return parsed;
+  process.stderr.write(
+    `[smart-code-proxy] Valor no numérico en ${STATUSLINE_REFRESH_INTERVAL_KEY}="${raw}"; usando refreshInterval por defecto (3s).\n`,
+  );
+  return 3;
+}
+
 export function writeClaudeSettings(settings: ClaudeSettings): void {
   const path = effectiveSettingsPath();
   const dir = dirname(path);

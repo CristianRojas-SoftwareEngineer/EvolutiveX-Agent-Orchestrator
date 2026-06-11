@@ -9,13 +9,14 @@
  * Lee stdin como JSON con el contexto de Claude Code ($ctx).
  */
 
-import { readFileSync, readdirSync, existsSync, writeFileSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync, writeFileSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   readClaudeSettings,
   SMART_CODE_PROXY_ROOT_KEY,
   STATUSLINE_ROUTER_DETAILS_KEY,
+  type ClaudeSettings,
 } from './shared/claude-settings.js';
 
 // ── Tipos ───────────────────────────────────────────────────────
@@ -455,6 +456,38 @@ interface MetricsSnapshot {
 interface StatuslineCache {
   contextUsagePercentage?: number;
   metricsSnapshot?: MetricsSnapshot;
+  lastRenderedMtimeMs?: number;
+  lastRenderedMetricsSize?: number;
+  lastRenderedTable2Output?: string;
+}
+
+/** Lee `refreshInterval` de settings (no de env). Retorna `null` si ausente o inválido. */
+export function readRefreshIntervalFromSettings(settings: ClaudeSettings): number | null {
+  const value = settings.statusLine?.refreshInterval;
+  if (value === undefined || value === null) return null;
+  if (!Number.isInteger(value) || value < 1) return null;
+  return value;
+}
+
+function readSessionMetricsMtime(sessionPath: string): { mtimeMs: number; size: number } | null {
+  const metricsFile = join(sessionPath, 'session-metrics.json');
+  if (!existsSync(metricsFile)) return null;
+  const stat = statSync(metricsFile);
+  return { mtimeMs: stat.mtimeMs, size: stat.size };
+}
+
+function canUseTable2EarlyExit(
+  cache: StatuslineCache,
+  mtimeInfo: { mtimeMs: number; size: number } | null,
+): boolean {
+  if (!cache.lastRenderedTable2Output) return false;
+  if (mtimeInfo === null) {
+    return cache.lastRenderedMtimeMs === 0;
+  }
+  return (
+    cache.lastRenderedMtimeMs === mtimeInfo.mtimeMs &&
+    cache.lastRenderedMetricsSize === mtimeInfo.size
+  );
 }
 
 function readStatuslineCache(sessionPath: string): StatuslineCache {
@@ -870,6 +903,7 @@ function renderTokenTable(
   metrics: AggregatedSessionMetrics,
   previous: MetricsSnapshot | null,
   targetWidth?: number,
+  liveIndicator: { seconds: number } | null = null,
 ): { lines: string[]; width: number } {
   // Función local para alinear a la derecha
   function alignRight(text: string, width: number): string {
@@ -1080,10 +1114,16 @@ function renderTokenTable(
   const botLine = `${C.border}${B.bl}${botParts.join(B.mb)}${B.br}${C.reset}`;
 
   // Calcular padding para que el título tenga el mismo ancho que la tabla
-  const titleText = '╭─ Trabajo por niveles de razonamiento ';
-  const titleVisLen = visibleLength(titleText);
-  const titlePad = Math.max(0, width - titleVisLen - 1); // -1 para ╮ (╭ ya está en titleVisLen)
-  const title = `${C.title}${titleText}${'─'.repeat(titlePad)}╮${C.reset}`;
+  const titlePrefix = '╭─ Trabajo por niveles de razonamiento ';
+  const liveSuffix = liveIndicator
+    ? ` ${C.dim}● live (${liveIndicator.seconds}s)${C.reset}`
+    : '';
+  const liveVisLen = liveIndicator ? visibleLength(`● live (${liveIndicator.seconds}s)`) : 0;
+  const titleVisLen = visibleLength(titlePrefix) + liveVisLen + (liveIndicator ? 1 : 0);
+  const titlePad = Math.max(0, width - titleVisLen - 1); // -1 para ╮
+  const title = liveIndicator
+    ? `${C.title}${titlePrefix}${'─'.repeat(titlePad)}${liveSuffix}╮${C.reset}`
+    : `${C.title}${titlePrefix}${'─'.repeat(titlePad)}╮${C.reset}`;
 
   // Eliminar el borde inferior generado por renderTable
   const tableLines = table.split('\n');
@@ -1190,48 +1230,63 @@ export function buildStatuslineOutput(
     settingsEnv[STATUSLINE_ROUTER_DETAILS_KEY]?.trim().toLowerCase() === 'on';
 
   if (showRouterDetails) {
-    let table2: { lines: string[]; width: number };
+    const claudeSettings = readClaudeSettings();
+    const refreshSec = readRefreshIntervalFromSettings(claudeSettings);
+    const liveIndicator = refreshSec !== null ? { seconds: refreshSec } : null;
+
     if (sessionPath) {
-      const metrics = aggregateSessionMetrics(sessionPath, settingsEnv, paths.routingPath);
       const cache = readStatuslineCache(sessionPath);
-      const previous = cache.metricsSnapshot || null;
-      table2 = renderTokenTable(metrics, previous, targetWidth);
-      writeStatuslineCache(sessionPath, {
-        metricsSnapshot: {
-          lite: {
-            billableHops: metrics.lite.billableHops,
-            finalizedRuns: metrics.lite.finalizedRuns,
-            inputTokens: metrics.lite.inputTokens,
-            cacheCreationInputTokens: metrics.lite.cacheCreationInputTokens,
-            cacheReadInputTokens: metrics.lite.cacheReadInputTokens,
-            outputTokens: metrics.lite.outputTokens,
+      const mtimeInfo = readSessionMetricsMtime(sessionPath);
+
+      if (canUseTable2EarlyExit(cache, mtimeInfo)) {
+        output.push(cache.lastRenderedTable2Output!.replace(/\n$/, ''));
+      } else {
+        const metrics = aggregateSessionMetrics(sessionPath, settingsEnv, paths.routingPath);
+        const previous = cache.metricsSnapshot || null;
+        const table2 = renderTokenTable(metrics, previous, targetWidth, liveIndicator);
+        const table2Text = table2.lines.join('\n') + '\n';
+        writeStatuslineCache(sessionPath, {
+          metricsSnapshot: {
+            lite: {
+              billableHops: metrics.lite.billableHops,
+              finalizedRuns: metrics.lite.finalizedRuns,
+              inputTokens: metrics.lite.inputTokens,
+              cacheCreationInputTokens: metrics.lite.cacheCreationInputTokens,
+              cacheReadInputTokens: metrics.lite.cacheReadInputTokens,
+              outputTokens: metrics.lite.outputTokens,
+            },
+            standard: {
+              billableHops: metrics.standard.billableHops,
+              finalizedRuns: metrics.standard.finalizedRuns,
+              inputTokens: metrics.standard.inputTokens,
+              cacheCreationInputTokens: metrics.standard.cacheCreationInputTokens,
+              cacheReadInputTokens: metrics.standard.cacheReadInputTokens,
+              outputTokens: metrics.standard.outputTokens,
+            },
+            reasoning: {
+              billableHops: metrics.reasoning.billableHops,
+              finalizedRuns: metrics.reasoning.finalizedRuns,
+              inputTokens: metrics.reasoning.inputTokens,
+              cacheCreationInputTokens: metrics.reasoning.cacheCreationInputTokens,
+              cacheReadInputTokens: metrics.reasoning.cacheReadInputTokens,
+              outputTokens: metrics.reasoning.outputTokens,
+            },
           },
-          standard: {
-            billableHops: metrics.standard.billableHops,
-            finalizedRuns: metrics.standard.finalizedRuns,
-            inputTokens: metrics.standard.inputTokens,
-            cacheCreationInputTokens: metrics.standard.cacheCreationInputTokens,
-            cacheReadInputTokens: metrics.standard.cacheReadInputTokens,
-            outputTokens: metrics.standard.outputTokens,
-          },
-          reasoning: {
-            billableHops: metrics.reasoning.billableHops,
-            finalizedRuns: metrics.reasoning.finalizedRuns,
-            inputTokens: metrics.reasoning.inputTokens,
-            cacheCreationInputTokens: metrics.reasoning.cacheCreationInputTokens,
-            cacheReadInputTokens: metrics.reasoning.cacheReadInputTokens,
-            outputTokens: metrics.reasoning.outputTokens,
-          },
-        },
-      });
+          lastRenderedMtimeMs: mtimeInfo?.mtimeMs ?? 0,
+          lastRenderedMetricsSize: mtimeInfo?.size ?? 0,
+          lastRenderedTable2Output: table2Text,
+        });
+        output.push(table2.lines.join('\n'));
+      }
     } else {
-      table2 = renderTokenTable(
+      const table2 = renderTokenTable(
         { ...createEmptyMetrics(settingsEnv, paths.routingPath), sessionTotals: emptySessionTotals() },
         null,
         targetWidth,
+        liveIndicator,
       );
+      output.push(table2.lines.join('\n'));
     }
-    output.push(table2.lines.join('\n'));
   }
 
   return output.join('\n');

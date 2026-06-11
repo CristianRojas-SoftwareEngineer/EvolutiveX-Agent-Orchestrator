@@ -216,7 +216,7 @@ Los pendientes viven en `IToolUse` del workflow padre, no en `ActiveInteraction`
 
 ## 5. Tipos de interacción (semántica → workflow)
 
-El turno de usuario es un workflow con **`interactionType: agentic`** (`workflows/NN/`, `NN` base 1). Se abre en `UserPromptSubmit` (hook) o lazy-open en el primer hop HTTP, y cierra en hook `Stop` / `StopFailure` con `IWorkflowResult` (`finalText` desde el hook).
+El turno de usuario es un workflow con **`interactionType: agentic`** (`workflows/NN/`, `NN` base 1). Lo abre exclusivamente `ensureTurnWorkflow` al llegar el primer hop HTTP del turno (el hook `UserPromptSubmit` no crea workflows), y cierra en hook `Stop` / `StopFailure` con `IWorkflowResult` (`finalText` desde el hook).
 
 | Campo              | Valores activos       | Notas                                                      |
 | ------------------ | --------------------- | ---------------------------------------------------------- |
@@ -242,8 +242,8 @@ El turno de usuario es un workflow con **`interactionType: agentic`** (`workflow
 
 ### 5.2 Invariantes del turno
 
-- Como máximo **un** workflow de turno `running` por `sessionId` con `id === sessionId`.
-- **Lazy open:** si el primer hop HTTP (`side-request` o `fresh`) llega antes de `UserPromptSubmit`, se abre el turno implícito y el hop se registra como step.
+- Como máximo **un** workflow de turno `running` por `sessionId`. El primer turno usa `id === sessionId`; los turnos posteriores usan `id === ${sessionId}-turn-${layoutIndex}` (los workflows cerrados permanecen en el repo pero no se reutilizan: lookups y reuse filtran por `result == null`).
+- El workflow de turno se abre siempre desde el primer hop HTTP (`ensureTurnWorkflow`); el hook `UserPromptSubmit` solo dispara notificaciones (toast/voz).
 - Mutaciones HTTP del turno se serializan con `withSessionLock(sessionId)` en `AuditWorkflowHandler` (evita cross-wiring cuando `side-request` y `agentic` arrancan en paralelo).
 
 ---

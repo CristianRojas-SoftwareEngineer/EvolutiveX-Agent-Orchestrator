@@ -612,13 +612,11 @@ export function classifyModelWithEnv(
   if (opus && modelId.includes(opus)) return 'reasoning';
   if (sonnet && modelId.includes(sonnet)) return 'standard';
 
-  // Fallback heurístico cuando vars no están configuradas (ej. provider default / OAuth nativo).
-  // Solo se activa si las tres están ausentes; si alguna tiene valor, se respeta la configuración explícita.
-  if (!haiku && !opus && !sonnet) {
-    if (modelId.includes('haiku')) return 'lite';
-    if (modelId.includes('opus')) return 'reasoning';
-    if (modelId.includes('sonnet')) return 'standard';
-  }
+  // Fallback heurístico por nivel: cada nivel sin variable configurada clasifica
+  // por keyword, aunque otros niveles sí tengan variable (configuración parcial).
+  if (!haiku && modelId.includes('haiku')) return 'lite';
+  if (!opus && modelId.includes('opus')) return 'reasoning';
+  if (!sonnet && modelId.includes('sonnet')) return 'standard';
 
   return null;
 }
@@ -710,10 +708,14 @@ export function aggregateSessionMetrics(
       levelMetrics.outputTokens += coerceMetricNumber(entry.output_tokens);
     }
 
+    // El total de runs se deriva de la suma de los niveles renderizados para que la
+    // fila de totales de la tabla sea internamente consistente con las filas por nivel.
+    sessionTotals.finalizedRuns =
+      metrics.lite.finalizedRuns + metrics.standard.finalizedRuns + metrics.reasoning.finalizedRuns;
+
     const totals = data.session_totals;
     if (totals) {
       sessionTotals.billableHops = coerceMetricNumber(totals.billable_hops);
-      sessionTotals.finalizedRuns = coerceMetricNumber(totals.finalized_runs);
       sessionTotals.inputTokens = coerceMetricNumber(totals.input_tokens);
       sessionTotals.cacheCreationInputTokens = coerceMetricNumber(
         totals.cache_creation_input_tokens,

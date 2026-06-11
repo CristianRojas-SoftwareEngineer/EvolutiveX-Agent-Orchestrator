@@ -104,8 +104,13 @@ export class WorkflowRepositoryService implements IWorkflowRepository {
     options: OpenWorkflowOptions = {},
   ): IWorkflow {
     if (!options.forceNew) {
-      const existing = this.workflows.get(sessionId);
-      if (existing) return existing;
+      // Reutilizar solo workflows main abiertos: los turnos posteriores usan claves
+      // `-turn-N`, por lo que el lookup directo por sessionId no basta.
+      const direct = this.workflows.get(sessionId);
+      if (direct && direct.result == null) return direct;
+      for (const wf of this.workflows.values()) {
+        if (wf.sessionId === sessionId && wf.kind === 'main' && wf.result == null) return wf;
+      }
     }
 
     const layoutIndex =
@@ -116,7 +121,13 @@ export class WorkflowRepositoryService implements IWorkflowRepository {
         return next;
       })();
 
-    const workflowId = options.forceNew ? `${sessionId}-wire-${layoutIndex}` : sessionId;
+    // Primer turno conserva `sessionId` como id; turnos posteriores usan sufijo `-turn-N`
+    // para no colisionar con el workflow cerrado del turno anterior.
+    const workflowId = options.forceNew
+      ? `${sessionId}-wire-${layoutIndex}`
+      : layoutIndex > 1
+        ? `${sessionId}-turn-${layoutIndex}`
+        : sessionId;
     const workflow = new Workflow({
       id: workflowId,
       sessionId,
@@ -357,9 +368,9 @@ export class WorkflowRepositoryService implements IWorkflowRepository {
 
   public getWorkflowBySessionId(sessionId: string): IWorkflow | undefined {
     const direct = this.workflows.get(sessionId);
-    if (direct && direct.kind === 'main') return direct;
+    if (direct && direct.kind === 'main' && direct.result == null) return direct;
     for (const wf of this.workflows.values()) {
-      if (wf.kind === 'main' && wf.sessionId === sessionId) return wf;
+      if (wf.kind === 'main' && wf.sessionId === sessionId && wf.result == null) return wf;
     }
     return undefined;
   }

@@ -366,7 +366,7 @@ Un **Step** no es solo una llamada HTTP aislada: incluye la fase de tools observ
 
 | Evento             | Acción                                                                          |
 | ------------------ | ------------------------------------------------------------------------------- |
-| `UserPromptSubmit` | Abre `Workflow` con `kind: 'main'`                                              |
+| `UserPromptSubmit` | Notificaciones (toast/voz); el main lo abre `ensureTurnWorkflow` en el primer hop HTTP |
 | `SubagentStart`    | Abre `Workflow` con `kind: 'subagent'`                                          |
 | `Stop`             | Cierra main si `stop_hook_active === false` y sin `background_tasks` pendientes |
 | `SubagentStop`     | Cierra sub-workflow                                                             |
@@ -1031,7 +1031,7 @@ sequenceDiagram
 | Concern                          | Autoridad primaria                                                           | Fallback / complemento                                                                                                         |
 | -------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
 | **Sesión**                       | Header HTTP `x-cc-audit-session` + reconciliar `session_id` en payload hook. | Si hook llega antes de primer POST: crear sesión desde hook.                                                                   |
-| **Abrir workflow main**          | Wire request `fresh` (abre en disco).                                        | Hook `UserPromptSubmit` alinea/confirma workflow main en repo.                                                                 |
+| **Abrir workflow main**          | Wire request `fresh` (abre en disco vía `ensureTurnWorkflow`; creador único). | Hook `UserPromptSubmit` no participa en la apertura (solo notificaciones).                                                     |
 | **Abrir workflow subagente**     | Plano A: cabeceras `agent-id` + `parent-agent-id` en POST `fresh`.           | Legacy: `findInteractionWithPendingAgents` + prompt si CC < 2.1.139. Hook `SubagentStart` confirma y enlaza `childWorkflowId`. |
 | **Enlazar `tool_use_id` ↔ hijo** | Plano B: SSE `registerPendingTool` + `joinToolUseToSubagent`.                | Hook `PreToolUse`/`PostToolUse` enriquecen `ToolUse.status` y timing.                                                          |
 | **Cerrar workflow**              | **Plano C**: hook `Stop` / `SubagentStop` (autoritativo).                    | Wire `stop_reason` como cierre **transitorio** solo si hook no llega (ventana documentada).                                    |
@@ -1110,7 +1110,7 @@ El registro de tools pending en SSE:
 | -------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
 | `SessionStart`       | Crear/reconciliar metadata de sesión (`externalSessionId`).                                                                  |
 | `SessionEnd`         | Marcar sesión inactiva.                                                                                                      |
-| `UserPromptSubmit`   | Abrir o alinear workflow `kind: main` en repo. Si wire ya abrió la interacción, enlazar.                                     |
+| `UserPromptSubmit`   | Notificaciones (toast con preview del prompt, locución). No crea ni alinea workflows.                                        |
 | `SubagentStart`      | `confirmSubagentFromHook(agentId, toolUseId?)` — confirma sub-workflow; enlaza `ToolUse.childWorkflowId` si join ya ocurrió. |
 | `PreToolUse`         | `ToolUse.status = 'running'`; registrar `startedAt`.                                                                         |
 | `PostToolUse`        | Completar `ToolUse`; si `name === 'Agent'`, enriquecer metadata del enlace hijo.                                             |
@@ -1449,7 +1449,7 @@ stateDiagram-v2
 | --- | ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | POST subagent (headers) → `SubagentStart` → steps → `SubagentStop` | Caso nominal: wire abre `sub-agent/workflow/`, hook confirma y cierra.                                                                                   |
 | 2   | `SubagentStart` → POST subagent (headers)                          | Crear workflow `status: pending` indexado por `agent_id`; al llegar POST, reconciliar con carpeta en disco.                                              |
-| 3   | Main: wire `fresh` → `UserPromptSubmit`                            | Wire abre interacción; hook alinea workflow main en repo (idempotente).                                                                                  |
+| 3   | Main: wire `fresh` → `UserPromptSubmit`                            | Wire abre interacción (`ensureTurnWorkflow`); el hook no toca el repo (solo notificaciones).                                                             |
 | 4   | Wire cierra por `stop_reason` → hook `Stop` llega después          | Hook **gana**: reescribir `output/result.json` con `finalText` del orquestador; `closedByEvent: 'Stop'`; actualizar `meta.json` con `status: completed`. |
 | 5   | Hook `Stop` llega → wire `stop_reason` en request posterior        | Hook ya cerró; wire posterior se ignora para cierre (workflow ya inmutable).                                                                             |
 | 6   | CC < 2.1.139: sin cabeceras ni hooks configurados                  | Fallback completo a heurística (pending+prompt + cierre por wire).                                                                                       |

@@ -54,7 +54,7 @@ Cada clave en `models` es el `modelId` (`step.inferenceRequest.model`). Los nomb
 | Método | Cuándo | Qué actualiza |
 |--------|--------|---------------|
 | `updateFromStep(sessionDir, step)` | Tras hop agéntico contable (main o subagent; stop terminal + `usage`) | `billable_hops`, tokens, `cache_efficiency`, `session_totals.billable_hops`; **no** `finalized_runs` |
-| `finalizeWorkflowMetrics(sessionDir, workflowId, closedSteps)` | Hook `Stop` / `StopFailure` / `SubagentStop` en workflow agéntico (G16′) | `finalized_runs` (+1 al modelo atribuido); `billable_hops`/tokens solo para steps no volcados per-step |
+| `finalizeWorkflowMetrics(sessionDir, workflowId, closedSteps)` | Hook `Stop` / `StopFailure` / `SubagentStop` en workflow agéntico (G16′) | `finalized_runs` (+1 al modelo atribuido); `billable_hops`/tokens solo para steps no volcados per-step. Registra el `workflowId` en `finalized_workflow_ids` **incondicionalmente** (incluso sin usage o sin modelo atribuido), garantizando idempotencia entre sus tres callers |
 
 **Invariante G16′:** escriben métricas los workflows `kind: 'main'` y `kind: 'subagent'`. Preflights y side-requests standalone no cierran ejecución agéntica (aunque un side-request con `usage` sí suma en `billable_hops` vía `updateFromStep`).
 
@@ -68,7 +68,7 @@ Cada clave en `models` es el `modelId` (`step.inferenceRequest.model`). Los nomb
 
 #### Lectura en el statusline (`scripting/router-status.ts`)
 
-`aggregateSessionMetrics` lee **solo** el schema canónico (`billable_hops`, `finalized_runs`, tokens en snake_case). La fila **Totales** toma `# Workflows` y `# Steps` desde `session_totals`, no desde la suma de columnas por nivel.
+`aggregateSessionMetrics` lee **solo** el schema canónico (`billable_hops`, `finalized_runs`, tokens en snake_case). La fila **Totales** toma `# Steps` y tokens desde `session_totals`; `# Workflows` se deriva de la **suma de los niveles renderizados** (lite + standard + reasoning) para que la tabla sea internamente consistente (en `session_totals.finalized_runs` cuentan también workflows sin modelo atribuido, que no tienen fila por nivel).
 
 #### Mapeo Tabla 2
 
@@ -79,7 +79,7 @@ Por fila (Lite / Standard / Reasoning):
 
 Fila Totales:
   # Steps     ← session_totals.billable_hops
-  # Workflows ← session_totals.finalized_runs
+  # Workflows ← Σ finalized_runs de los niveles lite/standard/reasoning
 ```
 
 #### Semántica de los totales

@@ -138,7 +138,7 @@ El statusline refleja el cambio en el siguiente refresh (no requiere reiniciar C
 | Caché Read (tks)  | suma de `cache_read_input_tokens` para el nivel                                                                                                                     | `session-metrics.json → models[modelId].cache_read_input_tokens`     | derecha    |
 | Output (tks)      | suma de `output_tokens` para el nivel                                                                                                                               | `session-metrics.json → models[modelId].output_tokens`               | derecha    |
 
-**Fila de totales:** celdas fusionadas en columnas 0+1 (texto `"Totales de sesión"`). `# Workflows` y `# Steps` provienen de `session_totals.finalized_runs` y `session_totals.billable_hops`; tokens desde `session_totals.*`. Los separadores horizontales usan `┴` en la posición de la columna fusionada.
+**Fila de totales:** celdas fusionadas en columnas 0+1 (texto `"Totales de sesión"`). `# Workflows` es la **suma de los niveles renderizados** (consistencia interna de la tabla); `# Steps` proviene de `session_totals.billable_hops` y tokens desde `session_totals.*`. Los separadores horizontales usan `┴` en la posición de la columna fusionada.
 
 > **Semántica:** las columnas Input / Cache In / Output reflejan consumo acumulado de la sesión (tokens facturados), no el tamaño del contexto en un único request. Ver [`session-metrics-system.md`](./session-metrics-system.md).
 
@@ -284,7 +284,7 @@ classifyModelWithEnv(modelId, settingsEnv):
 
 Orden de evaluación: haiku → opus → sonnet. Si `modelId` no coincide con ninguno de los tres modelos configurados, el registro no se suma a ningún nivel.
 
-**Fallback heurístico (vars ausentes):** si las tres variables `ANTHROPIC_DEFAULT_*_MODEL` están vacías o ausentes (situación típica con `configure-provider default` / OAuth nativo), la clasificación usa los términos `"haiku"` → Lite, `"opus"` → Reasoning, `"sonnet"` → Standard como substrings del `modelId`. El fallback no se activa si al menos una variable está configurada; en ese caso solo aplica el modo primario.
+**Fallback heurístico por nivel:** para cada nivel cuya variable `ANTHROPIC_DEFAULT_*_MODEL` esté vacía o ausente (situación típica con `configure-provider default` / OAuth nativo), la clasificación usa el término correspondiente como substring del `modelId`: `"haiku"` → Lite, `"opus"` → Reasoning, `"sonnet"` → Standard. El fallback opera por nivel: con configuración parcial, los niveles configurados clasifican por match de variable y los no configurados por keyword.
 
 ---
 

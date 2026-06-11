@@ -76,14 +76,8 @@ export class AuditHookEventHandler {
         break;
 
       case 'UserPromptSubmit': {
-        this.workflowRepo.openWorkflow(
-          event.sessionId,
-          {
-            agentId: event.agentId,
-            isSubagentRequest: false,
-          },
-          { workflowKind: 'agentic' },
-        );
+        // El workflow del turno lo crea exclusivamente `ensureTurnWorkflow` al llegar
+        // la request HTTP real; crear aquí produciría workflows sin request body.
         // Locución asíncrona como asistente de voz
         void this.speakAsync(event, 'prompt');
         // Toast con preview del prompt (mismo texto que el script relay)

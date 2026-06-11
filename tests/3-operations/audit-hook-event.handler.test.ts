@@ -187,7 +187,7 @@ describe('AuditHookEventHandler', () => {
     expect(sessionMetrics.finalizeWorkflowMetrics).toHaveBeenCalled();
   });
 
-  it('UserPromptSubmit → openWorkflow invocado con sessionId', () => {
+  it('UserPromptSubmit → NO crea workflow (lo crea ensureTurnWorkflow con la request real)', () => {
     const openWorkflow = vi.fn();
     const repo = makeRepo({ openWorkflow });
     const handler = makeHandler(repo);
@@ -198,11 +198,7 @@ describe('AuditHookEventHandler', () => {
       agentId: 'agent-root',
     });
 
-    expect(openWorkflow).toHaveBeenCalledWith(
-      'session-1',
-      expect.objectContaining({ isSubagentRequest: false }),
-      { workflowKind: 'agentic' },
-    );
+    expect(openWorkflow).not.toHaveBeenCalled();
   });
 
   it('PostToolUse con autoridad hook → completeToolUse con isError false', () => {

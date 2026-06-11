@@ -188,6 +188,63 @@ describe('SessionMetricsService', () => {
     const data = JSON.parse(raw);
     expect(data.models['m-lite'].billable_hops).toBe(1);
     expect(data.models['m-lite'].finalized_runs).toBe(0);
-    expect(data.session_totals.finalized_runs).toBe(0);
+    // El cierre del workflow se cuenta en totales aunque no haya modelo atribuido.
+    expect(data.session_totals.finalized_runs).toBe(1);
+  });
+
+  it('finalizeWorkflowMetrics es idempotente con steps sin usage', async () => {
+    const step = makeStep('s1', 'm1', undefined);
+    await service.finalizeWorkflowMetrics(tmpDir, 'w1', [step]);
+    await service.finalizeWorkflowMetrics(tmpDir, 'w1', [step]);
+
+    const rawApplied = await fs.readFile(
+      path.join(tmpDir, 'session-metrics-applied.json'),
+      'utf8',
+    );
+    const applied = JSON.parse(rawApplied);
+    expect(applied.finalized_workflow_ids).toEqual(['w1']);
+
+    const raw = await fs.readFile(path.join(tmpDir, 'session-metrics.json'), 'utf8');
+    const data = JSON.parse(raw);
+    expect(data.session_totals.finalized_runs).toBe(1);
+  });
+
+  it('finalizeWorkflowMetrics es idempotente con usage pero sin modelo atribuible', async () => {
+    const sideStep = makeStep(
+      's-side',
+      'm-lite',
+      { input_tokens: 5, output_tokens: 1 },
+      'w1',
+      'side-request',
+      1,
+    );
+    await service.finalizeWorkflowMetrics(tmpDir, 'w1', [sideStep]);
+    await service.finalizeWorkflowMetrics(tmpDir, 'w1', [sideStep]);
+
+    const rawApplied = await fs.readFile(
+      path.join(tmpDir, 'session-metrics-applied.json'),
+      'utf8',
+    );
+    const applied = JSON.parse(rawApplied);
+    expect(applied.finalized_workflow_ids).toEqual(['w1']);
+
+    const raw = await fs.readFile(path.join(tmpDir, 'session-metrics.json'), 'utf8');
+    const data = JSON.parse(raw);
+    expect(data.models['m-lite'].billable_hops).toBe(1);
+    expect(data.session_totals.finalized_runs).toBe(1);
+  });
+
+  it('dos workflows distintos suman finalized_runs en totales y por modelo', async () => {
+    await service.finalizeWorkflowMetrics(tmpDir, 'w1', [
+      makeStep('s1', 'm1', { input_tokens: 10, output_tokens: 5 }, 'w1'),
+    ]);
+    await service.finalizeWorkflowMetrics(tmpDir, 'w2', [
+      makeStep('s2', 'm1', { input_tokens: 20, output_tokens: 10 }, 'w2'),
+    ]);
+
+    const raw = await fs.readFile(path.join(tmpDir, 'session-metrics.json'), 'utf8');
+    const data = JSON.parse(raw);
+    expect(data.session_totals.finalized_runs).toBe(2);
+    expect(data.models.m1.finalized_runs).toBe(2);
   });
 });

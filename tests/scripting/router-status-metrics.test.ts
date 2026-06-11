@@ -208,7 +208,7 @@ describe('aggregateSessionMetrics', () => {
     expect(m.lite.billableHops).toBe(0);
   });
 
-  it('lee finalized_runs por nivel y session_totals.finalized_runs para totales', () => {
+  it('deriva el total de finalized_runs de la suma de niveles, no de session_totals', () => {
     const dir = sessionDir();
     writeFileSync(
       join(dir, 'session-metrics.json'),
@@ -238,7 +238,9 @@ describe('aggregateSessionMetrics', () => {
     );
     const m = aggregateSessionMetrics(dir, configuredEnv, routingPath);
     expect(m.standard.finalizedRuns).toBe(2);
-    expect(m.sessionTotals.finalizedRuns).toBe(1);
+    // session_totals.finalized_runs (1) difiere de la suma por nivel (2):
+    // gana la suma de niveles para que la tabla sea internamente consistente.
+    expect(m.sessionTotals.finalizedRuns).toBe(2);
   });
 
   it('fallback heurístico: clasifica modelos estándar de Anthropic cuando vars están ausentes', () => {

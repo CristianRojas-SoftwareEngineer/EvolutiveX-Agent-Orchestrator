@@ -161,6 +161,54 @@ describe('WorkflowRepositoryService — lifecycle: apertura', () => {
   });
 });
 
+// ── Lifecycle — ciclo de vida multi-turno ─────────────────────────────────────
+
+describe('WorkflowRepositoryService — ciclo de vida multi-turno', () => {
+  it('tras cerrar el turno 1, openWorkflow crea un workflow nuevo con id -turn-2', () => {
+    const repo = new WorkflowRepositoryService();
+    const w1 = repo.openWorkflow(
+      'session-1',
+      { agentId: 'a', isSubagentRequest: false },
+      { layoutIndex: 1 },
+    );
+    expect(w1.id).toBe('session-1');
+    repo.close(w1.id, makeStopHook());
+
+    const w2 = repo.openWorkflow(
+      'session-1',
+      { agentId: 'a', isSubagentRequest: false },
+      { layoutIndex: 2 },
+    );
+    expect(w2).not.toBe(w1);
+    expect(w2.id).toBe('session-1-turn-2');
+    expect(w2.sessionId).toBe('session-1');
+    expect(w2.status).toBe('running');
+  });
+
+  it('getWorkflowBySessionId devuelve undefined cuando el workflow está cerrado', () => {
+    const repo = new WorkflowRepositoryService();
+    const w1 = repo.openWorkflow('session-1', { agentId: 'a', isSubagentRequest: false });
+    repo.close(w1.id, makeStopHook());
+    expect(repo.getWorkflowBySessionId('session-1')).toBeUndefined();
+  });
+
+  it('getWorkflowBySessionId devuelve el workflow abierto del turno 2', () => {
+    const repo = new WorkflowRepositoryService();
+    const w1 = repo.openWorkflow(
+      'session-1',
+      { agentId: 'a', isSubagentRequest: false },
+      { layoutIndex: 1 },
+    );
+    repo.close(w1.id, makeStopHook());
+    const w2 = repo.openWorkflow(
+      'session-1',
+      { agentId: 'a', isSubagentRequest: false },
+      { layoutIndex: 2 },
+    );
+    expect(repo.getWorkflowBySessionId('session-1')).toBe(w2);
+  });
+});
+
 // ── Lifecycle — readyToClose ──────────────────────────────────────────────────
 
 describe('WorkflowRepositoryService — lifecycle: readyToClose', () => {

@@ -198,38 +198,38 @@ export class SessionMetricsService {
       const applied = await loadAppliedState(sessionDir);
       if (applied.finalized_workflow_ids.includes(workflowId)) return;
 
-      const stepsWithUsage = closedSteps.filter((s) => s.usage != null);
-      if (stepsWithUsage.length === 0) return;
-
       const data = await loadMetrics(sessionDir);
 
-      const attributedModelId = resolveAttributedModelId(closedSteps);
-      if (attributedModelId) {
-        const existing = data.models[attributedModelId] ?? defaultModelMetrics();
-        data.models[attributedModelId] = {
-          ...existing,
-          finalized_runs: existing.finalized_runs + 1,
-        };
-      }
+      const stepsWithUsage = closedSteps.filter((s) => s.usage != null);
+      if (stepsWithUsage.length > 0) {
+        const attributedModelId = resolveAttributedModelId(closedSteps);
+        if (attributedModelId) {
+          const existing = data.models[attributedModelId] ?? defaultModelMetrics();
+          data.models[attributedModelId] = {
+            ...existing,
+            finalized_runs: existing.finalized_runs + 1,
+          };
+        }
 
-      const unapplied = stepsWithUsage.filter((s) => !applied.applied_step_ids.includes(s.id));
-      const byModel = aggregateWorkflowUsageByModel(unapplied);
-      for (const [modelId, entry] of Object.entries(byModel)) {
-        const existing = data.models[modelId] ?? defaultModelMetrics();
-        data.models[modelId] = mergeModelUsage(existing, entry.usage, entry.stepCount, 0);
-        for (const step of unapplied) {
-          if (
-            step.inferenceRequest.model === modelId &&
-            !applied.applied_step_ids.includes(step.id)
-          ) {
-            applied.applied_step_ids.push(step.id);
+        const unapplied = stepsWithUsage.filter((s) => !applied.applied_step_ids.includes(s.id));
+        const byModel = aggregateWorkflowUsageByModel(unapplied);
+        for (const [modelId, entry] of Object.entries(byModel)) {
+          const existing = data.models[modelId] ?? defaultModelMetrics();
+          data.models[modelId] = mergeModelUsage(existing, entry.usage, entry.stepCount, 0);
+          for (const step of unapplied) {
+            if (
+              step.inferenceRequest.model === modelId &&
+              !applied.applied_step_ids.includes(step.id)
+            ) {
+              applied.applied_step_ids.push(step.id);
+            }
           }
         }
       }
 
-      if (attributedModelId) {
-        applied.finalized_workflow_ids.push(workflowId);
-      }
+      // Registro incondicional: la guarda de idempotencia debe cubrir a los tres
+      // callers aunque el workflow no tenga usage ni modelo atribuido.
+      applied.finalized_workflow_ids.push(workflowId);
       data.session_totals = {
         ...recalcSessionTotals(data.models),
         finalized_runs: applied.finalized_workflow_ids.length,

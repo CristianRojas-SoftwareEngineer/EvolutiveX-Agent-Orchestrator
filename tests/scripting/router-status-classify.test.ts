@@ -50,16 +50,27 @@ describe('fallback heurístico (vars ausentes)', () => {
     expect(classifyModelWithEnv('minimax-m2-5', {})).toBeNull();
   });
 
-  it('no aplica si alguna var está configurada', () => {
-    // sonnet no está vacía → fallback desactivado; 'claude-haiku-4-5' no incluye 'm2'
-    expect(
-      classifyModelWithEnv('claude-haiku-4-5', {
-        ANTHROPIC_DEFAULT_SONNET_MODEL: 'm2',
-      }),
-    ).toBeNull();
-  });
-
   it('prioridad opus > sonnet en fallback', () => {
     expect(classifyModelWithEnv('claude-opus-4-sonnet', {})).toBe('reasoning');
+  });
+});
+
+describe('fallback heurístico por nivel (configuración parcial)', () => {
+  const partialEnv: ClaudeSettingsEnv = { ANTHROPIC_DEFAULT_SONNET_MODEL: 'm2-sonnet' };
+
+  it('haiku clasifica lite por keyword aunque sonnet esté configurada', () => {
+    expect(classifyModelWithEnv('claude-haiku-4-5', partialEnv)).toBe('lite');
+  });
+
+  it('opus clasifica reasoning por keyword aunque sonnet esté configurada', () => {
+    expect(classifyModelWithEnv('claude-opus-4-8', partialEnv)).toBe('reasoning');
+  });
+
+  it('sonnet configurada clasifica por match de variable', () => {
+    expect(classifyModelWithEnv('provider/m2-sonnet', partialEnv)).toBe('standard');
+  });
+
+  it('modelo sin keyword ni match de variable → null', () => {
+    expect(classifyModelWithEnv('minimax-m2-5', partialEnv)).toBeNull();
   });
 });

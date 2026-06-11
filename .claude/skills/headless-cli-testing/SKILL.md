@@ -5,6 +5,18 @@ description: Run Claude Code non-interactively (claude -p / --print) against an 
 
 # Headless CLI Testing
 
+## Contents
+
+1. [Overview](#overview)
+2. [Isolation model](#isolation-model-required-when-running-from-a-live-claude-code-session)
+3. [Running a headless session](#running-a-headless-session)
+   - [From the terminal](#from-the-terminal)
+   - [From code — `runHeadlessSession`](#from-code--runheadlesssession)
+4. [Module architecture](#module-architecture)
+5. [TTS testing reference](#tts-testing-reference)
+
+---
+
 <overview>
 The **headless execution mechanism** runs Smart Code Proxy + Claude Code (`claude -p`) in
 a fully isolated environment: a dedicated test proxy port, in-memory provider configuration,
@@ -18,8 +30,10 @@ Use cases:
 - **Multi-session**: launch parallel isolated sessions for load or regression tests
 - **TTS testing**: validate the TTS cycle across providers (see [references/tts-testing.md](./references/tts-testing.md))
 
-This skill's instructions are in **English** (token efficiency). User explanations are in **Spanish** — see `<constraints>` in [artifact-structuring](../artifact-structuring/SKILL.md).
+This skill's instructions are in **English** (token efficiency). User explanations are in **Spanish** — see `<constraints>` below.
 </overview>
+
+---
 
 <isolation_guard>
 ## Isolation model (REQUIRED when running from a live Claude Code session)
@@ -47,38 +61,33 @@ The guard in `runHeadlessSession` (and in the TTS test harness) aborts with an e
 if the test port equals the main proxy port.
 </isolation_guard>
 
-## Module architecture
+---
 
-The headless mechanism lives in `scripting/headless-session/`:
+## Running a headless session
 
-```
-scripting/headless-session/
-├── index.ts            ← runHeadlessSession() — high-level API
-├── proxy-lifecycle.ts  ← startProxy, stopProxy, waitHealth, killProcessOnPort, sleep, getLogPath
-├── run-claude.ts       ← runClaudeHeadless, buildClaudeHeadlessArgs, resolveClaudeExecutable
-├── provider-env.ts     ← buildIsolatedProviderEnv (resolves provider config in memory)
-└── env-utils.ts        ← getProxyPort (reads configs/.env), getLogByteOffset
-```
+Two entry points — choose based on context:
 
-The TTS test suite (`scripting/headless-tts-gateway-test.ts`) is one consumer of
-these primitives — it adds TTS-specific assertions on top of the same lifecycle.
+| | From the terminal | From code |
+|---|---|---|
+| **When** | Exploratory, one-off diagnostic | Automated, repeatable, integrated in a test |
+| **How** | `claude -p` directly in bash | `runHeadlessSession()` in TypeScript |
+| **Setup** | Proxy must be running separately | `runHeadlessSession` handles the full lifecycle |
 
 ---
 
-## Manual use (ad-hoc debugging)
+### From the terminal
 
-This section covers ad-hoc debugging without programmatic infrastructure. **If you
-already have an active session or want to integrate tests into code, use
-[`runHeadlessSession`](#programmatic-use--runheadlesssession) directly.**
+One-off sessions from bash — no code required. The proxy must already be running and
+a provider must be configured before invoking `claude -p`.
 
-### Prerequisites (standalone mode — no live session on main proxy)
+#### Prerequisites
 
 1. **Proxy running** — `npm run dev` (append-mode logs to `server/logs.jsonl`).
 2. **Provider configured** — `npm run configure:provider <provider>` writes
    `ANTHROPIC_BASE_URL` to `~/.claude/settings.json`.
 3. **Verification** — confirm `configs/.env` has the expected `UPSTREAM_ORIGIN`.
 
-### Base command
+#### Base command
 
 ```bash
 claude -p "<prompt>" --model <model-alias>
@@ -96,7 +105,7 @@ claude -p "<prompt>" --model <model-alias>
 | `--permission-mode <mode>` | `default`, `acceptEdits`, `auto`, `bypassPermissions`. Use `auto` for fully non-interactive runs. |
 | `--bare` | Minimal mode: skips hooks, LSP, auto-memory, CLAUDE.md. **Do not use** when the goal is to trigger hooks. |
 
-### Minimal diagnostic prompt
+#### Minimal diagnostic prompt
 
 ```bash
 claude -p "Di hola en una palabra" --model haiku --max-turns 1
@@ -107,7 +116,7 @@ This triggers the full cycle:
 2. LLM turn executes (one turn via haiku).
 3. `Stop` hook → `POST /hooks` → gateway handlers run.
 
-### Observing results
+#### Observing results
 
 ```bash
 # Last N lines of the headless log
@@ -115,14 +124,7 @@ tail -n 50 server/logs-headless.jsonl
 
 # All hook events
 grep '"POST /hooks"' server/logs-headless.jsonl
-```
 
-Entries are JSONL (one JSON object per line), written by pino.
-
-Each turn writes artifacts under `server/headless/sessions/<sessionId>/`.
-Check for workflow closure files to confirm the hook cycle completed.
-
-```bash
 # Exit code: 0 = success, non-zero = error
 claude -p "Di hola" --model haiku; echo "exit: $?"
 
@@ -130,11 +132,18 @@ claude -p "Di hola" --model haiku; echo "exit: $?"
 claude -p "Di hola" --model haiku --output-format json | jq '.result'
 ```
 
+Entries are JSONL (one JSON object per line), written by pino. Each turn writes
+artifacts under `server/headless/sessions/<sessionId>/` — check for workflow closure
+files to confirm the hook cycle completed.
+
 ---
 
-## Programmatic use — `runHeadlessSession`
+### From code — `runHeadlessSession`
 
-### API
+Handles the full lifecycle (kill-port → start proxy → health check → run claude →
+stop proxy) in a single call. Suitable for automated tests and repeatable scenarios.
+
+#### API
 
 ```typescript
 import { runHeadlessSession } from './scripting/headless-session/index.js';
@@ -146,8 +155,8 @@ const result = await runHeadlessSession({
   maxTurns: 1,             // optional; default 1
   claudeTimeoutMs: 180_000,
   healthTimeoutMs: 30_000,
-  logFile: 'logs-headless.jsonl',     // relative to server/
-  auditDir: 'server/headless/sessions',
+  logFile: 'logs-headless.jsonl',      // relative to server/; optional
+  auditDir: 'server/headless/sessions', // optional
   extraProxyEnv: {},       // optional: extra env vars injected into the test proxy
 });
 // result: { output, exitCode, isError, logPath, sessionDir, claudeStartedAt }
@@ -156,7 +165,6 @@ const result = await runHeadlessSession({
 Log paths are available directly in the result — no need to locate them manually:
 
 ```typescript
-// No need to locate the files — the result includes the paths:
 console.log(result.logPath);    // absolute path, e.g. …/server/logs-headless.jsonl
 console.log(result.sessionDir); // absolute path, e.g. …/server/headless/sessions/
 
@@ -165,7 +173,7 @@ import { readFileSync } from 'node:fs';
 const lines = readFileSync(result.logPath, 'utf-8').trim().split('\n').slice(-20);
 ```
 
-### `extraProxyEnv`
+#### `extraProxyEnv`
 
 Use this escape hatch to simulate controlled proxy conditions without touching
 global config. Example: test what happens when a secrets file is missing:
@@ -178,7 +186,7 @@ await runHeadlessSession({
 });
 ```
 
-### Using the primitives directly
+#### Using the primitives directly
 
 For finer lifecycle control (e.g., reusing a proxy across multiple claude runs),
 import from the sub-modules directly:
@@ -188,6 +196,26 @@ import { startProxy, stopProxy, waitHealth } from './scripting/headless-session/
 import { runClaudeHeadless } from './scripting/headless-session/run-claude.js';
 import { buildIsolatedProviderEnv } from './scripting/headless-session/provider-env.js';
 ```
+
+---
+
+## Module architecture
+
+Internal layout for contributors and consumers that need fine-grained lifecycle control.
+Most use cases only need `runHeadlessSession` from `index.ts`.
+
+```
+scripting/headless-session/
+├── index.ts            ← runHeadlessSession() — high-level API
+├── proxy-lifecycle.ts  ← startProxy, stopProxy, waitHealth, killProcessOnPort, sleep, getLogPath
+├── run-claude.ts       ← runClaudeHeadless, buildClaudeHeadlessArgs, resolveClaudeExecutable
+├── provider-env.ts     ← buildIsolatedProviderEnv (resolves provider config in memory)
+└── env-utils.ts        ← getProxyPort (reads configs/.env), getLogByteOffset
+```
+
+The TTS test suite (`scripting/headless-tts-gateway-test.ts`) is one consumer of
+these primitives — it imports the sub-modules directly and adds TTS-specific assertions
+on top of the same lifecycle.
 
 ---
 

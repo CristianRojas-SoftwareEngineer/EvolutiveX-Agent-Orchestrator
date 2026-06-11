@@ -24,8 +24,11 @@ const TTS_MAX_TOKENS = 512;
 
 const VOICE_ASSISTANT_SYSTEM_PROMPT =
   'Eres la voz del asistente Smart Code Proxy. ' +
-  'Responde al último mensaje del usuario en una sola oración breve y natural en español, ' +
-  'confirmando lo que vas a hacer. Sin puntos al final. Sin markdown.';
+  'Recibirás tres mensajes: la petición anterior del usuario, ' +
+  'tu última respuesta, y la nueva petición del usuario. ' +
+  'Responde SOLO a la nueva petición (la tercera) en una sola oración breve y natural en español, ' +
+  'confirmando que procederás a investigar o ejecutar lo solicitado. ' +
+  'Sin puntos al final. Sin markdown.';
 
 const CONTINUITY_SYSTEM_PROMPT =
   'Eres la voz del asistente de continuidad de Smart Code Proxy. ' +
@@ -236,7 +239,11 @@ export class AuditHookEventHandler {
 
     try {
       // 1. Extraer contexto del transcript si está disponible
-      const messages = await this.extractContext(event.transcriptPath);
+      //    - 'prompt' (UserPromptSubmit): tríada curada (user + assistant + prompt actual)
+      //    - 'summary' (Stop/SubagentStop/StopFailure): últimos N mensajes del turno
+      const messages = mode === 'prompt'
+        ? await this.extractUserPromptContext(event)
+        : await this.extractContext(event.transcriptPath);
 
       // 2. Generar texto con LLM o usar fallback
       const text = await this.generateSpeechText(event.eventName, messages, mode);
@@ -257,6 +264,36 @@ export class AuditHookEventHandler {
     } catch {
       return [];
     }
+  }
+
+  /**
+   * Extrae la tríada curada para `UserPromptSubmit`:
+   *   [penúltimo user del transcript, último assistant, prompt actual].
+   * Mapea el `UserPromptContext` del extractor a `SessionMessage[]` (0-3 elementos).
+   * Si el extractor o el transcript no están disponibles, devuelve solo el prompt actual.
+   */
+  private async extractUserPromptContext(event: ClaudeHookEvent): Promise<SessionMessage[]> {
+    const messages: SessionMessage[] = [];
+
+    if (this.contextExtractor && event.transcriptPath) {
+      try {
+        const ctx = await this.contextExtractor.extractUserPromptSubmitContext(
+          event.transcriptPath,
+          event.prompt ?? '',
+        );
+        if (ctx.previousUserMessage) {
+          messages.push({ role: 'user', text: ctx.previousUserMessage });
+        }
+        if (ctx.lastAssistantResponse) {
+          messages.push({ role: 'assistant', text: ctx.lastAssistantResponse });
+        }
+      } catch {
+        /* extracción fallida: continuar con lo que tengamos */
+      }
+    }
+
+    messages.push({ role: 'user', text: event.prompt ?? '' });
+    return messages;
   }
 
   /**

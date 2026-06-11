@@ -80,3 +80,91 @@ describe('TranscriptContextExtractor', () => {
     expect(result[0]).toEqual({ role: 'user', text: 'pregunta' });
   });
 });
+
+describe('TranscriptContextExtractor.extractUserPromptSubmitContext', () => {
+  const extractor = new TranscriptContextExtractor();
+  const tempFiles: string[] = [];
+
+  afterEach(() => {
+    for (const f of tempFiles.splice(0)) {
+      try { unlinkSync(f); } catch { /* ignorar */ }
+    }
+  });
+
+  it('devuelve la tríada cuando hay un turno previo cerrado', async () => {
+    const path = writeTempJsonl([
+      { message: { role: 'user', content: 'Refactoriza calculateTotal' } },
+      { message: { role: 'assistant', content: [{ type: 'text', text: 'Voy a refactorizar' }] } },
+    ]);
+    tempFiles.push(path);
+
+    const result = await extractor.extractUserPromptSubmitContext(path, 'Aplica tests');
+
+    expect(result).toEqual({
+      previousUserMessage: 'Refactoriza calculateTotal',
+      lastAssistantResponse: 'Voy a refactorizar',
+      currentPrompt: 'Aplica tests',
+    });
+  });
+
+  it('devuelve solo el prompt actual cuando el transcript está vacío', async () => {
+    const result = await extractor.extractUserPromptSubmitContext(
+      '/ruta/inexistente.jsonl',
+      'Hola Claude',
+    );
+
+    expect(result).toEqual({
+      previousUserMessage: undefined,
+      lastAssistantResponse: undefined,
+      currentPrompt: 'Hola Claude',
+    });
+  });
+
+  it('selecciona el último user y el último assistant con varios turnos', async () => {
+    const path = writeTempJsonl([
+      { message: { role: 'user', content: 'turno 1 user' } },
+      { message: { role: 'assistant', content: [{ type: 'text', text: 'turno 1 assistant' }] } },
+      { message: { role: 'user', content: 'turno 2 user' } },
+      { message: { role: 'assistant', content: [{ type: 'text', text: 'turno 2 assistant' }] } },
+      { message: { role: 'user', content: 'turno 3 user' } },
+      { message: { role: 'assistant', content: [{ type: 'text', text: 'turno 3 assistant' }] } },
+    ]);
+    tempFiles.push(path);
+
+    const result = await extractor.extractUserPromptSubmitContext(path, 'turno 4 prompt');
+
+    expect(result.previousUserMessage).toBe('turno 3 user');
+    expect(result.lastAssistantResponse).toBe('turno 3 assistant');
+    expect(result.currentPrompt).toBe('turno 4 prompt');
+  });
+
+  it('ignora bloques system intercalados al seleccionar por rol', async () => {
+    const path = writeTempJsonl([
+      { message: { role: 'user', content: 'primera petición' } },
+      { message: { role: 'system', content: 'system reminder intermedio' } },
+      { message: { role: 'assistant', content: [{ type: 'text', text: 'respuesta 1' }] } },
+      { message: { role: 'system', content: 'otro reminder' } },
+      { message: { role: 'user', content: 'segunda petición' } },
+    ]);
+    tempFiles.push(path);
+
+    const result = await extractor.extractUserPromptSubmitContext(path, 'tercera petición');
+
+    expect(result.previousUserMessage).toBe('segunda petición');
+    expect(result.lastAssistantResponse).toBe('respuesta 1');
+    expect(result.currentPrompt).toBe('tercera petición');
+  });
+
+  it('devuelve lastAssistantResponse undefined si no hay assistant previo', async () => {
+    const path = writeTempJsonl([
+      { message: { role: 'user', content: 'única petición' } },
+    ]);
+    tempFiles.push(path);
+
+    const result = await extractor.extractUserPromptSubmitContext(path, 'prompt nuevo');
+
+    expect(result.previousUserMessage).toBe('única petición');
+    expect(result.lastAssistantResponse).toBeUndefined();
+    expect(result.currentPrompt).toBe('prompt nuevo');
+  });
+});

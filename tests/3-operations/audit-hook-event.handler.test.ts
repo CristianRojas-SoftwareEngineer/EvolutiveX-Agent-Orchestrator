@@ -359,3 +359,120 @@ describe('AuditHookEventHandler', () => {
     expect(speak).toHaveBeenCalledOnce();
   });
 });
+
+describe('AuditHookEventHandler UserPromptSubmit con TTS', () => {
+  it('UserPromptSubmit con transcript previo envía al LLM la tríada user/assistant/user', async () => {
+    // Mockear fetch global para capturar la petición a OpenRouter
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ content: [{ type: 'text', text: 'Voy a refactorizar' }] }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const speak = vi.fn().mockResolvedValue(undefined);
+    const tts = { speak, initialize: vi.fn() };
+    const extractUserPromptSubmitContext = vi.fn().mockResolvedValue({
+      previousUserMessage: 'petición anterior del usuario',
+      lastAssistantResponse: 'respuesta del turno previo',
+      currentPrompt: 'prompt actual',
+    });
+    const contextExtractor = { extractUserPromptSubmitContext, extractLastNMessages: vi.fn() };
+    const repo = makeRepo();
+    const handler = new AuditHookEventHandler(
+      repo, '/tmp/sessions', makeSessionMetrics(),
+      undefined, tts, contextExtractor, 3, undefined, undefined, 'fake-openrouter-key',
+    );
+
+    handler.execute({
+      eventName: 'UserPromptSubmit',
+      sessionId: 'session-1',
+      agentId: 'agent-root',
+      transcriptPath: '/tmp/transcript.jsonl',
+      prompt: 'prompt actual',
+    });
+
+    await new Promise((r) => setTimeout(r, 100));
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.messages).toEqual([
+      { role: 'user', content: 'petición anterior del usuario' },
+      { role: 'assistant', content: 'respuesta del turno previo' },
+      { role: 'user', content: 'prompt actual' },
+    ]);
+    expect(body.system).toContain('Responde SOLO a la nueva petición');
+    expect(body.model).toBe('poolside/laguna-xs.2:free');
+    expect(speak).toHaveBeenCalledWith('Voy a refactorizar');
+
+    vi.unstubAllGlobals();
+  });
+
+  it('UserPromptSubmit sin contexto previo envía al LLM solo el prompt actual', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ content: [{ type: 'text', text: 'Entendido, voy a investigar' }] }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const speak = vi.fn().mockResolvedValue(undefined);
+    const tts = { speak, initialize: vi.fn() };
+    const extractUserPromptSubmitContext = vi.fn().mockResolvedValue({
+      previousUserMessage: undefined,
+      lastAssistantResponse: undefined,
+      currentPrompt: 'primer mensaje',
+    });
+    const contextExtractor = { extractUserPromptSubmitContext, extractLastNMessages: vi.fn() };
+    const repo = makeRepo();
+    const handler = new AuditHookEventHandler(
+      repo, '/tmp/sessions', makeSessionMetrics(),
+      undefined, tts, contextExtractor, 3, undefined, undefined, 'fake-openrouter-key',
+    );
+
+    handler.execute({
+      eventName: 'UserPromptSubmit',
+      sessionId: 'session-1',
+      agentId: 'agent-root',
+      transcriptPath: '/tmp/transcript.jsonl',
+      prompt: 'primer mensaje',
+    });
+
+    await new Promise((r) => setTimeout(r, 100));
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.messages).toEqual([{ role: 'user', content: 'primer mensaje' }]);
+    expect(body.system).toContain('Responde SOLO a la nueva petición');
+    expect(speak).toHaveBeenCalledWith('Entendido, voy a investigar');
+
+    vi.unstubAllGlobals();
+  });
+
+  it('UserPromptSubmit sin clave OpenRouter reproduce fallback sin llamar a fetch', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const speak = vi.fn().mockResolvedValue(undefined);
+    const tts = { speak, initialize: vi.fn() };
+    const contextExtractor = { extractUserPromptSubmitContext: vi.fn(), extractLastNMessages: vi.fn() };
+    const repo = makeRepo();
+    const handler = new AuditHookEventHandler(
+      repo, '/tmp/sessions', makeSessionMetrics(),
+      undefined, tts, contextExtractor, 3, undefined, undefined, undefined, // sin API key
+    );
+
+    handler.execute({
+      eventName: 'UserPromptSubmit',
+      sessionId: 'session-1',
+      agentId: 'agent-root',
+      prompt: 'hola',
+    });
+
+    await new Promise((r) => setTimeout(r, 100));
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(speak).toHaveBeenCalledWith('Solicitud recibida. Procesando con Claude.');
+
+    vi.unstubAllGlobals();
+  });
+});

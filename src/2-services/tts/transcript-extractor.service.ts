@@ -1,6 +1,10 @@
 import { createReadStream } from 'node:fs';
 import { createInterface } from 'node:readline';
-import type { IContextExtractor, SessionMessage } from '../../1-domain/ports/IContextExtractor.js';
+import type {
+  IContextExtractor,
+  SessionMessage,
+  UserPromptContext,
+} from '../../1-domain/ports/IContextExtractor.js';
 
 /** Forma de cada línea del transcript JSONL de Claude Code. */
 interface TranscriptLine {
@@ -61,5 +65,31 @@ export class TranscriptContextExtractor implements IContextExtractor {
 
     // Retornar los últimos N mensajes
     return all.slice(-n);
+  }
+
+  async extractUserPromptSubmitContext(
+    transcriptPath: string,
+    currentPrompt: string,
+  ): Promise<UserPromptContext> {
+    // Ventana amplia para garantizar que los dos últimos roles (user + assistant)
+    // están presentes aunque haya entradas `system` intercaladas o chains largos
+    // de tool_use / tool_result.
+    const recent = await this.extractLastNMessages(transcriptPath, 10);
+
+    // El "prompt anterior" es el último mensaje de usuario en el transcript,
+    // que corresponde al turno previo. El prompt actual (currentPrompt) llega
+    // en el payload del hook y no está todavía en el transcript.
+    const users = recent.filter((m) => m.role === 'user');
+    const previousUserMessage = users.length > 0 ? users[users.length - 1]?.text : undefined;
+
+    const assistants = recent.filter((m) => m.role === 'assistant');
+    const lastAssistantResponse =
+      assistants.length > 0 ? assistants[assistants.length - 1]?.text : undefined;
+
+    return {
+      previousUserMessage,
+      lastAssistantResponse,
+      currentPrompt,
+    };
   }
 }

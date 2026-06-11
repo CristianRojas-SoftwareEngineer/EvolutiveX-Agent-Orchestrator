@@ -18,14 +18,8 @@ Use cases:
 - **Multi-session**: launch parallel isolated sessions for load or regression tests
 - **TTS testing**: validate the TTS cycle across providers (see [references/tts-testing.md](./references/tts-testing.md))
 
-This skill's instructions are in **English** (token efficiency). User explanations are in **Spanish** — see `<user_communication>` in [artifact-structuring](../artifact-structuring/SKILL.md).
+This skill's instructions are in **English** (token efficiency). User explanations are in **Spanish** — see `<constraints>` in [artifact-structuring](../artifact-structuring/SKILL.md).
 </overview>
-
-<user_communication>
-Ask, confirm, and respond to the user in **Spanish**.
-</user_communication>
-
----
 
 <isolation_guard>
 ## Isolation model (REQUIRED when running from a live Claude Code session)
@@ -53,8 +47,6 @@ The guard in `runHeadlessSession` (and in the TTS test harness) aborts with an e
 if the test port equals the main proxy port.
 </isolation_guard>
 
----
-
 ## Module architecture
 
 The headless mechanism lives in `scripting/headless-session/`:
@@ -74,6 +66,10 @@ these primitives — it adds TTS-specific assertions on top of the same lifecycl
 ---
 
 ## Manual use (ad-hoc debugging)
+
+Esta sección cubre depuración ad-hoc sin infraestructura programática. **Si ya tienes
+una sesión activa o quieres integrar pruebas en código, usa
+[`runHeadlessSession`](#programmatic-use--runheadlesssession) directamente.**
 
 ### Prerequisites (standalone mode — no live session on main proxy)
 
@@ -111,6 +107,29 @@ This triggers the full cycle:
 2. LLM turn executes (one turn via haiku).
 3. `Stop` hook → `POST /hooks` → gateway handlers run.
 
+### Observing results
+
+```bash
+# Last N lines of the headless log
+tail -n 50 server/logs-headless.jsonl
+
+# All hook events
+grep '"POST /hooks"' server/logs-headless.jsonl
+```
+
+Entries are JSONL (one JSON object per line), written by pino.
+
+Each turn writes artifacts under `server/headless/sessions/<sessionId>/`.
+Check for workflow closure files to confirm the hook cycle completed.
+
+```bash
+# Exit code: 0 = success, non-zero = error
+claude -p "Di hola" --model haiku; echo "exit: $?"
+
+# Parse JSON output
+claude -p "Di hola" --model haiku --output-format json | jq '.result'
+```
+
 ---
 
 ## Programmatic use — `runHeadlessSession`
@@ -132,6 +151,18 @@ const result = await runHeadlessSession({
   extraProxyEnv: {},       // optional: extra env vars injected into the test proxy
 });
 // result: { output, exitCode, isError, logPath, sessionDir, claudeStartedAt }
+```
+
+Los paths de logs están disponibles directamente en el resultado:
+
+```typescript
+// No necesitas saber dónde están los archivos — el resultado los incluye:
+console.log(result.logPath);    // path absoluto, e.g. …/server/logs-headless.jsonl
+console.log(result.sessionDir); // path absoluto, e.g. …/server/headless/sessions/
+
+// Leer las últimas entradas del log desde código:
+import { readFileSync } from 'node:fs';
+const lines = readFileSync(result.logPath, 'utf-8').trim().split('\n').slice(-20);
 ```
 
 ### `extraProxyEnv`
@@ -160,38 +191,10 @@ import { buildIsolatedProviderEnv } from './scripting/headless-session/provider-
 
 ---
 
-## Observing results
-
-### Gateway logs
-
-```bash
-# Last N lines of the headless log
-tail -n 50 server/logs-headless.jsonl
-
-# All hook events
-grep '"POST /hooks"' server/logs-headless.jsonl
-```
-
-Entries are JSONL (one JSON object per line), written by pino.
-
-### Session audit
-
-Each turn writes artifacts under `server/headless/sessions/<sessionId>/`.
-Check for workflow closure files to confirm the hook cycle completed.
-
-### Exit code assertions
-
-```bash
-# Exit code: 0 = success, non-zero = error
-claude -p "Di hola" --model haiku; echo "exit: $?"
-
-# Parse JSON output
-claude -p "Di hola" --model haiku --output-format json | jq '.result'
-```
-
----
-
 ## TTS testing reference
+
+Usa esta referencia cuando quieras validar específicamente el ciclo **TTS**
+(Stop hook → OpenRouter → SAPI), no solo el ciclo proxy/claude genérico.
 
 See [references/tts-testing.md](./references/tts-testing.md) for:
 - The TTS cycle (Stop hook → OpenRouter dedicated provider → SAPI)

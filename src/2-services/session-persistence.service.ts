@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
+import * as fsSync from 'node:fs';
 import type { IEventBus } from '../1-domain/repositories/IEventBus.js';
 import type { TelemetryEvent } from '../1-domain/types/telemetry.types.js';
 import type { Logger } from '../1-domain/types/logger.types.js';
@@ -329,8 +330,45 @@ export class SessionPersistence {
       lostPendingWebFetch?: unknown;
       continuationOrphan?: boolean;
     };
-    const entry = this.workflows.get(p.workflowId);
-    if (!entry) return;
+    let entry = this.workflows.get(p.workflowId);
+
+    // IN-1: si el entry no está en el mapa pero output/result.json existe en disco,
+    // el workflow se cerró sin estar registrado (ej. reinicio de proceso).
+    if (!entry) {
+      this.logger?.warn(
+        `[audit] workflow_complete for unknown workflow: ${p.workflowId}, ` +
+          `kind: unknown (result.json existence will be checked)`,
+      );
+      const resultPath = `${event.sessionId}/output/result.json`;
+      if (!fsSync.existsSync(resultPath)) {
+        this.logger?.warn(
+          `[audit] workflow_complete for unregistered workflow without result.json: ${p.workflowId}`,
+        );
+        return;
+      }
+      this.logger?.warn(
+        `[audit] result.json found for unregistered workflow ${p.workflowId}, reconciling`,
+      );
+      const phantomIndex = this.allocWorkflowIndex(event.sessionId);
+      const phantomBaseDir = getWorkflowDir(event.sessionId, phantomIndex);
+      const phantomEntry: WorkflowEntry = {
+        sessionId: event.sessionId,
+        workflowIndex: phantomIndex,
+        baseDir: phantomBaseDir,
+        toolCounter: 1,
+        tools: new Map(),
+        meta: {
+          workflowId: p.workflowId,
+          sessionId: event.sessionId,
+          status: 'completed',
+          layoutVersion: LAYOUT_VERSION,
+          completedAt: event.timestamp,
+        },
+      };
+      this.workflows.set(p.workflowId, phantomEntry);
+      entry = phantomEntry;
+    }
+
     const auditOutcome = p.outcome ?? (p.result as Record<string, unknown>)?.outcome;
     const finalStatus = auditOutcome === 'orphaned' ? 'orphaned' : 'completed';
     entry.meta.status = finalStatus;

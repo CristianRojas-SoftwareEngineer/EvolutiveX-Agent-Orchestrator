@@ -41,7 +41,7 @@ Las sesiones headless SHALL escribir logs en un archivo separado del log princip
 #### Scenario: Paths por defecto
 - **WHEN** no se especifican `logFile` ni `auditDir`
 - **THEN** los logs van a `server/logs-headless.jsonl`
-- **THEN** la auditoría va a `server/headless/sessions/`
+- **THEN** la auditoría va a `sessions/headless/`
 
 #### Scenario: Paths configurados
 - **WHEN** se especifican `logFile` y `auditDir` en las opciones

@@ -52,8 +52,8 @@ const DEFAULT_PROMPT = 'Hola, resume en una frase qué dices';
 const DEFAULT_TEST_PORT = 8788;
 /** Log separado para no mezclar la auditoría de test con server/logs.jsonl. */
 const TEST_LOG_FILENAME = 'logs-headless-tts.jsonl';
-/** Auditoría de sesiones de test aislada (debe terminar en "sessions"). */
-const TEST_AUDIT_BASE_DIR = join('server', 'headless-tts', 'sessions');
+/** Auditoría de sesiones de test aislada. */
+const TEST_AUDIT_BASE_DIR = join('sessions', 'headless-tts');
 
 interface CliOptions {
   providers: string[];

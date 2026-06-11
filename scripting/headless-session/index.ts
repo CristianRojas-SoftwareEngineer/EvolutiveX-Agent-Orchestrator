@@ -28,7 +28,7 @@ export interface HeadlessSessionResult {
 
 const DEFAULT_PORT = 8788;
 const DEFAULT_LOG_FILE = 'logs-headless.jsonl';
-const DEFAULT_AUDIT_DIR = join('server', 'headless', 'sessions');
+const DEFAULT_AUDIT_DIR = join('sessions', 'headless');
 const DEFAULT_CLAUDE_TIMEOUT_MS = 180_000;
 const DEFAULT_HEALTH_TIMEOUT_MS = 30_000;
 

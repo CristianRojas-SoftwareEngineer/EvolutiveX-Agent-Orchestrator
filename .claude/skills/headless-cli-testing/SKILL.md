@@ -55,7 +55,7 @@ global config.
 | Provider config | `~/.claude/settings.json` | In-memory env injection (`provider-env.ts`) |
 | `configs/.env` | Read at proxy startup | Never written; overridden via subprocess env |
 | Gateway logs | `server/logs.jsonl` | `server/logs-headless.jsonl` (default) |
-| Session audit | `sessions/` | `server/headless/sessions/` (default) |
+| Session audit | `sessions/` | `sessions/headless/` (default) |
 
 The guard in `runHeadlessSession` (and in the TTS test harness) aborts with an error
 if the test port equals the main proxy port.
@@ -133,7 +133,7 @@ claude -p "Di hola" --model haiku --output-format json | jq '.result'
 ```
 
 Entries are JSONL (one JSON object per line), written by pino. Each turn writes
-artifacts under `server/headless/sessions/<sessionId>/` — check for workflow closure
+artifacts under `sessions/headless/<sessionId>/` — check for workflow closure
 files to confirm the hook cycle completed.
 
 ---
@@ -156,7 +156,7 @@ const result = await runHeadlessSession({
   claudeTimeoutMs: 180_000,
   healthTimeoutMs: 30_000,
   logFile: 'logs-headless.jsonl',      // relative to server/; optional
-  auditDir: 'server/headless/sessions', // optional
+  auditDir: 'sessions/headless', // optional
   extraProxyEnv: {},       // optional: extra env vars injected into the test proxy
 });
 // result: { output, exitCode, isError, logPath, sessionDir, claudeStartedAt }
@@ -166,7 +166,7 @@ Log paths are available directly in the result — no need to locate them manual
 
 ```typescript
 console.log(result.logPath);    // absolute path, e.g. …/server/logs-headless.jsonl
-console.log(result.sessionDir); // absolute path, e.g. …/server/headless/sessions/
+console.log(result.sessionDir); // absolute path, e.g. …/sessions/headless/
 
 // Read the last log entries from code:
 import { readFileSync } from 'node:fs';

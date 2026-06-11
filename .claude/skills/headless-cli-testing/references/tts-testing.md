@@ -104,7 +104,7 @@ Campos de interés en cada entrada JSONL:
 
 ### Auditoría de sesiones
 
-Cada turno escribe artefactos bajo `server/headless-tts/sessions/<sessionId>/`.
+Cada turno escribe artefactos bajo `sessions/headless-tts/<sessionId>/`.
 Revisar los archivos de cierre del workflow para confirmar que el ciclo de hooks completó.
 
 ### Drain loop

@@ -53,7 +53,7 @@ Cada clave en `models` es el `modelId` (`step.inferenceRequest.model`). Los nomb
 
 | Método | Cuándo | Qué actualiza |
 |--------|--------|---------------|
-| `updateFromStep(sessionDir, step)` | Tras hop agéntico contable (main o subagent; stop terminal + `usage`) | `billable_hops`, tokens, `cache_efficiency`, `session_totals.billable_hops`; **no** `finalized_runs` |
+| `updateFromStep(sessionDir, step)` | Tras hop agéntico (main o subagent) con `usage` disponible, independientemente de `stop_reason` | `billable_hops`, tokens, `cache_efficiency`, `session_totals.billable_hops`; **no** `finalized_runs` |
 | `finalizeWorkflowMetrics(sessionDir, workflowId, closedSteps)` | Hook `Stop` / `StopFailure` / `SubagentStop` en workflow agéntico (G16′) | `finalized_runs` (+1 al modelo atribuido); `billable_hops`/tokens solo para steps no volcados per-step. Registra el `workflowId` en `finalized_workflow_ids` **incondicionalmente** (incluso sin usage o sin modelo atribuido), garantizando idempotencia entre sus tres callers |
 
 **Invariante G16′:** escriben métricas los workflows `kind: 'main'` y `kind: 'subagent'`. Preflights y side-requests standalone no cierran ejecución agéntica (aunque un side-request con `usage` sí suma en `billable_hops` vía `updateFromStep`).
@@ -64,7 +64,7 @@ Cada clave en `models` es el `modelId` (`step.inferenceRequest.model`). Los nomb
 |------------|-----|
 | `AuditHookEventHandler` | `close()` + `finalizeWorkflowMetrics` (main y subagent) |
 | `AuditSseResponseHandler` / `AuditStandardResponseHandler` | `persistBillableStepMetricsIfNeeded` → `updateFromStep` |
-| `persist-billable-step-metrics.util.ts` | G16′ + `isStepBillableForSessionMetrics` |
+| `persist-billable-step-metrics.util.ts` | G16′ + `usage` |
 
 #### Lectura en el statusline (`scripting/router-status.ts`)
 

@@ -273,7 +273,6 @@ export class AuditSseResponseHandler {
         this.auditBaseDir,
         workflow,
         wireStep,
-        assembled.stopReason,
       );
     }
     const workflowAfterClose = this.workflowRepo.getWorkflow(workflow.id);

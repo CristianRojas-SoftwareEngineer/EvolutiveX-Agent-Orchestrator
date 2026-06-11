@@ -168,7 +168,6 @@ export class AuditStandardResponseHandler {
             this.auditBaseDir,
             workflow,
             wireStep,
-            stopReason,
           );
         }
 

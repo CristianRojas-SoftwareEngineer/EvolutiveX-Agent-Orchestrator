@@ -38,7 +38,7 @@ function makeSessionMetrics(): SessionMetricsService {
 }
 
 describe('persistBillableStepMetricsIfNeeded', () => {
-  it('subagent + terminal + usage → updateFromStep llamado (G16′)', async () => {
+  it('subagent + usage → updateFromStep llamado (G16′)', async () => {
     const sessionMetrics = makeSessionMetrics();
     const step = makeStep();
     await persistBillableStepMetricsIfNeeded(
@@ -46,7 +46,6 @@ describe('persistBillableStepMetricsIfNeeded', () => {
       '/tmp/sessions',
       makeWorkflow('subagent'),
       step,
-      'end_turn',
     );
     expect(sessionMetrics.updateFromStep).toHaveBeenCalledWith(
       path.join('/tmp/sessions', 'session-1'),
@@ -54,19 +53,7 @@ describe('persistBillableStepMetricsIfNeeded', () => {
     );
   });
 
-  it('main + tool_use → updateFromStep no llamado', async () => {
-    const sessionMetrics = makeSessionMetrics();
-    await persistBillableStepMetricsIfNeeded(
-      sessionMetrics,
-      '/tmp/sessions',
-      makeWorkflow('main'),
-      makeStep(),
-      'tool_use',
-    );
-    expect(sessionMetrics.updateFromStep).not.toHaveBeenCalled();
-  });
-
-  it('main + end_turn con usage → updateFromStep llamado', async () => {
+  it('main + tool_use + usage → updateFromStep llamado', async () => {
     const sessionMetrics = makeSessionMetrics();
     const step = makeStep();
     await persistBillableStepMetricsIfNeeded(
@@ -74,7 +61,21 @@ describe('persistBillableStepMetricsIfNeeded', () => {
       '/tmp/sessions',
       makeWorkflow('main'),
       step,
-      'end_turn',
+    );
+    expect(sessionMetrics.updateFromStep).toHaveBeenCalledWith(
+      path.join('/tmp/sessions', 'session-1'),
+      step,
+    );
+  });
+
+  it('main + usage → updateFromStep llamado', async () => {
+    const sessionMetrics = makeSessionMetrics();
+    const step = makeStep();
+    await persistBillableStepMetricsIfNeeded(
+      sessionMetrics,
+      '/tmp/sessions',
+      makeWorkflow('main'),
+      step,
     );
     expect(sessionMetrics.updateFromStep).toHaveBeenCalledWith(
       path.join('/tmp/sessions', 'session-1'),

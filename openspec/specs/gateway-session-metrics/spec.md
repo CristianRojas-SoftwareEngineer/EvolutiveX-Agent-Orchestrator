@@ -32,10 +32,10 @@ El sistema SHALL proveer en `SessionMetricsService` un método de actualización
 - Ser **idempotente** por `step.id`: un mismo step no SHALL incrementar contadores más de una vez aunque se reintente la invocación.
 - **NO** incrementar `finalized_runs` (reservado al cierre de la ejecución agéntica).
 
-#### Scenario: Step terminal main persiste métricas antes del hook Stop
+#### Scenario: Hop tool_use main persiste métricas inmediatamente
 
-- **GIVEN** un workflow `kind: 'main'` con un step cerrado en correlador, `usage` presente y `step.id` no contabilizado previamente
-- **WHEN** el proxy invoca la actualización per-step tras registrar/cerrar ese step
+- **GIVEN** un workflow `kind: 'main'` con un step cerrado en correlador con `stop_reason: 'tool_use'`, `usage` presente y `step.id` no contabilizado previamente
+- **WHEN** el proxy invoca la actualización per-step tras cerrar ese step
 - **THEN** `session-metrics.json` SHALL reflejar `billable_hops` y tokens incrementados para ese `modelId`
 - **AND** `finalized_runs` del modelo SHALL permanecer sin cambio
 
@@ -60,19 +60,26 @@ El sistema SHALL proveer en `SessionMetricsService` un método de actualización
 
 ### Requirement: Steps contables — stop_reason y cierre en correlador
 
-La actualización per-step SHALL aplicarse a steps de workflows **`kind: 'main'` o `kind: 'subagent'`** que el correlador trate como contables para métricas de sesión: step con `usage` válido y cuya condición de cierre coincida con la del dominio (stop terminal tras `closeStep`; hops `tool_use` no cuentan hasta un hop terminal posterior).
+La actualización per-step SHALL aplicarse a **todo** step de workflows **`kind: 'main'` o `kind: 'subagent'`** cerrado en el correlador con `usage` válido, **independientemente de `stop_reason`** (incluido `tool_use`). SHALL NOT existir un gate por stop terminal en el path per-step: la única condición de contabilidad es `usage` válido presente en el step cerrado.
 
-#### Scenario: Hop con stop_reason terminal cuenta al cerrarse el step
+#### Scenario: Hop tool_use con usage cuenta al cerrar el stream SSE
 
-- **GIVEN** un hop de inferencia agéntico (main o subagent) con `stop_reason` terminal (`end_turn`, `max_tokens`, o equivalente documentado) y `closeStep` ejecutado
-- **WHEN** finaliza el registro wire del step con `usage`
+- **GIVEN** un hop de inferencia agéntico (main o subagent) cuyo stream SSE finaliza con `stop_reason: 'tool_use'` y `usage` válido
+- **WHEN** el handler enriquece y cierra el step en el correlador (`closedAt` definido)
 - **THEN** la actualización per-step SHALL ejecutarse una vez para ese step
+- **AND** `session-metrics.json` SHALL reflejar `billable_hops` y tokens incrementados sin esperar al hook `Stop`
+
+#### Scenario: Step de error sin usage no escribe métricas
+
+- **GIVEN** un step cerrado por error upstream sin objeto `usage`
+- **WHEN** se evalúa la actualización per-step
+- **THEN** `session-metrics.json` NO SHALL modificarse por ese step
 
 ### Requirement: SessionMetricsService — escritura atómica de session-metrics.json
 
 El sistema SHALL proveer `SessionMetricsService` en `src/2-services/session-metrics.service.ts` (capa 2) que mantenga `sessions/{sessionId}/session-metrics.json` como fuente agregada de la sesión. El servicio SHALL:
 
-- Actualizar contadores de hops y tokens **por step** cuando un step agéntico contable cierra (requisito per-step).
+- Actualizar contadores de hops y tokens **por step** cuando cualquier step agéntico con `usage` cierra (requisito per-step).
 - Al cerrar una ejecución agéntica (`main` o `subagent`), invocar `finalizeWorkflowMetrics` que incremente `finalized_runs` en **exactamente 1** para el modelo atribuido del workflow y recalcule totales, **sin volver a sumar** hops/tokens ya persistidos per-step en la misma ejecución. El servicio SHALL registrar el `workflowId` en `finalized_workflow_ids` de forma **incondicional** —incluso cuando no hay `usage` ni modelo atribuido— garantizando idempotencia entre sus tres callers (`AuditHookEventHandler` en `Stop`, `StopFailure` y `SubagentStop`).
 - Calcular `cache_efficiency` por modelo según §33.2.
 - Escribir el archivo de forma **atómica** (archivo temporal + rename) y persistir idempotencia en sidecar `session-metrics-applied.json`.

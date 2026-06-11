@@ -208,7 +208,7 @@ describe('runSetup — integración', () => {
     writeFileSync(settingsPath, JSON.stringify(initial, null, 2), 'utf-8');
     const resolvedRoot = resolvePosixAbsolutePath(proxyRoot);
     let manual = initial as Parameters<typeof applyStatuslineInstall>[0];
-    const s1 = applyStatuslineInstall(manual, resolvedRoot, false, 3);
+    const s1 = applyStatuslineInstall(manual, resolvedRoot, false);
     if ('error' in s1) throw new Error(String(s1.error));
     manual = s1;
     manual = applyVoiceInstall(manual, { mode: 'hold', autoSubmit: true });

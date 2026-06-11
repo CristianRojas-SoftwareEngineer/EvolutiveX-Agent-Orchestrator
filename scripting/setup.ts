@@ -18,7 +18,6 @@ import {
   readClaudeSettings,
   writeClaudeSettings,
   CLAUDE_SETTINGS_PATH,
-  resolveRefreshInterval,
 } from './shared/claude-settings.js';
 import {
   validateProxyRoot,
@@ -100,12 +99,7 @@ export function runSetup(options: SetupRunOptions): number {
 
   // INSTALL: Aplicar instalaciones en cadena sobre el mismo objeto
   if (doStatusline) {
-    const result = applyStatuslineInstall(
-      settings,
-      proxyRoot,
-      options.force,
-      resolveRefreshInterval(process.env),
-    );
+    const result = applyStatuslineInstall(settings, proxyRoot, options.force);
     if ('error' in result) {
       console.error(chalk.red(result.error));
       return 1;

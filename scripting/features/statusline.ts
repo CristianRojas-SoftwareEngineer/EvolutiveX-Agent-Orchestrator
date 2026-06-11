@@ -23,19 +23,12 @@ export function buildStatusLineCommand(proxyRoot: string): string {
   return buildNpxTsxCommand(proxyRoot, ROUTER_STATUS_SEGMENT);
 }
 
-export function buildStatusLineBlock(
-  command: string,
-  refreshInterval: number | null,
-): NonNullable<ClaudeSettings['statusLine']> {
-  const block: NonNullable<ClaudeSettings['statusLine']> = {
+export function buildStatusLineBlock(command: string): NonNullable<ClaudeSettings['statusLine']> {
+  return {
     type: 'command',
     command,
     padding: 0,
   };
-  if (refreshInterval !== null) {
-    block.refreshInterval = refreshInterval;
-  }
-  return block;
 }
 
 export function shouldOverwriteStatusLine(
@@ -70,14 +63,13 @@ export function applyStatuslineInstall(
   settings: ClaudeSettings,
   proxyRoot: string,
   force: boolean,
-  refreshInterval: number | null,
 ): ClaudeSettings | { error: string } {
   const check = shouldOverwriteStatusLine(settings.statusLine?.command, force);
   if (!check.ok) return { error: check.message };
   const command = buildStatusLineCommand(proxyRoot);
   const root = resolvePosixAbsolutePath(proxyRoot);
   const next: ClaudeSettings = { ...settings };
-  next.statusLine = buildStatusLineBlock(command, refreshInterval);
+  next.statusLine = buildStatusLineBlock(command);
   if (!next.env) next.env = {};
   next.env[SMART_CODE_PROXY_ROOT_KEY] = root;
   return next;

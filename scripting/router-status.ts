@@ -16,7 +16,6 @@ import {
   readClaudeSettings,
   SMART_CODE_PROXY_ROOT_KEY,
   STATUSLINE_ROUTER_DETAILS_KEY,
-  type ClaudeSettings,
 } from './shared/claude-settings.js';
 import { readSubscriptionQuotaFromProviderDir } from './shared/provider-config.js';
 
@@ -480,14 +479,6 @@ interface StatuslineCache {
   lastRenderedTable2Output?: string;
 }
 
-/** Lee `refreshInterval` de settings (no de env). Retorna `null` si ausente o inválido. */
-export function readRefreshIntervalFromSettings(settings: ClaudeSettings): number | null {
-  const value = settings.statusLine?.refreshInterval;
-  if (value === undefined || value === null) return null;
-  if (!Number.isInteger(value) || value < 1) return null;
-  return value;
-}
-
 function readSessionMetricsMtime(sessionPath: string): { mtimeMs: number; size: number } | null {
   const metricsFile = join(sessionPath, 'session-metrics.json');
   if (!existsSync(metricsFile)) return null;
@@ -922,7 +913,6 @@ function renderTokenTable(
   metrics: AggregatedSessionMetrics,
   previous: MetricsSnapshot | null,
   targetWidth?: number,
-  liveIndicator: { seconds: number } | null = null,
 ): { lines: string[]; width: number } {
   // Función local para alinear a la derecha
   function alignRight(text: string, width: number): string {
@@ -1134,15 +1124,9 @@ function renderTokenTable(
 
   // Calcular padding para que el título tenga el mismo ancho que la tabla
   const titlePrefix = '╭─ Trabajo por niveles de razonamiento ';
-  const liveSuffix = liveIndicator
-    ? ` ${C.dim}● live (${liveIndicator.seconds}s)${C.reset}`
-    : '';
-  const liveVisLen = liveIndicator ? visibleLength(`● live (${liveIndicator.seconds}s)`) : 0;
-  const titleVisLen = visibleLength(titlePrefix) + liveVisLen + (liveIndicator ? 1 : 0);
+  const titleVisLen = visibleLength(titlePrefix);
   const titlePad = Math.max(0, width - titleVisLen - 1); // -1 para ╮
-  const title = liveIndicator
-    ? `${C.title}${titlePrefix}${'─'.repeat(titlePad)}${liveSuffix}╮${C.reset}`
-    : `${C.title}${titlePrefix}${'─'.repeat(titlePad)}╮${C.reset}`;
+  const title = `${C.title}${titlePrefix}${'─'.repeat(titlePad)}╮${C.reset}`;
 
   // Eliminar el borde inferior generado por renderTable
   const tableLines = table.split('\n');
@@ -1287,10 +1271,6 @@ export function buildStatuslineOutput(
     settingsEnv[STATUSLINE_ROUTER_DETAILS_KEY]?.trim().toLowerCase() === 'on';
 
   if (showRouterDetails) {
-    const claudeSettings = readClaudeSettings();
-    const refreshSec = readRefreshIntervalFromSettings(claudeSettings);
-    const liveIndicator = refreshSec !== null ? { seconds: refreshSec } : null;
-
     if (sessionPath) {
       const cache = readStatuslineCache(sessionPath);
       const mtimeInfo = readSessionMetricsMtime(sessionPath);
@@ -1300,7 +1280,7 @@ export function buildStatuslineOutput(
       } else {
         const metrics = aggregateSessionMetrics(sessionPath, settingsEnv, paths.routingPath);
         const previous = cache.metricsSnapshot || null;
-        const table2 = renderTokenTable(metrics, previous, targetWidth, liveIndicator);
+        const table2 = renderTokenTable(metrics, previous, targetWidth);
         const table2Text = table2.lines.join('\n') + '\n';
         writeStatuslineCache(sessionPath, {
           metricsSnapshot: {
@@ -1340,7 +1320,6 @@ export function buildStatuslineOutput(
         { ...createEmptyMetrics(settingsEnv, paths.routingPath), sessionTotals: emptySessionTotals() },
         null,
         targetWidth,
-        liveIndicator,
       );
       output.push(table2.lines.join('\n'));
     }

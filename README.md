@@ -205,7 +205,7 @@ Todo volcado que se trunca genera un archivo `.omitted.txt` documentando la omis
 
 1.  **Instalar dependencias**: `npm install`
 2.  **Configurar proveedor** (opcional): `npm run configure:provider` (asistente interactivo para configurar API keys y modelos de diferentes proveedores).
-3.  **Integraciones Claude Code** (opcional): `npm run setup:install` instala statusline, voz y hooks en `~/.claude/settings.json` en un único paso (admite `--dry-run`, `--force`, flags `--statusline`/`--voice`/`--hooks`). El statusline incluye **modo live** por defecto (`refreshInterval: 3`, actualización cada 3 s de la Tabla 2); para desactivarlo: `SMART_CODE_PROXY__STATUSLINE_REFRESH_INTERVAL=0 npm run setup:install`. Para desinstalar: `npm run setup:uninstall`. Ver [`docs/notifications.md`](docs/notifications.md) y [`docs/router-statusline.md`](docs/router-statusline.md).
+3.  **Integraciones Claude Code** (opcional): `npm run setup:install` instala statusline, voz y hooks en `~/.claude/settings.json` en un único paso (admite `--dry-run`, `--force`, flags `--statusline`/`--voice`/`--hooks`). Para desinstalar: `npm run setup:uninstall`. Ver [`docs/notifications.md`](docs/notifications.md) y [`docs/router-statusline.md`](docs/router-statusline.md).
 4.  **Referencia multi-agente** (opcional): `npm run create:agents-reference` (Crea hardlink `AGENTS.md` → `CLAUDE.md` para compatibilidad con otros agentes de código).
 5.  **Modo Desarrollo**: `npm run dev` (Carga `configs/.env` mediante flag nativo de Node v22.9+; **v24 LTS recomendado**).
 6.  **Compilación**: `npm run build` (Genera `/dist` optimizado).

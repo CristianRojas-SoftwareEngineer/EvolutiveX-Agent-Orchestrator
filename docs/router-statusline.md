@@ -270,6 +270,11 @@ El statusline persiste estado ligero por sesión para mejorar la lectura entre r
 | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `contextUsagePercentage` | Fallback de la barra de contexto (Tabla 1) cuando stdin no trae `ctx.context_window.used_percentage` **usable** (`number`, `Number.isFinite`, `> 0`)                                              |
 | `metricsSnapshot`        | Snapshot `{ lite, standard, reasoning }` con `count`, `inputTokens`, `cacheReadInputTokens`, `outputTokens` para atenuar (`dim`) o resaltar (`value`) celdas numéricas en Tabla 2 vía `cellColor` |
+| `lastRenderedMtimeMs`    | `mtime` de `session-metrics.json` en el último render completo de Tabla 2                                                                                                                         |
+| `lastRenderedMetricsSize`| Tamaño en bytes de `session-metrics.json` en el último render completo de Tabla 2                                                                                                                 |
+| `lastRenderedTable2Output`| Texto completo del último render de Tabla 2 (para reimpresión sin re-agregar)                                                                                                                    |
+
+**Cierre temprano:** en cada invocación, `router-status.ts` compara `mtime` y `size` de `session-metrics.json` con `lastRenderedMtimeMs` y `lastRenderedMetricsSize`. Si no cambió, reimprime `lastRenderedTable2Output` sin re-agregar métricas (~5–10 ms).
 
 **Fuera de alcance de la caché:** reconstruir métricas de sesión si falta o está corrupto `session-metrics.json`; la Tabla 2 sigue dependiendo exclusivamente de ese archivo.
 
@@ -347,7 +352,9 @@ npm run install:statusline
 
 Ambos usan el mismo instalador subyacente ([`scripting/install-statusline.ts`](../scripting/install-statusline.ts)) y escriben en `~/.claude/settings.json`:
 
-- `statusLine` con `type: "command"`, `padding: 0`, `refreshInterval: 3` (por defecto, cada 3 segundos) y un comando generado por `buildNpxTsxCommand`: `npx --prefix "<ROOT>"` + `tsx "<RUTA_ABSOLUTA>/scripting/router-status.ts"` (ruta del script **absoluta**, separadores **`/`**, citada para cmd/PowerShell o shell POSIX según el SO)
+- `statusLine` con `type: "command"`, `padding: 0` y un comando generado por `buildNpxTsxCommand`: `npx --prefix "<ROOT>"` + `tsx "<RUTA_ABSOLUTA>/scripting/router-status.ts"` (ruta del script **absoluta**, separadores **`/`**, citada para cmd/PowerShell o shell POSIX según el SO)
+
+> Claude Code admite el campo opcional `statusLine.refreshInterval` (re-ejecución periódica del comando cada N segundos). **Este proyecto no lo escribe** en `setup:install`; la cadencia queda en los triggers nativos de Claude Code (mensaje del asistente, `/compact`, permisos, vim).
 - `env.SMART_CODE_PROXY_ROOT` con la ruta absoluta nativa del proxy (para resolver `sessions/`, `routing/` y `configs/.env` aunque Claude Code abra otro workspace)
 
 Reinicie Claude Code tras instalar. Opciones: `--dry-run`, `--force` (sobrescribir un statusLine ajeno), `--uninstall`. Si mueve el clon del repo, vuelva a ejecutar el instalador.
@@ -379,22 +386,6 @@ y en `env`: `"SMART_CODE_PROXY_ROOT": "<RUTA_ABSOLUTA_DEL_PROXY>"`.
 ---
 
 ## 10. Comportamiento ante entradas inválidas y límites
-
-### 10.1 Live refresh (`refreshInterval`)
-
-Claude Code admite el campo opcional `statusLine.refreshInterval`: re-ejecuta el comando del statusline **cada N segundos** (mínimo `1`), **además** de los triggers por evento (mensaje del asistente, `/compact`, modo permisos, modo vim). Si el campo está ausente, el script solo corre en esos eventos.
-
-El instalador escribe `refreshInterval: 3` por defecto (cada 3 segundos). Para desactivar el timer y volver a la cadencia solo por eventos:
-
-```bash
-SMART_CODE_PROXY__STATUSLINE_REFRESH_INTERVAL=0 npm run setup:install
-```
-
-O reinstale con la variable vacía (`SMART_CODE_PROXY__STATUSLINE_REFRESH_INTERVAL=`). Otros valores enteros ≥ 1 (p. ej. `2`, `5`) ajustan la cadencia. Variable ausente → `3`; valor no numérico → `3` con warning en stderr.
-
-**Cierre temprano:** en cada invocación, `router-status.ts` compara `mtime` y `size` de `session-metrics.json` con el cache en `.statusline-state.json`. Si no cambió, reimprime el último render de la Tabla 2 sin re-agregar métricas (~5–10 ms).
-
-**Indicador visual:** con `refreshInterval` activo y Tabla 2 visible (`SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS=on`), la cabecera de la Tabla 2 muestra `● live (Ns)` alineado a la derecha (`N` = segundos del `refreshInterval` configurado).
 
 ### Comportamiento ante entradas inválidas
 

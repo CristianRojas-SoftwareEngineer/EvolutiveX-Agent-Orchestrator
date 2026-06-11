@@ -309,7 +309,7 @@ Cuando `resets_at` es válido y ya expiró (`resets_at * 1000 <= Date.now()`), S
 
 ### Requirement: Caché por sesión (`.statusline-state.json`)
 
-El statusline SHALL persistir estado ligero por sesión para mejorar la lectura entre re-invocaciones de Claude Code y para soportar el cierre temprano del modo live refresh. **No** sustituye a `session-metrics.json`.
+El statusline SHALL persistir estado ligero por sesión para mejorar la lectura entre re-invocaciones de Claude Code y para optimizar re-invocaciones cuando `session-metrics.json` no cambió (cierre temprano de Tabla 2). **No** sustituye a `session-metrics.json`.
 
 | Aspecto   | Detalle                                                                                                                   |
 | --------- | ------------------------------------------------------------------------------------------------------------------------- |
@@ -364,28 +364,3 @@ El statusline SHALL persistir estado ligero por sesión para mejorar la lectura 
 - **GIVEN** `lastRenderedTable2Output` contiene la cadena exacta de un render previo con códigos ANSI
 - **WHEN** una invocación posterior detecta mtime sin cambios y reimprime el cache
 - **THEN** el output por stdout SHALL ser byte-idéntico al render original (mismos colores, bordes, alineación)
-
-### Requirement: Cabecera de Tabla 2 con indicador "● live (Ns)"
-
-Cuando `refreshInterval` está activo (entero ≥ 1, en segundos) y la Tabla 2 está habilitada, `router-status.ts` SHALL añadir el texto `● live (Ns)` en la cabecera de la Tabla 2, donde `N` es el valor de `refreshInterval` leído de `settings.statusLine.refreshInterval`.
-
-#### Scenario: Indicador visible con refreshInterval activo
-
-- **GIVEN** `settings.statusLine.refreshInterval` es `3`
-- **AND** `SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS` es `on`
-- **WHEN** `buildStatuslineOutput` renderiza la Tabla 2
-- **THEN** la primera línea (cabecera) de la Tabla 2 SHALL contener el sufijo `● live (3s)` en color dim, alineado a la derecha antes del cierre del borde superior
-
-#### Scenario: Indicador oculto con refreshInterval desactivado
-
-- **GIVEN** `settings.statusLine.refreshInterval` está ausente
-- **AND** `SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS` es `on`
-- **WHEN** `buildStatuslineOutput` renderiza la Tabla 2
-- **THEN** la cabecera de la Tabla 2 SHALL NO contener el sufijo `● live`
-
-#### Scenario: Lectura de refreshInterval desde settings
-
-- **GIVEN** `settings.statusLine.refreshInterval` es `5`
-- **WHEN** `buildStatuslineOutput` lee el valor
-- **THEN** SHALL usar el entero `5` en el sufijo, mostrando `● live (5s)`
-

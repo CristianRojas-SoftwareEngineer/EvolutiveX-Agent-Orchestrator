@@ -188,6 +188,7 @@ async function testProvider(
           ttsStatuses: [],
           has402: false,
           ttsFallbacks: [],
+          ttsSpeeches: [],
           stopUsedFallback: false,
         },
         false,
@@ -211,6 +212,7 @@ async function testProvider(
           ttsStatuses: [],
           has402: false,
           ttsFallbacks: [],
+          ttsSpeeches: [],
           stopUsedFallback: false,
         },
         false,
@@ -267,15 +269,16 @@ async function testProvider(
     const actionableFallbacks = filterActionableTtsFallbacks(logAnalysis.ttsFallbacks);
     const silentFallback = actionableFallbacks.length > 0;
     const httpFailure = hasAnyTtsHttpFailure(logAnalysis.ttsStatuses);
-    const messageType = inferMessageType(logAnalysis.ttsStatus, logAnalysis.ttsFallbacks);
+    const messageType = inferMessageType(logAnalysis.ttsStatus, logAnalysis.ttsFallbacks, logAnalysis.ttsSpeeches);
 
-    // Éxito: Stop dinámico (sin fallback accionable) y TTS HTTP 200.
-    // UserPromptSubmit sin historial (no-messages/no-token) es esperado al primer prompt.
+    // Éxito: Stop dinámico detectado por [TTS-SPEECH] (provider TTS dedicado no pasa por proxy).
+    // UserPromptSubmit sin historial (no-messages/no-openrouter-key) es esperado al primer prompt.
+    const stopSpeech = logAnalysis.ttsSpeeches.some((s) => s.eventName === 'Stop');
     const ttsWorked =
       promptCheck.ok &&
       !silentFallback &&
       !logAnalysis.stopUsedFallback &&
-      logAnalysis.ttsStatus === 200;
+      stopSpeech;
 
     if (silentFallback) {
       errors.push(...formatFallbackErrors(logAnalysis.ttsFallbacks));
@@ -332,22 +335,24 @@ function buildResult(
   errors: string[],
   messageType?: ProviderTestResult['messageType'],
 ): ProviderTestResult {
-  const { mainSessionStatus, ttsStatuses, ttsFallbacks, stopUsedFallback, has402 } = logAnalysis;
+  const { mainSessionStatus, ttsStatuses, ttsSpeeches, ttsFallbacks, stopUsedFallback, has402 } = logAnalysis;
   const ttsStatus = ttsStatuses.at(-1) ?? null;
+  // Con provider TTS dedicado, ttsStatuses está vacío; contamos por eventos de log.
+  const ttsCallCount = ttsSpeeches.length + ttsFallbacks.length || ttsStatuses.length;
   return {
     provider,
     upstreamOrigin,
     mainSessionStatus,
     ttsStatus,
     ttsStatuses,
-    ttsCallCount: ttsStatuses.length,
+    ttsCallCount,
     anyTtsFallback:
       filterActionableTtsFallbacks(ttsFallbacks).length > 0 ||
       hasAnyTtsHttpFailure(ttsStatuses),
     stopUsedFallback,
     ttsFallbacks,
     ttsWorked,
-    messageType: messageType ?? inferMessageType(ttsStatus, ttsFallbacks),
+    messageType: messageType ?? inferMessageType(ttsStatus, ttsFallbacks, ttsSpeeches),
     claudeExitCode,
     claudeError,
     has402,

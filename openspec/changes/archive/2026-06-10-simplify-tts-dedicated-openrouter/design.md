@@ -49,3 +49,17 @@ Se eliminan del handler: `isAnthropic`, `isOllama`, `capturedToken` y `setAuthTo
 - **Disponibilidad del modelo**: si OpenRouter retira `laguna-xs.2:free`, el TTS degrada a fallback permanente (visible en logs). Mitigación futura: cambiar la constante.
 - **Dependencia de secrets.json de OpenRouter** aunque no se use OpenRouter para sesiones: documentado en el SKILL/spec; sin clave el sistema funciona con mensajes genéricos.
 - **Latencia**: laguna-xs.2 piensa antes de responder; el resumen puede tardar unos segundos más que un modelo no-thinking. Aceptado (el TTS ya es asíncrono respecto al hook).
+
+## Divergencias documentadas (post-archivo)
+
+### Harness: drain loop corregido tras archivar el change
+
+**Qué ocurrió:** la task 3.1 se marcó completada (`[x]`) pero el harness conservaba un defecto latente: `waitForGatewayTtsDrain` contaba `ttsStatuses.length` (status HTTP de llamadas TTS vía proxy) para detectar cuándo el gateway había terminado. Con el provider TTS dedicado, las llamadas van directas a OpenRouter (no pasan por el proxy), por lo que `ttsStatuses` siempre queda vacío → el loop se ejecutaba hasta el timeout de 60 s antes de continuar.
+
+**Fix aplicado** (commit posterior al `ddee02e`):
+- `wait-for-tts.ts`: el drain loop usa `analysis.ttsSpeeches.length + analysis.ttsFallbacks.length` como contador; ambos siempre se emiten por el handler independientemente del routing TTS.
+- `log-analyzer.ts`: `inferMessageType` acepta `ttsSpeeches?` como tercer parámetro y lo usa para detectar éxito antes del fallback HTTP (compatibilidad con el diseño D2).
+- `headless-tts-gateway-test.ts`: `ttsWorked` detecta éxito por `ttsSpeeches.some(s => s.eventName === 'Stop')` en lugar de `ttsStatus === 200`; `buildResult` calcula `ttsCallCount` desde eventos de log.
+- `types.ts`: `TtsSpeechEvent` e `ttsSpeeches: TtsSpeechEvent[]` añadidos a `LogAnalysisResult`.
+
+**Por qué no se incluyó en las tasks originales:** el defecto solo se manifiesta en ejecución real del harness (el loop de 60 s no se observa en unit tests). Se detectó al correr `npm run test:headless-tts` por primera vez tras el archive del change, cuando el TTS sí produjo voz dinámica pero la terminal se quedó colgada 60 s esperando señal del proxy que nunca llegó.

@@ -30,16 +30,24 @@ export interface TtsFallbackEvent {
   fallbackText: string;
 }
 
+/** Evento [TTS-SPEECH] registrado en logs del gateway (mensaje dinámico generado). */
+export interface TtsSpeechEvent {
+  eventName: string;
+  textPreview: string;
+}
+
 /** Resultado del análisis incremental de logs JSONL. */
 export interface LogAnalysisResult {
   mainSessionStatus: number | null;
-  /** Status de la última llamada TTS (típicamente Stop). */
+  /** Status de la última llamada TTS vía proxy (null si el provider TTS es dedicado/directo). */
   ttsStatus: number | null;
-  /** Todas las llamadas TTS completadas en el intervalo. */
+  /** Todas las llamadas TTS completadas vía proxy. Vacío si el provider TTS es dedicado. */
   ttsStatuses: number[];
   has402: boolean;
   /** Fallbacks silenciosos detectados (audio/toast genérico). */
   ttsFallbacks: TtsFallbackEvent[];
+  /** Mensajes dinámicos generados (via [TTS-SPEECH]). */
+  ttsSpeeches: TtsSpeechEvent[];
   /** true si el Stop usó el mensaje genérico. */
   stopUsedFallback: boolean;
 }

@@ -47,13 +47,13 @@ En Smart Code Proxy, el evento **`Stop`** usa el relay genérico [`post-hook-eve
 | ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1    | `post-hook-event.ts` envía `POST /hooks` al proxy (fire-and-forget; respuesta en milisegundos)                                                                                                 |
 | 2    | `AuditHookEventHandler` extrae contexto del transcript (`transcript_path`) vía `IContextExtractor`                                                                                             |
-| 3    | Genera el texto de continuidad **una sola vez** con Haiku vía `fetch()` al proxy local con el **token del provider activo** (funciona con Anthropic, Minimax, Ollama y cualquier compatible)   |
+| 3    | Genera el texto de continuidad **una sola vez** vía **OpenRouter dedicado** (`poolside/laguna-xs.2:free`) con la API key de `routing/providers/openrouter/secrets.json`, llamando directamente al upstream de OpenRouter (no al proxy local); si la clave no está disponible, usa el mensaje de fallback genérico y emite `[TTS-FALLBACK] reason: no-openrouter-key`   |
 | 4    | Emite **voz** (TTS existente) y **toast** (`INotificationService` inyectado) en paralelo desde el mismo texto                                                                                  |
 | 5    | Si el toast falla, la voz y la respuesta HTTP del hook continúan sin errores (degradación con gracia)                                                                                          |
 
 **Sin persistencia en disco:** el archivo `sessions/.last-continuity-message.txt` se retiró. Voz y toast se emiten en memoria desde el mismo texto en el mismo proceso.
 
-**Consistencia voz↔toast:** al usar el mismo texto generado con el token del provider activo, voz y toast siempre tienen el mismo contenido, independientemente del provider configurado.
+**Consistencia voz↔toast:** al usar el mismo texto generado vía el provider TTS dedicado (OpenRouter, independiente del provider de sesión), voz y toast siempre tienen el mismo contenido, independientemente del provider configurado para el flujo agéntico.
 
 **Fragmento canónico para `configs/hooks.json`** (ya aplicado; sin `timeout`):
 

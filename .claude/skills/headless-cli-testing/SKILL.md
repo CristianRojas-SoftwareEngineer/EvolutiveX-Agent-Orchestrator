@@ -1,6 +1,6 @@
 ---
 name: headless-cli-testing
-description: Run Claude Code non-interactively (claude -p / --print) to validate changes end-to-end: proxy routing, hooks, TTS, toasts, and log output. Trigger when the user wants to test a proxy + hook + gateway change programmatically, run a headless E2E session, observe gateway logs, or reproduce the OAuth/bearer Stop-fallback scenario. También activar cuando el usuario quiera ejecutar pruebas headless, sesión no interactiva, validar hooks del gateway, o diagnosticar el fallback del Stop.
+description: Run Claude Code non-interactively (claude -p / --print) to validate changes end-to-end: proxy routing, hooks, TTS, toasts, and log output. Trigger when the user wants to test a proxy + hook + gateway change programmatically, run a headless E2E session, observe gateway logs, or reproduce the no-openrouter-key Stop-fallback scenario. También activar cuando el usuario quiera ejecutar pruebas headless, sesión no interactiva, validar hooks del gateway, o diagnosticar el fallback del Stop.
 ---
 
 # Headless CLI Testing
@@ -93,28 +93,64 @@ This triggers the full cycle:
 
 ---
 
+## TTS cycle (Stop event)
+
+**`generateSpeechText` always uses the dedicated OpenRouter TTS provider** — independent
+of the session provider. The session provider (Anthropic, Minimax, Ollama, etc.) is
+only used for the main agentik flow; the TTS summary call goes directly to OpenRouter:
+
+```
+Stop hook → POST /hooks → AuditHookEventHandler
+  → generateSpeechText → fetch('https://openrouter.ai/api/v1/messages')
+       model: poolside/laguna-xs.2:free
+       auth:  routing/providers/openrouter/secrets.json ANTHROPIC_AUTH_TOKEN
+       (NEVER through the local proxy)
+  → [TTS-SPEECH] log entry (success) OR [TTS-FALLBACK] log entry (any error)
+  → speak(text) via SAPI (local TTS engine)
+```
+
+**Two-state TTS output:**
+
+| Log tag | Meaning | `reason` field |
+|---|---|---|
+| `[TTS-SPEECH]` | Dynamic summary generated successfully | — (only `textPreview`) |
+| `[TTS-FALLBACK]` | Fallback to generic message | `no-openrouter-key`, `no-messages`, `http-NNN`, `empty-response`, `exception` |
+
+**Important:** because the TTS call bypasses the proxy, **no HTTP status code for TTS
+appears in `server/logs.jsonl`**. Detection of TTS completion relies entirely on
+`[TTS-SPEECH]` and `[TTS-FALLBACK]` log entries — not on proxy HTTP statuses.
+
+The harness drain loop (`waitForGatewayTtsDrain`) polls
+`ttsSpeeches.length + ttsFallbacks.length` from the log; this count rises as soon as
+the handler emits its log entry, regardless of which TTS path was taken.
+
+---
+
 ## Observing results
 
 ### Gateway logs
 
 ```bash
-# All [STOP-DIAG] entries (requires instrumented build)
-grep '\[STOP-DIAG\]' server/logs.jsonl
+# All [TTS-SPEECH] entries (dynamic TTS success)
+grep '\[TTS-SPEECH\]' server/logs-headless-tts.jsonl
+
+# All [TTS-FALLBACK] entries (fallback + reason)
+grep '\[TTS-FALLBACK\]' server/logs-headless-tts.jsonl
 
 # Last N lines of the full log
-tail -n 50 server/logs.jsonl
+tail -n 50 server/logs-headless-tts.jsonl
 ```
 
 Entries are JSONL (one JSON object per line). The gateway logs via pino; fields of interest:
 
 | Field | Meaning |
 |---|---|
-| `tag` | `[STOP-DIAG]` for diagnostic entries |
-| `status` | HTTP status from the upstream on `!res.ok` (e.g. 401, 403) |
-| `statusText` | HTTP reason phrase |
-| `body` | First 500 chars of the upstream error body |
-| `reason` | `no-openrouter-key` or `no-messages` for early-return in `generateSpeechText` |
-| `usedFallback` | `true` when `announceStop` used the hardcoded fallback string |
+| `tag` | `[TTS-SPEECH]` for successful dynamic TTS; `[TTS-FALLBACK]` for fallbacks |
+| `textPreview` | First 120 chars of the generated TTS text (only in `[TTS-SPEECH]`) |
+| `reason` | Fallback reason: `no-openrouter-key`, `no-messages`, `http-NNN`, `empty-response`, `exception` |
+| `usedFallback` | `true` when the generic fallback message was used |
+| `fallbackText` | The actual fallback text spoken (only in `[TTS-FALLBACK]`) |
+| `eventName` | Hook event that triggered the TTS (`Stop`, `UserPromptSubmit`, etc.) |
 
 ### Session audit
 
@@ -128,8 +164,11 @@ Each turn writes artifacts under `sessions/<sessionId>/` (configured by `AUDIT_B
 # Exit code: 0 = success, non-zero = error
 claude -p "Di hola" --model haiku; echo "exit: $?"
 
-# Grep for the key diagnostic entry
-grep '"tag":"\[STOP-DIAG\]"' server/logs.jsonl | grep '"status"' | tail -3
+# Grep for dynamic TTS success
+grep '"tag":"\[TTS-SPEECH\]"' server/logs.jsonl | grep '"eventName":"Stop"' | tail -3
+
+# Grep for fallback + reason
+grep '"tag":"\[TTS-FALLBACK\]"' server/logs.jsonl | tail -3
 
 # Parse JSON output (--output-format json)
 claude -p "Di hola" --model haiku --output-format json | jq '.result'
@@ -139,16 +178,39 @@ claude -p "Di hola" --model haiku --output-format json | jq '.result'
 
 ## Provider matrix
 
-| Provider | configure command | Expected `UPSTREAM_ORIGIN` | Auth header |
-|---|---|---|---|
-| Anthropic OAuth (`default`) | `npm run configure:provider default` | `https://api.anthropic.com` | `Bearer <oauth-token>` |
-| Minimax (`bearer`) | `npm run configure:provider minimax` | Minimax endpoint | `Bearer <api-key>` |
+The session provider only affects the main agentik flow. TTS always uses OpenRouter
+(dedicated provider). The harness tests 5 session providers to verify all paths work
+end-to-end with the dedicated TTS provider:
 
-To reproduce the OAuth fallback scenario:
-1. `npm run configure:provider default`
-2. `npm run dev` (background)
-3. `claude -p "Di hola en una palabra" --model haiku --max-turns 1`
-4. `grep '\[STOP-DIAG\]' server/logs.jsonl`
+| Provider | Session flow | TTS flow |
+|---|---|---|
+| `anthropic` (default) | `https://api.anthropic.com` with Bearer OAuth | OpenRouter dedicated (`poolside/laguna-xs.2:free`) |
+| `minimax` | Minimax endpoint with Bearer API key | OpenRouter dedicated |
+| `openrouter` | OpenRouter endpoint | OpenRouter dedicated |
+| `ollama` | Local Ollama endpoint | OpenRouter dedicated |
+| `default` | `https://api.anthropic.com` with Bearer OAuth | OpenRouter dedicated |
+
+**Prerequisite for TTS tests:** `routing/providers/openrouter/secrets.json` must contain
+a valid `ANTHROPIC_AUTH_TOKEN`. Without it, all providers fall back to the generic message
+(`[TTS-FALLBACK] reason: no-openrouter-key`) — valid behavior, but the harness considers
+it a failure for the dynamic TTS assertion.
+
+---
+
+## Reproducing the no-openrouter-key fallback scenario
+
+The harness includes a dedicated fallback scenario (always runs after the provider loop)
+that starts the test proxy with `OPENROUTER_SECRETS_PATH` pointing to a nonexistent file:
+
+```bash
+# Automatically run as part of the full suite:
+npm run test:headless-tts -- --no-voice-announce
+
+# Or trigger it in isolation by reading the harness source and running directly
+```
+
+Expected outcome: `[TTS-FALLBACK] reason: no-openrouter-key` appears in
+`server/logs-headless-tts.jsonl` for the `Stop` event.
 
 ---
 

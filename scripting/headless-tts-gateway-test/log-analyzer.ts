@@ -1,6 +1,6 @@
 import { openSync, readSync, closeSync, existsSync, statSync } from 'node:fs';
 import { FALLBACK_SPEECH, STOP_FALLBACK_TEXT } from './fallback-speech.js';
-import type { LogAnalysisResult, TtsFallbackEvent } from './types.js';
+import type { LogAnalysisResult, TtsFallbackEvent, TtsSpeechEvent } from './types.js';
 
 /** Razones de fallback aceptables en UserPromptSubmit al inicio (sin historial o sin clave TTS). */
 const EXPECTED_USER_PROMPT_SUBMIT_REASONS = new Set(['no-messages', 'no-openrouter-key']);
@@ -15,6 +15,7 @@ interface LogEntry {
   usedFallback?: boolean;
   reason?: string;
   fallbackText?: string;
+  textPreview?: string;
 }
 
 /** Lee bytes nuevos desde un offset sin cargar el archivo completo. */
@@ -100,11 +101,12 @@ export function analyzeLogEntries(entries: LogEntry[]): LogAnalysisResult {
   }
 
   const ttsFallbacks = extractTtsFallbacks(entries);
+  const ttsSpeeches = extractTtsSpeeches(entries);
   const stopUsedFallback = ttsFallbacks.some(
     (f) => f.eventName === 'Stop' && f.fallbackText === STOP_FALLBACK_TEXT,
   );
 
-  return { mainSessionStatus, ttsStatus, ttsStatuses, has402, ttsFallbacks, stopUsedFallback };
+  return { mainSessionStatus, ttsStatus, ttsStatuses, has402, ttsFallbacks, ttsSpeeches, stopUsedFallback };
 }
 
 /** Extrae eventos [TTS-FALLBACK] del JSONL del gateway. */
@@ -123,6 +125,20 @@ export function extractTtsFallbacks(entries: LogEntry[]): TtsFallbackEvent[] {
   }
 
   return fallbacks;
+}
+
+/** Extrae eventos [TTS-SPEECH] del JSONL del gateway (mensajes dinámicos generados). */
+export function extractTtsSpeeches(entries: LogEntry[]): TtsSpeechEvent[] {
+  const speeches: TtsSpeechEvent[] = [];
+  for (const entry of entries) {
+    if (entry.tag !== '[TTS-SPEECH]') continue;
+    if (!entry.eventName) continue;
+    speeches.push({
+      eventName: entry.eventName,
+      textPreview: entry.textPreview ?? '',
+    });
+  }
+  return speeches;
 }
 
 /** Analiza logs nuevos desde un byte offset. */
@@ -147,13 +163,22 @@ export function filterActionableTtsFallbacks(fallbacks: TtsFallbackEvent[]): Tts
   return fallbacks.filter((f) => !isExpectedSessionStartFallback(f));
 }
 
-/** Infiere tipo de mensaje Stop: solo fallbacks accionables cuentan como error. */
+/**
+ * Infiere tipo de mensaje Stop a partir de logs TTS.
+ * Prioridad: fallbacks accionables > [TTS-SPEECH] presente > ttsStatus HTTP > unknown.
+ * Con el provider TTS dedicado (OpenRouter directo), ttsStatus siempre es null;
+ * se detecta éxito por la presencia de [TTS-SPEECH].
+ */
 export function inferMessageType(
   ttsStatus: number | null,
   ttsFallbacks: TtsFallbackEvent[],
+  ttsSpeeches?: TtsSpeechEvent[],
 ): 'dynamic' | 'fallback' | 'unknown' {
   const actionable = filterActionableTtsFallbacks(ttsFallbacks);
   if (actionable.length > 0) return 'fallback';
+  // Provider TTS dedicado: éxito se detecta por [TTS-SPEECH]
+  if (ttsSpeeches && ttsSpeeches.length > 0) return 'dynamic';
+  // Fallback para provider TTS via proxy (legado / compatibilidad)
   if (ttsStatus === 200) return 'dynamic';
   if (ttsStatus !== null) return 'fallback';
   return 'unknown';

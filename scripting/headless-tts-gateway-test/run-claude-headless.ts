@@ -4,6 +4,8 @@ export interface ClaudeRunResult {
   exitCode: number;
   isError: boolean;
   resultText: string;
+  /** Detalle de error: stderr o primera línea útil de stdout cuando isError=true. */
+  errorDetail?: string;
 }
 
 /**
@@ -107,10 +109,18 @@ export async function runClaudeHeadless(
         }
       }
 
+      // Captura detalle de error: stderr primero, luego stdout no-JSON, truncado a 300 chars.
+      let errorDetail: string | undefined;
+      if (isError) {
+        const raw = (stderr.trim() || stdout.trim()).replace(/\r?\n/g, ' ').slice(0, 300);
+        if (raw) errorDetail = raw;
+      }
+
       resolve({
         exitCode: code ?? 1,
         isError,
         resultText,
+        errorDetail,
       });
     });
 

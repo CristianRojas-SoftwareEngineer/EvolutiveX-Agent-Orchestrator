@@ -234,7 +234,8 @@ async function testProvider(
     );
 
     if (claudeResult.isError) {
-      errors.push(`Claude: ${claudeResult.resultText || 'error'}`);
+      const base = claudeResult.resultText || claudeResult.errorDetail || 'error';
+      errors.push(`Claude (exit ${claudeResult.exitCode}): ${base}`);
     }
 
     await sleep(500);
@@ -418,7 +419,8 @@ async function testFallbackScenario(opts: CliOptions): Promise<boolean> {
     );
 
     if (claudeResult.isError) {
-      console.log(chalk.yellow(`  Claude: ${claudeResult.resultText || 'error'}`));
+      const base = claudeResult.resultText || claudeResult.errorDetail || 'error';
+      console.log(chalk.yellow(`  Claude (exit ${claudeResult.exitCode}): ${base}`));
     }
 
     await sleep(500);

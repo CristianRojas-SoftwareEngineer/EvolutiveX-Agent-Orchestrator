@@ -79,18 +79,18 @@ Errores de red en el fetch no abortan el hop; se preserva el archivo previo si e
 
 #### Lectura en el statusline (`scripting/router-status.ts`)
 
-`aggregateSessionMetrics` lee **solo** el schema canónico (`billable_hops`, `finalized_runs`, tokens en snake_case). La fila **Totales** toma `# Steps` y tokens desde `session_totals`; `# Workflows` se deriva de la **suma de los niveles renderizados** (lite + standard + reasoning) para que la tabla sea internamente consistente (en `session_totals.finalized_runs` cuentan también workflows sin modelo atribuido, que no tienen fila por nivel).
+`aggregateSessionMetrics` lee **solo** el schema canónico (`billable_hops`, `finalized_runs`, tokens en snake_case). La fila **Totales** toma `# Steps` y tokens desde `session_totals`; `# Workflows` se deriva de la **suma de los niveles renderizados** (lite + standard + reasoning + frontier) para que la tabla sea internamente consistente (en `session_totals.finalized_runs` cuentan también workflows sin modelo atribuido, que no tienen fila por nivel).
 
 #### Mapeo Tabla 2
 
 ```
-Por fila (Lite / Standard / Reasoning):
+Por fila (Lite / Standard / Reasoning / Frontier):
   # Steps     ← Σ models[modelId].billable_hops   (modelId clasificado en ese nivel)
   # Workflows ← Σ models[modelId].finalized_runs
 
 Fila Totales:
   # Steps     ← session_totals.billable_hops
-  # Workflows ← Σ finalized_runs de los niveles lite/standard/reasoning
+  # Workflows ← Σ finalized_runs de los niveles lite/standard/reasoning/frontier
 ```
 
 #### Semántica de los totales
@@ -99,6 +99,6 @@ Fila Totales:
 
 #### Validez multi-proveedor
 
-El sistema depende del campo `"model"` del request body. La clasificación lite/standard/reasoning usa `ANTHROPIC_DEFAULT_*_MODEL`; registros sin coincidencia no se suman (véase [`router-statusline.md`](./router-statusline.md)).
+El sistema depende del campo `"model"` del request body. La clasificación lite/standard/reasoning/frontier usa `ANTHROPIC_DEFAULT_*_MODEL` (incluye `ANTHROPIC_DEFAULT_FABLE_MODEL` para Frontier); registros sin coincidencia no se suman (véase [`router-statusline.md`](./router-statusline.md)).
 
 ---

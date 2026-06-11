@@ -5,6 +5,7 @@ const configuredEnv: ClaudeSettingsEnv = {
   ANTHROPIC_DEFAULT_HAIKU_MODEL: 'm1-haiku',
   ANTHROPIC_DEFAULT_SONNET_MODEL: 'm2-sonnet',
   ANTHROPIC_DEFAULT_OPUS_MODEL: 'm3-opus',
+  ANTHROPIC_DEFAULT_FABLE_MODEL: 'm4-fable',
 };
 
 describe('classifyModelWithEnv', () => {
@@ -12,8 +13,16 @@ describe('classifyModelWithEnv', () => {
     expect(classifyModelWithEnv('provider/m1-haiku', configuredEnv)).toBe('lite');
   });
 
+  it('clasifica fable como frontier', () => {
+    expect(classifyModelWithEnv('x/m4-fable', configuredEnv)).toBe('frontier');
+  });
+
   it('clasifica opus antes que sonnet (reasoning)', () => {
     expect(classifyModelWithEnv('x/m3-opus', configuredEnv)).toBe('reasoning');
+  });
+
+  it('prioriza fable sobre opus si el id incluye ambos substrings', () => {
+    expect(classifyModelWithEnv('combo-m4-fable-m3-opus', configuredEnv)).toBe('frontier');
   });
 
   it('clasifica sonnet como standard', () => {
@@ -38,8 +47,16 @@ describe('fallback heurístico (vars ausentes)', () => {
     expect(classifyModelWithEnv('claude-haiku-4-5-20251001', {})).toBe('lite');
   });
 
+  it('fable sin vars → frontier', () => {
+    expect(classifyModelWithEnv('claude-fable-5', {})).toBe('frontier');
+  });
+
   it('opus sin vars → reasoning', () => {
     expect(classifyModelWithEnv('claude-opus-4-8', {})).toBe('reasoning');
+  });
+
+  it('mythos sin keyword fable → null', () => {
+    expect(classifyModelWithEnv('claude-mythos-5', {})).toBeNull();
   });
 
   it('sonnet sin vars → standard', () => {

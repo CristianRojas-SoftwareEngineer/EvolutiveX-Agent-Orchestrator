@@ -149,7 +149,7 @@ El sistema SHALL proveer `SessionMetricsService` en `src/2-services/session-metr
 
 ### Requirement: finalized_runs estructural en ISessionTotals
 
-`ISessionTotals` SHALL incluir `finalized_runs: number` igual a la cantidad de IDs en `finalized_workflow_ids` del sidecar tras el último cierre procesado, **no** la suma de `finalized_runs` de cada modelo. Nota: el statusline deriva la columna `# Workflows` de la fila Totales de la **suma de los niveles renderizados** (lite + standard + reasoning), no desde `session_totals.finalized_runs` directamente (ver `statusline-runtime`); ambos valores difieren cuando hay workflows sin modelo atribuido.
+`ISessionTotals` SHALL incluir `finalized_runs: number` igual a la cantidad de IDs en `finalized_workflow_ids` del sidecar tras el último cierre procesado, **no** la suma de `finalized_runs` de cada modelo. Nota: el statusline deriva la columna `# Workflows` de la fila Totales de la **suma de los niveles renderizados** (lite + standard + reasoning + frontier), no desde `session_totals.finalized_runs` directamente (ver `statusline-runtime`); ambos valores difieren cuando hay workflows sin modelo atribuido.
 
 #### Scenario: total de sesión refleja ejecuciones estructurales
 

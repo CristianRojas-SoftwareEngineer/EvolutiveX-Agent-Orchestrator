@@ -3,7 +3,7 @@ name: statusline-system
 description: >
   Knowledge reference for the Smart Code Proxy Claude Code statusline: architecture,
   installation in settings.json, runtime pipeline (router-status.ts), three-table layout,
-  reasoning-level slots (Lite/Standard/Reasoning), Tabla 2 aggregation from
+  reasoning-level slots (Lite/Standard/Reasoning/Frontier), Tabla 2 aggregation from
   session-metrics.json, cache, and file map. Use when asking how the statusline works,
   where slot or Tabla 2 logic lives, how metrics are composed per level, statusline
   installation, SMART_CODE_PROXY_ROOT, router-details toggle, or improving/extending
@@ -140,7 +140,7 @@ Spec: `openspec/specs/statusline-router-details-toggle/spec.md`.
 | OAuth rate limits | stdin | `ctx.rate_limits` (Tabla 3, Anthropic OAuth) |
 | Upstream provider | `configs/.env` + `routing/providers/*/config.json` | `UPSTREAM_ORIGIN` cross-match |
 | Auth method | `settings.env` | `ANTHROPIC_API_KEY` / `ANTHROPIC_AUTH_TOKEN` |
-| Model per slot | `settings.env` | `ANTHROPIC_DEFAULT_HAIKU/SonNET/OPUS_MODEL` |
+| Model per slot | `settings.env` | `ANTHROPIC_DEFAULT_HAIKU/SONNET/OPUS/FABLE_MODEL` |
 | Display names | `routing/providers/*/models/*/metadata.json` | `displayName` |
 | Session metrics | `sessions/<dir>/session-metrics.json` | per `modelId` counters |
 | Subscription quota (bearer) | `sessions/<dir>/subscription-quota.json` | Tabla 3 fallback |
@@ -151,13 +151,14 @@ Spec: `openspec/specs/statusline-router-details-toggle/spec.md`.
 <slots>
 ## Reasoning-level slots
 
-In this project **slot** means one of the **three fixed reasoning levels** mapped to Anthropic API model tiers. Tabla 2 always renders **exactly three data rows** (plus a totals row), even when counters are zero.
+In this project **slot** means one of the **four fixed reasoning levels** mapped to Anthropic API model tiers. Tabla 2 always renders **exactly four data rows** (plus a totals row), even when counters are zero.
 
 | Slot (UI label) | `settings.env` variable | API slot | Tabla 2 row |
 |-----------------|-------------------------|----------|-------------|
 | **Lite** | `ANTHROPIC_DEFAULT_HAIKU_MODEL` | haiku | row 1 |
 | **Standard** | `ANTHROPIC_DEFAULT_SONNET_MODEL` | sonnet | row 2 |
 | **Reasoning** | `ANTHROPIC_DEFAULT_OPUS_MODEL` | opus | row 3 |
+| **Frontier** | `ANTHROPIC_DEFAULT_FABLE_MODEL` | fable | row 4 |
 
 Configured by `configure-provider.ts` into `settings.env`. The statusline **reads** these variables; it does not write them.
 
@@ -165,17 +166,27 @@ Configured by `configure-provider.ts` into `settings.env`. The statusline **read
 
 Location: `scripting/router-status.ts` (exported for tests).
 
-Evaluation order: **haiku → opus → sonnet** (substring match of `modelId` against configured variable).
+Evaluation order: **haiku → fable → opus → sonnet** (substring match of `modelId` against configured variable).
 
 | Condition | Result |
 |-----------|--------|
 | `modelId` includes configured haiku model | `lite` |
+| `modelId` includes configured fable model | `frontier` |
 | `modelId` includes configured opus model | `reasoning` |
 | `modelId` includes configured sonnet model | `standard` |
-| Variable empty/absent for a level | Fallback keyword in `modelId`: `haiku` / `opus` / `sonnet` |
+| Variable empty/absent for a level | Fallback keyword in `modelId`: `haiku` / `fable` / `opus` / `sonnet` |
 | No match | `null` — entry **excluded** from all slot rows |
 
 Partial configuration is supported: configured levels use variable match; unconfigured levels use keyword fallback.
+
+### Tabla 2 ANSI palette (level rows)
+
+| Level | Color | ANSI |
+|-------|-------|------|
+| Lite | Gray | `\x1B[90m` |
+| Standard | Gray | `\x1B[90m` |
+| Reasoning | White | `\x1B[37m` |
+| Frontier | White bold | `\x1B[1;37m` |
 
 ### Where to read about slots
 
@@ -202,22 +213,22 @@ session-metrics.json
          ▼
 aggregateSessionMetrics(sessionPath, settingsEnv, routingPath)
   for each modelId in models:
-    level = classifyModelWithEnv(modelId, settingsEnv)  → lite | standard | reasoning | null
+    level = classifyModelWithEnv(modelId, settingsEnv)  → lite | standard | reasoning | frontier | null
     if null → skip
     metrics[level] += entry counters
     metrics[level].modelName = loadDisplayName(modelId, routingPath)
   sessionTotals.billableHops ← session_totals.billable_hops
   sessionTotals.* tokens ← session_totals.*
-  sessionTotals.finalizedRuns ← sum(lite + standard + reasoning finalizedRuns)  [internal consistency]
+  sessionTotals.finalizedRuns ← sum(lite + standard + reasoning + frontier finalizedRuns)  [internal consistency]
          │
          ▼
 renderTokenTable(metrics, previousSnapshot, targetWidth)
-  3 fixed rows (Lite, Standard, Reasoning) + manual «Totales de sesión» row
+  4 fixed rows (Lite, Standard, Reasoning, Frontier) + manual «Totales de sesión» row
 ```
 
 ### Column mapping per slot row
 
-| Tabla 2 column | Per-row source (Lite / Standard / Reasoning) |
+| Tabla 2 column | Per-row source (Lite / Standard / Reasoning / Frontier) |
 |----------------|-----------------------------------------------|
 | Nivel | Fixed slot label |
 | Modelo | `displayName` from `metadata.json` for aggregated `modelId`(s); empty slot shows configured default model display name |
@@ -232,7 +243,7 @@ renderTokenTable(metrics, previousSnapshot, targetWidth)
 | Column | Source in current code (`aggregateSessionMetrics` + `renderTokenTable`) |
 |--------|------------------------------------------------------------------------|
 | # Steps | `session_totals.billable_hops` (structural session count, not sum of visible rows) |
-| # Workflows | Sum of `finalized_runs` across the three rendered slot rows |
+| # Workflows | Sum of `finalized_runs` across the four rendered slot rows |
 | Tokens | `session_totals.*` |
 
 **Doc/spec tension:** `docs/router-statusline.md` §3.2 mentions `session_totals.finalized_runs` for totals `# Workflows`; `openspec/specs/statusline-runtime/spec.md` requires totals `# Workflows` ← `session_totals.finalized_runs` (hallazgo 2). Current `router-status.ts` derives totals workflows from the **sum of slot rows** for internal table consistency. When answering users, cite **code behavior** and flag the spec/doc delta if relevant.
@@ -351,7 +362,7 @@ buildStatuslineOutput()
 - Respond to the user in **Spanish**; keep path and identifier literals as in the repo.
 - This is a **reference** skill — do not implement statusline changes unless the user exits explore/plan mode and requests implementation.
 - Prefer reading `scripting/router-status.ts` and `docs/router-statusline.md` when facts may have drifted since this skill was last updated.
-- Distinguish **slot** (reasoning level: Lite/Standard/Reasoning) from unrelated «slot» terms in other domains (e.g. artifact-structuring slot assignment).
+- Distinguish **slot** (reasoning level: Lite/Standard/Reasoning/Frontier) from unrelated «slot» terms in other domains (e.g. artifact-structuring slot assignment).
 </constraints>
 
 <iteration>

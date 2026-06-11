@@ -16,6 +16,22 @@ let basePath: string;
 beforeAll(() => {
   basePath = mkdtempSync(join(tmpdir(), 'provider-env-test-'));
 
+  // Provider anthropic con Fable en catálogo
+  const anthropicDir = join(basePath, 'anthropic');
+  mkdirSync(join(anthropicDir, 'models', 'claude-fable-5'), { recursive: true });
+  writeFileSync(
+    join(anthropicDir, 'config.json'),
+    JSON.stringify({
+      AUTH_METHOD: 'oauth',
+      ANTHROPIC_BASE_URL: 'https://api.anthropic.com',
+      ANTHROPIC_DEFAULT_FABLE_MODEL: 'models/claude-fable-5',
+    }),
+  );
+  writeFileSync(
+    join(anthropicDir, 'models', 'claude-fable-5', 'metadata.json'),
+    JSON.stringify({ modelId: 'claude-fable-5', displayName: 'Fable 5' }),
+  );
+
   // Provider bearer con modelo relativo y secrets
   const bearerDir = join(basePath, 'bearer-prov');
   mkdirSync(join(bearerDir, 'models', 'mini'), { recursive: true });
@@ -53,6 +69,11 @@ describe('buildIsolatedProviderEnv', () => {
     }
     expect(env.proxyEnv.UPSTREAM_ORIGIN).toBe(DEFAULT_UPSTREAM);
     expect(env.proxyEnv.ANTHROPIC_AUTH_TOKEN).toBe('');
+  });
+
+  it('anthropic: propaga ANTHROPIC_DEFAULT_FABLE_MODEL vía MANAGED_ENV_VARS en claudeEnv', () => {
+    const env = buildIsolatedProviderEnv('anthropic', TEST_PORT, basePath);
+    expect(env.claudeEnv.ANTHROPIC_DEFAULT_FABLE_MODEL).toBe('claude-fable-5');
   });
 
   it('bearer: resuelve modelId, token de secrets y upstream del provider', () => {

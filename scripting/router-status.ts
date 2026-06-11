@@ -91,6 +91,7 @@ export interface AggregatedSessionMetrics {
   lite: TokenMetrics;
   standard: TokenMetrics;
   reasoning: TokenMetrics;
+  frontier: TokenMetrics;
   sessionTotals: SessionTotalsSnapshot;
 }
 
@@ -158,10 +159,11 @@ const C = {
   value: '\x1B[37m', // blanco
   provider: '\x1B[37m', // blanco
   model: '\x1B[37m', // blanco
-  // Niveles (gris, blanco, blanco bold)
+  // Niveles (gris → blanco bold según costo percibido)
   lite: '\x1B[90m', // gris
-  standard: '\x1B[37m', // blanco
-  reasoning: '\x1B[1;37m', // blanco bold
+  standard: '\x1B[90m', // gris
+  reasoning: '\x1B[37m', // blanco
+  frontier: '\x1B[1;37m', // blanco bold
   total: '\x1B[1;37m', // blanco bold
   // Barra de progreso
   barGreen: '\x1B[38;2;46;204;113m', // verde oscuro elegante
@@ -469,6 +471,7 @@ interface MetricsSnapshot {
   lite: LevelMetricsSnapshot;
   standard: LevelMetricsSnapshot;
   reasoning: LevelMetricsSnapshot;
+  frontier: LevelMetricsSnapshot;
 }
 
 interface StatuslineCache {
@@ -524,7 +527,7 @@ function writeStatuslineCache(sessionPath: string, cache: StatuslineCache): void
 
 // ── Lógica de resolución ────────────────────────────────────────
 
-export type ReasoningLevel = 'lite' | 'standard' | 'reasoning';
+export type ReasoningLevel = 'lite' | 'standard' | 'reasoning' | 'frontier';
 
 function readClaudeSettingsEnv(): ClaudeSettingsEnv {
   return readClaudeSettings().env ?? {};
@@ -640,24 +643,27 @@ function loadDisplayName(modelId: string, routingPath: string): string {
 }
 
 /**
- * Clasifica un modelId según §5 de la propuesta (solo variables ANTHROPIC_DEFAULT_*).
- * Orden: haiku → opus → sonnet. Sin coincidencia → null (no suma a ningún nivel).
+ * Clasifica un modelId según variables ANTHROPIC_DEFAULT_*.
+ * Orden: haiku → fable → opus → sonnet. Sin coincidencia → null (no suma a ningún nivel).
  */
 export function classifyModelWithEnv(
   modelId: string,
   settingsEnv: ClaudeSettingsEnv,
 ): ReasoningLevel | null {
   const haiku = settingsEnv['ANTHROPIC_DEFAULT_HAIKU_MODEL'] ?? '';
+  const fable = settingsEnv['ANTHROPIC_DEFAULT_FABLE_MODEL'] ?? '';
   const opus = settingsEnv['ANTHROPIC_DEFAULT_OPUS_MODEL'] ?? '';
   const sonnet = settingsEnv['ANTHROPIC_DEFAULT_SONNET_MODEL'] ?? '';
 
   if (haiku && modelId.includes(haiku)) return 'lite';
+  if (fable && modelId.includes(fable)) return 'frontier';
   if (opus && modelId.includes(opus)) return 'reasoning';
   if (sonnet && modelId.includes(sonnet)) return 'standard';
 
   // Fallback heurístico por nivel: cada nivel sin variable configurada clasifica
   // por keyword, aunque otros niveles sí tengan variable (configuración parcial).
   if (!haiku && modelId.includes('haiku')) return 'lite';
+  if (!fable && modelId.includes('fable')) return 'frontier';
   if (!opus && modelId.includes('opus')) return 'reasoning';
   if (!sonnet && modelId.includes('sonnet')) return 'standard';
 
@@ -671,6 +677,7 @@ function createEmptyMetrics(
   lite: TokenMetrics;
   standard: TokenMetrics;
   reasoning: TokenMetrics;
+  frontier: TokenMetrics;
 } {
   const empty: TokenMetrics = {
     inputTokens: 0,
@@ -684,6 +691,7 @@ function createEmptyMetrics(
   const haiku = settingsEnv['ANTHROPIC_DEFAULT_HAIKU_MODEL'];
   const sonnet = settingsEnv['ANTHROPIC_DEFAULT_SONNET_MODEL'];
   const opus = settingsEnv['ANTHROPIC_DEFAULT_OPUS_MODEL'];
+  const fable = settingsEnv['ANTHROPIC_DEFAULT_FABLE_MODEL'];
   return {
     lite: {
       ...empty,
@@ -696,6 +704,10 @@ function createEmptyMetrics(
     reasoning: {
       ...empty,
       modelName: opus ? loadDisplayName(opus, routingPath) : 'Opus',
+    },
+    frontier: {
+      ...empty,
+      modelName: fable ? loadDisplayName(fable, routingPath) : 'Fable',
     },
   };
 }
@@ -754,7 +766,10 @@ export function aggregateSessionMetrics(
     // El total de runs se deriva de la suma de los niveles renderizados para que la
     // fila de totales de la tabla sea internamente consistente con las filas por nivel.
     sessionTotals.finalizedRuns =
-      metrics.lite.finalizedRuns + metrics.standard.finalizedRuns + metrics.reasoning.finalizedRuns;
+      metrics.lite.finalizedRuns +
+      metrics.standard.finalizedRuns +
+      metrics.reasoning.finalizedRuns +
+      metrics.frontier.finalizedRuns;
 
     const totals = data.session_totals;
     if (totals) {
@@ -774,7 +789,7 @@ export function aggregateSessionMetrics(
 }
 
 function cellColor(
-  level: 'lite' | 'standard' | 'reasoning',
+  level: 'lite' | 'standard' | 'reasoning' | 'frontier',
   field: keyof LevelMetricsSnapshot,
   current: number,
   previous: MetricsSnapshot | null,
@@ -791,7 +806,7 @@ function totalColor(
   previous: MetricsSnapshot | null,
 ): string {
   if (!previous) return C.dim;
-  for (const level of ['lite', 'standard', 'reasoning'] as const) {
+  for (const level of ['lite', 'standard', 'reasoning', 'frontier'] as const) {
     const prev = previous[level]?.[field];
     if (prev === undefined || values[level] !== prev) return C.total;
   }
@@ -921,7 +936,7 @@ function renderTokenTable(
     return ' '.repeat(pad) + text;
   }
 
-  type LevelKey = 'lite' | 'standard' | 'reasoning';
+  type LevelKey = 'lite' | 'standard' | 'reasoning' | 'frontier';
   const levels: Array<{
     key: LevelKey;
     label: string;
@@ -930,6 +945,7 @@ function renderTokenTable(
     { key: 'lite', label: 'Lite', color: C.lite },
     { key: 'standard', label: 'Standard', color: C.standard },
     { key: 'reasoning', label: 'Reasoning', color: C.reasoning },
+    { key: 'frontier', label: 'Frontier', color: C.frontier },
   ];
 
   const { sessionTotals } = metrics;
@@ -1059,6 +1075,7 @@ function renderTokenTable(
       lite: metrics.lite.finalizedRuns,
       standard: metrics.standard.finalizedRuns,
       reasoning: metrics.reasoning.finalizedRuns,
+      frontier: metrics.frontier.finalizedRuns,
     },
     previous,
   );
@@ -1066,6 +1083,7 @@ function renderTokenTable(
     lite: metrics.lite.billableHops,
     standard: metrics.standard.billableHops,
     reasoning: metrics.reasoning.billableHops,
+    frontier: metrics.frontier.billableHops,
   };
   const tcCount = totalColor('billableHops', hopTotals, previous);
   const tcInput = totalColor(
@@ -1074,6 +1092,7 @@ function renderTokenTable(
       lite: metrics.lite.inputTokens,
       standard: metrics.standard.inputTokens,
       reasoning: metrics.reasoning.inputTokens,
+      frontier: metrics.frontier.inputTokens,
     },
     previous,
   );
@@ -1083,6 +1102,7 @@ function renderTokenTable(
       lite: metrics.lite.cacheCreationInputTokens,
       standard: metrics.standard.cacheCreationInputTokens,
       reasoning: metrics.reasoning.cacheCreationInputTokens,
+      frontier: metrics.frontier.cacheCreationInputTokens,
     },
     previous,
   );
@@ -1092,6 +1112,7 @@ function renderTokenTable(
       lite: metrics.lite.cacheReadInputTokens,
       standard: metrics.standard.cacheReadInputTokens,
       reasoning: metrics.reasoning.cacheReadInputTokens,
+      frontier: metrics.frontier.cacheReadInputTokens,
     },
     previous,
   );
@@ -1101,6 +1122,7 @@ function renderTokenTable(
       lite: metrics.lite.outputTokens,
       standard: metrics.standard.outputTokens,
       reasoning: metrics.reasoning.outputTokens,
+      frontier: metrics.frontier.outputTokens,
     },
     previous,
   );
@@ -1307,6 +1329,14 @@ export function buildStatuslineOutput(
               cacheCreationInputTokens: metrics.reasoning.cacheCreationInputTokens,
               cacheReadInputTokens: metrics.reasoning.cacheReadInputTokens,
               outputTokens: metrics.reasoning.outputTokens,
+            },
+            frontier: {
+              billableHops: metrics.frontier.billableHops,
+              finalizedRuns: metrics.frontier.finalizedRuns,
+              inputTokens: metrics.frontier.inputTokens,
+              cacheCreationInputTokens: metrics.frontier.cacheCreationInputTokens,
+              cacheReadInputTokens: metrics.frontier.cacheReadInputTokens,
+              outputTokens: metrics.frontier.outputTokens,
             },
           },
           lastRenderedMtimeMs: mtimeInfo?.mtimeMs ?? 0,

@@ -9,6 +9,11 @@ import {
   type ClaudeSettingsEnv,
 } from '../../scripting/router-status.js';
 
+const ANSI_REGEX = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, 'g');
+function stripAnsi(s: string): string {
+  return s.replace(ANSI_REGEX, '');
+}
+
 const rateLimitsCtx: ClaudeCodeContext = {
   rate_limits: {
     five_hour: { used_percentage: 60, resets_at: Math.floor(Date.now() / 1000) + 3600 },
@@ -268,6 +273,13 @@ describe('buildStatuslineOutput', () => {
             cacheReadInputTokens: 0,
             outputTokens: 0,
           },
+          frontier: {
+            billableHops: 0,
+            finalizedRuns: 0,
+            inputTokens: 0,
+            cacheReadInputTokens: 0,
+            outputTokens: 0,
+          },
         },
       }),
       'utf-8',
@@ -277,6 +289,7 @@ describe('buildStatuslineOutput', () => {
       ANTHROPIC_DEFAULT_HAIKU_MODEL: 'm1-haiku',
       ANTHROPIC_DEFAULT_SONNET_MODEL: 'm2-sonnet',
       ANTHROPIC_DEFAULT_OPUS_MODEL: 'm3-opus',
+      ANTHROPIC_DEFAULT_FABLE_MODEL: 'm4-fable',
       SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS: 'on',
     };
 
@@ -298,6 +311,83 @@ describe('buildStatuslineOutput', () => {
     const out = buildStatuslineOutput({}, settings, { sessionsRoot: emptySessionsRoot() });
     expect(out).toContain('Sesión actual');
     expect(out).toContain('Trabajo por niveles de razonamiento');
+  });
+
+  it('Tabla 2 muestra cuatro filas fijas incluyendo Frontier con paleta ANSI', () => {
+    const settings: ClaudeSettingsEnv = { SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS: 'on' };
+    const out = buildStatuslineOutput({}, settings, { sessionsRoot: emptySessionsRoot() });
+    expect(out).toContain('Lite');
+    expect(out).toContain('Standard');
+    expect(out).toContain('Reasoning');
+    expect(out).toContain('Frontier');
+    const esc = String.fromCharCode(27);
+    // Frontier usa blanco bold; Standard reescalado a gris
+    expect(out).toContain(`${esc}[1;37mFrontier${esc}[0m`);
+    expect(out).toContain(`${esc}[90mStandard${esc}[0m`);
+    const tableBlock = stripAnsi(out.slice(out.indexOf('Trabajo por niveles de razonamiento')));
+    const levelRows = (tableBlock.match(/│\s*(?:Lite|Standard|Reasoning|Frontier)\s*│/g) ?? [])
+      .length;
+    expect(levelRows).toBe(4);
+  });
+
+  it('main Frontier + subagent Standard distribuye métricas por fila', () => {
+    const root = emptySessionsRoot();
+    const sessionId = 'frontier-main-sonnet-sub';
+    const sessionDir = join(root, sessionId);
+    mkdirSync(sessionDir, { recursive: true });
+    writeFileSync(
+      join(sessionDir, 'session-metrics.json'),
+      JSON.stringify({
+        models: {
+          'claude-fable-5': {
+            billable_hops: 4,
+            finalized_runs: 1,
+            input_tokens: 400,
+            cache_read_input_tokens: 0,
+            cache_creation_input_tokens: 0,
+            output_tokens: 80,
+          },
+          'provider/m2-sonnet': {
+            billable_hops: 2,
+            finalized_runs: 1,
+            input_tokens: 200,
+            cache_read_input_tokens: 0,
+            cache_creation_input_tokens: 0,
+            output_tokens: 40,
+          },
+        },
+        session_totals: {
+          billable_hops: 6,
+          finalized_runs: 2,
+          input_tokens: 600,
+          output_tokens: 120,
+          cache_read_input_tokens: 0,
+          cache_creation_input_tokens: 0,
+        },
+      }),
+      'utf-8',
+    );
+
+    const settings: ClaudeSettingsEnv = {
+      ANTHROPIC_DEFAULT_HAIKU_MODEL: 'm1-haiku',
+      ANTHROPIC_DEFAULT_SONNET_MODEL: 'm2-sonnet',
+      ANTHROPIC_DEFAULT_OPUS_MODEL: 'm3-opus',
+      ANTHROPIC_DEFAULT_FABLE_MODEL: 'claude-fable-5',
+      SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS: 'on',
+    };
+
+    const out = buildStatuslineOutput({ session_id: sessionId }, settings, {
+      sessionsRoot: root,
+    });
+    const frontierRow = stripAnsi(out.split('\n').find((l) => l.includes('Frontier')) ?? '');
+    const standardRow = stripAnsi(
+      out.split('\n').find((l) => l.includes('Standard') && l.includes('m2-sonnet')) ?? '',
+    );
+    expect(frontierRow).toContain('Frontier');
+    expect(standardRow).toContain('Standard');
+    expect(frontierRow).toMatch(/│\s+4\s+│/);
+    expect(standardRow).toMatch(/│\s+2\s+│/);
+    expect(stripAnsi(out.split('Totales de sesión')[1] ?? '')).toMatch(/│\s+2\s+│/);
   });
 
   it('Tabla 2 refleja billable_hops per-step con finalized_runs aún en 0', () => {

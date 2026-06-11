@@ -47,7 +47,7 @@ Instalación: [`npm run install:statusline`](#9-integración) (véase [how-to-st
 | Provider upstream activo      | `configs/.env`                                                  | `UPSTREAM_ORIGIN`                                                                                 |
 | Nombre del proveedor          | `routing/providers/*/config.json` → cruce con `UPSTREAM_ORIGIN` | `config.ANTHROPIC_BASE_URL`                                                                       |
 | Método de auth                | `~/.claude/settings.json → env`                                 | `ANTHROPIC_API_KEY` / `ANTHROPIC_AUTH_TOKEN`                                                      |
-| Modelos por nivel             | `~/.claude/settings.json → env`                                 | `ANTHROPIC_DEFAULT_HAIKU_MODEL`, `ANTHROPIC_DEFAULT_SONNET_MODEL`, `ANTHROPIC_DEFAULT_OPUS_MODEL` |
+| Modelos por nivel             | `~/.claude/settings.json → env`                                 | `ANTHROPIC_DEFAULT_HAIKU_MODEL`, `ANTHROPIC_DEFAULT_SONNET_MODEL`, `ANTHROPIC_DEFAULT_OPUS_MODEL`, `ANTHROPIC_DEFAULT_FABLE_MODEL` |
 | Display name de modelo        | `routing/providers/<p>/models/<m>/metadata.json`                | `displayName`                                                                                     |
 | Métricas acumuladas de sesión | `sessions/<ctx.session_id>/session-metrics.json`                | contadores por `modelId`                                                                          |
 
@@ -108,7 +108,7 @@ Visible de forma **condicional** según la variable `SMART_CODE_PROXY__STATUSLIN
 
 El statusline refleja el cambio en el siguiente refresh (no requiere reiniciar Claude Code). Se renderiza debajo del bloque Tabla 1 (± Tabla 3) incluso sin `ctx.session_id` ni carpeta en `sessions/` (métricas en cero). Permite al usuario conocer cuántos tokens consume por nivel de razonamiento en la sesión actual, tanto para providers con facturación por token (bearer) como para suscripciones (OAuth).
 
-**Cadencia de datos:** la Tabla 2 lee `sessions/<session_id>/session-metrics.json` en cada invocación del script. El proxy actualiza ese archivo **per-step** (`billable_hops` → `# Steps` y tokens) tras hops agénticos contables (main y subagent), y **`finalized_runs`** al cierre E2E de cada ejecución agéntica. La fila **Totales** usa `session_totals.finalized_runs` y `session_totals.billable_hops` (conteo estructural, no suma de columnas por nivel). Véase [`session-metrics-system.md`](./session-metrics-system.md).
+**Cadencia de datos:** la Tabla 2 lee `sessions/<session_id>/session-metrics.json` en cada invocación del script. El proxy actualiza ese archivo **per-step** (`billable_hops` → `# Steps` y tokens) tras hops agénticos contables (main y subagent), y **`finalized_runs`** al cierre E2E de cada ejecución agéntica. La fila **Totales** usa `session_totals.billable_hops` para `# Steps` y la **suma de `# Workflows` de las cuatro filas** para consistencia interna; `session_totals.finalized_runs` permanece como contador estructural en disco. Véase [`session-metrics-system.md`](./session-metrics-system.md).
 
 ```
 ╭─ Trabajo por niveles de razonamiento ─────────────────────────────────────────────────────────────────────────────╮
@@ -120,6 +120,8 @@ El statusline refleja el cambio en el siguiente refresh (no requiere reiniciar C
 │ Standard  │ Sonnet 4.6              │           3 │      12 │        5000 │            10.000 │           40.000 │        2.500 │
 ├───────────┼─────────────────────────┼─────────────┼─────────┼─────────────┼───────────────────┼──────────────────┼──────────────┤
 │ Reasoning │ claude-opus-4-8-lon...  │           1 │       2 │         800 │              1.600 │            6.400 │          400 │
+├───────────┼─────────────────────────┼─────────────┼─────────┼─────────────┼───────────────────┼──────────────────┼──────────────┤
+│ Frontier  │ Fable 5                 │           0 │       0 │           - │                  - │                - │            - │
 ├───────────┴─────────────────────────┼─────────────┼─────────┼─────────────┼───────────────────┼──────────────────┼──────────────┤
 │ Totales de sesión                   │           5 │      19 │        6800 │            13.600 │           54.400 │        3.400 │
 ╰─────────────────────────────────────┴─────────────┴─────────┴─────────────┴───────────────────┴──────────────────┴──────────────╯
@@ -129,7 +131,7 @@ El statusline refleja el cambio en el siguiente refresh (no requiere reiniciar C
 
 | Columna           | Contenido                                                                                                                                                           | Fuente                                                               | Alineación |
 | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- | ---------- |
-| Nivel             | `Lite` / `Standard` / `Reasoning`                                                                                                                                   | texto fijo por slot                                                  | izquierda  |
+| Nivel             | `Lite` / `Standard` / `Reasoning` / `Frontier`                                                                                                                        | texto fijo por slot                                                  | izquierda  |
 | Modelo            | display name del modelo del nivel; **columna elástica**: se expande con relleno o se trunca con `...` para anclar Tabla 2 al ancho del bloque superior (véase §4.2) | `metadata.json → displayName` (o `modelId` si falta)                 | izquierda  |
 | # Workflows       | ejecuciones agénticas finalizadas atribuidas a este nivel                                                                                                           | `session-metrics.json → models[modelId].finalized_runs`              | derecha    |
 | # Steps           | hops de inferencia con `usage` del nivel en la sesión                                                                                                               | `session-metrics.json → models[modelId].billable_hops`               | derecha    |
@@ -217,8 +219,9 @@ El script usa códigos ANSI raw sin dependencias externas:
 | Cabeceras y títulos                | Azul `#253ecc`    | `\x1B[38;2;37;62;204m`  |
 | Valores de celdas                  | Blanco            | `\x1B[37m`              |
 | Nivel Lite                         | Gris              | `\x1B[90m`              |
-| Nivel Standard                     | Blanco            | `\x1B[37m`              |
-| Nivel Reasoning                    | Blanco bold       | `\x1B[1;37m`            |
+| Nivel Standard                     | Gris              | `\x1B[90m`              |
+| Nivel Reasoning                    | Blanco            | `\x1B[37m`              |
+| Nivel Frontier                     | Blanco bold       | `\x1B[1;37m`            |
 | Barra de progreso (lleno, 0–39%)   | Verde `#2ecc71`   | `\x1B[38;2;46;204;113m` |
 | Barra de progreso (lleno, 40–69%)  | Naranja `#f39c12` | `\x1B[38;2;243;156;18m` |
 | Barra de progreso (lleno, 70–100%) | Rojo `#e74c3c`    | `\x1B[38;2;231;76;60m`  |
@@ -269,7 +272,7 @@ El statusline persiste estado ligero por sesión para mejorar la lectura entre r
 | Campo                    | Uso                                                                                                                                                                                               |
 | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `contextUsagePercentage` | Fallback de la barra de contexto (Tabla 1) cuando stdin no trae `ctx.context_window.used_percentage` **usable** (`number`, `Number.isFinite`, `> 0`)                                              |
-| `metricsSnapshot`        | Snapshot `{ lite, standard, reasoning }` con `count`, `inputTokens`, `cacheReadInputTokens`, `outputTokens` para atenuar (`dim`) o resaltar (`value`) celdas numéricas en Tabla 2 vía `cellColor` |
+| `metricsSnapshot`        | Snapshot `{ lite, standard, reasoning, frontier }` con contadores por nivel (`billableHops`, `finalizedRuns`, tokens) para atenuar (`dim`) o resaltar (`value`) celdas numéricas en Tabla 2 vía `cellColor` |
 | `lastRenderedMtimeMs`    | `mtime` de `session-metrics.json` en el último render completo de Tabla 2                                                                                                                         |
 | `lastRenderedMetricsSize`| Tamaño en bytes de `session-metrics.json` en el último render completo de Tabla 2                                                                                                                 |
 | `lastRenderedTable2Output`| Texto completo del último render de Tabla 2 (para reimpresión sin re-agregar)                                                                                                                    |
@@ -282,26 +285,28 @@ El statusline persiste estado ligero por sesión para mejorar la lectura entre r
 
 ## 5. Mapeo de niveles de razonamiento
 
-`configure-provider.ts` configura exactamente tres modelos en `~/.claude/settings.json → env`:
+`configure-provider.ts` configura cuatro modelos de nivel en `~/.claude/settings.json → env`:
 
 | Nivel     | Variable                         | Slot en la API |
 | --------- | -------------------------------- | -------------- |
 | Lite      | `ANTHROPIC_DEFAULT_HAIKU_MODEL`  | haiku          |
 | Standard  | `ANTHROPIC_DEFAULT_SONNET_MODEL` | sonnet         |
 | Reasoning | `ANTHROPIC_DEFAULT_OPUS_MODEL`   | opus           |
+| Frontier  | `ANTHROPIC_DEFAULT_FABLE_MODEL`  | fable          |
 
-Para clasificar una interacción en un nivel, el script compara el `modelId` del registro en `session-metrics.json` contra los tres valores configurados:
+Para clasificar una interacción en un nivel, el script compara el `modelId` del registro en `session-metrics.json` contra los valores configurados:
 
 ```
 classifyModelWithEnv(modelId, settingsEnv):
   modelId incluye ANTHROPIC_DEFAULT_HAIKU_MODEL  → Lite
+  modelId incluye ANTHROPIC_DEFAULT_FABLE_MODEL  → Frontier
   modelId incluye ANTHROPIC_DEFAULT_OPUS_MODEL   → Reasoning
   modelId incluye ANTHROPIC_DEFAULT_SONNET_MODEL → Standard
 ```
 
-Orden de evaluación: haiku → opus → sonnet. Si `modelId` no coincide con ninguno de los tres modelos configurados, el registro no se suma a ningún nivel.
+Orden de evaluación: haiku → fable → opus → sonnet. Si `modelId` no coincide con ningún modelo configurado, el registro no se suma a ningún nivel. Mythos 5 queda fuera de alcance hasta integración futura.
 
-**Fallback heurístico por nivel:** para cada nivel cuya variable `ANTHROPIC_DEFAULT_*_MODEL` esté vacía o ausente (situación típica con `configure-provider default` / OAuth nativo), la clasificación usa el término correspondiente como substring del `modelId`: `"haiku"` → Lite, `"opus"` → Reasoning, `"sonnet"` → Standard. El fallback opera por nivel: con configuración parcial, los niveles configurados clasifican por match de variable y los no configurados por keyword.
+**Fallback heurístico por nivel:** para cada nivel cuya variable `ANTHROPIC_DEFAULT_*_MODEL` esté vacía o ausente (situación típica con `configure-provider default` / OAuth nativo), la clasificación usa el término correspondiente como substring del `modelId`: `"haiku"` → Lite, `"fable"` → Frontier, `"opus"` → Reasoning, `"sonnet"` → Standard. El fallback opera por nivel: con configuración parcial, los niveles configurados clasifican por match de variable y los no configurados por keyword.
 
 ---
 

@@ -12,6 +12,7 @@ const configuredEnv: ClaudeSettingsEnv = {
   ANTHROPIC_DEFAULT_HAIKU_MODEL: 'm1-haiku',
   ANTHROPIC_DEFAULT_SONNET_MODEL: 'm2-sonnet',
   ANTHROPIC_DEFAULT_OPUS_MODEL: 'm3-opus',
+  ANTHROPIC_DEFAULT_FABLE_MODEL: 'm4-fable',
 };
 
 const routingPath = join(process.cwd(), 'routing', 'providers');
@@ -101,7 +102,12 @@ describe('aggregateSessionMetrics', () => {
       'utf-8',
     );
     const m = aggregateSessionMetrics(dir, configuredEnv, routingPath);
-    expect(m.lite.billableHops + m.standard.billableHops + m.reasoning.billableHops).toBe(0);
+    expect(
+      m.lite.billableHops +
+        m.standard.billableHops +
+        m.reasoning.billableHops +
+        m.frontier.billableHops,
+    ).toBe(0);
     expect(m.sessionTotals.billableHops).toBe(0);
   });
 
@@ -126,7 +132,46 @@ describe('aggregateSessionMetrics', () => {
       'utf-8',
     );
     const m = aggregateSessionMetrics(dir, configuredEnv, routingPath);
-    expect(m.lite.billableHops + m.standard.billableHops + m.reasoning.billableHops).toBe(0);
+    expect(
+      m.lite.billableHops +
+        m.standard.billableHops +
+        m.reasoning.billableHops +
+        m.frontier.billableHops,
+    ).toBe(0);
+  });
+
+  it('acumula Fable en fila frontier', () => {
+    const dir = sessionDir();
+    writeFileSync(
+      join(dir, 'session-metrics.json'),
+      JSON.stringify(
+        canonicalMetrics({
+          models: {
+            'provider/m4-fable': {
+              billable_hops: 7,
+              finalized_runs: 2,
+              input_tokens: 900,
+              cache_read_input_tokens: 0,
+              cache_creation_input_tokens: 0,
+              output_tokens: 150,
+            },
+          },
+          session_totals: {
+            billable_hops: 7,
+            finalized_runs: 2,
+            input_tokens: 900,
+            output_tokens: 150,
+            cache_read_input_tokens: 0,
+            cache_creation_input_tokens: 0,
+          },
+        }),
+      ),
+      'utf-8',
+    );
+    const m = aggregateSessionMetrics(dir, configuredEnv, routingPath);
+    expect(m.frontier.billableHops).toBe(7);
+    expect(m.frontier.finalizedRuns).toBe(2);
+    expect(m.sessionTotals.finalizedRuns).toBe(2);
   });
 
   it('trata cache_read_input_tokens null como 0 (§10)', () => {

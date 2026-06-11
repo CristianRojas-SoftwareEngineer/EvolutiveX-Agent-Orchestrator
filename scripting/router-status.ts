@@ -4,7 +4,7 @@
  * Renderiza 2-3 tablas Unicode con bordes redondeados y anchos calculados:
  *  - Tabla 1: Sesión y proveedor activo
  *  - Tabla 2: Métricas de steps por nivel de razonamiento
- *  - Tabla 3: Rate limits (solo si authMethod === 'oauth')
+ *  - Tabla 3: Cuota de suscripción vía resolveQuotaSource (OAuth stdin o archivo en disco)
  *
  * Lee stdin como JSON con el contexto de Claude Code ($ctx).
  */
@@ -18,6 +18,7 @@ import {
   STATUSLINE_ROUTER_DETAILS_KEY,
   type ClaudeSettings,
 } from './shared/claude-settings.js';
+import { readSubscriptionQuotaFromProviderDir } from './shared/provider-config.js';
 
 // ── Tipos ───────────────────────────────────────────────────────
 
@@ -31,8 +32,8 @@ export interface ClaudeCodeContext {
     used_percentage?: number;
   };
   rate_limits?: {
-    five_hour?: { used_percentage?: number; resets_at?: number };
-    seven_day?: { used_percentage?: number; resets_at?: number };
+    five_hour?: { used_percentage?: number | null; resets_at?: number | null };
+    seven_day?: { used_percentage?: number | null; resets_at?: number | null };
   } | null;
 }
 
@@ -264,6 +265,24 @@ function formatTimeRemaining(resetEpoch?: number): string {
   const diffD = Math.floor(diffH / 24);
   const remH = diffH % 24;
   return remH > 0 ? `${diffD}d ${remH}h` : `${diffD}d`;
+}
+
+/** Tiempo de reinicio para Tabla 3: inválido → "-", expirado → "Ahora". */
+function formatQuotaResetTime(resetEpoch?: number | null): string {
+  if (resetEpoch == null || !Number.isFinite(resetEpoch) || resetEpoch <= 0) return '-';
+  return formatTimeRemaining(resetEpoch);
+}
+
+function formatQuotaUsedCell(usedPercentage?: number | null): string {
+  if (
+    usedPercentage == null ||
+    !Number.isFinite(usedPercentage) ||
+    usedPercentage < 0 ||
+    usedPercentage > 100
+  ) {
+    return `${C.value}-${C.reset}`;
+  }
+  return `${renderBar(usedPercentage, 8)} ${usedPercentage.toFixed(0)}%`;
 }
 
 // ── Renderizado de tablas con bordes ────────────────────────────
@@ -1142,6 +1161,46 @@ function renderTokenTable(
   return { lines, width };
 }
 
+type ResolvedQuotaLimits = NonNullable<ClaudeCodeContext['rate_limits']>;
+
+function readSubscriptionQuotaFromSession(sessionPath: string | null): ResolvedQuotaLimits | null {
+  if (!sessionPath) return null;
+  const filePath = join(sessionPath, 'subscription-quota.json');
+  if (!existsSync(filePath)) return null;
+  try {
+    const data = JSON.parse(readFileSync(filePath, 'utf-8')) as {
+      five_hour?: { used_percentage?: number | null; resets_at?: number | null };
+      seven_day?: { used_percentage?: number | null; resets_at?: number | null };
+    };
+    if (!data.five_hour && !data.seven_day) return null;
+    return { five_hour: data.five_hour, seven_day: data.seven_day };
+  } catch {
+    return null;
+  }
+}
+
+/** Resuelve cuota para Tabla 3: stdin OAuth → archivo en disco → null. */
+export function resolveQuotaSource(
+  ctx: ClaudeCodeContext,
+  paths: ResolvedStatuslinePaths,
+  settingsEnv: ClaudeSettingsEnv,
+  sessionPath: string | null,
+): ResolvedQuotaLimits | null {
+  const authMethod = resolveAuthMethodFromEnv(settingsEnv);
+  const stdinLimits = ctx.rate_limits ?? {};
+  if (authMethod === 'oauth' && (stdinLimits.five_hour || stdinLimits.seven_day)) {
+    return ctx.rate_limits ?? null;
+  }
+
+  const { providerName } = resolveActiveProvider(paths);
+  if (providerName === 'Desconocido') return null;
+
+  const quotaConfig = readSubscriptionQuotaFromProviderDir(join(paths.routingPath, providerName));
+  if (!quotaConfig?.enabled) return null;
+
+  return readSubscriptionQuotaFromSession(sessionPath);
+}
+
 function buildRateLimitTableData(ctx: ClaudeCodeContext) {
   const { five_hour, seven_day } = ctx.rate_limits ?? {};
   if (!five_hour && !seven_day) return null;
@@ -1149,22 +1208,20 @@ function buildRateLimitTableData(ctx: ClaudeCodeContext) {
   const rows: string[][] = [];
 
   if (five_hour) {
-    const usedPercentage = five_hour.used_percentage ?? 0;
     rows.push([
       `${C.label}Cuota actual (5h)${C.reset}`,
-      `${renderBar(usedPercentage, 8)} ${usedPercentage.toFixed(0)}%`,
+      formatQuotaUsedCell(five_hour.used_percentage),
       `${C.dim}Reinicio en${C.reset}`,
-      `${C.value}${formatTimeRemaining(five_hour.resets_at)}${C.reset}`,
+      `${C.value}${formatQuotaResetTime(five_hour.resets_at)}${C.reset}`,
     ]);
   }
 
   if (seven_day) {
-    const usedPercentage = seven_day.used_percentage ?? 0;
     rows.push([
       `${C.label}Cuota semanal (7d)${C.reset}`,
-      `${renderBar(usedPercentage, 8)} ${usedPercentage.toFixed(0)}%`,
+      formatQuotaUsedCell(seven_day.used_percentage),
       `${C.dim}Reinicio en${C.reset}`,
-      `${C.value}${formatTimeRemaining(seven_day.resets_at)}${C.reset}`,
+      `${C.value}${formatQuotaResetTime(seven_day.resets_at)}${C.reset}`,
     ]);
   }
 
@@ -1210,13 +1267,13 @@ export function buildStatuslineOutput(
   const output: string[] = [];
 
   const sessionPath = resolveSessionPath(ctx.session_id, paths.sessionsPath);
-  const authMethod = resolveAuthMethodFromEnv(settingsEnv);
 
   const table1 = renderSessionTable(ctx, paths, sessionPath);
 
-  // §3.3: Tabla 3 solo con oauth; api_key y bearer comparten layout sin rate limits.
-  // Se resuelve antes de Tabla 2 para poder calcular targetWidth.
-  const table3 = authMethod === 'oauth' ? renderRateLimitTable(ctx) : null;
+  const quotaSource = resolveQuotaSource(ctx, paths, settingsEnv, sessionPath);
+  const table3 = quotaSource
+    ? renderRateLimitTable({ ...ctx, rate_limits: quotaSource })
+    : null;
   const table3Width = table3 ? table3.width : computeRateLimitReferenceWidth();
   const targetWidth = table1.width + table3Width + 2;
 

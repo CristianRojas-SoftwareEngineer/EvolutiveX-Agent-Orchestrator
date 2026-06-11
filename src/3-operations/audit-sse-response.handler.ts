@@ -6,6 +6,7 @@ import type {
   IStepAssembler,
 } from '../2-services/ports/step-assembler.port.js';
 import { SessionMetricsService } from '../2-services/session-metrics.service.js';
+import type { SubscriptionQuotaService } from '../2-services/subscription-quota.service.js';
 import { ProxyEnvironmentConfig } from '../1-domain/types/config.types.js';
 import { AuditWorkflowContext, SsePhase } from '../1-domain/types/audit.types.js';
 import type { IWorkflow } from '../1-domain/interfaces/gateway/IWorkflow.js';
@@ -38,6 +39,7 @@ export class AuditSseResponseHandler {
     private auditBaseDir: string,
     private sessionMetrics: SessionMetricsService,
     private logger?: Logger,
+    private subscriptionQuota?: SubscriptionQuotaService,
   ) {}
 
   public execute(
@@ -282,6 +284,7 @@ export class AuditSseResponseHandler {
         this.auditBaseDir,
         workflow,
         wireStep,
+        this.subscriptionQuota,
       );
     }
     const workflowAfterClose = this.workflowRepo.getWorkflow(workflow.id);

@@ -4,5 +4,13 @@
   "ANTHROPIC_DEFAULT_HAIKU_MODEL": "models/minimax-m2.5",
   "ANTHROPIC_DEFAULT_SONNET_MODEL": "models/minimax-m2.7",
   "ANTHROPIC_DEFAULT_OPUS_MODEL": "models/minimax-m3",
-  "CLAUDE_CODE_SUBAGENT_MODEL": "models/minimax-m2.7"
+  "CLAUDE_CODE_SUBAGENT_MODEL": "models/minimax-m2.7",
+  "SUBSCRIPTION_QUOTA": {
+    "enabled": true,
+    "adapter": "minimax_token_plan_remains",
+    "endpoint": "https://api.minimax.io/v1/token_plan/remains",
+    "auth_credential": "ANTHROPIC_AUTH_TOKEN",
+    "model_filter": "general",
+    "refresh_interval_seconds": 60
+  }
 }

@@ -63,8 +63,19 @@ Cada clave en `models` es el `modelId` (`step.inferenceRequest.model`). Los nomb
 | Componente | Rol |
 |------------|-----|
 | `AuditHookEventHandler` | `close()` + `finalizeWorkflowMetrics` (main y subagent) |
-| `AuditSseResponseHandler` / `AuditStandardResponseHandler` | `persistBillableStepMetricsIfNeeded` → `updateFromStep` |
-| `persist-billable-step-metrics.util.ts` | G16′ + `usage` |
+| `AuditSseResponseHandler` / `AuditStandardResponseHandler` | `persistBillableStepMetricsIfNeeded` → `updateFromStep` + refresh de cuota |
+| `persist-billable-step-metrics.util.ts` | G16′ + `usage`; opcionalmente `SubscriptionQuotaService.refreshIfNeeded` |
+| `SubscriptionQuotaService` | Tras hop facturable: fetch TTL a API del proveedor → `subscription-quota.json` |
+
+#### Archivo `subscription-quota.json`
+
+Se escribe en la raíz de la sesión (`sessions/<session-id>/subscription-quota.json`), al mismo nivel que `session-metrics.json`. El proxy lo actualiza tras cada hop facturable cuando el proveedor activo declara `SUBSCRIPTION_QUOTA.enabled` en `routing/providers/<name>/config.json`.
+
+- **Escritura:** `SubscriptionQuotaService.refreshIfNeeded` (invocado desde `persistBillableStepMetricsIfNeeded`), con TTL `refresh_interval_seconds` (default 60s).
+- **Lectura:** `router-status.ts` → `resolveQuotaSource()` (sin HTTP en el statusline).
+- **Schema:** `fetched_at`, `provider`, `adapter`, ventanas opcionales `five_hour` / `seven_day` con `used_percentage` y `resets_at` (epoch segundos).
+
+Errores de red en el fetch no abortan el hop; se preserva el archivo previo si existía.
 
 #### Lectura en el statusline (`scripting/router-status.ts`)
 

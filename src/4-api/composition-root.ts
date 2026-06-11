@@ -10,6 +10,8 @@ import { SessionPersistence } from '../2-services/session-persistence.service.js
 import { ProviderCatalogService } from '../2-services/provider-catalog.service.js';
 import { StepAssemblerService } from '../2-services/step-assembler.service.js';
 import { SessionMetricsService } from '../2-services/session-metrics.service.js';
+import { ProviderRoutingResolverService } from '../2-services/provider-routing-resolver.service.js';
+import { SubscriptionQuotaService } from '../2-services/subscription-quota.service.js';
 import { AuditHookEventHandler } from '../3-operations/audit-hook-event.handler.js';
 import { AuditWorkflowHandler } from '../3-operations/audit-workflow.handler.js';
 import { AuditSseResponseHandler } from '../3-operations/audit-sse-response.handler.js';
@@ -69,6 +71,8 @@ export async function createProxyDependencies(
     logger,
   );
   const sessionMetrics = new SessionMetricsService();
+  const providerRoutingResolver = new ProviderRoutingResolverService(process.cwd());
+  const subscriptionQuota = new SubscriptionQuotaService(providerRoutingResolver, undefined, logger);
   const auditSseResponseHandler = new AuditSseResponseHandler(
     config,
     () => new StepAssemblerService(),
@@ -77,6 +81,7 @@ export async function createProxyDependencies(
     auditBaseDir,
     sessionMetrics,
     logger,
+    subscriptionQuota,
   );
   const auditStandardResponseHandler = new AuditStandardResponseHandler(
     eventBus,
@@ -84,6 +89,7 @@ export async function createProxyDependencies(
     workflowRepo,
     auditBaseDir,
     sessionMetrics,
+    subscriptionQuota,
   );
   const auditUpstreamErrorHandler = new AuditUpstreamErrorHandler(workflowRepo);
   const filterToolsHandler = new FilterToolsHandler(config);

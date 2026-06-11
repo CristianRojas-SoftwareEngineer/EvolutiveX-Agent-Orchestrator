@@ -1,6 +1,7 @@
 import type { IWorkflowRepository } from '../1-domain/repositories/IWorkflowRepository.js';
 import type { IEventBus } from '../1-domain/repositories/IEventBus.js';
 import { SessionMetricsService } from '../2-services/session-metrics.service.js';
+import type { SubscriptionQuotaService } from '../2-services/subscription-quota.service.js';
 import type { AnthropicMessage } from '../1-domain/types/anthropic.types.js';
 import {
   buildInferenceRequestSnapshot,
@@ -26,6 +27,7 @@ export class AuditStandardResponseHandler {
     private workflowRepo: IWorkflowRepository,
     private auditBaseDir: string,
     private sessionMetrics: SessionMetricsService,
+    private subscriptionQuota?: SubscriptionQuotaService,
   ) {}
 
   public execute(
@@ -168,6 +170,7 @@ export class AuditStandardResponseHandler {
             this.auditBaseDir,
             workflow,
             wireStep,
+            this.subscriptionQuota,
           );
         }
 

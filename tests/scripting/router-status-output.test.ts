@@ -42,7 +42,6 @@ describe('buildStatuslineOutput', () => {
     expect(out).toContain('Trabajo por niveles de razonamiento');
   });
 
-  // api_key y bearer comparten layout; solo oauth activa Tabla 3 (§3.3).
   it('no muestra rate limits con api_key aunque ctx traiga rate_limits', () => {
     const settings: ClaudeSettingsEnv = { ANTHROPIC_API_KEY: 'test-key' };
     const out = buildStatuslineOutput(rateLimitsCtx, settings, {
@@ -51,12 +50,101 @@ describe('buildStatuslineOutput', () => {
     expect(out).not.toContain('Límites de uso por suscripción');
   });
 
-  it('no muestra rate limits con bearer aunque ctx traiga rate_limits', () => {
+  it('no muestra rate limits con bearer sin SUBSCRIPTION_QUOTA aunque ctx traiga rate_limits', () => {
     const settings: ClaudeSettingsEnv = { ANTHROPIC_AUTH_TOKEN: 'test-token' };
     const out = buildStatuslineOutput(rateLimitsCtx, settings, {
       sessionsRoot: emptySessionsRoot(),
     });
     expect(out).not.toContain('Límites de uso por suscripción');
+  });
+
+  it('muestra rate limits con bearer y subscription-quota.json (Minimax)', () => {
+    const root = mkdtempSync(join(tmpdir(), 'router-status-minimax-'));
+    sessionsRoot = root;
+    const projectRoot = mkdtempSync(join(tmpdir(), 'router-status-minimax-proj-'));
+    const sessionId = 'minimax-quota';
+    const sessionDir = join(root, sessionId);
+    mkdirSync(sessionDir, { recursive: true });
+    mkdirSync(join(projectRoot, 'configs'), { recursive: true });
+    mkdirSync(join(projectRoot, 'routing', 'providers', 'minimax'), { recursive: true });
+    writeFileSync(
+      join(projectRoot, 'configs', '.env'),
+      'UPSTREAM_ORIGIN=https://api.minimax.io/anthropic\n',
+      'utf-8',
+    );
+    writeFileSync(
+      join(projectRoot, 'routing', 'providers', 'minimax', 'config.json'),
+      JSON.stringify({
+        ANTHROPIC_BASE_URL: 'https://api.minimax.io/anthropic',
+        SUBSCRIPTION_QUOTA: { enabled: true, adapter: 'minimax_token_plan_remains', endpoint: 'x', auth_credential: 'ANTHROPIC_AUTH_TOKEN' },
+      }),
+      'utf-8',
+    );
+    writeFileSync(
+      join(sessionDir, 'subscription-quota.json'),
+      JSON.stringify({
+        fetched_at: new Date().toISOString(),
+        provider: 'minimax',
+        adapter: 'minimax_token_plan_remains',
+        five_hour: { used_percentage: 14, resets_at: Math.floor(Date.now() / 1000) + 3600 },
+      }),
+      'utf-8',
+    );
+
+    const settings: ClaudeSettingsEnv = { ANTHROPIC_AUTH_TOKEN: 'test-token' };
+    const out = buildStatuslineOutput(
+      { session_id: sessionId },
+      settings,
+      { sessionsRoot: root, projectRoot },
+    );
+    expect(out).toContain('Límites de uso por suscripción');
+    expect(out).toContain('Cuota actual (5h)');
+    expect(out).toContain('14%');
+  });
+
+  it('muestra guión cuando used_percentage no es calculable', () => {
+    const root = mkdtempSync(join(tmpdir(), 'router-status-dash-'));
+    sessionsRoot = root;
+    const projectRoot = mkdtempSync(join(tmpdir(), 'router-status-dash-proj-'));
+    const sessionId = 'dash-quota';
+    const sessionDir = join(root, sessionId);
+    mkdirSync(sessionDir, { recursive: true });
+    mkdirSync(join(projectRoot, 'configs'), { recursive: true });
+    mkdirSync(join(projectRoot, 'routing', 'providers', 'minimax'), { recursive: true });
+    writeFileSync(
+      join(projectRoot, 'configs', '.env'),
+      'UPSTREAM_ORIGIN=https://api.minimax.io/anthropic\n',
+      'utf-8',
+    );
+    writeFileSync(
+      join(projectRoot, 'routing', 'providers', 'minimax', 'config.json'),
+      JSON.stringify({
+        ANTHROPIC_BASE_URL: 'https://api.minimax.io/anthropic',
+        SUBSCRIPTION_QUOTA: { enabled: true, adapter: 'minimax_token_plan_remains', endpoint: 'x', auth_credential: 'ANTHROPIC_AUTH_TOKEN' },
+      }),
+      'utf-8',
+    );
+    writeFileSync(
+      join(sessionDir, 'subscription-quota.json'),
+      JSON.stringify({
+        fetched_at: new Date().toISOString(),
+        provider: 'minimax',
+        adapter: 'minimax_token_plan_remains',
+        five_hour: { resets_at: Math.floor(Date.now() / 1000) + 3600 },
+      }),
+      'utf-8',
+    );
+
+    const settings: ClaudeSettingsEnv = { ANTHROPIC_AUTH_TOKEN: 'test-token' };
+    const out = buildStatuslineOutput(
+      { session_id: sessionId },
+      settings,
+      { sessionsRoot: root, projectRoot },
+    );
+    expect(out).toContain('Límites de uso por suscripción');
+    const cuotaLine = out.split('\n').find((l) => l.includes('Cuota actual (5h)'));
+    expect(cuotaLine).toBeDefined();
+    expect(cuotaLine).toContain('-');
   });
 
   it('muestra rate limits con oauth y rate_limits en ctx', () => {

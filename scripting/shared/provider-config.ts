@@ -8,6 +8,16 @@ import { join } from 'node:path';
 
 type ModelMetadata = { modelId: string; displayName?: string };
 
+/** Bloque declarativo de cuota de suscripción en config.json del proveedor. */
+export interface SubscriptionQuotaConfig {
+  enabled: boolean;
+  adapter: string;
+  endpoint: string;
+  auth_credential: string;
+  model_filter?: string;
+  refresh_interval_seconds?: number;
+}
+
 export interface ProviderConfig {
   ANTHROPIC_BASE_URL: string;
   ANTHROPIC_AUTH_TOKEN: string;
@@ -16,7 +26,8 @@ export interface ProviderConfig {
   ANTHROPIC_DEFAULT_SONNET_MODEL: string;
   ANTHROPIC_DEFAULT_OPUS_MODEL: string;
   CLAUDE_CODE_SUBAGENT_MODEL: string;
-  [key: string]: string;
+  SUBSCRIPTION_QUOTA?: SubscriptionQuotaConfig;
+  [key: string]: string | SubscriptionQuotaConfig | undefined;
 }
 
 export const MANAGED_ENV_VARS = [
@@ -102,7 +113,7 @@ export function loadProviderConfig(
   }
 
   // Leer config.json
-  const configJson = JSON.parse(readFileSync(configPath, 'utf-8')) as Record<string, string>;
+  const configJson = JSON.parse(readFileSync(configPath, 'utf-8')) as Record<string, unknown>;
 
   // Método de autenticación del proveedor: "api_key" (X-Api-Key), "bearer" (Authorization: Bearer) u "oauth"
   const authMethod: 'api_key' | 'bearer' | 'oauth' =
@@ -112,18 +123,24 @@ export function loadProviderConfig(
         ? 'oauth'
         : 'bearer';
 
+  const subscriptionQuota = readSubscriptionQuotaFromProviderDir(providerDir);
+
   // Resolver rutas relativas de modelos
-  const config: Record<string, string> = {};
+  const config: Record<string, string | SubscriptionQuotaConfig | undefined> = {};
   for (const [key, value] of Object.entries(configJson)) {
+    if (key === 'SUBSCRIPTION_QUOTA') continue;
     if (
       (key.startsWith('ANTHROPIC_DEFAULT_') || key === 'CLAUDE_CODE_SUBAGENT_MODEL') &&
       typeof value === 'string' &&
       value.startsWith('models/')
     ) {
       config[key] = resolveModelId(value, providerDir);
-    } else {
+    } else if (typeof value === 'string') {
       config[key] = value;
     }
+  }
+  if (subscriptionQuota) {
+    config.SUBSCRIPTION_QUOTA = subscriptionQuota;
   }
 
   // Merge secrets.json si existe
@@ -143,13 +160,15 @@ export function loadProviderConfig(
   // Aplicar lógica de autenticación según el método del proveedor
   if (authMethod === 'api_key') {
     // Acceso directo a la API (ej. Anthropic): usar ANTHROPIC_API_KEY (header X-Api-Key)
-    if (!config.ANTHROPIC_API_KEY || /^<.*>$/.test(config.ANTHROPIC_API_KEY)) {
+    const apiKey = config.ANTHROPIC_API_KEY;
+    if (typeof apiKey !== 'string' || !apiKey || /^<.*>$/.test(apiKey)) {
       config.ANTHROPIC_API_KEY = `<${providerName.toUpperCase()}_API_KEY>`;
     }
     config.ANTHROPIC_AUTH_TOKEN = '';
   } else if (authMethod === 'bearer') {
     // Gateway/proxy (ej. OpenRouter, Ollama, Xiaomi): usar ANTHROPIC_AUTH_TOKEN (header Authorization: Bearer)
-    if (!config.ANTHROPIC_AUTH_TOKEN || /^<.*>$/.test(config.ANTHROPIC_AUTH_TOKEN)) {
+    const authToken = config.ANTHROPIC_AUTH_TOKEN;
+    if (typeof authToken !== 'string' || !authToken || /^<.*>$/.test(authToken)) {
       config.ANTHROPIC_AUTH_TOKEN = `<${providerName.toUpperCase()}_API_KEY>`;
     }
     config.ANTHROPIC_API_KEY = '';
@@ -160,4 +179,34 @@ export function loadProviderConfig(
   }
 
   return config as ProviderConfig;
+}
+
+/** Lee y valida SUBSCRIPTION_QUOTA desde config.json del proveedor (sin merge de secrets). */
+export function readSubscriptionQuotaFromProviderDir(
+  providerDir: string,
+): SubscriptionQuotaConfig | undefined {
+  const configPath = join(providerDir, 'config.json');
+  if (!existsSync(configPath)) return undefined;
+  try {
+    const configJson = JSON.parse(readFileSync(configPath, 'utf-8')) as Record<string, unknown>;
+    const raw = configJson.SUBSCRIPTION_QUOTA;
+    if (!raw || typeof raw !== 'object') return undefined;
+    const obj = raw as Record<string, unknown>;
+    if (obj.enabled !== true) return undefined;
+    if (typeof obj.adapter !== 'string' || typeof obj.endpoint !== 'string') return undefined;
+    if (typeof obj.auth_credential !== 'string') return undefined;
+    return {
+      enabled: true,
+      adapter: obj.adapter,
+      endpoint: obj.endpoint,
+      auth_credential: obj.auth_credential,
+      model_filter: typeof obj.model_filter === 'string' ? obj.model_filter : undefined,
+      refresh_interval_seconds:
+        typeof obj.refresh_interval_seconds === 'number'
+          ? obj.refresh_interval_seconds
+          : undefined,
+    };
+  } catch {
+    return undefined;
+  }
 }

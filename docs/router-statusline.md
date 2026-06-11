@@ -23,9 +23,9 @@ Con el proxy activo, **`ANTHROPIC_BASE_URL` en Claude Code apunta al proxy local
 
 **Capacidades:**
 
-- Dos o tres tablas según el método de autenticación (`api_key`, `bearer`, `oauth`).
+- Dos o tres tablas según disponibilidad de datos de cuota de suscripción.
 - Tablas 1 y 2 siempre en layout side-by-side; métricas de Tabla 2 desde `session-metrics.json` por sesión.
-- Tabla 3 (rate limits) solo con OAuth y datos de cuota en stdin.
+- Tabla 3 («Límites de uso por suscripción») vía `resolveQuotaSource`: stdin OAuth (Anthropic) o `subscription-quota.json` en disco (p. ej. Minimax bearer).
 - Caché ligera por sesión (`.statusline-state.json`) para porcentaje de contexto y resaltado de métricas.
 - Ejecución multiplataforma con Node.js estándar (`fs`, `path`, `process.stdin`); sin dependencia de shell scripts externos.
 
@@ -148,9 +148,16 @@ El statusline refleja el cambio en el siguiente refresh (no requiere reiniciar C
 
 ---
 
-### 3.3 Tabla 3 — Rate Limits (solo OAuth)
+### 3.3 Tabla 3 — Límites de uso por suscripción
 
-Se renderiza cuando `authMethod === 'oauth'` **y** `ctx.rate_limits` incluye al menos `five_hour` o `seven_day`. Si el método es OAuth pero stdin no trae datos de cuota, no se imprime Tabla 3, pero Tabla 2 sigue usando un **ancho de referencia determinista** (equivalente a una Tabla 3 a plena capacidad) para mantener un layout estable entre renders (véase §4.2). Aplica al proveedor `anthropic` con suscripción PRO/Max.
+Se renderiza cuando `resolveQuotaSource()` devuelve al menos una ventana (`five_hour` o `seven_day`). Orden de resolución:
+
+1. **Anthropic OAuth:** `authMethod === 'oauth'` y `ctx.rate_limits` en stdin (suscripción PRO/Max).
+2. **Proveedor con `SUBSCRIPTION_QUOTA.enabled`:** archivo `sessions/<sessionDir>/subscription-quota.json` escrito por el proxy (p. ej. Minimax Token Plan con `AUTH_METHOD: bearer`).
+
+Si no hay fuente válida, no se imprime Tabla 3; Tabla 2 sigue usando un **ancho de referencia determinista** (véase §4.2).
+
+Celdas no calculables (porcentaje o tiempo de reinicio ausente/inválido) muestran el literal `"-"` (sin barra al 0% por defecto). Tiempo de reinicio expirado pero válido: `"Ahora"`.
 
 ```
 ╭─ Límites de uso por suscripción ─────────────────────────────────────────────────────╮
@@ -164,9 +171,9 @@ Se renderiza cuando `authMethod === 'oauth'` **y** `ctx.rate_limits` incluye al 
 | Columna           | Contenido                                      | Fuente                                                                         | Alineación |
 | ----------------- | ---------------------------------------------- | ------------------------------------------------------------------------------ | ---------- |
 | Cuota             | `"Cuota actual (5h)"` / `"Cuota semanal (7d)"` | texto fijo                                                                     | izquierda  |
-| Barra + %         | barra de progreso + porcentaje (`XX%`)         | `ctx.rate_limits.five_hour.used_percentage` / `seven_day.used_percentage`      | izquierda  |
+| Barra + %         | barra + `XX%`, o `"-"` si no calculable        | stdin `ctx.rate_limits.*.used_percentage` o `subscription-quota.json`        | izquierda  |
 | Etiqueta reinicio | texto fijo `"Reinicio en"`                     | —                                                                              | izquierda  |
-| Tiempo restante   | `"Xh Ym"` / `"Xd Yh"`                          | `ctx.rate_limits.five_hour.resets_at` / `seven_day.resets_at` (epoch segundos) | derecha    |
+| Tiempo restante   | `"Xh Ym"` / `"Xd Yh"` / `"Ahora"` / `"-"`      | `*.resets_at` (epoch segundos) en la fuente activa                             | derecha    |
 
 **Barra de progreso:** 8 bloques (`█` / `░`), colores dinámicos según porcentaje (verde/naranja/rojo), misma lógica que la Tabla 1.
 
@@ -187,11 +194,16 @@ resolveAuthMethodFromEnv(settingsEnv)
         ANTHROPIC_AUTH_TOKEN presente → 'bearer'
         ninguno                       → 'oauth'
 
+resolveQuotaSource()
+  ├── oauth + ctx.rate_limits → stdin (Anthropic)
+  ├── SUBSCRIPTION_QUOTA.enabled + subscription-quota.json legible → disco
+  └── null → sin Tabla 3
+
 buildStatuslineOutput()
   ├── si hay sessionDir: leer .statusline-state.json (caché, para Tabla 2 y fallback de % en Tabla 1)
-  ├── Fila 1: Tabla 1 + Tabla 3 side-by-side (si oauth con cuotas); o solo Tabla 1 (resto de casos)
+  ├── Fila 1: Tabla 1 + Tabla 3 side-by-side (si resolveQuotaSource devuelve datos); o solo Tabla 1
   ├── si hay sessionDir: escribir .statusline-state.json (caché: metricsSnapshot; % de contexto al renderizar Tabla 1 si stdin aportó valor usable)
-  └── Fila 2: Tabla 2 (Trabajo por niveles de razonamiento, siempre, debajo)
+  └── Fila 2: Tabla 2 (Trabajo por niveles de razonamiento, si SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS=on)
 ```
 
 ---
@@ -219,9 +231,9 @@ Los bloques llenos (`█`) de las barras de contexto (Tabla 1) y de cuotas (Tabl
 
 ## 4.2 Layout side-by-side y ancho uniforme de Tabla 2
 
-La Tabla 1 y la Tabla 3 se renderizan lado a lado usando `renderSideBySide()`, con un gap de 2 espacios entre ellas, cuando `authMethod === 'oauth'` y hay datos de cuota en ctx. Si la Tabla 3 tiene más líneas que la Tabla 1, las líneas sobrantes se renderizan debajo con indentación.
+La Tabla 1 y la Tabla 3 se renderizan lado a lado usando `renderSideBySide()`, con un gap de 2 espacios entre ellas, cuando `resolveQuotaSource()` devuelve datos (OAuth stdin o archivo en disco). Si la Tabla 3 tiene más líneas que la Tabla 1, las líneas sobrantes se renderizan debajo con indentación.
 
-Cuando no hay Tabla 3 (`api_key` o `bearer`, u OAuth sin datos de cuota), la Tabla 1 se imprime sola en la primera fila.
+Cuando no hay Tabla 3 (sin fuente de cuota válida), la Tabla 1 se imprime sola en la primera fila.
 
 La Tabla 2 (métricas) se imprime siempre **debajo** del bloque de la primera fila, con un ancho fijado a `anchoTabla1 + anchoTabla3 + 2` (gap):
 
@@ -395,7 +407,9 @@ O reinstale con la variable vacía (`SMART_CODE_PROXY__STATUSLINE_REFRESH_INTERV
 | `cacheReadInputTokens` es `null`                                             | Se trata como `0` en la suma (`coerceMetricNumber` en el lector del statusline; mismo criterio para `count`, `inputTokens`, `outputTokens`) |
 | `displayName` ausente en `metadata.json` (Tabla 2)                           | Se muestra `modelId` como texto de la columna Modelo                                                                                        |
 | `ctx.context_window.used_percentage` ausente, no finito o `0`                | Usar `contextUsagePercentage` de `.statusline-state.json` si existe; si no, barra al `0%`                                                   |
-| `authMethod === 'oauth'` sin `five_hour` ni `seven_day` en `ctx.rate_limits` | No se muestra Tabla 3                                                                                                                       |
+| OAuth sin `five_hour` ni `seven_day` en `ctx.rate_limits`                    | No se muestra Tabla 3 (salvo `subscription-quota.json` con proveedor habilitado)                                                          |
+| Bearer con `SUBSCRIPTION_QUOTA.enabled` pero sin `subscription-quota.json`   | No se muestra Tabla 3 hasta el primer hop facturable del proxy                                                                            |
+| `subscription-quota.json` corrupto o sin ventanas válidas                    | No se muestra Tabla 3; Tabla 1 sin alteraciones                                                                                             |
 | `.statusline-state.json` ausente, corrupto o ilegible                        | Ignorar caché; Tabla 2 sin diff de celdas; Tabla 1 sin % de contexto cacheado                                                               |
 
 ### Fuera de alcance

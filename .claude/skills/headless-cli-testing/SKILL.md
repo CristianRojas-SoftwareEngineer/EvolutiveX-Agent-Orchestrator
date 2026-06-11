@@ -26,7 +26,7 @@ If the session invoking the test is itself routed through the main proxy (port 8
 Use the isolated harness instead:
 
 ```bash
-npm run test:headless-tts -- --no-voice-announce
+npm run test:headless-tts
 ```
 
 Isolation guarantees (see `scripting/headless-tts-gateway-test/`):

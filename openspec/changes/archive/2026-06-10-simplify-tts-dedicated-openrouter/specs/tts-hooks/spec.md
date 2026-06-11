@@ -1,57 +1,6 @@
-# Especificación: tts-hooks
+# Delta: tts-hooks — simplify-tts-dedicated-openrouter
 
-## Propósito
-Definir los requisitos de comportamiento y los escenarios para la síntesis de voz (TTS) contextual local ante los eventos de ciclo de vida interceptados en el endpoint `/hooks` y procesados por `AuditHookEventHandler`.
-
----
-## Requirements
-### Requirement: Extracción de Memoria Contextual
-El sistema SHALL ser capaz de leer el transcript de la sesión activa de Claude Code y extraer las últimas $N$ interacciones, incluyendo mensajes de usuario, respuestas del asistente y mensajes de sistema. El extractor SHALL manejar el campo `content` tanto en formato string (mensajes de usuario) como en formato array de bloques `{type, text}` (mensajes de asistente).
-
-#### Scenario: Lectura del transcript con éxito
-- **GIVEN** que se recibe un hook con un `transcript_path` válido
-- **WHEN** el backend lee el archivo
-- **THEN** SHALL retornar una estructura con los últimos $N$ mensajes ordenados cronológicamente detallando el rol (usuario, asistente, sistema).
-
-#### Scenario: Mensaje de usuario con content string
-- **GIVEN** una línea del transcript donde `message.content` es un string plano
-- **WHEN** el extractor procesa esa línea
-- **THEN** SHALL incluir el mensaje en el resultado usando el string directamente como texto.
-
-#### Scenario: Mensaje de asistente con content array
-- **GIVEN** una línea del transcript donde `message.content` es un array de bloques `{type, text}`
-- **WHEN** el extractor procesa esa línea
-- **THEN** SHALL extraer los bloques con `type === 'text'` y unirlos como texto del mensaje.
-
----
-
-### Requirement: Respuesta de Asistente de Voz en `UserPromptSubmit`
-Al recibir un evento `UserPromptSubmit`, el sistema SHALL leer el último mensaje del usuario y los $N-1$ anteriores, generar una respuesta introductoria asumiendo el rol de asistente de voz (ej. "Entendido, estoy trabajando en..."), y reproducirla inmediatamente de forma asíncrona.
-
-#### Scenario: UserPromptSubmit genera locución interactiva de asistente
-- **GIVEN** el hook `UserPromptSubmit` es recibido en el backend
-- **AND** el último prompt del usuario contiene una petición de refactorización
-- **WHEN** el backend procesa el evento
-- **THEN** SHALL generar una breve locución usando el LLM (ej. "Entendido, voy a analizar el código para realizar la refactorización.")
-- **AND** reproducirla por voz mediante el servicio TTS local de forma asíncrona.
-
----
-
-### Requirement: Resumen conversacional en eventos de parada (`Stop`, `SubagentStop`, `StopFailure`)
-Al recibir `Stop`, `SubagentStop` o `StopFailure`, el sistema SHALL extraer los últimos $N$ mensajes de la sesión para generar y reproducir por voz un resumen conciso en español del proceso ejecutado (logros, tareas abiertas, y estado final).
-
-#### Scenario: Stop exitoso genera resumen por voz
-- **GIVEN** el hook `Stop` es recibido con éxito
-- **WHEN** el backend lee los últimos turnos del transcript
-- **THEN** SHALL solicitar al LLM un resumen corto (3-5 frases en prosa) sobre lo que se ha completado y lo que queda pendiente
-- **AND** reproducir dicho resumen en voz a través del motor local.
-
-#### Scenario: StopFailure genera locución de alerta por voz
-- **GIVEN** el hook `StopFailure` es recibido
-- **WHEN** el backend procesa el evento
-- **THEN** SHALL generar y reproducir una advertencia hablada explicando de forma contextual el error ocurrido o informando sobre el fallo del agente.
-
----
+## ADDED Requirements
 
 ### Requirement: Provider dedicado de inferencia TTS (OpenRouter)
 La generación del texto de resumen TTS SHALL usar siempre un provider dedicado, independiente del provider activo de la sesión: OpenRouter (`https://openrouter.ai/api/v1/messages`) con el modelo fijo `poolside/laguna-xs.2:free`, `max_tokens: 512` y `reasoning: { effort: 'none' }`. La credencial SHALL ser el `ANTHROPIC_AUTH_TOKEN` de `routing/providers/openrouter/secrets.json`, resuelta en el arranque e inyectada por el composition root. La llamada SHALL ir directa al upstream de OpenRouter (no a través del proxy local) con headers `Authorization: Bearer <key>`, `HTTP-Referer` y `X-Title`.
@@ -77,7 +26,7 @@ Si la credencial no está disponible, el sistema SHALL emitir `[TTS-FALLBACK]` c
 - **THEN** SHALL emitir `[TTS-FALLBACK]` con el `reason` correspondiente (`http-429`, `exception`, etc.)
 - **AND** NO SHALL intentar la inferencia contra el provider de la sesión
 
----
+## MODIFIED Requirements
 
 ### Requirement: Robustez en la Inferencia y Reproducción de Audio
 Cualquier fallo al leer el transcript, al invocar al LLM para el resumen/respuesta, o al reproducir el audio NO SHALL afectar el ciclo de vida normal de Claude Code ni bloquear las respuestas del proxy. Cada fallo SHALL ser registrado como `[TTS-FALLBACK]` con `reason` identificando la causa (`no-openrouter-key`, `no-messages`, `http-NNN`, `empty-response`, `exception`), de forma que sea detectable sin afectar el flujo principal. La reproducción de audio SHALL completarse antes de que el handler retorne; el servicio TTS SHALL esperar al cierre del proceso de síntesis.
@@ -130,23 +79,6 @@ Si no hay servicio de notificación inyectado, o si la emisión del toast falla,
 - **AND** SHALL reproducir ese fallback por voz
 - **AND** SHALL emitir el toast con ese mismo fallback como cuerpo
 
-### Requirement: Solo bloques `type === "text"` son válidos como salida hablable
-El sistema SHALL extraer únicamente los bloques con `type === "text"` de la respuesta del LLM para generar el texto a sintetizar. Los bloques `type === "thinking"` o de cualquier otro tipo SHALL ser ignorados. Si la respuesta HTTP es 200 pero no contiene ningún bloque `text`, el sistema SHALL tratar el resultado como `empty-response` y activar el fallback honesto.
-
-#### Scenario: Respuesta con bloques thinking-only activa empty-response
-- **GIVEN** que el LLM responde HTTP 200 con `content` que solo contiene bloques `type: "thinking"`
-- **WHEN** el handler extrae el texto hablable
-- **THEN** SHALL emitir `[TTS-FALLBACK]` con `reason: "empty-response"`
-- **AND** SHALL retornar el mensaje de fallback del evento sin sintetizar el contenido del `thinking`
-
-#### Scenario: Respuesta con bloque text retorna texto dinámico
-- **GIVEN** que el LLM responde HTTP 200 con al menos un bloque `type: "text"` no vacío
-- **WHEN** el handler extrae el texto hablable
-- **THEN** SHALL retornar el contenido de ese bloque como texto a sintetizar
-- **AND** SHALL emitir `[TTS-SPEECH]` con una vista previa del texto
-
----
-
 ### Requirement: Logging estructurado de fallback y mensaje dinámico
 Cada vez que el sistema active un fallback TTS, SHALL emitir una entrada de log con tag `[TTS-FALLBACK]` incluyendo: `eventName`, `usedFallback: true`, `reason` (uno de: `no-openrouter-key`, `no-messages`, `http-NNN`, `empty-response`, `exception`) y `fallbackText`. Cada vez que se genere un mensaje dinámico, SHALL emitir `[TTS-SPEECH]` con `eventName`, `usedFallback: false` y una vista previa del texto (`textPreview`, máximo 120 caracteres).
 
@@ -162,4 +94,12 @@ Cada vez que el sistema active un fallback TTS, SHALL emitir una entrada de log 
 - **THEN** SHALL emitir `[TTS-SPEECH]` con `usedFallback: false`
 - **AND** el campo `textPreview` SHALL contener los primeros 120 caracteres del texto generado
 
----
+## REMOVED Requirements
+
+### Requirement: Selección de token y headers según el tipo de provider activo
+**Reason**: La inferencia TTS ya no usa el provider de la sesión; el provider dedicado de OpenRouter tiene token y headers fijos, por lo que la selección condicional desaparece íntegramente.
+**Migration**: Cubierta por el requisito nuevo "Provider dedicado de inferencia TTS (OpenRouter)". Eliminar `isAnthropic`, la selección `capturedToken`/env y los headers condicionales del handler.
+
+### Requirement: Presupuesto de tokens de inferencia TTS según el provider activo
+**Reason**: Con un único modelo fijo (`poolside/laguna-xs.2:free`, thinking) el presupuesto es constante (`512`); ya no existe la rama Anthropic (150) ni el cap de Ollama local.
+**Migration**: Cubierta por el requisito nuevo "Provider dedicado de inferencia TTS (OpenRouter)". Eliminar `isOllama` y el `max_tokens` condicional del handler.

@@ -38,10 +38,10 @@ describe('isExpectedSessionStartFallback', () => {
     expect(inferMessageType(200, [fallback])).toBe('dynamic');
   });
 
-  it('acepta UserPromptSubmit sin token al inicio (OAuth aún no capturado)', () => {
+  it('acepta UserPromptSubmit sin clave de OpenRouter (TTS aún no configurado)', () => {
     const fallback = {
       eventName: 'UserPromptSubmit',
-      reason: 'no-token',
+      reason: 'no-openrouter-key',
       fallbackText: FALLBACK_SPEECH.UserPromptSubmit,
     };
     expect(isExpectedSessionStartFallback(fallback)).toBe(true);
@@ -213,7 +213,7 @@ describe('inferMessageType', () => {
           tag: '[TTS-FALLBACK]',
           eventName: 'Stop',
           usedFallback: true,
-          reason: 'no-token',
+          reason: 'no-openrouter-key',
           fallbackText: STOP_FALLBACK_TEXT,
         }),
       ),

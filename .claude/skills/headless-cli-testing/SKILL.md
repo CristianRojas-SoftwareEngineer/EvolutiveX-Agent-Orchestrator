@@ -113,7 +113,7 @@ Entries are JSONL (one JSON object per line). The gateway logs via pino; fields 
 | `status` | HTTP status from the upstream on `!res.ok` (e.g. 401, 403) |
 | `statusText` | HTTP reason phrase |
 | `body` | First 500 chars of the upstream error body |
-| `reason` | `no-token` or `no-messages` for early-return in `generateSpeechText` |
+| `reason` | `no-openrouter-key` or `no-messages` for early-return in `generateSpeechText` |
 | `usedFallback` | `true` when `announceStop` used the hardcoded fallback string |
 
 ### Session audit

@@ -357,6 +357,95 @@ function buildResult(
   };
 }
 
+/**
+ * Escenario de fallback sin clave TTS: arranca el proxy con OPENROUTER_SECRETS_PATH
+ * apuntando a una ruta inexistente, corre un prompt headless y verifica que el log
+ * emite [TTS-FALLBACK] reason: no-openrouter-key. No produce TTS de voz (fallback).
+ * Devuelve true si el escenario pasó.
+ */
+async function testFallbackScenario(opts: CliOptions): Promise<boolean> {
+  const port = opts.port ?? DEFAULT_TEST_PORT;
+  const logPath = getLogPath(PROJECT_ROOT, TEST_LOG_FILENAME);
+
+  console.log(chalk.cyan('\n========== Escenario: fallback sin clave TTS =========='));
+
+  killProcessOnPort(port);
+  await sleep(1000);
+
+  // Provider de sesión: default (OAuth) — no importa; lo que cambia es que el proxy
+  // no puede leer la clave TTS de OpenRouter.
+  let providerEnv: ReturnType<typeof buildIsolatedProviderEnv>;
+  try {
+    providerEnv = buildIsolatedProviderEnv('default', port);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.log(chalk.red(`  Fallo al resolver configuración: ${msg}`));
+    return false;
+  }
+
+  const { upstreamOrigin, claudeEnv, proxyEnv } = providerEnv;
+  console.log(chalk.gray(`  UPSTREAM_ORIGIN=${upstreamOrigin} (sin clave TTS)`));
+
+  let proxyHandle: ReturnType<typeof startProxy> | null = null;
+  let passed = false;
+
+  try {
+    // OPENROUTER_SECRETS_PATH a ruta inexistente → resolveTtsApiKey devuelve undefined
+    proxyHandle = startProxy(PROJECT_ROOT, port, {
+      ...proxyEnv,
+      LOG_FILE: logPath,
+      AUDIT_BASE_DIR: join(PROJECT_ROOT, TEST_AUDIT_BASE_DIR),
+      OPENROUTER_SECRETS_PATH: '/nonexistent/tts-secrets.json',
+    });
+    const healthy = await waitHealth(port, opts.healthTimeout);
+    if (!healthy) {
+      console.log(chalk.red('  Proxy no respondió en /health'));
+      return false;
+    }
+    console.log(chalk.green(`  Proxy listo en puerto ${port} (sin clave TTS)`));
+
+    const logOffset = getLogByteOffset(logPath);
+    const claudeResult = await runClaudeHeadless(
+      opts.prompt,
+      PROJECT_ROOT,
+      opts.claudeTimeout,
+      claudeEnv,
+    );
+
+    if (claudeResult.isError) {
+      console.log(chalk.yellow(`  Claude: ${claudeResult.resultText || 'error'}`));
+    }
+
+    await sleep(500);
+    const drain = await waitForGatewayTtsDrain(logPath, logOffset, {
+      settleMs: opts.ttsSettleMs,
+      pollMs: 500,
+      timeoutMs: opts.ttsDrainTimeoutMs,
+      extraDrainMs: opts.ttsExtraDrainMs,
+      fallbackChars: 80,
+    });
+    console.log(chalk.gray(`  Drenaje TTS: ${drain.ttsCount} llamada(s), ${Math.round(drain.drainMs / 1000)}s`));
+
+    const logAnalysis = analyzeLogsFromOffset(logPath, logOffset);
+    const noKeyFallback = logAnalysis.ttsFallbacks.some((f) => f.reason === 'no-openrouter-key');
+
+    if (noKeyFallback) {
+      console.log(chalk.green('  ✓ Fallback no-openrouter-key detectado'));
+      passed = true;
+    } else {
+      console.log(chalk.red('  ✗ No se detectó [TTS-FALLBACK] reason: no-openrouter-key'));
+      console.log(chalk.gray(`  Fallbacks encontrados: ${JSON.stringify(logAnalysis.ttsFallbacks.map((f) => f.reason))}`));
+    }
+  } finally {
+    if (proxyHandle) {
+      await stopProxy(proxyHandle);
+      console.log(chalk.gray('  Proxy detenido'));
+    }
+  }
+
+  return passed;
+}
+
 function printSuitePlan(
   providers: string[],
   excluded: string[],
@@ -559,6 +648,19 @@ async function main(): Promise<void> {
     }
   }
 
+  // Escenario adicional: fallback sin clave TTS (se salta si --skip-claude)
+  let fallbackScenarioPassed = true;
+  if (!opts.skipClaude) {
+    fallbackScenarioPassed = await testFallbackScenario(opts);
+    if (!opts.json) {
+      if (fallbackScenarioPassed) {
+        console.log(chalk.green('  Escenario fallback sin clave: OK'));
+      } else {
+        console.log(chalk.red('  Escenario fallback sin clave: FALLIDO'));
+      }
+    }
+  }
+
   if (opts.json) {
     printJsonReport(results);
   } else {
@@ -566,7 +668,8 @@ async function main(): Promise<void> {
   }
 
   const anyTtsFailed = results.some((r) => !r.ttsWorked && !opts.skipClaude);
-  if (anyTtsFailed && !opts.allowPartial) {
+  const fallbackScenarioFailed = !opts.skipClaude && !fallbackScenarioPassed;
+  if ((anyTtsFailed || fallbackScenarioFailed) && !opts.allowPartial) {
     process.exit(1);
   }
 }

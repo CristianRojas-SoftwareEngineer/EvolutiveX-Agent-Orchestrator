@@ -2,8 +2,8 @@ import { openSync, readSync, closeSync, existsSync, statSync } from 'node:fs';
 import { FALLBACK_SPEECH, STOP_FALLBACK_TEXT } from './fallback-speech.js';
 import type { LogAnalysisResult, TtsFallbackEvent } from './types.js';
 
-/** Razones de fallback aceptables en UserPromptSubmit al inicio (sin historial ni token aún). */
-const EXPECTED_USER_PROMPT_SUBMIT_REASONS = new Set(['no-messages', 'no-token']);
+/** Razones de fallback aceptables en UserPromptSubmit al inicio (sin historial o sin clave TTS). */
+const EXPECTED_USER_PROMPT_SUBMIT_REASONS = new Set(['no-messages', 'no-openrouter-key']);
 
 interface LogEntry {
   reqId?: string;

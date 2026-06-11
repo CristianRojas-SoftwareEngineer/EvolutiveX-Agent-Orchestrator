@@ -326,8 +326,6 @@ describe('AuditHookEventHandler', () => {
       repo, '/tmp/sessions', makeSessionMetrics(),
       undefined, tts, undefined, 3, notifier,
     );
-    handler.setAuthToken('test-token');
-
     handler.execute({
       eventName: 'Stop',
       sessionId: 'session-1',

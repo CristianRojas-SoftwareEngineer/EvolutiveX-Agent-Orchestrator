@@ -17,7 +17,10 @@ import {
 import { SessionMetricsService } from '../2-services/session-metrics.service.js';
 import { FALLBACK_SPEECH } from '../2-services/tts/fallback-speech.constants.js';
 import { resolveSessionDir } from './audit-workflow-closure.handler.js';
-import Anthropic from '@anthropic-ai/sdk';
+
+const TTS_OPENROUTER_URL = 'https://openrouter.ai/api/v1/messages';
+const TTS_MODEL = 'poolside/laguna-xs.2:free';
+const TTS_MAX_TOKENS = 512;
 
 const VOICE_ASSISTANT_SYSTEM_PROMPT =
   'Eres la voz del asistente Smart Code Proxy. ' +
@@ -43,9 +46,6 @@ function extractSpeakableTextFromContent(content: MessageContentBlock[] | undefi
 }
 
 export class AuditHookEventHandler {
-  private anthropic: Anthropic | undefined;
-  private capturedToken: string | undefined;
-
   constructor(
     private readonly workflowRepo: IWorkflowRepository,
     private readonly auditBaseDir: string,
@@ -56,29 +56,8 @@ export class AuditHookEventHandler {
     private readonly contextN: number = 3,
     private readonly notifier?: INotificationService,
     private readonly toastBranding?: { appId?: string; icon?: string },
-    private readonly upstreamOrigin: string = 'https://api.anthropic.com',
-  ) {
-    // Instanciar Anthropic solo si hay API key estática disponible en el entorno
-    const apiKey = process.env.ANTHROPIC_API_KEY ?? process.env.ANTHROPIC_AUTH_TOKEN;
-    if (apiKey?.trim()) {
-      this.anthropic = new Anthropic({ apiKey: apiKey.trim() });
-    }
-  }
-
-  /**
-   * Inicializa el cliente Anthropic con un OAuth Bearer token capturado
-   * del primer request autenticado que pasa por el proxy.
-   * No-op si el cliente ya fue creado (ya sea por API key estática o por
-   * una llamada previa a este método).
-   */
-  public setAuthToken(token: string): void {
-    if (!this.capturedToken && token.trim()) {
-      this.capturedToken = token.trim();
-    }
-    if (!this.anthropic && token.trim()) {
-      this.anthropic = new Anthropic({ authToken: token.trim() });
-    }
-  }
+    private readonly ttsApiKey?: string,
+  ) {}
 
   public execute(event: ClaudeHookEvent): void {
     void this.executeAsync(event);
@@ -316,17 +295,8 @@ export class AuditHookEventHandler {
   ): Promise<string> {
     const fallback = FALLBACK_SPEECH[eventName] ?? 'Procesando.';
 
-    // Detectar provider: para bearer auth (OpenRouter, Ollama, etc.) usar env var; para OAuth usar capturedToken
-    const isAnthropic = this.upstreamOrigin.includes('api.anthropic.com');
-    const envToken = process.env.ANTHROPIC_AUTH_TOKEN?.trim();
-    const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
-    // Para Anthropic: OAuth capturado o API key estática; para otros providers: token bearer desde env
-    const token = isAnthropic
-      ? (this.capturedToken || apiKey)
-      : (envToken || this.capturedToken);
-
-    if (!token) {
-      this.logTtsFallback(eventName, 'no-token', fallback);
+    if (!this.ttsApiKey) {
+      this.logTtsFallback(eventName, 'no-openrouter-key', fallback);
       return fallback;
     }
     if (messages.length === 0) {
@@ -335,52 +305,32 @@ export class AuditHookEventHandler {
     }
 
     try {
-      // || (no ??): una variable vacía ('' tras trim) debe caer al modelo por defecto
-      const model = process.env.ANTHROPIC_DEFAULT_HAIKU_MODEL?.trim() || 'claude-haiku-4-5';
       const systemPrompt = mode === 'prompt' ? VOICE_ASSISTANT_SYSTEM_PROMPT : CONTINUITY_SYSTEM_PROMPT;
 
-      // Construir el historial de chat con los mensajes de contexto
       const chatHistory = messages.map((m) => ({
         role: (m.role === 'system' ? 'user' : m.role) as 'user' | 'assistant',
         content: m.role === 'system' ? `[Sistema]: ${m.text}` : m.text,
       }));
 
-      // El último mensaje debe ser de usuario para que el LLM pueda responder
-      const lastRole = chatHistory.at(-1)?.role;
-      if (lastRole !== 'user') {
+      if (chatHistory.at(-1)?.role !== 'user') {
         chatHistory.push({ role: 'user', content: '¿Qué pasó en este turno?' });
       }
 
-      const port = process.env.PORT || 8787;
-
-      const baseHeaders = {
-        'authorization': `Bearer ${token}`,
-        'content-type': 'application/json',
-      };
-
-      const headers = isAnthropic
-        ? { ...baseHeaders, 'anthropic-version': '2023-06-01' }
-        : { ...baseHeaders, 'HTTP-Referer': 'https://smartcodeproxy.local', 'X-Title': 'Smart Code Proxy' };
-
-      // Los modelos thinking (MiniMax-M2.5, laguna-xs.2) consumen tokens en razonamiento
-      // antes de producir bloques text; necesitan ≥512 o devuelven empty-response.
-      // Ollama cloud rechaza max_tokens >150 (404), por eso mantiene el cap bajo.
-      // reasoning: { effort: 'none' } reduce el thinking en OpenRouter pero no lo elimina
-      // de forma fiable; MiniMax y Ollama lo ignoran sin error.
-      const isOllama = this.upstreamOrigin.includes('localhost:11434');
-      const nonAnthropicMaxTokens = isOllama ? 150 : 512;
-      const ttsBody = {
-        model,
-        messages: chatHistory,
-        system: systemPrompt,
-        max_tokens: isAnthropic ? 150 : nonAnthropicMaxTokens,
-        ...(isAnthropic ? {} : { reasoning: { effort: 'none' } }),
-      };
-
-      const res = await fetch(`http://127.0.0.1:${port}/v1/messages`, {
+      const res = await fetch(TTS_OPENROUTER_URL, {
         method: 'POST',
-        headers,
-        body: JSON.stringify(ttsBody),
+        headers: {
+          'authorization': `Bearer ${this.ttsApiKey}`,
+          'content-type': 'application/json',
+          'HTTP-Referer': 'https://smartcodeproxy.local',
+          'X-Title': 'Smart Code Proxy',
+        },
+        body: JSON.stringify({
+          model: TTS_MODEL,
+          messages: chatHistory,
+          system: systemPrompt,
+          max_tokens: TTS_MAX_TOKENS,
+          reasoning: { effort: 'none' },
+        }),
       });
 
       if (!res.ok) {

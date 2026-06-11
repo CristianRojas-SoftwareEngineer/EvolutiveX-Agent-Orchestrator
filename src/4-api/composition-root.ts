@@ -104,6 +104,9 @@ export async function createProxyDependencies(
   // Branding por defecto para el toast del Stop (appId + icono fallback global)
   const toastBranding = resolveBranding({ sound: false, silent: false, stdinJson: false });
 
+  // Credencial TTS dedicada: leída una vez al arranque desde el secrets de OpenRouter
+  const ttsApiKey = await resolveTtsApiKey();
+
   const hookEventHandler = new AuditHookEventHandler(
     workflowRepo,
     auditBaseDir,
@@ -114,7 +117,7 @@ export async function createProxyDependencies(
     config.TTS_CONTEXT_N ?? 3,
     new DesktopNotificationAdapter(),
     toastBranding,
-    config.UPSTREAM_ORIGIN,
+    ttsApiKey,
   );
 
   return {
@@ -133,6 +136,21 @@ export async function createProxyDependencies(
 }
 
 export type ProxyDependencies = Awaited<ReturnType<typeof createProxyDependencies>>;
+
+/** Lee la API key de OpenRouter para el provider TTS dedicado. Devuelve `undefined` si el archivo no existe o no contiene la clave. Acepta override de ruta via OPENROUTER_SECRETS_PATH (para tests). */
+async function resolveTtsApiKey(): Promise<string | undefined> {
+  const secretsPath =
+    process.env['OPENROUTER_SECRETS_PATH'] ??
+    path.join(process.cwd(), 'routing', 'providers', 'openrouter', 'secrets.json');
+  try {
+    const raw = await fs.readFile(secretsPath, 'utf8');
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const key = parsed['ANTHROPIC_AUTH_TOKEN'];
+    return typeof key === 'string' && key.trim() ? key.trim() : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 /** Crea el directorio raíz de sesiones auditadas y `.gitkeep` si no existen. */
 async function ensureAuditSessionsRoot(auditBaseDir: string): Promise<void> {

@@ -8,20 +8,20 @@ import {
 
 describe('session-routing', () => {
   it('getWorkflowDir genera ruta correcta', () => {
-    expect(getWorkflowDir('sess-abc', 1)).toBe('sessions/sess-abc/workflows/01/');
+    expect(getWorkflowDir('sess-abc', 1)).toBe('sess-abc/workflows/01/');
   });
 
   it('getStepDir genera ruta correcta', () => {
-    expect(getStepDir('sess-abc', 1, 3)).toBe('sessions/sess-abc/workflows/01/steps/03/');
+    expect(getStepDir('sess-abc', 1, 3)).toBe('sess-abc/workflows/01/steps/03/');
   });
 
   it('getToolsDir genera ruta correcta', () => {
-    expect(getToolsDir('sess-abc', 1, 1)).toBe('sessions/sess-abc/workflows/01/steps/01/tools/');
+    expect(getToolsDir('sess-abc', 1, 1)).toBe('sess-abc/workflows/01/steps/01/tools/');
   });
 
   it('getToolDir genera ruta con slug normalizado', () => {
     expect(getToolDir('sess-abc', 1, 1, 1, 'Read')).toBe(
-      'sessions/sess-abc/workflows/01/steps/01/tools/01-Read/',
+      'sess-abc/workflows/01/steps/01/tools/01-Read/',
     );
   });
 
@@ -31,7 +31,7 @@ describe('session-routing', () => {
 
   it('tool name con caracteres especiales se normaliza a slug con guiones', () => {
     expect(getToolDir('s', 1, 1, 2, 'my_custom.tool')).toBe(
-      'sessions/s/workflows/01/steps/01/tools/02-my-custom-tool/',
+      's/workflows/01/steps/01/tools/02-my-custom-tool/',
     );
   });
 

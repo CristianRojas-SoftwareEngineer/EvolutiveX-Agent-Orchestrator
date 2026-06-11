@@ -28,9 +28,9 @@ import type { Logger } from '../1-domain/types/logger.types.js';
  *
  * @param config Configuración del entorno del proxy.
  * @param logger Logger de Fastify para logging estructurado.
- * @param auditBaseDir Directorio donde se escribirán las sesiones auditadas.
- *   Por defecto `./sessions` relativo al CWD del proceso. Los tests de
- *   integración pueden inyectar un path absoluto para aislar capturas.
+ * @param auditBaseDir Directorio base de sesiones. Todos los artefactos
+ *   (workflows, eventos y métricas) se escriben directamente bajo él.
+ *   Por defecto `./sessions` relativo al CWD del proceso.
  */
 export async function createProxyDependencies(
   config: ProxyEnvironmentConfig,
@@ -48,7 +48,7 @@ export async function createProxyDependencies(
   // y el correlador publica sus mutaciones al mismo bus (Opción A, §28b/§40).
   const eventBus = new EventBus(logger);
   const sessionPersistence = new SessionPersistence(eventBus, {
-    rootDir: path.dirname(auditBaseDir),
+    rootDir: auditBaseDir,
     logger,
     sseReconstruct,
     markdownRenderer,

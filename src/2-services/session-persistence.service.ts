@@ -68,7 +68,7 @@ export class SessionPersistence {
   /** Conjunto de escrituras en curso (para `flush()` en tests). */
   private readonly pending = new Set<Promise<void>>();
 
-  /** Raíz bajo la cual se resuelven las rutas relativas `sessions/...`. */
+  /** Directorio base de sesiones; todas las rutas relativas se resuelven bajo él. */
   private readonly rootDir: string;
   private readonly logger?: Logger;
   private readonly sseReconstruct?: ISseReconstructor;
@@ -399,7 +399,7 @@ export class SessionPersistence {
   }
 
   private onAnyEvent(event: TelemetryEvent): void {
-    const eventsPath = `sessions/${event.sessionId}/events.ndjson`;
+    const eventsPath = `${event.sessionId}/events.ndjson`;
     const line = JSON.stringify(event);
     this.enqueue(eventsPath, () => this.appendLine(eventsPath, line));
   }
@@ -457,7 +457,7 @@ export class SessionPersistence {
         ...(patch.completedAt ? { completedAt: patch.completedAt } : {}),
       });
     }
-    const seqPath = `sessions/${sessionId}/workflows/workflow-sequence.json`;
+    const seqPath = `${sessionId}/workflows/workflow-sequence.json`;
     this.writeJson(seqPath, seq);
   }
 

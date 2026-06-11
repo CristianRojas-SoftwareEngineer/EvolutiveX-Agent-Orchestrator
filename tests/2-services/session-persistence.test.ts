@@ -16,7 +16,7 @@ let persistence: SessionPersistence;
 beforeEach(async () => {
   rootDir = await fs.mkdtemp(path.join(os.tmpdir(), 'scp-persist-'));
   bus = new EventBus();
-  persistence = new SessionPersistence(bus, { rootDir });
+  persistence = new SessionPersistence(bus, { rootDir: path.join(rootDir, 'sessions') });
 });
 
 afterEach(async () => {
@@ -372,7 +372,7 @@ describe('SessionPersistence — P2-g vistas coalesced', () => {
     };
 
     const persistenceWithCoalesced = new SessionPersistence(bus, {
-      rootDir,
+      rootDir: path.join(rootDir, 'sessions'),
       sseReconstruct: mockReconstruct,
       markdownRenderer: new MarkdownRendererService(),
     });

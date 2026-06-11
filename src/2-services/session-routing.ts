@@ -7,7 +7,6 @@
  * acepta `/` sin problema.
  */
 
-const SESSIONS_ROOT = 'sessions';
 const PAD = 2;
 
 /** Índice con zero-padding a 2 dígitos (sin padding adicional para >= 100). */
@@ -27,22 +26,22 @@ export function slugifyToolName(toolName: string): string {
     .slice(0, 32);
 }
 
-/** `sessions/<sessionId>/workflows/<NN>/` — `workflowIndex` base 1 (primer turno → `01`). */
+/** `<sessionId>/workflows/<NN>/` — `workflowIndex` base 1 (primer turno → `01`). */
 export function getWorkflowDir(sessionId: string, workflowIndex: number): string {
-  return `${SESSIONS_ROOT}/${sessionId}/workflows/${pad(workflowIndex)}/`;
+  return `${sessionId}/workflows/${pad(workflowIndex)}/`;
 }
 
-/** `sessions/<sessionId>/workflows/<NN>/steps/<MM>/` — índices base 1. */
+/** `<sessionId>/workflows/<NN>/steps/<MM>/` — índices base 1. */
 export function getStepDir(sessionId: string, workflowIndex: number, stepIndex: number): string {
   return `${getWorkflowDir(sessionId, workflowIndex)}steps/${pad(stepIndex)}/`;
 }
 
-/** `sessions/<sessionId>/workflows/<NN>/steps/<MM>/tools/`. */
+/** `<sessionId>/workflows/<NN>/steps/<MM>/tools/`. */
 export function getToolsDir(sessionId: string, workflowIndex: number, stepIndex: number): string {
   return `${getStepDir(sessionId, workflowIndex, stepIndex)}tools/`;
 }
 
-/** `sessions/<sessionId>/workflows/<NN>/steps/<MM>/tools/<KK-slug>/` — índices base 1. */
+/** `<sessionId>/workflows/<NN>/steps/<MM>/tools/<KK-slug>/` — índices base 1. */
 export function getToolDir(
   sessionId: string,
   workflowIndex: number,

@@ -40,9 +40,8 @@ async function start() {
     ]),
   );
 
-  // Directorio de auditoría sobreescribible por entorno (AUDIT_BASE_DIR) para aislar tests.
-  // Debe terminar en "sessions": SessionPersistence resuelve rutas relativas "sessions/..."
-  // contra el directorio padre.
+  // Directorio base de sesiones sobreescribible por entorno (AUDIT_BASE_DIR).
+  // Todos los artefactos (workflows, eventos, métricas) se escriben directamente bajo él.
   const auditBaseDir = process.env.AUDIT_BASE_DIR?.trim() || undefined;
   const deps = auditBaseDir
     ? await createProxyDependencies(config, logger, path.resolve(auditBaseDir))

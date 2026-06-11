@@ -36,8 +36,9 @@ export function resolveClaudeExecutable(): string {
 export function buildClaudeHeadlessArgs(
   prompt: string,
   env: Record<string, string> = {},
+  maxTurns = 1,
 ): string[] {
-  const args = ['-p', prompt, '--model', 'haiku', '--max-turns', '1', '--output-format', 'json'];
+  const args = ['-p', prompt, '--model', 'haiku', '--max-turns', String(maxTurns), '--output-format', 'json'];
   if (Object.keys(env).length > 0) {
     args.push('--settings', JSON.stringify({ env }));
   }
@@ -54,9 +55,10 @@ export async function runClaudeHeadless(
   cwd: string,
   timeoutMs: number,
   env: Record<string, string> = {},
+  maxTurns = 1,
 ): Promise<ClaudeRunResult> {
   const executable = resolveClaudeExecutable();
-  const args = buildClaudeHeadlessArgs(prompt, env);
+  const args = buildClaudeHeadlessArgs(prompt, env, maxTurns);
 
   return new Promise((resolve) => {
     const child = spawn(executable, args, {

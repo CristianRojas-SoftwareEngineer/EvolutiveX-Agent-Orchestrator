@@ -1,5 +1,5 @@
 import { analyzeLogsFromOffset } from './log-analyzer.js';
-import { sleep } from './proxy-lifecycle.js';
+import { sleep } from '../headless-session/proxy-lifecycle.js';
 
 const MIN_PLAYBACK_MS = 3000;
 const MAX_PLAYBACK_MS = 25000;

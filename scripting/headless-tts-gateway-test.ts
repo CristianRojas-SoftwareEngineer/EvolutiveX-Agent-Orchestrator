@@ -36,10 +36,10 @@ import {
   waitHealth,
   sleep,
   getLogPath,
-} from './headless-tts-gateway-test/proxy-lifecycle.js';
-import { getProxyPort, getLogByteOffset } from './headless-tts-gateway-test/env-utils.js';
-import { buildIsolatedProviderEnv } from './headless-tts-gateway-test/provider-env.js';
-import { runClaudeHeadless } from './headless-tts-gateway-test/run-claude-headless.js';
+} from './headless-session/proxy-lifecycle.js';
+import { getProxyPort, getLogByteOffset } from './headless-session/env-utils.js';
+import { buildIsolatedProviderEnv } from './headless-session/provider-env.js';
+import { runClaudeHeadless } from './headless-session/run-claude.js';
 import {
   findLatestTranscriptPath,
   verifyPromptInTranscript,

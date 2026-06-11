@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import {
   buildIsolatedProviderEnv,
   DEFAULT_UPSTREAM,
-} from '../../scripting/headless-tts-gateway-test/provider-env.js';
+} from '../../scripting/headless-session/provider-env.js';
 import { MANAGED_ENV_VARS } from '../../scripting/shared/provider-config.js';
 
 const TEST_PORT = 8788;

@@ -140,7 +140,7 @@ const SSE_BASH_TOOL = [
 
 const SSE_END_TURN = [
   'event: message_start',
-  'data: {"type":"message_start","message":{"usage":{"input_tokens":5,"output_tokens":0}}}',
+  'data: {"type":"message_start","message":{"id":"msg_test_001","model":"claude-test","usage":{"input_tokens":5,"output_tokens":0}}}',
   '',
   'event: message_delta',
   'data: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":10}}',
@@ -239,6 +239,24 @@ describe('AuditSseResponseHandler', () => {
         workflowId: 'session-1',
       }),
     );
+    // Verificar shape del envelope Message en payload.response (paridad SSE/estándar)
+    const stepResponseCall = (publish as ReturnType<typeof vi.fn>).mock.calls.find(
+      ([e]) => e.type === 'step_response',
+    );
+    expect(stepResponseCall).toBeDefined();
+    expect(stepResponseCall![0].payload.response).toMatchObject({
+      id: expect.any(String),
+      type: 'message',
+      role: 'assistant',
+      model: expect.any(String),
+      content: expect.any(Array),
+      stop_reason: expect.any(String),
+      stop_sequence: null,
+      usage: expect.objectContaining({
+        input_tokens: expect.any(Number),
+        output_tokens: expect.any(Number),
+      }),
+    });
   });
 
   it('registra pending tool use para herramienta Agent', async () => {
@@ -361,6 +379,24 @@ describe('AuditSseResponseHandler', () => {
     await wait();
 
     expect(publish).toHaveBeenCalledWith(expect.objectContaining({ type: 'step_response' }));
+    // Verificar shape del envelope Message en payload.response (paridad SSE/estándar)
+    const stepResponseCall = (publish as ReturnType<typeof vi.fn>).mock.calls.find(
+      ([e]) => e.type === 'step_response',
+    );
+    expect(stepResponseCall).toBeDefined();
+    expect(stepResponseCall![0].payload.response).toMatchObject({
+      id: expect.any(String),
+      type: 'message',
+      role: 'assistant',
+      model: expect.any(String),
+      content: expect.any(Array),
+      stop_reason: expect.any(String),
+      stop_sequence: null,
+      usage: expect.objectContaining({
+        input_tokens: expect.any(Number),
+        output_tokens: expect.any(Number),
+      }),
+    });
   });
 
   it('atribuye stream_chunks al workflowId del AuditWorkflowContext (no al main de sessionId)', async () => {

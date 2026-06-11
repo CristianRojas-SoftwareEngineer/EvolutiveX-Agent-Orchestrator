@@ -197,7 +197,16 @@ export class AuditSseResponseHandler {
             payload: {
               workflowId: workflow.id,
               stepIndex: wireStep.index,
-              response: assembled.assistantMessage,
+              response: {
+                id: assembled.anthropicMessageId,
+                type: 'message',
+                role: 'assistant',
+                model: assembled.model,
+                content: assembled.assistantMessage.content,
+                stop_reason: assembled.stopReason,
+                stop_sequence: null,
+                usage: assembled.usage,
+              },
               ...(isCoalescedAgentContinuation
                 ? { coalescedDelegationStepIndex: wireStep.index - 1 }
                 : {}),

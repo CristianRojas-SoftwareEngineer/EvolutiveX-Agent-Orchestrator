@@ -46,8 +46,14 @@ Al finalizar un stream SSE, `AuditSseResponseHandler` SHALL publicar en `payload
 
 `StepAssemblerService` SHALL acumular bloques `content_block` de tipo `text` mediante eventos `text_delta` y SHALL incluirlos en `assistantMessage.content` junto a `thinking` y `tool_use`.
 
-#### Scenario: SSE con text_delta produce bloque text en el content del envelope
+#### Scenario: SSE con text_delta produce bloque text en la raíz de body.json (before-change)
 
 - **GIVEN** un stream SSE con `content_block_start` type `text` y deltas `text_delta`
 - **WHEN** `AuditSseResponseHandler` finaliza el stream y publica `step_response`
+- **THEN** `response/body.json` SHALL contener al menos un bloque `{ type: 'text', text: '...' }` en la raíz del payload, sin envelope (el publish usa `assembled.assistantMessage` con shape `{role, content}` directamente)
+
+#### Scenario: SSE con text_delta produce bloque text en el content[] del envelope (after-change)
+
+- **GIVEN** un stream SSE con `content_block_start` type `text` y deltas `text_delta`
+- **WHEN** `AuditSseResponseHandler` finaliza el stream y publica `step_response` con el envelope Message Anthropic completo (`{id, type: 'message', role: 'assistant', model, content, stop_reason, stop_sequence: null, usage}`)
 - **THEN** `response/body.json` SHALL contener al menos un bloque `{ type: 'text', text: '...' }` dentro del array `content[]` del envelope

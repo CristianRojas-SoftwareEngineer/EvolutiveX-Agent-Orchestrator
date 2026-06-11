@@ -35,4 +35,11 @@ export interface ProxyEnvironmentConfig {
 
   /** Número de últimos mensajes a leer del transcript para contexto. Env: `TTS_CONTEXT_N`. */
   TTS_CONTEXT_N?: number;
+
+  /** Activar logging del body de request. Default: false. Env: `LOG_HTTP_BODIES`. */
+  LOG_HTTP_BODIES?: boolean;
+  /** Activar logging de headers request+response. Default: true. Env: `LOG_HTTP_HEADERS`. */
+  LOG_HTTP_HEADERS?: boolean;
+  /** Nivel dedicado para los logs del plugin http-logger. Default: 'info'. Env: `LOG_HTTP_LEVEL`. */
+  LOG_HTTP_LEVEL?: 'info' | 'debug';
 }

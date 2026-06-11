@@ -2,6 +2,7 @@ import fastify from 'fastify';
 import { randomUUID } from 'node:crypto';
 import { proxyRoutes } from './5-user-interfaces/http/proxy.routes.js';
 import { HooksController } from './5-user-interfaces/http/hooks.controller.js';
+import { createHttpOnRequestHook, createHttpPreValidationHook, createHttpOnResponseHook } from './5-user-interfaces/http/middlewares/http-logger.js';
 import type { ProxyDependencies } from './4-api/composition-root.js';
 import type { Logger } from './1-domain/types/logger.types.js';
 
@@ -14,6 +15,17 @@ export function buildApp(deps: ProxyDependencies, logger: Logger) {
     loggerInstance: logger as unknown as import('fastify').FastifyBaseLogger,
     genReqId: () => randomUUID(),
   });
+
+  // Logging HTTP estructurado: hooks onRequest/onResponse aplicados al root context
+  // para que cubran TODAS las rutas (/health, /hooks, /proxy/*).
+  const httpLoggerConfig = {
+    logBodies: deps.config.LOG_HTTP_BODIES === true,
+    logHeaders: deps.config.LOG_HTTP_HEADERS !== false,
+    level: deps.config.LOG_HTTP_LEVEL ?? 'info',
+  };
+  app.addHook('onRequest', createHttpOnRequestHook(httpLoggerConfig));
+  app.addHook('preValidation', createHttpPreValidationHook(httpLoggerConfig));
+  app.addHook('onResponse', createHttpOnResponseHook(httpLoggerConfig));
 
   /**
    * Configura el límite global de cuerpo para el parsing de buffer crudo.

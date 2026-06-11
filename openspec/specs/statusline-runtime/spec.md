@@ -172,11 +172,11 @@ el cache de métricas y el string de salida NO incluye ninguna línea de dicha t
 - **WHEN** el método de auth es `oauth` con cuotas disponibles
 - **THEN** el output SHALL contener Tabla 1 y Tabla 3 renderizadas side-by-side, igual que si Tabla 2 estuviera visible
 
-### Requirement: Clasificación con vars ausentes (fallback heurístico)
+### Requirement: Clasificación con vars ausentes (fallback heurístico por nivel)
 
-`router-status` SHALL aplicar clasificación heurística por subcadena (`haiku`, `sonnet`, `opus`) en el `modelId` cuando `ANTHROPIC_DEFAULT_HAIKU_MODEL`, `ANTHROPIC_DEFAULT_SONNET_MODEL` y `ANTHROPIC_DEFAULT_OPUS_MODEL` estén vacías o ausentes en settings.
+`router-status` SHALL aplicar clasificación heurística por subcadena en `classifyModelWithEnv` de forma **independiente por nivel**: para cada nivel (`haiku` → Lite, `sonnet` → Standard, `opus` → Reasoning) cuya variable `ANTHROPIC_DEFAULT_*_MODEL` esté vacía o ausente, la clasificación usa el término correspondiente como substring del `modelId`. Los niveles con variable configurada siempre clasifican por coincidencia de variable, con independencia del estado de los otros niveles (configuración parcial).
 
-#### Scenario: Fallback activo — modelIds estándar de Anthropic
+#### Scenario: Fallback activo — todas las vars ausentes, modelIds estándar de Anthropic
 
 - **GIVEN** `ANTHROPIC_DEFAULT_HAIKU_MODEL`, `ANTHROPIC_DEFAULT_SONNET_MODEL` y `ANTHROPIC_DEFAULT_OPUS_MODEL` están vacías o ausentes
 - **AND** `session-metrics.json` contiene `modelId`s con `"haiku"`, `"sonnet"` u `"opus"`
@@ -189,9 +189,12 @@ el cache de métricas y el string de salida NO incluye ninguna línea de dicha t
 - **AND** `modelId` no contiene ninguno de los tres términos
 - **THEN** `classifyModelWithEnv` SHALL retornar `null` (el registro no se suma)
 
-#### Scenario: Fallback no activo — alguna var configurada
+#### Scenario: Configuración parcial — fallback por nivel independiente
 
-- **GIVEN** al menos una de las tres variables tiene valor no vacío
-- **THEN** el fallback heurístico SHALL NOT activarse
-- **AND** solo SHALL aplicar la comparación por includes contra las vars configuradas
+- **GIVEN** `ANTHROPIC_DEFAULT_HAIKU_MODEL` tiene valor no vacío (p. ej. `"claude-haiku-4-5"`)
+- **AND** `ANTHROPIC_DEFAULT_SONNET_MODEL` está vacía o ausente
+- **AND** `session-metrics.json` contiene modelos con `"haiku"` y modelos con `"sonnet"` en su `modelId`
+- **THEN** los modelos con `"haiku"` SHALL clasificar por match de variable (Lite)
+- **AND** los modelos con `"sonnet"` SHALL clasificar por keyword heurística (Standard)
+- **AND** `aggregateSessionMetrics` SHALL retornar contadores `> 0` para ambos niveles
 

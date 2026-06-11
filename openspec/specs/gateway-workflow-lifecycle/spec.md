@@ -116,7 +116,7 @@ El sistema SHALL actualizar `AuditHookEventHandler` en `src/3-operations/audit-h
 
 | Evento | Acción en G2 |
 |--------|-------------|
-| `UserPromptSubmit` | Abre o confirma el workflow main en el repo (idempotente) |
+| `UserPromptSubmit` | Notificaciones (toast/voz); el main lo abre `ensureTurnWorkflow` al llegar el primer hop HTTP |
 | `Stop` | Invoca `readyToClose`; si `true`, invoca `close` |
 | `SubagentStop` | Invoca `readyToClose` para el sub-workflow del agente; si `true`, invoca `close` |
 | `StopFailure` | Invoca `close` directamente (no `readyToClose`; §15.4: siempre cierra) |
@@ -283,25 +283,39 @@ Cuando el hook no incluye `last_assistant_message`, `finalText` SHALL ser `undef
 - **THEN** `finalText` SHALL ser `undefined`
 - **AND** SHALL conservar `outcome`, `stepCount`, `usage` y `closedByEvent`
 
-### Requirement: Apertura de workflow de turno en UserPromptSubmit
+### Requirement: Apertura de workflow de turno en el primer hop HTTP
 
-Al procesar `UserPromptSubmit`, `AuditHookEventHandler` SHALL abrir (o reutilizar idempotentemente) el workflow de turno con `workflowKind: 'agentic'`, `kind: 'main'` y `id === sessionId`. El workflow SHALL permanecer `running` hasta el hook `Stop` o `StopFailure`.
+El workflow de turno (`kind: 'main'`, `workflowKind: 'agentic'`) SHALL abrirse exclusivamente desde `ensureTurnWorkflow` al llegar el primer hop HTTP del turno (fresh o side-request). El hook `UserPromptSubmit` NO SHALL invocar `openWorkflow` ni tocar `IWorkflowRepository`; su responsabilidad se limita a notificaciones (toast/voz).
 
-Como máximo **un** workflow de turno `running` por `sessionId` con `id === sessionId` SHALL existir en el correlador.
+**Esquema de ids por turno:**
+- El **primer turno** de la sesión usa `id === sessionId`.
+- Los **turnos posteriores** usan `id === ${sessionId}-turn-${layoutIndex}` (donde `layoutIndex` es el índice secuencial del workflow en la sesión, base 1).
 
-#### Scenario: UserPromptSubmit abre turno agentic
+**No-reutilización de workflows cerrados:** `openWorkflow` y `getWorkflowBySessionId` filtran por `result == null`. Los workflows cerrados (resultado presente) permanecen en el repo pero no se reutilizan como turno activo.
 
-- **WHEN** llega un hook `UserPromptSubmit` para `sessionId` S sin turno abierto
-- **THEN** `openWorkflow` SHALL recibir `workflowKind: 'agentic'`
+Como máximo **un** workflow de turno `running` por `sessionId` SHALL existir en el correlador.
+
+#### Scenario: Primer hop HTTP abre el turno agentic
+
+- **GIVEN** una sesión sin turno activo abierto
+- **WHEN** llega el primer hop HTTP fresh o side-request para `sessionId` S
+- **THEN** `ensureTurnWorkflow` SHALL invocar `openWorkflow` con `workflowKind: 'agentic'`
+- **AND** el workflow SHALL recibir `id === sessionId` (primer turno) o `id === ${sessionId}-turn-N` (turno N > 1)
 - **AND** el evento `workflow_start` SHALL incluir `interactionType: agentic` en payload para persistencia
-- **AND** el workflow SHALL NOT tener steps HTTP aún
 
-#### Scenario: UserPromptSubmit idempotente con turno lazy-open
+#### Scenario: UserPromptSubmit no crea ni confirma workflow
 
-- **GIVEN** un turno ya abierto por side-request o fresh (lazy open) con `id === sessionId`
-- **WHEN** llega `UserPromptSubmit` para el mismo `sessionId`
-- **THEN** el correlador SHALL reutilizar el mismo workflow sin `forceNew`
-- **AND** NO SHALL crear un segundo workflow hermano
+- **GIVEN** cualquier estado del repositorio (sin turno o con turno abierto)
+- **WHEN** llega un hook `UserPromptSubmit`
+- **THEN** `AuditHookEventHandler` SHALL NOT invocar `openWorkflow` ni modificar `IWorkflowRepository`
+- **AND** el handler SHALL despachar únicamente las notificaciones (toast con preview del prompt, locución por voz)
+
+#### Scenario: Segundo turno no reutiliza workflow cerrado
+
+- **GIVEN** un workflow cerrado (`result != null`) con `id === sessionId` del turno anterior
+- **WHEN** llega el primer hop HTTP del turno siguiente
+- **THEN** `ensureTurnWorkflow` SHALL crear un workflow nuevo con `id === ${sessionId}-turn-2`
+- **AND** el workflow anterior SHALL permanecer en el repo sin reutilizarse
 
 ### Requirement: Cierre E2E del turno solo por hook
 

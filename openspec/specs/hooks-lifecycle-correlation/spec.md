@@ -109,7 +109,7 @@ El sistema SHALL implementar un handler `AuditHookEventHandler` en capa 3 (`src/
 
 | Evento | Acción |
 |--------|--------|
-| `UserPromptSubmit` | **Abre o confirma el workflow main en el repo** (idempotente; ver `gateway-workflow-lifecycle`); locución por voz; toast con preview del `prompt` |
+| `UserPromptSubmit` | Locución por voz; toast con preview del `prompt`. No crea ni alinea workflows (la apertura del turno corresponde a `ensureTurnWorkflow` en el primer hop HTTP) |
 | `SubagentStart` | **`confirmSubagentFromHook(agentId, toolUseId?)`**; toast `"Subagente iniciado"` |
 | `Stop` | **`readyToClose` → si true: `close`** (§15.4); voz + toast de continuidad (generado por LLM) |
 | `SubagentStop` | **`readyToClose` para sub-workflow → si true: `close`** (§15.4); voz; toast `"Subagente terminado"` |

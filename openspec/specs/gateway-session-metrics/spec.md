@@ -73,7 +73,7 @@ La actualización per-step SHALL aplicarse a steps de workflows **`kind: 'main'`
 El sistema SHALL proveer `SessionMetricsService` en `src/2-services/session-metrics.service.ts` (capa 2) que mantenga `sessions/{sessionId}/session-metrics.json` como fuente agregada de la sesión. El servicio SHALL:
 
 - Actualizar contadores de hops y tokens **por step** cuando un step agéntico contable cierra (requisito per-step).
-- Al cerrar una ejecución agéntica (`main` o `subagent`), invocar `finalizeWorkflowMetrics` que incremente `finalized_runs` en **exactamente 1** para el modelo atribuido del workflow y recalcule totales, **sin volver a sumar** hops/tokens ya persistidos per-step en la misma ejecución.
+- Al cerrar una ejecución agéntica (`main` o `subagent`), invocar `finalizeWorkflowMetrics` que incremente `finalized_runs` en **exactamente 1** para el modelo atribuido del workflow y recalcule totales, **sin volver a sumar** hops/tokens ya persistidos per-step en la misma ejecución. El servicio SHALL registrar el `workflowId` en `finalized_workflow_ids` de forma **incondicional** —incluso cuando no hay `usage` ni modelo atribuido— garantizando idempotencia entre sus tres callers (`AuditHookEventHandler` en `Stop`, `StopFailure` y `SubagentStop`).
 - Calcular `cache_efficiency` por modelo según §33.2.
 - Escribir el archivo de forma **atómica** (archivo temporal + rename) y persistir idempotencia en sidecar `session-metrics-applied.json`.
 - Serializar escrituras concurrentes mediante cola serializada (`writeQueue`).
@@ -142,7 +142,7 @@ El sistema SHALL proveer `SessionMetricsService` en `src/2-services/session-metr
 
 ### Requirement: finalized_runs estructural en ISessionTotals
 
-`ISessionTotals` SHALL incluir `finalized_runs: number` igual a la cantidad de IDs en `finalized_workflow_ids` del sidecar tras el último cierre procesado, **no** la suma de `finalized_runs` de cada modelo. Alimenta la columna `# Workflows` de la fila Totales en la Tabla 2.
+`ISessionTotals` SHALL incluir `finalized_runs: number` igual a la cantidad de IDs en `finalized_workflow_ids` del sidecar tras el último cierre procesado, **no** la suma de `finalized_runs` de cada modelo. Nota: el statusline deriva la columna `# Workflows` de la fila Totales de la **suma de los niveles renderizados** (lite + standard + reasoning), no desde `session_totals.finalized_runs` directamente (ver `statusline-runtime`); ambos valores difieren cuando hay workflows sin modelo atribuido.
 
 #### Scenario: total de sesión refleja ejecuciones estructurales
 
@@ -182,6 +182,15 @@ El servicio SHALL NOT incrementar `finalized_runs` para más de un `modelId` por
 - **WHEN** finalize ejecuta al cierre
 - **THEN** ningún `models[*].finalized_runs` SHALL incrementarse
 - **AND** los `billable_hops` de los side-requests SHALL permanecer contabilizados per-step
+- **AND** el `workflowId` SHALL quedar registrado en `finalized_workflow_ids` del sidecar (idempotencia incondicional)
+
+#### Scenario: Idempotencia entre callers — segunda invocación de finalize es no-op
+
+- **GIVEN** un workflow cuyo `workflowId` ya fue registrado en `finalized_workflow_ids` por un primer caller
+- **WHEN** un segundo caller invoca `finalizeWorkflowMetrics` para el mismo `workflowId`
+- **THEN** `finalized_workflow_ids` SHALL no duplicar el id
+- **AND** ningún contador de `finalized_runs` ni `billable_hops` SHALL modificarse
+- **AND** `session_totals.finalized_runs` SHALL permanecer igual que tras el primer cierre
 
 ### Requirement: Invariante G16′ — ejecuciones agénticas main y subagent
 

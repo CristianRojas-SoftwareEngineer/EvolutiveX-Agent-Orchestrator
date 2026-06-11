@@ -90,6 +90,7 @@ function applyWireStepResponseToStep(
   if (stopReason === 'tool_use') {
     openStep.closedAt = patch.closedAt;
     repo.closeStep(workflow.id, openStep.id);
+    repo.patchWireMeta(workflow.id, { awaitingContinuation: true, awaitingSince: Date.now() });
     return openStep;
   }
 
@@ -179,6 +180,7 @@ export function registerWireStepInCorrelator(
   if (stopReason === 'tool_use') {
     step.closedAt = step.closedAt ?? new Date();
     repo.closeStep(step.workflowId, step.id);
+    repo.patchWireMeta(step.workflowId, { awaitingContinuation: true, awaitingSince: Date.now() });
     return step;
   }
 
@@ -229,6 +231,8 @@ function closeWireWorkflowOnTerminalStop(
   if (workflow.id === workflow.sessionId) return;
   if (workflow.kind === 'subagent') return;
   if (workflow.result != null) return;
+  // I1: el stop_reason de un side-request nunca decide el destino del workflow padre.
+  if (step.stepKind === 'side-request') return;
 
   const closedSteps = workflow.steps.filter((s) => s.closedAt != null);
   const finalText = extractTextFromAssistantMessage(step.assistantMessage);

@@ -662,7 +662,9 @@ export class AuditWorkflowHandler {
         params.rawBody,
         headersForAudit,
       );
-      this.workflowRepo.forceClose(workflow.id, 'orphaned', { continuationOrphan: true });
+      // I3: no cerrar prematuramente — el workflow degradado queda abierto y cierra
+      // por reaper o shutdown con sus steps reales.
+      this.workflowRepo.patchWireMeta(workflow.id, { continuationOrphan: true });
       return this.resultFromWorkflow(
         workflow,
         layoutIndex,

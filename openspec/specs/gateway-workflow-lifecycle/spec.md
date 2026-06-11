@@ -165,10 +165,9 @@ El handler SHALL resolver el `workflowId` a partir del `sessionId` y `agentId` d
 
 #### Scenario: forceClose por orphan no incluye closedByEvent en el result
 
-- **GIVEN** un workflow con id `session-wire-3` y `result === null` (aún no cerrado)
-- **AND** `findWorkflowByToolUseId` no encontró el parent para una continuation
-- **WHEN** `forceClose('session-wire-3', 'orphaned', { continuationOrphan: true })` se invoca
-- **THEN** el `IWorkflowResult` SHALL tener `outcome: 'orphaned'` y `stepCount: 0`
+- **GIVEN** un workflow con id `session-wire-3` y `result === null` abierto con `continuationOrphan: true` en wireMeta (marcado por `handleContinuation` al no encontrar padre)
+- **WHEN** el reaper o el cierre de sesión invoca `forceClose('session-wire-3', 'orphaned')` tras acumular los steps reales del workflow
+- **THEN** el `IWorkflowResult` SHALL tener `outcome: 'orphaned'`
 - **AND** el `IWorkflowResult` SHALL NO tener la clave `closedByEvent`
 - **AND** el evento `workflow_complete` SHALL emitirse al bus con `outcome: 'orphaned'`
 - **AND** `workflow.status` SHALL quedar como `'failed'`
@@ -245,13 +244,14 @@ Referencia: [§38 gateway-architecture.md](../../../docs/gateway-architecture.md
 - **AND** `workflow.steps.length` SHALL permanecer igual (no +1)
 - **AND** SHALL invocarse `closeStep` con el `stepId` del step enriquecido
 
-#### Scenario: Inferencia SSE con tool_use cierra el hop
+#### Scenario: Inferencia SSE con tool_use cierra el hop y activa awaitingContinuation
 
 - **GIVEN** un workflow wire con step abierto de ingress
 - **WHEN** `AuditSseResponseHandler` completa con `stopReason: 'tool_use'`
 - **THEN** el step enriquecido SHALL tener `closedAt` definido
 - **AND** `registerStep` NO SHALL añadir un segundo step
 - **AND** el workflow wire SHALL permanecer `running` hasta `end_turn`
+- **AND** `patchWireMeta` SHALL asignar `awaitingContinuation: true` y `awaitingSince: Date.now()` al workflow
 
 #### Scenario: Tres hops producen tres steps
 
@@ -317,6 +317,33 @@ Como máximo **un** workflow de turno `running` por `sessionId` SHALL existir en
 - **THEN** `ensureTurnWorkflow` SHALL crear un workflow nuevo con `id === ${sessionId}-turn-2`
 - **AND** el workflow anterior SHALL permanecer en el repo sin reutilizarse
 
+### Requirement: Rama huérfana de continuation — workflow abierto hasta reaper o shutdown
+
+Cuando `handleContinuation` no encuentra un workflow padre para una continuation (resultado genuinamente huérfano, p. ej. SSE previo nunca llegó), el handler SHALL:
+
+- Crear un workflow wire nuevo con `openWireWorkflow`.
+- Marcar `continuationOrphan: true` en `wireMeta` (señal diagnóstica).
+- **NOT** invocar `forceClose` directamente: el workflow permanece `running` y acumula los steps de la inferencia.
+- El workflow se cerrará por el reaper (`closeOrphanWorkflow` tras `ORPHAN_MAX_AGE_MS` si `awaitingContinuation` se activa) o por el cierre de sesión con los steps reales ya registrados.
+- `finalizeWorkflowMetrics` barrerá el `usage` completo del workflow en el momento de cierre efectivo, eliminando el error de métricas que ocurría cuando el cierre prematuro (outcome `orphaned` con 0 steps) bloqueaba la guarda de idempotencia.
+
+#### Scenario: continuation sin padre crea workflow abierto con continuationOrphan
+
+- **GIVEN** una sesión sin ningún workflow padre que coincida con el `tool_use_id` de la continuation
+- **WHEN** `handleContinuation` procesa la request
+- **THEN** SHALL crearse un workflow nuevo cuyo `result` SHALL ser `null` (abierto)
+- **AND** `getWireMeta(workflow.id).continuationOrphan` SHALL ser `true`
+- **AND** NO SHALL emitirse `workflow_complete` en este momento
+
+#### Scenario: reaper cierra workflow continuationOrphan con outcome orphaned
+
+- **GIVEN** un workflow abierto con `continuationOrphan: true` y `awaitingContinuation: true` en wireMeta cuyo `awaitingSince` supera `ORPHAN_MAX_AGE_MS`
+- **WHEN** `closeOrphanWorkflow` del reaper lo procesa
+- **THEN** `forceClose('orphaned')` SHALL invocarse con los steps reales del workflow
+- **AND** `finalizeWorkflowMetrics` SHALL ejecutarse sobre esos steps reales al cerrarse
+
+---
+
 ### Requirement: Cierre E2E del turno solo por hook
 
 El workflow de turno (`id === sessionId`) SHALL cerrarse exclusivamente por hook `Stop` o `StopFailure`. SSE `end_turn` SHALL NOT invocar `forceClose` ni emitir `workflow_complete` para el workflow de turno.
@@ -330,6 +357,14 @@ Sub-workflows (`kind: subagent`) SHALL seguir la misma regla: cierre E2E por `Su
 - **THEN** el step SHALL cerrarse (`closedAt` definido)
 - **AND** el workflow de turno SHALL permanecer `running`
 - **AND** NO SHALL emitirse `workflow_complete` para `workflowId === sessionId`
+
+#### Scenario: side-request end_turn no cierra workflow turn-N con tool_use cliente pendiente
+
+- **GIVEN** un workflow `turn-N` (id `${sessionId}-turn-N`, N≥2) con un step agéntico que cerró con `stopReason: 'tool_use'` y un tool cliente (p. ej. `ExitPlanMode`) indexado en `toolUseIdToWorkflowId`
+- **AND** un step `stepKind: 'side-request'` adjunto al mismo workflow que cierra con `stopReason: 'end_turn'`
+- **WHEN** `closeWireWorkflowOnTerminalStop` evalúa el `end_turn` del step side-request
+- **THEN** el workflow `turn-N` SHALL permanecer `running` (`result === null`)
+- **AND** `findWorkflowByToolUseId` SHALL seguir devolviendo el workflow para el `tool_use_id` del step agéntico
 
 #### Scenario: Stop cierra turno y emite workflow_complete
 

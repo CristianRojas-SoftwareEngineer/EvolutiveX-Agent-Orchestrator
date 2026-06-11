@@ -259,7 +259,8 @@ describe('AuditWorkflowHandler', () => {
 
   // Caso genuino de orphan: el SSE del response anterior no llegó o falló (error upstream),
   // por lo que no hay tool_use_id registrado en el índice cuando llega la continuation.
-  it('continuation sin tool_use_id registrado crea workflow orphan', async () => {
+  // I3: el workflow degradado queda ABIERTO (acumula sus steps) y cierra por reaper/shutdown.
+  it('continuation sin tool_use_id registrado crea workflow abierto marcado continuationOrphan', async () => {
     const { handler, workflowRepo } = createTestStack();
     const result = await handler.execute({
       headers: { 'x-cc-audit-session': 'test-session' },
@@ -267,8 +268,84 @@ describe('AuditWorkflowHandler', () => {
       requestId: 'req-1',
     });
     expect(result).not.toBeNull();
-    const wf = workflowRepo.getWorkflow(result!.workflowId);
-    expect(wf?.result?.outcome).toBe('orphaned');
+    const wf = workflowRepo.getWorkflow(result!.workflowId)!;
+    expect(wf.result == null).toBe(true);
+    expect(workflowRepo.getWireMeta(wf.id)?.continuationOrphan).toBe(true);
+
+    // Si queda awaiting continuation y envejece, el reaper lo cosecha como orphaned.
+    workflowRepo.patchWireMeta(wf.id, {
+      awaitingContinuation: true,
+      awaitingSince: Date.now() - 2 * AuditWorkflowHandler.ORPHAN_MAX_AGE_MS,
+    });
+    const stale = workflowRepo.findStaleWorkflowsAwaitingContinuation(
+      'test-session',
+      AuditWorkflowHandler.ORPHAN_MAX_AGE_MS,
+    );
+    expect(stale.map((w) => w.id)).toContain(wf.id);
+    await handler.closeOrphanWorkflow(stale[0]);
+    expect(workflowRepo.getWorkflow(wf.id)?.result?.outcome).toBe('orphaned');
+  });
+
+  it('continuation de ExitPlanMode correlaciona con el padre turn-N tras side-request', async () => {
+    const sessionId = 'plan-session';
+    const { handler, workflowRepo } = createTestStack((repo) => {
+      // Turno N≥2 (id -turn-3) con tool cliente ExitPlanMode pendiente de continuation.
+      const wf = repo.openWorkflow(
+        sessionId,
+        { isSubagentRequest: false, agentId: undefined },
+        { layoutIndex: 3, workflowKind: 'agentic' },
+      );
+      const stepId = 'step-plan-1';
+      wf.steps.push({
+        id: stepId,
+        workflowId: wf.id,
+        index: 1,
+        stepKind: 'agentic',
+        inferenceRequest: { model: 'claude-opus', messages: [], max_tokens: 4096 },
+        assistantMessage: { role: 'assistant', content: [] },
+        toolUses: [],
+        startedAt: new Date(),
+        closedAt: new Date(),
+      });
+      repo.registerToolUse(wf.id, {
+        id: 'tool-x',
+        stepId,
+        name: 'ExitPlanMode',
+        arguments: {},
+        status: 'running',
+        toolUseBlock: { type: 'tool_use', id: 'tool-x', name: 'ExitPlanMode', input: {} } as never,
+      });
+      repo.patchWireMeta(wf.id, { awaitingContinuation: true, awaitingSince: Date.now() });
+      // Side-request (haiku) ya cerrado con end_turn en el mismo workflow.
+      wf.steps.push({
+        id: 'step-side',
+        workflowId: wf.id,
+        index: 2,
+        stepKind: 'side-request',
+        inferenceRequest: { model: 'claude-haiku', messages: [], max_tokens: 256 },
+        assistantMessage: { role: 'assistant', content: [{ type: 'text', text: 'título' }] },
+        toolUses: [],
+        stopReason: 'end_turn',
+        startedAt: new Date(),
+        closedAt: new Date(),
+      });
+    });
+
+    const result = await handler.execute({
+      headers: { 'x-cc-audit-session': sessionId },
+      rawBody: CONTINUATION_BODY,
+      requestId: 'req-cont',
+    });
+
+    expect(result).not.toBeNull();
+    expect(result!.requestClassification).toEqual({ type: 'continuation' });
+    expect(result!.workflowId).toBe(`${sessionId}-turn-3`);
+    // No se creó workflow huérfano wire-N.
+    const wireOrphans = workflowRepo
+      .getAllRunningWorkflows()
+      .filter((w) => w.id.includes('-wire-'));
+    expect(wireOrphans).toHaveLength(0);
+    expect(workflowRepo.getWireMeta(result!.workflowId)?.awaitingContinuation).toBe(false);
   });
 
   // Tool client-side (Read/Edit/…): el SSE previo lo registró vía registerToolUse,

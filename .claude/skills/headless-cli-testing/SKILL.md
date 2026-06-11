@@ -67,9 +67,9 @@ these primitives — it adds TTS-specific assertions on top of the same lifecycl
 
 ## Manual use (ad-hoc debugging)
 
-Esta sección cubre depuración ad-hoc sin infraestructura programática. **Si ya tienes
-una sesión activa o quieres integrar pruebas en código, usa
-[`runHeadlessSession`](#programmatic-use--runheadlesssession) directamente.**
+This section covers ad-hoc debugging without programmatic infrastructure. **If you
+already have an active session or want to integrate tests into code, use
+[`runHeadlessSession`](#programmatic-use--runheadlesssession) directly.**
 
 ### Prerequisites (standalone mode — no live session on main proxy)
 
@@ -153,14 +153,14 @@ const result = await runHeadlessSession({
 // result: { output, exitCode, isError, logPath, sessionDir, claudeStartedAt }
 ```
 
-Los paths de logs están disponibles directamente en el resultado:
+Log paths are available directly in the result — no need to locate them manually:
 
 ```typescript
-// No necesitas saber dónde están los archivos — el resultado los incluye:
-console.log(result.logPath);    // path absoluto, e.g. …/server/logs-headless.jsonl
-console.log(result.sessionDir); // path absoluto, e.g. …/server/headless/sessions/
+// No need to locate the files — the result includes the paths:
+console.log(result.logPath);    // absolute path, e.g. …/server/logs-headless.jsonl
+console.log(result.sessionDir); // absolute path, e.g. …/server/headless/sessions/
 
-// Leer las últimas entradas del log desde código:
+// Read the last log entries from code:
 import { readFileSync } from 'node:fs';
 const lines = readFileSync(result.logPath, 'utf-8').trim().split('\n').slice(-20);
 ```
@@ -193,8 +193,8 @@ import { buildIsolatedProviderEnv } from './scripting/headless-session/provider-
 
 ## TTS testing reference
 
-Usa esta referencia cuando quieras validar específicamente el ciclo **TTS**
-(Stop hook → OpenRouter → SAPI), no solo el ciclo proxy/claude genérico.
+Use this reference when you want to validate the **TTS** cycle specifically
+(Stop hook → OpenRouter → SAPI), not just the generic proxy/claude cycle.
 
 See [references/tts-testing.md](./references/tts-testing.md) for:
 - The TTS cycle (Stop hook → OpenRouter dedicated provider → SAPI)

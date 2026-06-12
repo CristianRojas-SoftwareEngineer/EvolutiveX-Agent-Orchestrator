@@ -476,7 +476,7 @@ Keep language instructions alongside normal project context such as stack, datab
 
 **Workflow delivery:** `.claude/skills/openspec-<slug>/SKILL.md` only. Skills are **maintained and refined in-repo** (hybrid XML + Markdown, Spanish user I/O per `artifact-structuring`).
 
-**Other project commands** (unrelated to OpenSpec workflow): `.claude/commands/analyze-session.md`, `create-plan.md`, `verify-scripts.md`.
+**Other project commands** (unrelated to OpenSpec workflow): `.claude/commands/analyze-session.md`, `create-plan-to-implement.md`, `create-plan-to-investigate.md`, `verify-scripts.md`.
 
 Catalog and policy: `<skill_catalog>` and `<maintenance>` in this file.
 <!-- </supported_tools> -->

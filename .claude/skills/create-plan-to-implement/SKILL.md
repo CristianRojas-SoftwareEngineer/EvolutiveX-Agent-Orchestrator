@@ -1,15 +1,16 @@
 ---
-name: create-plan
+name: create-plan-to-implement
 description: >
-  Build development plans with a canonical structure: project context, table of contents,
-  fundamental considerations, purpose and objectives, an implementation phase (tasks with
-  repo-relative file actions), and an opt-in closure phase (zombie cleanup, validation,
-  docs, commit — each stage activated by its flag). Delivers Spanish plans ready for
-  execution by an implementation agent.
+  Build implementation plans with a canonical structure: project context, table of
+  contents, fundamental considerations, purpose and objectives, an implementation phase
+  (tasks with repo-relative file actions), and an opt-in closure phase (zombie cleanup,
+  validation, docs, commit — each stage activated by its flag). Delivers Spanish plans
+  ready for execution by an agent in any harness.
 when_to_use: >
-  Invoke with /create-plan [requirements] plus optional opt-in closure flags (--zombie,
-  --validation, --docs, --commit) or when the user explicitly asks to create a development
-  plan, plan de desarrollo, or plan de implementación.
+  Invoke with /create-plan-to-implement [requirements] plus optional opt-in closure flags
+  (--zombie, --validation, --docs, --commit) or when the user explicitly asks to create a
+  development plan, plan de desarrollo, or plan de implementación. For exploration,
+  analysis, or research plans that mutate nothing, use create-plan-to-investigate instead.
 argument-hint: "[requirements] [--zombie] [--validation] [--docs] [--commit]"
 ---
 
@@ -33,12 +34,32 @@ Ask, confirm, and respond to the user in **Spanish** (native Spanish-speaking au
 <!-- <operation> -->
 ## How to operate this workflow
 
-1. **Requirements and closure flags**: the user may pass plan requirements as `$requirements` (text after the slash command). Parse the optional closure flags out of `$requirements` before interpreting the rest as requirements. Closure stages are **opt-in**: each flag adds one closure stage (its H3 and its TOC entry): `--zombie` → «Eliminación de código zombie», `--validation` → «Validación técnica», `--docs` → «Actualización de documentación sincronizada», `--commit` → «Commit descriptivo». Without flags, no closure stage is generated and the entire «Fase de cierre» H2 and its TOC entry are omitted — the default, so invoking the skill never triggers cascading actions beyond the implementation phase. Delivered stages always keep the canonical relative order (zombie → validación → documentación → commit). Typical uses: the four flags together for a fully consolidated close, `--zombie --validation --docs` when the user will review before committing, or no flags when an outer flow (e.g. OpenSpec) owns the closure. If the remaining `$requirements` is empty and no requirements appear elsewhere in the message, request them **in Spanish** (problem to solve, proposed improvement or functionality, restrictions, context to size scope) before generating anything. Never invent or assume requirements.
-2. **Planning mode**: call `EnterPlanMode` before requirement analysis, codebase discovery, or drafting. Read-only until the plan is delivered; source edits belong to a separate apply flow unless the user explicitly requests execution in the same turn.
-3. **Discovery**: resolve every target file from requirements and codebase layout (use `Agent` with `subagent_type: "Explore"` for independent discovery tasks, in parallel when possible). If a required file cannot be resolved, **stop and ask** — never emit placeholder paths (`the file`, `relevant module`).
-4. **Design decisions**: if requirements are ambiguous, incomplete, or contradict the fundamental considerations, stop and ask. If you detect an architectural decision point the user did not resolve (competing strategies, residual behavior to keep or drop), do not resolve it unilaterally: present alternatives, trade-offs, and your recommendation, and continue only after the user decides.
+**Harness tooling (reflective, not mechanical)**: this skill targets Claude Code first but is
+written to run in any agentic harness. Before starting, survey the planning and interaction
+**capabilities** your harness exposes and reflect on which fits each step below. The
+capabilities this workflow relies on, named by function with their Claude Code incarnation as
+the reference example: a read-only planning mode with explicit user approval (`EnterPlanMode`/
+`ExitPlanMode`), structured user questions with options (`AskUserQuestion`), delegable
+exploration or planning subagents (`Agent`), and task-list management (`TaskCreate`/
+`TaskUpdate`). In another harness, map each capability to its closest equivalent; where one
+has no equivalent, achieve the intent by other means (e.g. no plan mode → simply refrain from
+editing and ask for explicit approval in the conversation) rather than skipping the intent.
+Prefer a real tool over improvising its effect in prose: structured questions over inline
+"¿quieres A o B?", plan-mode approval over pasting a plan and hoping, task tracking over a
+mental checklist. This workflow is **interactive by design**: stopping to ask the user is
+success, not failure.
+
+**Task tracking**: at any phase — discovery, drafting, or (in an apply flow) implementation and
+closure — trace work in progress with the harness task-list tools: create tasks for the steps
+ahead, mark them in progress when started and completed when verified. This gives the user
+visibility and prevents silently dropped steps.
+
+1. **Requirements and closure flags**: the user may pass plan requirements as `$requirements` (text after the slash command). If the request is to explore, analyze, or research without mutating the project, this is the wrong skill — route to `create-plan-to-investigate`; if genuinely ambiguous, ask (structured question with both options) instead of guessing. Parse the optional closure flags out of `$requirements` before interpreting the rest as requirements. Closure stages are **opt-in**: each flag adds one closure stage (its H3 and its TOC entry): `--zombie` → «Eliminación de código zombie», `--validation` → «Validación técnica», `--docs` → «Actualización de documentación sincronizada», `--commit` → «Commit descriptivo». Without flags, no closure stage is generated and the entire «Fase de cierre» H2 and its TOC entry are omitted — the default, so invoking the skill never triggers cascading actions beyond the implementation phase. Delivered stages always keep the canonical relative order (zombie → validación → documentación → commit). Typical uses: the four flags together for a fully consolidated close, `--zombie --validation --docs` when the user will review before committing, or no flags when an outer flow (e.g. OpenSpec) owns the closure. If the remaining `$requirements` is empty and no requirements appear elsewhere in the message, request them **in Spanish** (problem to solve, proposed improvement or functionality, restrictions, context to size scope) — prefer the structured-question capability with concrete options when the missing input is a bounded choice; free text otherwise — before generating anything. Never invent or assume requirements.
+2. **Planning mode**: enter your harness's read-only planning mode (Claude Code: `EnterPlanMode`) before requirement analysis, codebase discovery, or drafting; without one, refrain from any edit until the plan is approved. Source edits belong to a separate apply flow unless the user explicitly requests execution in the same turn.
+3. **Discovery**: resolve every target file from requirements and codebase layout. Delegate independent discovery tasks to exploration subagents when the harness offers them (Claude Code: `Agent` with `subagent_type: "Explore"`), in parallel when possible; consider a planning subagent when the strategy itself needs architectural design. If a required file cannot be resolved, **stop and ask** — never emit placeholder paths (`the file`, `relevant module`).
+4. **Design decisions**: if requirements are ambiguous, incomplete, or contradict the fundamental considerations, stop and ask. If you detect an architectural decision point the user did not resolve (competing strategies, residual behavior to keep or drop), do not resolve it unilaterally: surface it via the structured-question capability — one question per decision, each alternative as an option with its trade-offs in the description, your recommendation first and marked as such — and continue only after the user decides.
 5. **Drafting order**: outline implementation-task H3 titles first → write context → build the table of contents from the outline → write the remaining sections per `<plan_template>`.
-6. **Verify and deliver**: run `<verification>`, then deliver the complete plan in Spanish as a single well-structured markdown block. Do not omit any section even for small requirements — structural uniformity is part of this workflow's value (the closure phase is the exception: its presence is governed solely by the closure flags). Do not mention harness tools, modes, subagents, or internal XML block names in the delivered plan.
+6. **Verify and deliver**: run `<verification>`, then deliver the complete plan in Spanish as a single well-structured markdown block. If you entered plan mode in step 2, close it through the harness's approval mechanism (Claude Code: `ExitPlanMode`) so the user reviews and approves the plan formally instead of an informal "¿procedo?". Do not omit any section even for small requirements — structural uniformity is part of this workflow's value (the closure phase is the exception: its presence is governed solely by the closure flags). Do not mention harness tools, modes, subagents, or internal XML block names in the delivered plan.
 <!-- </operation> -->
 
 <!-- <plan_template> -->
@@ -197,8 +218,8 @@ Reason: no repo-relative file path per step — agent must guess which artifact 
 <!-- <example name="action_with_explicit_file_good"> -->
 ```markdown
 #### Acciones
-1. **`.claude/skills/create-plan/SKILL.md`** — bloque `<content_rules>`: prescribir formato obligatorio con ruta en backticks al inicio de cada línea.
-2. **`.claude/skills/create-plan/SKILL.md`** — bloque `<verification>`: añadir check de rutas placeholder.
+1. **`.claude/skills/create-plan-to-implement/SKILL.md`** — bloque `<content_rules>`: prescribir formato obligatorio con ruta en backticks al inicio de cada línea.
+2. **`.claude/skills/create-plan-to-implement/SKILL.md`** — bloque `<verification>`: añadir check de rutas placeholder.
 ```
 <!-- </example> -->
 <!-- </examples> -->

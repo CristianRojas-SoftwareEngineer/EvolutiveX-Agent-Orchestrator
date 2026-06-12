@@ -12,7 +12,7 @@ Operates on the CAUSE axis only (`chain: cause`).
 
 <user_communication>Spanish for user interaction. See ../artifact-structuring/SKILL.md §language_policy.</user_communication>
 
-<phase_procedure>
+<!-- <phase_procedure> -->
 ## Inputs
 - case.md (phase_policy.hypothesis); 02 and 03.
 - On re-invocation (cause refutation loop, Bucle A): existing 04-hypothesis.md is also an input.
@@ -25,7 +25,7 @@ Operates on the CAUSE axis only (`chain: cause`).
 3. **If 04-hypothesis.md does not exist (first pass):** formulate cause hypotheses aligned
    with `focus`; for each, state observable prediction, refutation criterion, priority, and
    `status: pending` (except the active one under test).
-</phase_procedure>
+<!-- </phase_procedure> -->
 
 ## Output
 Write (first pass) or update (re-invocation) `04-hypothesis.md` with `chain: cause` in the

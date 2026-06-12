@@ -10,7 +10,7 @@ description: >
 
 <user_communication>Spanish for user interaction. See ../artifact-structuring/SKILL.md §language_policy.</user_communication>
 
-<phase_procedure>
+<!-- <phase_procedure> -->
 ## Inputs
 - case.md (phase_policy.problem-definition); 01-observation.md.
 
@@ -18,7 +18,7 @@ description: >
 1. Read the policy entry.
 2. Convert observations into ONE precise problem statement aligned with `focus`.
 3. Define the explicit "solved" criterion, limits, impact and severity.
-</phase_procedure>
+<!-- </phase_procedure> -->
 
 ## Output
 Write `02-problem-definition.md` with `chain: cause` in the frontmatter: Applied policy,

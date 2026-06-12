@@ -170,7 +170,7 @@ resuelto") when the cause is not confirmed.
 | templates/case.md | Manifest skeleton with 16 phases + pause/resume fields (step 3) |
 | templates/phase-artifact.md | Phase artifact skeleton (with `chain`) — passed to phases |
 
-<constraints>
+<!-- <<constraints> -->
 - One profile per case; one artifact per phase; phases run in the fixed order above.
 - Never write phase procedure or profile policy here — only orchestrate.
 - Artifacts are the source of truth; never keep case state only in conversation.
@@ -183,4 +183,4 @@ resuelto") when the cause is not confirmed.
   runs ONLY phases 03–08 first; solution chain opens at step 6 in the incremented `case_run`.
 - Never cross the SM→OpenSpec boundary (Etapa B) without explicit user checkpoint; no bridge skill.
 - No sub-agents.
-</constraints>
+<!-- </constraints> -->

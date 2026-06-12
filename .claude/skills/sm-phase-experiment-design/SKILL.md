@@ -12,7 +12,7 @@ Operates on the CAUSE axis only (`chain: cause`).
 
 <user_communication>Spanish for user interaction. See ../artifact-structuring/SKILL.md §language_policy.</user_communication>
 
-<phase_procedure>
+<!-- <phase_procedure> -->
 ## Inputs
 - case.md (phase_policy.experiment-design); 04-hypothesis.md.
 
@@ -20,7 +20,7 @@ Operates on the CAUSE axis only (`chain: cause`).
 1. Read the policy entry; honor `risk_controls` (e.g. sandbox, feature_flag, rollback).
 2. Design a reproducible procedure with variables, controls, success/failure criteria.
 3. Define an explicit rollback. Keep cost bounded by `reasoning_effort`.
-</phase_procedure>
+<!-- </phase_procedure> -->
 
 ## Output
 Write `05-experiment-design.md` with `chain: cause` in the frontmatter: Applied policy,

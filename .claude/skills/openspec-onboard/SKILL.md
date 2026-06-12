@@ -13,21 +13,21 @@ metadata:
   generatedBy: "1.3.1"
 ---
 
-<overview>
+<!-- <overview> -->
 Guide the user through their first complete OpenSpec workflow cycle with narration and real work in their codebase.
-</overview>
+<!-- </overview> -->
 
-<user_communication>
+<!-- <user_communication> -->
 Ask, confirm, and respond to the user in **Spanish** (native Spanish-speaking audience). Keep this artifact's instructions in **English** for token efficiency. Canonical policy: `<language_policy>` in [artifact-structuring](../artifact-structuring/SKILL.md). User-facing rules: [AGENTS.md](../../AGENTS.md) §0.
-</user_communication>
+<!-- </user_communication> -->
 
-<repo_context>
+<!-- <repo_context> -->
 ## OpenSpec delivery in this repo
 
 Workflow steps live in `.claude/skills/openspec-<slug>/` only. When teaching or showing recap tables, use the **Skill reference** format from [`openspec-specialist`](../openspec-specialist/SKILL.md) (`<skill_catalog>` + `<invocation_model>`).
-</repo_context>
+<!-- </repo_context> -->
 
-<workflow>
+<!-- <workflow> -->
 Guide the user through their first complete OpenSpec workflow cycle. This is a teaching experience—you'll do real work in their codebase while explaining each step.
 
 ## Preflight
@@ -498,7 +498,7 @@ This same rhythm works for any size change—a small fix or a major feature.
 
 Pide una propuesta OpenSpec (`openspec-propose`), describe lo que quieres construir, o usa `/openspec-propose` si tu IDE lo expone. ¡Ya tienes el ritmo!
 ```
-</workflow>
+<!-- </workflow> -->
 
 <graceful_exit>
 ## Graceful exit handling
@@ -545,7 +545,7 @@ Pide `openspec-propose` o describe tu primera feature para empezar.
 Exit gracefully.
 </graceful_exit>
 
-<guardrails>
+<!-- <guardrails> -->
 ## Guardrails
 
 - **Follow the EXPLAIN → DO → SHOW → PAUSE pattern** at key transitions (after explore, after proposal draft, after tasks, after archive)
@@ -557,4 +557,4 @@ Exit gracefully.
 - **Adjust scope gently**—guide toward smaller tasks but respect user choice
 - **Skills-only UX**—teach workflow via `openspec-<slug>` skills only; do not add duplicate OpenSpec workflow files under `.claude/commands/`
 - **Recap tables**—use Skill + Cómo invocar + Qué hace (see Phase 11), aligned with `openspec-specialist` `<skill_catalog>`
-</guardrails>
+<!-- </guardrails> -->

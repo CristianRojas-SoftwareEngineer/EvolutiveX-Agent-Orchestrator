@@ -15,7 +15,7 @@ description: >
 policy). See ../artifact-structuring/SKILL.md §language_policy and the conventional-commits
 skill.</user_communication>
 
-<phase_procedure>
+<!-- <phase_procedure> -->
 ## Inputs
 - case.md (phase_policy.communication).
 - `17-conclusion.md` (verdict, spec, pause note, or investigativo note).
@@ -42,7 +42,7 @@ skill.</user_communication>
    navigable from the commit.
 6. On the pause path, the commit body additionally documents the `case_paused_at` timestamp
    and the Bucle C re-opening offer.
-</phase_procedure>
+<!-- </phase_procedure> -->
 
 ## Output
 Write `18-communication.md` with `chain: closure` in the frontmatter: Applied policy,

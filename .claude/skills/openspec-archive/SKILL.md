@@ -12,19 +12,19 @@ metadata:
   generatedBy: "1.3.1"
 ---
 
-<overview>
+<!-- <overview> -->
 Archive a completed OpenSpec change after implementation is done.
-</overview>
+<!-- </overview> -->
 
-<user_communication>
+<!-- <user_communication> -->
 Ask, confirm, and respond to the user in **Spanish** (native Spanish-speaking audience). Keep this artifact's instructions in **English** for token efficiency. Canonical policy: `<language_policy>` in [artifact-structuring](../artifact-structuring/SKILL.md). User-facing rules: [AGENTS.md](../../AGENTS.md) §0.
-</user_communication>
+<!-- </user_communication> -->
 
-<repo_context>
+<!-- <repo_context> -->
 Workflow delivery in this repo: `.claude/skills/openspec-archive/` only. Invocation: see `<invocation_model>` in [openspec-specialist](../openspec-specialist/SKILL.md).
-</repo_context>
+<!-- </repo_context> -->
 
-<workflow>
+<!-- <workflow> -->
 Archive a completed change in the experimental workflow.
 
 **Input**: Optionally specify a change name. If omitted, check if it can be inferred from conversation context. If vague or ambiguous you MUST prompt for available changes.
@@ -132,4 +132,6 @@ All artifacts complete. All tasks complete.
 - Show clear summary of what happened
 - If sync is requested, use openspec-sync approach (agent-driven)
 - If delta specs exist, always run the sync assessment and show the combined summary before prompting
-</guardrails>
+<!-- </guardrails> -->
+
+<!-- </workflow> -->

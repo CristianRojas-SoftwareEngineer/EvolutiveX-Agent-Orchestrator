@@ -11,7 +11,7 @@ description: >
   Also trigger for optimizar menú del comando or argument-hint in Spanish.
 ---
 
-<overview>
+<!-- <<overview> -->
 ## Command Manager — overview
 
 Skill to create, plan refinements for, and iteratively improve **project** slash commands in Claude Code (`.claude/commands/<name>.md`).
@@ -30,9 +30,9 @@ High-level flow:
 Detect which stage the user is in and act per `<routing>`. If they prefer to iterate without formal evaluation, adapt.
 
 **Skills:** This skill does **not** create or refine `.claude/skills/`. For skills, activate [.claude/skills/skill-manager/SKILL.md](../skill-manager/SKILL.md) (`/skill-manager` only; the legacy `/create-skill` command was removed).
-</overview>
+<!-- </overview> -->
 
-<routing>
+<!-- <<routing> -->
 ## Routing by intent
 
 **Rule:** do not read both references by default; only the one indicated in the table. Follow this table before loading `references/`.
@@ -50,9 +50,9 @@ Detect which stage the user is in and act per `<routing>`. If they prefer to ite
 | Create / refine / test a **skill** | — | Delegate to `/skill-manager`; do not load command references |
 | XML/Markdown format | — | [.claude/skills/artifact-structuring/SKILL.md](../artifact-structuring/SKILL.md) |
 | Language policy (EN artifacts / ES user) | — | `<language_policy>` in [artifact-structuring](../artifact-structuring/SKILL.md) |
-</routing>
+<!-- </routing> -->
 
-<user_communication>
+<!-- <<user_communication> -->
 Ask, confirm, and respond to the user in **Spanish** (native Spanish-speaking audience). Keep this artifact's instructions in **English** for token efficiency. Canonical policy: `<language_policy>` in [artifact-structuring](../artifact-structuring/SKILL.md). User-facing rules: [AGENTS.md](../../AGENTS.md) §0.
 
 Adapt vocabulary to the user's level:
@@ -61,9 +61,9 @@ Adapt vocabulary to the user's level:
 - "frontmatter" and "argument-hint" only without explanation if there are clear signals of technical familiarity
 
 Briefly explain unclear terms when it helps.
-</user_communication>
+<!-- </user_communication> -->
 
-<creation_process>
+<!-- <<creation_process> -->
 ## Create a command
 
 ### Capture intent
@@ -136,9 +136,9 @@ argument-hint: "[param1] [param2]"
 ### Test prompts (draft)
 
 After the draft, propose 2–3 realistic `/name` invocations or user phrases. Detail → [references/testing-workflows.md](references/testing-workflows.md).
-</creation_process>
+<!-- </creation_process> -->
 
-<refinement_planning>
+<!-- <<refinement_planning> -->
 ## Plan command refinements
 
 Absorbs the former `refine-command` flow for **commands only**. Produces a prescriptive plan; does **not** edit files unless the user explicitly asks to implement afterward.
@@ -167,9 +167,9 @@ If the user asks to refine a **skill**, stop and delegate to `/skill-manager` wi
 **Constraints:** single command per plan; no out-of-scope refactors; Claude Code paths only under `.claude/commands/`.
 
 After the user approves the plan, switch to `<updating_commands>` to implement.
-</refinement_planning>
+<!-- </refinement_planning> -->
 
-<testing_process>
+<!-- <<testing_process> -->
 ## Test and evaluate
 
 Summary; detail in [references/testing-workflows.md](references/testing-workflows.md) (read only if designing or running a full test battery).
@@ -180,9 +180,9 @@ Summary; detail in [references/testing-workflows.md](references/testing-workflow
 4. **Feedback** → iterate the `.md` file
 
 Commands are not auto-triggered from the skill catalog; do not test auto-activation here.
-</testing_process>
+<!-- </testing_process> -->
 
-<improvement_process>
+<!-- <<improvement_process> -->
 ## Improve the command
 
 After tests and user feedback:
@@ -195,9 +195,9 @@ After tests and user feedback:
 Loop: apply changes → re-run cases → present → repeat until satisfied or stalled.
 
 Version comparison: see [references/testing-workflows.md](references/testing-workflows.md).
-</improvement_process>
+<!-- </improvement_process> -->
 
-<menu_metadata_optimization>
+<!-- <<menu_metadata_optimization> -->
 ## Optimize menu metadata
 
 Optional frontmatter on commands affects the `/` menu label and argument hint — **not** skill-catalog auto-activation.
@@ -211,9 +211,9 @@ Optional frontmatter on commands affects the `/` menu label and argument hint �
 Do not confuse with skill `description` optimization — that is only in `/skill-manager`.
 
 Platform notes: [references/claude-code-commands-platform.md](references/claude-code-commands-platform.md).
-</menu_metadata_optimization>
+<!-- </menu_metadata_optimization> -->
 
-<command_vs_skill>
+<!-- <<command_vs_skill> -->
 ## Command vs skill
 
 | Choose **command** | Choose **skill** (`/skill-manager`) |
@@ -224,9 +224,9 @@ Platform notes: [references/claude-code-commands-platform.md](references/claude-
 | No `context: fork` / subagents | Subagents, `!`cmd`` injection, fork testing |
 
 If both `.claude/commands/<name>.md` and `.claude/skills/<name>/SKILL.md` exist, the **skill wins** for `/name` — remove or rename the command file to avoid confusion.
-</command_vs_skill>
+<!-- </command_vs_skill> -->
 
-<updating_commands>
+<!-- <<updating_commands> -->
 ## Update existing commands
 
 - Read `.claude/commands/<name>.md` before changing; summarize for the user; confirm if replacing
@@ -234,9 +234,9 @@ If both `.claude/commands/<name>.md` and `.claude/skills/<name>/SKILL.md` exist,
 - **Incremental** changes; test with `/name` after each meaningful change
 - Do not break use cases that already work
 - After an approved refinement plan from `<refinement_planning>`, implement only what the plan specifies
-</updating_commands>
+<!-- </updating_commands> -->
 
-<references>
+<!-- <<references> -->
 ## References (level 3)
 
 | File | When to read |
@@ -247,9 +247,9 @@ If both `.claude/commands/<name>.md` and `.claude/skills/<name>/SKILL.md` exist,
 | [.claude/skills/artifact-structuring/SKILL.md](../artifact-structuring/SKILL.md) | XML + Markdown format; `<language_policy>` |
 | [.claude/skills/skill-manager/SKILL.md](../skill-manager/SKILL.md) | Skills only — delegate, do not duplicate |
 | [code.claude.com/docs/en/skills](https://code.claude.com/docs/en/skills) | Official documentation |
-</references>
+<!-- </references> -->
 
-<delivery_format>
+<!-- <<delivery_format> -->
 ## Delivery format to the user
 
 **After creating, improving, or updating a command**, respond in **Spanish** with:
@@ -266,9 +266,9 @@ If both `.claude/commands/<name>.md` and `.claude/skills/<name>/SKILL.md` exist,
 - **Numbered stages and tasks**
 - **Open items**
 - Note that implementation waits for user confirmation unless they asked to apply the plan immediately
-</delivery_format>
+<!-- </delivery_format> -->
 
-<verification>
+<!-- <<verification> -->
 ## Verification before responding
 
 Per active phase (see `<routing>`):
@@ -284,4 +284,4 @@ Per active phase (see `<routing>`):
 **Menu metadata:** `description` / `argument-hint` accurate; not confused with skill auto-trigger.
 
 **Update:** basename preserved; incremental tested changes; plan implementation matches approved tasks.
-</verification>
+<!-- </verification> -->

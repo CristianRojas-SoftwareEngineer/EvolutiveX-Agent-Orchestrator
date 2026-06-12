@@ -13,7 +13,7 @@ description: >
 
 # Smart Code Proxy — Statusline System
 
-<overview>
+<!-- <<overview> -->
 Canonical **knowledge** skill for the Claude Code statusline shipped by Smart Code Proxy.
 This skill summarizes design and implementation; for normative requirements see
 `openspec/specs/statusline-runtime/spec.md` and `openspec/specs/statusline-installer/spec.md`.
@@ -22,17 +22,17 @@ For human-facing visual spec see `docs/router-statusline.md`.
 **Iterative maintenance:** when `docs/router-statusline.md`, `docs/session-metrics-system.md`,
 or `scripting/router-status.ts` change materially, update the matching section here.
 Prefer verifying against code over stale prose in older OpenSpec archives.
-</overview>
+<!-- </overview> -->
 
-<user_communication>
+<!-- <<user_communication> -->
 Ask, confirm, and respond to the user in **Spanish** (native Spanish-speaking audience).
 Keep this artifact's instructions in **English** for token efficiency.
 Canonical policy: `<language_policy>` in [artifact-structuring](../artifact-structuring/SKILL.md).
 User-facing rules: [AGENTS.md](../../AGENTS.md) §0.
 Use ASCII diagrams and file-path tables when explaining architecture.
-</user_communication>
+<!-- </user_communication> -->
 
-<architecture>
+<!-- <<architecture> -->
 ## High-level architecture
 
 The statusline is an **external command** Claude Code invokes on each status-bar refresh.
@@ -68,9 +68,9 @@ Smart Code Proxy registers a subprocess in `~/.claude/settings.json` that runs
 | 2 | Tabla 2 («Trabajo por niveles de razonamiento») | Only when `SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS` = `on` (opt-in; hidden by default) |
 
 **Contract:** Claude Code injects `settings.json → env` into the subprocess — **not** the user's shell `process.env`. `router-status.ts` reads auth, model slots, `SMART_CODE_PROXY_ROOT`, and the Tabla 2 toggle from that block.
-</architecture>
+<!-- </architecture> -->
 
-<installation>
+<!-- <<installation> -->
 ## Loading into Claude Code
 
 ### Install path
@@ -126,9 +126,9 @@ CLI helpers (`package.json`):
 
 Implementation: `scripting/statusline-router-details.ts`.
 Spec: `openspec/specs/statusline-router-details-toggle/spec.md`.
-</installation>
+<!-- </installation> -->
 
-<data_sources>
+<!-- <<data_sources> -->
 ## Data sources per table
 
 `router-status.ts` combines these sources (see `docs/router-statusline.md` §2 for full table):
@@ -146,9 +146,9 @@ Spec: `openspec/specs/statusline-router-details-toggle/spec.md`.
 | Subscription quota (bearer) | `sessions/<dir>/subscription-quota.json` | Tabla 3 fallback |
 
 **Session folder resolution:** prefix match — `sessions/<dir>` where `dir.startsWith(ctx.session_id)` (proxy may suffix folder names).
-</data_sources>
+<!-- </data_sources> -->
 
-<slots>
+<!-- <<slots> -->
 ## Reasoning-level slots
 
 In this project **slot** means one of the **four fixed reasoning levels** mapped to Anthropic API model tiers. Tabla 2 always renders **exactly four data rows** (plus a totals row), even when counters are zero.
@@ -198,7 +198,7 @@ Partial configuration is supported: configured levels use variable match; unconf
 | Domain types | `src/1-domain/types/gateway/session-metrics.types.ts` | `ISessionMetrics`, `IModelSessionMetrics` |
 | Attribution | `src/1-domain/services/gateway/resolve-attributed-model-id.ts` | Which `modelId` receives `finalized_runs` |
 | Formal scenarios | `openspec/specs/statusline-runtime/spec.md` | e.g. «Un prompt con dos subagentes distribuye trabajo por slot» |
-</slots>
+<!-- </slots> -->
 
 <table2_composition>
 ## How slots compose Tabla 2
@@ -279,7 +279,7 @@ Per session under `sessions/<dir>/`. Does **not** replace `session-metrics.json`
 Early exit: if `session-metrics.json` mtime/size unchanged, skip re-aggregation and re-print `lastRenderedTable2Output`.
 </table2_composition>
 
-<tables_summary>
+<!-- <<tables_summary> -->
 ## All three tables (quick reference)
 
 ### Tabla 1 — Session and provider
@@ -294,9 +294,9 @@ Eight columns; conditional visibility (see `<installation>`). Title: «Trabajo p
 
 When `resolveQuotaSource()` succeeds: OAuth stdin or `subscription-quota.json` on disk.
 Four columns: quota label, bar+%, «Reinicio en», time remaining.
-</tables_summary>
+<!-- </tables_summary> -->
 
-<file_map>
+<!-- <<file_map> -->
 ## File and document map
 
 ### Implementation
@@ -339,9 +339,9 @@ Four columns: quota label, bar+%, «Reinicio en», time remaining.
 |-------|--------------|
 | `anthropic-api-protocol` | Token fields, API concepts behind metrics |
 | `openspec-specialist` | OpenSpec workflow for statusline changes |
-</file_map>
+<!-- </file_map> -->
 
-<dispatch>
+<!-- <<dispatch> -->
 ## Provider dispatch (simplified)
 
 ```
@@ -354,18 +354,18 @@ buildStatuslineOutput()
 ```
 
 `projectRoot` resolution: `settings.env.SMART_CODE_PROXY_ROOT` → fallback `process.cwd()` if invalid.
-</dispatch>
+<!-- </dispatch> -->
 
-<constraints>
+<!-- <<constraints> -->
 ## Agent constraints when using this skill
 
 - Respond to the user in **Spanish**; keep path and identifier literals as in the repo.
 - This is a **reference** skill — do not implement statusline changes unless the user exits explore/plan mode and requests implementation.
 - Prefer reading `scripting/router-status.ts` and `docs/router-statusline.md` when facts may have drifted since this skill was last updated.
 - Distinguish **slot** (reasoning level: Lite/Standard/Reasoning/Frontier) from unrelated «slot» terms in other domains (e.g. artifact-structuring slot assignment).
-</constraints>
+<!-- </constraints> -->
 
-<iteration>
+<!-- <<iteration> -->
 ## Evolving this skill
 
 When extending the statusline or answering deep questions:
@@ -376,4 +376,4 @@ When extending the statusline or answering deep questions:
 4. **OpenSpec** — new requirements go to delta specs under `openspec/changes/` then merge to `openspec/specs/statusline-runtime/spec.md`.
 
 Suggested triggers to revisit this skill: new Tabla 2 columns, slot count change, new cache fields, installer path changes, refresh-interval policy changes.
-</iteration>
+<!-- </iteration> -->

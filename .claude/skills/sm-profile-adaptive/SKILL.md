@@ -27,7 +27,7 @@ Adapt the software to an external change while preserving compatibility.
 
 ## Phase-policy matrix (16 entries)
 
-<policy_matrix>
+<!-- <policy_matrix> -->
 ```yaml
 phase_policy:
   # ── Causa (01–08) ────────────────────────────────────────────────────────
@@ -50,7 +50,7 @@ phase_policy:
   conclusion:                { focus: "adaptación compatible + ruta de migración reversible",   reasoning_effort: medium, evidence: [veredicto, plan_retirada, deuda],                       acceptance: "veredicto coherente con análisis",                    risk_controls: [] }
   communication:             { focus: "compatibilidad y migración; guía adjunta",               reasoning_effort: medium, evidence: [resumen, cambios, guia, commit],                       acceptance: "commit con metadatos Case:; cita 16 ## Solución ganadora + guía solo con ganadora", risk_controls: [] }
 ```
-</policy_matrix>
+<!-- </policy_matrix> -->
 
 ## Evidence prioritized
 Compatibility matrices, contract tests, version before/after.

@@ -13,7 +13,7 @@ Sequentially executes each hypothesis; rollback between runs. Operates on the SO
 
 <user_communication>Spanish for user interaction. See ../artifact-structuring/SKILL.md §language_policy.</user_communication>
 
-<phase_procedure>
+<!-- <phase_procedure> -->
 ## Inputs
 - case.md (phase_policy.solution-execution).
 - `13-solution-experiment-design.md`.
@@ -33,7 +33,7 @@ Sequentially executes each hypothesis; rollback between runs. Operates on the SO
 4. Log every command, every applied change, every rollback step, every deviation (with reason).
 5. **Throwaway branches** for larger implementations: `exp/<case-id>/hypothesis-X`. They carry
    the `Case: <case-id>` trailer but are **never merged**.
-</phase_procedure>
+<!-- </phase_procedure> -->
 
 ## Output
 Write `14-solution-execution.md` from templates/phase-artifact.md with `chain: solution` in

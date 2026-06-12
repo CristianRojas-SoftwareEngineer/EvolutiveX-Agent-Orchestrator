@@ -18,7 +18,7 @@ closure routes **(a)/(b)/(c)** are decided in phase 17 (§5.3).
 
 <user_communication>Spanish for user interaction. See ../artifact-structuring/SKILL.md §language_policy.</user_communication>
 
-<phase_procedure>
+<!-- <phase_procedure> -->
 ## Inputs
 - case.md (phase_policy.solution-analysis).
 - `12-solution-hypothesis.md` (refutation criteria of each hypothesis).
@@ -47,7 +47,7 @@ closure routes **(a)/(b)/(c)** are decided in phase 17 (§5.3).
    in map 11 (orchestrator re-invokes 12–16). When 13–16 are marked `superseded` for a new round,
    any prior `16-solution-analysis.md` is also `superseded` with `links.previous_version`; the new
    verdict replaces it with a version bump.
-</phase_procedure>
+<!-- </phase_procedure> -->
 
 ## Output
 Write `16-solution-analysis.md` from templates/phase-artifact.md with `chain: solution` in the

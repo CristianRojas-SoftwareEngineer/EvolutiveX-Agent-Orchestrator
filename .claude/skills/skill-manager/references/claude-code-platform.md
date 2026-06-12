@@ -4,17 +4,17 @@ description: Claude Code platform reference for project skills (discovery, front
 
 # Claude Code — project skills platform
 
-<overview>
+<!-- <<overview> -->
 Reference for Claude Code capabilities applicable to skills in `.claude/skills/` in this repository.
 
 Official documentation: https://code.claude.com/docs/en/skills
-</overview>
+<!-- </overview> -->
 
-<user_communication>
+<!-- <<user_communication> -->
 Ask, confirm, and respond to the user in **Spanish** when this reference informs user-facing output. Instructions stay in **English**. Canonical policy: `<language_policy>` in [artifact-structuring](../../artifact-structuring/SKILL.md). User-facing rules: [AGENTS.md](../../../../AGENTS.md) §0.
-</user_communication>
+<!-- </user_communication> -->
 
-<location>
+<!-- <<location> -->
 ## Location and discovery
 
 | Concept | Value in this repo |
@@ -30,18 +30,18 @@ Ask, confirm, and respond to the user in **Spanish** when this reference informs
 - Changes to skill files are detected hot during the session (no restart needed unless `.claude/skills/` is created for the first time after the session starts).
 
 **Merge with commands:** `.claude/commands/<name>.md` and `.claude/skills/<name>/SKILL.md` expose the same `/name`; the skill takes priority and supports bundled files.
-</location>
+<!-- </location> -->
 
-<skill_types>
+<!-- <<skill_types> -->
 ## Skill types
 
 | Type | Content | Typical invocation |
 |------|-----------|-------------------|
 | **Reference** | Knowledge, conventions, patterns | Claude auto-loads when `description` matches |
 | **Task** | Steps with side effects (commit, deploy) | User with `/name`; add `disable-model-invocation: true` |
-</skill_types>
+<!-- </skill_types> -->
 
-<frontmatter>
+<!-- <<frontmatter> -->
 ## Frontmatter (YAML)
 
 Only `name` and `description` are required. `description` is the main auto-activation mechanism: include WHAT it does and WHEN to use it (third person).
@@ -68,9 +68,9 @@ Only `name` and `description` are required. `description` is the main auto-activ
 | `allowed-tools` | Same; use `<constraints>` in the body for restrictions |
 
 See `docs/references/historical/smart-code-proxy/MAINTENANCE.md`. For language: follow `<language_policy>` in [artifact-structuring/SKILL.md](../../artifact-structuring/SKILL.md) — English artifact text, Spanish user I/O via `<constraints>` in the body (not extra frontmatter fields). Do not duplicate the full policy here.
-</frontmatter>
+<!-- </frontmatter> -->
 
-<dynamic_injection>
+<!-- <<dynamic_injection> -->
 ## Dynamic injection
 
 Lines `!`command`` or blocks opened with ` ```! ` run shell **before** Claude sees the content. It is preprocessed: Claude only receives the substituted output.
@@ -93,9 +93,9 @@ Summarize in two or three bullets. If the diff is empty, state that there are no
 ```
 
 On Windows, `shell: powershell` in frontmatter if the project uses PowerShell for `!` blocks (requires `CLAUDE_CODE_USE_POWERSHELL_TOOL=1`).
-</dynamic_injection>
+<!-- </dynamic_injection> -->
 
-<progressive_disclosure>
+<!-- <<progressive_disclosure> -->
 ## Progressive disclosure (three levels)
 
 1. **Metadata** (`name` + `description`) — always in the skill catalog (~100 words).
@@ -107,17 +107,17 @@ Patterns:
 - Link `references/` from SKILL.md with when to read each file.
 - References > 300 lines: include a table of contents at the top.
 - Domain variants: `references/aws.md`, `references/gcp.md`, etc., chosen by context.
-</progressive_disclosure>
+<!-- </progressive_disclosure> -->
 
-<session_lifecycle>
+<!-- <<session_lifecycle> -->
 ## Session lifecycle
 
 - On invoke, rendered SKILL.md content enters the conversation and **remains** for the rest of the session (the file is not re-read each turn).
 - After compaction: re-attached up to 5000 tokens per skill (max 25000 tokens combined across invoked skills), prioritizing the most recent.
 - If the skill stops influencing after several turns: strengthen `description`/instructions or re-invoke `/skill-name` after compaction.
-</session_lifecycle>
+<!-- </session_lifecycle> -->
 
-<troubleshooting>
+<!-- <<troubleshooting> -->
 ## Catalog budget and troubleshooting
 
 - All skills list `name`; `description` entries are shortened if there are many skills (~1% of context window budget).
@@ -126,9 +126,9 @@ Patterns:
 - Skill does not trigger: broaden keywords in `description`, try `/skill-name`, verify it appears in the listing.
 - Skill triggers too often: more specific `description` or `disable-model-invocation: true`.
 - `skillOverrides` in `.claude/settings.local.json` — control visibility without editing SKILL.md (`/skills` menu).
-</troubleshooting>
+<!-- </troubleshooting> -->
 
-<directory_layout>
+<!-- <<directory_layout> -->
 ## Recommended directory layout
 
 ```
@@ -139,4 +139,4 @@ skill-name/
 ├── scripts/              # Executable code
 └── assets/               # Templates, icons, etc.
 ```
-</directory_layout>
+<!-- </directory_layout> -->

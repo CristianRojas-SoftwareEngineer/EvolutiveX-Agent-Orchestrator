@@ -16,17 +16,17 @@ metadata:
   generatedBy: "1.3.1"
 ---
 
-<overview>
+<!-- <overview> -->
 End-to-end apply flow for a single OpenSpec change: select → apply → verify →
 sync specs → sync docs → archive → commit, with CRITICAL/WARNING/SUGGESTION
 gates inherited from openspec-verify.
-</overview>
+<!-- </overview> -->
 
-<user_communication>
+<!-- <user_communication> -->
 Ask, confirm, and respond to the user in **Spanish** (native Spanish-speaking audience). Keep this artifact's instructions in **English** for token efficiency. Canonical policy: `<language_policy>` in [artifact-structuring](../artifact-structuring/SKILL.md). User-facing rules: [AGENTS.md](../../AGENTS.md) §0.
-</user_communication>
+<!-- </user_communication> -->
 
-<repo_context>
+<!-- <repo_context> -->
 Workflow delivery in this repo: `.claude/skills/openspec-apply/` only. Invocation: see `<invocation_model>` in [openspec-specialist](../openspec-specialist/SKILL.md).
 
 <delegation_map>
@@ -38,9 +38,9 @@ All steps run inline. Reasoning:
 - **archive** (inline via openspec-archive): the procedure is defined in `openspec-archive/SKILL.md` and executed inline — same thread, no subagent. Steps 1–4 of that skill (selection, artifact check, task check, sync assessment) are skipped because Steps 1–5 of this workflow already cover them. Only openspec-archive Steps 5–6 (the actual `mv` and summary) run.
 - **commit** (inline): the conventional-commits message must reflect the change's own diff; this is part of the apply context.
 </delegation_map>
-</repo_context>
+<!-- </repo_context> -->
 
-<workflow>
+<!-- <workflow> -->
 End-to-end apply flow for a single OpenSpec change. Seven steps run in
 **strict order**: select → apply → verify → sync specs → sync docs → archive
 → commit. Every step ends with a gate (see `<gate_definitions>`); CRITICAL
@@ -358,11 +358,12 @@ There is no dedicated skill; this step is **inline and bespoke**.
      `proposal.md` «What Changes» first bullet, rewritten in
      imperative, compressed.
 
-   - **Body** in Spanish with the four mandatory blocks per
-     conventional-commits: **Motivación**, **Propósito**, **Objetivos**,
+   - **Body** in Spanish with the three mandatory blocks per
+     conventional-commits: **Propósito**, **Objetivos**,
      **Resumen de cambios**. Populate from:
-     - **Motivación** → `proposal.md` «Why» section, condensed.
-     - **Propósito** → `proposal.md` «What Changes» first paragraph.
+     - **Propósito** → single narrative: the observed need from
+       `proposal.md` «Why» (condensed), then the proposed resolution
+       and its added value from «What Changes» first paragraph.
      - **Objetivos** → bullet list of completed tasks from `tasks.md`
        (the `- [x]` lines), one bullet per task, in order.
      - **Resumen de cambios** → list of `src/` and `docs/` paths
@@ -413,7 +414,7 @@ catalog: it can be invoked at any point where a change has tasks
 sequence is a **recommended path** for the close-out cycle, not a
 phase lock. A user may invoke `openspec-verify` or `openspec-sync`
 directly; this skill does not pretend exclusivity.
-</workflow>
+<!-- </workflow> -->
 
 <gate_definitions>
 Severities are reused from openspec-verify: prefer SUGGESTION > WARNING
@@ -692,7 +693,7 @@ are filled by the step that invokes the pause.
 ```
 </output_templates>
 
-<guardrails>
+<!-- <guardrails> -->
 ## Structural
 
 - Steps run in **strict order**: select → apply → verify → sync specs →
@@ -729,7 +730,7 @@ are filled by the step that invokes the pause.
   run `mkdir -p` + `mv`. No sync re-prompt needed — Step 4 already handled it.
 - **Step 7 (commit)**:
   - First line ≤72 chars, imperative, no trailing period.
-  - Four Spanish blocks: **Motivación**, **Propósito**, **Objetivos**,
+  - Three Spanish blocks: **Propósito**, **Objetivos**,
     **Resumen de cambios**.
   - The Type and Scope are derived deterministically (see workflow
     Step 7.2); never guess — use the rules.
@@ -756,4 +757,4 @@ are filled by the step that invokes the pause.
   always use **AskUserQuestion** when the input is vague.
 - Do not over-engineer the commit message scope: a noisy scope is
   worse than a generic `change` fallback.
-</guardrails>
+<!-- </guardrails> -->

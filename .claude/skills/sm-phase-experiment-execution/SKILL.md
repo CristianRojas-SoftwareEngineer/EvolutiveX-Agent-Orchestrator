@@ -12,7 +12,7 @@ Operates on the CAUSE axis only (`chain: cause`).
 
 <user_communication>Spanish for user interaction. See ../artifact-structuring/SKILL.md §language_policy.</user_communication>
 
-<phase_procedure>
+<!-- <phase_procedure> -->
 ## Inputs
 - case.md (phase_policy.experiment-execution); 05-experiment-design.md.
 
@@ -20,7 +20,7 @@ Operates on the CAUSE axis only (`chain: cause`).
 1. Read the policy entry and the design.
 2. Execute the experiment as designed under the required `risk_controls`. Record environment.
 3. Log commands, applied changes, raw output, and any deviation (with reason).
-</phase_procedure>
+<!-- </phase_procedure> -->
 
 ## Output
 Write `06-experiment-execution.md` with `chain: cause` in the frontmatter: Applied policy,

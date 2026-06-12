@@ -18,20 +18,20 @@ metadata:
 
 <!-- Instructions: English; user I/O: Spanish — see language_policy in artifact-structuring -->
 
-<user_communication>
+<!-- <<user_communication> -->
 Ask, confirm, and respond to the user in **Spanish** (native Spanish-speaking audience). Keep this artifact's instructions in **English** for token efficiency. Canonical policy: `<language_policy>` in [.claude/skills/artifact-structuring/SKILL.md](../artifact-structuring/SKILL.md). User-facing rules: [AGENTS.md](../../../AGENTS.md) §0. Keep standard technical terms in English when clarity benefits (e.g. gate, change, specs, roadmap, orchestrator).
-</user_communication>
+<!-- </user_communication> -->
 
-<overview>
+<!-- <<overview> -->
 Decompose a large set of high-level changes into a prescriptively governed two-level OpenSpec roadmap.
 
 - **Input:** a set of high-level changes + source design document(s) + a base name for the orchestrator.
 - **Output:** one L1 orchestrator change (governance only, no `src/` code) + N L2 phase changes (1:1 to phases), chained by dependency, iteratively created and implemented, with phase registry, documentary governance, and a pre-archive gate before each phase is closed.
 
 This skill generalizes the process proven in the `gateway-migration` (C0–P2, closed 2026-06-01). It prescribes structure; it delegates all artifact creation to `openspec-propose`, implementation to `openspec-apply`, verification to `openspec-verify`, spec sync to `openspec-sync`, and archiving to `openspec-archive`.
-</overview>
+<!-- </overview> -->
 
-<repo_context>
+<!-- <<repo_context> -->
 Two-level model:
 
 - **L1 orchestrator change** (e.g. `<name>-migration`, `<name>-roadmap`): governance only. Owns the phase registry and the per-phase Definition of Done (DoD). Never touches `src/`.
@@ -60,9 +60,9 @@ This skill **delegates** to:
 - [openspec-propose](../openspec-propose/SKILL.md), [openspec-apply](../openspec-apply/SKILL.md), [openspec-sync](../openspec-sync/SKILL.md), [openspec-archive](../openspec-archive/SKILL.md) — creation, implementation, sync, archive.
 
 Invocation model: see `<invocation_model>` in [openspec-specialist](../openspec-specialist/SKILL.md). Never run `openspec update` / `openspec init --force`.
-</repo_context>
+<!-- </repo_context> -->
 
-<when_it_applies>
+<!-- <<when_it_applies> -->
 ## When it applies
 
 **Use this skill** when:
@@ -77,9 +77,9 @@ Invocation model: see `<invocation_model>` in [openspec-specialist](../openspec-
 - The change is a single, self-contained unit → use `openspec-propose` directly.
 - The set of changes is small and has no internal dependency risk → use `openspec-propose` per change.
 - The user only needs to validate one already-existing phase before archiving → jump to `<phase_gate>`.
-</when_it_applies>
+<!-- </when_it_applies> -->
 
-<inputs>
+<!-- <<inputs> -->
 ## Inputs
 
 - **Set of high-level changes** (description or source design document with sections enumerating them).
@@ -87,9 +87,9 @@ Invocation model: see `<invocation_model>` in [openspec-specialist](../openspec-
 - **Base name for the orchestrator** — convention: `<domain>-migration` or `<domain>-roadmap`. L2 names follow `<prefix>-<phaseid>-<slug>` (e.g. `auth-p1-token-model`).
 - **Orchestrator change name** — if already exists, infer from `openspec list`; do not re-create.
 - **Phase change name** (for gate mode) — default: infer from conversation. If ambiguous, run `openspec list --json` and ask the user to choose. Do NOT auto-select.
-</inputs>
+<!-- </inputs> -->
 
-<workflow>
+<!-- <<workflow> -->
 ## Workflow — 4 phases
 
 ### Phase 1: Analysis and decomposition
@@ -158,9 +158,9 @@ When all L2 phases are archived:
    `openspec/changes/archive/<date>-<orchestrator>/` together. Never move L2 directories
    under the L1 folder before this step.
 5. **Commit** with a message describing the roadmap close-out (Spanish, per conventional-commits).
-</workflow>
+<!-- </workflow> -->
 
-<phase_gate>
+<!-- <<phase_gate> -->
 ## Phase gate (pre-archive check)
 
 Run this gate when the user wants to validate one L2 phase change before archiving it. The gate is **read-only**: it proposes fixes with `file:line` references but never applies them.
@@ -217,16 +217,16 @@ When that context pressure is real, delegate **only** those fan-out checks to a 
 - **The main thread keeps ownership of:** Checks 2–4 (cheap reads of the orchestrator contract), the final PASS/FAIL verdict, and all user-facing output in Spanish per `<output_format>`. The sub-agent never applies fixes (the gate is read-only) and never emits the verdict itself.
 
 Escalate to this mode only when context cost is a **measured** problem in the current roadmap, not preventively (see `<guardrails>`).
-</phase_gate>
+<!-- </phase_gate> -->
 
-<output_format>
+<!-- <<output_format> -->
 ## Output format
 
 All output delivered to the user **in Spanish**.
 
 ### A — Decomposition table (Phase 1 output)
 
-<output_template_decomposition>
+<!-- <<output_template_decomposition> -->
 ## Descomposición del roadmap: {{orchestrator-name}}
 
 | Fase | Bloque | Dependencia | Gate de validación | Docs a actualizar | Legacy a retirar | Estado |
@@ -236,11 +236,11 @@ All output delivered to the user **in Spanish**.
 **Coherencia:** {{observation}}
 **Consistencia:** {{observation}}
 **Completitud:** {{observation or gaps}}
-</output_template_decomposition>
+<!-- </output_template_decomposition> -->
 
 ### B — Phase gate report
 
-<output_template_gate>
+<!-- <<output_template_gate> -->
 ## Gate de fase: {{phase-change-name}}
 
 **Veredicto:** {{PASS | FAIL}}
@@ -264,10 +264,10 @@ All output delivered to the user **in Spanish**.
 - {{issue}} → {{recomendación}}
 
 **Cierre:** {{si FAIL: corregir CRITICAL antes de archivar | si PASS: listo para archivar la fase}}
-</output_template_gate>
-</output_format>
+<!-- </output_template_gate> -->
+<!-- </output_format> -->
 
-<guardrails>
+<!-- <<guardrails> -->
 - Delegate to existing skills; never re-implement their logic.
 - **L2 phase changes MUST live at `openspec/changes/<l2-name>/` during the phase loop.** Never
   move or nest them inside the orchestrator folder (e.g. `openspec/changes/<orchestrator>/phases/<l2>/`)
@@ -283,7 +283,7 @@ All output delivered to the user **in Spanish**.
 - Never run `openspec update` / `openspec init --force`.
 - Templates for the orchestrator and phase changes live in [references/templates.md](references/templates.md).
 - Gate runs inline by default. Delegating the fan-out checks to a read-only sub-agent (see `<phase_gate>` § "Optional: delegate heavy verification") is an escalation for measured context pressure in long roadmaps, not a preventive default; the main thread always owns the verdict and the Spanish output.
-</guardrails>
+<!-- </guardrails> -->
 
 ## Examples
 

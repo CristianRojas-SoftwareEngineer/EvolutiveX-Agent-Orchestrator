@@ -12,19 +12,19 @@ metadata:
   generatedBy: "1.3.1"
 ---
 
-<overview>
+<!-- <overview> -->
 Create an empty OpenSpec change scaffold without planning artifacts.
-</overview>
+<!-- </overview> -->
 
-<user_communication>
+<!-- <user_communication> -->
 Ask, confirm, and respond to the user in **Spanish** (native Spanish-speaking audience). Keep this artifact's instructions in **English** for token efficiency. Canonical policy: `<language_policy>` in [artifact-structuring](../artifact-structuring/SKILL.md). User-facing rules: [AGENTS.md](../../AGENTS.md) §0.
-</user_communication>
+<!-- </user_communication> -->
 
-<repo_context>
+<!-- <repo_context> -->
 Workflow delivery in this repo: `.claude/skills/openspec-new/` only. Invocation: see `<invocation_model>` in [openspec-specialist](../openspec-specialist/SKILL.md).
-</repo_context>
+<!-- </repo_context> -->
 
-<workflow>
+<!-- <workflow> -->
 Start a new change using the experimental artifact-driven approach.
 
 **Input**: The user's request should include a change name (kebab-case) OR a description of what they want to build.
@@ -82,9 +82,9 @@ After completing the steps, summarize:
 - The template for the first artifact
 - Prompt: "Ready to create the first artifact? Just describe what this change is about and I'll draft it, or ask me to continue."
 
-</workflow>
+<!-- </workflow> -->
 
-<guardrails>
+<!-- <guardrails> -->
 ## Guardrails
 
 - Do NOT create any artifacts yet - just show the instructions
@@ -92,4 +92,4 @@ After completing the steps, summarize:
 - If the name is invalid (not kebab-case), ask for a valid name
 - If a change with that name already exists, suggest continuing that change instead
 - Pass --schema if using a non-default workflow
-</guardrails>
+<!-- </guardrails> -->

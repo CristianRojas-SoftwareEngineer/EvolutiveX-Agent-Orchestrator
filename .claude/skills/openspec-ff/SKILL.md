@@ -12,19 +12,19 @@ metadata:
   generatedBy: "1.3.1"
 ---
 
-<overview>
+<!-- <overview> -->
 Fast-forward all planning artifacts for a change in one run until apply-ready.
-</overview>
+<!-- </overview> -->
 
-<user_communication>
+<!-- <user_communication> -->
 Ask, confirm, and respond to the user in **Spanish** (native Spanish-speaking audience). Keep this artifact's instructions in **English** for token efficiency. Canonical policy: `<language_policy>` in [artifact-structuring](../artifact-structuring/SKILL.md). User-facing rules: [AGENTS.md](../../AGENTS.md) §0.
-</user_communication>
+<!-- </user_communication> -->
 
-<repo_context>
+<!-- <repo_context> -->
 Workflow delivery in this repo: `.claude/skills/openspec-ff/` only. Invocation: see `<invocation_model>` in [openspec-specialist](../openspec-specialist/SKILL.md).
-</repo_context>
+<!-- </repo_context> -->
 
-<workflow>
+<!-- <workflow> -->
 Fast-forward through artifact creation - generate everything needed to start implementation in one go.
 
 **Input**: The user's request should include a change name (kebab-case) OR a description of what they want to build.
@@ -109,9 +109,9 @@ After completing all artifacts, summarize:
   - Do NOT copy `<context>`, `<rules>`, `<project_context>` blocks into the artifact
   - These guide what you write, but should never appear in the output
 
-</workflow>
+<!-- </workflow> -->
 
-<guardrails>
+<!-- <guardrails> -->
 ## Guardrails
 
 - Create ALL artifacts needed for implementation (as defined by schema's `apply.requires`)
@@ -119,4 +119,4 @@ After completing all artifacts, summarize:
 - If context is critically unclear, ask the user - but prefer making reasonable decisions to keep momentum
 - If a change with that name already exists, suggest continuing that change instead
 - Verify each artifact file exists after writing before proceeding to next
-</guardrails>
+<!-- </guardrails> -->

@@ -4,15 +4,15 @@ description: Testing and validation workflows for project skills (TEST-CASES, fo
 
 # Skill testing and evaluation
 
-<overview>
+<!-- <<overview> -->
 Workflows to validate project skills in Claude Code before closing an iteration.
-</overview>
+<!-- </overview> -->
 
-<user_communication>
+<!-- <<user_communication> -->
 Ask, confirm, and respond to the user in **Spanish** (native Spanish-speaking audience). Keep this artifact's instructions in **English** for token efficiency. Canonical policy: `<language_policy>` in [.claude/skills/artifact-structuring/SKILL.md](../../artifact-structuring/SKILL.md). User-facing rules: [AGENTS.md](../../../../AGENTS.md) §0.
-</user_communication>
+<!-- </user_communication> -->
 
-<methods_matrix>
+<!-- <<methods_matrix> -->
 ## Methods matrix
 
 | Method | How | When to use |
@@ -22,9 +22,9 @@ Ask, confirm, and respond to the user in **Spanish** (native Spanish-speaking au
 | **Baseline** | Same request without invoking the skill | Compare quality with/without skill |
 | **Isolation** | Test skill with `context: fork` + `agent: Explore` | Evaluate without chat history noise |
 | **Objective verification** | Script in `scripts/` + check output/files | Deterministic outputs (transformations, extraction, codegen) |
-</methods_matrix>
+<!-- </methods_matrix> -->
 
-<qualitative_flow>
+<!-- <<qualitative_flow> -->
 ## Recommended flow (qualitative)
 
 1. Draft 2–3 realistic prompts (as a user would say them).
@@ -36,9 +36,9 @@ Ask, confirm, and respond to the user in **Spanish** (native Spanish-speaking au
 7. Iterate SKILL.md and repeat.
 
 If the user prefers to iterate without formal evaluation, adapt; do not force the full matrix.
-</qualitative_flow>
+<!-- </qualitative_flow> -->
 
-<test_cases_template>
+<!-- <<test_cases_template> -->
 ## TEST-CASES.md template
 
 Save in `.claude/skills/<skill-name>/TEST-CASES.md` when the skill has verifiable behavior or the team wants traceability.
@@ -58,9 +58,9 @@ Save in `.claude/skills/<skill-name>/TEST-CASES.md` when the skill has verifiabl
 ```
 
 Skills with subjective output (style, tone) may omit this file.
-</test_cases_template>
+<!-- </test_cases_template> -->
 
-<fork_testing>
+<!-- <<fork_testing> -->
 ## Testing with subagent (`context: fork`)
 
 Useful for **task** skills with explicit steps:
@@ -79,9 +79,9 @@ The body becomes the subagent prompt; it does not see prior history. Explore/Pla
 **When to use fork:** research or validation tasks that must not mix with the main thread.
 
 **When not to:** **reference** skills (conventions) — prefer inline invocation so they coexist with current work.
-</fork_testing>
+<!-- </fork_testing> -->
 
-<script_verification>
+<!-- <<script_verification> -->
 ## Verification with scripts
 
 For objective outputs:
@@ -92,9 +92,9 @@ For objective outputs:
 4. Document success criteria in TEST-CASES.md.
 
 The script runs without loading its full source into context (only the output).
-</script_verification>
+<!-- </script_verification> -->
 
-<version_comparison>
+<!-- <<version_comparison> -->
 ## Version comparison (optional)
 
 If the user asks whether the new version is better:
@@ -103,9 +103,9 @@ If the user asks whether the new version is better:
 2. Same prompts with new version.
 3. Present outputs side by side.
 4. Incorporate findings in the next SKILL.md revision.
-</version_comparison>
+<!-- </version_comparison> -->
 
-<meta_testing>
+<!-- <<meta_testing> -->
 ## Testing skill-manager (meta)
 
 | Test prompt | Expected behavior |
@@ -116,9 +116,9 @@ If the user asks whether the new version is better:
 | "How do I test this skill?" | `<testing_process>` + this file |
 
 Direct invocation: `/skill-manager` (replaces legacy `/create-skill`).
-</meta_testing>
+<!-- </meta_testing> -->
 
-<verification>
+<!-- <<verification> -->
 ## Checklist before closing an iteration
 
 - [ ] Cases run with skill active
@@ -127,4 +127,4 @@ Direct invocation: `/skill-manager` (replaces legacy `/create-skill`).
 - [ ] Feedback incorporated or open items documented
 - [ ] `description` tested with prompt wording variations
 - [ ] TEST-CASES.md updated if documentation was agreed
-</verification>
+<!-- </verification> -->

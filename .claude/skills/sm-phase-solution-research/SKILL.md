@@ -15,7 +15,7 @@ Generic, profile-parameterized.
 
 <user_communication>Spanish for user interaction. See ../artifact-structuring/SKILL.md §language_policy.</user_communication>
 
-<phase_procedure>
+<!-- <phase_procedure> -->
 ## Inputs
 - case.md (phase_policy.solution-research).
 - `08-analysis.md` with the mandatory `## Causa confirmada` section (precondition §5.2).
@@ -35,7 +35,7 @@ Generic, profile-parameterized.
    prioritize (corrective → reversibility + minimal diff; adaptive → reversibility + flag
    isolation; perfective → metric dominance + benchmark cost; preventive → coverage of
    materialization paths).
-</phase_procedure>
+<!-- </phase_procedure> -->
 
 ## Output
 Write `maintenance-cases/<case-id>/11-solution-research.md` from templates/phase-artifact.md

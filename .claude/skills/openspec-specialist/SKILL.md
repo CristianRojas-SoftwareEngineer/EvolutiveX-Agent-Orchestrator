@@ -19,17 +19,17 @@ metadata:
   generatedBy: "1.3.1"
 ---
 
-<overview>
+<!-- <overview> -->
 Assist with OpenSpec end-to-end: installation, project initialization, workflow skill selection, CLI commands, artifact interpretation, schema customization, migration, and troubleshooting.
 
 **This repo:** workflow steps live in `.claude/skills/openspec-*/` only. Invoke them by auto-activation, natural language, or `/openspec-<slug>` when the IDE exposes project skills. Do not add duplicate OpenSpec workflow files under `.claude/commands/`.
-</overview>
+<!-- </overview> -->
 
-<user_communication>
+<!-- <user_communication> -->
 Ask, confirm, and respond to the user in **Spanish** (native Spanish-speaking audience). Keep this artifact's instructions in **English** for token efficiency. Canonical policy: `<language_policy>` in [artifact-structuring](../artifact-structuring/SKILL.md). User-facing rules: [AGENTS.md](../../AGENTS.md) §0.
-</user_communication>
+<!-- </user_communication> -->
 
-<mental_model>
+<!-- <mental_model> -->
 ## Core mental model
 
 OpenSpec is a spec-driven workflow system built around two durable directories inside a repo:
@@ -40,9 +40,9 @@ OpenSpec is a spec-driven workflow system built around two durable directories i
 The operating model is fluid and action-based, not phase-locked. You can create, refine, implement, verify, sync, and archive as the work evolves.
 
 OpenSpec is also brownfield-first: the delta model is intended to describe changes to an existing system, not just greenfield designs.
-</mental_model>
+<!-- </mental_model> -->
 
-<workflow_profiles>
+<!-- <workflow_profiles> -->
 ## Workflow profiles (skills in this repo)
 
 OpenSpec CLI profiles (`core` vs expanded) still apply to which workflows exist upstream. **In this repository**, all listed workflow skills are present under `.claude/skills/` and are maintained manually (hybrid XML + Markdown per `artifact-structuring`).
@@ -81,9 +81,9 @@ To inspect CLI profile settings only (does **not** refresh `.claude/` skills):
 ```bash
 openspec config profile
 ```
-</workflow_profiles>
+<!-- </workflow_profiles> -->
 
-<skill_catalog>
+<!-- <skill_catalog> -->
 ## Workflow skill catalog (canonical for this repo)
 
 Convention: directory `.claude/skills/openspec-<slug>/`, frontmatter `name: openspec-<slug>`. See `<invocation_model>` for how users invoke skills in this repo.
@@ -109,9 +109,9 @@ Convention: directory `.claude/skills/openspec-<slug>/`, frontmatter `name: open
 **Delivery:** OpenSpec workflow steps are skills under `.claude/skills/openspec-<slug>/` only. Do not add duplicate workflow slash commands under `.claude/commands/` without explicit user request.
 
 Upstream-generated skill folder names (`openspec-apply-change`, `openspec-sync-specs`, …) must not be reintroduced; use `openspec-<slug>` only.
-</skill_catalog>
+<!-- </skill_catalog> -->
 
-<invocation_model>
+<!-- <invocation_model> -->
 ## How workflow skills are invoked (this repo)
 
 Workflow delivery is **skills only** under `.claude/skills/openspec-<slug>/`. Do not add duplicate OpenSpec workflow files under `.claude/commands/`.
@@ -127,9 +127,9 @@ Workflow delivery is **skills only** under `.claude/skills/openspec-<slug>/`. Do
 **Onboarding and recap tables** must use the `<skill_catalog>` columns (Skill, Invocation, purpose)—not a separate command-style table for removed workflow slash files.
 
 **Cross-cutting OpenSpec work** (`openspec list`, `status`, `validate`, `instructions`, …) uses the CLI directly; no homonymous workflow skill is required unless a skill wraps that step (e.g. `openspec-archive` for archive with sync prompts).
-</invocation_model>
+<!-- </invocation_model> -->
 
-<artifact_model>
+<!-- <artifact_model> -->
 ## Artifact model
 
 A change is usually represented by a dedicated folder under `openspec/changes/<change-name>/`. In the default `spec-driven` workflow, that folder is organized as:
@@ -256,9 +256,9 @@ openspec/changes/<change-name>/
 ```
 
 The exact layout can vary by schema, but the responsibility split should remain the same.
-</artifact_model>
+<!-- </artifact_model> -->
 
-<change_lifecycle>
+<!-- <change_lifecycle> -->
 ## When to update an existing change versus start a new one
 
 Use the existing change when the intent is the same and you are refining execution.
@@ -272,9 +272,9 @@ Prefer a new change when:
 A good practical heuristic:
 - Same problem, same feature, same story: update the current change.
 - Different problem, different feature, different story: create a new change.
-</change_lifecycle>
+<!-- </change_lifecycle> -->
 
-<skill_selection_heuristics>
+<!-- <skill_selection_heuristics> -->
 ## Skill selection heuristics
 
 Activate or invoke the homonymous skill from `<skill_catalog>` per `<invocation_model>` (do not run `openspec update` to "fix" skills):
@@ -291,9 +291,9 @@ Activate or invoke the homonymous skill from `<skill_catalog>` per `<invocation_
 - **`openspec-bulk-archive`** — several completed changes; possible spec conflicts.
 - **`openspec-onboard`** — guided learning on the real codebase.
 - **`openspec-roadmap-manager`** — large set of changes with internal dependencies, multi-phase decomposition, iterative-incremental delivery with governance and phase gate.
-</skill_selection_heuristics>
+<!-- </skill_selection_heuristics> -->
 
-<workflow_skills_reference>
+<!-- <workflow_skills_reference> -->
 ## Workflow skills reference
 
 Each row points to `SKILL.md` in the skill directory. Follow that file when the skill is active; do not duplicate its full workflow here.
@@ -345,18 +345,18 @@ Guided first-time tutorial on the real codebase. Must teach the **skill catalog*
 ### `openspec-roadmap-manager`
 
 Orchestration skill for large, multi-phase change sets. Decomposes a set of high-level changes into one L1 orchestrator change (governance only, no `src/`) and N L2 phase changes (1:1 to phases), chained by a dependency DAG. Covers: analysis and decomposition (coherence/consistency/completeness), L1 orchestrator creation via `openspec-propose`, phase loop (create L2 → implement → gate → sync → docs → retire legacy → archive), and roadmap close-out. Embeds a generalized **phase gate** (6 checks: openspec-verify delegation, phase traceability, dependency gate, DoD from orchestrator specs, doc sync, legacy reduction) with PASS/FAIL verdict. Templates for orchestrator and phase change prompts live in `.claude/skills/openspec-roadmap-manager/references/templates.md`.
-</workflow_skills_reference>
+<!-- </workflow_skills_reference> -->
 
-<routing>
+<!-- <routing> -->
 ## Routing: specialist vs workflow skill
 
 - **OpenSpec questions, errors, or "which skill?"** → `openspec-specialist` (this file). Do not embed full step workflows here.
 - **Concrete workflow step** (explore, propose, apply, …) → activate `openspec-<slug>` from `<skill_catalog>` per `<invocation_model>`; read its `SKILL.md`.
 - **How to invoke** → explain paths in `<invocation_model>`; point to `<skill_catalog>` for per-skill invocation column.
 - **Cross-cutting CLI** (`openspec list`, `validate`, `status`, `instructions`, …) → run CLI; no workflow skill required.
-</routing>
+<!-- </routing> -->
 
-<cli_reference>
+<!-- <cli_reference> -->
 ## CLI reference
 
 Use the CLI for terminal-side project management and automation.
@@ -403,9 +403,9 @@ Some commands support `--json` and are suitable for scripts or agents:
 - `openspec templates`
 - `openspec schemas`
 - workspace commands such as `setup`, `list`, `ls`, `link`, `relink`, `doctor`, and `update`
-</cli_reference>
+<!-- </cli_reference> -->
 
-<workspaces>
+<!-- <workspaces> -->
 ## Workspace model
 
 Use workspaces only for cross-repo or multi-folder planning. Workspace support is under active development, so treat its behavior, state files, and JSON output as more volatile than repo-local OpenSpec state.
@@ -427,9 +427,9 @@ Workspaces keep their state in:
 
 - `.openspec-workspace/workspace.yaml`
 - `.openspec-workspace/local.yaml`
-</workspaces>
+<!-- </workspaces> -->
 
-<project_configuration>
+<!-- <project_configuration> -->
 ## Schema customization
 
 Schema resolution order:
@@ -469,9 +469,9 @@ context: |
 ```
 
 Keep language instructions alongside normal project context such as stack, database, and architecture rules.
-</project_configuration>
+<!-- </project_configuration> -->
 
-<supported_tools>
+<!-- <supported_tools> -->
 ## Supported tools and delivery modes (this repo)
 
 **Workflow delivery:** `.claude/skills/openspec-<slug>/SKILL.md` only. Skills are **maintained and refined in-repo** (hybrid XML + Markdown, Spanish user I/O per `artifact-structuring`).
@@ -479,9 +479,9 @@ Keep language instructions alongside normal project context such as stack, datab
 **Other project commands** (unrelated to OpenSpec workflow): `.claude/commands/analyze-session.md`, `create-plan.md`, `verify-scripts.md`.
 
 Catalog and policy: `<skill_catalog>` and `<maintenance>` in this file.
-</supported_tools>
+<!-- </supported_tools> -->
 
-<maintenance>
+<!-- <maintenance> -->
 ## Maintenance policy (this repo)
 
 <critical>
@@ -504,17 +504,17 @@ Those commands overwrite hand-maintained skills and break customized workflows.
 4. Do **not** add duplicate OpenSpec workflow slash commands under `.claude/commands/` unless the user explicitly requests them.
 
 Restart the IDE after bulk skill edits so the skill catalog reloads.
-</maintenance>
+<!-- </maintenance> -->
 
-<migration>
+<!-- <migration> -->
 ## Migration guidance
 
 Legacy OpenSpec workflows are preserved during migration. Existing changes, archived history, and `openspec/specs/` remain intact. **Tool integration under `.claude/` is owned by this repo**, not by automatic `openspec update` runs.
 
 The core model is unchanged: `openspec/specs/` = source of truth, `openspec/changes/` = active work.
-</migration>
+<!-- </migration> -->
 
-<troubleshooting>
+<!-- <troubleshooting> -->
 ## Troubleshooting
 
 Use these patterns:
@@ -525,9 +525,9 @@ Use these patterns:
 - If validation fails, inspect `openspec validate`, `openspec status`, and the relevant spec or change files.
 - If archive complains about missing sync, use skill `openspec-sync` or let `openspec-archive` prompt for it.
 - If workspace behavior seems inconsistent, prefer repo-local planning unless multi-repo coordination is truly required.
-</troubleshooting>
+<!-- </troubleshooting> -->
 
-<guardrails>
+<!-- <guardrails> -->
 ## Meta skill guardrails
 
 - Route workflow steps to the homonymous skill in `<skill_catalog>`; read that skill's `SKILL.md` instead of embedding full workflows here.
@@ -535,9 +535,9 @@ Use these patterns:
 - Respond in Spanish per `<user_communication>`.
 - When adding or removing a workflow skill on disk, update `<skill_catalog>`, `<workflow_profiles>`, and `<workflow_skills_reference>` in this file together.
 - Do not add OpenSpec workflow slash commands under `.claude/commands/` without explicit user request.
-</guardrails>
+<!-- </guardrails> -->
 
-<response_behavior>
+<!-- <response_behavior> -->
 ## Recommended response behavior
 
 When helping a user with OpenSpec, respond **in Spanish**:
@@ -548,4 +548,4 @@ When helping a user with OpenSpec, respond **in Spanish**:
 4. State whether the result affects `openspec/specs/`, `openspec/changes/`, or both.
 5. Mention profile, schema, and workspace dependencies when relevant.
 6. Prefer concrete examples over abstract descriptions.
-</response_behavior>
+<!-- </response_behavior> -->

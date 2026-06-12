@@ -13,7 +13,7 @@ Operates on the CAUSE axis only (`chain: cause`).
 
 <user_communication>Spanish for user interaction. See ../artifact-structuring/SKILL.md §language_policy.</user_communication>
 
-<phase_procedure>
+<!-- <phase_procedure> -->
 ## Inputs
 - case.md (phase_policy.research); 02-problem-definition.md; the knowledge base
   (.claude/memory/ via MEMORY.md). See ../sm-orchestrator/references/knowledge-base.md.
@@ -25,7 +25,7 @@ Operates on the CAUSE axis only (`chain: cause`).
    as prior art. Recall is a procedure, not a guarantee a lesson exists.
 3. Gather knowledge focused by `focus`: related code (file:line), docs, recent commits.
 4. Cite every source so it is locatable. Collect required `evidence`.
-</phase_procedure>
+<!-- </phase_procedure> -->
 
 ## Output
 Write `03-research.md` with `chain: cause` in the frontmatter: Applied policy, Recalled lessons

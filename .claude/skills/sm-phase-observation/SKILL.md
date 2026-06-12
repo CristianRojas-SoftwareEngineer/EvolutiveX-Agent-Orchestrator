@@ -12,7 +12,7 @@ Generic, profile-parameterized. Reads policy; never decides order; never consoli
 
 <user_communication>Spanish for user interaction. See ../artifact-structuring/SKILL.md §language_policy.</user_communication>
 
-<phase_procedure>
+<!-- <phase_procedure> -->
 ## Inputs
 - case.md (profile + phase_policy.observation)
 - The user request; access to code, logs, metrics, tests, issues.
@@ -22,7 +22,7 @@ Generic, profile-parameterized. Reads policy; never decides order; never consoli
 2. Collect observable facts in line with `focus` and gather every required `evidence` item.
 3. Record facts only — no causes, no fixes. Date and source each fact.
 4. Delimit scope.
-</phase_procedure>
+<!-- </phase_procedure> -->
 
 ## Output
 Write `maintenance-cases/<case-id>/01-observation.md` from templates/phase-artifact.md with

@@ -7,11 +7,11 @@ description: >
 
 # Roadmap templates — generic (two-level model)
 
-<overview>
+<!-- <<overview> -->
 These templates are **generic and reusable** across any two-level roadmap, not tied to any specific project.
 Fill in `{{placeholders}}` when invoking `openspec-propose`. The orchestrator template (Prompt A) is used
 once per roadmap; the phase template (Prompt B) is used once per phase, in dependency order.
-</overview>
+<!-- </overview> -->
 
 ---
 

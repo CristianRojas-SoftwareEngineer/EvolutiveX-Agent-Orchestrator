@@ -24,7 +24,7 @@ Closes the case by deciding the outcome and the action. Consumes data from both 
 
 <user_communication>Spanish for user interaction. See ../artifact-structuring/SKILL.md §language_policy.</user_communication>
 
-<phase_procedure>
+<!-- <phase_procedure> -->
 ## Inputs
 - case.md (phase_policy.conclusion).
 - `02-problem-definition.md` (problem statement + success criterion).
@@ -58,7 +58,7 @@ Closes the case by deciding the outcome and the action. Consumes data from both 
 6. **Common final (all branches):** set `phases.conclusion: done` in the canonical block if not
    already set; distill one lesson into `.claude/memory/` with tags; index in `MEMORY.md`; write
    `17-conclusion.md` per Output below.
-</phase_procedure>
+<!-- </phase_procedure> -->
 
 ## Output
 - Write `17-conclusion.md` with `chain: closure` in the frontmatter:

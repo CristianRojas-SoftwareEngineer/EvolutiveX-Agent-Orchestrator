@@ -13,7 +13,7 @@ Operates on the CAUSE axis only (`chain: cause`).
 
 <user_communication>Spanish for user interaction. See ../artifact-structuring/SKILL.md §language_policy.</user_communication>
 
-<phase_procedure>
+<!-- <phase_procedure> -->
 ## Inputs
 - case.md (phase_policy.analysis); 04-hypothesis.md; 07-data-collection.md.
 
@@ -26,7 +26,7 @@ Operates on the CAUSE axis only (`chain: cause`).
 5. When **refuted**, emit `## Causa refutada: <brief>` with evidence; if `pending` candidates
    remain in `04-hypothesis.md`, Bucle A re-enters phase 04; otherwise orchestrator routes to
    phase 17 route **(c)** (`no_abierta`, **`C1`**).
-</phase_procedure>
+<!-- </phase_procedure> -->
 
 ## Output
 Write `08-analysis.md` with `chain: cause` in the frontmatter: Applied policy, Verdict on cause

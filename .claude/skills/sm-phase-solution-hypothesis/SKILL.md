@@ -15,7 +15,7 @@ Narrows the solution space to falsifiable hypotheses. Operates on the SOLUTION a
 
 <user_communication>Spanish for user interaction. See ../artifact-structuring/SKILL.md §language_policy.</user_communication>
 
-<phase_procedure>
+<!-- <phase_procedure> -->
 ## Inputs
 - case.md (phase_policy.solution-hypothesis).
 - `11-solution-research.md`.
@@ -34,7 +34,7 @@ Narrows the solution space to falsifiable hypotheses. Operates on the SOLUTION a
    (what the experiment will measure if the solution wins), **refutation criterion** (what
    measurement value falsifies it), priority (per the profile's `focus`).
 4. Cover the prioritization rationale: why this order, what trade-off each priority embodies.
-</phase_procedure>
+<!-- </phase_procedure> -->
 
 ## Output
 Write (first pass) or update (re-invocation) `12-solution-hypothesis.md` from

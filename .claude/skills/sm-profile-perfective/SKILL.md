@@ -29,7 +29,7 @@ functional behavior.
 
 ## Phase-policy matrix (16 entries)
 
-<policy_matrix>
+<!-- <policy_matrix> -->
 ```yaml
 phase_policy:
   # ── Causa (01–08) ────────────────────────────────────────────────────────
@@ -52,7 +52,7 @@ phase_policy:
   conclusion:                { focus: "mejora medible + comportamiento invariante",              reasoning_effort: medium, evidence: [veredicto, delta, igualdad_funcional],                   acceptance: "veredicto cuantitativo",                               risk_controls: [] }
   communication:             { focus: "delta de métricas con números; reproducibilidad",        reasoning_effort: medium, evidence: [resumen, deltas, benchmark, commit],                     acceptance: "commit con metadatos Case:; cita 16 ## Solución ganadora con números solo con ganadora", risk_controls: [] }
 ```
-</policy_matrix>
+<!-- </policy_matrix> -->
 
 ## Evidence prioritized
 Reproducible benchmarks, performance profiles, complexity metrics, coverage.

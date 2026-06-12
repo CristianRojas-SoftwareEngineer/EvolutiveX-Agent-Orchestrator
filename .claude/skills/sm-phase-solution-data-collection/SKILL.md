@@ -13,7 +13,7 @@ Normalizes per-hypothesis metrics into a single comparable table. Operates on th
 
 <user_communication>Spanish for user interaction. See ../artifact-structuring/SKILL.md §language_policy.</user_communication>
 
-<phase_procedure>
+<!-- <phase_procedure> -->
 ## Inputs
 - case.md (phase_policy.solution-data-collection).
 - `14-solution-execution.md` and the per-hypothesis raw outputs in
@@ -30,7 +30,7 @@ Normalizes per-hypothesis metrics into a single comparable table. Operates on th
 4. Cells with no measurement are marked explicitly (e.g. `n/a` with reason) — they are NOT
    treated as zero, which would distort the comparison.
 5. Never edit raw results; record them faithfully.
-</phase_procedure>
+<!-- </phase_procedure> -->
 
 ## Output
 Write `15-solution-data-collection.md` from templates/phase-artifact.md with `chain: solution`

@@ -14,7 +14,7 @@ Designs ONE comparative experiment, not one per hypothesis. Operates on the SOLU
 
 <user_communication>Spanish for user interaction. See ../artifact-structuring/SKILL.md §language_policy.</user_communication>
 
-<phase_procedure>
+<!-- <phase_procedure> -->
 ## Inputs
 - case.md (phase_policy.solution-experiment-design).
 - `12-solution-hypothesis.md`.
@@ -36,7 +36,7 @@ Designs ONE comparative experiment, not one per hypothesis. Operates on the SOLU
 4. State the **profile-driven emphasis** (e.g. corrective → mandatory no-regression test inside
    the comparative run; perfective → baseline N runs before any hypothesis; preventive →
    isolation of risk injection).
-</phase_procedure>
+<!-- </phase_procedure> -->
 
 ## Output
 Write `13-solution-experiment-design.md` from templates/phase-artifact.md with `chain: solution`

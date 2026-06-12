@@ -12,19 +12,19 @@ metadata:
   generatedBy: "1.3.1"
 ---
 
-<overview>
+<!-- <overview> -->
 Verify implementation matches OpenSpec change artifacts before archive.
-</overview>
+<!-- </overview> -->
 
-<user_communication>
+<!-- <user_communication> -->
 Ask, confirm, and respond to the user in **Spanish** (native Spanish-speaking audience). Keep this artifact's instructions in **English** for token efficiency. Canonical policy: `<language_policy>` in [artifact-structuring](../artifact-structuring/SKILL.md). User-facing rules: [AGENTS.md](../../AGENTS.md) §0.
-</user_communication>
+<!-- </user_communication> -->
 
-<repo_context>
+<!-- <repo_context> -->
 Workflow delivery in this repo: `.claude/skills/openspec-verify/` only. Invocation: see `<invocation_model>` in [openspec-specialist](../openspec-specialist/SKILL.md).
-</repo_context>
+<!-- </repo_context> -->
 
-<workflow>
+<!-- <workflow> -->
 Verify that an implementation matches the change artifacts (specs, tasks, design).
 
 **Input**: Optionally specify a change name. If omitted, check if it can be inferred from conversation context. If vague or ambiguous you MUST prompt for available changes.
@@ -159,9 +159,9 @@ Verify that an implementation matches the change artifacts (specs, tasks, design
    - If only warnings: "No critical issues. Y warning(s) to consider. Ready for archive (with noted improvements)."
    - If all clear: "All checks passed. Ready for archive."
 
-</workflow>
+<!-- </workflow> -->
 
-<guardrails>
+<!-- <guardrails> -->
 ## Verification heuristics
 
 - **Completeness**: Focus on objective checklist items (checkboxes, requirements list)
@@ -176,7 +176,7 @@ Verify that an implementation matches the change artifacts (specs, tasks, design
 - If tasks + specs exist: verify completeness and correctness, skip design
 - If full artifacts: verify all three dimensions
 - Always note which checks were skipped and why
-</guardrails>
+<!-- </guardrails> -->
 
 <output_format>
 ## Output format

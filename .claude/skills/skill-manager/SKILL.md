@@ -14,7 +14,7 @@ description: >
   casos de prueba, or auto-activación in Spanish.
 ---
 
-<overview>
+<!-- <<overview> -->
 ## Skill Manager — overview
 
 Skill to create and iteratively improve **project** skills in Claude Code (`.claude/skills/<name>/`).
@@ -33,9 +33,9 @@ High-level flow:
 6. Optimize `description` for reliable auto-activation
 
 Detect which stage the user is in and act per `<routing>`. If they prefer to iterate without formal evaluation, adapt.
-</overview>
+<!-- </overview> -->
 
-<routing>
+<!-- <<routing> -->
 ## Routing by intent
 
 **Rule:** do not read both references by default; only the one indicated in the table. Follow this table before loading `references/`.
@@ -49,9 +49,9 @@ Detect which stage the user is in and act per `<routing>`. If they prefer to ite
 | XML/Markdown format | — | [.claude/skills/artifact-structuring/SKILL.md](.claude/skills/artifact-structuring/SKILL.md); do not duplicate Boundary Rule here |
 | Language policy (EN artifacts / ES user) | — | `<language_policy>` in [.claude/skills/artifact-structuring/SKILL.md](../artifact-structuring/SKILL.md) |
 | Slash commands (`.claude/commands/`) | — | Delegate to [.claude/skills/command-manager/SKILL.md](../command-manager/SKILL.md) (`/command-manager`) |
-</routing>
+<!-- </routing> -->
 
-<user_communication>
+<!-- <<user_communication> -->
 Ask, confirm, and respond to the user in **Spanish** (native Spanish-speaking audience). Keep this artifact's instructions in **English** for token efficiency. Canonical policy: `<language_policy>` in [artifact-structuring](../artifact-structuring/SKILL.md). User-facing rules: [AGENTS.md](../../AGENTS.md) §0.
 
 Adapt vocabulary to the user's level:
@@ -60,9 +60,9 @@ Adapt vocabulary to the user's level:
 - "JSON" and "assertion" only without explanation if there are clear signals of technical familiarity
 
 Briefly explain unclear terms when it helps.
-</user_communication>
+<!-- </user_communication> -->
 
-<creation_process>
+<!-- <<creation_process> -->
 ## Create a skill
 
 ### Capture intent
@@ -164,9 +164,9 @@ Before delivery, confirm:
 ### Test cases (draft)
 
 After the draft, propose 2–3 realistic prompts. Optional template: `TEST-CASES.md`. Detail → [references/testing-workflows.md](references/testing-workflows.md).
-</creation_process>
+<!-- </creation_process> -->
 
-<testing_process>
+<!-- <<testing_process> -->
 ## Test and evaluate
 
 Summary; detail in [references/testing-workflows.md](references/testing-workflows.md) (read only if designing or running a full test battery).
@@ -178,9 +178,9 @@ Summary; detail in [references/testing-workflows.md](references/testing-workflow
 5. **Document** in `TEST-CASES.md` if applicable
 
 Objective output: scripts in `scripts/`. Isolation without history: `context: fork` + `agent: Explore` (see platform).
-</testing_process>
+<!-- </testing_process> -->
 
-<improvement_process>
+<!-- <<improvement_process> -->
 ## Improve the skill
 
 After tests and user feedback:
@@ -193,9 +193,9 @@ After tests and user feedback:
 Loop: apply changes → re-run cases → present → repeat until satisfied or stalled.
 
 Compare two versions of the same skill: see § Version comparison in [references/testing-workflows.md](references/testing-workflows.md).
-</improvement_process>
+<!-- </improvement_process> -->
 
-<description_optimization>
+<!-- <<description_optimization> -->
 ## Optimize the description
 
 Frontmatter `description` is the main auto-activation mechanism. Offer to optimize it after creating or improving a skill.
@@ -217,18 +217,18 @@ Troubleshooting truncated catalog, `/doctor`, `skillOverrides`: [references/clau
 Before: *How to build a quick dashboard for internal data.*
 
 After: *Build quick internal dashboards. Use when the user mentions dashboards, data visualization, visualización de datos, internal metrics, métricas internas, or showing data, even if they do not say "dashboard".*
-</description_optimization>
+<!-- </description_optimization> -->
 
-<updating_skills>
+<!-- <<updating_skills> -->
 ## Update existing skills
 
 - Read SKILL.md and support files before changing; summarize for the user; confirm if replacing
 - **Preserve** directory name and frontmatter `name`
 - **Incremental** changes; test each change
 - Do not break use cases that already work
-</updating_skills>
+<!-- </updating_skills> -->
 
-<references>
+<!-- <<references> -->
 ## References (level 3)
 
 | File | When to read |
@@ -238,9 +238,9 @@ After: *Build quick internal dashboards. Use when the user mentions dashboards, 
 | [references/skill-skeleton.md](references/skill-skeleton.md) | When writing a new skill |
 | [.claude/skills/artifact-structuring/SKILL.md](../artifact-structuring/SKILL.md) | XML + Markdown format; `<language_policy>` |
 | [code.claude.com/docs/en/skills](https://code.claude.com/docs/en/skills) | Official documentation |
-</references>
+<!-- </references> -->
 
-<delivery_format>
+<!-- <<delivery_format> -->
 ## Delivery format to the user
 
 After creating, improving, or updating a skill, respond in **Spanish** with:
@@ -250,9 +250,9 @@ After creating, improving, or updating a skill, respond in **Spanish** with:
 - **Summary**: one sentence of purpose
 - **Changes**: brief description (on updates)
 - **Open items**: pending decisions
-</delivery_format>
+<!-- </delivery_format> -->
 
-<verification>
+<!-- <<verification> -->
 ## Verification before responding
 
 Per active phase (see `<routing>`):
@@ -266,4 +266,4 @@ Per active phase (see `<routing>`):
 **Description:** keywords and contexts; explicit against undertriggering; tested with varied prompts.
 
 **Update:** name preserved; behavior understood; incremental tested changes.
-</verification>
+<!-- </verification> -->

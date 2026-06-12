@@ -12,15 +12,15 @@ description: >
 
 # Artifact Structuring for Claude Code
 
-<overview>
+<!-- <overview> -->
 How to combine XML tags with Markdown to structure Claude Code artifacts
 (skills, commands, rules, hooks, system prompts) that the model follows precisely
 at a reasonable token cost.
 
-This document applies its own pattern: XML at semantic boundaries (level 1), Markdown inside each block (level 2), nested XML only for constraints or templates (level 3).
-</overview>
+This document applies its own pattern: XML at semantic boundaries (level 1), Markdown inside each block (level 2), nested XML only for constraints or templates (level 3). In `.md` files, XML boundaries are written as HTML comments so Markdown renderers ignore them; raw XML is used only in non-Markdown contexts.
+<!-- </overview> -->
 
-<language_policy>
+<!-- <language_policy> -->
 ## Repository language policy
 
 LLM-facing artifacts under `.claude/` (skills, slash commands, references) are written in **English** to reduce token cost when they are loaded and cached repeatedly across a session.
@@ -50,9 +50,9 @@ Assume Spanish by default for all user-facing text.
 **Technical terms:** keep standard terms in English when translation adds ambiguity (e.g. `prompt`, `token`, `API`, `streaming`, `frontmatter`, `undertrigger`).
 
 Other artifacts should reference this block instead of copying it in full — use a short `<user_communication>` section with a link here.
-</language_policy>
+<!-- </language_policy> -->
 
-<why_hybrid>
+<!-- <why_hybrid> -->
 ## Why a hybrid format
 
 Markdown and XML solve different problems. Markdown creates **reading hierarchy** — headings, emphasis, and lists make text scannable. XML creates **semantic boundaries** — open/close tags tell the model where a block starts and ends. Neither format alone is optimal for instructional artifact authoring:
@@ -60,27 +60,34 @@ Markdown and XML solve different problems. Markdown creates **reading hierarchy*
 Markdown alone fails on long multi-section artifacts because boundaries are implicit. A `## Section A` ends only when the next `##` appears, which can cause instruction *bleeding* between adjacent sections. XML alone is verbose and hard for humans to read — it lacks the light hierarchy of headers, bold, and lists.
 
 The hybrid pattern uses each format where it is strongest: XML for hard boundaries between discrete blocks, Markdown for readable content inside those blocks. It is the same pattern Anthropic uses in production system prompts.
-</why_hybrid>
+<!-- </why_hybrid> -->
 
-<boundary_rule>
+<!-- <boundary_rule> -->
 ## Core principle — Boundary Rule
 
 > Use XML when the model must treat a block as an **atomic unit** it can activate, ignore, or reference separately. Use Markdown for everything that goes **inside** that unit.
 
 Ask: "Does this section need a hard boundary so the model never mixes its content with adjacent sections?" If yes, wrap it in XML. If not, a Markdown heading is enough.
-</boundary_rule>
 
-<hierarchy>
+**Syntax by context:**
+
+- **`.md` files** (SKILL.md, slash commands, CLAUDE.md): write XML boundaries as HTML comments — `<!-- <tag_name> -->` ... `<!-- </tag_name> -->`. Markdown renderers ignore HTML comments completely, so the file renders cleanly while the model still sees the semantic boundary.
+- **Non-Markdown contexts** (API system prompts delivered as plain strings, JSON/YAML payloads, hook configurations): use raw XML — `<tag_name>` ... `</tag_name>`.
+
+Code blocks inside `.md` files always render as literal text regardless of their content, so examples within fenced code blocks do not need the comment wrapping.
+<!-- </boundary_rule> -->
+
+<!-- <hierarchy> -->
 ## Three-level hierarchy
 
 ### Level 1 — XML wrapper (semantic boundary)
 
-Top-level sections the model can activate conditionally, skip entirely, or that a program can inject/replace dynamically.
+Top-level sections the model can activate conditionally, skip entirely, or that a program can inject/replace dynamically. In `.md` files, write as HTML comments:
 
-```xml
-<routing_rules>
+```markdown
+<!-- <routing_rules> -->
 ...content...
-</routing_rules>
+<!-- </routing_rules> -->
 ```
 
 When to use level 1:
@@ -94,8 +101,8 @@ When to use level 1:
 
 Inside an XML wrapper, use `##` and `###` to organize prose. Headings create visual hierarchy for humans and light structure for the model — but they do not create hard boundaries.
 
-```xml
-<routing_rules>
+```markdown
+<!-- <routing_rules> -->
 ## Slot assignment
 
 EXPLORE mode uses the light model for fast iteration...
@@ -104,39 +111,39 @@ EXPLORE mode uses the light model for fast iteration...
 
 When the prompt implies file discovery, route to EXPLORE.
 When it requires multi-step reasoning, route to REASON.
-</routing_rules>
+<!-- </routing_rules> -->
 ```
 
 ### Level 3 — Nested XML (sub-block with its own identity)
 
 Use a nested tag only when a sub-block inside a level-1 block must be **referenced independently** or has a different nature than surrounding content (e.g. a hard constraint inside explanatory prose).
 
-```xml
-<routing_rules>
+```markdown
+<!-- <routing_rules> -->
 ## Slot assignment
 
 EXPLORE uses the light model for fast iteration.
 
-<cost_limits>
+<!-- <cost_limits> -->
 Never exceed $0.02 per request in EXPLORE mode.
 Never exceed $0.10 per request in REASON mode.
-</cost_limits>
+<!-- </cost_limits> -->
 
 ## Fallback behavior
 
 If the router cannot determine a slot, default to REASON.
-</routing_rules>
+<!-- </routing_rules> -->
 ```
 
 Nested XML should be rare. If you nest three or more levels, you are probably overusing it — flatten the structure or split into sibling level-1 blocks.
-</hierarchy>
+<!-- </hierarchy> -->
 
-<practical_patterns>
+<!-- <practical_patterns> -->
 ## Practical patterns
 
-### Pattern 1 — Persona + Rules + Context
+### Pattern 1 — Persona + Rules + Context (system prompt, non-Markdown)
 
-Typical layout for `CLAUDE.md` or a system prompt. Each top-level concern in its own XML boundary; prose in Markdown inside.
+Typical layout for an API system prompt or plain-string config. Each top-level concern in its own XML boundary; prose in Markdown inside. Raw XML is appropriate here because this is not a `.md` file.
 
 ```xml
 <persona>
@@ -169,9 +176,9 @@ Test framework: Vitest.
 </project_context>
 ```
 
-### Pattern 2 — Conditional blocks for mode-aware prompts
+### Pattern 2 — Conditional blocks for mode-aware prompts (non-Markdown)
 
-When a hook or router injects different instructions by context (e.g. CCR), XML tags are injection points the code can replace.
+When a hook or router injects different instructions by context (e.g. CCR), XML tags are injection points the code can replace. Raw XML since this is delivered as a string, not a `.md` file.
 
 ```xml
 <base_instructions>
@@ -186,9 +193,9 @@ Prioritize reading and search over editing. Summarize findings before proposing 
 </mode_instructions>
 ```
 
-### Pattern 3 — Examples with clear boundaries
+### Pattern 3 — Examples with clear boundaries (non-Markdown)
 
-In few-shots, XML prevents the model from confusing example content with real instructions.
+In few-shots inside API prompts, XML prevents the model from confusing example content with real instructions.
 
 ```xml
 <examples>
@@ -205,9 +212,9 @@ Reason: Too vague, missing scope and type prefix.
 </examples>
 ```
 
-### Pattern 4 — SKILL.md body
+### Pattern 4 — SKILL.md body (`.md` file)
 
-Skills are read when activated. Optimize for quick comprehension. XML only where a hard boundary is needed — typically constraints, output templates, or data schemas. The rest is Markdown.
+Skills are read when activated. Optimize for quick comprehension. XML only where a hard boundary is needed — typically constraints, output templates, or data schemas. Use HTML-comment syntax since SKILL.md is a `.md` file; the rest is plain Markdown.
 
 ```markdown
 ---
@@ -227,26 +234,26 @@ Brief explanation of what it does and when it applies.
 
 ## Output format
 
-<output_template>
+<!-- <output_template> -->
 # {{title}}
 ## Summary
 {{summary}}
 ## Details
 {{details}}
-</output_template>
+<!-- </output_template> -->
 
-<constraints>
+<!-- <constraints> -->
 Output must not exceed 500 words.
 Never include PII in the summary section.
-</constraints>
+<!-- </constraints> -->
 
 ## Edge cases
 
 If the input file is empty, return an error message instead of empty output.
 ```
-</practical_patterns>
+<!-- </practical_patterns> -->
 
-<tag_naming>
+<!-- <tag_naming> -->
 ## Tag naming conventions
 
 There are no magic tags — Claude treats `<rules>` and `<my_rules>` the same. Consistency helps humans and programmatic parsers.
@@ -257,9 +264,9 @@ Recommended conventions:
 - Names that describe the **role** of the content, not its format (e.g. `<constraints>`, not `<bullet_list>`).
 - Short names — 1-3 words. Long tags cost tokens twice (open + close).
 - Project consistency. If `CLAUDE.md` uses `<rules>`, do not switch to `<instructions>` in a skill without reason.
-</tag_naming>
+<!-- </tag_naming> -->
 
-<anti_patterns>
+<!-- <anti_patterns> -->
 ## Anti-patterns to avoid
 
 **Over-wrapping**: Wrapping every paragraph in XML. Fragments reading and inflates tokens without benefit. XML is for section-level boundaries, not paragraph-level.
@@ -281,21 +288,23 @@ Use `const` by default. Prefer named exports.
 **Deeply nested XML**: Three or more levels (`<a><b><c>`). Restructure into sibling level-1 blocks or merge inner content into Markdown.
 
 **Inconsistent boundaries**: XML on some top-level sections and only `##` on others at the same structural level. Pick one mechanism per level and apply it uniformly.
-</anti_patterns>
 
-<token_cost>
+**Raw XML tags in `.md` files**: Writing `<tag>` directly in a `.md` file outside a code block breaks Markdown rendering. Use HTML comments (`<!-- <tag> -->`) instead.
+<!-- </anti_patterns> -->
+
+<!-- <token_cost> -->
 ## Token cost analysis
 
-Each XML tag pair costs roughly 2-4 tokens. A well-structured artifact with 15-20 XML sections adds ~60-80 tokens of overhead. In practice this is negligible because:
+Each XML tag pair costs roughly 2-4 tokens. The HTML comment wrapper (`<!-- -->`) adds ~4 tokens per boundary. A well-structured artifact with 15-20 XML sections adds ~120-160 tokens of overhead in `.md` files. In practice this is negligible because:
 
 - System prompts and skills are often **cached** on the API; overhead is paid once and amortized across the session.
 - Improved instruction compliance offsets the marginal cost.
 - Real waste comes from over-wrapping, not from well-placed section-level XML.
 
 In cost-sensitive slots (light router), minimal XML — 2-3 critical boundaries. In complex artifacts (e.g. main `CLAUDE.md`), liberal XML per distinct concern.
-</token_cost>
+<!-- </token_cost> -->
 
-<decision_checklist>
+<!-- <decision_checklist> -->
 ## Decision checklist
 
 When structuring a block, run through this sequence:
@@ -303,11 +312,12 @@ When structuring a block, run through this sequence:
 1. Must the block be treated as an atomic unit the model activates, skips, or that code injects/replaces? → **Level 1 XML tag**.
 2. Inside the block, is there a sub-block of a different nature or separately referenceable? → **Level 3 nested XML** (infrequent).
 3. Everything else inside the block? → **Level 2 Markdown headings, lists, and prose**.
+4. Is this artifact a `.md` file? → Wrap all XML boundaries in HTML comments (`<!-- <tag> -->`). Otherwise use raw XML.
 
 If the whole document is short (< ~500 tokens), linear, and without distinct concerns, plain Markdown without XML is fine. Do not add XML by ritual.
-</decision_checklist>
+<!-- </decision_checklist> -->
 
-<artifact_reference>
+<!-- <artifact_reference> -->
 ## Quick reference for Claude Code artifacts
 
 | Artifact | Typical structure | Language |
@@ -319,4 +329,8 @@ If the whole document is short (< ~500 tokens), linear, and without distinct con
 | **Rule file (.mdc)** | Level 1 XML in the body if there are several distinct sections. Markdown if a single concern. | Per project root policy |
 | **Hook payload** | XML on blocks the hook replaces dynamically. Markdown inside. | Usually English |
 | **System prompt (API)** | Full hybrid pattern. Level 1 XML on each top-level concern. Markdown inside. | Context-dependent |
-</artifact_reference>
+
+**XML syntax by context:**
+- `.md` files (SKILL.md, commands, CLAUDE.md): `<!-- <tag_name> -->` ... `<!-- </tag_name> -->` — HTML comments preserve semantic structure without breaking Markdown rendering.
+- Non-Markdown (API strings, JSON/YAML payloads, hook configs): raw `<tag_name>` ... `</tag_name>`.
+<!-- </artifact_reference> -->

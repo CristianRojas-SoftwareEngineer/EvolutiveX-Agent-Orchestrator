@@ -10,15 +10,15 @@ description: >
 
 # Anthropic API Protocol
 
-<overview>
+<!-- <<overview> -->
 Complete reference for the Anthropic API protocol (Messages API): request/response structure, SSE events, and conceptual cost calculation.
-</overview>
+<!-- </overview> -->
 
-<user_communication>
+<!-- <<user_communication> -->
 Ask, confirm, and respond to the user in **Spanish** (native Spanish-speaking audience). Keep this artifact's instructions in **English** for token efficiency. Canonical policy: `<language_policy>` in [artifact-structuring](../artifact-structuring/SKILL.md). User-facing rules: [AGENTS.md](../../AGENTS.md) §0. Keep standard technical terms in English when clarity benefits (e.g. streaming, SSE, tokens, cache hits).
-</user_communication>
+<!-- </user_communication> -->
 
-<request_schema>
+<!-- <<request_schema> -->
 ## Request Structure
 
 ### AnthropicRequest
@@ -86,9 +86,9 @@ interface AnthropicContentBlock {
   signature?: string;             // Signature of redacted reasoning
 }
 ```
-</request_schema>
+<!-- </request_schema> -->
 
-<response_schema>
+<!-- <<response_schema> -->
 ## Response Structure
 
 ### AnthropicResponse
@@ -190,9 +190,9 @@ Each field represents a separate billing category. Do not treat `input_tokens + 
 
 **Key insight:** Prompt caching provides value when there is **shared context** (documentation, codebase, system prompt) that persists across multiple requests. The delta (new user messages, new questions, new images) is typically small, making cache reads much cheaper than re-processing the entire prompt.
 
-</response_schema>
+<!-- </response_schema> -->
 
-<sse_events>
+<!-- <<sse_events> -->
 ## SSE Protocol (Server-Sent Events)
 
 When `stream: true`, the API sends SSE events. The event order is:
@@ -265,9 +265,9 @@ content_block_start → content_block_delta* → content_block_stop →
 [repeat for each block] →
 message_delta → message_stop
 ```
-</sse_events>
+<!-- </sse_events> -->
 
-<cost_calculation>
+<!-- <<cost_calculation> -->
 ## Cost Calculation
 
 **Note:** This section provides the conceptual cost equation and pricing categories.
@@ -314,17 +314,17 @@ Prices are expressed in USD per million tokens (MTok):
 - 5m cache write: 1.25×
 - 1h cache write: 2×
 - Cache read: 0.1×
-</cost_calculation>
+<!-- </cost_calculation> -->
 
-<gateway_usage_aggregation>
+<!-- <<gateway_usage_aggregation> -->
 When aggregating `usage` across multiple Messages API calls (e.g. tool loop):
 - Sum each billing field per hop for total billed consumption and cost estimation.
 - Do not treat summed `input_tokens` as unique context size; the last hop's `input_tokens` approximates prompt size for that request only.
 - Smart Code Proxy gateway: `WorkflowResult.usage` — see `docs/proposals/new-diseno-dominio-gateway-observabilidad.md` §7.7.1.
 - Per-hop billing categories: `docs/how-to-calculate-anthropic-api-costs.md` §4 and §4.1.
-</gateway_usage_aggregation>
+<!-- </gateway_usage_aggregation> -->
 
-<api_routes>
+<!-- <<api_routes> -->
 ## API Routes
 
 | Route                              | Generates usage? | Billable?              |
@@ -332,9 +332,9 @@ When aggregating `usage` across multiple Messages API calls (e.g. tool loop):
 | `POST /v1/messages` (streaming)   | Yes            | Yes                    |
 | `POST /v1/messages` (no-streaming)| Yes            | Yes                    |
 | `POST /v1/messages/count_tokens`  | Yes            | No (currently free)    |
-</api_routes>
+<!-- </api_routes> -->
 
-<stop_reasons>
+<!-- <<stop_reasons> -->
 ## Stop Reasons
 
 Common `stop_reason` values:
@@ -343,9 +343,9 @@ Common `stop_reason` values:
 - `stop_sequence`: A stop sequence was detected
 - `tool_use`: The model requested to use a tool
 - `null`: Error or interruption
-</stop_reasons>
+<!-- </stop_reasons> -->
 
-<extended_thinking>
+<!-- <<extended_thinking> -->
 ## Extended Thinking
 
 When the model uses extended reasoning:
@@ -353,9 +353,9 @@ When the model uses extended reasoning:
 - `redacted_thinking` blocks contain redacted reasoning with signature
 - These blocks appear before normal text content
 - `usage.output_tokens` may include reasoning tokens depending on the model
-</extended_thinking>
+<!-- </extended_thinking> -->
 
-<tool_use>
+<!-- <<tool_use> -->
 ## Tool Use
 
 For tool invocations:
@@ -363,9 +363,9 @@ For tool invocations:
 - `tool_result` block returns the result (tool_use_id, content, is_error)
 - `stop_reason: 'tool_use'` indicates the model expects a tool_result
 - `input_json_delta` in SSE builds the input progressively
-</tool_use>
+<!-- </tool_use> -->
 
-<references>
+<!-- <<references> -->
 ## Additional References
 
 For specific implementation in the Smart Code Proxy project:
@@ -377,4 +377,4 @@ For official Anthropic documentation:
 - Streaming: https://docs.anthropic.com/en/api/messages-streaming
 - Prompt Caching: https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching
 - Pricing: https://platform.claude.com/docs/en/about-claude/pricing
-</references>
+<!-- </references> -->

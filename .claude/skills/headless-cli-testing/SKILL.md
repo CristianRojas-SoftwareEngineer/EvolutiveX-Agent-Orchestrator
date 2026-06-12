@@ -17,7 +17,7 @@ description: Run Claude Code non-interactively (claude -p / --print) against an 
 
 ---
 
-<overview>
+<!-- <<overview> -->
 The **headless execution mechanism** runs Smart Code Proxy + Claude Code (`claude -p`) in
 a fully isolated environment: a dedicated test proxy port, in-memory provider configuration,
 and separate log/audit paths. No global state is mutated — `~/.claude/settings.json` and
@@ -31,11 +31,11 @@ Use cases:
 - **TTS testing**: validate the TTS cycle across providers (see [references/tts-testing.md](./references/tts-testing.md))
 
 This skill's instructions are in **English** (token efficiency). User explanations are in **Spanish** — see `<constraints>` below.
-</overview>
+<!-- </overview> -->
 
 ---
 
-<isolation_guard>
+<!-- <<isolation_guard> -->
 ## Isolation model (REQUIRED when running from a live Claude Code session)
 
 If the session invoking the test is itself routed through the main proxy (port 8787),
@@ -59,7 +59,7 @@ global config.
 
 The guard in `runHeadlessSession` (and in the TTS test harness) aborts with an error
 if the test port equals the main proxy port.
-</isolation_guard>
+<!-- </isolation_guard> -->
 
 ---
 
@@ -232,7 +232,7 @@ See [references/tts-testing.md](./references/tts-testing.md) for:
 - The `no-openrouter-key` fallback scenario
 - `npm run test:headless-tts` suite reference
 
-<constraints>
+<!-- <<constraints> -->
 All user-facing output, explanations, questions, and summaries MUST be in Spanish.
 Technical identifiers, flag names, and code snippets remain in their original form.
-</constraints>
+<!-- </constraints> -->

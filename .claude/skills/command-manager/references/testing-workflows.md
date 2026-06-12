@@ -4,15 +4,15 @@ description: Testing workflows for project slash commands. Load when command-man
 
 # Command testing and evaluation
 
-<overview>
+<!-- <<overview> -->
 Workflows to validate project slash commands in Claude Code before closing an iteration.
-</overview>
+<!-- </overview> -->
 
-<user_communication>
+<!-- <<user_communication> -->
 Ask, confirm, and respond to the user in **Spanish** (native Spanish-speaking audience). Keep this artifact's instructions in **English** for token efficiency. Canonical policy: `<language_policy>` in [.claude/skills/artifact-structuring/SKILL.md](../../artifact-structuring/SKILL.md). User-facing rules: [AGENTS.md](../../../../AGENTS.md) §0.
-</user_communication>
+<!-- </user_communication> -->
 
-<methods_matrix>
+<!-- <<methods_matrix> -->
 ## Methods matrix
 
 | Method | How | When to use |
@@ -22,9 +22,9 @@ Ask, confirm, and respond to the user in **Spanish** (native Spanish-speaking au
 | **Objective verification** | Check files, exit codes, or diffs the command promises | Deterministic outputs (codegen, validation, extraction) |
 
 Commands do **not** support skill-catalog auto-trigger tests. If that is required, migrate to a skill and use [skill-manager/references/testing-workflows.md](../../skill-manager/references/testing-workflows.md).
-</methods_matrix>
+<!-- </methods_matrix> -->
 
-<qualitative_flow>
+<!-- <<qualitative_flow> -->
 ## Recommended flow (qualitative)
 
 1. Draft 2–3 realistic prompts (as a user would say them, or as `/name` invocations with args).
@@ -36,18 +36,18 @@ Commands do **not** support skill-catalog auto-trigger tests. If that is require
 7. Repeat until satisfied or stalled.
 
 If the user prefers to iterate without formal evaluation, adapt; do not force the full matrix.
-</qualitative_flow>
+<!-- </qualitative_flow> -->
 
-<traceability>
+<!-- <<traceability> -->
 ## Optional traceability
 
 Commands do not have a standard `TEST-CASES.md` location. If the team wants documented cases:
 
 - Keep a short checklist in the command body under a `## Test notes` section, or
 - After migrating to a skill, use `.claude/skills/<name>/TEST-CASES.md` per skill-manager.
-</traceability>
+<!-- </traceability> -->
 
-<version_comparison>
+<!-- <<version_comparison> -->
 ## Version comparison (optional)
 
 If the user asks whether the new version is better:
@@ -56,9 +56,9 @@ If the user asks whether the new version is better:
 2. Same prompts with new version.
 3. Present outputs side by side.
 4. Incorporate findings in the next command revision.
-</version_comparison>
+<!-- </version_comparison> -->
 
-<meta_testing>
+<!-- <<meta_testing> -->
 ## Testing command-manager (meta)
 
 | Test prompt | Expected behavior |
@@ -69,9 +69,9 @@ If the user asks whether the new version is better:
 | "Optimize argument-hint for my command" | `<menu_metadata_optimization>` |
 
 Direct invocation: `/command-manager`.
-</meta_testing>
+<!-- </meta_testing> -->
 
-<verification>
+<!-- <<verification> -->
 ## Checklist before closing an iteration
 
 - [ ] Cases run with command active (`/name`)
@@ -79,4 +79,4 @@ Direct invocation: `/command-manager`.
 - [ ] Results presented to the user
 - [ ] Feedback incorporated or open items documented
 - [ ] User offered skill migration if command exceeded ~100 lines or needs bundled files
-</verification>
+<!-- </verification> -->

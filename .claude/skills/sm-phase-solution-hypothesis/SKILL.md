@@ -13,7 +13,9 @@ description: >
 
 Narrows the solution space to falsifiable hypotheses. Operates on the SOLUTION axis.
 
-<user_communication>Spanish for user interaction. See ../artifact-structuring/SKILL.md §language_policy.</user_communication>
+<!-- <user_communication> -->
+Spanish for user interaction. See ../artifact-structuring/SKILL.md §language_policy.
+<!-- </user_communication> -->
 
 <!-- <phase_procedure> -->
 ## Inputs
@@ -49,4 +51,6 @@ At least one hypothesis falsifiable; each hypothesis with observable prediction 
 refutation criterion; prioritization justified by the profile's focus. On re-invocation:
 existing content preserved; only new hypothesis appended.
 
-<constraints>Formulate hypotheses; do not design or run experiments.</constraints>
+<!-- <constraints> -->
+Formulate hypotheses; do not design or run experiments.
+<!-- </constraints> -->

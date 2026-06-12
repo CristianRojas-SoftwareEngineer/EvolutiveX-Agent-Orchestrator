@@ -10,7 +10,9 @@ description: >
 
 Generic, profile-parameterized. Reads policy; never decides order; never consolidates.
 
-<user_communication>Spanish for user interaction. See ../artifact-structuring/SKILL.md §language_policy.</user_communication>
+<!-- <user_communication> -->
+Spanish for user interaction. See ../artifact-structuring/SKILL.md §language_policy.
+<!-- </user_communication> -->
 
 <!-- <phase_procedure> -->
 ## Inputs
@@ -32,4 +34,6 @@ Write `maintenance-cases/<case-id>/01-observation.md` from templates/phase-artif
 ## Acceptance
 Meets `acceptance`: facts verifiable and dated; no assumed cause; scope bounded.
 
-<constraints>No interpretation or proposed fixes. No phase ordering decisions.</constraints>
+<!-- <constraints> -->
+No interpretation or proposed fixes. No phase ordering decisions.
+<!-- </constraints> -->

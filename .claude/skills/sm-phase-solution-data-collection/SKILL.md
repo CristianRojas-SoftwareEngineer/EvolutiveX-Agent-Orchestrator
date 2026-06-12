@@ -11,7 +11,9 @@ description: >
 
 Normalizes per-hypothesis metrics into a single comparable table. Operates on the SOLUTION axis.
 
-<user_communication>Spanish for user interaction. See ../artifact-structuring/SKILL.md §language_policy.</user_communication>
+<!-- <user_communication> -->
+Spanish for user interaction. See ../artifact-structuring/SKILL.md §language_policy.
+<!-- </user_communication> -->
 
 <!-- <phase_procedure> -->
 ## Inputs
@@ -44,4 +46,6 @@ Every hypothesis has a row; metrics are of the same type per column; units and c
 recorded; cells with no measurement are explicit; raw outputs unedited. The table is the input
 phase 16 consumes.
 
-<constraints>Normalize; do not draw conclusions.</constraints>
+<!-- <constraints> -->
+Normalize; do not draw conclusions.
+<!-- </constraints> -->

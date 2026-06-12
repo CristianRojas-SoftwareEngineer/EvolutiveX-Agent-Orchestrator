@@ -1,4 +1,4 @@
-<scientific_maintenance>
+<!-- <scientific_maintenance> -->
 # Scientific Maintenance Subsystem (two-chain) — persistent instructions
 
 This repository runs software maintenance as two sequential reproducible scientific experiments
@@ -63,10 +63,10 @@ data from both chains. Treat every maintenance request as a *case* driven by `sm
 
 ## Memory index (explicit reference — MEMORY.md is not auto-loaded by the runtime)
 See: .claude/memory/MEMORY.md
-</scientific_maintenance>
+<!-- </scientific_maintenance> -->
 
-<user_communication>
+<!-- <user_communication> -->
 All user-facing output is in Spanish. Skill bodies and artifact header fields are in English for
 token efficiency; explanations, questions, and summaries to the user are Spanish. See
 .claude/skills/artifact-structuring/SKILL.md §language_policy.
-</user_communication>
+<!-- </user_communication> -->

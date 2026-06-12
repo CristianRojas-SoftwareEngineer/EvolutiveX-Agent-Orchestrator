@@ -16,7 +16,9 @@ description: >
 Compares normalized trade-offs; emits outputs for phase 17 (§7.14). Does **not** set `case.status` —
 closure routes **(a)/(b)/(c)** are decided in phase 17 (§5.3).
 
-<user_communication>Spanish for user interaction. See ../artifact-structuring/SKILL.md §language_policy.</user_communication>
+<!-- <user_communication> -->
+Spanish for user interaction. See ../artifact-structuring/SKILL.md §language_policy.
+<!-- </user_communication> -->
 
 <!-- <phase_procedure> -->
 ## Inputs
@@ -61,4 +63,6 @@ If winner: `## Solución ganadora` cites at least one quantitative metric. Alway
 descartadas` with each discard reason; if no winner, batch note present. No winner with zero
 evidence. Winner feeds route **(a)**/**(b)** via phase 17; no winner → phase 17 route **(c)** or Bucle B.
 
-<constraints>Analyze; the case decision belongs to phase 17.</constraints>
+<!-- <constraints> -->
+Analyze; the case decision belongs to phase 17.
+<!-- </constraints> -->

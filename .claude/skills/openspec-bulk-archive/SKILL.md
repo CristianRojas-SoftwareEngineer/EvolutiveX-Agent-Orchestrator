@@ -248,9 +248,9 @@ Failed K changes:
 No active changes found. Create a new change to get started.
 ```
 
-</workflow>
+<!-- </workflow> -->
 
-<guardrails>
+<!-- <guardrails> -->
 ## Guardrails
 
 - Allow any number of changes (1+ is fine, 2+ is the typical use case)

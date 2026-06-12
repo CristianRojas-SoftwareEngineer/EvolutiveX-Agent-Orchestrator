@@ -484,11 +484,11 @@ Catalog and policy: `<skill_catalog>` and `<maintenance>` in this file.
 <!-- <maintenance> -->
 ## Maintenance policy (this repo)
 
-<critical>
+<!-- <critical> -->
 **Never run `openspec update`, `openspec init --force`, or similar CLI commands that regenerate `.claude/` integration files unless the user explicitly requests it in the current task.**
 
 Those commands overwrite hand-maintained skills and break customized workflows.
-</critical>
+<!-- </critical> -->
 
 **Normal workflow:**
 

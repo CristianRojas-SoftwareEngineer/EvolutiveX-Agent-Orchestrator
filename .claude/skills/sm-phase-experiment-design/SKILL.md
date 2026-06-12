@@ -10,7 +10,9 @@ description: >
 
 Operates on the CAUSE axis only (`chain: cause`).
 
-<user_communication>Spanish for user interaction. See ../artifact-structuring/SKILL.md §language_policy.</user_communication>
+<!-- <user_communication> -->
+Spanish for user interaction. See ../artifact-structuring/SKILL.md §language_policy.
+<!-- </user_communication> -->
 
 <!-- <phase_procedure> -->
 ## Inputs
@@ -29,4 +31,6 @@ Procedure, Variables, Controls, Success/Failure, Rollback.
 ## Acceptance
 Reproducible; controls defined; rollback explicit; cost bounded.
 
-<constraints>Design only; do not execute.</constraints>
+<!-- <constraints> -->
+Design only; do not execute.
+<!-- </constraints> -->

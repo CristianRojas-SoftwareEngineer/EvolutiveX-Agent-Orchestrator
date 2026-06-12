@@ -500,7 +500,7 @@ Pide una propuesta OpenSpec (`openspec-propose`), describe lo que quieres constr
 ```
 <!-- </workflow> -->
 
-<graceful_exit>
+<!-- <graceful_exit> -->
 ## Graceful exit handling
 
 ### User wants to stop mid-way
@@ -543,7 +543,7 @@ Pide `openspec-propose` o describe tu primera feature para empezar.
 ```
 
 Exit gracefully.
-</graceful_exit>
+<!-- </graceful_exit> -->
 
 <!-- <guardrails> -->
 ## Guardrails

@@ -8,7 +8,9 @@ description: >
 
 # Phase 02 — Problem Definition
 
-<user_communication>Spanish for user interaction. See ../artifact-structuring/SKILL.md §language_policy.</user_communication>
+<!-- <user_communication> -->
+Spanish for user interaction. See ../artifact-structuring/SKILL.md §language_policy.
+<!-- </user_communication> -->
 
 <!-- <phase_procedure> -->
 ## Inputs
@@ -27,4 +29,6 @@ Problem statement, Solved criterion, Limits, Severity.
 ## Acceptance
 Falsifiable and measurable statement; explicit success criterion; single problem.
 
-<constraints>Do not formulate hypotheses or solutions here.</constraints>
+<!-- <constraints> -->
+Do not formulate hypotheses or solutions here.
+<!-- </constraints> -->

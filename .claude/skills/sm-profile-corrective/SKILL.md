@@ -12,7 +12,9 @@ description: >
 Policy layer. Writes parameters + 16-entry phase-policy matrix into `case.md`. Never
 executes phases or writes phase artifacts.
 
-<user_communication>Spanish for any user interaction. See ../artifact-structuring/SKILL.md §language_policy.</user_communication>
+<!-- <user_communication> -->
+Spanish for any user interaction. See ../artifact-structuring/SKILL.md §language_policy.
+<!-- </user_communication> -->
 
 ## Objective
 Restore correct behavior by removing a defect with a minimal, verified change.
@@ -25,7 +27,8 @@ Restore correct behavior by removing a defect with a minimal, verified change.
 
 ## Phase-policy matrix (16 entries) — schema: ../sm-orchestrator/references/phase-policy-schema.md
 
-<!-- <policy_matrix> -->
+<!-- <!-- <policy_matrix> -->
+ -->
 ```yaml
 phase_policy:
   # ── Causa (01–08) ────────────────────────────────────────────────────────
@@ -48,7 +51,8 @@ phase_policy:
   conclusion:                { focus: "veredicto: causa confirmada + solución ganadora + diff mínimo", reasoning_effort: medium, evidence: [veredicto, decision, deuda, seguimiento],      acceptance: "veredicto coherente con análisis",                   risk_controls: [] }
   communication:             { focus: "causa raíz + prueba de no-regresión; diff mínimo",         reasoning_effort: medium, evidence: [resumen, cambios, evidencia, commit],                 acceptance: "commit con metadatos Case:; cita 16 ## Solución ganadora solo en rutas con ganadora", risk_controls: [] }
 ```
-<!-- </policy_matrix> -->
+<!-- 
+<!-- </policy_matrix> --> -->
 
 ## Evidence prioritized
 Reproduction test (red→green), stack traces, minimal diff.

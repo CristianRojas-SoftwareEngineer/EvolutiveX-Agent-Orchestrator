@@ -25,9 +25,9 @@ Conducts a maintenance case through TWO sequential scientific methods. Owns the 
 delegates POLICY to a profile skill and PROCEDURE to phase skills. Never implements profile
 policy or phase procedure.
 
-<user_communication>Talk to the user in Spanish (questions, confirmations, summaries). Keep
-artifacts' machine fields in English. Canonical policy: ../artifact-structuring/SKILL.md
-§language_policy.</user_communication>
+<!-- <user_communication> -->
+Talk to the user in Spanish (questions, confirmations, summaries). Keep artifacts' machine fields in English. Canonical policy: ../artifact-structuring/SKILL.md §language_policy.
+<!-- </user_communication> -->
 
 ## Workflow
 

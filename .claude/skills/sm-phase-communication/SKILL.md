@@ -11,9 +11,11 @@ description: >
 
 # Phase 18 — Communication
 
-<user_communication>Spanish for user interaction AND for the produced PR/commit drafts (repo
+<!-- <user_communication> -->
+Spanish for user interaction AND for the produced PR/commit drafts (repo
 policy). See ../artifact-structuring/SKILL.md §language_policy and the conventional-commits
-skill.</user_communication>
+skill.
+<!-- </user_communication> -->
 
 <!-- <phase_procedure> -->
 ## Inputs
@@ -56,6 +58,8 @@ commit draft carries the `Case:` commit metadata (*trailer*); on the close path,
 body cites 16-solution-analysis.md ## Solución ganadora; on the pause path, the commit body
 documents case_paused_at and the Bucle C offer.
 
-<constraints>Communicate; do not introduce new changes or conclusions. Run the changelog
+<!-- <constraints> -->
+Communicate; do not introduce new changes or conclusions. Run the changelog
 generator with the pending entry (`--pending "<subject>" --case <id>`) and include
-CHANGELOG.md in the commit. Never hand-write changelog entries.</constraints>
+CHANGELOG.md in the commit. Never hand-write changelog entries.
+<!-- </constraints> -->

@@ -10,7 +10,9 @@ description: >
 
 Operates on the CAUSE axis only (`chain: cause`).
 
-<user_communication>Spanish for user interaction. See ../artifact-structuring/SKILL.md §language_policy.</user_communication>
+<!-- <user_communication> -->
+Spanish for user interaction. See ../artifact-structuring/SKILL.md §language_policy.
+<!-- </user_communication> -->
 
 <!-- <phase_procedure> -->
 ## Inputs
@@ -29,4 +31,6 @@ Normalized data, Metrics, Before/after.
 ## Acceptance
 Data traceable to execution; units and conditions recorded; raw results unedited.
 
-<constraints>Collect and normalize; do not draw conclusions.</constraints>
+<!-- <constraints> -->
+Collect and normalize; do not draw conclusions.
+<!-- </constraints> -->

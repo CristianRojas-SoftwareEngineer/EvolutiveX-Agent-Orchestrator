@@ -11,7 +11,9 @@ description: >
 
 Operates on the CAUSE axis only (`chain: cause`).
 
-<user_communication>Spanish for user interaction. See ../artifact-structuring/SKILL.md §language_policy.</user_communication>
+<!-- <user_communication> -->
+Spanish for user interaction. See ../artifact-structuring/SKILL.md §language_policy.
+<!-- </user_communication> -->
 
 <!-- <phase_procedure> -->
 ## Inputs
@@ -35,4 +37,6 @@ Write `03-research.md` with `chain: cause` in the frontmatter: Applied policy, R
 Sources cited and locatable; recall executed by the relevant tags; coverage of the affected
 area sufficient.
 
-<constraints>Gather knowledge and recall lessons; do not propose hypotheses yet.</constraints>
+<!-- <constraints> -->
+Gather knowledge and recall lessons; do not propose hypotheses yet.
+<!-- </constraints> -->

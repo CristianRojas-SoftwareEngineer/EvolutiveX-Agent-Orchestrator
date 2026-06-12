@@ -13,7 +13,9 @@ description: >
 Maps the solution space. Operates on the SOLUTION axis (the cause axis is closed by phase 08).
 Generic, profile-parameterized.
 
-<user_communication>Spanish for user interaction. See ../artifact-structuring/SKILL.md §language_policy.</user_communication>
+<!-- <user_communication> -->
+Spanish for user interaction. See ../artifact-structuring/SKILL.md §language_policy.
+<!-- </user_communication> -->
 
 <!-- <phase_procedure> -->
 ## Inputs
@@ -50,4 +52,6 @@ At least two viable candidates enumerated; each with description, predicted trad
 references; recall executed by the relevant tags; coverage statement explains the boundaries
 of the space.
 
-<constraints>No hypothesis formulation here. Map the space; do not yet propose what to test.</constraints>
+<!-- <constraints> -->
+No hypothesis formulation here. Map the space; do not yet propose what to test.
+<!-- </constraints> -->

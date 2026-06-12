@@ -12,7 +12,9 @@ description: >
 
 Designs ONE comparative experiment, not one per hypothesis. Operates on the SOLUTION axis.
 
-<user_communication>Spanish for user interaction. See ../artifact-structuring/SKILL.md §language_policy.</user_communication>
+<!-- <user_communication> -->
+Spanish for user interaction. See ../artifact-structuring/SKILL.md §language_policy.
+<!-- </user_communication> -->
 
 <!-- <phase_procedure> -->
 ## Inputs
@@ -49,4 +51,6 @@ in the frontmatter:
 A single procedure covers all hypotheses; shared metrics; identical initial conditions;
 rollback between runs enumerated; per-hypothesis criterion traceable to phase 12.
 
-<constraints>Design the comparative procedure; do not execute.</constraints>
+<!-- <constraints> -->
+Design the comparative procedure; do not execute.
+<!-- </constraints> -->

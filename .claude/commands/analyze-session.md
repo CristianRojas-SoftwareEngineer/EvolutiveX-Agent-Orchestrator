@@ -5,15 +5,15 @@ argument-hint: "[session-id]"
 
 # Analyze Smart Code Proxy session
 
-<overview>
+<!-- <overview> -->
 Comparative analysis between the native Claude Code harness log and Smart Code Proxy audit, to identify gaps and guide the next proxy iteration.
-</overview>
+<!-- </overview> -->
 
-<user_communication>
+<!-- <user_communication> -->
 Ask, confirm, and respond to the user in **Spanish** (native Spanish-speaking audience). Keep this artifact's instructions in **English** for token efficiency. Canonical policy: `<language_policy>` in [.claude/skills/artifact-structuring/SKILL.md](../skills/artifact-structuring/SKILL.md). User-facing rules: [AGENTS.md](../../AGENTS.md) §0.
-</user_communication>
+<!-- </user_communication> -->
 
-<parameters>
+<!-- <parameters> -->
 ## Expected parameters
 
 You can invoke this command with or without arguments in `$ARGUMENTS`. With arguments, Claude interprets the session-id and starts analysis directly. Without arguments, Claude requests the session-id before continuing.
@@ -23,15 +23,15 @@ The required parameter is:
 - **`session-id`**: UUID of the session to analyze (e.g. `9810c57a-2168-40b8-ba51-5695ffafec5a`)
 
 If session-id is missing, stop and request it **in Spanish** before continuing. Do not start analysis without this parameter.
-</parameters>
+<!-- </parameters> -->
 
-<objective>
+<!-- <objective> -->
 ## Operational objective
 
 Perform a systematic comparative analysis between the session logged natively by the Claude Code harness and the version audited by Smart Code Proxy, to understand architectural design decisions, identify discrepancies, omissions, or unexpected behavior, and generate actionable insights for the next proxy development iteration.
-</objective>
+<!-- </objective> -->
 
-<context>
+<!-- <context> -->
 ## Development context
 
 Smart Code Proxy is an intermediary in active development built through trial and error. Development consists of observing Claude Code harness behavior and building the proxy based on the format of responses intercepted between the harness and the Anthropic API. In each iteration, the proxy's observability/audit system is tested against the harness native log, identifying discrepancies to resolve in test, fix, and adjust cycles.
@@ -41,9 +41,9 @@ Smart Code Proxy is an intermediary in active development built through trial an
 Smart Code Proxy seeks **intelligent observability for human analysis**, not technical granularity for its own sake. The goal is to present logical flows the user orchestrates (sequential and/or parallel with subagents) naturally and traceably, following the "Screaming Architecture" concept.
 
 **Not everything that can be logged should be logged.** Internal built-in tool executions (WebFetch/WebSearch) by subagents are relevant and must be logged as sub-interactions.
-</context>
+<!-- </context> -->
 
-<motivation>
+<!-- <motivation> -->
 ## Motivation
 
 Smart Code Proxy is not yet fully aligned with complete Claude Code harness behavior. In each new test session, it is necessary to analyze the harness native log, the proxy audit on disk, and the proxy runtime diagnostics (`server/logs.jsonl`, `sessions/{session-id}/events.ndjson`) to understand:
@@ -51,15 +51,15 @@ Smart Code Proxy is not yet fully aligned with complete Claude Code harness beha
 - Gaps between real/native workflow and what the proxy captured
 - Proxy areas requiring adjustment to faithfully reflect harness behavior
 - Internal proxy warnings, correlation failures, and event-bus timeline gaps not visible in the causal tree alone
-</motivation>
+<!-- </motivation> -->
 
-<purpose>
+<!-- <purpose> -->
 ## Purpose
 
 Understand architectural design decisions of each system, identify discrepancies, omissions, or unexpected proxy behavior, and generate actionable insights for the next proxy development iteration.
-</purpose>
+<!-- </purpose> -->
 
-<gap_classification>
+<!-- <gap_classification> -->
 ### Design differences vs inconsistencies
 
 During analysis, classify every gap into one of two categories:
@@ -74,9 +74,9 @@ During analysis, classify every gap into one of two categories:
 - tool_use IDs that do not correlate between harness and proxy
 - Orphan workflows (no `output/result.json` and no `status: cancelled/complete` in `meta.json`)
 - Level 2+ subagents without a corresponding `tools/KK-Agent/sub-agent/workflow/` directory
-</gap_classification>
+<!-- </gap_classification> -->
 
-<process>
+<!-- <process> -->
 ## Step-by-step process
 
 ### Step 1: Load reference documentation
@@ -266,9 +266,9 @@ Based on the analysis above, produce a structured explanation covering:
    - What proxy adjustments are needed to faithfully capture harness behavior?
    - What harness behaviors were undocumented and should be incorporated into the skill?
    - What emerging patterns suggest proxy refactoring?
-</process>
+<!-- </process> -->
 
-<data_sources>
+<!-- <data_sources> -->
 ## Data sources
 
 ### 1. Claude Code session store (harness)
@@ -303,9 +303,9 @@ Relevant usage:
 - Filter by `{session-id}` or by session time window before reading
 - Inventory `level: warn` / `level: error` and messages prefixed `[audit]`
 - Correlate warnings with orphan workflows and `workflowId` distribution in `sessions/{session-id}/events.ndjson`
-</data_sources>
+<!-- </data_sources> -->
 
-<constraints>
+<!-- <constraints> -->
 ## Design rules
 
 1. **Deterministic inventory**: Step 2 with `tree /F` is mandatory. Do not proceed without running it.
@@ -314,9 +314,9 @@ Relevant usage:
 4. **Comparative evidence**: Each gap must be backed by evidence from harness and proxy; proxy-side gaps SHOULD also cite `server/logs.jsonl` and/or `sessions/{session-id}/events.ndjson` when relevant.
 5. **Runtime diagnostics**: Step 3 MUST consult `server/logs.jsonl` and `sessions/{session-id}/events.ndjson` before structural comparison.
 6. **Docs load**: Read `docs/session-audit-model.md` and the relevant README sections (Step 1) before interpreting `meta.json` fields or layout.
-</constraints>
+<!-- </constraints> -->
 
-<delivery_format>
+<!-- <delivery_format> -->
 ## Delivery format
 
 Deliver the analysis in a well-structured markdown block in Spanish per AGENTS.md (§0):
@@ -325,9 +325,9 @@ Deliver the analysis in a well-structured markdown block in Spanish per AGENTS.m
 - **H2**: Main sections (Summary, Architecture, Behavior, Findings, Reflection)
 - **H3**: Subsections as needed
 - **Code**: Use code blocks for relevant file paths or significant metadata fragments
-</delivery_format>
+<!-- </delivery_format> -->
 
-<verification>
+<!-- <verification> -->
 ## Final verification
 
 Before responding, mentally confirm:
@@ -343,4 +343,4 @@ Before responding, mentally confirm:
 9. Was Step 2 with `tree /F` executed before proceeding with analysis?
 
 Only deliver the analysis when these verifications have passed.
-</verification>
+<!-- </verification> -->

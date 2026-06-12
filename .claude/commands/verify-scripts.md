@@ -4,15 +4,15 @@ description: Runs all scripts defined in package.json in a safe order based on t
 
 # Full verification of package.json scripts
 
-<overview>
+<!-- <overview> -->
 Run `scripting/verify-package-scripts.ts` (the canonical verifier) and translate its JSON report into a Spanish markdown table. The command is a thin orchestration layer: it enforces preconditions, invokes the script, parses the report, and formats the output. It does **not** enumerate, order, or invoke npm scripts itself — that responsibility lives entirely in `scripting/verify-config.ts`, the single source of truth.
-</overview>
+<!-- </overview> -->
 
-<user_communication>
+<!-- <user_communication> -->
 Ask, confirm, and respond to the user in **Spanish** (native Spanish-speaking audience). Keep this artifact's instructions in **English** for token efficiency. Canonical policy: `<language_policy>` in [.claude/skills/artifact-structuring/SKILL.md](../skills/artifact-structuring/SKILL.md). User-facing rules: [AGENTS.md](../../AGENTS.md) §0.
-</user_communication>
+<!-- </user_communication> -->
 
-<prerequisites>
+<!-- <prerequisites> -->
 ## Prerequisites
 
 Before invoking the script, verify the following locally (the command is responsible for these; the script assumes them):
@@ -25,20 +25,20 @@ Before invoking the script, verify the following locally (the command is respons
    - If occupied, halt with a Spanish warning pointing to the process ID.
 
 The script itself handles the `node_modules/` existence check and runs `npm install` if missing; the command must NOT run `npm install` ahead of the script.
-</prerequisites>
+<!-- </prerequisites> -->
 
-<constraints>
+<!-- <constraints> -->
 ## Mandatory requirement
 
-<critical>
+<!-- <critical> -->
 
 **This procedure must invoke the canonical verifier and produce the report from its JSON output. No step enumeration, no inline `npm run` invocations, no parallel execution paths.**
 
 The source of truth is `scripting/verify-config.ts`. If the user requests adding, removing, or reordering a verify step, the correct response is to edit that file — not to add inline steps in this command. The previous 38-step enumeration that lived here has been **migrated** to the config and must not reappear.
-</critical>
-</constraints>
+<!-- </critical> -->
+<!-- </constraints> -->
 
-<execution>
+<!-- <execution> -->
 ## Execution
 
 1. **Read the config** with the Read tool: `scripting/verify-config.ts`. The file declares `VERIFY_STEPS: VerifyStep[]`. Use the `id` field of each entry as the step identifier; the `kind` and `args` fields describe execution; the `verifier`, `dependsOn`, and `riskControls` fields describe post-conditions. Do not modify the file.
@@ -69,9 +69,9 @@ The source of truth is `scripting/verify-config.ts`. If the user requests adding
    - If the script exited `0`, report success.
    - If the script exited `1`, report the failure summary and the link to `verify-report.json` for full detail.
    - Do NOT propagate exit code 1 to a shell — this command is interactive.
-</execution>
+<!-- </execution> -->
 
-<final_report>
+<!-- <final_report> -->
 ## Final report
 
 Produce a markdown report with this shape (Spanish throughout):
@@ -94,4 +94,4 @@ Reporte JSON: ./verify-report.json
 ```
 
 Deliver the report in Spanish per AGENTS.md §0.
-</final_report>
+<!-- </final_report> -->

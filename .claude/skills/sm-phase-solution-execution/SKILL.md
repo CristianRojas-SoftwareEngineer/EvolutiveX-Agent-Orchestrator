@@ -11,7 +11,9 @@ description: >
 
 Sequentially executes each hypothesis; rollback between runs. Operates on the SOLUTION axis.
 
-<user_communication>Spanish for user interaction. See ../artifact-structuring/SKILL.md §language_policy.</user_communication>
+<!-- <user_communication> -->
+Spanish for user interaction. See ../artifact-structuring/SKILL.md §language_policy.
+<!-- </user_communication> -->
 
 <!-- <phase_procedure> -->
 ## Inputs
@@ -47,4 +49,6 @@ Hypotheses executed in priority order; rollback verified between runs; deviation
 raw outputs in `experiments/solution-<id>/<hypothesis-id>/`; per-hypothesis pass/fail against
 the refutation criterion recorded.
 
-<constraints>Execute; do not interpret results here (phase 15 normalizes; phase 16 analyzes).</constraints>
+<!-- <constraints> -->
+Execute; do not interpret results here (phase 15 normalizes; phase 16 analyzes).
+<!-- </constraints> -->

@@ -29,7 +29,7 @@ Ask, confirm, and respond to the user in **Spanish** (native Spanish-speaking au
 <!-- <repo_context> -->
 Workflow delivery in this repo: `.claude/skills/openspec-apply/` only. Invocation: see `<invocation_model>` in [openspec-specialist](../openspec-specialist/SKILL.md).
 
-<delegation_map>
+<!-- <delegation_map> -->
 All steps run inline. Reasoning:
 
 - **verify** (inline): a single change produces bounded context; the main thread needs the findings to drive the gate decision and to feed the commit message. Delegation would add round-trip latency for the verdict without freeing significant context.
@@ -37,7 +37,7 @@ All steps run inline. Reasoning:
 - **sync docs** (inline): no dedicated skill exists; this is bespoke and must use the active context (Impact section + grep results).
 - **archive** (inline via openspec-archive): the procedure is defined in `openspec-archive/SKILL.md` and executed inline — same thread, no subagent. Steps 1–4 of that skill (selection, artifact check, task check, sync assessment) are skipped because Steps 1–5 of this workflow already cover them. Only openspec-archive Steps 5–6 (the actual `mv` and summary) run.
 - **commit** (inline): the conventional-commits message must reflect the change's own diff; this is part of the apply context.
-</delegation_map>
+<!-- </delegation_map> -->
 <!-- </repo_context> -->
 
 <!-- <workflow> -->
@@ -416,7 +416,7 @@ phase lock. A user may invoke `openspec-verify` or `openspec-sync`
 directly; this skill does not pretend exclusivity.
 <!-- </workflow> -->
 
-<gate_definitions>
+<!-- <gate_definitions> -->
 Severities are reused from openspec-verify: prefer SUGGESTION > WARNING
 > CRITICAL when uncertain, except for the explicit CRITICAL cases listed
 below.
@@ -460,9 +460,9 @@ these):
 must **never** be blocked on warnings. CRITICAL inside the archive
 itself (CLI failure) does block. WARNINGs in archive are
 informational and require a confirm, not a fix.
-</gate_definitions>
+<!-- </gate_definitions> -->
 
-<output_templates>
+<!-- <output_templates> -->
 All blocks below are rendered to the user in **Spanish** with the
 specific change's values substituted. The placeholders are English
 because they live inside this artifact; the filled output is Spanish.
@@ -691,7 +691,7 @@ are filled by the step that invokes the pause.
 
 ¿Qué prefieres hacer?
 ```
-</output_templates>
+<!-- </output_templates> -->
 
 <!-- <guardrails> -->
 ## Structural

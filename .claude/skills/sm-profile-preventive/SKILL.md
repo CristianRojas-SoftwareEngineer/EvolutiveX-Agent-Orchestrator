@@ -13,7 +13,9 @@ description: >
 Policy layer. Writes parameters + 16-entry phase-policy matrix into `case.md`. Never
 executes phases.
 
-<user_communication>Spanish for any user interaction. See ../artifact-structuring/SKILL.md §language_policy.</user_communication>
+<!-- <user_communication> -->
+Spanish for any user interaction. See ../artifact-structuring/SKILL.md §language_policy.
+<!-- </user_communication> -->
 
 ## Objective
 Reduce the probability or impact of future failures before they occur.
@@ -28,7 +30,8 @@ Reduce the probability or impact of future failures before they occur.
 
 ## Phase-policy matrix (16 entries)
 
-<!-- <policy_matrix> -->
+<!-- <!-- <policy_matrix> -->
+ -->
 ```yaml
 phase_policy:
   # ── Causa (01–08) ────────────────────────────────────────────────────────
@@ -51,7 +54,8 @@ phase_policy:
   conclusion:                { focus: "riesgo mitigado + residual cuantificado + vías cubiertas", reasoning_effort: medium, evidence: [veredicto, residual, cobertura, deuda],            acceptance: "veredicto cuantitativo",                                risk_controls: [] }
   communication:             { focus: "riesgo evitado y residual; cobertura de vías",           reasoning_effort: medium, evidence: [resumen, riesgo, residual, commit],                    acceptance: "commit con metadatos Case:; cita 16 ## Solución ganadora con residual solo con ganadora", risk_controls: [] }
 ```
-<!-- </policy_matrix> -->
+<!-- 
+<!-- </policy_matrix> --> -->
 
 ## Evidence prioritized
 Tests that provoke the risk condition, static analysis, critical-path coverage, threat

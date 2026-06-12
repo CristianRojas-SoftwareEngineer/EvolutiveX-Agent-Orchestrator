@@ -122,9 +122,9 @@ Common artifact patterns:
 
 For other schemas, follow the `instruction` field from the CLI output.
 
-</workflow>
+<!-- </workflow> -->
 
-<guardrails>
+<!-- <guardrails> -->
 ## Guardrails
 
 - Create ONE artifact per invocation

@@ -10,7 +10,9 @@ description: >
 
 Operates on the CAUSE axis only (`chain: cause`).
 
-<user_communication>Spanish for user interaction. See ../artifact-structuring/SKILL.md §language_policy.</user_communication>
+<!-- <user_communication> -->
+Spanish for user interaction. See ../artifact-structuring/SKILL.md §language_policy.
+<!-- </user_communication> -->
 
 <!-- <phase_procedure> -->
 ## Inputs
@@ -38,4 +40,6 @@ frontmatter:
 Each hypothesis falsifiable with observable prediction; prioritization justified. On
 re-invocation: existing content preserved; only new cause hypothesis appended.
 
-<constraints>Do not design or run experiments here.</constraints>
+<!-- <constraints> -->
+Do not design or run experiments here.
+<!-- </constraints> -->

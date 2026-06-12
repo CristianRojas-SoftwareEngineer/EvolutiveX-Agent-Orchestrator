@@ -13,7 +13,7 @@ description: >
 
 # Smart Code Proxy — Statusline System
 
-<!-- <<overview> -->
+<!-- <overview> -->
 Canonical **knowledge** skill for the Claude Code statusline shipped by Smart Code Proxy.
 This skill summarizes design and implementation; for normative requirements see
 `openspec/specs/statusline-runtime/spec.md` and `openspec/specs/statusline-installer/spec.md`.
@@ -24,7 +24,7 @@ or `scripting/router-status.ts` change materially, update the matching section h
 Prefer verifying against code over stale prose in older OpenSpec archives.
 <!-- </overview> -->
 
-<!-- <<user_communication> -->
+<!-- <user_communication> -->
 Ask, confirm, and respond to the user in **Spanish** (native Spanish-speaking audience).
 Keep this artifact's instructions in **English** for token efficiency.
 Canonical policy: `<language_policy>` in [artifact-structuring](../artifact-structuring/SKILL.md).
@@ -32,7 +32,7 @@ User-facing rules: [AGENTS.md](../../AGENTS.md) §0.
 Use ASCII diagrams and file-path tables when explaining architecture.
 <!-- </user_communication> -->
 
-<!-- <<architecture> -->
+<!-- <architecture> -->
 ## High-level architecture
 
 The statusline is an **external command** Claude Code invokes on each status-bar refresh.
@@ -70,7 +70,7 @@ Smart Code Proxy registers a subprocess in `~/.claude/settings.json` that runs
 **Contract:** Claude Code injects `settings.json → env` into the subprocess — **not** the user's shell `process.env`. `router-status.ts` reads auth, model slots, `SMART_CODE_PROXY_ROOT`, and the Tabla 2 toggle from that block.
 <!-- </architecture> -->
 
-<!-- <<installation> -->
+<!-- <installation> -->
 ## Loading into Claude Code
 
 ### Install path
@@ -128,7 +128,7 @@ Implementation: `scripting/statusline-router-details.ts`.
 Spec: `openspec/specs/statusline-router-details-toggle/spec.md`.
 <!-- </installation> -->
 
-<!-- <<data_sources> -->
+<!-- <data_sources> -->
 ## Data sources per table
 
 `router-status.ts` combines these sources (see `docs/router-statusline.md` §2 for full table):
@@ -148,7 +148,7 @@ Spec: `openspec/specs/statusline-router-details-toggle/spec.md`.
 **Session folder resolution:** prefix match — `sessions/<dir>` where `dir.startsWith(ctx.session_id)` (proxy may suffix folder names).
 <!-- </data_sources> -->
 
-<!-- <<slots> -->
+<!-- <slots> -->
 ## Reasoning-level slots
 
 In this project **slot** means one of the **four fixed reasoning levels** mapped to Anthropic API model tiers. Tabla 2 always renders **exactly four data rows** (plus a totals row), even when counters are zero.
@@ -200,7 +200,7 @@ Partial configuration is supported: configured levels use variable match; unconf
 | Formal scenarios | `openspec/specs/statusline-runtime/spec.md` | e.g. «Un prompt con dos subagentes distribuye trabajo por slot» |
 <!-- </slots> -->
 
-<table2_composition>
+<!-- <table2_composition> -->
 ## How slots compose Tabla 2
 
 ### Pipeline
@@ -277,9 +277,9 @@ Per session under `sessions/<dir>/`. Does **not** replace `session-metrics.json`
 | `lastRenderedTable2Output` | Re-print cached Tabla 2 text when metrics file unchanged |
 
 Early exit: if `session-metrics.json` mtime/size unchanged, skip re-aggregation and re-print `lastRenderedTable2Output`.
-</table2_composition>
+<!-- </table2_composition> -->
 
-<!-- <<tables_summary> -->
+<!-- <tables_summary> -->
 ## All three tables (quick reference)
 
 ### Tabla 1 — Session and provider
@@ -296,7 +296,7 @@ When `resolveQuotaSource()` succeeds: OAuth stdin or `subscription-quota.json` o
 Four columns: quota label, bar+%, «Reinicio en», time remaining.
 <!-- </tables_summary> -->
 
-<!-- <<file_map> -->
+<!-- <file_map> -->
 ## File and document map
 
 ### Implementation
@@ -341,7 +341,7 @@ Four columns: quota label, bar+%, «Reinicio en», time remaining.
 | `openspec-specialist` | OpenSpec workflow for statusline changes |
 <!-- </file_map> -->
 
-<!-- <<dispatch> -->
+<!-- <dispatch> -->
 ## Provider dispatch (simplified)
 
 ```
@@ -356,7 +356,7 @@ buildStatuslineOutput()
 `projectRoot` resolution: `settings.env.SMART_CODE_PROXY_ROOT` → fallback `process.cwd()` if invalid.
 <!-- </dispatch> -->
 
-<!-- <<constraints> -->
+<!-- <constraints> -->
 ## Agent constraints when using this skill
 
 - Respond to the user in **Spanish**; keep path and identifier literals as in the repo.
@@ -365,7 +365,7 @@ buildStatuslineOutput()
 - Distinguish **slot** (reasoning level: Lite/Standard/Reasoning/Frontier) from unrelated «slot» terms in other domains (e.g. artifact-structuring slot assignment).
 <!-- </constraints> -->
 
-<!-- <<iteration> -->
+<!-- <iteration> -->
 ## Evolving this skill
 
 When extending the statusline or answering deep questions:

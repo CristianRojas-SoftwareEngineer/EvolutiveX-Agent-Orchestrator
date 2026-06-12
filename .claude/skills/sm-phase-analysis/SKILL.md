@@ -11,7 +11,11 @@ description: >
 
 Operates on the CAUSE axis only (`chain: cause`).
 
-<user_communication>Spanish for user interaction. See ../artifact-structuring/SKILL.md §language_policy.</user_communication>
+<!-- <!-- <user_communication> -->
+ -->
+Spanish for user interaction. See ../artifact-structuring/SKILL.md §language_policy.
+<!-- 
+<!-- </user_communication> --> -->
 
 <!-- <phase_procedure> -->
 ## Inputs
@@ -37,4 +41,8 @@ or **`## Causa refutada`**.
 Conclusion supported by data; alternatives considered; limits declared. Exactly one of
 `## Causa confirmada` or `## Causa refutada` (never both, never neither).
 
-<constraints>Analyze; the case decision belongs to phase 17.</constraints>
+<!-- <!-- <constraints> -->
+ -->
+Analyze; the case decision belongs to phase 17.
+<!-- 
+<!-- </constraints> --> -->

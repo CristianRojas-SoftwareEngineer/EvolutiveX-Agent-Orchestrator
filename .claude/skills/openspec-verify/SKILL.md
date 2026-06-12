@@ -178,7 +178,7 @@ Verify that an implementation matches the change artifacts (specs, tasks, design
 - Always note which checks were skipped and why
 <!-- </guardrails> -->
 
-<output_format>
+<!-- <output_format> -->
 ## Output format
 
 Use clear markdown with:
@@ -187,4 +187,4 @@ Use clear markdown with:
 - Code references in format: `file.ts:123`
 - Specific, actionable recommendations
 - No vague suggestions like "consider reviewing"
-</output_format>
+<!-- </output_format> -->

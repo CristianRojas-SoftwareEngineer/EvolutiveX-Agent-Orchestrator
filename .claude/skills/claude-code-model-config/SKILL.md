@@ -16,7 +16,7 @@ description: >
 
 # Claude Code — Model Configuration
 
-<!-- <<overview> -->
+<!-- <overview> -->
 Canonical **knowledge** skill for how Claude Code selects, routes, and configures models.
 Source: [Model configuration](https://code.claude.com/docs/en/model-configuration) (official docs).
 Full doc index: https://code.claude.com/docs/llms.txt
@@ -29,7 +29,7 @@ change materially (new alias, new `ANTHROPIC_DEFAULT_*` var, tier mapping), upda
 section here. Prefer official docs + `scripting/shared/provider-config.ts` over stale prose.
 <!-- </overview> -->
 
-<!-- <<user_communication> -->
+<!-- <user_communication> -->
 Ask, confirm, and respond to the user in **Spanish** (native Spanish-speaking audience).
 Keep this artifact's instructions in **English** for token efficiency.
 Canonical policy: `<language_policy>` in [artifact-structuring](../artifact-structuring/SKILL.md).
@@ -37,7 +37,7 @@ User-facing rules: [AGENTS.md](../../AGENTS.md) §0.
 Keep standard technical terms in English when clarity benefits (e.g. alias, fallback, effort, settings).
 <!-- </user_communication> -->
 
-<!-- <<routing> -->
+<!-- <routing> -->
 ## When to use which section
 
 | User question | Section |
@@ -59,7 +59,7 @@ Keep standard technical terms in English when clarity benefits (e.g. alias, fall
 | Smart Code Proxy `configure-provider` / statusline Frontier | `<proxy_integration>` |
 <!-- </routing> -->
 
-<!-- <<model_tiers> -->
+<!-- <model_tiers> -->
 ## Reasoning tiers (capability / cost)
 
 From lowest to highest capability and typical cost:
@@ -78,7 +78,7 @@ From lowest to highest capability and typical cost:
 product tier later. Do not invent `ANTHROPIC_DEFAULT_MYTHOS_MODEL` unless documented upstream.
 <!-- </model_tiers> -->
 
-<!-- <<model_aliases> -->
+<!-- <model_aliases> -->
 ## Model aliases and names
 
 The `model` setting accepts either a **model alias** or a **model name**:
@@ -119,7 +119,7 @@ Aliases point to the recommended version for your provider and update over time.
 Run `claude update` to upgrade.
 <!-- </model_aliases> -->
 
-<fable_5>
+<!-- <fable_5> -->
 ## Fable 5 notes
 
 Fable 5 is the most capable model for tasks larger than a single sitting — long autonomous sessions, investigation before action, frequent self-verification.
@@ -129,9 +129,9 @@ Fable 5 is the most capable model for tasks larger than a single sitting — lon
 - **Safety classifiers** on cybersecurity/biology content trigger [automatic fallback](#automatic_fallback) to Opus.
 - **Unavailable** under [zero data retention](https://code.claude.com/docs/en/zero-data-retention).
 - **Thinking cannot be disabled** on Fable 5.
-</fable_5>
+<!-- </fable_5> -->
 
-<!-- <<setting_model> -->
+<!-- <setting_model> -->
 ## Setting your model — precedence (highest first)
 
 1. **During session** — `/model <alias|name>` or `/model` for picker
@@ -167,7 +167,7 @@ claude --model opus
 ```
 <!-- </setting_model> -->
 
-<!-- <<default_model> -->
+<!-- <default_model> -->
 ## `default` alias behavior by account type
 
 | Account type | Default resolves to |
@@ -180,7 +180,7 @@ claude --model opus
 Fable 5 is never the system default. Choosing `/model fable` saves it in user settings for later sessions.
 <!-- </default_model> -->
 
-<!-- <<opusplan> -->
+<!-- <opusplan> -->
 ## `opusplan` hybrid mode
 
 | Mode | Model used |
@@ -193,7 +193,7 @@ Plan-mode Opus uses standard **200K** context. The automatic 1M upgrade does **n
 For mid-task consultation of a second model (not at plan boundary), see the [advisor tool](https://code.claude.com/docs/en/advisor).
 <!-- </opusplan> -->
 
-<!-- <<fallback_chains> -->
+<!-- <fallback_chains> -->
 ## Fallback model chains (availability-based)
 
 When the primary model is overloaded, unavailable, or returns a non-retryable server error, Claude Code tries fallback models in order.
@@ -217,7 +217,7 @@ Each element accepts alias or name; `"default"` expands to the default model.
 **Skipped elements:** unavailable (retired) models; entries outside `availableModels` allowlist.
 <!-- </fallback_chains> -->
 
-<!-- <<automatic_fallback> -->
+<!-- <automatic_fallback> -->
 ## Automatic model fallback (Fable 5 content-based)
 
 When Fable 5 safety classifiers flag a request (cybersecurity, biology), Claude Code re-runs on default Opus and shows a notice:
@@ -235,7 +235,7 @@ Set `ANTHROPIC_DEFAULT_FABLE_MODEL` and `ANTHROPIC_DEFAULT_OPUS_MODEL` to enable
 **Security/biology workloads:** expect frequent fallback; this is expected routing, not an account flag.
 <!-- </automatic_fallback> -->
 
-<!-- <<effort_and_thinking> -->
+<!-- <effort_and_thinking> -->
 ## Effort levels
 
 Adaptive reasoning: model decides how much to think per step.
@@ -284,7 +284,7 @@ Thinking collapsed by default; `Ctrl+O` toggles verbose. Set `showThinkingSummar
 Opus 4.6 / Sonnet 4.6: `CLAUDE_CODE_DISABLE_ADAPTIVE_THINKING=1` reverts to fixed budget via `MAX_THINKING_TOKENS`.
 <!-- </effort_and_thinking> -->
 
-<!-- <<extended_context> -->
+<!-- <extended_context> -->
 ## Extended context (1M window)
 
 Fable 5, Opus 4.6+, Sonnet 4.6 support [1M token context](https://platform.claude.com/docs/en/about-claude/context-windows#1m-token-context-window).
@@ -308,7 +308,7 @@ On Max/Team/Enterprise, Opus auto-upgrades to 1M with no extra config.
 1M uses standard pricing beyond 200K (no premium surcharge).
 <!-- </extended_context> -->
 
-<!-- <<restrict_selection> -->
+<!-- <restrict_selection> -->
 ## Restrict model selection (enterprise)
 
 `availableModels` in managed or policy settings restricts picker, `--model`, and `ANTHROPIC_MODEL`.
@@ -346,7 +346,7 @@ Strict allowlist → set in managed/policy settings (highest priority).
 Include standard aliases alongside Mantle IDs.
 <!-- </restrict_selection> -->
 
-<!-- <<env_vars> -->
+<!-- <env_vars> -->
 ## Environment variables — alias resolution
 
 Must be full **model names** (or provider equivalent):
@@ -364,7 +364,7 @@ Must be full **model names** (or provider equivalent):
 Canonical order in Smart Code Proxy `MANAGED_ENV_VARS`: haiku → sonnet → opus → fable → subagent.
 <!-- </env_vars> -->
 
-<!-- <<third_party> -->
+<!-- <third_party> -->
 ## Pin models for third-party deployments
 
 **Always pin** on Bedrock, Vertex, Foundry, Claude Platform on AWS before rollout.
@@ -414,7 +414,7 @@ Available for OPUS, SONNET, HAIKU, FABLE, and `ANTHROPIC_CUSTOM_MODEL_OPTION`.
 When set, listed capabilities enabled; unlisted disabled. Unset → built-in ID pattern detection.
 <!-- </third_party> -->
 
-<!-- <<model_overrides> -->
+<!-- <model_overrides> -->
 ## `modelOverrides` setting
 
 Maps individual Anthropic model IDs to provider-specific strings (ARNs, deployment names).
@@ -434,7 +434,7 @@ Keys must match [Models overview](https://platform.claude.com/docs/en/about-clau
 - `availableModels` evaluates against Anthropic model ID, not override value.
 <!-- </model_overrides> -->
 
-<!-- <<custom_model> -->
+<!-- <custom_model> -->
 ## Custom model picker entry
 
 `ANTHROPIC_CUSTOM_MODEL_OPTION` adds one custom entry to `/model` picker.
@@ -451,7 +451,7 @@ For LLM gateway deployments with discovery: set `CLAUDE_CODE_ENABLE_GATEWAY_MODE
 Claude Code skips validation for custom model IDs.
 <!-- </custom_model> -->
 
-<!-- <<proxy_integration> -->
+<!-- <proxy_integration> -->
 ## Smart Code Proxy — provider config and statusline
 
 This repo maps Claude Code model env vars to provider catalogs and statusline Tabla 2 tiers.
@@ -477,7 +477,7 @@ Without `ANTHROPIC_DEFAULT_FABLE_MODEL` in settings, OAuth users still get Front
 For statusline slots, metrics, and cache see [statusline-system](../statusline-system/SKILL.md).
 <!-- </proxy_integration> -->
 
-<!-- <<checking_model> -->
+<!-- <checking_model> -->
 ## Checking current model
 
 1. [Status line](https://code.claude.com/docs/en/statusline) (if configured)
@@ -485,7 +485,7 @@ For statusline slots, metrics, and cache see [statusline-system](../statusline-s
 3. In this repo: Tabla 1 «Modelo activo» when Smart Code Proxy statusline is installed
 <!-- </checking_model> -->
 
-<!-- <<prompt_caching> -->
+<!-- <prompt_caching> -->
 ## Prompt caching
 
 Claude Code uses [prompt caching](https://code.claude.com/docs/en/prompt-caching) automatically.
@@ -501,14 +501,14 @@ Claude Code uses [prompt caching](https://code.claude.com/docs/en/prompt-caching
 Cache TTL and miss triggers: [How Claude Code uses prompt caching](https://code.claude.com/docs/en/prompt-caching).
 <!-- </prompt_caching> -->
 
-<!-- <<related_skills> -->
+<!-- <related_skills> -->
 | Skill | Relationship |
 |-------|--------------|
 | [statusline-system](../statusline-system/SKILL.md) | Tabla 2 Frontier slot, aggregation, ANSI palette |
 | [anthropic-api-protocol](../anthropic-api-protocol/SKILL.md) | API protocol behind model requests and metrics |
 <!-- </related_skills> -->
 
-<!-- <<constraints> -->
+<!-- <constraints> -->
 When answering the user:
 - Respond in **Spanish** with clear precedence tables when explaining configuration conflicts.
 - Distinguish **alias resolution** (what model runs) from **routing** (`ANTHROPIC_BASE_URL` / LLM gateway).
@@ -517,7 +517,7 @@ When answering the user:
 - For proxy-specific wiring, point to `<proxy_integration>` and `statusline-system`, not only upstream Claude docs.
 <!-- </constraints> -->
 
-<!-- <<iteration> -->
+<!-- <iteration> -->
 ## Evolving this skill
 
 1. **Verify upstream** — [Model configuration](https://code.claude.com/docs/en/model-configuration) when aliases or env vars change.

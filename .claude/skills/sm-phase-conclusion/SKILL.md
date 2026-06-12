@@ -22,7 +22,9 @@ Closes the case by deciding the outcome and the action. Consumes data from both 
 | **(b)** | `done` | Solo-SM + `## Solución ganadora`; no spec |
 | **(c)** | `pausado` | No spec; Bucle C offer in phase 18 |
 
-<user_communication>Spanish for user interaction. See ../artifact-structuring/SKILL.md §language_policy.</user_communication>
+<!-- <user_communication> -->
+Spanish for user interaction. See ../artifact-structuring/SKILL.md §language_policy.
+<!-- </user_communication> -->
 
 <!-- <phase_procedure> -->
 ## Inputs
@@ -82,6 +84,8 @@ validated-spec structure present on close-with-spec path; investigativo note on 
 pause note present on the pause path;
 lesson written with tags that enable phase-03 / phase-11 recall in both paths.
 
-<constraints>Decide, write the validated spec (close) or the pause note (pause), and the
+<!-- <constraints> -->
+Decide, write the validated spec (close) or the pause note (pause), and the
 lesson. Do not produce the human communication (phase 18). Do not write the changelog or any
-case ledger (both are derived).</constraints>
+case ledger (both are derived).
+<!-- </constraints> -->

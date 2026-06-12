@@ -328,6 +328,13 @@ describe('buildStatuslineOutput', () => {
     const levelRows = (tableBlock.match(/│\s*(?:Lite|Standard|Reasoning|Frontier)\s*│/g) ?? [])
       .length;
     expect(levelRows).toBe(4);
+
+    const tableLines = tableBlock.split('\n');
+    const frontierIdx = tableLines.findIndex((l) => /│\s*Frontier\s*│/.test(l));
+    expect(frontierIdx).toBeGreaterThanOrEqual(0);
+    const separatorBeforeTotals = tableLines[frontierIdx + 1] ?? '';
+    expect(separatorBeforeTotals).toMatch(/^├.*┴/);
+    expect(tableLines[frontierIdx + 2] ?? '').toContain('Totales de sesión');
   });
 
   it('main Frontier + subagent Standard distribuye métricas por fila', () => {

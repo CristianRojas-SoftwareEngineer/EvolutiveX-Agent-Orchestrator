@@ -1047,7 +1047,7 @@ function renderTokenTable(
     headers,
     rows,
     alignments,
-    [0, 1, 2],
+    [0, 1, 2, 3],
     undefined,
     targetWidth,
     1,

@@ -1,78 +1,62 @@
 #!/usr/bin/env bash
-# scripting/generate-changelog — regenerate CHANGELOG.md from conventional commits (Keep a Changelog).
-# Derived state: never hand-edit CHANGELOG.md. Single source of truth = git history.
+# scripting/generate-changelog — regenera CHANGELOG.md desde el historial de conventional commits (Keep a Changelog).
+# Estado derivado: nunca editar CHANGELOG.md a mano. Fuente de verdad = historial git.
 #
-# Usage:
-#   generate-changelog                          # rebuild full file from all commits
-#   generate-changelog --pending "msg" --case X # prepend pending entry (called from phase 10)
+# Uso: generate-changelog
 #
-# Does NOT commit or amend. The caller (phase 10) stages and commits CHANGELOG.md.
+# No hace commit ni amend. El hook post-commit (ver scripting/install-changelog-hook) se encarga.
 set -euo pipefail
 
-PENDING_SUBJECT=""
-PENDING_CASE=""
-
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --pending) PENDING_SUBJECT="$2"; shift 2;;
-    --case)    PENDING_CASE="$2";    shift 2;;
-    *) echo "Unknown arg: $1" >&2; exit 1;;
-  esac
-done
+if [[ $# -gt 0 ]]; then
+  echo "Error: argumento eliminado: el script no acepta flags" >&2
+  exit 1
+fi
 
 OUT="CHANGELOG.md"
-map_type() { case "$1" in
-  feat) echo "Added";; fix) echo "Fixed";; perf|refactor) echo "Changed";;
-  docs) echo "Documentation";; *) echo "";; esac; }
 
-# Determine tag boundaries for release sections
-latest_tag=$(git describe --tags --abbrev=0 2>/dev/null || true)
+# Acumuladores por bloque (clave: "unreleased" o nombre de tag)
+declare -A added changed fixed doc
+declare -A tag_date
+current_block="unreleased"
+order=("unreleased")
 
-emit_section() {
-  local section="$1"; local range="$2"
-  local body=""
-  while IFS=$'\t' read -r subject case_id; do
-    local type="${subject%%:*}"; type="${type%%(*}"
-    local desc="${subject#*: }"
-    [ "$(map_type "$type")" = "$section" ] || continue
-    local line="- ${desc}"; [ -n "$case_id" ] && line="${line} (Case: ${case_id})"
-    body="${body}${line}"$'\n'
-  done < <(git log ${range:+$range} --pretty=$'%s\t%(trailers:key=Case,valueonly)')
-  [ -n "$body" ] && { echo "### ${section}"; printf '%s\n' "$body"; }
-}
+while IFS='|' read -r refs subject; do
+  # Detectar límite de tag a partir de los refs de este commit
+  if [[ "$refs" =~ tag:\ ([^,\ ]+) ]]; then
+    tag="${BASH_REMATCH[1]}"
+    if [[ "$current_block" != "$tag" ]]; then
+      current_block="$tag"
+      order+=("$tag")
+      tag_date["$tag"]=$(git log -1 --format=%as "$tag" 2>/dev/null || echo "")
+    fi
+  fi
+  # Clasificar el subject por tipo de conventional commit
+  type="${subject%%(*}"; type="${type%%:*}"
+  desc="${subject#*: }"
+  case "$type" in
+    feat)           added["$current_block"]+="- ${desc}"$'\n' ;;
+    fix)            fixed["$current_block"]+="- ${desc}"$'\n' ;;
+    perf|refactor)  changed["$current_block"]+="- ${desc}"$'\n' ;;
+    docs)           doc["$current_block"]+="- ${desc}"$'\n' ;;
+    # chore/test/build/ci/style descartados por diseño (Keep a Changelog)
+  esac
+done < <(git log --pretty=format:'%D|%s')
 
+# Emisión del archivo completo
 {
   echo "# Changelog"
   echo
   echo "All notable changes are derived from conventional commits. Do not edit by hand."
   echo
-
-  # Unreleased section (optionally prepend the pending entry not yet committed)
-  echo "## [Unreleased]"
-  if [ -n "$PENDING_SUBJECT" ]; then
-    ptype="${PENDING_SUBJECT%%:*}"; ptype="${ptype%%(*}"
-    pdesc="${PENDING_SUBJECT#*: }"
-    psect="$(map_type "$ptype")"
-    if [ -n "$psect" ]; then
-      pline="- ${pdesc}"; [ -n "$PENDING_CASE" ] && pline="${pline} (Case: ${PENDING_CASE})"
-      echo "### ${psect}"; echo "$pline"; echo
+  for block in "${order[@]}"; do
+    if [[ "$block" == "unreleased" ]]; then
+      echo "## [Unreleased]"
+    else
+      echo "## [${block#v}] — ${tag_date[$block]}"
     fi
-  fi
-  unreleased_range="${latest_tag:+${latest_tag}..HEAD}"
-  for section in Added Changed Fixed Documentation; do
-    emit_section "$section" "$unreleased_range"
+    [[ -n "${added[$block]:-}"   ]] && { echo "### Added";         printf '%s\n' "${added[$block]}";   }
+    [[ -n "${changed[$block]:-}" ]] && { echo "### Changed";       printf '%s\n' "${changed[$block]}"; }
+    [[ -n "${fixed[$block]:-}"   ]] && { echo "### Fixed";         printf '%s\n' "${fixed[$block]}";   }
+    [[ -n "${doc[$block]:-}"     ]] && { echo "### Documentation"; printf '%s\n' "${doc[$block]}";     }
   done
-
-  # Release sections (one per tag, newest first)
-  if [ -n "$latest_tag" ]; then
-    git tag --sort=-version:refname | while read -r tag; do
-      prev=$(git describe --tags --abbrev=0 "${tag}^" 2>/dev/null || true)
-      range="${prev:+${prev}..}${tag}"
-      date=$(git log -1 --format=%as "$tag")
-      echo "## [${tag#v}] — ${date}"
-      for section in Added Changed Fixed Documentation; do
-        emit_section "$section" "$range"
-      done
-    done
-  fi
 } > "$OUT"

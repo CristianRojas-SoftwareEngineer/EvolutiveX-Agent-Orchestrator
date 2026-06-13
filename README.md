@@ -204,13 +204,14 @@ Todo volcado que se trunca genera un archivo `.omitted.txt` documentando la omis
 ### Instrucciones de Inicio Rápido
 
 1.  **Instalar dependencias**: `npm install`
-2.  **Configurar proveedor** (opcional): `npm run configure:provider` (asistente interactivo para configurar API keys y modelos de diferentes proveedores).
-3.  **Integraciones Claude Code** (opcional): `npm run setup:install` instala statusline, voz y hooks en `~/.claude/settings.json` en un único paso (admite `--dry-run`, `--force`, flags `--statusline`/`--voice`/`--hooks`). Para desinstalar: `npm run setup:uninstall`. Ver [`docs/notifications.md`](docs/notifications.md) y [`docs/router-statusline.md`](docs/router-statusline.md).
-4.  **Referencia multi-agente** (opcional): `npm run create:agents-reference` (Crea hardlink `AGENTS.md` → `CLAUDE.md` para compatibilidad con otros agentes de código).
-5.  **Modo Desarrollo**: `npm run dev` (Carga `configs/.env` mediante flag nativo de Node v22.9+; **v24 LTS recomendado**).
-6.  **Compilación**: `npm run build` (Genera `/dist` optimizado).
-7.  **Referencia de scripts**: `npm run help` (muestra todos los scripts disponibles con descripciones).
-8.  **Limpieza**: `npm run clean:dist` (purga `dist/`), `npm run clean:modules` (purga `node_modules/`). Purga completa del entorno de desarrollo del proxy (auditoría `./sessions/` y logs `./server/`): `npm run clean:all` — sustituye el antiguo slash `/router-clean-slate` de Claude Code Router (CCR), que operaba sobre `~/.claude` y ya no aplica. Selectiva: `npm run clean:sessions` o `npm run clean:logs`.
+2.  **Hook de changelog** (opcional): `bash scripting/install-changelog-hook` instala el hook git `post-commit` que mantiene `CHANGELOG.md` sincronizado tras cada commit. El hook no se versiona — reinstalar tras cada clone.
+3.  **Configurar proveedor** (opcional): `npm run configure:provider` (asistente interactivo para configurar API keys y modelos de diferentes proveedores).
+4.  **Integraciones Claude Code** (opcional): `npm run setup:install` instala statusline, voz y hooks en `~/.claude/settings.json` en un único paso (admite `--dry-run`, `--force`, flags `--statusline`/`--voice`/`--hooks`). Para desinstalar: `npm run setup:uninstall`. Ver [`docs/notifications.md`](docs/notifications.md) y [`docs/router-statusline.md`](docs/router-statusline.md).
+5.  **Referencia multi-agente** (opcional): `npm run create:agents-reference` (Crea hardlink `AGENTS.md` → `CLAUDE.md` para compatibilidad con otros agentes de código).
+6.  **Modo Desarrollo**: `npm run dev` (Carga `configs/.env` mediante flag nativo de Node v22.9+; **v24 LTS recomendado**).
+7.  **Compilación**: `npm run build` (Genera `/dist` optimizado).
+8.  **Referencia de scripts**: `npm run help` (muestra todos los scripts disponibles con descripciones).
+9.  **Limpieza**: `npm run clean:dist` (purga `dist/`), `npm run clean:modules` (purga `node_modules/`). Purga completa del entorno de desarrollo del proxy (auditoría `./sessions/` y logs `./server/`): `npm run clean:all` — sustituye el antiguo slash `/router-clean-slate` de Claude Code Router (CCR), que operaba sobre `~/.claude` y ya no aplica. Selectiva: `npm run clean:sessions` o `npm run clean:logs`.
 
 ### Gestión de sesiones Claude Code
 

@@ -4,6 +4,19 @@ All notable changes are derived from conventional commits. Do not edit by hand.
 
 ## [Unreleased]
 ### Added
+- agregar skill claude-code-model-config refinada
+- agregar tier Frontier en Tabla 2 para Fable 5
+- agregar skill de conocimiento statusline-system
+- agregar plugin de logging HTTP estructurado con env vars configurables
+- extender Tabla 3 de cuota a proveedores con cache
+- aplicar envelope Message Anthropic completo en step_response SSE
+- autorizar dos changes — persistencia per-step sin gate tool_use y envelope SSE completo
+- habilitar refresh live cada 3s en Tabla 2
+- anclar locución de UserPromptSubmit al prompt actual
+- unificar voz y toast del Stop en el gateway con soporte multi-provider
+- add proposal for fix-tts-generic-fallback
+- integrar síntesis de voz contextual con hooks del proxy
+- unificar turno en un workflow con hops como steps
 - migrar SM a dos cadenas
 - versionar harness de agente en .claude/
 - agregar generador on-demand del changelog (§12.14)
@@ -17,7 +30,7 @@ All notable changes are derived from conventional commits. Do not edit by hand.
 - anclar ancho de Tabla 2 al bloque Tabla 1 + Tabla 3
 - agregar # Workflows en Tabla 2 y corregir Stop handler
 - separar cache en columnas Cache Creación y Cache Lectura
-- reordenar layout T1|T3 arriba y T2 abajo
+- reordenar layout T1
 - instalador unificado de statusline, notificaciones y voz
 - instalar hooks globales en ~/.claude
 - copy por evento y mensajes dinámicos stdin
@@ -73,9 +86,24 @@ All notable changes are derived from conventional commits. Do not edit by hand.
 - transform body.parsed.md to conversational format
 - implementa PROXY_UNREDACT_THINKING para capturar thinking legible
 - migración a arquitectura SOLID con Fastify y documentación completa en español
-- initial commit for Fastify + TypeScript SOLID API
 
 ### Changed
+- optimizar generate-changelog con pasada única e instalar hook post-commit
+- absorber aprendizajes sm-* en OpenSpec y eliminar la familia experimental
+- renombrar skill investigation a investigate
+- renombrar y consolidar create-plan e investigation con recorrido post-ejecución
+- dividir create-plan en create-plan-to-implement y create-plan-to-investigate
+- migrar etiquetas XML crudas a comentarios HTML en todo el ecosistema
+- retirar refreshInterval del instalador
+- eliminar contrato oculto de auditBaseDir y unificar resolución de paths
+- unificar almacenamiento de sesiones headless bajo sessions/
+- generalizar mecanismo headless como módulo de primera clase
+- reemplazar diseño multi-provider por provider TTS dedicado OpenRouter
+- consolidar todos los hooks del gateway en relay único
+- ejecutar archive inline vía openspec-archive
+- renombrar change archivado de kokoro a tts-hooks
+- retirar tipos zombie y alinear documentación
+- alinear Tabla 2 con ejecuciones agénticas
 - ajustar cobertura y eliminar drift de config
 - alinear script y comando vía config TS compartida
 - eliminar copia de assets a LOCALAPPDATA
@@ -107,13 +135,31 @@ All notable changes are derived from conventional commits. Do not edit by hand.
 - reemplazar 'any' por tipos estrictos del SDK de Anthropic
 
 ### Fixed
-- unificar request/response en un IStep por hop wire (Case: 20260608-proxy-step-request-response-split)
+- corregir estructura de encabezados del reporte en investigate
+- corregir etiquetas XML sin comentar en ecosistema
+- restaurar separador entre Frontier y Totales en Tabla 2
+- eliminar gate stop_reason en persistencia per-step de métricas
+- manejar workflows no registrados en onWorkflowComplete (IN-1)
+- restaurar invariantes I1–I3 de ciclo de vida de workflows turn-N
+- restaurar semántica un-workflow-por-turno y consistencia de métricas del statusline
+- mostrar código de salida y detalle de error de Claude en terminal
+- corregir hang de 60s en harness por drain loop usando ttsStatuses vacíos
+- compatibilidad multi-provider en inferencia TTS del gateway
+- añadir header anthropic-version al fetch interno de generateSpeechText
+- usar fetch al proxy local para generar texto TTS con cualquier provider
+- inicializar cliente Anthropic con OAuth token capturado del proxy
+- normalizar content string en TranscriptContextExtractor
+- imponer autoridad de completación en tool_result
+- proyectar respuesta estándar sin usage
+- atribuir respuestas egress por assignedStepIndex
+- corregir brechas de telemetría en auditoría del proxy
+- unificar request/response en un IStep por hop wire
 - persistir tool_result y métricas wire residuales
-- corregir gaps de proyección causal en workflows wire (Case: 20260608-proxy-audit-discrepancies)
+- corregir gaps de proyección causal en workflows wire
 - aplicar 7 correcciones a los artefactos del change
-- alinear todas las skills sm-* con el flujo causa→solución secuencial (Case: 20260607-clean-modules-windows)
-- corregir flujo secuencial causa→solución, no simultáneo (Case: 20260607-clean-modules-windows)
-- garantizar eliminación transaccional de node_modules en Windows (Case: 20260607-clean-modules-windows)
+- alinear todas las skills sm-* con el flujo causa→solución secuencial
+- corregir flujo secuencial causa→solución, no simultáneo
+- garantizar eliminación transaccional de node_modules en Windows
 - clasificar continuation por el último mensaje, no por el historial
 - threading de continuations client-side — eliminar orphans residuales
 - retry atómico en EPERM para rename cross-platform en Windows
@@ -167,6 +213,16 @@ All notable changes are derived from conventional commits. Do not edit by hand.
 - migrar ts-node a tsx por compatibilidad con Node.js 24
 
 ### Documentation
+- corregir referencias rotas a documentos eliminados
+- sincronizar specs con fix de workflow-lifecycle del commit d5a08e9
+- reestructurar narrativa y agregar tabla de contenido
+- traducir al inglés los fragmentos en español del cuerpo de la skill
+- corregir estructura y coherencia narrativa de la skill
+- cerrar task 6.3 con verificación manual PASS
+- add tasks for fix-tts-generic-fallback
+- add specs delta for fix-tts-generic-fallback
+- add design for fix-tts-generic-fallback
+- consolidar reglas de unify-turn y eliminar design duplicado
 - integrar logs de runtime en análisis
 - pulir coherencia v6 en new-scientific-maintenance
 - pulir coherencia v5 en new-scientific-maintenance
@@ -177,8 +233,8 @@ All notable changes are derived from conventional commits. Do not edit by hand.
 - embeber código fuente de las 16 skills en §13
 - añadir new-scientific-maintenance.md con dos cadenas
 - promover spec clean-modules-transactional a specs principales
-- añadir bucle del espacio de soluciones §5.4.1 (Case: 20260607-clean-modules-windows)
-- documentar divergencias en design.md archivado (Case: 20260607-clean-modules-windows)
+- añadir bucle del espacio de soluciones §5.4.1
+- documentar divergencias en design.md archivado
 - añadir análisis estructural de create-plan
 - renombrar 'trailer' a 'metadatos de commit' en los dos documentos
 - reconciliar contradicción §5.2/§5.3/§11.2 (Goal 2a)

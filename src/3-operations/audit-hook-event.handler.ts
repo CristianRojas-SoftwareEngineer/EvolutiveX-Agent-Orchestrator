@@ -94,7 +94,7 @@ export class AuditHookEventHandler {
       case 'Stop': {
         const wf = this.workflowRepo.getWorkflowBySessionId(event.sessionId);
         if (!wf) {
-          this.logger?.info(
+          this.logger?.warn(
             { eventName: event.eventName, sessionId: event.sessionId },
             'workflow no encontrado — evento ignorado',
           );
@@ -114,7 +114,7 @@ export class AuditHookEventHandler {
         if (!agentId) break;
         const entry = this.workflowRepo.getWorkflowByAgentId(agentId);
         if (!entry) {
-          this.logger?.info(
+          this.logger?.warn(
             { eventName: event.eventName, agentId },
             'sub-workflow no encontrado — evento ignorado',
           );
@@ -123,7 +123,7 @@ export class AuditHookEventHandler {
         const wfId = entry.agentId;
         const wf = this.workflowRepo.getWorkflow(wfId);
         if (!wf) {
-          this.logger?.info(
+          this.logger?.error(
             { eventName: event.eventName, agentId, wfId },
             'sub-workflow en índice wire pero no en lifecycle — evento ignorado',
           );
@@ -142,7 +142,7 @@ export class AuditHookEventHandler {
       case 'StopFailure': {
         const wf = this.workflowRepo.getWorkflowBySessionId(event.sessionId);
         if (!wf) {
-          this.logger?.info(
+          this.logger?.warn(
             { eventName: event.eventName, sessionId: event.sessionId },
             'workflow no encontrado — evento ignorado',
           );

@@ -40,10 +40,12 @@ export async function postHookEvent(
     });
     if (!res.ok) {
       process.stderr.write(`post-hook-event: HTTP ${res.status} ${url}\n`);
+      return 1;
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     process.stderr.write(`post-hook-event: ${msg}\n`);
+    return 1;
   }
   return 0;
 }
@@ -63,6 +65,6 @@ if (isEntryPoint) {
     .catch((err: unknown) => {
       const msg = err instanceof Error ? err.message : String(err);
       process.stderr.write(`post-hook-event: ${msg}\n`);
-      process.exit(0);
+      process.exit(1);
     });
 }

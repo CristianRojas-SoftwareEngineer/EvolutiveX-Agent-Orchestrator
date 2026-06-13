@@ -24,13 +24,13 @@ describe('postHookEvent', () => {
     });
   });
 
-  it('sale 0 ante error de red (no bloquea Claude Code)', async () => {
+  it('sale 1 ante error de red (visible en transcript de Claude Code)', async () => {
     const fetchImpl = vi.fn().mockRejectedValue(new Error('ECONNREFUSED'));
     const code = await postHookEvent(Buffer.from('{}'), {
       baseUrl: 'http://127.0.0.1:8787',
       fetchImpl,
     });
-    expect(code).toBe(0);
+    expect(code).toBe(1);
   });
 });
 

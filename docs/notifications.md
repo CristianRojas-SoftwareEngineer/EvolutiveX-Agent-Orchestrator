@@ -579,7 +579,7 @@ Esta tabla reemplaza las anteriores (`gateway-hook-notify.ts`, `pre-tool-use-hoo
 | `SubagentStop`       | —                 | `npx tsx scripting/post-hook-event.ts` (gateway emite toast `"Subagente terminado"`)                |
 | `Stop`               | —                 | `npx tsx scripting/post-hook-event.ts` (gateway genera voz y toast de continuidad internamente)    |
 | `StopFailure`        | —                 | `npx tsx scripting/post-hook-event.ts` (gateway emite toast con detalle del error)                 |
-| `SessionStart`       | `startup\|resume` | `npx tsx scripting/post-hook-event.ts` (gateway emite toast `"Sesión iniciada"`)                   |
+| `SessionStart`       | —                 | `npx tsx scripting/post-hook-event.ts` (gateway emite toast `"Sesión iniciada"`)                   |
 | `SessionEnd`         | —                 | `npx tsx scripting/post-hook-event.ts` (gateway emite toast `"Sesión finalizada"`)                 |
 | `PermissionRequest`  | —                 | `npx tsx scripting/post-hook-event.ts` (gateway emite toast con `tool_name` + preview)            |
 | `TaskCreated`        | —                 | `npx tsx scripting/post-hook-event.ts` (gateway emite toast `"Tarea creada"`)                       |

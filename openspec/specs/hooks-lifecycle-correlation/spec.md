@@ -111,9 +111,9 @@ El sistema SHALL implementar un handler `AuditHookEventHandler` en capa 3 (`src/
 |--------|--------|
 | `UserPromptSubmit` | Locución por voz; toast con preview del `prompt`. No crea ni alinea workflows (la apertura del turno corresponde a `ensureTurnWorkflow` en el primer hop HTTP) |
 | `SubagentStart` | **`confirmSubagentFromHook(agentId, toolUseId?)`**; toast `"Subagente iniciado"` |
-| `Stop` | **`readyToClose` → si true: `close`** (§15.4); voz + toast de continuidad (generado por LLM) |
-| `SubagentStop` | **`readyToClose` para sub-workflow → si true: `close`** (§15.4); voz; toast `"Subagente terminado"` |
-| `StopFailure` | **`close` directamente** (§15.4: siempre cierra en error); voz; toast con detalle del error (vía `formatStopFailureMessage`) |
+| `Stop` | **`readyToClose` → si true: `close`** (§15.4); voz + toast de continuidad (generado por LLM). Si no se encuentra workflow: **log `warn`** con `sessionId` |
+| `SubagentStop` | **`readyToClose` para sub-workflow → si true: `close`** (§15.4); voz; toast `"Subagente terminado"`. Si no se encuentra entrada por `agentId`: **log `warn`**. Si `agentId` existe en índice wire pero no en lifecycle: **log `error`** |
+| `StopFailure` | **`close` directamente** (§15.4: siempre cierra en error); voz; toast con detalle del error (vía `formatStopFailureMessage`). Si no se encuentra workflow: **log `warn`** con `sessionId` |
 | `PreToolUse` | Log informativo; toast condicional si `toolName === 'AskUserQuestion' && toolInput.questions` (vía `formatPreToolUseAskMessage`) |
 | `PostToolUse` | **`completeToolUse` solo si `completionAuthority === 'hook'`**; ignorar para tools `continuation`; toast condicional si `toolName === 'TaskUpdate' && toolInput.status === 'in_progress'` (vía `formatTaskInProgressMessage`) |
 | `PostToolUseFailure` | **`completeToolUse` con `isError: true` solo si `completionAuthority === 'hook'`**; ignorar para tools `continuation` |
@@ -147,6 +147,38 @@ Los hooks `PostToolUse` / `PostToolUseFailure` siguen recibiéndose en `POST /ho
 - **WHEN** `AuditHookEventHandler.execute(event)` se invoca
 - **THEN** el handler SHALL invocar `close` directamente sin `readyToClose`
 - **AND** el workflow SHALL quedar cerrado con `outcome: 'api_error'`
+
+#### Scenario: `Stop` sin workflow en repo → warn con sessionId
+
+- **GIVEN** no existe un workflow activo para el `sessionId` del evento
+- **AND** un `ClaudeHookEvent` con `eventName: 'Stop'`, `sessionId: 's1'`
+- **WHEN** `AuditHookEventHandler.execute(event)` se invoca
+- **THEN** el handler SHALL logear a nivel `warn` con `{ eventName: 'Stop', sessionId: 's1' }`
+- **AND** el handler NO SHALL logear a nivel `info` para este caso
+
+#### Scenario: `StopFailure` sin workflow en repo → warn con sessionId
+
+- **GIVEN** no existe un workflow activo para el `sessionId` del evento
+- **AND** un `ClaudeHookEvent` con `eventName: 'StopFailure'`, `sessionId: 's1'`
+- **WHEN** `AuditHookEventHandler.execute(event)` se invoca
+- **THEN** el handler SHALL logear a nivel `warn` con `{ eventName: 'StopFailure', sessionId: 's1' }`
+- **AND** el handler NO SHALL logear a nivel `info` para este caso
+
+#### Scenario: `SubagentStop` sin entrada en índice por agentId → warn
+
+- **GIVEN** no existe entrada en el índice wire para el `agentId` del evento
+- **AND** un `ClaudeHookEvent` con `eventName: 'SubagentStop'`, `agentId: 'agent-child'`
+- **WHEN** `AuditHookEventHandler.execute(event)` se invoca
+- **THEN** el handler SHALL logear a nivel `warn` con `{ eventName: 'SubagentStop', agentId: 'agent-child' }`
+- **AND** el handler NO SHALL logear a nivel `info` para este caso
+
+#### Scenario: `SubagentStop` con inconsistencia wire/lifecycle → error
+
+- **GIVEN** existe una entrada en el índice wire para `agentId: 'agent-child'` con `entry.agentId: 'wf-orphan'`
+- **AND** no existe workflow con id `'wf-orphan'` en el lifecycle del repositorio
+- **WHEN** `AuditHookEventHandler.execute(event)` se invoca
+- **THEN** el handler SHALL logear a nivel `error` con `{ eventName: 'SubagentStop', agentId: 'agent-child', wfId: 'wf-orphan' }`
+- **AND** el handler NO SHALL logear a nivel `info` para este caso
 
 #### Scenario: PostToolUse para Bash client-side no muta el tool
 
@@ -326,6 +358,8 @@ El sistema SHALL proporcionar un mecanismo de instalación de las **13 claves** 
 
 Las 13 claves gestionadas por SCP SHALL ser: `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PostToolUseFailure`, `SubagentStart`, `SubagentStop`, `Stop`, `StopFailure`, `SessionStart`, `SessionEnd`, `PermissionRequest`, `TaskCreated`, `TaskCompleted`. Cada clave SHALL contener un único comando que apunte a `scripting/post-hook-event.ts`.
 
+La entrada `SessionStart` en `configs/hooks.json` SHALL omitir el campo `"matcher"` para que Claude Code despache el hook para todos los valores de `source` (`startup`, `resume`, `clear`, `compact`). **No SHALL existir un campo `"matcher"` en la entrada `SessionStart` de `configs/hooks.json`.**
+
 El merge selectivo SHALL seguir esta política para cada clave:
 
 1. Si la clave NO existe en `~/.claude/settings.json` → crear con versión canónica de SCP.
@@ -345,6 +379,13 @@ La plantilla canónica SHALL vivir en `configs/hooks.json` en el repo SCP y SHAL
 - **WHEN** el usuario ejecuta `npm run setup -- --hooks`
 - **THEN** las 13 claves de SCP SHALL crearse en `settings.hooks`
 - **AND** `settings.env.SMART_CODE_PROXY_ROOT` SHALL establecerse con la ruta del repo
+
+#### Scenario: SessionStart instalado sin matcher
+
+- **GIVEN** `~/.claude/settings.json` no existe o tiene `hooks: {}`
+- **WHEN** el usuario ejecuta `npm run setup -- --hooks`
+- **THEN** la entrada `SessionStart` en `settings.hooks` NO SHALL tener campo `"matcher"`
+- **AND** el comando relay SHALL estar presente en la entrada `SessionStart`
 
 #### Scenario: Instalación con hooks ajenos existentes
 

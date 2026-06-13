@@ -3,11 +3,13 @@ name: openspec-apply
 description: >
   End-to-end apply flow for an OpenSpec change: select → plan → apply →
   verify → sync specs → sync docs → archive → commit, with
-  CRITICAL/WARNING/SUGGESTION gates inherited from openspec-verify at every step. Use when the user
-  invokes /openspec-apply or wants to drive a single change through the full
+  CRITICAL/WARNING/SUGGESTION gates inherited from openspec-verify at every step.
+  Accepts optional --run-until <phase> to stop after a specific phase (default: apply).
+  Use when the user invokes /openspec-apply or wants to drive a single change through the full
   close-out cycle. Also trigger for implementar cambio openspec, aplicar
   tareas, cerrar change end-to-end, aplicar y archivar, ciclo completo de
   apply, continuar implementacion.
+argument-hint: "[change-name] [--run-until apply|verify|sync-specs|sync-docs|archive|commit]"
 license: MIT
 compatibility: Requires openspec CLI.
 metadata:
@@ -20,6 +22,8 @@ metadata:
 End-to-end apply flow for a single OpenSpec change: select → plan → apply →
 verify → sync specs → sync docs → archive → commit, with
 CRITICAL/WARNING/SUGGESTION gates inherited from openspec-verify.
+Controlled by `--run-until <phase>` (default: `apply`); the flow stops cleanly after
+the named phase and reports what remains.
 <!-- </overview> -->
 
 <!-- <user_communication> -->
@@ -53,13 +57,22 @@ End-to-end apply flow for a single OpenSpec change. Eight steps run in
 pauses, WARNING asks for confirmation, SUGGESTION is logged and the flow
 continues.
 
-**Input**: Optionally a change name. If omitted: infer from conversation
-context; if ambiguous, run `openspec list --json` and prompt with the
-**AskUserQuestion tool**.
+**Input**: Optionally a change name and `--run-until <phase>`. Parse both
+before starting:
 
-**Anunciar siempre** al iniciar: «Usando change: `<name>`. Para aplicar otro
-change, ejecuta `/openspec-apply <otro-nombre>`.» (Una sola vez, antes del
-Step 1.)
+- **Change name**: if omitted, infer from conversation context; if
+  ambiguous, run `openspec list --json` and prompt with **AskUserQuestion**.
+- **`--run-until <phase>`**: controls how far the flow runs. Valid values
+  in order: `apply` · `verify` · `sync-specs` · `sync-docs` · `archive` ·
+  `commit`. Default: `apply`. Any unrecognized value → warn the user and
+  treat as `apply`. After the named phase completes successfully, the flow
+  stops and renders a **`run_until_stop_block`** (see `<output_templates>`)
+  listing the phases that were not run and how to resume them.
+
+**Anunciar siempre** al iniciar: «Usando change: `<name>`. Ejecutando hasta
+la fase: `<run-until>`. Para aplicar otro change o cambiar la fase de stop,
+ejecuta `/openspec-apply <otro-nombre> --run-until <fase>`.» (Una sola vez,
+antes del Step 1.)
 
 ---
 
@@ -169,6 +182,10 @@ of [artifact-structuring](../artifact-structuring/SKILL.md).
 2.5. **Render end-of-apply summary** with `apply_progress_block`
      (completion form).
 
+2.6. **`--run-until` stop check**: if `run-until == "apply"` (the default),
+     render `run_until_stop_block` with remaining phases
+     `[verify, sync-specs, sync-docs, archive, commit]` and stop.
+
 ---
 
 ### Step 3 — verify
@@ -202,7 +219,11 @@ of [artifact-structuring](../artifact-structuring/SKILL.md).
      discovered here is **logged** in Spanish so the commit message can
      reference it.
 
-3.6. **Reconcile coherence divergences** (mandatory when Coherence has
+3.6. **`--run-until` stop check**: if `run-until == "verify"`, render
+     `run_until_stop_block` with remaining phases
+     `[sync-specs, sync-docs, archive, commit]` and stop.
+
+3.7. **Reconcile coherence divergences** (mandatory when Coherence has
      WARNING or CRITICAL):
 
    For each coherence finding in the scorecard:
@@ -283,6 +304,10 @@ of [artifact-structuring](../artifact-structuring/SKILL.md).
      already up to date. This is the precondition for Step 6 (archive) —
      the archive's own sync re-prompt should now be a no-op.
 
+4.8. **`--run-until` stop check**: if `run-until == "sync-specs"`, render
+     `run_until_stop_block` with remaining phases
+     `[sync-docs, archive, commit]` and stop.
+
 ---
 
 ### Step 5 — sync docs (docs/)
@@ -325,6 +350,10 @@ There is no dedicated skill; this step is **inline and bespoke**.
 5.5. **Render `doc_sync_block`** with: candidates checked, edits
      applied, and any remaining warnings explicitly acknowledged.
 
+5.6. **`--run-until` stop check**: if `run-until == "sync-docs"`, render
+     `run_until_stop_block` with remaining phases `[archive, commit]`
+     and stop.
+
 ---
 
 ### Step 6 — archive (INLINE via openspec-archive)
@@ -345,6 +374,9 @@ There is no dedicated skill; this step is **inline and bespoke**.
 6.4. **Archive gate**:
    - `mv` fails or target collision → **PAUSE_BLOCK** (CRITICAL).
    - **Clean** → render `archive_complete_block` and continue.
+
+6.5. **`--run-until` stop check**: if `run-until == "archive"`, render
+     `run_until_stop_block` with remaining phases `[commit]` and stop.
 
 ---
 
@@ -521,6 +553,7 @@ Three renderings of the same template:
 ## Aplicando: <change-name> (schema: <schema-name>)
 ## Progreso inicial: <complete>/<total> tasks completas
 ## Plan: select → plan → apply → verify → sync specs → sync docs → archive → commit
+## Ejecutando hasta: <run-until>
 ```
 
 **Per-task (Step 2)**
@@ -713,6 +746,33 @@ Resumen de cambios
 
 ---
 
+### run_until_stop_block
+
+Rendered when the flow stops at the phase specified by `--run-until`.
+
+```
+## ✓ Fase completada: <phase-name> — <change-name>
+
+El flujo se detuvo tras la fase `<run-until>` según lo solicitado.
+
+### Fases ejecutadas
+- [x] select
+- [x] plan
+- [x] apply
+{{- [x] verify (si aplicable)}}
+{{...}}
+
+### Fases pendientes
+- [ ] <next-phase-1>
+- [ ] <next-phase-2>
+...
+
+Para continuar, ejecuta:
+  /openspec-apply <change-name> --run-until <next-phase>
+```
+
+---
+
 ### pause_block
 
 Generic rendering used by Steps 2, 3, 4, 5, 6, 7 whenever a gate
@@ -741,6 +801,11 @@ are filled by the step that invokes the pause.
 <!-- <guardrails> -->
 ## Structural
 
+- **`--run-until` parameter**: parse before Step 1. Valid values: `apply`
+  (default) · `verify` · `sync-specs` · `sync-docs` · `archive` · `commit`.
+  After the named phase completes cleanly, render `run_until_stop_block` and
+  stop — do not proceed further regardless of gate outcomes. Unrecognized
+  values → warn and treat as `apply`.
 - Steps run in **strict order**: select → plan → apply → verify →
   sync specs → sync docs → archive → commit. No step may be skipped; if a step is a
   no-op (e.g., no delta specs in Step 4), the workflow logs a

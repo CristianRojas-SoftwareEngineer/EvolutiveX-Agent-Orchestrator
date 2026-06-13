@@ -67,7 +67,7 @@ Only `name` and `description` are required. `description` is the main auto-activ
 | `paths` | CLI may silently reject the entire skill |
 | `allowed-tools` | Same; use `<constraints>` in the body for restrictions |
 
-See `docs/references/historical/smart-code-proxy/MAINTENANCE.md`. For language: follow `<language_policy>` in [artifact-structuring/SKILL.md](../../artifact-structuring/SKILL.md) — English artifact text, Spanish user I/O via `<constraints>` in the body (not extra frontmatter fields). Do not duplicate the full policy here.
+For language: follow `<language_policy>` in [artifact-structuring/SKILL.md](../../artifact-structuring/SKILL.md) — English artifact text, Spanish user I/O via `<constraints>` in the body (not extra frontmatter fields). Do not duplicate the full policy here.
 <!-- </frontmatter> -->
 
 <!-- <<dynamic_injection> -->

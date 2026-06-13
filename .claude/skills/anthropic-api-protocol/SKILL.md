@@ -320,8 +320,8 @@ Prices are expressed in USD per million tokens (MTok):
 When aggregating `usage` across multiple Messages API calls (e.g. tool loop):
 - Sum each billing field per hop for total billed consumption and cost estimation.
 - Do not treat summed `input_tokens` as unique context size; the last hop's `input_tokens` approximates prompt size for that request only.
-- Smart Code Proxy gateway: `WorkflowResult.usage` — see `docs/proposals/new-diseno-dominio-gateway-observabilidad.md` §7.7.1.
-- Per-hop billing categories: `docs/how-to-calculate-anthropic-api-costs.md` §4 and §4.1.
+- Smart Code Proxy gateway: `WorkflowResult.usage` — see `docs/gateway-architecture.md` §9.6.
+- Per-hop billing categories: see the `<cost_calculation>` table above.
 <!-- </gateway_usage_aggregation> -->
 
 <!-- <<api_routes> -->

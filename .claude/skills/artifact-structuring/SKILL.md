@@ -43,7 +43,7 @@ Assume Spanish by default for all user-facing text.
 
 **Git commits:** message body in Spanish per [AGENTS.md](../../AGENTS.md) §0 and the [conventional-commits](../conventional-commits/SKILL.md) skill. The conventional-commits skill keeps instructions in English; Spanish appears only in the commit message output template and required section headers.
 
-**Generated plans** (e.g. `/create-plan-to-implement`, `/create-plan-to-investigate`): invariant reasoning text in the command artifact is English; the plan delivered to the user is Spanish, including translated fundamental considerations.
+**Generated plans and reports** (e.g. `/create-plan` plans, `/investigation` reports): invariant reasoning text in the skill artifact is English; the deliverable to the user is Spanish, including translated fundamental considerations.
 
 **Output templates in skills:** use English placeholders in SKILL.md (e.g. `## Summary`); require Spanish in delivered output via `<constraints>`.
 

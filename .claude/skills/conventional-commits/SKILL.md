@@ -62,11 +62,11 @@ Separate from the first line with a blank line. Include these three blocks **in 
 
 | Header | Content |
 |--------|---------|
-| **Propósito** | Single narrative under one header, composed of two components in order: the **observed need** — what was seen, missing, or failing (bug, defect to prevent, new capability, or change to existing behavior) — and the **proposed resolution with its added value**. Flowing prose or consecutive paragraphs; same pattern as `/create-plan-to-implement` Propósito. |
+| **Propósito** | Single narrative under one header, composed of two components in order: the **observed need** — what was seen, missing, or failing (bug, defect to prevent, new capability, or change to existing behavior) — and the **proposed resolution with its added value**. Flowing prose or consecutive paragraphs; same pattern as `/create-plan` Propósito. |
 | **Objetivos** | Bullet list of concrete goals fulfilled by this commit. |
 | **Resumen de cambios** | Files or components modified: what was added, updated, or removed and where. |
 
-Canonical narrative rules: `.claude/skills/create-plan-to-implement/SKILL.md` `<plan_template>` § Propósito.
+Canonical narrative rules: `.claude/skills/create-plan/SKILL.md` `<plan_template>` § Propósito.
 <!-- </body_structure> -->
 
 <!-- <footer> -->
@@ -88,7 +88,7 @@ Propósito
 El skill conventional-commits definía la sección Propósito por oposición a un
 concepto narrativo independiente heredado, en lugar de definirla positivamente
 por sus dos componentes. Eso desalineaba el skill respecto al patrón de
-create-plan-to-implement y podía producir mensajes de commit fragmentados. Redefinir
+create-plan y podía producir mensajes de commit fragmentados. Redefinir
 Propósito como una sola narrativa — necesidad observada primero, propuesta de
 solución y su valor agregado después — mantiene coherencia en todo el flujo
 plan → implementación → commit.

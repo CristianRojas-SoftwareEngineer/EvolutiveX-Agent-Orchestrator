@@ -93,9 +93,11 @@ Good:
 The report is the deliverable: the final assistant message, in Spanish, clear and structured. It must:
 
 1. **Recorrido (walkthrough)**: open with a post-execution account of how the investigation proceeded — which tasks were executed, against which sources — and any drift between the internal plan and the actual execution (sources replaced, tasks adapted, scope adjustments), or an explicit note that there was none.
-2. **Respuestas a los objetivos**: answer explicitly each objective of the internal plan (or declare what remained unanswered and why).
+2. **Respuestas a los objetivos**: answer explicitly each objective of the internal plan (or declare what remained unanswered and why). Keep each answer a concise verdict (a short paragraph or list item per objective); the supporting evidence and development belong in the findings section — do not grow sub-sections here that duplicate it.
 3. **Hallazgos por tema**: present findings organized by theme — not by execution order — distinguishing verified facts from interpretations and hypotheses, citing the examined sources next to each relevant finding (paths as `file:line` when applicable).
 4. **Conclusiones**: close with conclusions and, when appropriate, recommendations or open questions for a next iteration.
+
+**Heading structure**: render the four components above as same-level sections (`##`), in that order, each opening with prose — never a heading followed immediately by another heading. Sub-headings (`###`) are allowed only inside the findings section, one per theme; the other three sections use prose and lists, no sub-headings.
 
 Detail matters: the report must let someone who did not watch the investigation reach the same conclusions from the cited evidence. No report files unless explicitly requested.
 <!-- </report_format> -->
@@ -107,7 +109,7 @@ Before delivering the report, run this checklist mentally; fix gaps before deliv
 
 1. Did the internal plan exist before execution, with purpose (both components), verifiable objectives, concrete-source action lines, and task numbering that was a valid execution order (every dependency numbered lower than its dependent, no "caution" dependencies between independent tasks) — and was its summary announced to the user?
 2. Was every declared source actually examined (or its absence reported), with zero mutations to the project?
-3. Does the report open with the Recorrido (process followed plus drift versus the internal plan, or its explicit absence), answer every objective explicitly, organize findings by theme, distinguish facts from interpretations, and cite sources per finding?
+3. Does the report open with the Recorrido (process followed plus drift versus the internal plan, or its explicit absence), answer every objective explicitly, organize findings by theme, distinguish facts from interpretations, cite sources per finding, and follow the heading structure of `<report_format>` (four `##` sections opening with prose; `###` only inside findings)?
 4. Were all unresolved scoping decision points consulted with the user before or during execution?
 5. Were task-list entries created and closed for each investigation task and the report?
 6. Is the report entirely in Spanish, with no internal vocabulary from this skill (XML block names, harness tools) leaked into it, and not persisted to any file?

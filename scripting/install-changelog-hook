@@ -11,8 +11,13 @@ HOOK="$REPO_ROOT/.git/hooks/post-commit"
 cat > "$HOOK" <<'HOOK_EOF'
 #!/usr/bin/env bash
 # post-commit: regenera CHANGELOG.md y lo incluye en el commit via --amend.
+# Guard contra recursión: git dispara post-commit también en --amend.
 set -euo pipefail
 REPO_ROOT="$(git rev-parse --show-toplevel)"
+LOCK="$REPO_ROOT/.git/post-commit.lock"
+[ -f "$LOCK" ] && exit 0
+touch "$LOCK"
+trap "rm -f '$LOCK'" EXIT
 bash "$REPO_ROOT/scripting/generate-changelog"
 git -C "$REPO_ROOT" add CHANGELOG.md
 git -C "$REPO_ROOT" commit --amend --no-edit --no-verify

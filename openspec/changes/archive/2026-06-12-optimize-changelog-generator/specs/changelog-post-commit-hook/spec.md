@@ -23,8 +23,8 @@ El hook `post-commit` instalado por `scripting/install-changelog-hook` regenera 
 - **THEN** el hook igualmente regenera `CHANGELOG.md` (el script no emite error por commits no mapeados) y lo enmienda al commit; el archivo refleja el historial actual aunque ese commit no genere entradas visibles
 
 ### Requirement: no-recursive-hook
-El hook `post-commit` no se dispara recursivamente cuando `git commit --amend` enmienda el commit.
+El hook `post-commit` no entra en bucle recursivo cuando `git commit --amend` dispara `post-commit` de nuevo. El guard es un lock file en `.git/post-commit.lock`.
 
 #### Scenario: amend interno del hook
-- **WHEN** el hook ejecuta `git commit --amend --no-edit --no-verify`
-- **THEN** git no dispara `post-commit` de nuevo (comportamiento estándar de git); el hook termina sin recursión
+- **WHEN** el hook ejecuta `git commit --amend --no-edit --no-verify` y git dispara `post-commit` de nuevo
+- **THEN** el hook detecta el lock file `.git/post-commit.lock`, sale con exit code 0 sin ejecutar nada, y el lock file es eliminado por `trap` al salir del proceso padre

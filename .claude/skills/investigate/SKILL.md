@@ -1,5 +1,5 @@
 ---
-name: investigation
+name: investigate
 description: >
   Self-contained investigation workflow: formalize an internal investigation plan
   (purpose, objectives, tasks with concrete sources), execute it against those sources
@@ -8,7 +8,7 @@ description: >
   code changes, validations, or commits. Similar to an Explore agent, but reusable and
   auto-discoverable as a skill.
 when_to_use: >
-  Invoke with /investigation [requirements] or when the user asks to explore,
+  Invoke with /investigate [requirements] or when the user asks to explore,
   investigate, analyze, or research something without changing the project (explorar,
   investigar, analizar, investigación, análisis de arquitectura, entender cómo funciona
   X), including online research. For work that changes the project, use

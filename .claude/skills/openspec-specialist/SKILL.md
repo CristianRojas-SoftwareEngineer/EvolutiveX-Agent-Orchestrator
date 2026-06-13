@@ -291,6 +291,8 @@ Activate or invoke the homonymous skill from `<skill_catalog>` per `<invocation_
 - **`openspec-bulk-archive`** — several completed changes; possible spec conflicts.
 - **`openspec-onboard`** — guided learning on the real codebase.
 - **`openspec-roadmap-manager`** — large set of changes with internal dependencies, multi-phase decomposition, iterative-incremental delivery with governance and phase gate.
+
+**Maintenance-profile heuristic**: when the request fits a maintenance profile — bug/regression → correctivo; quality improvement without behavior change → perfectivo; future risk/hardening → preventivo; external change/migration → adaptativo — route to `openspec-explore` suggesting the profile; it is confirmed per the determination rule in `investigate` `<maintenance_profiles>`.
 <!-- </skill_selection_heuristics> -->
 
 <!-- <workflow_skills_reference> -->
@@ -476,7 +478,9 @@ Keep language instructions alongside normal project context such as stack, datab
 
 **Workflow delivery:** `.claude/skills/openspec-<slug>/SKILL.md` only. Skills are **maintained and refined in-repo** (hybrid XML + Markdown, Spanish user I/O per `artifact-structuring`).
 
-**Other project tooling** (unrelated to OpenSpec workflow): commands `.claude/commands/analyze-session.md` and `verify-scripts.md`; skills `.claude/skills/create-plan/SKILL.md` and `.claude/skills/investigate/SKILL.md`.
+**Composable skills sub-invoked by the workflow**: `.claude/skills/investigate/SKILL.md` (sub-invoked by `openspec-explore` for structured investigation) and `.claude/skills/create-plan/SKILL.md` (sub-invoked by `openspec-apply` at Step 1.5). Composition contract: `<sub_invocation_protocol>` in [artifact-structuring](../artifact-structuring/SKILL.md).
+
+**Other project tooling** (unrelated to OpenSpec workflow): commands `.claude/commands/analyze-session.md` and `verify-scripts.md`.
 
 Catalog and policy: `<skill_catalog>` and `<maintenance>` in this file.
 <!-- </supported_tools> -->

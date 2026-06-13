@@ -253,6 +253,29 @@ If the input file is empty, return an error message instead of empty output.
 ```
 <!-- </practical_patterns> -->
 
+<!-- <sub_invocation_protocol> -->
+## Sub-invocation protocol (composition between skills)
+
+Three composition patterns exist in this ecosystem. Skills that compose with others must reference this block instead of defining a local variant.
+
+### Pattern A — Fire-and-proceed delegation
+
+The invoker triggers another skill (e.g. via a subagent + Skill tool) and continues without consuming its output. Example: `openspec-archive` delegating to `openspec-sync`.
+
+### Pattern B — Inline step reuse
+
+The invoker executes specific steps of another skill's procedure inline, as part of its own flow, without a separate invocation. Example: `openspec-apply` running steps 5–6 of `openspec-archive` inline.
+
+### Pattern C — Invocation with result consumption
+
+The invoker runs another skill as a sub-step and consumes its canonical output (report, plan). Contract:
+
+1. **Input context** — the invoker passes explicit context in the invocation prompt: which skill is invoking, what is already known (prior findings, active artifacts), and the complete requirements (sources to review, constraints, expected output). The sub-invoked skill never guesses the invoker's workflow.
+2. **Sub-invoked mode** — the sub-invoked skill suppresses its conversational close-out: it delivers its canonical output (report or plan) as a hand-off to the invoker's flow, and does not execute its own closing stages (commits, syncs, follow-up offers) unless the invoker explicitly instructs it to.
+3. **Gate propagation** — approval gates belonging to the sub-invoked skill (scope questions, plan approval) are still presented to the user through the outer flow. The invoker never absorbs or skips them.
+4. **Invoker declarations** — the invoker declares whether the sub-invocation is conditional or mandatory, and what it does with the result (e.g. sync it into its own artifacts). Any artifact the invoker owns is updated by the invoker, never by the sub-invoked skill.
+<!-- </sub_invocation_protocol> -->
+
 <!-- <tag_naming> -->
 ## Tag naming conventions
 
@@ -333,4 +356,6 @@ If the whole document is short (< ~500 tokens), linear, and without distinct con
 **XML syntax by context:**
 - `.md` files (SKILL.md, commands, CLAUDE.md): `<!-- <tag_name> -->` ... `<!-- </tag_name> -->` — HTML comments preserve semantic structure without breaking Markdown rendering.
 - Non-Markdown (API strings, JSON/YAML payloads, hook configs): raw `<tag_name>` ... `</tag_name>`.
+
+**Composition between skills:** see `<sub_invocation_protocol>` above — three patterns (fire-and-proceed, inline step reuse, invocation with result consumption) and the contract for the third.
 <!-- </artifact_reference> -->

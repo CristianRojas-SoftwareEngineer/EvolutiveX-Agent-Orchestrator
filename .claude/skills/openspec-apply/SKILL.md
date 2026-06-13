@@ -1,9 +1,9 @@
 ---
 name: openspec-apply
 description: >
-  End-to-end apply flow for an OpenSpec change: select → apply → verify →
-  sync specs → sync docs → archive → commit, with CRITICAL/WARNING/SUGGESTION
-  gates inherited from openspec-verify at every step. Use when the user
+  End-to-end apply flow for an OpenSpec change: select → plan → apply →
+  verify → sync specs → sync docs → archive → commit, with
+  CRITICAL/WARNING/SUGGESTION gates inherited from openspec-verify at every step. Use when the user
   invokes /openspec-apply or wants to drive a single change through the full
   close-out cycle. Also trigger for implementar cambio openspec, aplicar
   tareas, cerrar change end-to-end, aplicar y archivar, ciclo completo de
@@ -17,9 +17,9 @@ metadata:
 ---
 
 <!-- <overview> -->
-End-to-end apply flow for a single OpenSpec change: select → apply → verify →
-sync specs → sync docs → archive → commit, with CRITICAL/WARNING/SUGGESTION
-gates inherited from openspec-verify.
+End-to-end apply flow for a single OpenSpec change: select → plan → apply →
+verify → sync specs → sync docs → archive → commit, with
+CRITICAL/WARNING/SUGGESTION gates inherited from openspec-verify.
 <!-- </overview> -->
 
 <!-- <user_communication> -->
@@ -30,7 +30,13 @@ Ask, confirm, and respond to the user in **Spanish** (native Spanish-speaking au
 Workflow delivery in this repo: `.claude/skills/openspec-apply/` only. Invocation: see `<invocation_model>` in [openspec-specialist](../openspec-specialist/SKILL.md).
 
 <!-- <delegation_map> -->
-All steps run inline. Reasoning:
+All steps run inline, with one reasoned exception (Step 1.5). Reasoning:
+
+- **plan (Step 1.5 — the only delegated step)**: sub-invocation of
+  `create-plan` with result consumption per `<sub_invocation_protocol>`
+  in [artifact-structuring](../artifact-structuring/SKILL.md). Planning
+  with an approval gate is a complete workflow with its own mode, not an
+  inline procedure; re-implementing it here would duplicate it.
 
 - **verify** (inline): a single change produces bounded context; the main thread needs the findings to drive the gate decision and to feed the commit message. Delegation would add round-trip latency for the verdict without freeing significant context.
 - **sync specs** (inline): the existing `openspec-sync` is already agent-driven; re-delegating to a sub-agent would re-launch the same logic in a different thread. Inline reuses the active context.
@@ -41,9 +47,9 @@ All steps run inline. Reasoning:
 <!-- </repo_context> -->
 
 <!-- <workflow> -->
-End-to-end apply flow for a single OpenSpec change. Seven steps run in
-**strict order**: select → apply → verify → sync specs → sync docs → archive
-→ commit. Every step ends with a gate (see `<gate_definitions>`); CRITICAL
+End-to-end apply flow for a single OpenSpec change. Eight steps run in
+**strict order**: select → plan → apply → verify → sync specs → sync docs
+→ archive → commit. Every step ends with a gate (see `<gate_definitions>`); CRITICAL
 pauses, WARNING asks for confirmation, SUGGESTION is logged and the flow
 continues.
 
@@ -95,6 +101,34 @@ Step 1.)
 
 ---
 
+### Step 1.5 — plan
+
+Mandatory planning step before touching code. Sub-invokes
+[create-plan](../create-plan/SKILL.md) per the `<sub_invocation_protocol>`
+of [artifact-structuring](../artifact-structuring/SKILL.md).
+
+1.5.1. **Sub-invoke `create-plan`** with explicit instructions and
+   requirements:
+   - **Sources (mandatory)**: the `contextFiles` already read in Step 1
+     (proposal, specs, design, tasks).
+   - **Constraint**: the plan's tasks refine the tasks in `tasks.md`
+     without contradicting their scope.
+   - **Profile**: pass the maintenance profile if the flow carries one.
+   - **No closure flags**: closure belongs to Steps 3–7 of this workflow.
+
+1.5.2. **Plan-approval gate (blocking)**: the plan's approval gate is
+   presented to the user as-is. Without an approved plan, Step 2 does
+   not start (CRITICAL).
+
+1.5.3. **Sync `tasks.md` (owned by this step, not by create-plan)**:
+   after approval, update `tasks.md` to reflect the refinement — same
+   checkbox tasks, with references to the plan where its breakdown
+   expands them — keeping plan and `tasks.md` synchronized before
+   Step 2. Scope drift detected between plan and `tasks.md` during this
+   sync → WARNING (confirm with the user).
+
+---
+
 ### Step 2 — apply
 
 2.1. **Show progress header** (use `apply_progress_block` summary form).
@@ -102,9 +136,12 @@ Step 1.)
 2.2. **Implement loop** (preserve existing logic, but with explicit
      per-task progress rendering):
 
-   For each task still marked `- [ ]` in `tasks.md`:
+   For each task still marked `- [ ]` in `tasks.md` (already synchronized
+   with the approved plan in Step 1.5; the plan governs the
+   implementation order and breakdown):
    - Render «Working on task N/M: <description>».
-   - Make the code changes required (minimal, focused, AGENTS.md §2/§3).
+   - Make the code changes required (minimal, focused, AGENTS.md §2/§3),
+     guided by the approved plan.
    - Mark the checkbox `- [x]` **immediately** on completion of that task.
    - Render «✓ Task complete» (`apply_progress_block` per-task form).
 
@@ -386,8 +423,15 @@ There is no dedicated skill; this step is **inline and bespoke**.
    hazards.
 
 7.5. **Final confirmation** in Spanish: change name, commit hash (from
-   `git rev-parse --short HEAD`), and a one-line summary of the seven
+   `git rev-parse --short HEAD`), and a one-line summary of the eight
    steps that ran.
+
+7.6. **Drift walkthrough (three-way)**: close with a comparison of the
+   approved plan (Step 1.5) vs the actual execution vs `tasks.md`,
+   reporting each divergence with its reason — or stating explicitly
+   that there was none. This comparison is this workflow's
+   responsibility (it owns its artifacts); `create-plan` only provides
+   the approved plan as reference.
 
 ---
 
@@ -424,6 +468,7 @@ below.
 | Step | CRITICAL (pause / block) | WARNING (ask confirm) | SUGGESTION (log + continue) |
 |------|--------------------------|-----------------------|------------------------------|
 | 1 — select | `state: "blocked"` from `openspec status`; schema not resolved | — | — |
+| 1.5 — plan | No approved plan (rejected or approval missing) → Step 2 does not start | Scope drift between approved plan and `tasks.md` during sync (confirm with user) | — |
 | 2 — apply | Build / typecheck / test failure; user explicitly aborts | Task description ambiguous, design flaw revealed mid-implementation, voluntary pause with incomplete tasks | Implementation deviates from `design.md` but works |
 | 3 — verify | Any incomplete `- [ ]` task; any requirement in delta specs with no codebase evidence; any open CRITICAL from openspec-verify's three dimensions; spec/design divergence **not reconciled** via Step 3.6 | Spec/design divergence detected but reconciliation pending Step 3.6 decision; missing scenario coverage; coherence issues | Pattern inconsistencies, minor refactors |
 | 4 — sync specs | — | Merge ambiguity (a MODIFIED requirement cannot be matched confidently) | Re-sync drift; RENAMED applied as ADDED+REMOVED; idempotency re-check shows minor diff |
@@ -475,7 +520,7 @@ Three renderings of the same template:
 ```
 ## Aplicando: <change-name> (schema: <schema-name>)
 ## Progreso inicial: <complete>/<total> tasks completas
-## Plan: select → apply → verify → sync specs → sync docs → archive → commit
+## Plan: select → plan → apply → verify → sync specs → sync docs → archive → commit
 ```
 
 **Per-task (Step 2)**
@@ -696,8 +741,8 @@ are filled by the step that invokes the pause.
 <!-- <guardrails> -->
 ## Structural
 
-- Steps run in **strict order**: select → apply → verify → sync specs →
-  sync docs → archive → commit. No step may be skipped; if a step is a
+- Steps run in **strict order**: select → plan → apply → verify →
+  sync specs → sync docs → archive → commit. No step may be skipped; if a step is a
   no-op (e.g., no delta specs in Step 4), the workflow logs a
   SUGGESTION and continues.
 - Each step ends with a gate from `<gate_definitions>`. CRITICAL pauses,

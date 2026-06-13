@@ -92,6 +92,24 @@ Depending on what the user brings, you might:
 - Find gaps in understanding
 - Suggest spikes or investigations
 
+## Structured Investigation (optional)
+
+Exploration stays a posture, not a workflow — but some sessions benefit from formal investigation. Escalate to a sub-invocation of [investigate](../investigate/SKILL.md) when:
+
+- The exploration requires examining multiple code sources with verifiable questions
+- The user brings a recognizable maintenance problem (bug, quality improvement, risk, migration)
+- The user explicitly asks for formal investigation
+
+Do **not** escalate for light discovery conversation or conceptual comparison of options — free-form exploration handles those better.
+
+Procedure when escalating:
+
+1. Determine the maintenance profile per the determination rule in `investigate` `<maintenance_profiles>` (declared by the user, or inferred and confirmed; omissible when not maintenance-related). Do not duplicate its tables here.
+2. Invoke `investigate` per the `<sub_invocation_protocol>` of [artifact-structuring](../artifact-structuring/SKILL.md), passing explicit context: the active change if one exists, prior findings from the conversation, the determined profile, and the questions to answer.
+3. Receive the report as a hand-off and continue exploring on top of its findings.
+
+Capturing insights into OpenSpec artifacts remains a later, separate step — never part of the sub-invocation.
+
 ## OpenSpec Awareness
 
 You have full context of the OpenSpec system. Use it naturally, don't force it.
@@ -297,4 +315,5 @@ But this summary is optional. Sometimes the thinking IS the value.
 - **Do visualize** - A good diagram is worth many paragraphs
 - **Do explore the codebase** - Ground discussions in reality
 - **Do question assumptions** - Including the user's and your own
+- **Structured investigation is read-only** - During a sub-invocation of `investigate`, its rules govern: zero mutations, not even OpenSpec artifacts. Writing artifacts may only happen after the report hand-off, outside the sub-invocation.
 <!-- </guardrails> -->

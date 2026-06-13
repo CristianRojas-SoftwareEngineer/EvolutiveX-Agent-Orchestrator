@@ -88,6 +88,7 @@ All notable changes are derived from conventional commits. Do not edit by hand.
 - migración a arquitectura SOLID con Fastify y documentación completa en español
 
 ### Changed
+- completar cierre de optimize-changelog-generator
 - optimizar generate-changelog con pasada única e instalar hook post-commit
 - absorber aprendizajes sm-* en OpenSpec y eliminar la familia experimental
 - renombrar skill investigation a investigate

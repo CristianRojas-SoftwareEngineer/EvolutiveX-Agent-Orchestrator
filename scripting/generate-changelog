@@ -20,14 +20,14 @@ declare -A tag_date
 current_block="unreleased"
 order=("unreleased")
 
-while IFS='|' read -r refs subject; do
+while IFS='|' read -r refs subject date; do
   # Detectar límite de tag a partir de los refs de este commit
   if [[ "$refs" =~ tag:\ ([^,\ ]+) ]]; then
     tag="${BASH_REMATCH[1]}"
     if [[ "$current_block" != "$tag" ]]; then
       current_block="$tag"
       order+=("$tag")
-      tag_date["$tag"]=$(git log -1 --format=%as "$tag" 2>/dev/null || echo "")
+      tag_date["$tag"]="$date"
     fi
   fi
   # Clasificar el subject por tipo de conventional commit
@@ -40,7 +40,7 @@ while IFS='|' read -r refs subject; do
     docs)           doc["$current_block"]+="- ${desc}"$'\n' ;;
     # chore/test/build/ci/style descartados por diseño (Keep a Changelog)
   esac
-done < <(git log --pretty=format:'%D|%s')
+done < <(git log --pretty=format:'%D|%s|%as')
 
 # Emisión del archivo completo
 {

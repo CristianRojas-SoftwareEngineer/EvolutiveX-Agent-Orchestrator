@@ -23,10 +23,9 @@ argument-hint: "[requirements]"
 
 1. [How to operate this workflow](#how-to-operate-this-workflow)
 2. [Maintenance profiles (optional exploration modes)](#maintenance-profiles-optional-exploration-modes)
-3. [Internal plan structure](#internal-plan-structure)
-4. [Investigation rules](#investigation-rules)
-5. [Report format](#report-format)
-6. [Final verification before reporting](#final-verification-before-reporting)
+3. [Investigation rules](#investigation-rules)
+4. [Report format](#report-format)
+5. [Final verification before reporting](#final-verification-before-reporting)
 <!-- </table_of_contents> -->
 
 <!-- <user_communication> -->
@@ -36,19 +35,19 @@ Ask, confirm, and respond to the user in **Spanish** (native Spanish-speaking au
 <!-- <operation> -->
 ## How to operate this workflow
 
-This skill is **self-contained**: it formalizes an internal investigation plan, executes it, and reports the results — all in one flow. The plan is an internal formalization step, never the deliverable; the deliverable is the report in the assistant message.
+This skill is **self-contained**: it formalizes an internal investigation plan (by sub-invoking `create-plan`), executes it, and reports the results — all in one flow. The plan is an internal formalization step, never the deliverable; the deliverable is the report in the assistant message.
 
 **Sub-invoked mode**: when another skill invokes this one as a sub-step, follow the `<sub_invocation_protocol>` of [artifact-structuring](../artifact-structuring/SKILL.md): the report keeps its canonical structure but is delivered as a hand-off to the invoking flow instead of a conversational close-out, and scope questions are still presented to the user.
 
 **Harness tooling (reflective, not mechanical)**: this skill targets Claude Code first but is written to run in any agentic harness. Before starting, survey the **capabilities** your harness exposes and reflect on which fits each step below, named by function with their Claude Code incarnation as the reference example: structured user questions with options (`AskUserQuestion`), delegable exploration subagents (`Agent`), web search and fetch (`WebSearch`/`WebFetch`), and task-list management (`TaskCreate`/`TaskUpdate`). In another harness, map each capability to its closest equivalent; where one has no equivalent, achieve the intent by other means rather than skipping the intent. Prefer a real tool over improvising its effect in prose.
 
-**Task tracking**: trace the investigation with the harness task-list tools: create one task per investigation task of the internal plan plus one for the final report, mark them in progress when started and completed when verified. This gives the user visibility and prevents silently dropped steps.
+**Task tracking**: trace the investigation with the harness task-list tools: create one task per investigation task of the plan plus one for the final report, mark them in progress when started and completed when verified. This gives the user visibility and prevents silently dropped steps.
 
 1. **Requirements**: the user may pass requirements as `$requirements` (text after the slash command). If the request actually demands changes to the project, this is the wrong skill — route to `create-plan`; if genuinely ambiguous, ask (structured question with both options) instead of guessing. If `$requirements` is empty and no requirements appear elsewhere in the message, request them **in Spanish** (phenomenon to explore, idea to analyze, or topic to research; questions to answer; restrictions; context to size scope) before starting. Never invent or assume requirements.
 2. **Discovery**: resolve every source (repo file, document, URL or named external source, precisely-named element) from requirements and codebase layout. Delegate independent discovery tasks to exploration subagents when the harness offers them (Claude Code: `Agent` with `subagent_type: "Explore"`), in parallel when possible; use web search to confirm that external sources exist and are pertinent before relying on them. If a required source cannot be resolved, **stop and ask** — never investigate against placeholder sources.
 3. **Scope decisions**: if requirements are ambiguous, incomplete, or contradictory, stop and ask. Determine the maintenance profile as a scope decision per `<maintenance_profiles>` (explicit → accept; inferred → confirm via structured question; not maintenance-related → omit). If you detect a scoping decision point the user did not resolve (competing investigation angles, depth versus breadth, which questions matter most), surface it via the structured-question capability — one question per decision, your recommendation first and marked as such — and continue only after the user decides.
-4. **Formalize the internal plan**: build the plan per `<internal_plan>` — purpose, objectives, and investigation tasks with concrete-source actions. If a profile is active, modulate each task's focus, required evidence, and depth per the `<maintenance_profiles>` table. Keep it internal: do not write it to a file and do not deliver it as the response. Announce it to the user **in Spanish** as a brief summary (one line per task) before executing, so they see the walkthrough ahead.
-5. **Execute the investigation**: work through the tasks in numbering order — valid by construction per `<internal_plan>` § Orden por dependencia — executing or delegating mutually independent tasks in parallel when possible, examining each declared source and extracting the findings or determinations it targets. Record findings as you go (which source, what was found, fact vs. interpretation). Investigation mutates nothing — see `<investigation_rules>`. If execution reveals that a planned source is missing or insufficient, adapt the internal plan (note the deviation for the report) or ask if the gap blocks an objective.
+4. **Formalize the plan (sub-invocation of create-plan)**: sub-invoke [create-plan](../create-plan/SKILL.md) per the `<sub_invocation_protocol>` of [artifact-structuring](../artifact-structuring/SKILL.md) to formalize the investigation as a read-only plan. Pass as invocation context the investigation material: the purpose (both components — observed need and proposed investigation with its added value), the objectives formulated as questions to answer or determinations to produce (never «redactar el reporte» — reporting is the fixed final step), and the investigation tasks, each with one concrete read-only source per action line in backticks (repo-relative path, URL or named external source, or precisely-named element — never placeholders). If a profile is active, modulate each task's focus, required evidence, and depth per the `<maintenance_profiles>` table and declare it to the sub-invocation. The plan's approval gate is presented to the user as-is. Consume the approved plan as the hand-off that drives execution; keep it internal — do not write it to a file and do not deliver it as the response.
+5. **Execute the investigation**: work through the tasks in numbering order — a valid execution order by construction (every dependency numbered lower than its dependent in the plan built by `create-plan`) — executing or delegating mutually independent tasks in parallel when possible, examining each declared source and extracting the findings or determinations it targets. Record findings as you go (which source, what was found, fact vs. interpretation). Investigation mutates nothing — see `<investigation_rules>`. If execution reveals that a planned source is missing or insufficient, adapt the plan (note the deviation for the report) or ask if the gap blocks an objective.
 6. **Report**: synthesize all findings per `<report_format>` and deliver them **in Spanish** as the final assistant message. Do not persist the report in project files unless the user explicitly requests it. Do not mention harness tools, modes, subagents, or internal XML block names in the report.
 <!-- </operation> -->
 
@@ -76,20 +75,6 @@ When the investigation is tied to a software-maintenance problem, an active prof
 - The skill infers a profile from the request → confirm it with the user via a structured question before executing.
 - The investigation is not maintenance-related (general research, architecture discovery) → omit the profile without friction; no profile is a valid state.
 <!-- </maintenance_profiles> -->
-
-<!-- <internal_plan> -->
-## Internal plan structure
-
-The internal plan formalizes the investigation before executing it. It exists in working memory (and as the task list), not as a file or deliverable. It must define:
-
-- **Propósito**: continuous prose with two components in order — the **observed need** (what is unknown, doubted, or hypothesized, and what decision depends on it) and the **proposed investigation with its added value** (what knowledge it produces and returns).
-- **Objetivos**: verifiable goals formulated as questions to answer or determinations to produce. Never include "redactar el reporte" — reporting is the fixed final step, not an objective.
-- **Tareas de investigación**: one per coherent aspect of the phenomenon, each with:
-  - a title naming the primary source in backticks when the scope is bounded;
-  - the aspect it covers and the analysis approach;
-  - **Acciones**: numbered lines where **every** line starts with an explicit, concrete source in backticks — a repo-relative path, a URL or named external source, or a precisely-named element (module, pattern, metric) — followed by the section or aspect to examine and what to extract or determine. One primary source per line; never placeholders (`algunas fuentes`, `documentación relevante`).
-  - **Orden por dependencia**: number the tasks so list order is a valid execution order — a task that consumes findings or determinations another task produces gets a higher number. A dependency exists **only** on real consumption of results; never chain tasks "for caution" — that destroys the parallelism information. Break topological ties by thematic affinity. Tasks with no mutual dependencies are parallelizable (delegable in parallel to exploration subagents when the harness offers them).
-<!-- </internal_plan> -->
 
 <!-- <investigation_rules> -->
 ## Investigation rules
@@ -120,7 +105,7 @@ Good:
 
 The report is the deliverable: the final assistant message, in Spanish, clear and structured. It must:
 
-1. **Recorrido (walkthrough)**: open with a post-execution account of how the investigation proceeded — which tasks were executed, against which sources — and any drift between the internal plan and the actual execution (sources replaced, tasks adapted, scope adjustments), or an explicit note that there was none.
+1. **Recorrido (walkthrough)**: open with a post-execution account of how the investigation proceeded — which tasks were executed, against which sources — and any drift between the plan (built via the `create-plan` sub-invocation) and the actual execution (sources replaced, tasks adapted, scope adjustments), or an explicit note that there was none. This Recorrido is the investigation's walkthrough — it owns that role here; the sub-invoked plan's own closure phase is not produced separately.
 2. **Respuestas a los objetivos**: answer explicitly each objective of the internal plan (or declare what remained unanswered and why). Keep each answer a concise verdict (a short paragraph or list item per objective); the supporting evidence and development belong in the findings section — do not grow sub-sections here that duplicate it.
 3. **Hallazgos por tema**: present findings organized by theme — not by execution order — distinguishing verified facts from interpretations and hypotheses, citing the examined sources next to each relevant finding (paths as `file:line` when applicable).
 4. **Conclusiones**: close with conclusions and, when appropriate, recommendations or open questions for a next iteration.
@@ -135,7 +120,7 @@ Detail matters: the report must let someone who did not watch the investigation 
 
 Before delivering the report, run this checklist mentally; fix gaps before delivering if any check fails:
 
-1. Did the internal plan exist before execution, with purpose (both components), verifiable objectives, concrete-source action lines, and task numbering that was a valid execution order (every dependency numbered lower than its dependent, no "caution" dependencies between independent tasks) — and was its summary announced to the user?
+1. Was the plan formalized via a `create-plan` sub-invocation before execution — purpose (both components), verifiable objectives, concrete read-only source action lines, and a valid execution order (every dependency numbered lower than its dependent, no "caution" dependencies between independent tasks) — and was its approval gate presented to the user?
 2. Was every declared source actually examined (or its absence reported), with zero mutations to the project?
 3. Does the report open with the Recorrido (process followed plus drift versus the internal plan, or its explicit absence), answer every objective explicitly, organize findings by theme, distinguish facts from interpretations, cite sources per finding, and follow the heading structure of `<report_format>` (four `##` sections opening with prose; `###` only inside findings)?
 4. Were all unresolved scoping decision points consulted with the user before or during execution?

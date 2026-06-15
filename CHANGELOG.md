@@ -4,6 +4,7 @@ All notable changes are derived from conventional commits. Do not edit by hand.
 
 ## [Unreleased]
 ### Added
+- adoptar pipeline spec-driven secuencial con schema local
 - agregar skill claude-code-model-config refinada
 - agregar tier Frontier en Tabla 2 para Fable 5
 - agregar skill de conocimiento statusline-system

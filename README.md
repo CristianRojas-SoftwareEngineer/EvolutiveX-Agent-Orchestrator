@@ -347,3 +347,13 @@ El proxy intercepta métricas de uso de tokens que pueden ser cuantificadas. Con
 - [Peticiones sin sesión (pre-sesión)](./docs/health-check-handling.md)
 - [Coste por interacción: Claude Code y la API de Anthropic](./docs/how-to-calculate-anthropic-api-costs.md)
 - [Coste por generación: OpenRouter y la API Chat Completions](./docs/how-to-calculate-openrouter-api-costs.md)
+
+## OpenSpec
+
+Este proyecto usa [OpenSpec](https://www.npmjs.com/package/@fission-ai/openspec) con el schema local **`sequential-spec-driven-design`**, definido en [`openspec/schemas/sequential-spec-driven-design/`](./openspec/schemas/sequential-spec-driven-design/). El override vive en el repositorio para sobrevivir a `openspec update`.
+
+Los artefactos de un cambio se generan en secuencia estricta:
+
+**proposal → specs → design → tasks**
+
+La configuración activa está en [`openspec/config.yaml`](./openspec/config.yaml).

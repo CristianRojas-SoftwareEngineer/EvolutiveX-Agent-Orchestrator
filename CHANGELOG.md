@@ -218,6 +218,7 @@ All notable changes are derived from conventional commits. Do not edit by hand.
 - migrar ts-node a tsx por compatibilidad con Node.js 24
 
 ### Documentation
+- refactorizar guías de agentes y meta-skills
 - corregir referencias rotas a documentos eliminados
 - sincronizar specs con fix de workflow-lifecycle del commit d5a08e9
 - reestructurar narrativa y agregar tabla de contenido

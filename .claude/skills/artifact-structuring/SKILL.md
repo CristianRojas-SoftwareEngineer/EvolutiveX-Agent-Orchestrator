@@ -41,7 +41,7 @@ Assume Spanish by default for all user-facing text.
 - Add a `<constraints>` block (or equivalent) requiring **Spanish** for all user-facing output
 - Include Spanish trigger phrases in frontmatter `description` when they improve auto-activation
 
-**Git commits:** message body in Spanish per [AGENTS.md](../../AGENTS.md) §0 and the [conventional-commits](../conventional-commits/SKILL.md) skill. The conventional-commits skill keeps instructions in English; Spanish appears only in the commit message output template and required section headers.
+**Git commits:** message body in Spanish per [AGENTS.md](../../../AGENTS.md) §0 and the [conventional-commits](../conventional-commits/SKILL.md) skill. The conventional-commits skill keeps instructions in English; Spanish appears only in the commit message output template and required section headers.
 
 **Generated plans and reports** (e.g. `/create-plan` plans, `/investigate` reports): invariant reasoning text in the skill artifact is English; the deliverable to the user is Spanish, including translated fundamental considerations.
 
@@ -256,17 +256,9 @@ If the input file is empty, return an error message instead of empty output.
 <!-- <sub_invocation_protocol> -->
 ## Sub-invocation protocol (composition between skills)
 
-Three composition patterns exist in this ecosystem. Skills that compose with others must reference this block instead of defining a local variant.
+Two composition patterns exist in this ecosystem. Skills that compose with others must reference this block instead of defining a local variant.
 
-### Pattern A — Fire-and-proceed delegation
-
-The invoker triggers another skill (e.g. via a subagent + Skill tool) and continues without consuming its output. Example: `openspec-archive` delegating to `openspec-sync`.
-
-### Pattern B — Inline step reuse
-
-The invoker executes specific steps of another skill's procedure inline, as part of its own flow, without a separate invocation. Example: `openspec-apply` running steps 5–6 of `openspec-archive` inline.
-
-### Pattern C — Invocation with result consumption
+### Pattern A — Invocation with result consumption
 
 The invoker runs another skill as a sub-step and consumes its canonical output (report, plan). Contract:
 
@@ -274,6 +266,12 @@ The invoker runs another skill as a sub-step and consumes its canonical output (
 2. **Sub-invoked mode** — the sub-invoked skill suppresses its conversational close-out: it delivers its canonical output (report or plan) as a hand-off to the invoker's flow, and does not execute its own closing stages (commits, syncs, follow-up offers) unless the invoker explicitly instructs it to.
 3. **Gate propagation** — approval gates belonging to the sub-invoked skill (scope questions, plan approval) are still presented to the user through the outer flow. The invoker never absorbs or skips them.
 4. **Invoker declarations** — the invoker declares whether the sub-invocation is conditional or mandatory, and what it does with the result (e.g. sync it into its own artifacts). Any artifact the invoker owns is updated by the invoker, never by the sub-invoked skill.
+
+Living examples: `investigate` sub-invoking `create-plan` to formalize its read-only investigation plan (and consuming it as the hand-off that drives execution); `apply-specification-delta` sub-invoking `create-plan` before implementing.
+
+### Pattern B — Shared canonical reference
+
+The invoker neither invokes nor inlines another skill: it cites a canonical block as the single source of truth for a rule or structure and follows it in place. There is no transfer of control and no output to consume — the reference points at the authoritative definition so the invoker does not restate or fork it. Examples: `conventional-commits` referencing the `Propósito` section of `create-plan` as the canonical narrative structure; skills citing the `<language_policy>` block of this artifact instead of redefining the language rule locally.
 <!-- </sub_invocation_protocol> -->
 
 <!-- <tag_naming> -->
@@ -357,5 +355,5 @@ If the whole document is short (< ~500 tokens), linear, and without distinct con
 - `.md` files (SKILL.md, commands, CLAUDE.md): `<!-- <tag_name> -->` ... `<!-- </tag_name> -->` — HTML comments preserve semantic structure without breaking Markdown rendering.
 - Non-Markdown (API strings, JSON/YAML payloads, hook configs): raw `<tag_name>` ... `</tag_name>`.
 
-**Composition between skills:** see `<sub_invocation_protocol>` above — three patterns (fire-and-proceed, inline step reuse, invocation with result consumption) and the contract for the third.
+**Composition between skills:** see `<sub_invocation_protocol>` above — two patterns (invocation with result consumption; shared canonical reference) and the contract for the sub-invocation pattern.
 <!-- </artifact_reference> -->

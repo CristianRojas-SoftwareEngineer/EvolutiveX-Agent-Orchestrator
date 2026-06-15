@@ -8,11 +8,11 @@ description: Activate when user requests commit, drafting commit message, Claude
 <!-- <overview> -->
 All commit messages must follow Conventional Commits with a structured first line and a mandatory body in three blocks.
 
-This skill's instructions are in **English** (token efficiency). **Commit messages** and explanations to the user are in **Spanish** — see `<language_policy>` in [artifact-structuring](../artifact-structuring/SKILL.md) and [AGENTS.md](../../AGENTS.md) §0.
+This skill's instructions are in **English** (token efficiency). **Commit messages** and explanations to the user are in **Spanish** — see `<language_policy>` in [artifact-structuring](../artifact-structuring/SKILL.md) and [AGENTS.md](../../../AGENTS.md) §0.
 <!-- </overview> -->
 
 <!-- <user_communication> -->
-Ask, confirm, and respond to the user in **Spanish** (native Spanish-speaking audience). Keep this artifact's instructions in **English** for token efficiency. Canonical policy: `<language_policy>` in [artifact-structuring](../artifact-structuring/SKILL.md). User-facing rules: [AGENTS.md](../../AGENTS.md) §0.
+Ask, confirm, and respond to the user in **Spanish** (native Spanish-speaking audience). Keep this artifact's instructions in **English** for token efficiency. Canonical policy: `<language_policy>` in [artifact-structuring](../artifact-structuring/SKILL.md). User-facing rules: [AGENTS.md](../../../AGENTS.md) §0.
 <!-- </user_communication> -->
 
 <!-- <activation> -->

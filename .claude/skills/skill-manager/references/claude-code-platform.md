@@ -28,8 +28,6 @@ Ask, confirm, and respond to the user in **Spanish** when this reference informs
 - Skills in `.claude/skills/` from the start directory and each parent directory up to the repo root.
 - In monorepos, skills in nested `.claude/skills/` under subdirectories are also discovered when working in those paths.
 - Changes to skill files are detected hot during the session (no restart needed unless `.claude/skills/` is created for the first time after the session starts).
-
-**Merge with commands:** `.claude/commands/<name>.md` and `.claude/skills/<name>/SKILL.md` expose the same `/name`; the skill takes priority and supports bundled files.
 <!-- </location> -->
 
 <!-- <<skill_types> -->

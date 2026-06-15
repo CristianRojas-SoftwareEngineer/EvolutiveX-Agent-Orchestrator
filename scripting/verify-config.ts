@@ -4,9 +4,9 @@
  * Este módulo es la **única fuente de verdad** sobre qué pasos ejecuta la
  * pipeline, en qué orden, y con qué dependencias. Es consumido por:
  *   - `scripting/verify-package-scripts.ts` (vía `import`).
- *   - `.claude/commands/verify-scripts.md` (vía la herramienta Read del agente).
+ *   - `.claude/skills/verify-scripts/SKILL.md` (vía la herramienta Read del agente).
  *
- * Cualquier paso nuevo o modificado se declara aquí. El script y el comando
+ * Cualquier paso nuevo o modificado se declara aquí. El script y la skill
  * derivan su comportamiento de este array; no duplican la enumeración.
  */
 
@@ -42,7 +42,7 @@ export interface VerifyStep {
   verifier?: string;
   /** IDs de pasos de los que depende este. Si alguno falla, este se omite. */
   dependsOn?: string[];
-  /** Etiquetas legibles de controles de riesgo (informativo, narrado por el comando). */
+  /** Etiquetas legibles de controles de riesgo (informativo, narrado por la skill). */
   riskControls?: string[];
   /**
    * Si es `true`, el script NO ejecuta este paso y lo reporta como `skip` en el

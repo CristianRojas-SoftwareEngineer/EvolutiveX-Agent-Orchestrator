@@ -11,7 +11,7 @@
  *   2. `verify-report.json` con la forma documentada en
  *      `./verify-report-schema.md`.
  *
- * El reporte JSON es el contrato que consume `.claude/commands/verify-scripts.md`.
+ * El reporte JSON es el contrato que consume `.claude/skills/verify-scripts/SKILL.md`.
  */
 
 import { execSync, spawn } from 'child_process';

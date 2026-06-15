@@ -1,6 +1,7 @@
 ---
+name: analyze-session
 description: Comparative analysis between the native Claude Code harness log and Smart Code Proxy audit, to identify gaps and guide the next proxy iteration.
-argument-hint: "[session-id]"
+disable-model-invocation: true
 ---
 
 # Analyze Smart Code Proxy session
@@ -10,13 +11,13 @@ Comparative analysis between the native Claude Code harness log and Smart Code P
 <!-- </overview> -->
 
 <!-- <user_communication> -->
-Ask, confirm, and respond to the user in **Spanish** (native Spanish-speaking audience). Keep this artifact's instructions in **English** for token efficiency. Canonical policy: `<language_policy>` in [.claude/skills/artifact-structuring/SKILL.md](../skills/artifact-structuring/SKILL.md). User-facing rules: [AGENTS.md](../../AGENTS.md) §0.
+Ask, confirm, and respond to the user in **Spanish** (native Spanish-speaking audience). Keep this artifact's instructions in **English** for token efficiency. Canonical policy: `<language_policy>` in [.claude/skills/artifact-structuring/SKILL.md](../artifact-structuring/SKILL.md). User-facing rules: [AGENTS.md](../../AGENTS.md) §0.
 <!-- </user_communication> -->
 
 <!-- <parameters> -->
 ## Expected parameters
 
-You can invoke this command with or without arguments in `$ARGUMENTS`. With arguments, Claude interprets the session-id and starts analysis directly. Without arguments, Claude requests the session-id before continuing.
+You can invoke this skill with or without arguments in `$ARGUMENTS`. With arguments, Claude interprets the session-id and starts analysis directly. Without arguments, Claude requests the session-id before continuing.
 
 The required parameter is:
 
@@ -59,22 +60,14 @@ Smart Code Proxy is not yet fully aligned with complete Claude Code harness beha
 Understand architectural design decisions of each system, identify discrepancies, omissions, or unexpected proxy behavior, and generate actionable insights for the next proxy development iteration.
 <!-- </purpose> -->
 
-<!-- <gap_classification> -->
-### Design differences vs inconsistencies
+<!-- <references> -->
+## On-demand references
 
-During analysis, classify every gap into one of two categories:
+Read these only when the active step requires them:
 
-**Intentional design differences (not bugs):**
-- Smart Code Proxy logs preflights (`client-preflight`) and side-requests as separate workflows (the harness groups them inline in the JSONL log)
-- Causal layout `causal-workflows-v1`: all workflow kinds live under a flat `workflows/NN/` tree; `workflowKind` in `meta.json` distinguishes agentic vs preflight vs side-request (no `main-agent/` or `side-interactions/` directories)
-- Subagents hang off `tools/KK-Agent/sub-agent/workflow/` under the step that launched the Agent tool; the harness uses a different file structure
-
-**Inconsistencies/bugs (require investigation/fix):**
-- Subagents the harness logs but the proxy does not capture
-- tool_use IDs that do not correlate between harness and proxy
-- Orphan workflows (no `output/result.json` and no `status: cancelled/complete` in `meta.json`)
-- Level 2+ subagents without a corresponding `tools/KK-Agent/sub-agent/workflow/` directory
-<!-- </gap_classification> -->
+- [references/gap-classification.md](references/gap-classification.md) — taxonomy that distinguishes intentional design differences from inconsistencies/bugs. Read before Step 5 and Step 6, where every gap must be classified.
+- [references/data-sources.md](references/data-sources.md) — exact paths and the harness-vs-proxy source distinction (harness store, proxy audit trail, runtime log). Read during Step 1 and Step 3 to locate files on disk.
+<!-- </references> -->
 
 <!-- <process> -->
 ## Step-by-step process
@@ -94,6 +87,8 @@ Key concepts to internalize before proceeding:
 - `session-metrics.json` at session root aggregates tokens by model across closed workflows.
 - `sessions/{session-id}/events.ndjson` is the append-only chronological EventBus log for the session.
 - `server/logs.jsonl` is the append-only Pino runtime log for the proxy process (warnings, routing, audit correlation).
+
+The exact file paths for each source live in [references/data-sources.md](references/data-sources.md).
 
 ### Step 2: Deterministic file structure inventory (MANDATORY)
 
@@ -184,6 +179,8 @@ Save this command output and refer to it throughout the analysis.
 5. Compare: How many workflows does the harness log vs. how many does the proxy capture? Classify each by `workflowKind` in `meta.json`.
 6. Identify the `workflowKind` of the first workflow (`agentic`, `client-preflight`, or `side-request`)
 
+The exact base paths for these sources are listed in [references/data-sources.md](references/data-sources.md).
+
 ### Step 4: Comparative analysis of hierarchical structure
 
 **In the native harness:**
@@ -211,6 +208,8 @@ Save this command output and refer to it throughout the analysis.
 
 ### Step 5: Comparative analysis of individual interactions
 
+Before classifying gaps in this step, read [references/gap-classification.md](references/gap-classification.md).
+
 For each interaction (main and subagents), compare both sources:
 
 **Interaction classification:**
@@ -233,16 +232,16 @@ For each interaction (main and subagents), compare both sources:
 
 ### Step 6: Comparative synthesis and gap detection
 
-Based on the analysis above, produce a structured explanation covering:
+Classify every gap per [references/gap-classification.md](references/gap-classification.md). Based on the analysis above, produce a structured explanation covering:
 
 1. **Executive summary**: What was tested in this session? Expected vs. observed result?
 
-2. **Architecture comparison**: 
+2. **Architecture comparison**:
    - **Native harness**: How does Claude Code structure sessions and subagents?
    - **Smart Code Proxy**: How did it intermediate and audit these interactions?
    - **Fundamental design differences**: What distinct architectural decisions are observed?
 
-3. **Identified gaps** (classified by type):
+3. **Identified gaps** (classified by type per the reference):
 
    **Inconsistencies (require investigation/fix):**
    - Harness subagents without proxy counterpart
@@ -268,49 +267,12 @@ Based on the analysis above, produce a structured explanation covering:
    - What emerging patterns suggest proxy refactoring?
 <!-- </process> -->
 
-<!-- <data_sources> -->
-## Data sources
-
-### 1. Claude Code session store (harness)
-
-Base location: `C:\Users\Cristian\.claude\projects\C--Users-Cristian-Desktop-Proyectos-Smart-Code-Proxy\{session-id}`
-
-Relevant files:
-- `C:\Users\Cristian\.claude\projects\C--Users-Cristian-Desktop-Proyectos-Smart-Code-Proxy\{session-id}.jsonl`: Main session log recorded by the harness
-- `C:\Users\Cristian\.claude\projects\C--Users-Cristian-Desktop-Proyectos-Smart-Code-Proxy\{session-id}\`: Directory with subagent files created during the session
-
-### 2. Smart Code Proxy audit trail (layout `causal-workflows-v1`)
-
-Location: `sessions/{session-id}` (relative to project CWD)
-
-Structure (single `workflows/` tree, all kinds share the same root):
-- `session-metrics.json`: Aggregated token metrics per model across closed workflows
-- `events.ndjson`: Append-only telemetry event log (raw EventBus stream) — **mandatory review in Step 3 and Step 5**
-- `workflows/workflow-sequence.json`: Ordered list of main workflows opened/closed
-- `workflows/NN/meta.json`: Fused identity+state for each workflow (`workflowKind`: `agentic` | `client-preflight` | `side-request`); no `state.json` separate file
-- `workflows/NN/output/result.json`: `IWorkflowResult` written when the workflow closes
-- `workflows/NN/steps/MM/request/body.json`: Step request body
-- `workflows/NN/steps/MM/response/body.json`, `headers.json`, `parsed.md`: Step response
-- `workflows/NN/steps/MM/response/streaming/NNNN-chunk.ndjson`: Per-chunk SSE audit (P2)
-- `workflows/NN/steps/MM/tools/KK-<slug>/meta.json`, `input.json`, `result.json`: Tool invocation
-- `workflows/NN/steps/MM/tools/KK-Agent/sub-agent/workflow/`: Nested subagent (same structure, recursively)
-
-### 3. Smart Code Proxy runtime log
-
-Location: `server/logs.jsonl` (relative to project CWD; shared across sessions)
-
-Relevant usage:
-- Filter by `{session-id}` or by session time window before reading
-- Inventory `level: warn` / `level: error` and messages prefixed `[audit]`
-- Correlate warnings with orphan workflows and `workflowId` distribution in `sessions/{session-id}/events.ndjson`
-<!-- </data_sources> -->
-
 <!-- <constraints> -->
 ## Design rules
 
 1. **Deterministic inventory**: Step 2 with `tree /F` is mandatory. Do not proceed without running it.
 2. **Use inventory**: Use `tree` output as source of truth to identify workflows and subagents. Ignore shallow listings reporting "(0 items)".
-3. **Gap classification**: Clearly distinguish intentional design differences from inconsistencies/bugs.
+3. **Gap classification**: Clearly distinguish intentional design differences from inconsistencies/bugs (see [references/gap-classification.md](references/gap-classification.md)).
 4. **Comparative evidence**: Each gap must be backed by evidence from harness and proxy; proxy-side gaps SHOULD also cite `server/logs.jsonl` and/or `sessions/{session-id}/events.ndjson` when relevant.
 5. **Runtime diagnostics**: Step 3 MUST consult `server/logs.jsonl` and `sessions/{session-id}/events.ndjson` before structural comparison.
 6. **Docs load**: Read `docs/session-audit-model.md` and the relevant README sections (Step 1) before interpreting `meta.json` fields or layout.

@@ -4,10 +4,9 @@ description: >
   Create, edit, and improve project skills in Claude Code (.claude/skills/).
   Use when the user asks to create a skill, new skill, SKILL.md, agent skill,
   migrate CLAUDE.md to a skill, optimize description or frontmatter, invoke
-  /skill-manager or /create-skill, or mentions auto-activation, undertrigger,
-  test cases, or TEST-CASES. Canonical entry for skill creation (replaces the
-  legacy create-skill command). For slash commands (.claude/commands/), use
-  command-manager instead.
+  /skill-manager, or mentions auto-activation, undertrigger,
+  test cases, or TEST-CASES. Canonical entry for skill creation. Handles both
+  reference (auto-trigger) and task-manual (disable-model-invocation) skills.
   Follow the routing table in the body; read references/ only per that table
   (platform or testing-workflows). Activate when evaluating or iterating behavior
   of an existing skill. Also trigger for crear skill, skill nueva, optimizar description,
@@ -19,7 +18,7 @@ description: >
 
 Skill to create and iteratively improve **project** skills in Claude Code (`.claude/skills/<name>/`).
 
-**Canonical entry:** `/skill-manager` replaces the former `/create-skill` command (absorbed into `<creation_process>`). Use this skill for the full flow; do not recreate `.claude/commands/create-skill.md`.
+**Canonical entry:** `/skill-manager`; the full creation flow lives in `<creation_process>`.
 
 This skill uses XML blocks per section because it orchestrates conditional flows. Skills you create must follow `.claude/skills/artifact-structuring/SKILL.md` (mostly Markdown, XML only for hard boundaries).
 
@@ -30,7 +29,7 @@ High-level flow:
 3. Test with realistic prompts (`/skill-name` and/or auto-trigger)
 4. Evaluate with the user (qualitative or objective)
 5. Iterate based on feedback
-6. Optimize `description` for reliable auto-activation
+6. **Reference mode:** optimize `description` for reliable auto-activation. **Task-manual mode** (`disable-model-invocation: true`): step 6 is only to confirm `description` reads clearly in the `/` menu — auto-activation optimization does not apply
 
 Detect which stage the user is in and act per `<routing>`. If they prefer to iterate without formal evaluation, adapt.
 <!-- </overview> -->
@@ -48,7 +47,7 @@ Detect which stage the user is in and act per `<routing>`. If they prefer to ite
 | Edit existing skill | `<updating_skills>` | — |
 | XML/Markdown format | — | [.claude/skills/artifact-structuring/SKILL.md](.claude/skills/artifact-structuring/SKILL.md); do not duplicate Boundary Rule here |
 | Language policy (EN artifacts / ES user) | — | `<language_policy>` in [.claude/skills/artifact-structuring/SKILL.md](../artifact-structuring/SKILL.md) |
-| Slash commands (`.claude/commands/`) | — | Delegate to [.claude/skills/command-manager/SKILL.md](../command-manager/SKILL.md) (`/command-manager`) |
+| Plan skill improvements (no impl yet) | — | Delegate to `/create-plan` ([.claude/skills/create-plan/SKILL.md](../create-plan/SKILL.md)) |
 <!-- </routing> -->
 
 <!-- <<user_communication> -->
@@ -69,7 +68,7 @@ Briefly explain unclear terms when it helps.
 
 If the conversation already contains the desired flow ("turn this into a skill"), extract from history: tools, sequence, user corrections, input/output formats. Confirm gaps with the user **in Spanish** before writing files.
 
-If the user invokes `/skill-manager` or `/create-skill` with text in `$ARGUMENTS`, treat it as a free-form description of the skill to create and start this flow without repeating the initial interview.
+If the user invokes `/skill-manager` with text in `$ARGUMENTS`, treat it as a free-form description of the skill to create and start this flow without repeating the initial interview.
 
 1. What should Claude Code be enabled to do?
 2. When should it activate? (user phrases and contexts)
@@ -144,7 +143,7 @@ description: >
 Before delivery, confirm:
 
 1. Valid `name` and `description` in frontmatter.
-2. `description` includes WHAT and WHEN (explicit against undertriggering).
+2. **Reference:** `description` includes WHAT and WHEN-keywords (explicit against undertriggering). **Task-manual** (`disable-model-invocation: true`): WHEN-keywords do not apply; `description` needs only WHAT plus an invocation hint (it just labels the `/` menu). The Task variant is the canonical pattern for former commands — see `<activation_variants>` in [references/skill-skeleton.md](references/skill-skeleton.md).
 3. `<user_communication>` in the body for Spanish user I/O; `<constraints>` when tool or path limits apply.
 4. No unnecessary `references/` or `scripts/` files.
 
@@ -197,6 +196,8 @@ Compare two versions of the same skill: see § Version comparison in [references
 
 <!-- <<description_optimization> -->
 ## Optimize the description
+
+**Applies to reference skills only.** Skip this section for task-manual skills (`disable-model-invocation: true`): they are not auto-activated, so `description` only labels the `/` menu and needs no trigger-keyword tuning.
 
 Frontmatter `description` is the main auto-activation mechanism. Offer to optimize it after creating or improving a skill.
 

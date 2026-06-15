@@ -1,21 +1,23 @@
 ---
+name: verify-scripts
 description: Runs all scripts defined in package.json in a safe order based on the dependency graph, captures output/errors for each, and produces a final status report. The workspace remains functional when finished.
+disable-model-invocation: true
 ---
 
 # Full verification of package.json scripts
 
 <!-- <overview> -->
-Run `scripting/verify-package-scripts.ts` (the canonical verifier) and translate its JSON report into a Spanish markdown table. The command is a thin orchestration layer: it enforces preconditions, invokes the script, parses the report, and formats the output. It does **not** enumerate, order, or invoke npm scripts itself — that responsibility lives entirely in `scripting/verify-config.ts`, the single source of truth.
+Run `scripting/verify-package-scripts.ts` (the canonical verifier) and translate its JSON report into a Spanish markdown table. The skill is a thin orchestration layer: it enforces preconditions, invokes the script, parses the report, and formats the output. It does **not** enumerate, order, or invoke npm scripts itself — that responsibility lives entirely in `scripting/verify-config.ts`, the single source of truth.
 <!-- </overview> -->
 
 <!-- <user_communication> -->
-Ask, confirm, and respond to the user in **Spanish** (native Spanish-speaking audience). Keep this artifact's instructions in **English** for token efficiency. Canonical policy: `<language_policy>` in [.claude/skills/artifact-structuring/SKILL.md](../skills/artifact-structuring/SKILL.md). User-facing rules: [AGENTS.md](../../AGENTS.md) §0.
+Ask, confirm, and respond to the user in **Spanish** (native Spanish-speaking audience). Keep this artifact's instructions in **English** for token efficiency. Canonical policy: `<language_policy>` in [.claude/skills/artifact-structuring/SKILL.md](../artifact-structuring/SKILL.md). User-facing rules: [AGENTS.md](../../AGENTS.md) §0.
 <!-- </user_communication> -->
 
 <!-- <prerequisites> -->
 ## Prerequisites
 
-Before invoking the script, verify the following locally (the command is responsible for these; the script assumes them):
+Before invoking the script, verify the following locally (the skill is responsible for these; the script assumes them):
 
 1. The current working directory is the repository root (a directory containing `package.json`). If not, halt with a Spanish error message and stop.
 2. `package.json` exists. If not, halt.
@@ -24,7 +26,7 @@ Before invoking the script, verify the following locally (the command is respons
    - **Linux/macOS**: `lsof -i :8787`
    - If occupied, halt with a Spanish warning pointing to the process ID.
 
-The script itself handles the `node_modules/` existence check and runs `npm install` if missing; the command must NOT run `npm install` ahead of the script.
+The script itself handles the `node_modules/` existence check and runs `npm install` if missing; the skill must NOT run `npm install` ahead of the script.
 <!-- </prerequisites> -->
 
 <!-- <constraints> -->
@@ -34,7 +36,7 @@ The script itself handles the `node_modules/` existence check and runs `npm inst
 
 **This procedure must invoke the canonical verifier and produce the report from its JSON output. No step enumeration, no inline `npm run` invocations, no parallel execution paths.**
 
-The source of truth is `scripting/verify-config.ts`. If the user requests adding, removing, or reordering a verify step, the correct response is to edit that file — not to add inline steps in this command. The previous 38-step enumeration that lived here has been **migrated** to the config and must not reappear.
+The source of truth is `scripting/verify-config.ts`. If the user requests adding, removing, or reordering a verify step, the correct response is to edit that file — not to add inline steps in this skill. The previous 38-step enumeration that lived here has been **migrated** to the config and must not reappear.
 <!-- </critical> -->
 <!-- </constraints> -->
 
@@ -68,7 +70,7 @@ The source of truth is `scripting/verify-config.ts`. If the user requests adding
 7. **Exit behaviour**:
    - If the script exited `0`, report success.
    - If the script exited `1`, report the failure summary and the link to `verify-report.json` for full detail.
-   - Do NOT propagate exit code 1 to a shell — this command is interactive.
+   - Do NOT propagate exit code 1 to a shell — this skill is interactive.
 <!-- </execution> -->
 
 <!-- <final_report> -->

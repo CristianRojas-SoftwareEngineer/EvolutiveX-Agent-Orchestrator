@@ -111,11 +111,10 @@ If the user asks whether the new version is better:
 | Test prompt | Expected behavior |
 |------------------|-------------------------|
 | "Create a skill for X" | Follow `<creation_process>`; read `skill-skeleton.md`; link `artifact-structuring` |
-| `/create-skill` or habit from removed command | Same as "Create a skill for X"; use `/skill-manager` |
 | "Optimize my skill description" | Go to `<description_optimization>`; do not load `testing-workflows.md` by default |
 | "How do I test this skill?" | `<testing_process>` + this file |
 
-Direct invocation: `/skill-manager` (replaces legacy `/create-skill`).
+Direct invocation: `/skill-manager`.
 <!-- </meta_testing> -->
 
 <!-- <<verification> -->

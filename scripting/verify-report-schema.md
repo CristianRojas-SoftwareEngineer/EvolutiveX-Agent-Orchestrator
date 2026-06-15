@@ -2,7 +2,7 @@
 
 Este documento describe la forma del archivo `verify-report.json` que el script
 `scripting/verify-package-scripts.ts` escribe tras cada ejecución. El reporte es
-el contrato que el comando `/verify-scripts` lee para componer la tabla
+el contrato que la skill `/verify-scripts` lee para componer la tabla
 markdown en español.
 
 ## Versionado
@@ -60,7 +60,7 @@ valor. Los consumidores deben rechazarlo si su valor esperado no coincide.
 | `steps[].status === "skip"` | El paso tiene `skip: true` en la config **o** una dependencia `dependsOn` no se satisfizo. `skippedReason` contiene la razón. |
 | `coverage.missingFromConfig` | Scripts declarados en `package.json` que ningún `VerifyStep` referencia. Es drift **legítimo** (scripts que la pipeline no sabe verificar). |
 | `coverage.missingFromPackageJson` | Scripts referenciados por un `VerifyStep` que ya no existen en `package.json`. Es drift **crítico** que requiere remediación. |
-| `workspaceState.destructiveStepsRan` | Lista de ids de pasos `kind: destructive` que **efectivamente ejecutaron** (no fueron skipped). El comando la usa para decidir si correr `npm install` post-condición. |
+| `workspaceState.destructiveStepsRan` | Lista de ids de pasos `kind: destructive` que **efectivamente ejecutaron** (no fueron skipped). La skill la usa para decidir si correr `npm install` post-condición. |
 
 ## Exit codes del script
 
@@ -70,8 +70,8 @@ valor. Los consumidores deben rechazarlo si su valor esperado no coincide.
 | `1` | Al menos un paso no-skip falló. |
 | `2` | Sólo con `--strict-coverage` y `coverage.missingFromPackageJson.length > 0`. Indica drift crítico (paso referencia script inexistente). |
 
-## Compatibilidad con el comando
+## Compatibilidad con la skill
 
-`.claude/commands/verify-scripts.md` lee este archivo y deriva la tabla markdown
+`.claude/skills/verify-scripts/SKILL.md` lee este archivo y deriva la tabla markdown
 y la línea de resumen. Cambios incompatibles al esquema requieren actualizar
-el comando en el mismo change que incremente `schemaVersion`.
+la skill en el mismo change que incremente `schemaVersion`.

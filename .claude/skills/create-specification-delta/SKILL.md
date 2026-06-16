@@ -33,22 +33,54 @@ in **English** for token efficiency. Canonical policy: `<language_policy>` in
 absent or unclear, ask the user what the delta is about and derive a slug (e.g.
 "add user authentication" → `add-user-auth`).
 
-## Step 1 — Derive the incremental id (stateless scan)
+## Step 1 — Derive the incremental id (canonical script)
 
 The change name has the form `c<NNNNN>-<slug>`: a mandatory lowercase `c` prefix +
 an incremental integer zero-padded to **5 digits** + the kebab-case slug. The `c`
 prefix is required because OpenSpec rejects names that start with a digit or contain
 uppercase (`validateChangeName`).
 
-Derive the next integer by scanning, with no persistent counter:
+**You MUST NOT reimplement the scan inline.** Derive `c<NNNNN>` exclusively from the
+canonical script:
 
-1. List active change directories under `openspec/changes/` (exclude `archive/` and
-   `.gitkeep`).
-2. List archived directories under `openspec/changes/archive/`, discounting the
-   `YYYY-MM-DD-` date prefix the archive step adds.
-3. From every name, extract the head integer matching `^c(\d+)`.
-4. Take the maximum (0 if none exists) and add one.
-5. Zero-pad to 5 digits → `c<NNNNN>`. Compose `c<NNNNN>-<slug>`.
+```bash
+npm run openspec:next-change-id
+```
+
+Stdout is exactly one line (`c<NNNNN>`). Compose `c<NNNNN>-<slug>` with the slug from
+explore. Implementation lives in `scripting/openspec/change-id.ts`.
+
+### Algorithm (reference pseudocode)
+
+The script implements this scan — documented here so agents understand the contract:
+
+```
+function stripArchiveDatePrefix(name):
+  if name matches ^\d{4}-\d{2}-\d{2}--(.+)$ → return capture group 1
+  else → return name
+
+function parseNumericId(name):
+  normalized = stripArchiveDatePrefix(name)
+  if normalized matches ^c(\d+) → return integer
+  else → return null   // nombres sin prefijo c no participan en el incremento
+
+maxId = 0
+for dir in active_dirs(openspec/changes/) excluding archive/ and .gitkeep:
+  maxId = max(maxId, parseNumericId(dir) ?? 0)
+for dir in dirs(openspec/changes/archive/):
+  maxId = max(maxId, parseNumericId(dir) ?? 0)
+for dir in dirs(openspec/changes/archive/*/phases/) with date-prefixed names:
+  maxId = max(maxId, parseNumericId(dir) ?? 0)
+return "c" + zero_pad(maxId + 1, 5)
+```
+
+### Counterexample — why date normalization is mandatory
+
+Archived folder: `2026-06-16--c00068-fix-change-id-increment`
+
+- **Wrong** (naive `^c(\d+)` on raw name): no match → max stays 0 → next id `c00001`
+  again → **collision** with the existing `c00001-*` delta.
+- **Correct**: strip date → `c00068-fix-change-id-increment` → id `68` → next `c00069`.
 
 The same rule applies to all changes, including the L1/L2 changes of a roadmap (where
 the `phaseid` lives inside the slug: `c<NNNNN>-<prefix>-<phaseid>-<slug>`).
@@ -78,6 +110,7 @@ orchestrator.
 
 <!-- <constraints> -->
 - Mint the id **only here**; never re-derive numbering in other stages.
+- Derive `c<NNNNN>` **only** via `npm run openspec:next-change-id`; never scan inline.
 - The `c` prefix is mandatory and lowercase; the integer is zero-padded to 5 digits.
 - Scaffold strictly via `openspec new change`; do not hand-create the folder.
 - Do not create any planning artifact (proposal/specs/design/tasks) here.

@@ -140,6 +140,7 @@ All notable changes are derived from conventional commits. Do not edit by hand.
 - reemplazar 'any' por tipos estrictos del SDK de Anthropic
 
 ### Fixed
+- normalizar archivados con -- y c<NNNNN> global
 - elevar observabilidad en el borde hooks del proxy
 - corregir recursión infinita del hook post-commit con lock file
 - corregir estructura de encabezados del reporte en investigate

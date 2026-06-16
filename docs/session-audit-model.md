@@ -360,12 +360,12 @@ En memoria, el modelo legacy usaba `ActiveInteraction` → `InteractionMetadata`
 
 Entre P1 y `unify-turn-workflow` (junio 2026) algunas sesiones fragmentaban un turno en **tres workflows hermanos**: `workflows/00` (`session-shell`), `workflows/01` (`side-request`) y `workflows/02` (`agentic`). Las sesiones nuevas usan **un workflow por turno** (`workflows/01/` con `interactionType: agentic` y hops como `steps/MM/`). No hay migración automática; al analizar capturas antiguas, distinguir este layout del modelo vigente.
 
-Change de referencia: `openspec/changes/archive/2026-06-08-unify-turn-workflow/`.
+Change de referencia: `openspec/changes/archive/2026-06-08--c00042-unify-turn-workflow/`.
 
 ---
 
 ## Referencias cruzadas
 
 - Arquitectura del gateway: [`gateway-architecture.md`](./gateway-architecture.md)
-- Fusión turno unificado (implementado): `openspec/changes/archive/2026-06-08-unify-turn-workflow/`
+- Fusión turno unificado (implementado): `openspec/changes/archive/2026-06-08--c00042-unify-turn-workflow/`
 - OpenSpec: `openspec/specs/session-persistence/`, `event-bus/`, `session-routing/`, `gateway-audit-projection/`

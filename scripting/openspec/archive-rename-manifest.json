@@ -1,0 +1,623 @@
+[
+  {
+    "oldName": "2026-05-27-c00001-statusline-installer",
+    "newName": "2026-05-27--c00001-statusline-installer",
+    "numericId": "c00001",
+    "slug": "statusline-installer",
+    "archiveDate": "2026-05-27",
+    "kind": "root",
+    "pass": 2
+  },
+  {
+    "oldName": "2026-06-01-c00002-gateway-migration/phases/2026-05-28-gateway-c1-wire-agent-headers",
+    "newName": "2026-06-01-c00002-gateway-migration/phases/2026-05-28--c00002-gateway-c1-wire-agent-headers",
+    "numericId": "c00002",
+    "slug": "gateway-c1-wire-agent-headers",
+    "archiveDate": "2026-05-28",
+    "kind": "phase",
+    "pass": 1
+  },
+  {
+    "oldName": "2026-06-01-c00002-gateway-migration/phases/2026-05-29-gateway-c2-sse-subagent-join",
+    "newName": "2026-06-01-c00002-gateway-migration/phases/2026-05-29--c00003-gateway-c2-sse-subagent-join",
+    "numericId": "c00003",
+    "slug": "gateway-c2-sse-subagent-join",
+    "archiveDate": "2026-05-29",
+    "kind": "phase",
+    "pass": 1
+  },
+  {
+    "oldName": "2026-06-01-c00002-gateway-migration/phases/2026-05-29-gateway-c3-hooks-endpoint",
+    "newName": "2026-06-01-c00002-gateway-migration/phases/2026-05-29--c00004-gateway-c3-hooks-endpoint",
+    "numericId": "c00004",
+    "slug": "gateway-c3-hooks-endpoint",
+    "archiveDate": "2026-05-29",
+    "kind": "phase",
+    "pass": 1
+  },
+  {
+    "oldName": "2026-06-01-c00002-gateway-migration/phases/2026-05-29-gateway-g1-domain-types-services",
+    "newName": "2026-06-01-c00002-gateway-migration/phases/2026-05-29--c00005-gateway-g1-domain-types-services",
+    "numericId": "c00005",
+    "slug": "gateway-g1-domain-types-services",
+    "archiveDate": "2026-05-29",
+    "kind": "phase",
+    "pass": 1
+  },
+  {
+    "oldName": "2026-06-01-c00002-gateway-migration/phases/2026-05-29-gateway-g2-workflow-repository",
+    "newName": "2026-06-01-c00002-gateway-migration/phases/2026-05-29--c00006-gateway-g2-workflow-repository",
+    "numericId": "c00006",
+    "slug": "gateway-g2-workflow-repository",
+    "archiveDate": "2026-05-29",
+    "kind": "phase",
+    "pass": 1
+  },
+  {
+    "oldName": "2026-06-01-c00002-gateway-migration/phases/2026-05-29-gateway-g3-step-assembler",
+    "newName": "2026-06-01-c00002-gateway-migration/phases/2026-05-29--c00007-gateway-g3-step-assembler",
+    "numericId": "c00007",
+    "slug": "gateway-g3-step-assembler",
+    "archiveDate": "2026-05-29",
+    "kind": "phase",
+    "pass": 1
+  },
+  {
+    "oldName": "2026-06-01-c00002-gateway-migration/phases/2026-05-29-gateway-g4-audit-projection",
+    "newName": "2026-06-01-c00002-gateway-migration/phases/2026-05-29--c00008-gateway-g4-audit-projection",
+    "numericId": "c00008",
+    "slug": "gateway-g4-audit-projection",
+    "archiveDate": "2026-05-29",
+    "kind": "phase",
+    "pass": 1
+  },
+  {
+    "oldName": "2026-06-01-c00002-gateway-migration/phases/2026-05-30-gateway-g5-provider-catalog",
+    "newName": "2026-06-01-c00002-gateway-migration/phases/2026-05-30--c00009-gateway-g5-provider-catalog",
+    "numericId": "c00009",
+    "slug": "gateway-g5-provider-catalog",
+    "archiveDate": "2026-05-30",
+    "kind": "phase",
+    "pass": 1
+  },
+  {
+    "oldName": "2026-06-01-c00002-gateway-migration/phases/2026-05-30-gateway-p0-layout-diff-spike",
+    "newName": "2026-06-01-c00002-gateway-migration/phases/2026-05-30--c00010-gateway-p0-layout-diff-spike",
+    "numericId": "c00010",
+    "slug": "gateway-p0-layout-diff-spike",
+    "archiveDate": "2026-05-30",
+    "kind": "phase",
+    "pass": 1
+  },
+  {
+    "oldName": "2026-06-01-c00002-gateway-migration/phases/2026-05-30-gateway-p1-new-session-layout",
+    "newName": "2026-06-01-c00002-gateway-migration/phases/2026-05-30--c00011-gateway-p1-new-session-layout",
+    "numericId": "c00011",
+    "slug": "gateway-p1-new-session-layout",
+    "archiveDate": "2026-05-30",
+    "kind": "phase",
+    "pass": 1
+  },
+  {
+    "oldName": "2026-06-01-c00002-gateway-migration",
+    "newName": "2026-06-01--c00012-gateway-migration",
+    "numericId": "c00012",
+    "slug": "gateway-migration",
+    "archiveDate": "2026-06-01",
+    "kind": "root",
+    "pass": 2
+  },
+  {
+    "oldName": "2026-06-01-c00002-gateway-migration/phases/2026-06-01-gateway-p2-new-artifacts",
+    "newName": "2026-06-01-c00002-gateway-migration/phases/2026-06-01--c00013-gateway-p2-new-artifacts",
+    "numericId": "c00013",
+    "slug": "gateway-p2-new-artifacts",
+    "archiveDate": "2026-06-01",
+    "kind": "phase",
+    "pass": 1
+  },
+  {
+    "oldName": "2026-06-02-c00003-claude-code-hooks-implementation",
+    "newName": "2026-06-02--c00014-claude-code-hooks-implementation",
+    "numericId": "c00014",
+    "slug": "claude-code-hooks-implementation",
+    "archiveDate": "2026-06-02",
+    "kind": "root",
+    "pass": 2
+  },
+  {
+    "oldName": "2026-06-02-c00004-claude-h1-register-missing-hooks",
+    "newName": "2026-06-02--c00015-claude-h1-register-missing-hooks",
+    "numericId": "c00015",
+    "slug": "claude-h1-register-missing-hooks",
+    "archiveDate": "2026-06-02",
+    "kind": "root",
+    "pass": 2
+  },
+  {
+    "oldName": "2026-06-02-c00005-claude-n1-migrate-notifications-service",
+    "newName": "2026-06-02--c00016-claude-n1-migrate-notifications-service",
+    "numericId": "c00016",
+    "slug": "claude-n1-migrate-notifications-service",
+    "archiveDate": "2026-06-02",
+    "kind": "root",
+    "pass": 2
+  },
+  {
+    "oldName": "2026-06-02-c00006-claude-n2-repoint-hooks-to-internal-notifications",
+    "newName": "2026-06-02--c00017-claude-n2-repoint-hooks-to-internal-notifications",
+    "numericId": "c00017",
+    "slug": "claude-n2-repoint-hooks-to-internal-notifications",
+    "archiveDate": "2026-06-02",
+    "kind": "root",
+    "pass": 2
+  },
+  {
+    "oldName": "2026-06-03-c00007-add-notification-event-copy",
+    "newName": "2026-06-03--c00018-add-notification-event-copy",
+    "numericId": "c00018",
+    "slug": "add-notification-event-copy",
+    "archiveDate": "2026-06-03",
+    "kind": "root",
+    "pass": 2
+  },
+  {
+    "oldName": "2026-06-03-c00008-add-notification-event-profiles",
+    "newName": "2026-06-03--c00019-add-notification-event-profiles",
+    "numericId": "c00019",
+    "slug": "add-notification-event-profiles",
+    "archiveDate": "2026-06-03",
+    "kind": "root",
+    "pass": 2
+  },
+  {
+    "oldName": "2026-06-03-c00009-add-notifications-branding",
+    "newName": "2026-06-03--c00020-add-notifications-branding",
+    "numericId": "c00020",
+    "slug": "add-notifications-branding",
+    "archiveDate": "2026-06-03",
+    "kind": "root",
+    "pass": 2
+  },
+  {
+    "oldName": "2026-06-03-c00010-align-notification-docs-specs",
+    "newName": "2026-06-03--c00021-align-notification-docs-specs",
+    "numericId": "c00021",
+    "slug": "align-notification-docs-specs",
+    "archiveDate": "2026-06-03",
+    "kind": "root",
+    "pass": 2
+  },
+  {
+    "oldName": "2026-06-03-c00011-statusline-classify-fallback",
+    "newName": "2026-06-03--c00022-statusline-classify-fallback",
+    "numericId": "c00022",
+    "slug": "statusline-classify-fallback",
+    "archiveDate": "2026-06-03",
+    "kind": "root",
+    "pass": 2
+  },
+  {
+    "oldName": "2026-06-03-c00012-unified-installer",
+    "newName": "2026-06-03--c00023-unified-installer",
+    "numericId": "c00023",
+    "slug": "unified-installer",
+    "archiveDate": "2026-06-03",
+    "kind": "root",
+    "pass": 2
+  },
+  {
+    "oldName": "2026-06-04-c00013-add-statusline-router-details-toggle",
+    "newName": "2026-06-04--c00024-add-statusline-router-details-toggle",
+    "numericId": "c00024",
+    "slug": "add-statusline-router-details-toggle",
+    "archiveDate": "2026-06-04",
+    "kind": "root",
+    "pass": 2
+  },
+  {
+    "oldName": "2026-06-04-c00014-fix-continuation-orphan-workflow-attribution",
+    "newName": "2026-06-04--c00025-fix-continuation-orphan-workflow-attribution",
+    "numericId": "c00025",
+    "slug": "fix-continuation-orphan-workflow-attribution",
+    "archiveDate": "2026-06-04",
+    "kind": "root",
+    "pass": 2
+  },
+  {
+    "oldName": "2026-06-04-c00015-fix-cursor-mojibake-hook-payload",
+    "newName": "2026-06-04--c00026-fix-cursor-mojibake-hook-payload",
+    "numericId": "c00026",
+    "slug": "fix-cursor-mojibake-hook-payload",
+    "archiveDate": "2026-06-04",
+    "kind": "root",
+    "pass": 2
+  },
+  {
+    "oldName": "2026-06-04-c00016-fix-notification-stdin-hook-relays",
+    "newName": "2026-06-04--c00027-fix-notification-stdin-hook-relays",
+    "numericId": "c00027",
+    "slug": "fix-notification-stdin-hook-relays",
+    "archiveDate": "2026-06-04",
+    "kind": "root",
+    "pass": 2
+  },
+  {
+    "oldName": "2026-06-04-c00017-installer-crossplatform-paths",
+    "newName": "2026-06-04--c00028-installer-crossplatform-paths",
+    "numericId": "c00028",
+    "slug": "installer-crossplatform-paths",
+    "archiveDate": "2026-06-04",
+    "kind": "root",
+    "pass": 2
+  },
+  {
+    "oldName": "2026-06-04-c00018-proxy-hooks-promote-unified-installer",
+    "newName": "2026-06-04--c00029-proxy-hooks-promote-unified-installer",
+    "numericId": "c00029",
+    "slug": "proxy-hooks-promote-unified-installer",
+    "archiveDate": "2026-06-04",
+    "kind": "root",
+    "pass": 2
+  },
+  {
+    "oldName": "2026-06-04-c00019-proxy-hooks-safe-setup",
+    "newName": "2026-06-04--c00030-proxy-hooks-safe-setup",
+    "numericId": "c00030",
+    "slug": "proxy-hooks-safe-setup",
+    "archiveDate": "2026-06-04",
+    "kind": "root",
+    "pass": 2
+  },
+  {
+    "oldName": "2026-06-04-c00020-session-metrics-per-step",
+    "newName": "2026-06-04--c00031-session-metrics-per-step",
+    "numericId": "c00031",
+    "slug": "session-metrics-per-step",
+    "archiveDate": "2026-06-04",
+    "kind": "root",
+    "pass": 2
+  },
+  {
+    "oldName": "2026-06-04-c00021-sessionmetrics-workflow-count",
+    "newName": "2026-06-04--c00032-sessionmetrics-workflow-count",
+    "numericId": "c00032",
+    "slug": "sessionmetrics-workflow-count",
+    "archiveDate": "2026-06-04",
+    "kind": "root",
+    "pass": 2
+  },
+  {
+    "oldName": "2026-06-04-c00022-stop-hook-continuity-assistant",
+    "newName": "2026-06-04--c00033-stop-hook-continuity-assistant",
+    "numericId": "c00033",
+    "slug": "stop-hook-continuity-assistant",
+    "archiveDate": "2026-06-04",
+    "kind": "root",
+    "pass": 2
+  },
+  {
+    "oldName": "2026-06-05-c00023-add-task-in-progress-notification",
+    "newName": "2026-06-05--c00034-add-task-in-progress-notification",
+    "numericId": "c00034",
+    "slug": "add-task-in-progress-notification",
+    "archiveDate": "2026-06-05",
+    "kind": "root",
+    "pass": 2
+  },
+  {
+    "oldName": "2026-06-05-c00024-fix-classifier-tool-result-scope",
+    "newName": "2026-06-05--c00035-fix-classifier-tool-result-scope",
+    "numericId": "c00035",
+    "slug": "fix-classifier-tool-result-scope",
+    "archiveDate": "2026-06-05",
+    "kind": "root",
+    "pass": 2
+  },
+  {
+    "oldName": "2026-06-05-c00025-remove-notification-asset-cache",
+    "newName": "2026-06-05--c00036-remove-notification-asset-cache",
+    "numericId": "c00036",
+    "slug": "remove-notification-asset-cache",
+    "archiveDate": "2026-06-05",
+    "kind": "root",
+    "pass": 2
+  },
+  {
+    "oldName": "2026-06-07-c00026-align-verify-pipeline",
+    "newName": "2026-06-07--c00037-align-verify-pipeline",
+    "numericId": "c00037",
+    "slug": "align-verify-pipeline",
+    "archiveDate": "2026-06-07",
+    "kind": "root",
+    "pass": 2
+  },
+  {
+    "oldName": "2026-06-07-c00027-fix-clean-modules-windows",
+    "newName": "2026-06-07--c00038-fix-clean-modules-windows",
+    "numericId": "c00038",
+    "slug": "fix-clean-modules-windows",
+    "archiveDate": "2026-06-07",
+    "kind": "root",
+    "pass": 2
+  },
+  {
+    "oldName": "2026-06-08-c00028-fix-proxy-audit-causal-gaps",
+    "newName": "2026-06-08--c00039-fix-proxy-audit-causal-gaps",
+    "numericId": "c00039",
+    "slug": "fix-proxy-audit-causal-gaps",
+    "archiveDate": "2026-06-08",
+    "kind": "root",
+    "pass": 2
+  },
+  {
+    "oldName": "2026-06-08-c00029-fix-proxy-audit-telemetry-gaps",
+    "newName": "2026-06-08--c00040-fix-proxy-audit-telemetry-gaps",
+    "numericId": "c00040",
+    "slug": "fix-proxy-audit-telemetry-gaps",
+    "archiveDate": "2026-06-08",
+    "kind": "root",
+    "pass": 2
+  },
+  {
+    "oldName": "2026-06-08-c00030-fix-proxy-tool-result-metrics",
+    "newName": "2026-06-08--c00041-fix-proxy-tool-result-metrics",
+    "numericId": "c00041",
+    "slug": "fix-proxy-tool-result-metrics",
+    "archiveDate": "2026-06-08",
+    "kind": "root",
+    "pass": 2
+  },
+  {
+    "oldName": "2026-06-08-c00031-unify-turn-workflow",
+    "newName": "2026-06-08--c00042-unify-turn-workflow",
+    "numericId": "c00042",
+    "slug": "unify-turn-workflow",
+    "archiveDate": "2026-06-08",
+    "kind": "root",
+    "pass": 2
+  },
+  {
+    "oldName": "2026-06-09-c00032-align-reasoning-level-session-metrics",
+    "newName": "2026-06-09--c00043-align-reasoning-level-session-metrics",
+    "numericId": "c00043",
+    "slug": "align-reasoning-level-session-metrics",
+    "archiveDate": "2026-06-09",
+    "kind": "root",
+    "pass": 2
+  },
+  {
+    "oldName": "2026-06-09-c00033-align-wire-step-request-response",
+    "newName": "2026-06-09--c00044-align-wire-step-request-response",
+    "numericId": "c00044",
+    "slug": "align-wire-step-request-response",
+    "archiveDate": "2026-06-09",
+    "kind": "root",
+    "pass": 2
+  },
+  {
+    "oldName": "2026-06-09-c00034-fix-audit-standard-response-without-usage",
+    "newName": "2026-06-09--c00045-fix-audit-standard-response-without-usage",
+    "numericId": "c00045",
+    "slug": "fix-audit-standard-response-without-usage",
+    "archiveDate": "2026-06-09",
+    "kind": "root",
+    "pass": 2
+  },
+  {
+    "oldName": "2026-06-09-c00035-fix-client-tool-result-backfill",
+    "newName": "2026-06-09--c00046-fix-client-tool-result-backfill",
+    "numericId": "c00046",
+    "slug": "fix-client-tool-result-backfill",
+    "archiveDate": "2026-06-09",
+    "kind": "root",
+    "pass": 2
+  },
+  {
+    "oldName": "2026-06-09-c00036-fix-concurrent-step-attribution",
+    "newName": "2026-06-09--c00047-fix-concurrent-step-attribution",
+    "numericId": "c00047",
+    "slug": "fix-concurrent-step-attribution",
+    "archiveDate": "2026-06-09",
+    "kind": "root",
+    "pass": 2
+  },
+  {
+    "oldName": "2026-06-09-c00037-fix-transcript-extractor-string-content",
+    "newName": "2026-06-09--c00048-fix-transcript-extractor-string-content",
+    "numericId": "c00048",
+    "slug": "fix-transcript-extractor-string-content",
+    "archiveDate": "2026-06-09",
+    "kind": "root",
+    "pass": 2
+  },
+  {
+    "oldName": "2026-06-09-c00038-remove-audit-zombie-types",
+    "newName": "2026-06-09--c00049-remove-audit-zombie-types",
+    "numericId": "c00049",
+    "slug": "remove-audit-zombie-types",
+    "archiveDate": "2026-06-09",
+    "kind": "root",
+    "pass": 2
+  },
+  {
+    "oldName": "2026-06-09-c00039-tts-hooks",
+    "newName": "2026-06-09--c00050-tts-hooks",
+    "numericId": "c00050",
+    "slug": "tts-hooks",
+    "archiveDate": "2026-06-09",
+    "kind": "root",
+    "pass": 2
+  },
+  {
+    "oldName": "2026-06-09-c00040-unify-stop-continuity-toast-in-gateway",
+    "newName": "2026-06-09--c00051-unify-stop-continuity-toast-in-gateway",
+    "numericId": "c00051",
+    "slug": "unify-stop-continuity-toast-in-gateway",
+    "archiveDate": "2026-06-09",
+    "kind": "root",
+    "pass": 2
+  },
+  {
+    "oldName": "2026-06-10-c00041-consolidate-hooks-in-gateway",
+    "newName": "2026-06-10--c00052-consolidate-hooks-in-gateway",
+    "numericId": "c00052",
+    "slug": "consolidate-hooks-in-gateway",
+    "archiveDate": "2026-06-10",
+    "kind": "root",
+    "pass": 2
+  },
+  {
+    "oldName": "2026-06-10-c00042-fix-tts-generic-fallback",
+    "newName": "2026-06-10--c00053-fix-tts-generic-fallback",
+    "numericId": "c00053",
+    "slug": "fix-tts-generic-fallback",
+    "archiveDate": "2026-06-10",
+    "kind": "root",
+    "pass": 2
+  },
+  {
+    "oldName": "2026-06-10-c00043-fix-tts-multi-provider-compat",
+    "newName": "2026-06-10--c00054-fix-tts-multi-provider-compat",
+    "numericId": "c00054",
+    "slug": "fix-tts-multi-provider-compat",
+    "archiveDate": "2026-06-10",
+    "kind": "root",
+    "pass": 2
+  },
+  {
+    "oldName": "2026-06-10-c00044-improve-userpromptsubmit-tts-context",
+    "newName": "2026-06-10--c00055-improve-userpromptsubmit-tts-context",
+    "numericId": "c00055",
+    "slug": "improve-userpromptsubmit-tts-context",
+    "archiveDate": "2026-06-10",
+    "kind": "root",
+    "pass": 2
+  },
+  {
+    "oldName": "2026-06-10-c00045-simplify-tts-dedicated-openrouter",
+    "newName": "2026-06-10--c00056-simplify-tts-dedicated-openrouter",
+    "numericId": "c00056",
+    "slug": "simplify-tts-dedicated-openrouter",
+    "archiveDate": "2026-06-10",
+    "kind": "root",
+    "pass": 2
+  },
+  {
+    "oldName": "2026-06-11-c00046-add-http-access-logging",
+    "newName": "2026-06-11--c00057-add-http-access-logging",
+    "numericId": "c00057",
+    "slug": "add-http-access-logging",
+    "archiveDate": "2026-06-11",
+    "kind": "root",
+    "pass": 2
+  },
+  {
+    "oldName": "2026-06-11-c00047-add-statusline-frontier-tier",
+    "newName": "2026-06-11--c00058-add-statusline-frontier-tier",
+    "numericId": "c00058",
+    "slug": "add-statusline-frontier-tier",
+    "archiveDate": "2026-06-11",
+    "kind": "root",
+    "pass": 2
+  },
+  {
+    "oldName": "2026-06-11-c00048-fix-session-metrics-tool-use-deferral",
+    "newName": "2026-06-11--c00059-fix-session-metrics-tool-use-deferral",
+    "numericId": "c00059",
+    "slug": "fix-session-metrics-tool-use-deferral",
+    "archiveDate": "2026-06-11",
+    "kind": "root",
+    "pass": 2
+  },
+  {
+    "oldName": "2026-06-11-c00049-headless-session-generalize",
+    "newName": "2026-06-11--c00060-headless-session-generalize",
+    "numericId": "c00060",
+    "slug": "headless-session-generalize",
+    "archiveDate": "2026-06-11",
+    "kind": "root",
+    "pass": 2
+  },
+  {
+    "oldName": "2026-06-11-c00050-project-sse-response-envelope",
+    "newName": "2026-06-11--c00061-project-sse-response-envelope",
+    "numericId": "c00061",
+    "slug": "project-sse-response-envelope",
+    "archiveDate": "2026-06-11",
+    "kind": "root",
+    "pass": 2
+  },
+  {
+    "oldName": "2026-06-11-c00051-remove-statusline-refresh-interval",
+    "newName": "2026-06-11--c00062-remove-statusline-refresh-interval",
+    "numericId": "c00062",
+    "slug": "remove-statusline-refresh-interval",
+    "archiveDate": "2026-06-11",
+    "kind": "root",
+    "pass": 2
+  },
+  {
+    "oldName": "2026-06-11-c00052-statusline-live-refresh",
+    "newName": "2026-06-11--c00063-statusline-live-refresh",
+    "numericId": "c00063",
+    "slug": "statusline-live-refresh",
+    "archiveDate": "2026-06-11",
+    "kind": "root",
+    "pass": 2
+  },
+  {
+    "oldName": "2026-06-11-c00053-statusline-subscription-quota-providers",
+    "newName": "2026-06-11--c00064-statusline-subscription-quota-providers",
+    "numericId": "c00064",
+    "slug": "statusline-subscription-quota-providers",
+    "archiveDate": "2026-06-11",
+    "kind": "root",
+    "pass": 2
+  },
+  {
+    "oldName": "2026-06-12-c00054-optimize-changelog-generator",
+    "newName": "2026-06-12--c00065-optimize-changelog-generator",
+    "numericId": "c00065",
+    "slug": "optimize-changelog-generator",
+    "archiveDate": "2026-06-12",
+    "kind": "root",
+    "pass": 2
+  },
+  {
+    "oldName": "2026-06-13-c00055-fix-hooks-observability",
+    "newName": "2026-06-13--c00066-fix-hooks-observability",
+    "numericId": "c00066",
+    "slug": "fix-hooks-observability",
+    "archiveDate": "2026-06-13",
+    "kind": "root",
+    "pass": 2
+  },
+  {
+    "oldName": "2026-06-16-c00056-agentkanban-board-mirror",
+    "newName": "2026-06-16--c00067-agentkanban-board-mirror",
+    "numericId": "c00067",
+    "slug": "agentkanban-board-mirror",
+    "archiveDate": "2026-06-16",
+    "kind": "root",
+    "pass": 2
+  },
+  {
+    "oldName": "2026-06-16-c00057-fix-change-id-increment",
+    "newName": "2026-06-16--c00068-fix-change-id-increment",
+    "numericId": "c00068",
+    "slug": "fix-change-id-increment",
+    "archiveDate": "2026-06-16",
+    "kind": "root",
+    "pass": 2
+  },
+  {
+    "oldName": "2026-06-16-c00058-remove-log-http-level",
+    "newName": "2026-06-16--c00069-remove-log-http-level",
+    "numericId": "c00069",
+    "slug": "remove-log-http-level",
+    "archiveDate": "2026-06-16",
+    "kind": "root",
+    "pass": 2
+  }
+]

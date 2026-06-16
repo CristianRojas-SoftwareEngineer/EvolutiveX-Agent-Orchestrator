@@ -46,10 +46,14 @@ mayúsculas. El relleno a cinco dígitos da margen amplio (hasta `c99999`) antes
 ampliar el ancho, y garantiza que el orden lexicográfico (con que ordenan
 `openspec list` y el filesystem) coincida con el orden numérico de creación. El
 número se **deriva por escaneo stateless** en el momento de crear el change (etapa
-`create`): se inspeccionan los changes activos en `openspec/changes/` y los
-archivados en `openspec/changes/archive/` (descontando el prefijo de fecha
-`YYYY-MM-DD-` que añade el archivado), se toma el máximo entero existente y se suma
-uno. No requiere contador persistente. La convención aplica a **todos** los changes,
+`create`): la fuente canónica es `npm run openspec:next-change-id` (implementación en
+`scripting/openspec/change-id.ts`), que inspecciona los changes activos en
+`openspec/changes/`, los archivados en `openspec/changes/archive/` y las fases L2 bajo
+`archive/*/phases/` (descontando el prefijo de fecha `YYYY-MM-DD--` del archivado), toma el máximo entero existente y suma uno.
+El inventario archivado (raíz y fases) comparte una secuencia global `c00001`… ordenada
+por fecha de directorio y slug alfabético. La etapa `verify` ejecuta `npm run openspec:verify-change-id`
+como gate CRITICAL ante colisiones del mismo `c<NNNNN>`. No requiere contador
+persistente. La convención aplica a **todos** los changes,
 incluidos el L1 orquestador y los L2 de fase del roadmap, donde el `phaseid`
 permanece dentro del slug: `c<NNNNN>-<prefix>-<phaseid>-<slug>`.
 

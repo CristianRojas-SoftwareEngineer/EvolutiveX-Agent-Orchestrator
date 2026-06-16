@@ -45,11 +45,12 @@ already enforced this; surface, don't block, on residual warnings).
 ## Step 2 — Move the delta to archive
 
 Derive the archive directory from `planningHome.changesDir` (never hardcode
-`openspec/changes/archive`). Target name: `YYYY-MM-DD-<change-name>` (today's date).
+`openspec/changes/archive`). Target name: `YYYY-MM-DD--<change-name>` (today's date,
+**double hyphen** before the change name).
 
 ```bash
 mkdir -p "<changesDir>/archive"
-mv "<changesDir>/<name>" "<changesDir>/archive/YYYY-MM-DD-<name>"
+mv "<changesDir>/<name>" "<changesDir>/archive/YYYY-MM-DD--<name>"
 ```
 
 If the target already exists, stop with an error (suggest a different date or

@@ -141,7 +141,9 @@ For each phase, prerequisites first:
 When all L2 phases are archived: confirm no legacy/zombie remains; confirm every
 registry doc reflects final reality; then archive the L1 orchestrator. This is the
 **only** moment the L1 and L2 directories are physically moved together under
-`openspec/changes/archive/<date>-<orchestrator>/`.
+`openspec/changes/archive/<date>--c<NNNNN>-<orchestrator>/`, with each L2 phase nested
+as `phases/<date>--c<NNNNN>-<phase-slug>/` (same `YYYY-MM-DD--` separator and
+mandatory `c<NNNNN>` prefix as root archived changes).
 <!-- </workflow> -->
 
 <!-- <roadmap_gate> -->

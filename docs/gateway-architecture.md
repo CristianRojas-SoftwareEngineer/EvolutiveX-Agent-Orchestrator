@@ -2694,7 +2694,7 @@ Consideraciones para `POST /hooks`:
 | Capa 4 en SCP                                                                          | `src/4-api/README.md`                                                    |
 | workflow-persistence design                                                            | `docs/external-references/workflow-persistence-refactor-phase/design.md` |
 | Arquitectura del Gateway (este documento)                                              | `docs/gateway-architecture.md`                                           |
-| **Historia de la migración gateway** (registro de cómo se construyó esta arquitectura) | `openspec/changes/archive/2026-06-01-gateway-migration/`                 |
+| **Historia de la migración gateway** (registro de cómo se construyó esta arquitectura) | `openspec/changes/archive/2026-06-01--c00012-gateway-migration/`                 |
 
 ### 41.2 Skills y referencias PKA
 

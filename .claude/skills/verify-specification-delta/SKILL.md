@@ -4,8 +4,8 @@ description: >
   Stage 8 of the specification-delta pipeline. Read-only hard gate before
   synchronize/archive. Produces a CRITICAL/WARNING/SUGGESTION report combining
   a 4C check (Completeness/Correctness/Coherence/Consistency over all applied
-  changes), a documentary-synchronization check, a legacy-reduction check, and a
-  framework-agnostic test gate (CRITICAL). It only detects;
+  changes), a change-id uniqueness gate (CRITICAL), a documentary-synchronization
+  check, a legacy-reduction check, and a framework-agnostic test gate (CRITICAL). It only detects;
   remediation lives upstream. Invoked only by orchestrate-specification-delta.
 when_to_use: >
   Used by orchestrate-specification-delta after apply, as the gate before sync and
@@ -17,7 +17,7 @@ argument-hint: "[--change <name>]"
 
 <!-- <overview> -->
 Stage 8 (read-only). Produces a verification report and acts as the **hard gate**
-before sync/archive. It combines four checks with severities
+before sync/archive. It combines five checks with severities
 CRITICAL/WARNING/SUGGESTION. Any CRITICAL stops the pipeline. It **only detects** —
 remediation lives upstream (sync for docs, apply for legacy). It mutates nothing.
 <!-- </overview> -->
@@ -38,16 +38,16 @@ node_modules/.bin/openspec instructions apply --change "<name>" --json
 ```
 
 Read all artifacts from `contextFiles` (proposal, specs, design, tasks). Then run the
-four checks.
+five checks.
 
 ## Plan the checks (sub-invocation of create-plan)
 
 Before running the checks, sub-invoke [create-plan](../create-plan/SKILL.md) per the
 `<sub_invocation_protocol>` of [artifact-structuring](../artifact-structuring/SKILL.md)
 to structure the four checks as a **read-only** verification plan: pass the delta
-artifacts (proposal, specs, design, tasks) as the sources and the four checks below
-(4C, documentary synchronization, legacy reduction, test gate) as read-only tasks
-ordered by dependency. The plan is read-only and its closure phase produces no effects
+artifacts (proposal, specs, design, tasks) as the sources and the five checks below
+(4C, change-id uniqueness, documentary synchronization, legacy reduction, test gate)
+as read-only tasks ordered by dependency. The plan is read-only and its closure phase produces no effects
 — this stage mutates nothing. The verdict and the CRITICAL/WARNING/SUGGESTION report
 below are unchanged by it. Then execute the plan's tasks in order.
 
@@ -82,6 +82,20 @@ Confirm the code/doc the delta replaced was removed or explicitly deprecated (wi
 retirement date). Dangling imports, duplicated sections, obsolete references →
 **WARNING**. (Remediation is the cleanup tasks `apply` executed; this check only
 confirms the residue is gone.)
+
+## Change id uniqueness gate (CRITICAL)
+
+Before the test gate, verify that the delta's numeric prefix `c<NNNNN>` is unique
+across all directories under `openspec/changes/` and `openspec/changes/archive/`
+(date prefix normalized). Run:
+
+```bash
+npm run openspec:verify-change-id -- --change "<name>"
+```
+
+A non-zero exit code is **CRITICAL** — it hard-blocks the gate. Report every
+conflicting directory path from stderr. (Remediation: rename the colliding archive or
+active change upstream in `apply` or before `create`.)
 
 ## Test gate (framework-agnostic, CRITICAL)
 
@@ -120,12 +134,14 @@ Spanish output. (This escalation lives here, not in `orchestrate-roadmap`.)
 - Read-only: this stage never mutates code, artifacts, docs, or specs. The `create-plan`
   sub-invocation structures the checks as a read-only plan and introduces no mutation —
   the stage's read-only invariant holds.
-- Integrate the 4C, documentary-synchronization and legacy-reduction checks + the test
-  gate **only**; do **not** port the roadmap-scoped checks (phase traceability,
-  dependency gate, Definition of Done) — they need the L1 registry, which a single
-  delta cannot see.
+- Integrate the 4C, change-id uniqueness, documentary-synchronization and
+  legacy-reduction checks + the test gate **only**; do **not** port the roadmap-scoped
+  checks (phase traceability, dependency gate, Definition of Done) — they need the L1
+  registry, which a single delta cannot see.
 - Detection only; remediation lives upstream (`synchronize` for docs, `apply` for
   legacy).
+- A duplicate `c<NNNNN>` across change directories is CRITICAL (change-id uniqueness
+  gate).
 - A failing test suite is CRITICAL. Stay framework-agnostic — never encode a runner.
 - Prefer SUGGESTION > WARNING > CRITICAL when uncertain, except the explicit CRITICAL
   cases above.

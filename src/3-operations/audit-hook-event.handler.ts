@@ -17,6 +17,7 @@ import {
 import { SessionMetricsService } from '../2-services/session-metrics.service.js';
 import { FALLBACK_SPEECH } from '../2-services/tts/fallback-speech.constants.js';
 import { resolveSessionDir } from './audit-workflow-closure.handler.js';
+import { KanbanBoardProjector } from './kanban-board.projector.js';
 
 const TTS_OPENROUTER_URL = 'https://openrouter.ai/api/v1/messages';
 const TTS_MODEL = 'poolside/laguna-xs.2:free';
@@ -60,6 +61,7 @@ export class AuditHookEventHandler {
     private readonly notifier?: INotificationService,
     private readonly toastBranding?: { appId?: string; icon?: string },
     private readonly ttsApiKey?: string,
+    private readonly kanbanProjector?: KanbanBoardProjector,
   ) {}
 
   public execute(event: ClaudeHookEvent): void {
@@ -438,6 +440,20 @@ export class AuditHookEventHandler {
       const taskMsg = formatTaskInProgressMessage(taskInProgressPayload);
       if (taskMsg) {
         void this.emitToast('TaskInProgress', taskMsg);
+      }
+    }
+
+    // Proyección Kanban: solo para TaskCreate/TaskUpdate con source='spec-delta'
+    if (
+      !isError &&
+      this.kanbanProjector &&
+      (event.toolName === 'TaskCreate' || event.toolName === 'TaskUpdate') &&
+      (event.toolInput?.['metadata'] as Record<string, unknown> | undefined)?.['source'] === 'spec-delta'
+    ) {
+      if (event.toolName === 'TaskCreate') {
+        void this.kanbanProjector.onTaskCreate(event);
+      } else {
+        void this.kanbanProjector.onTaskUpdate(event);
       }
     }
   }

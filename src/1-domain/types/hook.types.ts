@@ -31,6 +31,8 @@ export interface ClaudeHookEvent {
   toolInput?: Record<string, unknown>;
   /** Texto del prompt en UserPromptSubmit. */
   prompt?: string;
+  /** Respuesta de la tool (PostToolUse); objeto opaco preservado para proyecciones como el tablero Kanban. */
+  toolResponse?: Record<string, unknown>;
 }
 
 // Mapea el payload wire (snake_case) al tipo interno (camelCase).
@@ -60,6 +62,10 @@ export function parseHookEvent(payload: unknown): ClaudeHookEvent {
       ? (p['tool_input'] as Record<string, unknown>)
       : undefined;
   const prompt = typeof p['prompt'] === 'string' ? p['prompt'] : undefined;
+  const toolResponse =
+    typeof p['tool_response'] === 'object' && p['tool_response'] !== null
+      ? (p['tool_response'] as Record<string, unknown>)
+      : undefined;
 
   return {
     eventName,
@@ -73,5 +79,6 @@ export function parseHookEvent(payload: unknown): ClaudeHookEvent {
     toolName,
     toolInput,
     prompt,
+    toolResponse,
   };
 }

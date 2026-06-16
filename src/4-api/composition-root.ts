@@ -13,6 +13,7 @@ import { SessionMetricsService } from '../2-services/session-metrics.service.js'
 import { ProviderRoutingResolverService } from '../2-services/provider-routing-resolver.service.js';
 import { SubscriptionQuotaService } from '../2-services/subscription-quota.service.js';
 import { AuditHookEventHandler } from '../3-operations/audit-hook-event.handler.js';
+import { KanbanBoardProjector } from '../3-operations/kanban-board.projector.js';
 import { AuditWorkflowHandler } from '../3-operations/audit-workflow.handler.js';
 import { AuditSseResponseHandler } from '../3-operations/audit-sse-response.handler.js';
 import { AuditStandardResponseHandler } from '../3-operations/audit-standard-response.handler.js';
@@ -113,6 +114,11 @@ export async function createProxyDependencies(
   // Credencial TTS dedicada: leída una vez al arranque desde el secrets de OpenRouter
   const ttsApiKey = await resolveTtsApiKey();
 
+  const kanbanProjector = new KanbanBoardProjector(
+    path.join(process.cwd(), '.agentkanban'),
+    logger,
+  );
+
   const hookEventHandler = new AuditHookEventHandler(
     workflowRepo,
     auditBaseDir,
@@ -124,6 +130,7 @@ export async function createProxyDependencies(
     new DesktopNotificationAdapter(),
     toastBranding,
     ttsApiKey,
+    kanbanProjector,
   );
 
   return {

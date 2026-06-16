@@ -63,8 +63,10 @@ For each task still marked `- [ ]` in `tasks.md` (in the order the approved plan
 governs):
 
 - Announce «Trabajando en task N/M: <description>».
+- Emit `TaskCreate({ subject: <task subject>, description: <task description>, metadata: { source: 'spec-delta', taskNum: N, group: <group if applicable> } })` immediately after announcing; preserve the returned `tool_response.task.id` as `taskId` for the closing call.
 - Make the minimal, focused code changes the task requires (AGENTS.md §3/§4).
 - Mark the checkbox `- [x]` **immediately** on completing that task.
+- Emit `TaskUpdate({ taskId: <taskId from above>, status: 'completed', metadata: { source: 'spec-delta' } })` immediately after marking the checkbox.
 
 Pause conditions: ambiguous task; an implementation that reveals a design flaw (fix
 the code to match `design.md`, or update `design.md` to reflect the real decision —

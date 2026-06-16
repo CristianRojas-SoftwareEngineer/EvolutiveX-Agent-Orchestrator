@@ -46,6 +46,7 @@ ClaudeHookEvent {
   transcriptPath?: string;
   toolName?: string;
   toolInput?: Record<string, unknown>;
+  toolResponse?: Record<string, unknown>;
   prompt?: string;
 }
 ```
@@ -56,6 +57,7 @@ donde `HookEventName` es la unión de los 13 nombres de evento del lifecycle:
 `parseHookEvent` SHALL mapear los campos wire adicionales:
 - `tool_name` (string) → `toolName`
 - `tool_input` (object) → `toolInput`
+- `tool_response` (object) → `toolResponse`
 - `prompt` (string) → `prompt`
 
 #### Scenario: Payload `PostToolUse` → campos mapeados correctamente
@@ -101,6 +103,18 @@ donde `HookEventName` es la unión de los 13 nombres de evento del lifecycle:
 - **WHEN** se invoca `parseHookEvent(payload)`
 - **THEN** el resultado NO SHALL tener propiedad `toolName`
 
+#### Scenario: Payload `PostToolUse/TaskCreate` con `tool_response` mapeado correctamente
+
+- **GIVEN** un payload JSON `{ "hook_event_name": "PostToolUse", "session_id": "s1", "tool_name": "TaskCreate", "tool_input": { "subject": "Extender parseHookEvent", "metadata": { "source": "spec-delta" } }, "tool_response": { "task": { "id": "7", "subject": "Extender parseHookEvent" } } }`
+- **WHEN** se invoca `parseHookEvent(payload)`
+- **THEN** SHALL devolver un `ClaudeHookEvent` con `toolResponse: { task: { id: '7', subject: 'Extender parseHookEvent' } }`
+
+#### Scenario: Payload sin `tool_response` no incluye `toolResponse` en el resultado
+
+- **GIVEN** un payload JSON `{ "hook_event_name": "PostToolUse", "session_id": "s1", "tool_name": "Bash" }` (sin `tool_response`)
+- **WHEN** se invoca `parseHookEvent(payload)`
+- **THEN** el resultado NO SHALL tener propiedad `toolResponse`
+
 ---
 
 ### Requirement: Mapeo de eventos al correlador (`AuditHookEventHandler`)
@@ -115,7 +129,7 @@ El sistema SHALL implementar un handler `AuditHookEventHandler` en capa 3 (`src/
 | `SubagentStop` | **`readyToClose` para sub-workflow → si true: `close`** (§15.4); voz; toast `"Subagente terminado"`. Si no se encuentra entrada por `agentId`: **log `warn`**. Si `agentId` existe en índice wire pero no en lifecycle: **log `error`** |
 | `StopFailure` | **`close` directamente** (§15.4: siempre cierra en error); voz; toast con detalle del error (vía `formatStopFailureMessage`). Si no se encuentra workflow: **log `warn`** con `sessionId` |
 | `PreToolUse` | Log informativo; toast condicional si `toolName === 'AskUserQuestion' && toolInput.questions` (vía `formatPreToolUseAskMessage`) |
-| `PostToolUse` | **`completeToolUse` solo si `completionAuthority === 'hook'`**; ignorar para tools `continuation`; toast condicional si `toolName === 'TaskUpdate' && toolInput.status === 'in_progress'` (vía `formatTaskInProgressMessage`) |
+| `PostToolUse` | **`completeToolUse` solo si `completionAuthority === 'hook'`**; ignorar para tools `continuation`; toast condicional si `toolName === 'TaskUpdate' && toolInput.status === 'in_progress'` (vía `formatTaskInProgressMessage`); **proyección al board** si `toolName ∈ { TaskCreate, TaskUpdate }` y `toolInput.metadata.source === 'spec-delta'` (vía `KanbanBoardProjector`, opcional) |
 | `PostToolUseFailure` | **`completeToolUse` con `isError: true` solo si `completionAuthority === 'hook'`**; ignorar para tools `continuation` |
 | `SessionStart` | Toast `"Sesión iniciada"` |
 | `SessionEnd` | Toast `"Sesión finalizada"` |
@@ -236,6 +250,21 @@ Los hooks `PostToolUse` / `PostToolUseFailure` siguen recibiéndose en `POST /ho
 - **GIVEN** un `ClaudeHookEvent` con `eventName: 'PermissionRequest'`, `toolName: 'Bash'`, `toolInput.command: 'rm -rf /tmp/test'`
 - **WHEN** `AuditHookEventHandler.execute(event)` se invoca
 - **THEN** SHALL emitirse un toast `"Permiso para: Bash\n<command preview>"` (vía `formatPermissionRequestMessage`)
+
+#### Scenario: `PostToolUse[TaskCreate+spec-delta]` → proyección al board
+
+- **GIVEN** un `ClaudeHookEvent` con `eventName: 'PostToolUse'`, `toolName: 'TaskCreate'`, `toolInput.metadata.source: 'spec-delta'`, `toolResponse.task.id: '7'`
+- **AND** `AuditHookEventHandler` tiene `KanbanBoardProjector` inyectado
+- **WHEN** `AuditHookEventHandler.execute(event)` se invoca
+- **THEN** SHALL llamarse `KanbanBoardProjector.onTaskCreate(event)`
+- **AND** el procesamiento existente (completeToolUse si aplica) SHALL continuar normalmente
+
+#### Scenario: `PostToolUse[TaskUpdate+spec-delta]` → proyección al board
+
+- **GIVEN** un `ClaudeHookEvent` con `eventName: 'PostToolUse'`, `toolName: 'TaskUpdate'`, `toolInput.metadata.source: 'spec-delta'`, `toolInput.status: 'completed'`
+- **AND** `AuditHookEventHandler` tiene `KanbanBoardProjector` inyectado
+- **WHEN** `AuditHookEventHandler.execute(event)` se invoca
+- **THEN** SHALL llamarse `KanbanBoardProjector.onTaskUpdate(event)`
 
 ---
 

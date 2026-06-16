@@ -20,6 +20,7 @@ coverage/
 
 sessions/
 server/
+.agentkanban/
 
 # Secrets de providers (API keys)
 routing/providers/*/secrets.json

@@ -62,20 +62,27 @@ The system MUST allow enabling or disabling request body logging via configurati
 
 ### Requirement: Configuration MUST be sourced from environment variables
 
-The system MUST read the three logging flags from the environment configuration module (`env.config.ts`). The env vars and their defaults MUST be:
+The system MUST read the two logging flags from the environment configuration module (`env.config.ts`). The env vars and their defaults MUST be:
 - `LOG_HTTP_BODIES` — default `false`
 - `LOG_HTTP_HEADERS` — default `true`
-- `LOG_HTTP_LEVEL` — default `info`
 
 #### Scenario: Defaults are applied when env vars are absent
-- **WHEN** none of the three env vars is set
-- **THEN** the plugin MUST behave as if `LOG_HTTP_BODIES=false`, `LOG_HTTP_HEADERS=true`, and `LOG_HTTP_LEVEL=info`
+- **WHEN** neither of the two env vars is set
+- **THEN** the plugin MUST behave as if `LOG_HTTP_BODIES=false` and `LOG_HTTP_HEADERS=true`
 
 #### Scenario: Valid string values are accepted
 - **WHEN** `LOG_HTTP_BODIES=true` is set
 - **THEN** body logging MUST be enabled for the lifetime of the process
 - **AND** when `LOG_HTTP_HEADERS=false` is set, header logging MUST be disabled
-- **AND** when `LOG_HTTP_LEVEL=debug` is set, the plugin MUST emit at debug level (instead of the default `info`)
+
+### Requirement: HTTP access log entries MUST always emit at info level
+
+The system MUST emit all HTTP access log entries (`→ incoming request`, `→ incoming request body`, `← response sent`) via `request.log.info(...)`. The system MUST NOT provide a per-subsystem Pino level override for HTTP logging.
+
+#### Scenario: All hooks emit at info level regardless of global log level configuration
+- **WHEN** the HTTP logger hooks process a request
+- **THEN** each emitted log entry MUST use Pino's `info` level (level 30)
+- **AND** the system MUST NOT read or honor any `LOG_HTTP_LEVEL` environment variable
 
 ### Requirement: Plugin hooks MUST be testable in isolation
 

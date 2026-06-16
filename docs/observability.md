@@ -10,7 +10,6 @@ Plugin de logging HTTP estructurado que emite logs en los hooks `onRequest` y `p
 |---------------------|---------|----------------------------------------------------------|
 | `LOG_HTTP_BODIES`    | `false` | Activar logging del body de request como texto/Preview.  |
 | `LOG_HTTP_HEADERS`  | `true`  | Activar logging de headers request y response.            |
-| `LOG_HTTP_LEVEL`    | `info`  | Nivel Pino para los logs del plugin (`info` \| `debug`). |
 
 > ⚠️ **Advertencia:** No usar en producción con usuarios activos hasta que se implemente redacción de campos sensibles. Este plugin es solo para debugging en entornos de desarrollo.
 
@@ -80,9 +79,6 @@ LOG_HTTP_BODIES=true LOG_HTTP_HEADERS=true npm run dev
 
 # Solo bodies sin headers (menos ruido)
 LOG_HTTP_BODIES=true LOG_HTTP_HEADERS=false npm run dev
-
-# Modo debug (nivel 20 en Pino — muy verboso)
-LOG_HTTP_BODIES=true LOG_HTTP_LEVEL=debug npm run dev
 ```
 
 ### Inspeccionar logs en tiempo real

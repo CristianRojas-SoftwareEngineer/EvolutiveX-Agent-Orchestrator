@@ -8,8 +8,6 @@ export interface HttpLoggerConfig {
   logBodies: boolean;
   /** Activar logging de headers request+response. */
   logHeaders: boolean;
-  /** Nivel Pino para los logs del plugin (info | debug). */
-  level: 'info' | 'debug';
 }
 
 /**
@@ -59,11 +57,7 @@ export function createHttpOnRequestHook(config: HttpLoggerConfig) {
 
     // Body logging requiere preParsing (body disponible como Buffer tras content-type parser).
     // Se delega a createHttpPreParsingHook; aquí solo se loguean headers.
-    if (config.level === 'debug') {
-      request.log.debug(payload, '→ incoming request');
-    } else {
-      request.log.info(payload, '→ incoming request');
-    }
+    request.log.info(payload, '→ incoming request');
   };
 }
 
@@ -81,11 +75,7 @@ export function createHttpPreValidationHook(config: HttpLoggerConfig) {
 
     const payload: Record<string, unknown> = { reqId: request.id, ...serialized };
 
-    if (config.level === 'debug') {
-      request.log.debug(payload, '→ incoming request body');
-    } else {
-      request.log.info(payload, '→ incoming request body');
-    }
+    request.log.info(payload, '→ incoming request body');
   };
 }
 
@@ -107,11 +97,7 @@ export function createHttpOnResponseHook(config: HttpLoggerConfig) {
       payload.headers = pickHeaders(reply.getHeaders() as Record<string, unknown> | undefined);
     }
 
-    if (config.level === 'debug') {
-      request.log.debug(payload, '← response sent');
-    } else {
-      request.log.info(payload, '← response sent');
-    }
+    request.log.info(payload, '← response sent');
   };
 }
 

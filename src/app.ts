@@ -21,7 +21,6 @@ export function buildApp(deps: ProxyDependencies, logger: Logger) {
   const httpLoggerConfig = {
     logBodies: deps.config.LOG_HTTP_BODIES === true,
     logHeaders: deps.config.LOG_HTTP_HEADERS !== false,
-    level: deps.config.LOG_HTTP_LEVEL ?? 'info',
   };
   app.addHook('onRequest', createHttpOnRequestHook(httpLoggerConfig));
   app.addHook('preValidation', createHttpPreValidationHook(httpLoggerConfig));

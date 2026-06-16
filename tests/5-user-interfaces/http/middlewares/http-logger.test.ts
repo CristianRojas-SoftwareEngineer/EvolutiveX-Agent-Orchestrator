@@ -73,7 +73,6 @@ describe('httpLoggerPlugin hooks', () => {
       const { app, parsed } = createTestApp({
         logBodies: false,
         logHeaders: true,
-        level: 'info',
       });
 
       await app.inject({
@@ -100,7 +99,6 @@ describe('httpLoggerPlugin hooks', () => {
       const { app, parsed } = createTestApp({
         logBodies: true,
         logHeaders: false,
-        level: 'info',
       });
 
       const payload = JSON.stringify({ foo: 'bar' });
@@ -124,7 +122,6 @@ describe('httpLoggerPlugin hooks', () => {
       const { app, parsed } = createTestApp({
         logBodies: true,
         logHeaders: false,
-        level: 'info',
       });
 
       const binaryPayload = Buffer.from([0x00, 0x01, 0xff, 0xfe]);
@@ -152,7 +149,6 @@ describe('httpLoggerPlugin hooks', () => {
       const { app, parsed } = createTestApp({
         logBodies: false,
         logHeaders: false,
-        level: 'info',
       });
 
       await app.inject({ method: 'GET', url: '/echo' });
@@ -168,11 +164,10 @@ describe('httpLoggerPlugin hooks', () => {
       expect(sent!.reqId).toBe('test-req-id');
     });
 
-    it('level=debug emite a nivel 20 (Pino debug)', async () => {
+    it('siempre emite a nivel 30 (Pino info)', async () => {
       const { app, parsed } = createTestApp({
         logBodies: false,
         logHeaders: false,
-        level: 'debug',
       });
 
       await app.inject({ method: 'GET', url: '/echo' });
@@ -182,14 +177,13 @@ describe('httpLoggerPlugin hooks', () => {
 
       const incoming = parsed().find((p) => p.msg === '→ incoming request');
       expect(incoming).toBeDefined();
-      expect(incoming!.level).toBe(20); // Pino debug level
+      expect(incoming!.level).toBe(30); // Pino info level
     });
 
     it('logHeaders=true → response log incluye headers de respuesta', async () => {
       const { app, parsed } = createTestApp({
         logBodies: false,
         logHeaders: true,
-        level: 'info',
       });
 
       await app.inject({ method: 'GET', url: '/echo' });

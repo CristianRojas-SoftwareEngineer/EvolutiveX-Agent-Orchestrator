@@ -49,5 +49,4 @@ export const config: ProxyEnvironmentConfig = {
   TTS_CONTEXT_N: process.env.TTS_CONTEXT_N ? parseInt(process.env.TTS_CONTEXT_N, 10) : 3,
   LOG_HTTP_BODIES: process.env.LOG_HTTP_BODIES === 'true',
   LOG_HTTP_HEADERS: process.env.LOG_HTTP_HEADERS !== 'false',
-  LOG_HTTP_LEVEL: (process.env.LOG_HTTP_LEVEL === 'debug' ? 'debug' : 'info') as 'info' | 'debug',
 };

@@ -7,10 +7,10 @@
  */
 import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { SMART_CODE_PROXY_ROOT_KEY, type ClaudeSettings } from '../shared/claude-settings.js';
+import { EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT_KEY, type ClaudeSettings } from '../shared/claude-settings.js';
 import { buildNpxTsxCommand, resolvePosixAbsolutePath } from '../shared/npx-tsx-command.js';
 
-export { SMART_CODE_PROXY_ROOT_KEY };
+export { EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT_KEY };
 
 const ROUTER_STATUS_SEGMENT = 'scripting/router-status.ts';
 
@@ -71,7 +71,7 @@ export function applyStatuslineInstall(
   const next: ClaudeSettings = { ...settings };
   next.statusLine = buildStatusLineBlock(command);
   if (!next.env) next.env = {};
-  next.env[SMART_CODE_PROXY_ROOT_KEY] = root;
+  next.env[EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT_KEY] = root;
   return next;
 }
 
@@ -87,7 +87,7 @@ export function applyStatuslineUninstall(settings: ClaudeSettings, force: boolea
   }
   delete next.statusLine;
   if (next.env) {
-    delete next.env[SMART_CODE_PROXY_ROOT_KEY];
+    delete next.env[EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT_KEY];
     if (Object.keys(next.env).length === 0) delete next.env;
   }
   return next;

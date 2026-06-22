@@ -10,7 +10,7 @@ import {
 } from '../../../scripting/features/statusline.js';
 import { createValidProxyRootForStatusline } from '../helpers/proxy-root-fixture.js';
 import {
-  SMART_CODE_PROXY_ROOT_KEY,
+  EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT_KEY,
   type ClaudeSettings,
 } from '../../../scripting/shared/claude-settings.js';
 
@@ -69,14 +69,14 @@ describe('buildStatusLineBlock', () => {
 });
 
 describe('applyStatuslineInstall', () => {
-  it('instala statusLine y env.SMART_CODE_PROXY_ROOT sin refreshInterval', () => {
+  it('instala statusLine y env.EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT sin refreshInterval', () => {
     const root = createValidProxyRootForStatusline();
     const result = applyStatuslineInstall({}, root, false);
     expect('error' in result).toBe(false);
     const settings = result as ClaudeSettings;
     expect(settings.statusLine?.type).toBe('command');
     expect(settings.statusLine).not.toHaveProperty('refreshInterval');
-    expect(settings.env?.[SMART_CODE_PROXY_ROOT_KEY]).toBeTruthy();
+    expect(settings.env?.[EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT_KEY]).toBeTruthy();
     rmSync(root, { recursive: true, force: true });
   });
 
@@ -101,7 +101,7 @@ describe('applyStatuslineUninstall', () => {
   it('borra statusLine de SCP sin --force', () => {
     const settings: ClaudeSettings = {
       statusLine: { command: 'npx tsx /repo/scripting/router-status.ts' },
-      env: { [SMART_CODE_PROXY_ROOT_KEY]: '/repo' },
+      env: { [EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT_KEY]: '/repo' },
     };
     const result = applyStatuslineUninstall(settings, false);
     expect(result.statusLine).toBeUndefined();
@@ -111,17 +111,17 @@ describe('applyStatuslineUninstall', () => {
   it('preserva statusLine ajeno sin --force (S4)', () => {
     const settings: ClaudeSettings = {
       statusLine: { command: 'echo other' },
-      env: { [SMART_CODE_PROXY_ROOT_KEY]: '/repo', OTHER: 'val' },
+      env: { [EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT_KEY]: '/repo', OTHER: 'val' },
     };
     const result = applyStatuslineUninstall(settings, false);
     expect(result.statusLine?.command).toBe('echo other');
-    expect(result.env?.[SMART_CODE_PROXY_ROOT_KEY]).toBe('/repo');
+    expect(result.env?.[EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT_KEY]).toBe('/repo');
   });
 
   it('borra statusLine ajeno con --force', () => {
     const settings: ClaudeSettings = {
       statusLine: { command: 'echo other' },
-      env: { [SMART_CODE_PROXY_ROOT_KEY]: '/repo' },
+      env: { [EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT_KEY]: '/repo' },
     };
     const result = applyStatuslineUninstall(settings, true);
     expect(result.statusLine).toBeUndefined();

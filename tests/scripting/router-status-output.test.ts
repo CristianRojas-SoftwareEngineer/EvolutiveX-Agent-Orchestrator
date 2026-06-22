@@ -41,7 +41,7 @@ describe('buildStatuslineOutput', () => {
   }
 
   it('muestra Tabla 1 y Tabla 2 side-by-side sin session_id ni carpeta (§3.2)', () => {
-    const settings: ClaudeSettingsEnv = { SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS: 'on' };
+    const settings: ClaudeSettingsEnv = { EVOLUTIVEX_AGENT_ORCHESTRATOR__STATUSLINE_ROUTER_DETAILS: 'on' };
     const out = buildStatuslineOutput({}, settings, { sessionsRoot: emptySessionsRoot() });
     expect(out).toContain('Sesión actual');
     expect(out).toContain('Trabajo por niveles de razonamiento');
@@ -290,7 +290,7 @@ describe('buildStatuslineOutput', () => {
       ANTHROPIC_DEFAULT_SONNET_MODEL: 'm2-sonnet',
       ANTHROPIC_DEFAULT_OPUS_MODEL: 'm3-opus',
       ANTHROPIC_DEFAULT_FABLE_MODEL: 'm4-fable',
-      SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS: 'on',
+      EVOLUTIVEX_AGENT_ORCHESTRATOR__STATUSLINE_ROUTER_DETAILS: 'on',
     };
 
     const out = buildStatuslineOutput({ session_id: sessionId }, settings, {
@@ -300,21 +300,21 @@ describe('buildStatuslineOutput', () => {
     expect(out).toMatch(/2/);
   });
 
-  it('oculta Tabla 2 cuando SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS está ausente', () => {
+  it('oculta Tabla 2 cuando EVOLUTIVEX_AGENT_ORCHESTRATOR__STATUSLINE_ROUTER_DETAILS está ausente', () => {
     const out = buildStatuslineOutput({}, {}, { sessionsRoot: emptySessionsRoot() });
     expect(out).toContain('Sesión actual');
     expect(out).not.toContain('Trabajo por niveles de razonamiento');
   });
 
-  it('muestra Tabla 2 cuando SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS = "on"', () => {
-    const settings: ClaudeSettingsEnv = { SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS: 'on' };
+  it('muestra Tabla 2 cuando EVOLUTIVEX_AGENT_ORCHESTRATOR__STATUSLINE_ROUTER_DETAILS = "on"', () => {
+    const settings: ClaudeSettingsEnv = { EVOLUTIVEX_AGENT_ORCHESTRATOR__STATUSLINE_ROUTER_DETAILS: 'on' };
     const out = buildStatuslineOutput({}, settings, { sessionsRoot: emptySessionsRoot() });
     expect(out).toContain('Sesión actual');
     expect(out).toContain('Trabajo por niveles de razonamiento');
   });
 
   it('Tabla 2 muestra cuatro filas fijas incluyendo Frontier con paleta ANSI', () => {
-    const settings: ClaudeSettingsEnv = { SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS: 'on' };
+    const settings: ClaudeSettingsEnv = { EVOLUTIVEX_AGENT_ORCHESTRATOR__STATUSLINE_ROUTER_DETAILS: 'on' };
     const out = buildStatuslineOutput({}, settings, { sessionsRoot: emptySessionsRoot() });
     expect(out).toContain('Lite');
     expect(out).toContain('Standard');
@@ -380,7 +380,7 @@ describe('buildStatuslineOutput', () => {
       ANTHROPIC_DEFAULT_SONNET_MODEL: 'm2-sonnet',
       ANTHROPIC_DEFAULT_OPUS_MODEL: 'm3-opus',
       ANTHROPIC_DEFAULT_FABLE_MODEL: 'claude-fable-5',
-      SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS: 'on',
+      EVOLUTIVEX_AGENT_ORCHESTRATOR__STATUSLINE_ROUTER_DETAILS: 'on',
     };
 
     const out = buildStatuslineOutput({ session_id: sessionId }, settings, {
@@ -432,7 +432,7 @@ describe('buildStatuslineOutput', () => {
       ANTHROPIC_DEFAULT_HAIKU_MODEL: 'm1-haiku',
       ANTHROPIC_DEFAULT_SONNET_MODEL: 'm2-sonnet',
       ANTHROPIC_DEFAULT_OPUS_MODEL: 'm3-opus',
-      SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS: 'on',
+      EVOLUTIVEX_AGENT_ORCHESTRATOR__STATUSLINE_ROUTER_DETAILS: 'on',
     };
 
     const out = buildStatuslineOutput({ session_id: sessionId }, settings, {
@@ -443,8 +443,8 @@ describe('buildStatuslineOutput', () => {
     expect(out).toContain('0');
   });
 
-  it('oculta Tabla 2 cuando SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS = "off"', () => {
-    const settings: ClaudeSettingsEnv = { SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS: 'off' };
+  it('oculta Tabla 2 cuando EVOLUTIVEX_AGENT_ORCHESTRATOR__STATUSLINE_ROUTER_DETAILS = "off"', () => {
+    const settings: ClaudeSettingsEnv = { EVOLUTIVEX_AGENT_ORCHESTRATOR__STATUSLINE_ROUTER_DETAILS: 'off' };
     const out = buildStatuslineOutput({}, settings, { sessionsRoot: emptySessionsRoot() });
     expect(out).toContain('Sesión actual');
     expect(out).not.toContain('Trabajo por niveles de razonamiento');
@@ -485,7 +485,7 @@ describe('buildStatuslineOutput', () => {
       ANTHROPIC_DEFAULT_HAIKU_MODEL: 'm1-haiku',
       ANTHROPIC_DEFAULT_SONNET_MODEL: 'm2-sonnet',
       ANTHROPIC_DEFAULT_OPUS_MODEL: 'm3-opus',
-      SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS: 'on',
+      EVOLUTIVEX_AGENT_ORCHESTRATOR__STATUSLINE_ROUTER_DETAILS: 'on',
     };
 
     const ctx: ClaudeCodeContext = { session_id: sessionId };
@@ -529,7 +529,7 @@ describe('buildStatuslineOutput', () => {
       ANTHROPIC_DEFAULT_HAIKU_MODEL: 'm1-haiku',
       ANTHROPIC_DEFAULT_SONNET_MODEL: 'm2-sonnet',
       ANTHROPIC_DEFAULT_OPUS_MODEL: 'm3-opus',
-      SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS: 'on',
+      EVOLUTIVEX_AGENT_ORCHESTRATOR__STATUSLINE_ROUTER_DETAILS: 'on',
     };
 
     const ctx: ClaudeCodeContext = { session_id: sessionId };
@@ -573,7 +573,7 @@ describe('buildStatuslineOutput', () => {
     writeFileSync(join(sessionDir, '.statusline-state.json'), '{ invalid', 'utf-8');
 
     const settings: ClaudeSettingsEnv = {
-      SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS: 'on',
+      EVOLUTIVEX_AGENT_ORCHESTRATOR__STATUSLINE_ROUTER_DETAILS: 'on',
     };
 
     buildStatuslineOutput({ session_id: sessionId }, settings, { sessionsRoot: root });

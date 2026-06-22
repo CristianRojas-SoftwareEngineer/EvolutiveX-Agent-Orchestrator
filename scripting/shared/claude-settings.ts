@@ -6,13 +6,13 @@
  * canónica que usan `configure-provider`, `install-statusline`, `install-notifications` y `router-status`.
  *
  * Responsabilidad de este módulo: solo lectura/escritura del JSON en disco. El merge de
- * claves (`ANTHROPIC_*`, `statusLine`, `SMART_CODE_PROXY_ROOT`, etc.) lo hace cada script
+ * claves (`ANTHROPIC_*`, `statusLine`, `EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT`, etc.) lo hace cada script
  * antes de llamar a `writeClaudeSettings`, para no pisar configuración ajena.
  *
  * Consumidores:
  * - `configure-provider.ts` — bloque `env` (proveedor upstream / proxy)
- * - `install-statusline.ts` — `statusLine` + `env.SMART_CODE_PROXY_ROOT`
- * - `install-notifications.ts` — hooks globales de notificación + `env.SMART_CODE_PROXY_ROOT`
+ * - `install-statusline.ts` — `statusLine` + `env.EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT`
+ * - `install-notifications.ts` — hooks globales de notificación + `env.EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT`
  * - `router-status.ts` — lectura de `env` (auth, modelos, resolución de rutas del proxy)
  */
 
@@ -27,13 +27,13 @@ export const CLAUDE_SETTINGS_PATH = join(homedir(), '.claude', 'settings.json');
  * Clave en `settings.env` con la ruta absoluta del repositorio Smart Code Proxy.
  * La escribe `install-statusline`; la lee `router-status` vía `resolveProjectRoot`.
  */
-export const SMART_CODE_PROXY_ROOT_KEY = 'SMART_CODE_PROXY_ROOT';
+export const EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT_KEY = 'EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT';
 
 /**
  * Clave en `settings.env` que controla la visibilidad de la Tabla 2 del statusline.
  * Valor `'on'` → visible; cualquier otro valor o ausente → oculta (opt-in).
  */
-export const STATUSLINE_ROUTER_DETAILS_KEY = 'SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS';
+export const STATUSLINE_ROUTER_DETAILS_KEY = 'EVOLUTIVEX_AGENT_ORCHESTRATOR__STATUSLINE_ROUTER_DETAILS';
 
 /**
  * Subconjunto tipado de `settings.json` que manipulan los scripts de este repo.

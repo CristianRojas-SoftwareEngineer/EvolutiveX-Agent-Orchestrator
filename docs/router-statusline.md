@@ -88,7 +88,7 @@ El statusline consta de **dos o tres tablas** según el método de autenticació
 
 ### 3.2 Tabla 2 — Steps y consumo de tokens por nivel (común a todos los proveedores)
 
-Visible de forma **condicional** según la variable `SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS` en `~/.claude/settings.json → env`. Por defecto está **oculta** (opt-in); solo se muestra cuando el valor es `'on'`.
+Visible de forma **condicional** según la variable `EVOLUTIVEX_AGENT_ORCHESTRATOR__STATUSLINE_ROUTER_DETAILS` en `~/.claude/settings.json → env`. Por defecto está **oculta** (opt-in); solo se muestra cuando el valor es `'on'`.
 
 **Controlar la visibilidad:**
 
@@ -205,7 +205,7 @@ buildStatuslineOutput()
   ├── si hay sessionDir: leer .statusline-state.json (caché, para Tabla 2 y fallback de % en Tabla 1)
   ├── Fila 1: Tabla 1 + Tabla 3 side-by-side (si resolveQuotaSource devuelve datos); o solo Tabla 1
   ├── si hay sessionDir: escribir .statusline-state.json (caché: metricsSnapshot; % de contexto al renderizar Tabla 1 si stdin aportó valor usable)
-  └── Fila 2: Tabla 2 (Trabajo por niveles de razonamiento, si SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS=on)
+  └── Fila 2: Tabla 2 (Trabajo por niveles de razonamiento, si EVOLUTIVEX_AGENT_ORCHESTRATOR__STATUSLINE_ROUTER_DETAILS=on)
 ```
 
 ---
@@ -360,7 +360,7 @@ Ambos usan el mismo instalador subyacente ([`scripting/install-statusline.ts`](.
 - `statusLine` con `type: "command"`, `padding: 0` y un comando generado por `buildNpxTsxCommand`: `npx --prefix "<ROOT>"` + `tsx "<RUTA_ABSOLUTA>/scripting/router-status.ts"` (ruta del script **absoluta**, separadores **`/`**, citada para cmd/PowerShell o shell POSIX según el SO)
 
 > Claude Code admite el campo opcional `statusLine.refreshInterval` (re-ejecución periódica del comando cada N segundos). **Este proyecto no lo escribe** en `setup:install`; la cadencia queda en los triggers nativos de Claude Code (mensaje del asistente, `/compact`, permisos, vim).
-- `env.SMART_CODE_PROXY_ROOT` con la ruta absoluta nativa del proxy (para resolver `sessions/`, `routing/` y `configs/.env` aunque Claude Code abra otro workspace)
+- `env.EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT` con la ruta absoluta nativa del proxy (para resolver `sessions/`, `routing/` y `configs/.env` aunque Claude Code abra otro workspace)
 
 Reinicie Claude Code tras instalar. Opciones: `--dry-run`, `--force` (sobrescribir un statusLine ajeno), `--uninstall`. Si mueve el clon del repo, vuelva a ejecutar el instalador.
 
@@ -378,15 +378,15 @@ Si prefiere editar a mano, el bloque equivalente es:
 
 Use `/` en la ruta del script aunque el proxy esté en Windows (p. ej. `C:/Users/.../Smart Code Proxy/scripting/router-status.ts`). Prefiera `npm run install:statusline` para no citar mal las rutas.
 
-y en `env`: `"SMART_CODE_PROXY_ROOT": "<RUTA_ABSOLUTA_DEL_PROXY>"`.
+y en `env`: `"EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT": "<RUTA_ABSOLUTA_DEL_PROXY>"`.
 
 ### Scripts de configuración en `settings.json`
 
-**`configure-provider.ts`** escribe las variables `ANTHROPIC_*` en `~/.claude/settings.json → env` mediante `ClaudeSettingsEnvManager` (auth y modelos por nivel). No modifica `statusLine` ni `SMART_CODE_PROXY_ROOT`.
+**`configure-provider.ts`** escribe las variables `ANTHROPIC_*` en `~/.claude/settings.json → env` mediante `ClaudeSettingsEnvManager` (auth y modelos por nivel). No modifica `statusLine` ni `EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT`.
 
-**`install-statusline.ts`** (véase instalación recomendada arriba) escribe `statusLine` y `env.SMART_CODE_PROXY_ROOT`.
+**`install-statusline.ts`** (véase instalación recomendada arriba) escribe `statusLine` y `env.EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT`.
 
-**`router-status.ts`** lee el bloque `env` completo en cada invocación: `ANTHROPIC_*` (dispatch y clasificación), `SMART_CODE_PROXY_ROOT` (rutas a `sessions/`, `routing/` y `configs/.env`).
+**`router-status.ts`** lee el bloque `env` completo en cada invocación: `ANTHROPIC_*` (dispatch y clasificación), `EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT` (rutas a `sessions/`, `routing/` y `configs/.env`).
 
 ---
 

@@ -6,7 +6,7 @@ description: >
   reasoning-level slots (Lite/Standard/Reasoning/Frontier), Tabla 2 aggregation from
   session-metrics.json, cache, and file map. Use when asking how the statusline works,
   where slot or Tabla 2 logic lives, how metrics are composed per level, statusline
-  installation, SMART_CODE_PROXY_ROOT, router-details toggle, or improving/extending
+  installation, EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT, router-details toggle, or improving/extending
   the statusline. Also trigger for statusline, barra de estado, slots de razonamiento,
   tabla 2, session-metrics en statusline, install statusline, router-status.
 ---
@@ -65,9 +65,9 @@ Smart Code Proxy registers a subprocess in `~/.claude/settings.json` that runs
 | Row | Content | Condition |
 |-----|---------|-----------|
 | 1 | Tabla 1 (session/provider) ± Tabla 3 (subscription quotas) side-by-side | Tabla 3 when `resolveQuotaSource()` returns data |
-| 2 | Tabla 2 («Trabajo por niveles de razonamiento») | Only when `SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS` = `on` (opt-in; hidden by default) |
+| 2 | Tabla 2 («Trabajo por niveles de razonamiento») | Only when `EVOLUTIVEX_AGENT_ORCHESTRATOR__STATUSLINE_ROUTER_DETAILS` = `on` (opt-in; hidden by default) |
 
-**Contract:** Claude Code injects `settings.json → env` into the subprocess — **not** the user's shell `process.env`. `router-status.ts` reads auth, model slots, `SMART_CODE_PROXY_ROOT`, and the Tabla 2 toggle from that block.
+**Contract:** Claude Code injects `settings.json → env` into the subprocess — **not** the user's shell `process.env`. `router-status.ts` reads auth, model slots, `EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT`, and the Tabla 2 toggle from that block.
 <!-- </architecture> -->
 
 <!-- <installation> -->
@@ -78,7 +78,7 @@ Smart Code Proxy registers a subprocess in `~/.claude/settings.json` that runs
 | Layer | File | Role |
 |-------|------|------|
 | CLI entry | `scripting/setup.ts` | Universal installer (`npm run setup:install`) |
-| Feature logic | `scripting/features/statusline.ts` | Builds `statusLine` block + `SMART_CODE_PROXY_ROOT` |
+| Feature logic | `scripting/features/statusline.ts` | Builds `statusLine` block + `EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT` |
 | Settings I/O | `scripting/shared/claude-settings.ts` | Read/write `~/.claude/settings.json` |
 | Formal spec | `openspec/specs/statusline-installer/spec.md` | Installer requirements |
 
@@ -92,7 +92,7 @@ Smart Code Proxy registers a subprocess in `~/.claude/settings.json` that runs
     "padding": 0
   },
   "env": {
-    "SMART_CODE_PROXY_ROOT": "<absolute proxy repo path>"
+    "EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT": "<absolute proxy repo path>"
   }
 }
 ```
@@ -115,7 +115,7 @@ See archived change `remove-statusline-refresh-interval` if investigating live-r
 
 | Key | Value | Effect |
 |-----|-------|--------|
-| `SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS` | `on` | Tabla 2 rendered |
+| `EVOLUTIVEX_AGENT_ORCHESTRATOR__STATUSLINE_ROUTER_DETAILS` | `on` | Tabla 2 rendered |
 | absent / `off` / other | — | Tabla 2 omitted entirely |
 
 CLI helpers (`package.json`):
@@ -304,9 +304,9 @@ Four columns: quota label, bar+%, «Reinicio en», time remaining.
 | File | Responsibility |
 |------|----------------|
 | `scripting/router-status.ts` | Full render pipeline, slot classification, aggregation, cache |
-| `scripting/features/statusline.ts` | Install/uninstall statusLine + `SMART_CODE_PROXY_ROOT` |
+| `scripting/features/statusline.ts` | Install/uninstall statusLine + `EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT` |
 | `scripting/setup.ts` | `npm run setup:install` orchestration |
-| `scripting/shared/claude-settings.ts` | Settings keys (`SMART_CODE_PROXY_ROOT`, router-details toggle) |
+| `scripting/shared/claude-settings.ts` | Settings keys (`EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT`, router-details toggle) |
 | `scripting/statusline-router-details.ts` | Toggle Tabla 2 in settings |
 
 ### Human documentation
@@ -350,10 +350,10 @@ resolveAuthMethodFromEnv()  → api_key | bearer | oauth
 resolveQuotaSource()        → stdin OAuth | subscription-quota.json | null
 buildStatuslineOutput()
   ├── row 1: Tabla 1 + Tabla 3 side-by-side (or Tabla 1 alone)
-  └── row 2: Tabla 2 if SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS=on
+  └── row 2: Tabla 2 if EVOLUTIVEX_AGENT_ORCHESTRATOR__STATUSLINE_ROUTER_DETAILS=on
 ```
 
-`projectRoot` resolution: `settings.env.SMART_CODE_PROXY_ROOT` → fallback `process.cwd()` if invalid.
+`projectRoot` resolution: `settings.env.EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT` → fallback `process.cwd()` if invalid.
 <!-- </dispatch> -->
 
 <!-- <constraints> -->

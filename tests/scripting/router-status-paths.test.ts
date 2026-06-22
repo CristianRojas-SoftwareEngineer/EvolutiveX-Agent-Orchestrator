@@ -7,7 +7,7 @@ import {
   resolveProjectRoot,
   type ClaudeSettingsEnv,
 } from '../../scripting/router-status.js';
-import { SMART_CODE_PROXY_ROOT_KEY } from '../../scripting/shared/claude-settings.js';
+import { EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT_KEY } from '../../scripting/shared/claude-settings.js';
 import { createValidProxyRoot } from './helpers/proxy-root-fixture.js';
 
 const modelSettings: ClaudeSettingsEnv = {
@@ -33,9 +33,9 @@ describe('resolveProjectRoot', () => {
     return { root, cwd: resolve(cwd) };
   }
 
-  it('usa SMART_CODE_PROXY_ROOT cuando routing/providers existe', () => {
+  it('usa EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT cuando routing/providers existe', () => {
     const { root, cwd } = proxyRepo();
-    const resolved = resolveProjectRoot({ [SMART_CODE_PROXY_ROOT_KEY]: root }, cwd);
+    const resolved = resolveProjectRoot({ [EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT_KEY]: root }, cwd);
     expect(resolved).toBe(root);
   });
 
@@ -43,11 +43,11 @@ describe('resolveProjectRoot', () => {
     const { cwd } = proxyRepo();
     const invalid = mkdtempSync(join(tmpdir(), 'scp-invalid-'));
     tempDirs.push(invalid);
-    const resolved = resolveProjectRoot({ [SMART_CODE_PROXY_ROOT_KEY]: invalid }, cwd);
+    const resolved = resolveProjectRoot({ [EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT_KEY]: invalid }, cwd);
     expect(resolved).toBe(cwd);
   });
 
-  it('usa cwd si SMART_CODE_PROXY_ROOT está ausente', () => {
+  it('usa cwd si EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT está ausente', () => {
     const { cwd } = proxyRepo();
     expect(resolveProjectRoot({}, cwd)).toBe(cwd);
   });
@@ -59,7 +59,7 @@ describe('resolveProjectRoot', () => {
 
     const out = buildStatuslineOutput(
       {},
-      { [SMART_CODE_PROXY_ROOT_KEY]: join(cwd, 'should-not-use') },
+      { [EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT_KEY]: join(cwd, 'should-not-use') },
       { projectRoot: root, sessionsRoot },
     );
     expect(out).toContain('Sesión actual');
@@ -116,8 +116,8 @@ describe('buildStatuslineOutput con ROOT en settingsEnv', () => {
 
     const settingsEnv: ClaudeSettingsEnv = {
       ...modelSettings,
-      [SMART_CODE_PROXY_ROOT_KEY]: proxyRoot,
-      SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS: 'on',
+      [EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT_KEY]: proxyRoot,
+      EVOLUTIVEX_AGENT_ORCHESTRATOR__STATUSLINE_ROUTER_DETAILS: 'on',
     };
 
     const out = buildStatuslineOutput({ session_id: sessionId }, settingsEnv);

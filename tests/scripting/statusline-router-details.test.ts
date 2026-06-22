@@ -39,12 +39,12 @@ describe('applyRouterDetails', () => {
     const settings: ClaudeSettings = {
       env: {
         ANTHROPIC_API_KEY: 'test-key',
-        SMART_CODE_PROXY_ROOT: '/some/path',
+        EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT: '/some/path',
       },
     };
     const result = applyRouterDetails(settings, 'on');
     expect(result.env!['ANTHROPIC_API_KEY']).toBe('test-key');
-    expect(result.env!['SMART_CODE_PROXY_ROOT']).toBe('/some/path');
+    expect(result.env!['EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT']).toBe('/some/path');
     expect(result.env![STATUSLINE_ROUTER_DETAILS_KEY]).toBe('on');
   });
 

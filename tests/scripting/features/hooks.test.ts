@@ -14,7 +14,7 @@ import {
 } from '../../../scripting/features/hooks.js';
 import {
   setClaudeSettingsPathForTests,
-  SMART_CODE_PROXY_ROOT_KEY,
+  EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT_KEY,
   type ClaudeSettings,
 } from '../../../scripting/shared/claude-settings.js';
 import { createValidProxyRootForHooks } from '../helpers/proxy-root-fixture.js';
@@ -164,9 +164,9 @@ describe('mergeHooks', () => {
     expect(hooks['UserPromptSubmit'][1].hooks[0].command).toContain('post-hook-event.ts');
   });
 
-  it('establece SMART_CODE_PROXY_ROOT en env', () => {
+  it('establece EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT en env', () => {
     const result = mergeHooks({}, canonical, scpRoot, false);
-    expect(result.env?.[SMART_CODE_PROXY_ROOT_KEY]).toBe(scpRoot);
+    expect(result.env?.[EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT_KEY]).toBe(scpRoot);
   });
 });
 
@@ -249,7 +249,7 @@ describe('readCanonicalHooks', () => {
               {
                 type: 'command',
                 command:
-                  'npx --prefix "${SMART_CODE_PROXY_ROOT}" tsx "${SMART_CODE_PROXY_ROOT}/scripting/post-hook-event.ts"',
+                  'npx --prefix "${EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT}" tsx "${EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT}/scripting/post-hook-event.ts"',
               },
             ],
           },
@@ -260,7 +260,7 @@ describe('readCanonicalHooks', () => {
     const hooks = readCanonicalHooks(root);
     expect(hooks['UserPromptSubmit']).toBeDefined();
     const cmd = hooks['UserPromptSubmit'][0].hooks[0].command;
-    expect(cmd).not.toContain('${SMART_CODE_PROXY_ROOT}');
+    expect(cmd).not.toContain('${EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT}');
     const normalizedRoot = root.replace(/\\/g, '/');
     expect(cmd.replace(/\\/g, '/')).toContain(normalizedRoot);
     rmSync(root, { recursive: true, force: true });

@@ -18,13 +18,13 @@
 import { existsSync, readFileSync, copyFileSync, mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { homedir } from 'node:os';
-import { SMART_CODE_PROXY_ROOT_KEY, type ClaudeSettings } from '../shared/claude-settings.js';
+import { EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT_KEY, type ClaudeSettings } from '../shared/claude-settings.js';
 
-export { SMART_CODE_PROXY_ROOT_KEY };
+export { EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT_KEY };
 
 const HOOKS_JSON_SEGMENT = 'configs/hooks.json';
 const POST_HOOK_EVENT_SEGMENT = 'scripting/post-hook-event.ts';
-const PLACEHOLDER = '${SMART_CODE_PROXY_ROOT}';
+const PLACEHOLDER = '${EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT}';
 
 export interface HookEntry {
   type: string;
@@ -43,7 +43,7 @@ export type HooksBlock = Record<string, HookBlock[]>;
 export type KeyClassification = 'scp-only' | 'user-only' | 'mixed';
 
 /**
- * Reemplaza `${SMART_CODE_PROXY_ROOT}` por la ruta resuelta del repo.
+ * Reemplaza `${EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT}` por la ruta resuelta del repo.
  * Windows-safe: usa `String.split.join` (literal, no regex).
  */
 export function resolveCommandPlaceholders(command: string, scpRoot: string): string {
@@ -178,7 +178,7 @@ export function mergeHooks(
 
   next.hooks = nextHooks as ClaudeSettings['hooks'];
   if (!next.env) next.env = {};
-  next.env[SMART_CODE_PROXY_ROOT_KEY] = scpRoot;
+  next.env[EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT_KEY] = scpRoot;
   return next;
 }
 

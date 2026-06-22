@@ -14,7 +14,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   readClaudeSettings,
-  SMART_CODE_PROXY_ROOT_KEY,
+  EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT_KEY,
   STATUSLINE_ROUTER_DETAILS_KEY,
 } from './shared/claude-settings.js';
 import { readSubscriptionQuotaFromProviderDir } from './shared/provider-config.js';
@@ -114,11 +114,11 @@ interface ResolvedStatuslinePaths {
 
 /**
  * Resuelve la raíz del repositorio del proxy desde settings o cwd.
- * Si `SMART_CODE_PROXY_ROOT` no apunta a un repo válido (`routing/providers`), usa cwd.
+ * Si `EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT` no apunta a un repo válido (`routing/providers`), usa cwd.
  */
 export function resolveProjectRoot(settingsEnv: ClaudeSettingsEnv, cwd?: string): string {
   const fallback = resolve(cwd ?? process.cwd());
-  const fromSettings = settingsEnv[SMART_CODE_PROXY_ROOT_KEY]?.trim();
+  const fromSettings = settingsEnv[EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT_KEY]?.trim();
   if (!fromSettings) return fallback;
   const candidate = resolve(fromSettings);
   if (existsSync(join(candidate, 'routing', 'providers'))) return candidate;

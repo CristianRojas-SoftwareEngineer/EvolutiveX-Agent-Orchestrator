@@ -3,7 +3,8 @@
  *
  * Cubre el conjunto indivisible de 13 entradas declaradas en
  * `configs/hooks.json`:
- * - Relay único: `scripting/post-hook-event.ts`
+ * - 12 eventos: `scripting/post-hook-event.ts`
+ * - `SessionEnd`: `scripting/hooks/session-end-hook.ts` (node directo síncrono)
  *
  * Las funciones aquí definidas son puras (no escriben en disco). El
  * orquestador `scripting/setup.ts` se encarga de la I/O (S2 backup, S3
@@ -24,7 +25,7 @@ export { EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT_KEY };
 
 const HOOKS_JSON_SEGMENT = 'configs/hooks.json';
 const POST_HOOK_EVENT_SEGMENT = 'scripting/post-hook-event.ts';
-const DETACHED_SESSION_END_RELAY_SEGMENT = 'scripting/detached-session-end-relay.ts';
+const SESSION_END_HOOK_SEGMENT = 'scripting/hooks/session-end-hook.ts';
 const PLACEHOLDER = '${EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT}';
 
 export interface HookEntry {
@@ -73,6 +74,9 @@ export function resolveHooksBlock(hooks: HooksBlock, scpRoot: string): HooksBloc
  * Determina si un comando es gestionado por SCP.
  * Un comando es de SCP si su path normalizado contiene:
  * - `post-hook-event`
+ * - `session-end-hook`
+ * - `detached-session-end-relay` (legacy; conservado solo para limpiar
+ *   instalaciones previas en la reinstalación/uninstall)
  * - La ruta resolved del repo (sin backslash)
  */
 export function isScpManagedCommand(command: string | undefined, scpRoot: string): boolean {
@@ -81,6 +85,7 @@ export function isScpManagedCommand(command: string | undefined, scpRoot: string
   const rootNormalized = scpRoot.replace(/\\/g, '/');
   return (
     normalized.includes('post-hook-event') ||
+    normalized.includes('session-end-hook') ||
     normalized.includes('detached-session-end-relay') ||
     normalized.includes(rootNormalized)
   );
@@ -229,7 +234,7 @@ export function unmergeHooks(
  * Lanza error si falta alguno.
  */
 export function validateScpRoot(scpRoot: string): void {
-  const files = [HOOKS_JSON_SEGMENT, POST_HOOK_EVENT_SEGMENT, DETACHED_SESSION_END_RELAY_SEGMENT];
+  const files = [HOOKS_JSON_SEGMENT, POST_HOOK_EVENT_SEGMENT, SESSION_END_HOOK_SEGMENT];
   const missing: string[] = [];
   for (const file of files) {
     if (!existsSync(resolve(scpRoot, file))) {

@@ -22,7 +22,13 @@ import { createValidProxyRootForHooks } from '../helpers/proxy-root-fixture.js';
 describe('isScpManagedCommand', () => {
   const scpRoot = '/c/repos/smart-code-proxy';
 
-  it('detecta detached-session-end-relay', () => {
+  it('detecta session-end-hook', () => {
+    expect(
+      isScpManagedCommand('node /c/repos/scp/scripting/hooks/session-end-hook.ts', scpRoot),
+    ).toBe(true);
+  });
+
+  it('detecta detached-session-end-relay (legacy, para limpiar instalaciones viejas)', () => {
     expect(
       isScpManagedCommand(
         'npx tsx /c/repos/scp/scripting/detached-session-end-relay.ts',
@@ -281,17 +287,19 @@ describe('readCanonicalHooks', () => {
     rmSync(root, { recursive: true, force: true });
   });
 
-  it('preserva async: true en SessionEnd al resolver placeholders', () => {
+  it('SessionEnd usa node directo sobre session-end-hook.ts sin async', () => {
     const root = resolve(import.meta.dirname, '../../..');
     const hooks = readCanonicalHooks(root);
     const entry = hooks['SessionEnd'][0].hooks[0];
-    expect(entry.async).toBe(true);
-    expect(entry.command).toContain('detached-session-end-relay.ts');
+    expect(entry.async).toBeUndefined();
+    expect(entry.command).toContain('scripting/hooks/session-end-hook.ts');
+    expect(entry.command).not.toContain('detached-session-end-relay.ts');
+    expect(entry.command).not.toContain('tsx');
   });
 });
 
 describe('validateScpRoot', () => {
-  it('pasa si existen configs/hooks.json, post-hook-event.ts y detached-session-end-relay.ts', () => {
+  it('pasa si existen configs/hooks.json, post-hook-event.ts y session-end-hook.ts', () => {
     const root = createValidProxyRootForHooks();
     expect(() => validateScpRoot(root)).not.toThrow();
     rmSync(root, { recursive: true, force: true });
@@ -305,13 +313,13 @@ describe('validateScpRoot', () => {
     rmSync(root, { recursive: true, force: true });
   });
 
-  it('falla si falta detached-session-end-relay.ts', () => {
-    const root = mkdtempSync(join(tmpdir(), 'scp-missing-relay-'));
+  it('falla si falta session-end-hook.ts', () => {
+    const root = mkdtempSync(join(tmpdir(), 'scp-missing-hook-'));
     mkdirSync(join(root, 'configs'), { recursive: true });
     writeFileSync(join(root, 'configs', 'hooks.json'), JSON.stringify({ hooks: {} }), 'utf-8');
     mkdirSync(join(root, 'scripting'), { recursive: true });
     writeFileSync(join(root, 'scripting', 'post-hook-event.ts'), '', 'utf-8');
-    expect(() => validateScpRoot(root)).toThrow(/detached-session-end-relay\.ts/);
+    expect(() => validateScpRoot(root)).toThrow(/session-end-hook\.ts/);
     rmSync(root, { recursive: true, force: true });
   });
 
@@ -319,9 +327,9 @@ describe('validateScpRoot', () => {
     const root = mkdtempSync(join(tmpdir(), 'scp-no-legacy-'));
     mkdirSync(join(root, 'configs'), { recursive: true });
     writeFileSync(join(root, 'configs', 'hooks.json'), JSON.stringify({ hooks: {} }), 'utf-8');
-    mkdirSync(join(root, 'scripting'), { recursive: true });
+    mkdirSync(join(root, 'scripting', 'hooks'), { recursive: true });
     writeFileSync(join(root, 'scripting', 'post-hook-event.ts'), '', 'utf-8');
-    writeFileSync(join(root, 'scripting', 'detached-session-end-relay.ts'), '', 'utf-8');
+    writeFileSync(join(root, 'scripting', 'hooks', 'session-end-hook.ts'), '', 'utf-8');
     expect(() => validateScpRoot(root)).not.toThrow();
     rmSync(root, { recursive: true, force: true });
   });

@@ -99,8 +99,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "npx --prefix \"${EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT}\" tsx \"${EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT}/scripting/detached-session-end-relay.ts\"",
-            "async": true
+            "command": "node \"${EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT}/scripting/hooks/session-end-hook.ts\""
           }
         ]
       }

@@ -47,8 +47,8 @@ describe('hooks canónicos y encoding', () => {
       expect(hooks[key], `falta hook para ${key}`).toBeDefined();
       const allCmds = hooks[key]!.flatMap((b) => b.hooks.map((h) => h.command)).join(' ');
       if (key === 'SessionEnd') {
-        expect(allCmds, `hook ${key} debe usar relay detached`).toContain(
-          'detached-session-end-relay.ts',
+        expect(allCmds, `hook ${key} debe usar session-end-hook`).toContain(
+          'scripting/hooks/session-end-hook.ts',
         );
       } else {
         expect(allCmds, `hook ${key} debe usar post-hook-event`).toContain('post-hook-event.ts');
@@ -88,7 +88,7 @@ describe('hooks canónicos y encoding', () => {
     expect(ACCENT_SAMPLE).not.toMatch(/Ã/);
   });
 
-  it('SessionEnd es async y usa relay detached; el resto permanecen síncronos', () => {
+  it('SessionEnd usa node directo sobre session-end-hook.ts sin async; todos permanecen síncronos', () => {
     const hooksPath = resolve(import.meta.dirname, '../../configs/hooks.json');
     const parsed = JSON.parse(readFileSync(hooksPath, 'utf-8')) as {
       hooks: Record<string, { hooks: { async?: boolean; command?: string }[] }[]>;
@@ -96,16 +96,17 @@ describe('hooks canónicos y encoding', () => {
     for (const [key, blocks] of Object.entries(parsed.hooks)) {
       for (const block of blocks) {
         for (const entry of block.hooks) {
+          expect(entry.async, `${key} no debe ser async`).toBeUndefined();
           if (key === 'SessionEnd') {
-            expect(entry.async, `${key} debe ser async`).toBe(true);
-            expect(entry.command, `${key} debe usar relay detached`).toContain(
-              'detached-session-end-relay.ts',
+            expect(entry.command, `${key} debe usar session-end-hook`).toContain(
+              'scripting/hooks/session-end-hook.ts',
             );
-            expect(entry.command, `${key} no debe invocar post-hook-event directo`).not.toContain(
-              'post-hook-event.ts',
-            );
-          } else {
-            expect(entry.async, `${key} no debe ser async`).toBeUndefined();
+            expect(entry.command, `${key} debe invocarse con node directo`).toContain('node ');
+            expect(entry.command, `${key} no debe usar tsx`).not.toContain('tsx');
+            expect(
+              entry.command,
+              `${key} no debe usar relay detached`,
+            ).not.toContain('detached-session-end-relay.ts');
           }
         }
       }

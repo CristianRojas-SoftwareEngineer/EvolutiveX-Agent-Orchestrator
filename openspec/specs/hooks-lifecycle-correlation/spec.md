@@ -323,21 +323,22 @@ El repositorio SHALL registrar las entradas del lifecycle de hooks de Claude Cod
 
 ### Requirement: Todos los eventos de hook ciclan por `POST /hooks`
 
-Todos los **13 eventos** de Claude Code gestionados por SCP SHALL usar `scripting/post-hook-event.ts` como único comando relay en `configs/hooks.json`. El gateway (`AuditHookEventHandler`) es el único punto de decisión de efectos (toast, TTS, audit): los scripts relay nunca deciden efectos locales.
+Todos los **13 eventos** de Claude Code gestionados por SCP SHALL ciclar por el endpoint `POST /hooks`. Doce eventos SHALL usar `scripting/post-hook-event.ts` como comando relay en `configs/hooks.json`; el evento `SessionEnd` SHALL usar `scripting/hooks/session-end-hook.ts` (cliente HTTP autocontenido invocado con `node` directo). El gateway (`AuditHookEventHandler`) es el único punto de decisión de efectos (toast, TTS, audit): los scripts relay nunca deciden efectos locales.
 
-Los eventos que antes emitían toast directamente desde scripts (`gateway-hook-notify.ts`, `pre-tool-use-hook-ux.ts`, `task-in-progress-hook-ux.ts`) o desde `notifications/cli.ts` (`SessionStart`, `SessionEnd`, `PermissionRequest`, `TaskCreated`, `TaskCompleted`) ahora ciclan por el gateway: `post-hook-event.ts` → `POST /hooks` → `AuditHookEventHandler.executeAsync` → `emitToast`.
+Los eventos que antes emitían toast directamente desde scripts (`gateway-hook-notify.ts`, `pre-tool-use-hook-ux.ts`, `task-in-progress-hook-ux.ts`) o desde `notifications/cli.ts` (`SessionStart`, `SessionEnd`, `PermissionRequest`, `TaskCreated`, `TaskCompleted`) ahora ciclan por el gateway: el relay → `POST /hooks` → `AuditHookEventHandler.executeAsync` → `emitToast`.
 
 Los eventos condicionales (`PreToolUse[AskUserQuestion]`, `PostToolUse[TaskUpdate+in_progress]`) también ciclan por el gateway, que aplica el filtro (`toolName === 'AskUserQuestion' && toolInput.questions`; `toolName === 'TaskUpdate' && toolInput.status === 'in_progress'`) antes de emitir el toast.
 
 Ninguna clave SHALL contener un segundo comando en paralelo que lea stdin por separado (race condition de Windows eliminada de raíz: un solo relay por evento).
 
-**Módulos normativos:** `scripting/post-hook-event.ts` (único relay); `src/3-operations/audit-hook-event.handler.ts` (único punto de despacho de efectos).
+**Módulos normativos:** `scripting/post-hook-event.ts` (relay de los 12 eventos); `scripting/hooks/session-end-hook.ts` (relay de `SessionEnd`); `src/3-operations/audit-hook-event.handler.ts` (único punto de despacho de efectos).
 
-#### Scenario: Todos los eventos en hooks.json usan post-hook-event como comando
+#### Scenario: Todos los eventos en hooks.json usan el relay canónico como comando
 
 - **GIVEN** `configs/hooks.json` instalado por SCP
 - **WHEN** se inspeccionan todos los comandos de hook de todos los eventos
-- **THEN** cada comando SHALL referenciar únicamente `scripting/post-hook-event.ts`
+- **THEN** los doce eventos distintos de `SessionEnd` SHALL referenciar únicamente `scripting/post-hook-event.ts`
+- **AND** `SessionEnd` SHALL referenciar únicamente `scripting/hooks/session-end-hook.ts`
 - **AND** SHALL no existir ningún comando que referencie `scripting/gateway-hook-notify.ts`, `scripting/pre-tool-use-hook-ux.ts`, `scripting/task-in-progress-hook-ux.ts`, ni `src/2-services/notifications/cli.ts`
 
 #### Scenario: PostToolUse tiene una sola entrada de hook (sin duplicado TaskUpdate)
@@ -374,7 +375,7 @@ Ninguna clave SHALL contener un segundo comando en paralelo que lea stdin por se
 
 #### Scenario: Eventos lifecycle y de sesión llegan al gateway
 
-- **GIVEN** `configs/hooks.json` con entradas para los 13 eventos (12 vía `post-hook-event.ts`, `SessionEnd` vía `detached-session-end-relay.ts`)
+- **GIVEN** `configs/hooks.json` con entradas para los 13 eventos (12 vía `post-hook-event.ts`, `SessionEnd` vía `scripting/hooks/session-end-hook.ts`)
 - **WHEN** Claude Code dispara `SessionStart`, `SessionEnd`, `TaskCreated`, `TaskCompleted` o `PermissionRequest`
 - **THEN** SHALL llegar `POST /hooks` al gateway con el payload completo
 - **AND** el gateway SHALL emitir el toast correspondiente (texto estático para sesión/tareas; dinámico para `PermissionRequest`)
@@ -385,7 +386,7 @@ Ninguna clave SHALL contener un segundo comando en paralelo que lea stdin por se
 
 El sistema SHALL proporcionar un mecanismo de instalación de las **13 claves** de hooks de SCP en `~/.claude/settings.json` (user-level) mediante el script `setup --hooks` o `setup:hooks`. La instalación SHALL ser **merge selectivo** que preserve configs ajenas a SCP en las mismas claves.
 
-Las 13 claves gestionadas por SCP SHALL ser: `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PostToolUseFailure`, `SubagentStart`, `SubagentStop`, `Stop`, `StopFailure`, `SessionStart`, `SessionEnd`, `PermissionRequest`, `TaskCreated`, `TaskCompleted`. Cada clave SHALL contener un único comando relay SCP: las doce restantes apuntan a `scripting/post-hook-event.ts`; `SessionEnd` apunta a `scripting/detached-session-end-relay.ts`.
+Las 13 claves gestionadas por SCP SHALL ser: `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PostToolUseFailure`, `SubagentStart`, `SubagentStop`, `Stop`, `StopFailure`, `SessionStart`, `SessionEnd`, `PermissionRequest`, `TaskCreated`, `TaskCompleted`. Cada clave SHALL contener un único comando relay SCP: las doce restantes apuntan a `scripting/post-hook-event.ts`; `SessionEnd` apunta a `scripting/hooks/session-end-hook.ts`.
 
 La entrada `SessionStart` en `configs/hooks.json` SHALL omitir el campo `"matcher"` para que Claude Code despache el hook para todos los valores de `source` (`startup`, `resume`, `clear`, `compact`). **No SHALL existir un campo `"matcher"` en la entrada `SessionStart` de `configs/hooks.json`.**
 
@@ -398,7 +399,8 @@ El merge selectivo SHALL seguir esta política para cada clave:
 
 Un comando se considera "de SCP" si su path normalizado (backslash→forward slash) contiene:
 - `post-hook-event`
-- `detached-session-end-relay`
+- `session-end-hook`
+- `detached-session-end-relay` (conservado solo para limpiar instalaciones previas en la reinstalación/uninstall)
 - La ruta resolved de `EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT`
 
 La plantilla canónica SHALL vivir en `configs/hooks.json` en el repo SCP y SHALL estar versionada. La instalación SHALL escribir `env.EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT` con la ruta absoluta del repo para que el gateway y los hooks la lean. Antes de modificar `settings.json`, SHALL crearse un backup en `~/.claude/settings-backup-<timestamp>.json`.
@@ -416,6 +418,19 @@ La plantilla canónica SHALL vivir en `configs/hooks.json` en el repo SCP y SHAL
 - **WHEN** el usuario ejecuta `npm run setup -- --hooks`
 - **THEN** la entrada `SessionStart` en `settings.hooks` NO SHALL tener campo `"matcher"`
 - **AND** el comando relay SHALL estar presente en la entrada `SessionStart`
+
+#### Scenario: SessionEnd instalado con comando node-directo
+
+- **GIVEN** `~/.claude/settings.json` no existe o tiene `hooks: {}`
+- **WHEN** el usuario ejecuta `npm run setup -- --hooks`
+- **THEN** la entrada `SessionEnd` en `settings.hooks` SHALL referenciar `scripting/hooks/session-end-hook.ts` invocado con `node` directo
+- **AND** SHALL NOT contener `"async": true` ni referenciar `detached-session-end-relay.ts`
+
+#### Scenario: Reinstalación limpia el relay detached previo
+
+- **GIVEN** `~/.claude/settings.json` tiene `hooks.SessionEnd` con un comando que referencia `detached-session-end-relay`
+- **WHEN** el usuario ejecuta `npm run setup -- --hooks`
+- **THEN** el comando previo de `detached-session-end-relay` SHALL reconocerse como de SCP y reemplazarse por el comando canónico de `session-end-hook.ts`
 
 #### Scenario: Instalación con hooks ajenos existentes
 
@@ -482,69 +497,57 @@ Las entradas de hooks de SCP SHALL instalarse en `~/.claude/settings.json` (user
 
 ---
 
-### Requirement: SessionEnd hook SHALL ejecutarse en modo async
+### Requirement: SessionEnd hook SHALL ejecutarse con `node` directo síncrono
 
-La entrada `SessionEnd` en `configs/hooks.json` SHALL declarar `"async": true` en el
-comando que invoca `scripting/detached-session-end-relay.ts` (no
-`post-hook-event.ts` directamente). Claude Code cancela hooks síncronos de
-`SessionEnd` durante el apagado del proceso en cualquier plataforma soportada; el
-modo async (API de Claude Code, agnóstico al SO) permite que el relay padre termine
-sin bloquear el cierre de sesión. El relay detached garantiza que el hijo complete el
-`POST /hooks` aunque el árbol de Claude Code se cierre.
+La entrada `SessionEnd` en `configs/hooks.json` SHALL invocar un script TypeScript
+autocontenido `scripting/hooks/session-end-hook.ts` mediante `node` directo
+(type-stripping nativo de Node), sin `npx`, sin `tsx`, sin paso de build, y **sin**
+`"async": true`. El comando SHALL tener la forma
+`node "${EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT}/scripting/hooks/session-end-hook.ts"`.
 
-Las demás claves SCP (`UserPromptSubmit`, `PreToolUse`, `PostToolUse`,
-`PostToolUseFailure`, `SubagentStart`, `SubagentStop`, `Stop`, `StopFailure`,
-`SessionStart`, `PermissionRequest`, `TaskCreated`, `TaskCompleted`) SHALL NOT
-declarar `"async": true` en la plantilla canónica: dependen del comportamiento
-síncrono fire-and-forget del relay durante el agentic loop.
+La motivación es de fiabilidad de entrega: el comando previo (`npx … tsx …
+detached-session-end-relay.ts` con `"async": true`) sufría un cold-start de ~1471 ms
+de `npx`+`tsx` antes de ejecutar su primera línea; como `async` es fire-and-forget
+(Claude Code no espera) y `SessionEnd` no puede bloquear, Claude derribaba el subárbol
+del hook antes de que el relay alcanzara el `spawn` detached, por lo que el hijo
+detached nunca nacía y el `POST /hooks` no se emitía. Invocar `node` directo sobre el
+`.ts` elimina el cold-start (medido ~212 ms wall-clock, `POST` en ~38 ms), de modo que
+el trabajo cabe dentro de la ventana de teardown ejecutándose de forma síncrona.
 
-El instalador (`mergeHooks` / `readCanonicalHooks`) SHALL preservar el campo `async`
-al resolver placeholders y al escribir en `~/.claude/settings.json`.
+El script `scripting/hooks/session-end-hook.ts` SHALL ser un **cliente HTTP delgado**
+del contrato estable `/hooks`: SHALL leer el payload JSON de stdin y hacer un único
+`POST /hooks` (URL resuelta vía `ANTHROPIC_BASE_URL`, no acoplada a host:puerto
+literal). SHALL ser autocontenido —solo `node:` builtins y `fetch` global— sin imports
+relativos (no SHALL importar `scripting/post-hook-event.ts` ni compartir lógica con
+otros relays), de modo que `node` lo ejecute sin resolver módulos del repo. SHALL usar
+únicamente sintaxis borrable (erasable-only) para que el type-stripping nativo de Node
+funcione, y SHALL ser agnóstico al SO (solo API de Node, sin shell ni utilidades
+específicas de plataforma).
 
-#### Scenario: Plantilla canónica declara SessionEnd async con relay detached
+El entorno SHALL proveer una versión de Node con type-stripping nativo de TypeScript
+(≥ 22.18 / 23.6).
+
+#### Scenario: Plantilla canónica invoca SessionEnd con node directo síncrono
 
 - **GIVEN** `configs/hooks.json` versionado en el repo SCP
 - **WHEN** se inspecciona la entrada bajo la clave `SessionEnd`
-- **THEN** el único hook de comando SHALL referenciar `scripting/detached-session-end-relay.ts`
-- **AND** SHALL contener `"async": true`
-- **AND** SHALL NOT referenciar `post-hook-event.ts` directamente
+- **THEN** el único hook de comando SHALL invocar `scripting/hooks/session-end-hook.ts` con `node` directo
+- **AND** SHALL NOT contener `"async": true`
+- **AND** SHALL NOT referenciar `npx`, `tsx`, ni `detached-session-end-relay.ts`
 
-#### Scenario: Resto de eventos permanecen síncronos
-
-- **GIVEN** `configs/hooks.json`
-- **WHEN** se inspeccionan todas las claves distintas de `SessionEnd`
-- **THEN** ningún hook de comando SHALL tener `"async": true`
-
-#### Scenario: Instalación propaga async en SessionEnd
-
-- **GIVEN** un `~/.claude/settings.json` con `SessionEnd` scp-only (solo relay SCP)
-- **WHEN** el usuario ejecuta `npm run setup:install -- --hooks`
-- **THEN** `settings.hooks.SessionEnd[0].hooks[0].async` SHALL ser `true`
-
----
-
-### Requirement: SessionEnd relay SHALL usar spawn detached multiplataforma
-
-El script `scripting/detached-session-end-relay.ts` SHALL leer el payload JSON de
-stdin, lanzar `post-hook-event.ts` en un proceso hijo con `spawn({ detached: true })`,
-escribir el body en el stdin del hijo, cerrar ese stdin, y llamar `child.unref()` para
-desacoplar el hijo del ciclo de vida del padre. El hijo SHALL invocarse con
-`process.execPath` (node) y la ruta directa a `node_modules/tsx/dist/cli.mjs` (sin
-`npx`) más la ruta absoluta a `scripting/post-hook-event.ts`, usando rutas con `/`
-(resueltas vía `resolvePosixAbsolutePath`). El script SHALL ser agnóstico al SO: solo
-API de Node (`child_process.spawn`), sin shell ni utilidades específicas de Windows.
-
-#### Scenario: Relay padre termina tras spawn detached
+#### Scenario: El hook autocontenido emite POST /hooks desde stdin
 
 - **GIVEN** un payload JSON válido de `SessionEnd` en stdin
-- **WHEN** se ejecuta `detached-session-end-relay.ts`
-- **THEN** el proceso padre SHALL terminar con exit code 0 sin esperar la respuesta HTTP
-- **AND** el hijo SHALL completar `POST /hooks` de forma independiente
+- **AND** `ANTHROPIC_BASE_URL` definido con una URL válida
+- **WHEN** se ejecuta `node scripting/hooks/session-end-hook.ts`
+- **THEN** SHALL llegar una request `POST` al endpoint `/hooks` con el payload del evento
+- **AND** el proceso SHALL completar el `POST` de forma síncrona antes de salir (sin spawn detached)
 
-#### Scenario: isScpManagedCommand reconoce el relay detached
+#### Scenario: El hook no depende de npx/tsx ni de imports relativos
 
-- **GIVEN** un comando de hook que referencia `detached-session-end-relay`
-- **WHEN** se evalúa `isScpManagedCommand(command, scpRoot)`
-- **THEN** SHALL retornar `true`
+- **GIVEN** el archivo `scripting/hooks/session-end-hook.ts`
+- **WHEN** se inspeccionan sus imports
+- **THEN** SHALL importar únicamente módulos `node:` builtin
+- **AND** SHALL NOT contener imports relativos a otros módulos del repo
 
 ---

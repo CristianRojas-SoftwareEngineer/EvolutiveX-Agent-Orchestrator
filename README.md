@@ -166,7 +166,7 @@ Adicionalmente, el archivo `.claude/settings.json` del proyecto registra **13 cl
 | `Stop`               | —                 | `post-hook-event.ts` (gateway genera voz y toast de continuidad) |
 | `StopFailure`        | —                 | `post-hook-event.ts` (gateway emite toast con detalle del error) |
 | `SessionStart`       | `startup\|resume` | `post-hook-event.ts` (gateway emite toast `"Sesión iniciada"`) |
-| `SessionEnd`         | —                 | `post-hook-event.ts` (`async: true`; gateway emite toast `"Sesión finalizada"`) |
+| `SessionEnd`         | —                 | `detached-session-end-relay.ts` (`async: true`; gateway emite toast `"Sesión finalizada"`) |
 | `PermissionRequest`  | —                 | `post-hook-event.ts` (gateway emite toast con `tool_name` + preview) |
 | `TaskCreated`        | —                 | `post-hook-event.ts` (gateway emite toast `"Tarea creada"`) |
 | `TaskCompleted`      | —                 | `post-hook-event.ts` (gateway emite toast `"Tarea completada"`) |

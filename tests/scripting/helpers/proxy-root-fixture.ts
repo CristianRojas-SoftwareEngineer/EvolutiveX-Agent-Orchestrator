@@ -32,6 +32,7 @@ export function createValidProxyRoot(options: ValidProxyRootOptions = {}): strin
     'utf-8',
   );
   writeFileSync(join(root, 'scripting', 'post-hook-event.ts'), 'export {}', 'utf-8');
+  writeFileSync(join(root, 'scripting', 'detached-session-end-relay.ts'), 'export {}', 'utf-8');
   if (options.withSessionsDir) {
     mkdirSync(join(root, 'sessions'), { recursive: true });
   }
@@ -56,6 +57,7 @@ export function createValidProxyRootForHooks(
   );
   mkdirSync(join(root, 'scripting'), { recursive: true });
   writeFileSync(join(root, 'scripting', 'post-hook-event.ts'), 'export {}', 'utf-8');
+  writeFileSync(join(root, 'scripting', 'detached-session-end-relay.ts'), 'export {}', 'utf-8');
   return resolve(root);
 }
 

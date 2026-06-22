@@ -24,6 +24,7 @@ export { EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT_KEY };
 
 const HOOKS_JSON_SEGMENT = 'configs/hooks.json';
 const POST_HOOK_EVENT_SEGMENT = 'scripting/post-hook-event.ts';
+const DETACHED_SESSION_END_RELAY_SEGMENT = 'scripting/detached-session-end-relay.ts';
 const PLACEHOLDER = '${EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT}';
 
 export interface HookEntry {
@@ -78,7 +79,11 @@ export function isScpManagedCommand(command: string | undefined, scpRoot: string
   if (typeof command !== 'string') return false;
   const normalized = command.replace(/\\/g, '/');
   const rootNormalized = scpRoot.replace(/\\/g, '/');
-  return normalized.includes('post-hook-event') || normalized.includes(rootNormalized);
+  return (
+    normalized.includes('post-hook-event') ||
+    normalized.includes('detached-session-end-relay') ||
+    normalized.includes(rootNormalized)
+  );
 }
 
 /**
@@ -224,7 +229,7 @@ export function unmergeHooks(
  * Lanza error si falta alguno.
  */
 export function validateScpRoot(scpRoot: string): void {
-  const files = [HOOKS_JSON_SEGMENT, POST_HOOK_EVENT_SEGMENT];
+  const files = [HOOKS_JSON_SEGMENT, POST_HOOK_EVENT_SEGMENT, DETACHED_SESSION_END_RELAY_SEGMENT];
   const missing: string[] = [];
   for (const file of files) {
     if (!existsSync(resolve(scpRoot, file))) {

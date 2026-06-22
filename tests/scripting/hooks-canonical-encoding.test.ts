@@ -46,7 +46,13 @@ describe('hooks canónicos y encoding', () => {
       if (key === 'TaskInProgress') continue; // implementada como PostToolUse[matcher=TaskUpdate]
       expect(hooks[key], `falta hook para ${key}`).toBeDefined();
       const allCmds = hooks[key]!.flatMap((b) => b.hooks.map((h) => h.command)).join(' ');
-      expect(allCmds, `hook ${key} debe usar post-hook-event`).toContain('post-hook-event.ts');
+      if (key === 'SessionEnd') {
+        expect(allCmds, `hook ${key} debe usar relay detached`).toContain(
+          'detached-session-end-relay.ts',
+        );
+      } else {
+        expect(allCmds, `hook ${key} debe usar post-hook-event`).toContain('post-hook-event.ts');
+      }
     }
   });
 
@@ -82,16 +88,22 @@ describe('hooks canónicos y encoding', () => {
     expect(ACCENT_SAMPLE).not.toMatch(/Ã/);
   });
 
-  it('SessionEnd es async; el resto de claves permanecen síncronas', () => {
+  it('SessionEnd es async y usa relay detached; el resto permanecen síncronos', () => {
     const hooksPath = resolve(import.meta.dirname, '../../configs/hooks.json');
     const parsed = JSON.parse(readFileSync(hooksPath, 'utf-8')) as {
-      hooks: Record<string, { hooks: { async?: boolean }[] }[]>;
+      hooks: Record<string, { hooks: { async?: boolean; command?: string }[] }[]>;
     };
     for (const [key, blocks] of Object.entries(parsed.hooks)) {
       for (const block of blocks) {
         for (const entry of block.hooks) {
           if (key === 'SessionEnd') {
             expect(entry.async, `${key} debe ser async`).toBe(true);
+            expect(entry.command, `${key} debe usar relay detached`).toContain(
+              'detached-session-end-relay.ts',
+            );
+            expect(entry.command, `${key} no debe invocar post-hook-event directo`).not.toContain(
+              'post-hook-event.ts',
+            );
           } else {
             expect(entry.async, `${key} no debe ser async`).toBeUndefined();
           }

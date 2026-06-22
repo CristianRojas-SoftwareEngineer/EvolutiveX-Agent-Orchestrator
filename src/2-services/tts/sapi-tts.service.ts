@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
 import type { ITTSService } from '../../1-domain/ports/ITTSService.js';
+import { normalizeSpeechText } from '../../1-domain/services/tts/normalize-speech-text.js';
 
 // Implementación Windows-only via System.Speech.Synthesis (SAPI).
 // Gap multiplataforma documentado en design.md — pendiente análisis en iteración futura.
@@ -11,9 +12,11 @@ export class SapiTTSService implements ITTSService {
   }
 
   async speak(text: string): Promise<void> {
-    if (!text.trim()) return;
+    // Saneamiento determinista: elimina markdown/símbolos que SAPI verbalizaría.
+    const clean = normalizeSpeechText(text);
+    if (!clean.trim()) return;
     try {
-      await this.synthesize(text);
+      await this.synthesize(clean);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       process.stderr.write(`[SAPI TTS] Error en síntesis: ${msg}\n`);

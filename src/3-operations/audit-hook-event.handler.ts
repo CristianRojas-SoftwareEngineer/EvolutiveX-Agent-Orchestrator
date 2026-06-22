@@ -21,7 +21,7 @@ import { KanbanBoardProjector } from './kanban-board.projector.js';
 
 const TTS_OPENROUTER_URL = 'https://openrouter.ai/api/v1/messages';
 const TTS_MODEL = 'poolside/laguna-xs.2:free';
-const TTS_MAX_TOKENS = 512;
+const TTS_MAX_TOKENS = 128;
 
 const VOICE_ASSISTANT_SYSTEM_PROMPT =
   'Eres la voz del asistente Smart Code Proxy. ' +
@@ -29,13 +29,15 @@ const VOICE_ASSISTANT_SYSTEM_PROMPT =
   'tu última respuesta, y la nueva petición del usuario. ' +
   'Responde SOLO a la nueva petición (la tercera) en una sola oración breve y natural en español, ' +
   'confirmando que procederás a investigar o ejecutar lo solicitado. ' +
-  'Sin puntos al final. Sin markdown.';
+  'Texto plano para ser leído en voz alta: sin markdown, sin asteriscos, ' +
+  'comillas, guiones ni símbolos. Sin puntos al final.';
 
 const CONTINUITY_SYSTEM_PROMPT =
   'Eres la voz del asistente de continuidad de Smart Code Proxy. ' +
-  'En un máximo de tres oraciones cortas en español, resume: ' +
-  'qué se completó, qué quedó pendiente y cuál es el estado final. ' +
-  'Sin puntos al final de las oraciones. Sin markdown. Habla en primera persona.';
+  'Narra en alto nivel, en una o dos frases cortas en español, una síntesis de lo realizado. ' +
+  'Parafrasea; no expliques detalle técnico punto por punto ni enumeres pasos. ' +
+  'Texto plano para ser leído en voz alta: sin markdown, sin asteriscos, ' +
+  'comillas, guiones ni símbolos. Sin puntos al final de las oraciones. Habla en primera persona.';
 
 type MessageContentBlock = { type: string; text?: string };
 

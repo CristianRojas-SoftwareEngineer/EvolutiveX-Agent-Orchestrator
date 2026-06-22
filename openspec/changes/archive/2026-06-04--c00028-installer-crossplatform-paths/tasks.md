@@ -1,6 +1,6 @@
 ## 1. Template de hooks (config)
 
-- [x] 1.1 En `configs/hooks.json`, reemplazar `${CLAUDE_PROJECT_DIR}` (×2) por `${SMART_CODE_PROXY_ROOT}` en el bloque `Stop`
+- [x] 1.1 En `configs/hooks.json`, reemplazar `${CLAUDE_PROJECT_DIR}` (×2) por `${EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT}` en el bloque `Stop`
 
 ## 2. Orquestador (setup.ts)
 
@@ -28,7 +28,7 @@
 
 ## 6. Documentación
 
-- [x] 6.1 En `docs/notifications.md:67`, actualizar el snippet del hook `Stop`: `${CLAUDE_PROJECT_DIR}` → `${SMART_CODE_PROXY_ROOT}` (×2) con comillas dobles preservadas
+- [x] 6.1 En `docs/notifications.md:67`, actualizar el snippet del hook `Stop`: `${CLAUDE_PROJECT_DIR}` → `${EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT}` (×2) con comillas dobles preservadas
 - [x] 6.2 En `docs/notifications.md:76`, actualizar la nota: ya no se depende de `${CLAUDE_PROJECT_DIR}`; el script deriva su raíz de `import.meta.url`
 - [x] 6.3 En `docs/notifications.md:82,90,96`, quitar el prefijo `CLAUDE_PROJECT_DIR=.` de los comandos de prueba manual
 

@@ -15,7 +15,7 @@ El sistema SHALL proporcionar un comando CLI (`install-statusline`) ejecutable d
 - **AND** `settings.statusLine.padding` SHALL ser `0`
 - **AND** `settings.statusLine.command` SHALL invocar `router-status.ts` mediante `npx` + `tsx` con `--prefix` en la raíz del proxy
 - **AND** `settings.statusLine.refreshInterval` SHALL ser el entero `3`
-- **AND** `settings.env.SMART_CODE_PROXY_ROOT` SHALL ser la ruta absoluta resuelta del repositorio del proxy
+- **AND** `settings.env.EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT` SHALL ser la ruta absoluta resuelta del repositorio del proxy
 
 #### Scenario: Instalación con refreshInterval personalizado por variable de entorno
 

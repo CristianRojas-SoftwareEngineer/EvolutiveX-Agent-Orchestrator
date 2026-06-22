@@ -15,7 +15,7 @@ La fila de totales SHALL seguir inmediatamente a las cuatro filas de nivel.
 
 #### Scenario: Tabla 2 con router-details on muestra cuatro niveles
 
-- **GIVEN** `SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS` es `"on"`
+- **GIVEN** `EVOLUTIVEX_AGENT_ORCHESTRATOR__STATUSLINE_ROUTER_DETAILS` es `"on"`
 - **WHEN** se renderiza la Tabla 2 sin actividad en sesión
 - **THEN** el output SHALL contener las etiquetas `Lite`, `Standard`, `Reasoning` y `Frontier` como filas de nivel
 - **AND** SHALL contener la fila `Totales de sesión`

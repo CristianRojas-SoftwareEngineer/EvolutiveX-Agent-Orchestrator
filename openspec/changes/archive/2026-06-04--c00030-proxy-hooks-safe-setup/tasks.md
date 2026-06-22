@@ -3,14 +3,14 @@
 ## 1. Plantilla canónica de hooks
 
 - [ ] 1.1 Crear `configs/hooks.json` con las 14 entradas de hooks (8 lifecycle + 6 UX)
-- [ ] 1.2 Usar `${SMART_CODE_PROXY_ROOT}` como placeholder en todos los paths de comandos
+- [ ] 1.2 Usar `${EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT}` como placeholder en todos los paths de comandos
 - [ ] 1.3 Verificar que cada entrada tenga los comandos correctos según el contrato de `hooks-lifecycle-correlation`
 
 ## 2. Script setup-hooks.ts
 
 - [ ] 2.1 Crear `scripting/setup-hooks.ts` con CLI (commander)
 - [ ] 2.2 Implementar `readClaudeSettings` / `writeClaudeSettings` (reutilizar de `shared/claude-settings.ts`)
-- [ ] 2.3 Implementar `resolveScpRoot()`: lee `SMART_CODE_PROXY_ROOT` de `settings.env` o `--root`
+- [ ] 2.3 Implementar `resolveScpRoot()`: lee `EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT` de `settings.env` o `--root`
 - [ ] 2.4 Implementar `isScpManagedCommand(command: string): boolean` — detecta comandos de SCP
 - [ ] 2.5 Implementar `readCanonicalHooks()` — lee y parsea `configs/hooks.json`, reemplaza placeholders
 - [ ] 2.6 Implementar `classifyKey(commands: string[]): 'scp-only' | 'user-only' | 'mixed'` — clasifica cada clave

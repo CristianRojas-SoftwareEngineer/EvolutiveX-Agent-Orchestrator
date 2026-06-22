@@ -64,20 +64,20 @@ Cuando `refreshInterval` está activo (entero ≥ 1, en segundos) y la Tabla 2 e
 #### Scenario: Modo live activo y Tabla 2 visible
 
 - **GIVEN** `statusLine.refreshInterval` es `3` en `~/.claude/settings.json`
-- **AND** `SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS` es `on`
+- **AND** `EVOLUTIVEX_AGENT_ORCHESTRATOR__STATUSLINE_ROUTER_DETAILS` es `on`
 - **WHEN** Claude Code invoca el script del statusline
 - **THEN** la cabecera de la Tabla 2 SHALL incluir el texto `● live (3s)`
 
 #### Scenario: Modo live desactivado
 
 - **GIVEN** `statusLine.refreshInterval` está ausente en `~/.claude/settings.json`
-- **AND** `SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS` es `on`
+- **AND** `EVOLUTIVEX_AGENT_ORCHESTRATOR__STATUSLINE_ROUTER_DETAILS` es `on`
 - **WHEN** Claude Code invoca el script del statusline
 - **THEN** la cabecera de la Tabla 2 SHALL NO incluir el texto `● live`
 
 #### Scenario: Tabla 2 oculta
 
-- **GIVEN** `SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS` es `off` o ausente
+- **GIVEN** `EVOLUTIVEX_AGENT_ORCHESTRATOR__STATUSLINE_ROUTER_DETAILS` es `off` o ausente
 - **WHEN** Claude Code invoca el script del statusline
 - **THEN** el indicador `● live` SHALL NO renderizarse (la Tabla 2 no se imprime)
 
@@ -85,7 +85,7 @@ Cuando `refreshInterval` está activo (entero ≥ 1, en segundos) y la Tabla 2 e
 
 El campo `lastRenderedTable2Output` SHALL contener la representación textual exacta (incluyendo códigos ANSI) de la última Tabla 2 renderizada, lista para imprimir por stdout. SHALL incluir el sufijo de nueva línea final para preservar el layout cuando se reimprime.
 
-> **Nota de comportamiento — toggle de `STATUSLINE_ROUTER_DETAILS`**: cuando la variable `SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS` pasa de `on` a `off`, el script no renderiza la Tabla 2 ni actualiza el cache. El campo `lastRenderedTable2Output` previo permanece en disco. Si el usuario reactiva la variable a `on`, el cierre temprano podrá disparar re-impresión de la última tabla cacheada siempre que el `mtime` y `size` de `session-metrics.json` no hayan cambiado; si han cambiado, se re-renderiza normalmente. Este comportamiento es aceptable: una toggle no debe invalidar el cache mientras los datos no hayan cambiado.
+> **Nota de comportamiento — toggle de `STATUSLINE_ROUTER_DETAILS`**: cuando la variable `EVOLUTIVEX_AGENT_ORCHESTRATOR__STATUSLINE_ROUTER_DETAILS` pasa de `on` a `off`, el script no renderiza la Tabla 2 ni actualiza el cache. El campo `lastRenderedTable2Output` previo permanece en disco. Si el usuario reactiva la variable a `on`, el cierre temprano podrá disparar re-impresión de la última tabla cacheada siempre que el `mtime` y `size` de `session-metrics.json` no hayan cambiado; si han cambiado, se re-renderiza normalmente. Este comportamiento es aceptable: una toggle no debe invalidar el cache mientras los datos no hayan cambiado.
 
 #### Scenario: Cache contiene render válido
 

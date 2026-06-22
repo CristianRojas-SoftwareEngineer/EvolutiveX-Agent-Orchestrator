@@ -169,7 +169,7 @@ Un comando se considera "de SCP" si su path normalizado contiene alguno de:
 - `gateway-hook-notify`
 - `pre-tool-use-hook-ux`
 - `notifications/cli.ts`
-- La ruta resolved de `SMART_CODE_PROXY_ROOT`
+- La ruta resolved de `EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT`
 
 La plantilla canónica SHALL vivir en `configs/hooks.json`. Antes de modificar `settings.json`, SHALL crearse backup en `~/.claude/settings-backup-<timestamp>.json`.
 

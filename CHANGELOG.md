@@ -65,7 +65,7 @@ All notable changes are derived from conventional commits. Do not edit by hand.
 - implementar borde hooks con endpoint POST /hooks y AuditHookEventHandler
 - implementar join determinista tool_use_id↔subagente con política FIFO (plano B §23)
 - implementar correlación determinista por cabeceras de agente (plano A)
-- instalador de statusline y resolución SMART_CODE_PROXY_ROOT
+- instalador de statusline y resolución EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT
 - crear espejos faltantes entre Claude Code y Windsurf
 - mejorar legibilidad, consistencia y observabilidad de body.parsed.md
 - mostrar Tabla 2 con placeholders vacíos al inicio de sesión

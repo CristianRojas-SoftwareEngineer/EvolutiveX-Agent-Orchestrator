@@ -125,13 +125,13 @@ La plantilla canónica `configs/hooks.json` SHALL contener una única entrada ba
   "hooks": [
     {
       "type": "command",
-      "command": "npx --prefix \"${SMART_CODE_PROXY_ROOT}\" tsx \"${SMART_CODE_PROXY_ROOT}/scripting/post-hook-event.ts\""
+      "command": "npx --prefix \"${EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT}\" tsx \"${EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT}/scripting/post-hook-event.ts\""
     }
   ]
 }
 ```
 
-`${SMART_CODE_PROXY_ROOT}` SHALL resolverse en install-time por el instalador universal (`setup --hooks`) sustituyendo la variable de entorno con la ruta absoluta del repo.
+`${EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT}` SHALL resolverse en install-time por el instalador universal (`setup --hooks`) sustituyendo la variable de entorno con la ruta absoluta del repo.
 
 #### Scenario: PostToolUse tiene una única entrada con matcher "*"
 

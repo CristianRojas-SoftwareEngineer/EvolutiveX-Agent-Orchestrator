@@ -4,7 +4,7 @@ La Tabla 2 del statusline ("Steps y consumo de tokens por nivel") ocupa espacio 
 
 ## What Changes
 
-- Se añade la variable `SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS` en `settings.env` para controlar la visibilidad de la Tabla 2: solo se renderiza si el valor es `on`; ausente u otro valor → oculta. **BREAKING**: el comportamiento por defecto cambia (Tabla 2 pasa de visible a oculta en instalaciones previas que no tengan la variable).
+- Se añade la variable `EVOLUTIVEX_AGENT_ORCHESTRATOR__STATUSLINE_ROUTER_DETAILS` en `settings.env` para controlar la visibilidad de la Tabla 2: solo se renderiza si el valor es `on`; ausente u otro valor → oculta. **BREAKING**: el comportamiento por defecto cambia (Tabla 2 pasa de visible a oculta en instalaciones previas que no tengan la variable).
 - Se añade la CLI `scripting/statusline-router-details.ts` con subcomandos `on`, `off` y `toggle` para escribir/invertir ese valor en `settings.json` sin editarlo manualmente.
 - Se añaden tres scripts npm (`statusline:router-details:on/off/toggle`) que invocan la CLI directamente con `!npm run …` desde la terminal de Claude Code.
 
@@ -16,7 +16,7 @@ La Tabla 2 del statusline ("Steps y consumo de tokens por nivel") ocupa espacio 
 
 ### Modified Capabilities
 
-- `statusline-runtime`: se añade el requisito de visibilidad condicional de la Tabla 2 — el comportamiento existente de renderizado se subordina al valor de `SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS`.
+- `statusline-runtime`: se añade el requisito de visibilidad condicional de la Tabla 2 — el comportamiento existente de renderizado se subordina al valor de `EVOLUTIVEX_AGENT_ORCHESTRATOR__STATUSLINE_ROUTER_DETAILS`.
 
 ## Impact
 

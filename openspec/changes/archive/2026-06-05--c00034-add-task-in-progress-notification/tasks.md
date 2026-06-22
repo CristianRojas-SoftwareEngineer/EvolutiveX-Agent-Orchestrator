@@ -36,7 +36,7 @@
     "hooks": [
       {
         "type": "command",
-        "command": "npx --prefix \"${SMART_CODE_PROXY_ROOT}\" tsx \"${SMART_CODE_PROXY_ROOT}/scripting/task-in-progress-hook-ux.ts\""
+        "command": "npx --prefix \"${EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT}\" tsx \"${EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT}/scripting/task-in-progress-hook-ux.ts\""
       }
     ]
   }

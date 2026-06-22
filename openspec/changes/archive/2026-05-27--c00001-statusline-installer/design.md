@@ -11,7 +11,7 @@ El diseño visual y de tablas permanece en [`docs/proposals/router-status-redesi
 **Goals:**
 
 - Script dedicado `install-statusline.ts` independiente del proveedor upstream.
-- Persistir `statusLine` y `env.SMART_CODE_PROXY_ROOT` en settings global.
+- Persistir `statusLine` y `env.EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT` en settings global.
 - `router-status` resuelve `projectRoot` desde settings antes que `process.cwd()`.
 - Comando `statusLine` portable (Windows/Linux/macOS) sin sintaxis `cd /d` distinta por SO.
 - Tests y documentación mínima de uso.
@@ -57,7 +57,7 @@ con `<ROOT>` = `path.resolve(proxyRoot)` y citado según `process.platform === '
 - `cd /d` + ruta relativa — sintaxis distinta cmd vs bash.
 - Solo ruta absoluta al `.ts` sin `--prefix` — `npx` puede no usar el `tsx` local del proyecto.
 
-### 4. Variable `SMART_CODE_PROXY_ROOT` en `settings.json → env`
+### 4. Variable `EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT` en `settings.json → env`
 
 **Decisión:** El instalador escribe ruta absoluta nativa (`path.resolve`). `router-status` lee vía `readClaudeSettingsEnv()` existente; nueva función exportada `resolveProjectRoot(settingsEnv, cwd?)`.
 
@@ -65,7 +65,7 @@ con `<ROOT>` = `path.resolve(proxyRoot)` y citado según `process.platform === '
 
 **Rationale:** Alineado con el contrato actual del statusline (no `process.env` del shell); permite Tabla 2 correcta con Claude Code abierto en otro repo.
 
-**Prioridad en runtime:** `StatuslineBuildOptions.projectRoot` (tests) > `SMART_CODE_PROXY_ROOT` válido > `process.cwd()`.
+**Prioridad en runtime:** `StatuslineBuildOptions.projectRoot` (tests) > `EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT` válido > `process.cwd()`.
 
 ### 5. Política de sobrescritura
 
@@ -73,7 +73,7 @@ con `<ROOT>` = `path.resolve(proxyRoot)` y citado según `process.platform === '
 
 - Sin `--force`: actualizar si no hay `statusLine`, o si `command` incluye `router-status.ts`; en caso contrario abortar con mensaje.
 - Con `--force`: siempre escribir.
-- `--uninstall`: eliminar solo `statusLine` y `SMART_CODE_PROXY_ROOT`.
+- `--uninstall`: eliminar solo `statusLine` y `EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT`.
 
 **Rationale:** Protege statuslines personalizados; permite reinstalar tras mover el repo.
 

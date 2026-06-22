@@ -35,5 +35,5 @@ _(ninguna — el comportamiento extiende capacidades gateway y statusline existe
 
 - Reintroducir escaneo O(N) de `meta.json` / interacciones para el statusline.
 - Exponer endpoint HTTP de métricas en vivo para el statusline.
-- Cambiar el toggle `SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS` ni el layout de tablas.
+- Cambiar el toggle `EVOLUTIVEX_AGENT_ORCHESTRATOR__STATUSLINE_ROUTER_DETAILS` ni el layout de tablas.
 - Contabilizar `client-preflight` en métricas de sesión.

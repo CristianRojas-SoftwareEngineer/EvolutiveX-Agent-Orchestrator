@@ -10,7 +10,7 @@ solo al comando del statusline— al resto de las entradas generadas:
 - `statusLine.command`: rutas POSIX absolutas (ya garantizado por `buildNpxTsxCommand`).
 - `hooks[*][*].command`: rutas POSIX absolutas resueltas en install-time (no variables
   de runtime de Claude Code).
-- `env.SMART_CODE_PROXY_ROOT`: valor POSIX absoluto.
+- `env.EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT`: valor POSIX absoluto.
 
 El orquestador `scripting/setup.ts` SHALL normalizar la raíz del proxy con
 `resolvePosixAbsolutePath` antes de propagarla a cualquier función de feature.
@@ -18,7 +18,7 @@ El orquestador `scripting/setup.ts` SHALL normalizar la raíz del proxy con
 #### Scenario: Install en Windows produce comandos con forward slashes
 
 - **WHEN** el instalador se ejecuta en Windows con una raíz de proxy con backslashes
-- **THEN** `settings.json` SHALL contener únicamente forward slashes en todos los valores de `command` y en `env.SMART_CODE_PROXY_ROOT`
+- **THEN** `settings.json` SHALL contener únicamente forward slashes en todos los valores de `command` y en `env.EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT`
 - **AND** SHALL NOT contener backslashes en ninguna ruta generada por el instalador
 
 #### Scenario: Los comandos de hooks no contienen variables de runtime de Claude Code

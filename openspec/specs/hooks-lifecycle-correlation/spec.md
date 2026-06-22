@@ -398,16 +398,16 @@ El merge selectivo SHALL seguir esta política para cada clave:
 
 Un comando se considera "de SCP" si su path normalizado (backslash→forward slash) contiene:
 - `post-hook-event`
-- La ruta resolved de `SMART_CODE_PROXY_ROOT`
+- La ruta resolved de `EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT`
 
-La plantilla canónica SHALL vivir en `configs/hooks.json` en el repo SCP y SHALL estar versionada. La instalación SHALL escribir `env.SMART_CODE_PROXY_ROOT` con la ruta absoluta del repo para que el gateway y los hooks la lean. Antes de modificar `settings.json`, SHALL crearse un backup en `~/.claude/settings-backup-<timestamp>.json`.
+La plantilla canónica SHALL vivir en `configs/hooks.json` en el repo SCP y SHALL estar versionada. La instalación SHALL escribir `env.EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT` con la ruta absoluta del repo para que el gateway y los hooks la lean. Antes de modificar `settings.json`, SHALL crearse un backup en `~/.claude/settings-backup-<timestamp>.json`.
 
 #### Scenario: Instalación en config vacía
 
 - **GIVEN** `~/.claude/settings.json` no existe o tiene `hooks: {}`
 - **WHEN** el usuario ejecuta `npm run setup -- --hooks`
 - **THEN** las 13 claves de SCP SHALL crearse en `settings.hooks`
-- **AND** `settings.env.SMART_CODE_PROXY_ROOT` SHALL establecerse con la ruta del repo
+- **AND** `settings.env.EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT` SHALL establecerse con la ruta del repo
 
 #### Scenario: SessionStart instalado sin matcher
 

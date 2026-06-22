@@ -8,7 +8,7 @@ que hace fallar el hook `Stop` en cualquier proyecto que no sea SCP mismo.
 ## What Changes
 
 - **`configs/hooks.json`**: el hook `Stop` reemplaza `${CLAUDE_PROJECT_DIR}` (×2) por
-  `${SMART_CODE_PROXY_ROOT}`, de modo que el instalador resuelva la ruta a SCP en
+  `${EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT}`, de modo que el instalador resuelva la ruta a SCP en
   install-time igual que el resto de los hooks.
 - **`scripting/stop-hook-ux.ts`**: en lugar de pasar `process.env.CLAUDE_PROJECT_DIR` a
   `runContinuityNotification`, deriva la raíz de SCP de `import.meta.url`
@@ -16,9 +16,9 @@ que hace fallar el hook `Stop` en cualquier proyecto que no sea SCP mismo.
   `.last-continuity-message.txt` siempre se escribe en `<SCP>/sessions/`.
 - **`scripting/setup.ts`**: normaliza `proxyRoot` con `resolvePosixAbsolutePath`
   (ya existente en `scripting/shared/npx-tsx-command.ts`) antes de pasarlo a las features.
-  Un solo cambio garantiza que los 14 comandos de hooks y `env.SMART_CODE_PROXY_ROOT`
+  Un solo cambio garantiza que los 14 comandos de hooks y `env.EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT`
   lleguen con forward slashes.
-- **`scripting/features/statusline.ts`**: `env.SMART_CODE_PROXY_ROOT` escrito con
+- **`scripting/features/statusline.ts`**: `env.EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT` escrito con
   `resolvePosixAbsolutePath(proxyRoot)` en lugar de `resolve(proxyRoot)`.
 - **Tests**: `setup.test.ts` (reconstrucción manual) y `stop-hook-ux.test.ts` (ya no
   verifica `CLAUDE_PROJECT_DIR`; verifica raíz SCP auto-derivada).
@@ -33,10 +33,10 @@ _(ninguna)_
 ### Modified Capabilities
 
 - `hooks-lifecycle-correlation`: el hook `Stop` SHALL resolver rutas con
-  `${SMART_CODE_PROXY_ROOT}` (no `${CLAUDE_PROJECT_DIR}`); el mensaje de continuidad
-  SHALL persistirse en `<SMART_CODE_PROXY_ROOT>/sessions/.last-continuity-message.txt`.
+  `${EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT}` (no `${CLAUDE_PROJECT_DIR}`); el mensaje de continuidad
+  SHALL persistirse en `<EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT>/sessions/.last-continuity-message.txt`.
 - `unified-installer`: nueva cláusula S5-global — todas las rutas escritas en
-  `settings.json` (hooks command, `statusLine.command`, `env.SMART_CODE_PROXY_ROOT`)
+  `settings.json` (hooks command, `statusLine.command`, `env.EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT`)
   SHALL ser POSIX-absolutas, resueltas en install-time vía `resolvePosixAbsolutePath`.
 
 ## Impact

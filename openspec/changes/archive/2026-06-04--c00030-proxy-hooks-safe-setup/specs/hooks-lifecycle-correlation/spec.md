@@ -37,7 +37,7 @@ Un comando se considera "de SCP" si su path normalizado (backslash→forward sla
 - `post-hook-event`
 - `stop-hook-ux`
 - `notifications/cli.ts`
-- La ruta resolved de `SMART_CODE_PROXY_ROOT`
+- La ruta resolved de `EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT`
 
 La plantilla canónica SHALl vivir en `configs/hooks.json` en el repo SCP y SHALl estar versionada.
 
@@ -46,7 +46,7 @@ La plantilla canónica SHALl vivir en `configs/hooks.json` en el repo SCP y SHAL
 - **GIVEN** `~/.claude/settings.json` no existe o tiene `hooks: {}`
 - **WHEN** el usuario ejecuta `npm run setup -- --hooks`
 - **THEN** las 14 entradas de SCP SHALl crearse en `settings.hooks`
-- **AND** `settings.env.SMART_CODE_PROXY_ROOT` SHALL establecerse con la ruta del repo
+- **AND** `settings.env.EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT` SHALL establecerse con la ruta del repo
 
 #### Scenario: Instalación con hooks ajenos existentes
 
@@ -90,7 +90,7 @@ La plantilla canónica SHALl vivir en `configs/hooks.json` en el repo SCP y SHAL
 - **WHEN** el usuario ejecuta `npm run setup -- --hooks --uninstall`
 - **THEN** la entrada `Stop` SHALL eliminarse completamente de `settings.hooks`
 
-#### Scenario: Repo movido: SMART_CODE_PROXY_ROOT se re-resuelve
+#### Scenario: Repo movido: EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT se re-resuelve
 
 - **GIVEN** los hooks están instalados con paths pointing a `D:\OldPath\Smart-Code-Proxy`
 - **AND** el repo se movió a `D:\NewPath\Smart-Code-Proxy`

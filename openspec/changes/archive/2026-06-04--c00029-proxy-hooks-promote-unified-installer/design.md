@@ -63,7 +63,7 @@ export function applyStatuslineUninstall(settings: ClaudeSettings): ClaudeSettin
   const next: ClaudeSettings = { ...settings };
   delete next.statusLine;  // borra sin verificar
   if (next.env) {
-    delete next.env[SMART_CODE_PROXY_ROOT_KEY];
+    delete next.env[EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT_KEY];
     if (Object.keys(next.env).length === 0) delete next.env;
   }
   return next;
@@ -79,12 +79,12 @@ export function applyStatuslineUninstall(
   const next: ClaudeSettings = { ...settings };
   const existing = next.statusLine?.command;
   if (existing && !isSmartCodeStatusLine(existing) && !force) {
-    // Preservar ajeno: no tocar statusLine ni SMART_CODE_PROXY_ROOT
+    // Preservar ajeno: no tocar statusLine ni EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT
     return next;
   }
   delete next.statusLine;
   if (next.env) {
-    delete next.env[SMART_CODE_PROXY_ROOT_KEY];
+    delete next.env[EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT_KEY];
     if (Object.keys(next.env).length === 0) delete next.env;
   }
   return next;

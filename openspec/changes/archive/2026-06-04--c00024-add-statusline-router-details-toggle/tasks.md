@@ -1,6 +1,6 @@
 ## 1. Constante compartida en claude-settings.ts
 
-- [x] 1.1 Exportar `STATUSLINE_ROUTER_DETAILS_KEY = 'SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS'` en `scripting/shared/claude-settings.ts`, junto a `SMART_CODE_PROXY_ROOT_KEY`
+- [x] 1.1 Exportar `STATUSLINE_ROUTER_DETAILS_KEY = 'EVOLUTIVEX_AGENT_ORCHESTRATOR__STATUSLINE_ROUTER_DETAILS'` en `scripting/shared/claude-settings.ts`, junto a `EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT_KEY`
 
 ## 2. CLI de toggle (scripting/statusline-router-details.ts)
 

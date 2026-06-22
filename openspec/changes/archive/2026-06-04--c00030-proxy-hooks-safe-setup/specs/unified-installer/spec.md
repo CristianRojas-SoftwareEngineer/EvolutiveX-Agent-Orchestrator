@@ -39,7 +39,7 @@ Los flags `--dry-run`, `--force`, `--uninstall` y `--root` SHAL propagarse a `se
 
 ### Requirement: Validación de archivos SCP antes de invocar setup-hooks.ts
 
-Antes de invocar `setup-hooks.ts`, el script `setup` SHALL validar que los siguientes archivos existan en el repo SCP (indicado por `--root` o `SMART_CODE_PROXY_ROOT`):
+Antes de invocar `setup-hooks.ts`, el script `setup` SHALL validar que los siguientes archivos existan en el repo SCP (indicado por `--root` o `EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT`):
 
 - `configs/hooks.json` — plantilla canónica
 - `scripting/post-hook-event.ts` — gateway hook relay

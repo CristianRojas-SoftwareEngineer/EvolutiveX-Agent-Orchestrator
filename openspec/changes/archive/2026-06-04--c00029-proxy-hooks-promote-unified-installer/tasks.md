@@ -8,7 +8,7 @@
 
 ## 2. Mover lógica pura a `scripting/features/`
 
-- [ ] 2.1 Crear `scripting/features/hooks.ts` con: `isScpManagedCommand`, `classifyKey`, `mergeHooks`, `unmergeHooks`, `validateScpRoot`, `readCanonicalHooks`, `readCanonicalHooksResolved`, `SMART_CODE_PROXY_ROOT_KEY` re-exportado.
+- [ ] 2.1 Crear `scripting/features/hooks.ts` con: `isScpManagedCommand`, `classifyKey`, `mergeHooks`, `unmergeHooks`, `validateScpRoot`, `readCanonicalHooks`, `readCanonicalHooksResolved`, `EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT_KEY` re-exportado.
 - [ ] 2.2 Crear `scripting/features/statusline.ts` con: `isSmartCodeStatusLine`, `buildStatusLineCommand`, `buildStatusLineBlock`, `shouldOverwriteStatusLine`, `applyStatuslineInstall` (sin cambio de firma), `applyStatuslineUninstall(settings, force)` (firma nueva con preservación de ajeno).
 - [ ] 2.3 Crear `scripting/features/voice.ts` con: `applyVoiceInstall`, `applyVoiceUninstall` (sin cambios de firma).
 

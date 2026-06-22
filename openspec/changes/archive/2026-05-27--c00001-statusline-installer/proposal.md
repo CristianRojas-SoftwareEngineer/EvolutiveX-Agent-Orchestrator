@@ -7,9 +7,9 @@ Se necesita un instalador dedicado, independiente de `configure-provider`, que c
 ## What Changes
 
 - Nuevo script CLI `scripting/install-statusline.ts` con instalación, `--dry-run`, `--force` y `--uninstall`.
-- Escritura en `~/.claude/settings.json` de `statusLine` (comando `npx --prefix` + `tsx`) y de `env.SMART_CODE_PROXY_ROOT` (ruta absoluta del repo).
+- Escritura en `~/.claude/settings.json` de `statusLine` (comando `npx --prefix` + `tsx`) y de `env.EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT` (ruta absoluta del repo).
 - Módulo compartido para lectura/escritura de `settings.json` (extraído o reutilizado desde `configure-provider.ts`).
-- `router-status.ts` resuelve `projectRoot` desde `settings.json → env.SMART_CODE_PROXY_ROOT` con fallback a `process.cwd()` y validación mínima del repo.
+- `router-status.ts` resuelve `projectRoot` desde `settings.json → env.EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT` con fallback a `process.cwd()` y validación mínima del repo.
 - Script npm `install:statusline` en `package.json`.
 - Tests Vitest para instalador, resolución de rutas y regresión del statusline.
 - Documentación breve de uso (enlace desde guía existente; referencia a [`docs/proposals/router-status-redesign.md`](../../../docs/proposals/router-status-redesign.md) sin duplicar el diseño de tablas).
@@ -18,8 +18,8 @@ Se necesita un instalador dedicado, independiente de `configure-provider`, que c
 
 ### New Capabilities
 
-- `statusline-installer`: CLI que instala o desinstala el statusline en el settings global de Claude Code (`statusLine` + `SMART_CODE_PROXY_ROOT`), con política de sobrescritura y soporte Windows/Linux/macOS.
-- `statusline-runtime`: Comportamiento de `router-status.ts` al resolver rutas del proxy desde `SMART_CODE_PROXY_ROOT` en lugar de depender del cwd del subprocess.
+- `statusline-installer`: CLI que instala o desinstala el statusline en el settings global de Claude Code (`statusLine` + `EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT`), con política de sobrescritura y soporte Windows/Linux/macOS.
+- `statusline-runtime`: Comportamiento de `router-status.ts` al resolver rutas del proxy desde `EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT` en lugar de depender del cwd del subprocess.
 
 ### Modified Capabilities
 

@@ -24,7 +24,7 @@ El patrón establecido para persistir configuración del statusline es: un scrip
 
 ### D1: persistir en `settings.env`, no en `process.env` / `configs/.env`
 
-`router-status.ts` es un subprocess de Claude Code; no hereda el entorno del shell del usuario. La única fuente de configuración que el proceso del statusline puede leer en cada invocación es `~/.claude/settings.json → env`. Se sigue el mismo patrón que `SMART_CODE_PROXY_ROOT` y las variables de proveedor.
+`router-status.ts` es un subprocess de Claude Code; no hereda el entorno del shell del usuario. La única fuente de configuración que el proceso del statusline puede leer en cada invocación es `~/.claude/settings.json → env`. Se sigue el mismo patrón que `EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT` y las variables de proveedor.
 
 Alternativa considerada: escribir en `configs/.env`. Descartada: ese archivo no se lee en `router-status.ts` (y cargarlo añadiría una dependencia nueva).
 
@@ -47,4 +47,4 @@ Coherente con `session-manager/cli.ts` (usa subcomandos como primer argumento po
 
 - **Breaking default**: instalaciones existentes verán la Tabla 2 desaparecer tras actualizar el repo. Mitigación: documentar en `docs/router-statusline.md` y en el mensaje de salida de `npm run statusline:router-details:on`.
 - **`writeStatuslineCache` se omite cuando Tabla 2 está oculta**: el snapshot de métricas no se actualiza. Al reactivar la Tabla 2 se calculan deltas desde el último snapshot guardado (que puede ser antiguo). Mitigación: comportamiento aceptable — el delta simplemente será mayor; no hay corrupción de datos.
-- **Clave con doble guion bajo** (`SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS`): el doble `__` es intencional (lo eligió el usuario) y no entra en conflicto con otras claves del bloque `env`.
+- **Clave con doble guion bajo** (`EVOLUTIVEX_AGENT_ORCHESTRATOR__STATUSLINE_ROUTER_DETAILS`): el doble `__` es intencional (lo eligió el usuario) y no entra en conflicto con otras claves del bloque `env`.

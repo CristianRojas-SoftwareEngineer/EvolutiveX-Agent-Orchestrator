@@ -2,7 +2,7 @@
 
 ## Purpose
 
-CLI dedicado (`install-statusline`) para registrar en `~/.claude/settings.json` el comando del statusline de Smart Code Proxy y la ruta absoluta del repositorio (`SMART_CODE_PROXY_ROOT`), de forma idempotente y multiplataforma, sin alterar las variables `ANTHROPIC_*` gestionadas por `configure-provider`.
+CLI dedicado (`install-statusline`) para registrar en `~/.claude/settings.json` el comando del statusline de Smart Code Proxy y la ruta absoluta del repositorio (`EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT`), de forma idempotente y multiplataforma, sin alterar las variables `ANTHROPIC_*` gestionadas por `configure-provider`.
 ## Requirements
 ### Requirement: Instalación del statusline en settings global
 
@@ -16,7 +16,7 @@ El sistema SHALL proporcionar un comando CLI (`install-statusline`) ejecutable d
 - **AND** `settings.statusLine.padding` SHALL ser `0`
 - **AND** `settings.statusLine.command` SHALL invocar `router-status.ts` mediante `npx` + `tsx` con `--prefix` en la raíz del proxy
 - **AND** `settings.statusLine` SHALL NOT incluir el campo `refreshInterval`
-- **AND** `settings.env.SMART_CODE_PROXY_ROOT` SHALL ser la ruta absoluta resuelta del repositorio del proxy
+- **AND** `settings.env.EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT` SHALL ser la ruta absoluta resuelta del repositorio del proxy
 
 #### Scenario: Modo dry-run
 
@@ -47,18 +47,18 @@ El instalador SHALL no sobrescribir un bloque `statusLine` existente que no sea 
 
 - **GIVEN** `settings.statusLine.command` ya referencia `router-status.ts`
 - **WHEN** el usuario ejecuta el instalador sin `--force`
-- **THEN** `statusLine` y `SMART_CODE_PROXY_ROOT` SHALL actualizarse a la raíz y comando actuales del repo
+- **THEN** `statusLine` y `EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT` SHALL actualizarse a la raíz y comando actuales del repo
 
 ### Requirement: Desinstalación selectiva
 
-El instalador SHALL admitir `--uninstall` que elimine `statusLine` y la clave `env.SMART_CODE_PROXY_ROOT` sin borrar otras claves de `env`.
+El instalador SHALL admitir `--uninstall` que elimine `statusLine` y la clave `env.EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT` sin borrar otras claves de `env`.
 
 #### Scenario: Uninstall preserva env del proveedor
 
-- **GIVEN** `settings.env` contiene `ANTHROPIC_BASE_URL` y `SMART_CODE_PROXY_ROOT`
+- **GIVEN** `settings.env` contiene `ANTHROPIC_BASE_URL` y `EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT`
 - **WHEN** el usuario ejecuta el instalador con `--uninstall`
 - **THEN** `statusLine` SHALL eliminarse
-- **AND** `SMART_CODE_PROXY_ROOT` SHALL eliminarse
+- **AND** `EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT` SHALL eliminarse
 - **AND** las demás entradas de `settings.env` SHALL conservarse
 
 ### Requirement: Validación previa a escribir

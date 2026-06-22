@@ -8,9 +8,9 @@ Windows, producen comandos con backslashes y un hook `Stop` que falla fuera del 
    al directorio del proyecto activo en runtime. En instalación global apunta a proyectos
    ajenos donde `stop-hook-ux.ts` no existe.
 2. **P2 — Comandos de hooks con backslashes**: `setup.ts` pasa `resolve(options.root)` a
-   `readCanonicalHooks`, que sustituye literalmente `${SMART_CODE_PROXY_ROOT}` con la
+   `readCanonicalHooks`, que sustituye literalmente `${EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT}` con la
    ruta Windows → `C:\Users\...` en los 14 comandos.
-3. **P3 — `env.SMART_CODE_PROXY_ROOT` con backslashes (statusline)**: `statusline.ts`
+3. **P3 — `env.EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT` con backslashes (statusline)**: `statusline.ts`
    usa `resolve(proxyRoot)` para escribir la env var, no la utilidad POSIX ya existente.
 
 La garantía S5 del instalador universal (`buildNpxTsxCommand` → POSIX) cubre el comando
@@ -23,7 +23,7 @@ del statusline pero no las otras dos rutas escritas.
 - `scripting/stop-hook-ux.ts` deriva la raíz de SCP de su propia ubicación; el archivo
   `.last-continuity-message.txt` siempre se escribe en `<SCP>/sessions/`.
 - Todos los valores de ruta escritos en `settings.json` (hook commands, statusLine,
-  `env.SMART_CODE_PROXY_ROOT`) usan forward slashes en todas las plataformas.
+  `env.EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT`) usan forward slashes en todas las plataformas.
 - Sin utilidades nuevas: reutilizar `resolvePosixAbsolutePath` ya presente en
   `scripting/shared/npx-tsx-command.ts`.
 
@@ -34,10 +34,10 @@ del statusline pero no las otras dos rutas escritas.
 
 ## Decisions
 
-### D1: Reemplazar `${CLAUDE_PROJECT_DIR}` por `${SMART_CODE_PROXY_ROOT}` en `configs/hooks.json`
+### D1: Reemplazar `${CLAUDE_PROJECT_DIR}` por `${EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT}` en `configs/hooks.json`
 
 **Decisión**: cambiar los dos usos de `${CLAUDE_PROJECT_DIR}` en el bloque `Stop` por
-`${SMART_CODE_PROXY_ROOT}`, que el instalador ya sustituye por ruta POSIX literal.
+`${EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT}`, que el instalador ya sustituye por ruta POSIX literal.
 
 **Alternativa descartada**: dejar `${CLAUDE_PROJECT_DIR}` y añadir lógica en el
 instalador para resolverlo. Requeriría que el instalador conozca la semántica de todas
@@ -57,7 +57,7 @@ const scpRoot = resolvePath(dirname(fileURLToPath(import.meta.url)), '..');
 ```
 `scripting/stop-hook-ux.ts` está en `<SCP>/scripting/`, un nivel por debajo de la raíz.
 
-**Alternativa descartada**: leer `process.env.SMART_CODE_PROXY_ROOT` (la env var que el
+**Alternativa descartada**: leer `process.env.EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT` (la env var que el
 instalador escribe). Requiere que el instalador ya se haya ejecutado y que Claude Code
 propague esa env var al subproceso del hook. Más frágil y crea una dependencia circular
 entre runtime y bootstrap.
@@ -82,7 +82,7 @@ puras de features.
 
 ---
 
-### D4: `env.SMART_CODE_PROXY_ROOT` en `statusline.ts`
+### D4: `env.EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT` en `statusline.ts`
 
 **Decisión**: cambiar `const root = resolve(proxyRoot)` por
 `const root = resolvePosixAbsolutePath(proxyRoot)`. Si D3 ya garantiza que `proxyRoot`

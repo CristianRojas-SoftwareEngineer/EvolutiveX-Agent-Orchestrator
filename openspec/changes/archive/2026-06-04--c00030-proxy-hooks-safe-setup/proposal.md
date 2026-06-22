@@ -7,7 +7,7 @@ Los hooks de Claude Code (14 entradas: 8 lifecycle + 6 UX) actualmente requieren
 ## What Changes
 
 - **Nuevo script `scripting/setup-hooks.ts`** — instalador/uninstaller de hooks con merge selectivo que preserva configs ajenas a SCP.
-- **Nuevo archivo `configs/hooks.json`** — plantilla canónica versionada con las 14 entradas completas de hooks, placeholder `${SMART_CODE_PROXY_ROOT}` resuelto en runtime.
+- **Nuevo archivo `configs/hooks.json`** — plantilla canónica versionada con las 14 entradas completas de hooks, placeholder `${EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT}` resuelto en runtime.
 - **`setup.ts` unificado** — refactorizar para agregar `--hooks` como fourth feature flag (junto a `--statusline`, `--notifications`, `--voice`).
 - **Merge selectivo seguro** — nunca se borran ni reemplazan configs del usuario ajenas a SCP; solo se tocan las 14 entradas managed by SCP.
 - **Backup automático** — antes de escribir `~/.claude/settings.json`, se crea backup con timestamp.
@@ -17,7 +17,7 @@ Los hooks de Claude Code (14 entradas: 8 lifecycle + 6 UX) actualmente requieren
 
 ### New Capabilities
 
-- **`proxy-hooks-distribution`**: Script `setup --hooks` que instala las 14 entradas de hooks de SCP en `~/.claude/settings.json` (user-level) con merge selectivo seguro. La plantilla canónica vive en `configs/hooks.json` (versionada). Detecta comandos "de SCP" (`post-hook-event`, `stop-hook-ux`, `notifications/cli.ts`, ruta resolved de `SMART_CODE_PROXY_ROOT`). Uninstall elimina solo los comandos de SCP, preserva configs ajenas del usuario.
+- **`proxy-hooks-distribution`**: Script `setup --hooks` que instala las 14 entradas de hooks de SCP en `~/.claude/settings.json` (user-level) con merge selectivo seguro. La plantilla canónica vive en `configs/hooks.json` (versionada). Detecta comandos "de SCP" (`post-hook-event`, `stop-hook-ux`, `notifications/cli.ts`, ruta resolved de `EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT`). Uninstall elimina solo los comandos de SCP, preserva configs ajenas del usuario.
 
 ### Modified Capabilities
 

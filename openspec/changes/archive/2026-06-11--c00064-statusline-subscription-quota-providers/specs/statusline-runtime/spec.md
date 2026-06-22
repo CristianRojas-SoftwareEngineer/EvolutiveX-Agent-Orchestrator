@@ -104,9 +104,9 @@ Cuando `resets_at` es válido y ya expiró (`resets_at * 1000 <= Date.now()`), S
 
 `router-status.ts` SHALL leer `SUBSCRIPTION_QUOTA` del `config.json` del proveedor activo bajo `<projectRoot>/routing/providers/<name>/config.json`. SHALL NOT realizar peticiones HTTP para obtener cuota.
 
-#### Scenario: projectRoot desde SMART_CODE_PROXY_ROOT
+#### Scenario: projectRoot desde EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT
 
-- **GIVEN** `settings.env.SMART_CODE_PROXY_ROOT` apunta al repo del proxy
+- **GIVEN** `settings.env.EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT` apunta al repo del proxy
 - **AND** `configs/.env` bajo esa raíz define `UPSTREAM_ORIGIN` de Minimax
 - **WHEN** `resolveQuotaSource` evalúa configuración
 - **THEN** SHALL cargar `SUBSCRIPTION_QUOTA` desde `routing/providers/minimax/config.json` bajo esa raíz
@@ -116,7 +116,7 @@ Cuando `resets_at` es válido y ya expiró (`resets_at * 1000 <= Date.now()`), S
 ### Requirement: Visibilidad condicional de la Tabla 2
 
 `buildStatuslineOutput` SHALL renderizar la Tabla 2 ("Steps y consumo de tokens por
-nivel") únicamente cuando `settingsEnv.SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS`
+nivel") únicamente cuando `settingsEnv.EVOLUTIVEX_AGENT_ORCHESTRATOR__STATUSLINE_ROUTER_DETAILS`
 tenga el valor exacto `on` (case-insensitive, trim). En cualquier otro caso (valor
 ausente, `off`, o cualquier otro string) la Tabla 2 SHALL omitirse por completo del
 output: no se calcula `targetWidth`, no se llama a `renderTokenTable`, no se escribe
@@ -124,29 +124,29 @@ el cache de métricas y el string de salida NO incluye ninguna línea de dicha t
 
 #### Scenario: Variable en on — Tabla 2 visible
 
-- **WHEN** `settingsEnv.SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS` es `"on"`
+- **WHEN** `settingsEnv.EVOLUTIVEX_AGENT_ORCHESTRATOR__STATUSLINE_ROUTER_DETAILS` es `"on"`
 - **THEN** `buildStatuslineOutput` SHALL incluir la Tabla 2 en el output devuelto
 - **AND** el bloque superior (Tabla 1 y, si aplica, Tabla 3) SHALL renderizarse con normalidad
 
 #### Scenario: Variable ausente — Tabla 2 oculta
 
-- **WHEN** `settingsEnv` no contiene la clave `SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS`
+- **WHEN** `settingsEnv` no contiene la clave `EVOLUTIVEX_AGENT_ORCHESTRATOR__STATUSLINE_ROUTER_DETAILS`
 - **THEN** el output SHALL NOT contener la Tabla 2
 - **AND** el bloque superior SHALL estar presente e intacto
 
 #### Scenario: Variable en off — Tabla 2 oculta
 
-- **WHEN** `settingsEnv.SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS` es `"off"`
+- **WHEN** `settingsEnv.EVOLUTIVEX_AGENT_ORCHESTRATOR__STATUSLINE_ROUTER_DETAILS` es `"off"`
 - **THEN** el output SHALL NOT contener la Tabla 2
 - **AND** el bloque superior SHALL estar presente e intacto
 
 #### Scenario: Variable con valor desconocido — Tabla 2 oculta
 
-- **WHEN** `settingsEnv.SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS` tiene un valor distinto de `"on"` (p. ej. `"1"`, `"true"`, `"yes"`)
+- **WHEN** `settingsEnv.EVOLUTIVEX_AGENT_ORCHESTRATOR__STATUSLINE_ROUTER_DETAILS` tiene un valor distinto de `"on"` (p. ej. `"1"`, `"true"`, `"yes"`)
 - **THEN** el output SHALL NOT contener la Tabla 2
 
 #### Scenario: Tabla 2 oculta — bloque superior sin alteraciones
 
-- **GIVEN** `SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS` no es `"on"`
+- **GIVEN** `EVOLUTIVEX_AGENT_ORCHESTRATOR__STATUSLINE_ROUTER_DETAILS` no es `"on"`
 - **WHEN** hay cuota de suscripción disponible (stdin OAuth **o** `subscription-quota.json` con ventana válida)
 - **THEN** el output SHALL contener Tabla 1 y Tabla 3 renderizadas side-by-side, igual que si Tabla 2 estuviera visible

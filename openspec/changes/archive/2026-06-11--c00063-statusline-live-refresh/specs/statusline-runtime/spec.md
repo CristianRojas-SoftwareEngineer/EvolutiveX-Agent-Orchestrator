@@ -69,14 +69,14 @@ Cuando `refreshInterval` está activo (entero ≥ 1, en segundos) y la Tabla 2 e
 #### Scenario: Indicador visible con refreshInterval activo
 
 - **GIVEN** `settings.statusLine.refreshInterval` es `3`
-- **AND** `SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS` es `on`
+- **AND** `EVOLUTIVEX_AGENT_ORCHESTRATOR__STATUSLINE_ROUTER_DETAILS` es `on`
 - **WHEN** `buildStatuslineOutput` renderiza la Tabla 2
 - **THEN** la primera línea (cabecera) de la Tabla 2 SHALL contener el sufijo `● live (3s)` en color dim, alineado a la derecha antes del cierre del borde superior
 
 #### Scenario: Indicador oculto con refreshInterval desactivado
 
 - **GIVEN** `settings.statusLine.refreshInterval` está ausente
-- **AND** `SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS` es `on`
+- **AND** `EVOLUTIVEX_AGENT_ORCHESTRATOR__STATUSLINE_ROUTER_DETAILS` es `on`
 - **WHEN** `buildStatuslineOutput` renderiza la Tabla 2
 - **THEN** la cabecera de la Tabla 2 SHALL NO contener el sufijo `● live`
 

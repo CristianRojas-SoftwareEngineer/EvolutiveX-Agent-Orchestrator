@@ -94,7 +94,7 @@ null
 | Riesgo | Mitigación |
 |--------|------------|
 | Usuarios con `configure-provider anthropic` previo sin re-ejecutar | Documentar re-run; OAuth puro sigue clasificando Fable por keyword `fable` |
-| Tabla 2 más alta (4 filas) en terminales pequeñas | Misma opt-in `SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS`; ancho elástico existente |
+| Tabla 2 más alta (4 filas) en terminales pequeñas | Misma opt-in `EVOLUTIVEX_AGENT_ORCHESTRATOR__STATUSLINE_ROUTER_DETAILS`; ancho elástico existente |
 | `modelId` de terceros sin substring `fable` | Requiere `ANTHROPIC_DEFAULT_FABLE_MODEL` pinneado — mismo patrón que opus en Bedrock |
 | Mythos futuro en mismo tier | Diseño reserva `frontier`; integración posterior añadirá keyword/regla sin nueva fila |
 

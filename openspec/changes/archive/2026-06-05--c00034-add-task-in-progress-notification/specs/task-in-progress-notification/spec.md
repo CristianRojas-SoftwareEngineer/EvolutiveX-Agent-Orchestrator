@@ -82,10 +82,10 @@ El sistema SHALL exponer un módulo `scripting/task-in-progress-hook-ux.ts` (ent
 1. Lea stdin completo como `Buffer` UTF-8 (`readStdinBuffer` + `toString('utf-8')`), igual que `post-hook-event.ts` y `pre-tool-use-hook-ux.ts`.
 2. Haga `JSON.parse` del cuerpo; si el parse falla → escribir diagnóstico a `stderr` y terminar con código 0 (no propagar error al caller para no romper la sesión del cliente).
 3. Filtre el evento: extraiga `tool_input.status` del payload y descarte silenciosamente (exit 0) si el valor NO es exactamente la cadena `"in_progress"`. Esto cubre los casos donde Claude Code invoca `TaskUpdate` con `status: "completed"`, `"pending"` o `"deleted"`, y donde un agente externo invoca el script sin intención de notificar.
-4. Si el filtro pasa → invoque el CLI de notificaciones vía `npx --prefix "$SMART_CODE_PROXY_ROOT" tsx "$SMART_CODE_PROXY_ROOT/src/2-services/notifications/cli.ts" --event-type TaskInProgress --stdin-json`, reenviando el payload crudo por stdin al subproceso.
+4. Si el filtro pasa → invoque el CLI de notificaciones vía `npx --prefix "$EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT" tsx "$EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT/src/2-services/notifications/cli.ts" --event-type TaskInProgress --stdin-json`, reenviando el payload crudo por stdin al subproceso.
 5. El relay NO SHALL invocar `POST /hooks` del proxy: `AuditHookEventHandler` no procesa eventos `TaskUpdate` (ver spec `hooks-lifecycle-correlation` § 3.2), por lo que enviar el payload al gateway sería ancho de banda desperdiciado.
 
-El `SMART_CODE_PROXY_ROOT` SHALL resolverse desde la ubicación del script (`import.meta.url`), no desde `CLAUDE_PROJECT_DIR` ni de variables de runtime de Claude Code (paridad con `stop-hook-ux.ts`).
+El `EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT` SHALL resolverse desde la ubicación del script (`import.meta.url`), no desde `CLAUDE_PROJECT_DIR` ni de variables de runtime de Claude Code (paridad con `stop-hook-ux.ts`).
 
 #### Scenario: `TaskUpdate(in_progress)` → CLI invocado con `--stdin-json`
 
@@ -142,13 +142,13 @@ La plantilla canónica `configs/hooks.json` SHALL contener una entrada bajo `hoo
   "hooks": [
     {
       "type": "command",
-      "command": "npx --prefix \"${SMART_CODE_PROXY_ROOT}\" tsx \"${SMART_CODE_PROXY_ROOT}/scripting/task-in-progress-hook-ux.ts\""
+      "command": "npx --prefix \"${EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT}\" tsx \"${EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT}/scripting/task-in-progress-hook-ux.ts\""
     }
   ]
 }
 ```
 
-`${SMART_CODE_PROXY_ROOT}` SHALL resolverse en install-time por el instalador universal (`setup --hooks`) sustituyendo la variable de entorno con la ruta absoluta del repo. La entrada SHALL poder coexistir con la entrada `PostToolUse[matcher="*"]` ya existente (los matchers son disjuntos en Claude Code).
+`${EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT}` SHALL resolverse en install-time por el instalador universal (`setup --hooks`) sustituyendo la variable de entorno con la ruta absoluta del repo. La entrada SHALL poder coexistir con la entrada `PostToolUse[matcher="*"]` ya existente (los matchers son disjuntos en Claude Code).
 
 #### Scenario: La entrada canónica tiene un único comando al relay
 
@@ -156,7 +156,7 @@ La plantilla canónica `configs/hooks.json` SHALL contener una entrada bajo `hoo
 - **WHEN** se inspecciona `hooks.PostToolUse[matcher="TaskUpdate"]`
 - **THEN** SHALL existir exactamente esa entrada
 - **AND** SHALL contener un array `hooks` con longitud 1
-- **AND** SHALL apuntar a `scripting/task-in-progress-hook-ux.ts` con la variable `${SMART_CODE_PROXY_ROOT}`
+- **AND** SHALL apuntar a `scripting/task-in-progress-hook-ux.ts` con la variable `${EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT}`
 
 #### Scenario: La entrada se distribuye en user-level tras `setup --hooks`
 

@@ -50,7 +50,7 @@ El instalador existente `install-notifications.ts` solo cubre 11 entradas de not
 post-hook-event.ts
 stop-hook-ux.ts
 notifications/cli.ts
-<SMART_CODE_PROXY_ROOT resolved>  (e.g. C:/Proyectos/Smart-Code-Proxy)
+<EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT resolved>  (e.g. C:/Proyectos/Smart-Code-Proxy)
 ```
 
 **Alternativas consideradas:**
@@ -58,7 +58,7 @@ notifications/cli.ts
 - Registro en el settings.json con clave `__scp_managed: true` → intrusivo, requiere escribir metadata en la config del usuario.
 - Hash de la ruta del repo → frágil si el repo se mueve.
 
-**Justificación:** Las tres strings son únicas de SCP y cubren los tres puntos de entrada (`post-hook-event` para gateway, `stop-hook-ux` para Stop, `cli.ts` para notificaciones). La ruta resolved de `SMART_CODE_PROXY_ROOT` cubre el caso en que el usuario tiea un path hardcodeado pointing al repo SCP. Si el repo se mueve, el usuario ejecuta `setup --hooks` de nuevo (re-resolución automática).
+**Justificación:** Las tres strings son únicas de SCP y cubren los tres puntos de entrada (`post-hook-event` para gateway, `stop-hook-ux` para Stop, `cli.ts` para notificaciones). La ruta resolved de `EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT` cubre el caso en que el usuario tiea un path hardcodeado pointing al repo SCP. Si el repo se mueve, el usuario ejecuta `setup --hooks` de nuevo (re-resolución automática).
 
 ---
 
@@ -155,29 +155,29 @@ Lógica:
 
 ---
 
-### 7. Resolución de `${SMART_CODE_PROXY_ROOT}` en la plantilla
+### 7. Resolución de `${EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT}` en la plantilla
 
-**Decisión:** La plantilla `configs/hooks.json` usa `${SMART_CODE_PROXY_ROOT}` como placeholder. `setup-hooks.ts` resuelve este placeholder buscando la variable de entorno `SMART_CODE_PROXY_ROOT` en `settings.env` del settings.json, o usando `--root` pasado a `setup.ts`.
+**Decisión:** La plantilla `configs/hooks.json` usa `${EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT}` como placeholder. `setup-hooks.ts` resuelve este placeholder buscando la variable de entorno `EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT` en `settings.env` del settings.json, o usando `--root` pasado a `setup.ts`.
 
 ```
-Resolver SMART_CODE_PROXY_ROOT:
-  1. Si process.env.SMART_CODE_PROXY_ROOT existe → usar esa
-  2. Si settings.env.SMART_CODE_PROXY_ROOT existe → usar esa
+Resolver EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT:
+  1. Si process.env.EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT existe → usar esa
+  2. Si settings.env.EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT existe → usar esa
   3. Si --root fue pasado → usar resolve(--root)
-  4. Si no hay nada → error con mensaje "No se encontró SMART_CODE_PROXY_ROOT"
+  4. Si no hay nada → error con mensaje "No se encontró EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT"
 
 Reemplazar en cada comando de la plantilla:
-  command.replace('${SMART_CODE_PROXY_ROOT}', resolvedRoot)
+  command.replace('${EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT}', resolvedRoot)
 ```
 
-**Justificación:** `SMART_CODE_PROXY_ROOT` ya existe como convención (definido en `claude-settings.ts`). Resolverlo desde settings.env permite que el install funcione aunque el usuario no tenga la variable de entorno exportada en su shell.
+**Justificación:** `EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT` ya existe como convención (definido en `claude-settings.ts`). Resolverlo desde settings.env permite que el install funcione aunque el usuario no tenga la variable de entorno exportada en su shell.
 
 ---
 
 ## Risks / Trade-offs
 
 **[Risk] Repo SCP movido después de install**
-→ Mitigation: cada ejecución de `setup --hooks` re-resuelve `SMART_CODE_PROXY_ROOT` desde `--root` o `settings.env`. Los paths se actualizan automáticamente. El usuario debe re-ejecutar `setup --hooks` tras mover el repo.
+→ Mitigation: cada ejecución de `setup --hooks` re-resuelve `EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT` desde `--root` o `settings.env`. Los paths se actualizan automáticamente. El usuario debe re-ejecutar `setup --hooks` tras mover el repo.
 
 **[Risk] Windows con unidad diferente (`C:` vs `D:`)**
 → Mitigation: `buildNpxTsxCommand` ya maneja paths con comillas y normalización `/`. El generator mode (en lugar de symlink) evita problemas de cross-unit symlinks.

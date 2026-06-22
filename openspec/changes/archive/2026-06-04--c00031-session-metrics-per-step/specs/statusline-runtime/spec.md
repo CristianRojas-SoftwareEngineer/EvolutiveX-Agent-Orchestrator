@@ -6,7 +6,7 @@ Cuando el proxy ha persistido métricas per-step en `session-metrics.json`, el s
 
 #### Scenario: Métricas visibles tras un hop sin esperar al Stop
 
-- **GIVEN** `SMART_CODE_PROXY__STATUSLINE_ROUTER_DETAILS` es `"on"`
+- **GIVEN** `EVOLUTIVEX_AGENT_ORCHESTRATOR__STATUSLINE_ROUTER_DETAILS` es `"on"`
 - **AND** `sessions/<sessionId>/session-metrics.json` fue actualizado tras cerrar un step main contable
 - **AND** Claude Code invoca el statusline con ese `session_id`
 - **WHEN** `buildStatuslineOutput` agrega desde `session-metrics.json`

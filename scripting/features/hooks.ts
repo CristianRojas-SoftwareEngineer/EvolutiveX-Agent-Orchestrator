@@ -31,6 +31,7 @@ export interface HookEntry {
   command: string;
   timeout?: number;
   statusMessage?: string;
+  async?: boolean;
 }
 
 export interface HookBlock {

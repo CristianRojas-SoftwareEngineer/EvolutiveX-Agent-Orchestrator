@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
   isScpManagedCommand,
@@ -270,6 +270,12 @@ describe('readCanonicalHooks', () => {
     const root = mkdtempSync(join(tmpdir(), 'scp-no-hooks-'));
     expect(() => readCanonicalHooks(root)).toThrow();
     rmSync(root, { recursive: true, force: true });
+  });
+
+  it('preserva async: true en SessionEnd al resolver placeholders', () => {
+    const root = resolve(import.meta.dirname, '../../..');
+    const hooks = readCanonicalHooks(root);
+    expect(hooks['SessionEnd'][0].hooks[0].async).toBe(true);
   });
 });
 

@@ -81,4 +81,22 @@ describe('hooks canónicos y encoding', () => {
     expect(ACCENT_SAMPLE).toContain('sesión');
     expect(ACCENT_SAMPLE).not.toMatch(/Ã/);
   });
+
+  it('SessionEnd es async; el resto de claves permanecen síncronas', () => {
+    const hooksPath = resolve(import.meta.dirname, '../../configs/hooks.json');
+    const parsed = JSON.parse(readFileSync(hooksPath, 'utf-8')) as {
+      hooks: Record<string, { hooks: { async?: boolean }[] }[]>;
+    };
+    for (const [key, blocks] of Object.entries(parsed.hooks)) {
+      for (const block of blocks) {
+        for (const entry of block.hooks) {
+          if (key === 'SessionEnd') {
+            expect(entry.async, `${key} debe ser async`).toBe(true);
+          } else {
+            expect(entry.async, `${key} no debe ser async`).toBeUndefined();
+          }
+        }
+      }
+    }
+  });
 });

@@ -2,11 +2,11 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { setClaudeDirForTests } from '../../scripting/session-manager/shared/paths.js';
+import { setClaudeDirForTests } from '../../scripting/shared/claude-paths.js';
 import {
   extractLastUserPrompt,
   verifyPromptInTranscript,
-} from '../../scripting/headless-tts-gateway-test/verify-prompt.js';
+} from '../../scripting/headless/modules/verify-prompt.js';
 
 describe('verify-prompt', () => {
   const fakeClaudeDir = join(tmpdir(), `headless-tts-verify-${Date.now()}`);

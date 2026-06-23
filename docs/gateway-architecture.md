@@ -364,13 +364,13 @@ Un **Step** no es solo una llamada HTTP aislada: incluye la fase de tools observ
 
 **Delimitadores (hooks):**
 
-| Evento             | Acción                                                                          |
-| ------------------ | ------------------------------------------------------------------------------- |
+| Evento             | Acción                                                                                 |
+| ------------------ | -------------------------------------------------------------------------------------- |
 | `UserPromptSubmit` | Notificaciones (toast/voz); el main lo abre `ensureTurnWorkflow` en el primer hop HTTP |
-| `SubagentStart`    | Abre `Workflow` con `kind: 'subagent'`                                          |
-| `Stop`             | Cierra main si `stop_hook_active === false` y sin `background_tasks` pendientes |
-| `SubagentStop`     | Cierra sub-workflow                                                             |
-| `StopFailure`      | Cierra con `WorkflowResult.outcome: 'api_error'`                                |
+| `SubagentStart`    | Abre `Workflow` con `kind: 'subagent'`                                                 |
+| `Stop`             | Cierra main si `stop_hook_active === false` y sin `background_tasks` pendientes        |
+| `SubagentStop`     | Cierra sub-workflow                                                                    |
+| `StopFailure`      | Cierra con `WorkflowResult.outcome: 'api_error'`                                       |
 
 **Cardinalidad:** `Session` 1 — \* `Workflow`. Cada prompt significativo abre un workflow; reanudar sesión puede abrir un workflow nuevo.
 
@@ -1028,15 +1028,15 @@ sequenceDiagram
 
 ## 15. Reglas de autoridad por concern
 
-| Concern                          | Autoridad primaria                                                           | Fallback / complemento                                                                                                         |
-| -------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| **Sesión**                       | Header HTTP `x-cc-audit-session` + reconciliar `session_id` en payload hook. | Si hook llega antes de primer POST: crear sesión desde hook.                                                                   |
+| Concern                          | Autoridad primaria                                                            | Fallback / complemento                                                                                                         |
+| -------------------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| **Sesión**                       | Header HTTP `x-cc-audit-session` + reconciliar `session_id` en payload hook.  | Si hook llega antes de primer POST: crear sesión desde hook.                                                                   |
 | **Abrir workflow main**          | Wire request `fresh` (abre en disco vía `ensureTurnWorkflow`; creador único). | Hook `UserPromptSubmit` no participa en la apertura (solo notificaciones).                                                     |
-| **Abrir workflow subagente**     | Plano A: cabeceras `agent-id` + `parent-agent-id` en POST `fresh`.           | Legacy: `findInteractionWithPendingAgents` + prompt si CC < 2.1.139. Hook `SubagentStart` confirma y enlaza `childWorkflowId`. |
-| **Enlazar `tool_use_id` ↔ hijo** | Plano B: SSE `registerPendingTool` + `joinToolUseToSubagent`.                | Hook `PreToolUse`/`PostToolUse` enriquecen `ToolUse.status` y timing.                                                          |
-| **Cerrar workflow**              | **Plano C**: hook `Stop` / `SubagentStop` (autoritativo).                    | Wire `stop_reason` como cierre **transitorio** solo si hook no llega (ventana documentada).                                    |
-| **Texto final E2E**              | **Plano C**: `last_assistant_message` del hook de cierre.                    | `output/result.json` (`finalText` + `steps[]`); reconstrucción SSE como fallback si hook no incluye el campo.                  |
-| **Join paralelo (N hijos)**      | Prompt match → FIFO por orden SSE (limitación documentada).                  | Si CC envía agent-id único por hijo, join es trivial por identidad.                                                            |
+| **Abrir workflow subagente**     | Plano A: cabeceras `agent-id` + `parent-agent-id` en POST `fresh`.            | Legacy: `findInteractionWithPendingAgents` + prompt si CC < 2.1.139. Hook `SubagentStart` confirma y enlaza `childWorkflowId`. |
+| **Enlazar `tool_use_id` ↔ hijo** | Plano B: SSE `registerPendingTool` + `joinToolUseToSubagent`.                 | Hook `PreToolUse`/`PostToolUse` enriquecen `ToolUse.status` y timing.                                                          |
+| **Cerrar workflow**              | **Plano C**: hook `Stop` / `SubagentStop` (autoritativo).                     | Wire `stop_reason` como cierre **transitorio** solo si hook no llega (ventana documentada).                                    |
+| **Texto final E2E**              | **Plano C**: `last_assistant_message` del hook de cierre.                     | `output/result.json` (`finalText` + `steps[]`); reconstrucción SSE como fallback si hook no incluye el campo.                  |
+| **Join paralelo (N hijos)**      | Prompt match → FIFO por orden SSE (limitación documentada).                   | Si CC envía agent-id único por hijo, join es trivial por identidad.                                                            |
 
 ---
 
@@ -1102,7 +1102,7 @@ El registro de tools pending en SSE:
 
 **Endpoint:** `POST /hooks` en capa 5 (excluido de side-interactions).
 
-**Configuración operativa:** Claude Code hooks apuntan al proxy vía `.claude/settings.json` del proyecto. El archivo del proyecto registra **13 claves**, todas con un único comando: [`post-hook-event.ts`](../scripting/post-hook-event.ts) (relay puro — lee stdin una vez, hace `POST` a `$ANTHROPIC_BASE_URL/hooks`, sale). Las 13 claves son: `UserPromptSubmit`, `PreToolUse`, `PostToolUse` (`matcher: "*"`), `PostToolUseFailure`, `SubagentStart`, `SubagentStop`, `Stop`, `StopFailure`, `SessionStart`, `SessionEnd`, `PermissionRequest`, `TaskCreated`, `TaskCompleted`. Las 13 sobrescriben las entradas equivalentes del user-level `C:\Users\Cristian\.claude\settings.json` (merge por clave: el proyecto tiene precedencia). El gateway (`AuditHookEventHandler.executeAsync`) es el **único punto de decisión de efectos**: toast (estático, dinámico o condicional), TTS y audit. Los relays antiguos `gateway-hook-notify.ts`, `pre-tool-use-hook-ux.ts` y `task-in-progress-hook-ux.ts` se eliminaron en el change `consolidate-hooks-in-gateway`; sus lógicas migraron al handler. Tabla completa: [`docs/notifications.md`](notifications.md).
+**Configuración operativa:** Claude Code hooks apuntan al proxy vía `.claude/settings.json` del proyecto. El archivo del proyecto registra **13 claves**, todas con un único comando: [`post-hook-event.ts`](../scripting/hooks/post-hook-event.ts) (relay puro — lee stdin una vez, hace `POST` a `$ANTHROPIC_BASE_URL/hooks`, sale). Las 13 claves son: `UserPromptSubmit`, `PreToolUse`, `PostToolUse` (`matcher: "*"`), `PostToolUseFailure`, `SubagentStart`, `SubagentStop`, `Stop`, `StopFailure`, `SessionStart`, `SessionEnd`, `PermissionRequest`, `TaskCreated`, `TaskCompleted`. Las 13 sobrescriben las entradas equivalentes del user-level `C:\Users\Cristian\.claude\settings.json` (merge por clave: el proyecto tiene precedencia). El gateway (`AuditHookEventHandler.executeAsync`) es el **único punto de decisión de efectos**: toast (estático, dinámico o condicional), TTS y audit. Los relays antiguos `gateway-hook-notify.ts`, `pre-tool-use-hook-ux.ts` y `task-in-progress-hook-ux.ts` se eliminaron en el change `consolidate-hooks-in-gateway`; sus lógicas migraron al handler. Tabla completa: [`docs/notifications.md`](notifications.md).
 
 **Mapa de eventos hook → acción en dominio:**
 
@@ -2610,16 +2610,16 @@ La capa 1 contiene tipos primitivos, interfaces DTO, modelos de clase anémicos,
 
 ## 37. Capa 2 — Services
 
-| Componente                            | Rol                                                                                                                                                              | Referencia interna                             |
-| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
-| `WorkflowRepositoryService` (memoria) | `Session`, workflows activos, steps abiertos, índices `tool_use_id`; emite eventos al bus                                                                        | Correlador §14                                 |
-| `EventBusService`                     | Adapter async in-process del port `IEventBus`; pub/sub unidireccional                                                                                            | Bus de eventos §23                             |
-| `SessionPersistenceService`           | Suscriptor del bus; proyecta eventos de telemetría a disco `sessions/` (`causal-workflows-v1`)                                                                   | §23, Parte IV                                  |
+| Componente                            | Rol                                                                                                                                     | Referencia interna                             |
+| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| `WorkflowRepositoryService` (memoria) | `Session`, workflows activos, steps abiertos, índices `tool_use_id`; emite eventos al bus                                               | Correlador §14                                 |
+| `EventBusService`                     | Adapter async in-process del port `IEventBus`; pub/sub unidireccional                                                                   | Bus de eventos §23                             |
+| `SessionPersistenceService`           | Suscriptor del bus; proyecta eventos de telemetría a disco `sessions/` (`causal-workflows-v1`)                                          | §23, Parte IV                                  |
 | `SessionMetricsService`               | Escritura atómica de `session-metrics.json` (`billable_hops`, `finalized_runs`, tokens); workflows agénticos `main` y `subagent` (G16′) | §28.2                                          |
-| `StepAssemblerService`                | RAM: SSE → `assistantMessage`, `usage`, `stopReason`; callback `onInferenceComplete`                                                                             | StepBuffer §20                                 |
-| `SseReconstructService`               | Forense / `response/body.json` desde chunks SSE                                                                                                                  | Complemento; no sustituye `finalText` de hooks |
-| `StreamTeeService`                    | Reenvío transparente + rama auditoría                                                                                                                            | §19                                            |
-| `ProviderCatalogService`              | Deriva `Provider`, `LanguageModel` desde `UPSTREAM_ORIGIN`                                                                                                       | Entidades §7                                   |
+| `StepAssemblerService`                | RAM: SSE → `assistantMessage`, `usage`, `stopReason`; callback `onInferenceComplete`                                                    | StepBuffer §20                                 |
+| `SseReconstructService`               | Forense / `response/body.json` desde chunks SSE                                                                                         | Complemento; no sustituye `finalText` de hooks |
+| `StreamTeeService`                    | Reenvío transparente + rama auditoría                                                                                                   | §19                                            |
+| `ProviderCatalogService`              | Deriva `Provider`, `LanguageModel` desde `UPSTREAM_ORIGIN`                                                                              | Entidades §7                                   |
 
 **Principio:** los adapters **no** deciden cuándo cerrar un workflow; ejecutan lo que capa 3 ordena. Los handlers de capa 3 **no** escriben disco directamente (§23.4 regla 1); la proyección a disco la realiza `SessionPersistence` consumiendo eventos del bus.
 
@@ -2634,15 +2634,15 @@ La capa 1 contiene tipos primitivos, interfaces DTO, modelos de clase anémicos,
 
 ## 38. Capa 3 — Operations
 
-| Handler                        | Borde        | Orquestación                                                                                                                                                                            |
-| ------------------------------ | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `AuditWorkflowHandler`         | Wire         | Clasificar → `resolveAgentContext(headers)` → abrir workflow/step en repo → emitir `step_request`.                                                                                      |
-| `AuditSseResponseHandler`      | Wire         | `tee` → `stepAssembler.onEvent` → al `message_stop`: completar step en repo → emitir `stream_chunk` / `step_inference_complete` → registrar pending tools.                              |
-| `AuditWorkflowClosureHandler`  | Wire + Hooks | Invocar `buildWorkflowResult` → emitir `workflow_complete` → marcar workflow cerrado. Cierre autoritativo por hook `Stop`/`SubagentStop`; wire `stop_reason` como respaldo transitorio. |
+| Handler                        | Borde        | Orquestación                                                                                                                                                                                                                                                                                  |
+| ------------------------------ | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AuditWorkflowHandler`         | Wire         | Clasificar → `resolveAgentContext(headers)` → abrir workflow/step en repo → emitir `step_request`.                                                                                                                                                                                            |
+| `AuditSseResponseHandler`      | Wire         | `tee` → `stepAssembler.onEvent` → al `message_stop`: completar step en repo → emitir `stream_chunk` / `step_inference_complete` → registrar pending tools.                                                                                                                                    |
+| `AuditWorkflowClosureHandler`  | Wire + Hooks | Invocar `buildWorkflowResult` → emitir `workflow_complete` → marcar workflow cerrado. Cierre autoritativo por hook `Stop`/`SubagentStop`; wire `stop_reason` como respaldo transitorio.                                                                                                       |
 | `AuditHookEventHandler`        | Hooks        | `UserPromptSubmit` / `Stop` / `SubagentStart` / `SubagentStop` / `PreToolUse` / `PostToolUse` → mutar repo → delegar cierre a `AuditWorkflowClosureHandler`. `PostToolUse[TaskCreate\|TaskUpdate, source=spec-delta]` → proyectar al board Kanban vía `KanbanBoardProjector` (dep. opcional). |
-| `AuditStandardResponseHandler` | Wire         | Respuestas no streaming.                                                                                                                                                                |
-| `AuditUpstreamErrorHandler`    | Wire         | Errores upstream / conexión.                                                                                                                                                            |
-| `FilterToolsHandler`           | Wire         | Filtrar herramientas del body antes de audit/upstream.                                                                                                                                  |
+| `AuditStandardResponseHandler` | Wire         | Respuestas no streaming.                                                                                                                                                                                                                                                                      |
+| `AuditUpstreamErrorHandler`    | Wire         | Errores upstream / conexión.                                                                                                                                                                                                                                                                  |
+| `FilterToolsHandler`           | Wire         | Filtrar herramientas del body antes de audit/upstream.                                                                                                                                                                                                                                        |
 
 La **secuencia** entre repo, assembler y proyección vive aquí; las **reglas de suma de tokens** viven en capa 1. Todos los handlers comparten el mismo `IWorkflowRepository` en memoria como correlador unificado.
 
@@ -2694,7 +2694,7 @@ Consideraciones para `POST /hooks`:
 | Capa 4 en SCP                                                                          | `src/4-api/README.md`                                                    |
 | workflow-persistence design                                                            | `docs/external-references/workflow-persistence-refactor-phase/design.md` |
 | Arquitectura del Gateway (este documento)                                              | `docs/gateway-architecture.md`                                           |
-| **Historia de la migración gateway** (registro de cómo se construyó esta arquitectura) | `openspec/changes/archive/2026-06-01--c00012-gateway-migration/`                 |
+| **Historia de la migración gateway** (registro de cómo se construyó esta arquitectura) | `openspec/changes/archive/2026-06-01--c00012-gateway-migration/`         |
 
 ### 41.2 Skills y referencias PKA
 

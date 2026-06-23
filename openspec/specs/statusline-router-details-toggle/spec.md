@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Comportamiento de la CLI `scripting/statusline-router-details.ts` para activar,
+Comportamiento de la CLI `scripting/provider/statusline-router-details.ts` para activar,
 desactivar o invertir la visibilidad de la Tabla 2 del statusline, persistiendo el
 estado en el bloque `env` de `~/.claude/settings.json` bajo la clave
 `EVOLUTIVEX_AGENT_ORCHESTRATOR__STATUSLINE_ROUTER_DETAILS`.

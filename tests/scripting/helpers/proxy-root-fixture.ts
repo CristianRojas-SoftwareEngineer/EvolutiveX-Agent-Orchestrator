@@ -21,8 +21,8 @@ export function createValidProxyRoot(options: ValidProxyRootOptions = {}): strin
   const prefix = options.prefix ?? 'scp-proxy-';
   const root = mkdtempSync(join(tmpdir(), prefix));
   // Statusline
-  mkdirSync(join(root, 'scripting'), { recursive: true });
-  writeFileSync(join(root, 'scripting', 'router-status.ts'), '', 'utf-8');
+  mkdirSync(join(root, 'scripting', 'provider'), { recursive: true });
+  writeFileSync(join(root, 'scripting', 'provider', 'router-status.ts'), '', 'utf-8');
   mkdirSync(join(root, 'routing', 'providers'), { recursive: true });
   // Hooks
   mkdirSync(join(root, 'configs'), { recursive: true });
@@ -31,8 +31,8 @@ export function createValidProxyRoot(options: ValidProxyRootOptions = {}): strin
     JSON.stringify({ hooks: {} }, null, 2),
     'utf-8',
   );
-  writeFileSync(join(root, 'scripting', 'post-hook-event.ts'), 'export {}', 'utf-8');
   mkdirSync(join(root, 'scripting', 'hooks'), { recursive: true });
+  writeFileSync(join(root, 'scripting', 'hooks', 'post-hook-event.ts'), 'export {}', 'utf-8');
   writeFileSync(join(root, 'scripting', 'hooks', 'session-end-hook.ts'), 'export {}', 'utf-8');
   if (options.withSessionsDir) {
     mkdirSync(join(root, 'sessions'), { recursive: true });
@@ -56,9 +56,8 @@ export function createValidProxyRootForHooks(
     JSON.stringify(hooksJsonContent, null, 2),
     'utf-8',
   );
-  mkdirSync(join(root, 'scripting'), { recursive: true });
-  writeFileSync(join(root, 'scripting', 'post-hook-event.ts'), 'export {}', 'utf-8');
   mkdirSync(join(root, 'scripting', 'hooks'), { recursive: true });
+  writeFileSync(join(root, 'scripting', 'hooks', 'post-hook-event.ts'), 'export {}', 'utf-8');
   writeFileSync(join(root, 'scripting', 'hooks', 'session-end-hook.ts'), 'export {}', 'utf-8');
   return resolve(root);
 }
@@ -69,8 +68,8 @@ export function createValidProxyRootForHooks(
  */
 export function createValidProxyRootForStatusline(prefix = 'scp-statusline-'): string {
   const root = mkdtempSync(join(tmpdir(), prefix));
-  mkdirSync(join(root, 'scripting'), { recursive: true });
-  writeFileSync(join(root, 'scripting', 'router-status.ts'), '', 'utf-8');
+  mkdirSync(join(root, 'scripting', 'provider'), { recursive: true });
+  writeFileSync(join(root, 'scripting', 'provider', 'router-status.ts'), '', 'utf-8');
   mkdirSync(join(root, 'routing', 'providers'), { recursive: true });
   return resolve(root);
 }

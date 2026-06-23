@@ -44,7 +44,9 @@ type MessageContentBlock = { type: string; text?: string };
 function extractSpeakableTextFromContent(content: MessageContentBlock[] | undefined): string {
   if (!content?.length) return '';
   return content
-    .filter((b): b is { type: 'text'; text: string } => b.type === 'text' && typeof b.text === 'string')
+    .filter(
+      (b): b is { type: 'text'; text: string } => b.type === 'text' && typeof b.text === 'string',
+    )
     .map((b) => b.text.trim())
     .filter(Boolean)
     .join(' ')
@@ -229,19 +231,17 @@ export class AuditHookEventHandler {
    * @param mode 'prompt' — responde al último mensaje como asistente de voz
    *             'summary' — resume lo ejecutado en el turno finalizado
    */
-  private async speakAsync(
-    event: ClaudeHookEvent,
-    mode: 'prompt' | 'summary',
-  ): Promise<void> {
+  private async speakAsync(event: ClaudeHookEvent, mode: 'prompt' | 'summary'): Promise<void> {
     if (!this.tts) return;
 
     try {
       // 1. Extraer contexto del transcript si está disponible
       //    - 'prompt' (UserPromptSubmit): tríada curada (user + assistant + prompt actual)
       //    - 'summary' (Stop/SubagentStop/StopFailure): últimos N mensajes del turno
-      const messages = mode === 'prompt'
-        ? await this.extractUserPromptContext(event)
-        : await this.extractContext(event.transcriptPath);
+      const messages =
+        mode === 'prompt'
+          ? await this.extractUserPromptContext(event)
+          : await this.extractContext(event.transcriptPath);
 
       // 2. Generar texto con LLM o usar fallback
       const text = await this.generateSpeechText(event.eventName, messages, mode);
@@ -340,7 +340,8 @@ export class AuditHookEventHandler {
     }
 
     try {
-      const systemPrompt = mode === 'prompt' ? VOICE_ASSISTANT_SYSTEM_PROMPT : CONTINUITY_SYSTEM_PROMPT;
+      const systemPrompt =
+        mode === 'prompt' ? VOICE_ASSISTANT_SYSTEM_PROMPT : CONTINUITY_SYSTEM_PROMPT;
 
       const chatHistory = messages.map((m) => ({
         role: (m.role === 'system' ? 'user' : m.role) as 'user' | 'assistant',
@@ -354,7 +355,7 @@ export class AuditHookEventHandler {
       const res = await fetch(TTS_OPENROUTER_URL, {
         method: 'POST',
         headers: {
-          'authorization': `Bearer ${this.ttsApiKey}`,
+          authorization: `Bearer ${this.ttsApiKey}`,
           'content-type': 'application/json',
           'HTTP-Referer': 'https://smartcodeproxy.local',
           'X-Title': 'Smart Code Proxy',
@@ -373,7 +374,7 @@ export class AuditHookEventHandler {
         return fallback;
       }
 
-      const data = await res.json() as { content?: MessageContentBlock[] };
+      const data = (await res.json()) as { content?: MessageContentBlock[] };
       const text = extractSpeakableTextFromContent(data.content);
 
       if (!text) {
@@ -437,7 +438,11 @@ export class AuditHookEventHandler {
     });
 
     // Toast condicional: solo si la tool es TaskUpdate y status === 'in_progress'
-    if (!isError && event.toolName === 'TaskUpdate' && event.toolInput?.['status'] === 'in_progress') {
+    if (
+      !isError &&
+      event.toolName === 'TaskUpdate' &&
+      event.toolInput?.['status'] === 'in_progress'
+    ) {
       const taskInProgressPayload: Record<string, unknown> = { tool_input: event.toolInput };
       const taskMsg = formatTaskInProgressMessage(taskInProgressPayload);
       if (taskMsg) {
@@ -450,7 +455,8 @@ export class AuditHookEventHandler {
       !isError &&
       this.kanbanProjector &&
       (event.toolName === 'TaskCreate' || event.toolName === 'TaskUpdate') &&
-      (event.toolInput?.['metadata'] as Record<string, unknown> | undefined)?.['source'] === 'spec-delta'
+      (event.toolInput?.['metadata'] as Record<string, unknown> | undefined)?.['source'] ===
+        'spec-delta'
     ) {
       if (event.toolName === 'TaskCreate') {
         void this.kanbanProjector.onTaskCreate(event);

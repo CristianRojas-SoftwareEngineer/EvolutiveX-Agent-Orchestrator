@@ -333,9 +333,7 @@ export class MarkdownRendererService {
         parts.push(
           this.heading(headingLevel + 1, `Subagente ${subagent.index}: ${subagent.description}`),
         );
-        parts.push(
-          `**ID tool_use:** \`${subagent.toolUseId || 'no correlacionado'}\``,
-        );
+        parts.push(`**ID tool_use:** \`${subagent.toolUseId || 'no correlacionado'}\``);
         parts.push(`**Tipo:** ${subagent.subagentType || 'general-purpose'}`);
         parts.push(`**Estado:** ${this.formatOutcome(subagent.outcome)}`);
         parts.push(

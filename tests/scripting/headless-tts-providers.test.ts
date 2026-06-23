@@ -4,7 +4,7 @@ import {
   EXCLUDED_PROVIDERS,
   resolveTestProviders,
   sortProviders,
-} from '../../scripting/headless-tts-gateway-test/providers.js';
+} from '../../scripting/headless/modules/providers.js';
 
 const PROJECT_ROOT = process.cwd();
 

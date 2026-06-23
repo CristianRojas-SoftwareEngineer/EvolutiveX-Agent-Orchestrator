@@ -73,7 +73,11 @@ export async function createProxyDependencies(
   );
   const sessionMetrics = new SessionMetricsService();
   const providerRoutingResolver = new ProviderRoutingResolverService(process.cwd());
-  const subscriptionQuota = new SubscriptionQuotaService(providerRoutingResolver, undefined, logger);
+  const subscriptionQuota = new SubscriptionQuotaService(
+    providerRoutingResolver,
+    undefined,
+    logger,
+  );
   const auditSseResponseHandler = new AuditSseResponseHandler(
     config,
     () => new StepAssemblerService(),

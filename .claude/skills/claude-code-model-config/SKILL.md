@@ -458,10 +458,10 @@ This repo maps Claude Code model env vars to provider catalogs and statusline Ta
 
 | Concern | Location |
 |---------|----------|
-| Write `ANTHROPIC_DEFAULT_*` to settings | `scripting/configure-provider.ts` + `npm run configure:provider -- <name>` |
+| Write `ANTHROPIC_DEFAULT_*` to settings | `scripting/provider/configure-provider.ts` + `npm run configure:provider -- <name>` |
 | Managed var list | `scripting/shared/provider-config.ts` → `MANAGED_ENV_VARS` |
 | Anthropic catalog (incl. Fable 5) | `routing/providers/anthropic/config.json`, `models/claude-fable-5/metadata.json` |
-| Tabla 2 tier classification | `scripting/router-status.ts` → `classifyModelWithEnv` |
+| Tabla 2 tier classification | `scripting/provider/router-status.ts` → `classifyModelWithEnv` |
 | Normative Frontier behavior | `openspec/specs/statusline-runtime/spec.md`, `openspec/specs/provider-env-config/spec.md` |
 
 **After upgrading** or if Fable metrics are missing in Tabla 2, re-run:

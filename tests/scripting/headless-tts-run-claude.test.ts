@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildClaudeHeadlessArgs } from '../../scripting/headless-session/run-claude.js';
+import { buildClaudeHeadlessArgs } from '../../scripting/headless/session-lib/run-claude.js';
 
 describe('buildClaudeHeadlessArgs', () => {
   it('pasa el prompt como un solo argumento -p (comas no parten el comando)', () => {

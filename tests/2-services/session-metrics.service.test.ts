@@ -197,10 +197,7 @@ describe('SessionMetricsService', () => {
     await service.finalizeWorkflowMetrics(tmpDir, 'w1', [step]);
     await service.finalizeWorkflowMetrics(tmpDir, 'w1', [step]);
 
-    const rawApplied = await fs.readFile(
-      path.join(tmpDir, 'session-metrics-applied.json'),
-      'utf8',
-    );
+    const rawApplied = await fs.readFile(path.join(tmpDir, 'session-metrics-applied.json'), 'utf8');
     const applied = JSON.parse(rawApplied);
     expect(applied.finalized_workflow_ids).toEqual(['w1']);
 
@@ -221,10 +218,7 @@ describe('SessionMetricsService', () => {
     await service.finalizeWorkflowMetrics(tmpDir, 'w1', [sideStep]);
     await service.finalizeWorkflowMetrics(tmpDir, 'w1', [sideStep]);
 
-    const rawApplied = await fs.readFile(
-      path.join(tmpDir, 'session-metrics-applied.json'),
-      'utf8',
-    );
+    const rawApplied = await fs.readFile(path.join(tmpDir, 'session-metrics-applied.json'), 'utf8');
     const applied = JSON.parse(rawApplied);
     expect(applied.finalized_workflow_ids).toEqual(['w1']);
 

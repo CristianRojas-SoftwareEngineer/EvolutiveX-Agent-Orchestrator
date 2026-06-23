@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { postHookEvent, resolveHooksUrl } from '../../scripting/post-hook-event.js';
+import { postHookEvent, resolveHooksUrl } from '../../scripting/hooks/post-hook-event.js';
 
 describe('resolveHooksUrl', () => {
   it('normaliza base y añade /hooks', () => {
@@ -33,4 +33,3 @@ describe('postHookEvent', () => {
     expect(code).toBe(1);
   });
 });
-

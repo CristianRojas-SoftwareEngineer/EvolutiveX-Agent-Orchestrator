@@ -98,10 +98,7 @@ export class AuditWorkflowHandler {
       }
     }
 
-    if (
-      classification.type === 'preflight-quota' ||
-      classification.type === 'preflight-warmup'
-    ) {
+    if (classification.type === 'preflight-quota' || classification.type === 'preflight-warmup') {
       return null;
     }
 
@@ -349,11 +346,14 @@ export class AuditWorkflowHandler {
     classification: RequestClassification,
   ): Promise<AuditWorkflowResult> {
     const { parsed } = this.parseRequestPayload(params.rawBody);
-    const { workflow, layoutIndex, isNew, omitted: wfOmitted } = await this.ensureTurnWorkflow(
-      auditSessionId,
-      params.rawBody,
-      { request: parsed ?? undefined },
-    );
+    const {
+      workflow,
+      layoutIndex,
+      isNew,
+      omitted: wfOmitted,
+    } = await this.ensureTurnWorkflow(auditSessionId, params.rawBody, {
+      request: parsed ?? undefined,
+    });
     const meta = this.workflowRepo.getWireMeta(workflow.id);
     const seq = meta?.requestSequence ?? (await this.workflowRepo.nextSequence(auditSessionId));
     const materializeWorkflowRequest =
@@ -428,94 +428,94 @@ export class AuditWorkflowHandler {
     match: { workflow: IWorkflow; pendings: IToolUse[] },
     agentCtx?: AgentContext,
   ): Promise<AuditWorkflowResult> {
-      const parentWorkflow = match.workflow;
-      const parentMeta = this.workflowRepo.getWireMeta(parentWorkflow.id);
-      const parentLayoutIndex = parentMeta?.layoutIndex ?? 1;
-      const parentWorkflowDir = this.workflowDirAbs(auditSessionId, parentLayoutIndex);
+    const parentWorkflow = match.workflow;
+    const parentMeta = this.workflowRepo.getWireMeta(parentWorkflow.id);
+    const parentLayoutIndex = parentMeta?.layoutIndex ?? 1;
+    const parentWorkflowDir = this.workflowDirAbs(auditSessionId, parentLayoutIndex);
 
-      const parentStepIndex = match.pendings.reduce(
-        (min, p) => Math.min(min, this.stepIndexForToolUse(parentWorkflow, p)),
-        this.stepIndexForToolUse(parentWorkflow, match.pendings[0]),
-      );
+    const parentStepIndex = match.pendings.reduce(
+      (min, p) => Math.min(min, this.stepIndexForToolUse(parentWorkflow, p)),
+      this.stepIndexForToolUse(parentWorkflow, match.pendings[0]),
+    );
 
-      let wireAgentId: string | undefined;
-      let wireParentAgentId: string | undefined;
+    let wireAgentId: string | undefined;
+    let wireParentAgentId: string | undefined;
 
-      const subagentPrompt = this.extractSubagentPrompt(params.rawBody);
-      const legacyPendings = match.pendings.map((p) => ({
-        stepIndex: this.stepIndexForToolUse(parentWorkflow, p),
-        toolUseId: p.id,
-        subagentType: this.readSubagentType(p),
-      }));
-      const join = joinToolUseToSubagent(legacyPendings, agentCtx, subagentPrompt);
+    const subagentPrompt = this.extractSubagentPrompt(params.rawBody);
+    const legacyPendings = match.pendings.map((p) => ({
+      stepIndex: this.stepIndexForToolUse(parentWorkflow, p),
+      toolUseId: p.id,
+      subagentType: this.readSubagentType(p),
+    }));
+    const join = joinToolUseToSubagent(legacyPendings, agentCtx, subagentPrompt);
 
-      if (agentCtx?.isSubagentRequest) {
-        this.workflowRepo.openSubagentFromWire(auditSessionId, agentCtx);
-        wireAgentId = agentCtx.agentId;
-        wireParentAgentId = agentCtx.parentAgentId;
-      }
+    if (agentCtx?.isSubagentRequest) {
+      this.workflowRepo.openSubagentFromWire(auditSessionId, agentCtx);
+      wireAgentId = agentCtx.agentId;
+      wireParentAgentId = agentCtx.parentAgentId;
+    }
 
-      const triggeringToolUseId = join.toolUseId;
-      const subagentType = join.subagentType;
-      const correlationStatus = join.correlationStatus;
-      const correlationMethod: CorrelationMethod = join.correlationMethod;
+    const triggeringToolUseId = join.toolUseId;
+    const subagentType = join.subagentType;
+    const correlationStatus = join.correlationStatus;
+    const correlationMethod: CorrelationMethod = join.correlationMethod;
 
-      if (triggeringToolUseId) {
-        this.workflowRepo.consumePendingToolUse(parentWorkflow.id, triggeringToolUseId);
-      }
+    if (triggeringToolUseId) {
+      this.workflowRepo.consumePendingToolUse(parentWorkflow.id, triggeringToolUseId);
+    }
 
-      const subSeq = await this.workflowRepo.nextSequence(auditSessionId);
-      const { parsed, omitted } = this.parseRequestPayload(params.rawBody);
+    const subSeq = await this.workflowRepo.nextSequence(auditSessionId);
+    const { parsed, omitted } = this.parseRequestPayload(params.rawBody);
 
-      const parentContext: ParentContext = {
-        parentWorkflowDir,
-        parentStepIndex,
-        triggeringToolUseId,
-        correlationStatus,
-        correlationMethod,
-        ...(subagentType ? { subagentType } : {}),
-        ...(wireAgentId ? { wireAgentId } : {}),
-        ...(wireParentAgentId ? { wireParentAgentId } : {}),
-      };
+    const parentContext: ParentContext = {
+      parentWorkflowDir,
+      parentStepIndex,
+      triggeringToolUseId,
+      correlationStatus,
+      correlationMethod,
+      ...(subagentType ? { subagentType } : {}),
+      ...(wireAgentId ? { wireAgentId } : {}),
+      ...(wireParentAgentId ? { wireParentAgentId } : {}),
+    };
 
-      const subWorkflow = this.workflowRepo.openSubagentWorkflow(
-        auditSessionId,
-        {
-          agentId: wireAgentId,
-          parentAgentId: wireParentAgentId,
-          isSubagentRequest: true,
-        },
-        parentWorkflow.id,
-        triggeringToolUseId ?? '',
-        {
-          request: parsed ?? undefined,
-          parentContext,
-        },
-      );
-
-      const subLayoutIndex = this.workflowRepo.getWireMeta(subWorkflow.id)?.layoutIndex ?? 1;
-      this.workflowRepo.patchWireMeta(subWorkflow.id, {
-        layoutIndex: subLayoutIndex,
-        requestSequence: subSeq,
-        requestBodyOmitted: omitted,
-        requestBodyBytes: params.rawBody.length,
-        workflowKind: 'agentic',
+    const subWorkflow = this.workflowRepo.openSubagentWorkflow(
+      auditSessionId,
+      {
+        agentId: wireAgentId,
+        parentAgentId: wireParentAgentId,
+        isSubagentRequest: true,
+      },
+      parentWorkflow.id,
+      triggeringToolUseId ?? '',
+      {
+        request: parsed ?? undefined,
         parentContext,
-        modelId: extractModelFromRequestBody(params.rawBody) ?? undefined,
-      });
+      },
+    );
 
-      this.registerWireStepRequest(subWorkflow, headersForAudit, params.rawBody, 'agentic');
+    const subLayoutIndex = this.workflowRepo.getWireMeta(subWorkflow.id)?.layoutIndex ?? 1;
+    this.workflowRepo.patchWireMeta(subWorkflow.id, {
+      layoutIndex: subLayoutIndex,
+      requestSequence: subSeq,
+      requestBodyOmitted: omitted,
+      requestBodyBytes: params.rawBody.length,
+      workflowKind: 'agentic',
+      parentContext,
+      modelId: extractModelFromRequestBody(params.rawBody) ?? undefined,
+    });
 
-      return {
-        auditWorkflowDir: this.workflowDirAbs(auditSessionId, subLayoutIndex),
-        workflowId: subWorkflow.id,
-        requestBodyOmitted: omitted,
-        requestSequence: subSeq,
-        auditSessionId,
-        workflowKind: 'agentic',
-        requestClassification: classification,
-        assignedStepIndex: 1,
-      };
+    this.registerWireStepRequest(subWorkflow, headersForAudit, params.rawBody, 'agentic');
+
+    return {
+      auditWorkflowDir: this.workflowDirAbs(auditSessionId, subLayoutIndex),
+      workflowId: subWorkflow.id,
+      requestBodyOmitted: omitted,
+      requestSequence: subSeq,
+      auditSessionId,
+      workflowKind: 'agentic',
+      requestClassification: classification,
+      assignedStepIndex: 1,
+    };
   }
 
   private stepIndexForToolUse(workflow: IWorkflow, toolUse: IToolUse): number {
@@ -537,7 +537,7 @@ export class AuditWorkflowHandler {
     parentWorkflow: IWorkflow;
     consumePending: () => IToolUse | undefined;
     onConsumed?: (toolUse: IToolUse, stepIndex: number) => void;
-  }  ): Promise<AuditWorkflowResult> {
+  }): Promise<AuditWorkflowResult> {
     const pending = params.consumePending();
     const parentMeta = this.workflowRepo.getWireMeta(params.parentWorkflow.id);
     const layoutIndex = parentMeta?.layoutIndex ?? 1;
@@ -573,7 +573,7 @@ export class AuditWorkflowHandler {
     parentWorkflow: IWorkflow;
     consumePending: () => IToolUse | undefined;
     onConsumed?: (toolUse: IToolUse, stepIndex: number) => void;
-  }  ): Promise<AuditWorkflowResult | null> {
+  }): Promise<AuditWorkflowResult | null> {
     const pending = params.consumePending();
     if (!pending) {
       return null;
@@ -783,11 +783,13 @@ export class AuditWorkflowHandler {
       auditSessionId,
       params.rawBody,
     );
-    const { workflow, layoutIndex, omitted: wfOmitted } = await this.ensureTurnWorkflow(
-      auditSessionId,
-      params.rawBody,
-      { skipWorkflowRequest: true },
-    );
+    const {
+      workflow,
+      layoutIndex,
+      omitted: wfOmitted,
+    } = await this.ensureTurnWorkflow(auditSessionId, params.rawBody, {
+      skipWorkflowRequest: true,
+    });
     if (isSessionNaming) {
       this.workflowRepo.patchWireMeta(workflow.id, { sideRequestKind: 'session-naming' });
     }

@@ -172,7 +172,7 @@ agrupada bajo `## encabezados numerados`; la fase de apply parsea el formato
 numerados + `- [ ] X.Y descripción`) el schema admite una **gramática inline opcional y
 degradable** tras la descripción: `~<estado>` (`~todo` | `~doing`; solo 3 estados —
 `review` vive a nivel de change/`verify`) y `@<responsable>`. Regla decisiva: **el
-checkbox es la verdad para *done*** — `[x]` ⇒ done sin necesidad de `~done`, y un
+checkbox es la verdad para _done_** — `[x]` ⇒ done sin necesidad de `~done`, y un
 `~doing` junto a un `[x]` es obsoleto y se ignora. Los tags van **después** del
 checkbox+descripción, así que `task-progress` (el único módulo del CLI que lee
 `tasks.md`, con el regex `^[-*]\s+\[[\sx]\]`) no se ve afectado: el conteo de
@@ -180,7 +180,7 @@ checkboxes es idéntico con o sin tags.
 
 **Co-propiedad con la extensión Workbench.** `tasks.md` es co-poseído: además del
 pipeline (`plan` lo genera, `apply` marca `[x]` **in place**, `verify` cuenta
-checkboxes), la extensión *EvolutiveX Workbench* co-lee y co-edita el archivo desde su
+checkboxes), la extensión _EvolutiveX Workbench_ co-lee y co-edita el archivo desde su
 tablero de Tasks. Ambos respetan el mismo contrato: encabezados `## N.` numerados,
 identificadores `X.Y` estables y marcado in place (nunca reorganizar en columnas de
 pipeline). Por eso `apply` debe **preservar los tags inline** al marcar `[x]`, y la
@@ -188,7 +188,7 @@ extensión serializa in place sin tocar la estructura numerada. El formato enriq
 **no requiere modificar el CLI** (es permisivo): vive en este schema y en las skills.
 
 > **Sincronización del contrato.** Este contrato es **espejo** de `docs/10-migracion-tareas-y-gui.md`
-> del *EvolutiveX Workbench* (su fuente autocontenida). Cualquier cambio del formato canónico debe
+> del _EvolutiveX Workbench_ (su fuente autocontenida). Cualquier cambio del formato canónico debe
 > aplicarse en **ambos** sitios para mantenerlos sincronizados.
 
 No debe contener: justificación amplia de diseño; prosa de requisitos; justificación
@@ -229,12 +229,12 @@ principios:
    flujo y otro; cambia solo cómo se ejecutan.
 2. **Cero etapas opcionales.** `verify` y `synchronize` son obligatorias siempre, en
    ambos modos.
-3. **Skills de etapa autocontenidas, responsabilidad única a nivel de *concern*.** La
-   responsabilidad única se define por *concern* (estado canónico, freeze del delta),
+3. **Skills de etapa autocontenidas, responsabilidad única a nivel de _concern_.** La
+   responsabilidad única se define por _concern_ (estado canónico, freeze del delta),
    no por operación atómica: una etapa puede comprender varias tareas atómicas cuando
    la integridad referencial o documental lo exige (p. ej. `synchronize` actualiza
    specs **y** docs del repo; `archive` mueve **y** commitea). Lo que se prohíbe es
-   que una etapa embeba a *otra etapa*: `archive` no hace el spec-sync (etapa 9) y
+   que una etapa embeba a _otra etapa_: `archive` no hace el spec-sync (etapa 9) y
    `synchronize` no archiva.
 4. **Un orquestador por encima.** El usuario interactúa solo con el orquestador, que
    conoce todas las skills de etapa, decide el modo y, si el modo no está claro, lo
@@ -245,18 +245,18 @@ principios:
 Nomenclatura consistente: verbo + `-specification-delta`. Cada skill tiene una
 responsabilidad única.
 
-| # | Skill | Entrada → Salida | Muta estado |
-|---|---|---|---|
-| 1 | `explore-specification-delta` | descripción del problema → hallazgos en chat | No (solo lectura) |
-| 2 | `create-specification-delta` | slug + schema → nombre `c<NNNNN>-<slug>` + carpeta + `.openspec.yaml` | Sí |
-| 3 | `propose-specification-delta` | el delta → `proposal.md` (WHY) | Sí |
-| 4 | `define-specification-delta` | el delta → `specs/**/*.md` (WHAT) | Sí |
-| 5 | `design-specification-delta` | el delta → `design.md` (HOW) | Sí |
-| 6 | `plan-specification-delta` | el delta → `tasks.md` (breakdown) | Sí |
-| 7 | `apply-specification-delta` | `tasks.md` → código + tasks marcadas | Sí |
-| 8 | `verify-specification-delta` | artefactos + código → reporte (4C + sync doc + legacy eliminado + tests, todo CRITICAL) | No (solo lectura) |
-| 9 | `synchronize-specification-delta` | delta specs + `README`/`docs` → estado canónico sincronizado | Sí |
-| 10 | `archive-specification-delta` | delta verificado y sincronizado → movido a `archive/` + commit + worktree limpio (freeze) | Sí |
+| #   | Skill                             | Entrada → Salida                                                                          | Muta estado       |
+| --- | --------------------------------- | ----------------------------------------------------------------------------------------- | ----------------- |
+| 1   | `explore-specification-delta`     | descripción del problema → hallazgos en chat                                              | No (solo lectura) |
+| 2   | `create-specification-delta`      | slug + schema → nombre `c<NNNNN>-<slug>` + carpeta + `.openspec.yaml`                     | Sí                |
+| 3   | `propose-specification-delta`     | el delta → `proposal.md` (WHY)                                                            | Sí                |
+| 4   | `define-specification-delta`      | el delta → `specs/**/*.md` (WHAT)                                                         | Sí                |
+| 5   | `design-specification-delta`      | el delta → `design.md` (HOW)                                                              | Sí                |
+| 6   | `plan-specification-delta`        | el delta → `tasks.md` (breakdown)                                                         | Sí                |
+| 7   | `apply-specification-delta`       | `tasks.md` → código + tasks marcadas                                                      | Sí                |
+| 8   | `verify-specification-delta`      | artefactos + código → reporte (4C + sync doc + legacy eliminado + tests, todo CRITICAL)   | No (solo lectura) |
+| 9   | `synchronize-specification-delta` | delta specs + `README`/`docs` → estado canónico sincronizado                              | Sí                |
+| 10  | `archive-specification-delta`     | delta verificado y sincronizado → movido a `archive/` + commit + worktree limpio (freeze) | Sí                |
 
 Notas de nomenclatura:
 
@@ -321,11 +321,11 @@ La remediación vive aguas arriba; las etapas de cierre solo detectan.
   estructurados —issue + severidad + `file:line`—, nunca aplica cambios); nunca es un
   default preventivo.
 - **`synchronize-specification-delta`** sincroniza el **estado canónico**: su
-  *concern* abarca fusionar los delta specs en `openspec/specs/` **y** actualizar la
+  _concern_ abarca fusionar los delta specs en `openspec/specs/` **y** actualizar la
   documentación del repo (`README.md`, `docs/`) para que refleje el estado real tras
   el cambio. Es una sola responsabilidad (mantener el estado canónico coherente) que
   comprende ambas tareas por integridad documental; no archiva.
-- **`archive-specification-delta`** **freeza** el spec-delta: su *concern* comprende
+- **`archive-specification-delta`** **freeza** el spec-delta: su _concern_ comprende
   mover el delta a `archive/`, emitir el commit conventional y dejar el worktree
   limpio. A diferencia del `archive` nativo, **no** invoca el spec-sync: la
   sincronización ya ocurrió como etapa obligatoria independiente (paso 9). El commit y
@@ -341,7 +341,7 @@ verdad para las instrucciones de redacción. Se neutraliza con una regla estrict
 
 > Cada skill que escribe un artefacto (`propose` / `define` / `design` / `plan`) es un
 > **wrapper delgado** que invoca `openspec instructions <su-artefacto> --change <name>
-> --json` y sigue lo que devuelve, escribiendo en `resolvedOutputPath`. **Nunca** copia
+--json` y sigue lo que devuelve, escribiendo en `resolvedOutputPath`. **Nunca** copia
 > la guía de redacción en el cuerpo del `SKILL.md`.
 
 Así, el `schema.yaml` sigue siendo la única fuente de verdad del contenido, y las
@@ -362,10 +362,10 @@ El mismo pipeline de diez etapas, ejecutado a dos niveles de autonomía:
   etapas de corrido, sin pausas, en un único turno. Único corte: una parada admisible
   (CRITICAL en `verify`, gate de completitud en rojo, o cesión legítima por decisión
   irresoluble). El comportamiento de un solo turno no es solo prosa: lo respalda un
-  **backstop determinista** (hook `Stop`, `scripting/openspec/enforce-auto-pipeline.mts`)
-  que, mientras el centinela `openspec/.workbench/auto-pipeline.json` exista y el change
-  no esté archivado, impide el fin de turno y nombra la próxima etapa a invocar. Ver la
-  capability `pipeline-auto-continuation`.
+  **backstop determinista** (hook `Stop`) que, mientras el centinela
+  `openspec/.workbench/auto-pipeline.json` exista y el change no esté archivado,
+  impide el fin de turno y nombra la próxima etapa a invocar. Ver la capability
+  `pipeline-auto-continuation`.
 - **GUIDED** (semi-automático): para deltas de alta incertidumbre (feature nueva, bug
   sin diagnosticar, decisión arquitectónica). El orquestador recorre **las mismas**
   etapas, pero pausa en checkpoints para revisión humana: tras `explore`, tras
@@ -426,12 +426,12 @@ Se sostienen en AMBOS modos, sin excepción:
   que cualquier hallazgo 4C.
 - El orquestador **delega**; nunca inlinea el trabajo de una etapa. Ninguna etapa
   embebe a otra (`archive` no sincroniza; `synchronize` no archiva). Una etapa sí
-  puede agrupar las tareas atómicas que su *concern* exige (el commit + worktree
-  limpio pertenecen al *concern* de freeze de `archive`; el sync de README/docs
-  pertenece al *concern* de estado canónico de `synchronize`) — no son etapas
+  puede agrupar las tareas atómicas que su _concern_ exige (el commit + worktree
+  limpio pertenecen al _concern_ de freeze de `archive`; el sync de README/docs
+  pertenece al _concern_ de estado canónico de `synchronize`) — no son etapas
   embebidas.
 - Las etapas 3–6 no contienen guía de redacción: cada una llama `openspec instructions
-  <artifact> --change <name> --json` y sigue lo devuelto. El schema es la única fuente
+<artifact> --change <name> --json` y sigue lo devuelto. El schema es la única fuente
   de verdad del contenido de los artefactos.
 
 ---
@@ -459,20 +459,20 @@ a la convención de nombres).
 Es la regla que separa ambos orquestadores sin ambigüedad: `orchestrate-roadmap`
 conduce **fases**, y cada fase **es** un specification-delta; por eso invoca
 `orchestrate-specification-delta` **una vez por fase**, y nunca llama a las skills de
-etapa directamente. El roadmap decide *qué fase sigue*; el orquestador de delta decide
-*qué etapa sigue dentro de la fase*.
+etapa directamente. El roadmap decide _qué fase sigue_; el orquestador de delta decide
+_qué etapa sigue dentro de la fase_.
 
 ### Diseño del L1
 
 - **Formato del registro de fases** — vive en el `design.md` del L1, una fila por
   fase:
 
-  | Fase | Change hijo | Bloque | Dependencia | Gate de validación | Docs a actualizar | Legacy a retirar | Estado |
-  |------|-------------|--------|-------------|--------------------|-------------------|------------------|--------|
-  | `<phaseid>` | `<prefix>-<phaseid>-<slug>` | `<bloque>` | `<deps o «ninguna»>` | `<comando/criterio>` | `<lista docs>` | `<lista legacy o «ninguno»>` | `pendiente` |
+  | Fase        | Change hijo                 | Bloque     | Dependencia          | Gate de validación   | Docs a actualizar | Legacy a retirar             | Estado      |
+  | ----------- | --------------------------- | ---------- | -------------------- | -------------------- | ----------------- | ---------------------------- | ----------- |
+  | `<phaseid>` | `<prefix>-<phaseid>-<slug>` | `<bloque>` | `<deps o «ninguna»>` | `<comando/criterio>` | `<lista docs>`    | `<lista legacy o «ninguno»>` | `pendiente` |
 
   Estados: `pendiente` → `en curso` → `validada` → `archivada`. El **DAG de
-  dependencias** se codifica en la columna *Dependencia*.
+  dependencias** se codifica en la columna _Dependencia_.
 
 - **Esquema de la Definición de Hecho (DoD)** — vive en los `specs/` de gobernanza del
   L1 (capacidad `<orchestrator-name>-governance`), como requisitos delta ADDED con al
@@ -595,7 +595,7 @@ Returns a `ChangeStatus` object. Relevant fields (from `instruction-loader.d.ts`
 - `schemaName` — active schema (here `sequential-spec-driven-design`).
 - `changeRoot` — absolute path to the change directory.
 - `planningHome` — `PlanningHomeSummary`: `{ kind: 'repo' | 'workspace', root,
-  changesDir, defaultSchema, workspaceName? }`. `changesDir` is the canonical base
+changesDir, defaultSchema, workspaceName? }`. `changesDir` is the canonical base
   for archive-path derivation (do not hardcode `openspec/changes/archive`).
 - `artifactPaths` — `Record<artifactId, ArtifactPathSummary>`, where
   `ArtifactPathSummary = { outputPath, resolvedOutputPath, existingOutputPaths }`
@@ -611,7 +611,7 @@ Returns a `ChangeStatus` object. Relevant fields (from `instruction-loader.d.ts`
 - `applyRequires` — artifact IDs required before the apply phase (from the schema's
   `apply.requires`; here `["tasks"]`).
 - `artifacts` — per-artifact `{ id, outputPath, status: 'done' | 'ready' | 'blocked',
-  missingDeps? }`.
+missingDeps? }`.
 - `isComplete` — whether all artifacts are complete.
 
 ### `openspec instructions <artifact> --change "<name>" --json`
@@ -767,7 +767,7 @@ abiertos:
   Workbench escribe timestamps ISO 8601 completos (`YYYY-MM-DDThh:mm:ssZ`), que el
   validador Zod rechaza; los comandos `openspec instructions`, `openspec new change` y
   `openspec status` fallarían al encontrar ese formato. El script
-  `scripting/openspec/patch-openspec-change-metadata.mts` extiende el regex a formato
+  `scripting/openspec/patch-openspec-change-metadata.ts` extiende el regex a formato
   dual `(YYYY-MM-DD | ISO 8601 completo)` directamente en
   `node_modules/@fission-ai/openspec/dist/core/change-metadata/schema.js`. Está
   registrado como `postinstall` en `package.json` para reaplicarse automáticamente tras

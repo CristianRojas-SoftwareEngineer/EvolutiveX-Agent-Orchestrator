@@ -408,44 +408,9 @@ El CLI SHALL escribir un mensaje de error en `stderr` y terminar con código de 
 
 ---
 
-### Requirement: Relay `Stop` desde scripting (toast único con mensaje de continuidad)
+### Requirement: Hook `Stop` — relay genérico + gateway
 
-En el proyecto Smart Code Proxy, el flujo UX del hook `Stop` SHALL delegarse en `scripting/stop-hook-ux.ts`, que importa `buildEvent` y `DesktopNotificationAdapter` desde `src/2-services/notifications/` (mismo contrato de `NotificationEvent` que el CLI).
-
-El relay SHALL emitir **un único toast** por ejecución:
-
-| Título | Cuerpo | Sonido |
-| --- | --- | --- |
-| `"Stop"` (`eventKey` sin override) | Preview truncado (≤ 250 chars) del mensaje de continuidad; si no hay mensaje generado: fallback al texto fuente truncado; si no hay texto fuente: copy del catálogo para `Stop` | Según catálogo `Stop` |
-
-La lógica de generación del mensaje de continuidad SHALL vivir en `scripting/stop-work-summary-notification.ts` (función `runContinuityNotification`). La función `notifyStopTurnFinished()` SHALL ser eliminada. El orquestador `scripting/stop-hook-ux.ts` SHALL invocar `POST /hooks` antes del toast (ver `hooks-lifecycle-correlation`).
-
-El texto completo del mensaje de continuidad SHALL persistirse en `sessions/.last-continuity-message.txt` antes de emitir el toast. Ver spec `stop-hook-continuity-message` para el contrato completo de generación y persistencia.
-
-Este requirement NO modifica el contrato del CLI standalone: instalaciones globales (`install:notifications`) y otros hooks del lifecycle siguen usando `cli.ts` directamente.
-
-#### Scenario: Toast único usa mensaje de continuidad generado
-
-- **GIVEN** `runContinuityNotification` genera un mensaje de continuidad no vacío
-- **WHEN** se construye el evento del toast vía `buildEvent({ eventType: 'Stop', message: preview, stdinJson: false })`
-- **THEN** `title` SHALL ser `'Stop'`
-- **AND** `message` SHALL ser el preview truncado (≤ 250 chars) del mensaje de continuidad
-- **AND** el branding (`appId`, icono de perfil `Stop`) SHALL aplicarse vía `buildEvent` con `eventType: 'Stop'`
-
-#### Scenario: Sin texto generado → fallback al texto fuente
-
-- **GIVEN** que `generateContinuityMessage` devuelve `undefined` (sin API key o fallo)
-- **AND** existe texto fuente (`last_assistant_message` o transcript)
-- **WHEN** se construye el evento del toast
-- **THEN** `message` SHALL ser `fallbackSummary(assistantText)` (texto normalizado truncado)
-- **AND** `title` SHALL ser `'Stop'`
-
-#### Scenario: Sin texto fuente → copy del catálogo
-
-- **GIVEN** que no hay texto fuente disponible (stdin vacío, sin `last_assistant_message`, sin transcript legible)
-- **WHEN** se construye el evento del toast
-- **THEN** `message` SHALL ser el copy del catálogo para `Stop` («Tu turno — El asistente terminó. Escribe tu siguiente mensaje.»)
-- **AND** `title` SHALL ser `'Stop'`
+El hook `Stop` SHALL usar `scripting/hooks/post-hook-event.ts` como relay (igual que los demás 12 eventos gestionados por SCP). El gateway (`AuditHookEventHandler`) es el único punto de decisión de efectos: voz (TTS vía OpenRouter dedicado), toast de continuidad y audit. El relay no emite toasts propios ni genera mensajes de continuidad. Ver spec `hooks-lifecycle-correlation` para el contrato completo del relay.
 
 #### Scenario: CLI con payload inválido → error en stderr y exit 1
 

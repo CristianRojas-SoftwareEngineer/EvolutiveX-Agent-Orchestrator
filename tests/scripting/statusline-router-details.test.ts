@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { applyRouterDetails } from '../../scripting/statusline-router-details.js';
+import { applyRouterDetails } from '../../scripting/provider/statusline-router-details.js';
 import type { ClaudeSettings } from '../../scripting/shared/claude-settings.js';
 import { STATUSLINE_ROUTER_DETAILS_KEY } from '../../scripting/shared/claude-settings.js';
 

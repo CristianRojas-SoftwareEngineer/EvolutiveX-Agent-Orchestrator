@@ -31,28 +31,36 @@ Todos los logs del http-logger deben emitirse siempre en `request.log.info(...)`
 Eliminar `LOG_HTTP_LEVEL` de los cinco puntos donde existe y siempre emitir en `info`:
 
 ### 1. `src/1-domain/types/config.types.ts`
+
 Eliminar la línea 44:
+
 ```ts
 LOG_HTTP_LEVEL?: 'info' | 'debug';
 ```
+
 y su comentario JSDoc en la línea 43.
 
 ### 2. `src/4-api/config/env.config.ts`
+
 Eliminar la línea 52 del objeto `config`:
+
 ```ts
 LOG_HTTP_LEVEL: (process.env.LOG_HTTP_LEVEL === 'debug' ? 'debug' : 'info') as 'info' | 'debug',
 ```
 
 ### 3. `src/5-user-interfaces/http/middlewares/http-logger.ts`
+
 Tres cambios:
 
 **a)** Eliminar el campo `level` de la interfaz `HttpLoggerConfig` (línea 12):
+
 ```ts
 /** Nivel Pino para los logs del plugin (info | debug). */
 level: 'info' | 'debug';
 ```
 
 **b)** En `createHttpOnRequestHook` (líneas 62-66), reemplazar el bloque condicional:
+
 ```ts
 if (config.level === 'debug') {
   request.log.debug(payload, '→ incoming request');
@@ -60,12 +68,15 @@ if (config.level === 'debug') {
   request.log.info(payload, '→ incoming request');
 }
 ```
+
 por:
+
 ```ts
 request.log.info(payload, '→ incoming request');
 ```
 
 **c)** En `createHttpPreValidationHook` (líneas 84-88), reemplazar:
+
 ```ts
 if (config.level === 'debug') {
   request.log.debug(payload, '→ incoming request body');
@@ -73,12 +84,15 @@ if (config.level === 'debug') {
   request.log.info(payload, '→ incoming request body');
 }
 ```
+
 por:
+
 ```ts
 request.log.info(payload, '→ incoming request body');
 ```
 
 **d)** En `createHttpOnResponseHook` (líneas 110-114), reemplazar:
+
 ```ts
 if (config.level === 'debug') {
   request.log.debug(payload, '← response sent');
@@ -86,30 +100,37 @@ if (config.level === 'debug') {
   request.log.info(payload, '← response sent');
 }
 ```
+
 por:
+
 ```ts
 request.log.info(payload, '← response sent');
 ```
 
 ### 4. `src/app.ts`
+
 En la construcción de `httpLoggerConfig` (líneas 21-25), eliminar el campo `level`:
+
 ```ts
 const httpLoggerConfig = {
   logBodies: deps.config.LOG_HTTP_BODIES === true,
   logHeaders: deps.config.LOG_HTTP_HEADERS !== false,
-  level: deps.config.LOG_HTTP_LEVEL ?? 'info',   // ← eliminar esta línea
+  level: deps.config.LOG_HTTP_LEVEL ?? 'info', // ← eliminar esta línea
 };
 ```
 
 ### 5. `docs/observability.md`
+
 Dos cambios:
 
 **a)** En la tabla de variables de entorno (línea 13), eliminar la fila:
+
 ```
 | `LOG_HTTP_LEVEL`    | `info`  | Nivel Pino para los logs del plugin (`info` \| `debug`). |
 ```
 
 **b)** En la sección "Cómo activarlo temporalmente" (líneas 85-86), eliminar el bloque:
+
 ```bash
 # Modo debug (nivel 20 en Pino — muy verboso)
 LOG_HTTP_BODIES=true LOG_HTTP_LEVEL=debug npm run dev
@@ -119,13 +140,13 @@ LOG_HTTP_BODIES=true LOG_HTTP_LEVEL=debug npm run dev
 
 ## Archivos afectados (solo estos cinco)
 
-| Archivo | Tipo de cambio |
-|---|---|
-| `src/1-domain/types/config.types.ts` | Eliminar campo de interfaz |
-| `src/4-api/config/env.config.ts` | Eliminar línea de config |
+| Archivo                                                 | Tipo de cambio                                          |
+| ------------------------------------------------------- | ------------------------------------------------------- |
+| `src/1-domain/types/config.types.ts`                    | Eliminar campo de interfaz                              |
+| `src/4-api/config/env.config.ts`                        | Eliminar línea de config                                |
 | `src/5-user-interfaces/http/middlewares/http-logger.ts` | Eliminar campo de interfaz + reemplazar 3 condicionales |
-| `src/app.ts` | Eliminar campo de objeto literal |
-| `docs/observability.md` | Eliminar fila de tabla + ejemplo de bash |
+| `src/app.ts`                                            | Eliminar campo de objeto literal                        |
+| `docs/observability.md`                                 | Eliminar fila de tabla + ejemplo de bash                |
 
 `configs/.env.example` **no requiere cambios** — `LOG_HTTP_LEVEL` nunca fue documentada ahí.
 

@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+# scripting/changelog/generate-changelog — regenera CHANGELOG.md desde el historial de conventional commits (Keep a Changelog).
+# Estado derivado: nunca editar CHANGELOG.md a mano. Fuente de verdad = historial git.
+#
+# Uso: generate-changelog
+#
+# No hace commit ni amend. El hook post-commit (ver scripting/changelog/install-changelog-hook) se encarga.
+set -euo pipefail
+
+if [[ $# -gt 0 ]]; then
+  echo "Error: argumento eliminado: el script no acepta flags" >&2
+  exit 1
+fi
+
+OUT="CHANGELOG.md"
+
+# Acumuladores por bloque (clave: "unreleased" o nombre de tag)
+declare -A added changed fixed doc
+declare -A tag_date
+current_block="unreleased"
+order=("unreleased")
+
+while IFS='|' read -r refs subject date; do
+  # Detectar límite de tag a partir de los refs de este commit
+  if [[ "$refs" =~ tag:\ ([^,\ ]+) ]]; then
+    tag="${BASH_REMATCH[1]}"
+    if [[ "$current_block" != "$tag" ]]; then
+      current_block="$tag"
+      order+=("$tag")
+      tag_date["$tag"]="$date"
+    fi
+  fi
+  # Clasificar el subject por tipo de conventional commit
+  type="${subject%%(*}"; type="${type%%:*}"
+  desc="${subject#*: }"
+  case "$type" in
+    feat)           added["$current_block"]+="- ${desc}"$'\n' ;;
+    fix)            fixed["$current_block"]+="- ${desc}"$'\n' ;;
+    perf|refactor)  changed["$current_block"]+="- ${desc}"$'\n' ;;
+    docs)           doc["$current_block"]+="- ${desc}"$'\n' ;;
+    # chore/test/build/ci/style descartados por diseño (Keep a Changelog)
+  esac
+done < <(git log --pretty=format:'%D|%s|%as')
+
+# Emisión del archivo completo
+{
+  echo "# Changelog"
+  echo
+  echo "All notable changes are derived from conventional commits. Do not edit by hand."
+  echo
+  for block in "${order[@]}"; do
+    if [[ "$block" == "unreleased" ]]; then
+      echo "## [Unreleased]"
+    else
+      echo "## [${block#v}] — ${tag_date[$block]}"
+    fi
+    [[ -n "${added[$block]:-}"   ]] && { echo "### Added";         printf '%s\n' "${added[$block]}";   }
+    [[ -n "${changed[$block]:-}" ]] && { echo "### Changed";       printf '%s\n' "${changed[$block]}"; }
+    [[ -n "${fixed[$block]:-}"   ]] && { echo "### Fixed";         printf '%s\n' "${fixed[$block]}";   }
+    [[ -n "${doc[$block]:-}"     ]] && { echo "### Documentation"; printf '%s\n' "${doc[$block]}";     }
+  done
+} > "$OUT"

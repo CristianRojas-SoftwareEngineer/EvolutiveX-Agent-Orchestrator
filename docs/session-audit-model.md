@@ -59,11 +59,11 @@ sessions/<session-id>/
 
 **Precedencia `completionAuthority` (determinista, fijada al registrar el tool):**
 
-| Autoridad      | Canal de registro                         | Tools típicos                       | Emisor de `tool_result`                        |
-| -------------- | ----------------------------------------- | ----------------------------------- | ---------------------------------------------- |
-| `continuation` | `registerToolUse`                         | Bash, Read, Grep, Glob, Edit, Write | `handleContinuation` → body HTTP `tool_result` |
-| `continuation` | `registerPendingToolUse` + nombre `Agent` | Agent (subagente)                   | Continuation del padre (coalescing)            |
-| `hook`         | `registerPendingToolUse` + web_*          | `web_search`, `web_fetch`           | `AuditHookEventHandler` (`PostToolUse` / failure) |
+| Autoridad      | Canal de registro                         | Tools típicos                       | Emisor de `tool_result`                           |
+| -------------- | ----------------------------------------- | ----------------------------------- | ------------------------------------------------- |
+| `continuation` | `registerToolUse`                         | Bash, Read, Grep, Glob, Edit, Write | `handleContinuation` → body HTTP `tool_result`    |
+| `continuation` | `registerPendingToolUse` + nombre `Agent` | Agent (subagente)                   | Continuation del padre (coalescing)               |
+| `hook`         | `registerPendingToolUse` + web\_\*        | `web_search`, `web_fetch`           | `AuditHookEventHandler` (`PostToolUse` / failure) |
 
 `PostToolUse` **no** completa tools con autoridad `continuation` aunque llegue antes que la continuation HTTP. Un único `tool_result` por `tool_call` (idempotencia de `completeToolUse`).
 
@@ -178,12 +178,12 @@ flowchart LR
 
 La clasificación la realiza `RequestClassifierService` (dominio); `AuditWorkflowHandler` abre o continúa workflows en `IWorkflowRepository` y publica eventos.
 
-| Clasificación                          | Comportamiento resumido                                      | Proyección en disco                           |
-| -------------------------------------- | ------------------------------------------------------------ | --------------------------------------------- |
-| `fresh`                                | Hop agentic con `tools` no vacíos                            | Step `stepKind: agentic` bajo turno activo   |
-| `continuation`                         | `tool_result` en el **último mensaje** hacia workflow activo | Mismo turno; nuevo step o coalescing Agent    |
-| `preflight-quota` / `preflight-warmup` | `max_tokens:1` o warm-up                                     | **Excluido** (proxy activo, sin auditoría)    |
-| `side-request`                         | `tools: []` (p. ej. naming)                                  | Step `stepKind: side-request` bajo turno      |
+| Clasificación                          | Comportamiento resumido                                      | Proyección en disco                        |
+| -------------------------------------- | ------------------------------------------------------------ | ------------------------------------------ |
+| `fresh`                                | Hop agentic con `tools` no vacíos                            | Step `stepKind: agentic` bajo turno activo |
+| `continuation`                         | `tool_result` en el **último mensaje** hacia workflow activo | Mismo turno; nuevo step o coalescing Agent |
+| `preflight-quota` / `preflight-warmup` | `max_tokens:1` o warm-up                                     | **Excluido** (proxy activo, sin auditoría) |
+| `side-request`                         | `tools: []` (p. ej. naming)                                  | Step `stepKind: side-request` bajo turno   |
 
 **Sin sesión:** si `sessionId === '_unknown'`, el handler retorna sin escribir disco ([`health-check-handling.md`](./health-check-handling.md)).
 
@@ -218,11 +218,11 @@ Los pendientes viven en `IToolUse` del workflow padre, no en `ActiveInteraction`
 
 El turno de usuario es un workflow con **`interactionType: agentic`** (`workflows/NN/`, `NN` base 1). Lo abre exclusivamente `ensureTurnWorkflow` al llegar el primer hop HTTP del turno (el hook `UserPromptSubmit` no crea workflows), y cierra en hook `Stop` / `StopFailure` con `IWorkflowResult` (`finalText` desde el hook).
 
-| Campo              | Valores activos       | Notas                                                      |
-| ------------------ | --------------------- | ---------------------------------------------------------- |
-| `interactionType`  | `agentic`             | Workflow de turno; subagentes usan `kind: subagent`      |
-| `stepKind`         | `agentic`, `side-request` | Diferencia hops auxiliares vs inferencia dentro del turno |
-| Preflights         | —                     | Excluidos del árbol causal; no persisten `interactionType` |
+| Campo             | Valores activos           | Notas                                                      |
+| ----------------- | ------------------------- | ---------------------------------------------------------- |
+| `interactionType` | `agentic`                 | Workflow de turno; subagentes usan `kind: subagent`        |
+| `stepKind`        | `agentic`, `side-request` | Diferencia hops auxiliares vs inferencia dentro del turno  |
+| Preflights        | —                         | Excluidos del árbol causal; no persisten `interactionType` |
 
 `end_turn` en SSE cierra solo el **step** abierto; el workflow E2E del turno no hace `forceClose` en SSE.
 
@@ -230,13 +230,13 @@ El turno de usuario es un workflow con **`interactionType: agentic`** (`workflow
 
 ### 5.1 Cierre de step vs cierre de workflow
 
-| Señal | Cierra step | Cierra workflow de turno |
-| ----- | ----------- | ------------------------ |
-| Respuesta HTTP terminal de `side-request` | Sí | No |
-| SSE `stop_reason: tool_use` | Sí | No |
-| SSE `stop_reason: end_turn` | Sí | No |
-| Hook `Stop` / `StopFailure` | — | Sí |
-| Hook `SubagentStop` (sub-workflow) | — | Sí (sub-workflow anidado) |
+| Señal                                     | Cierra step | Cierra workflow de turno  |
+| ----------------------------------------- | ----------- | ------------------------- |
+| Respuesta HTTP terminal de `side-request` | Sí          | No                        |
+| SSE `stop_reason: tool_use`               | Sí          | No                        |
+| SSE `stop_reason: end_turn`               | Sí          | No                        |
+| Hook `Stop` / `StopFailure`               | —           | Sí                        |
+| Hook `SubagentStop` (sub-workflow)        | —           | Sí (sub-workflow anidado) |
 
 `IWorkflowResult.finalText` proviene del hook (`last_assistant_message`); si el hook no lo incluye queda `undefined` (sin fallback desde steps).
 
@@ -281,14 +281,14 @@ Al arranque, el proxy puede eliminar sesiones con layout flat legacy (**corte li
 
 Tipos **activos** en `src/1-domain/types/audit.types.ts` para clasificación HTTP y correlación (no sustituyen el modelo en memoria `IWorkflow` / `IStep` / `IToolUse`):
 
-| Tipo | Uso |
-| ---- | --- |
-| `WorkflowRequestKind`, `StepKind` | Clasificación semántica del request y del hop |
-| `RequestClassification` | Resultado de `classifyRequestBody()` |
-| `SideRequestKind` | Subtipo de `side-request` (p. ej. naming de sesión) |
-| `PendingAgentToolUse`, `CorrelationMethod`, `ParentContext` | Correlación subagente ↔ tool_use |
-| `CoalescedAgentStepResponse`, `SubagentSummary` | Contrato persistido en steps coalesced |
-| `SseReconstructOptions` | Reconstrucción SSE → `body.json` (sin campos legacy `sseRaw*`) |
+| Tipo                                                        | Uso                                                            |
+| ----------------------------------------------------------- | -------------------------------------------------------------- |
+| `WorkflowRequestKind`, `StepKind`                           | Clasificación semántica del request y del hop                  |
+| `RequestClassification`                                     | Resultado de `classifyRequestBody()`                           |
+| `SideRequestKind`                                           | Subtipo de `side-request` (p. ej. naming de sesión)            |
+| `PendingAgentToolUse`, `CorrelationMethod`, `ParentContext` | Correlación subagente ↔ tool_use                               |
+| `CoalescedAgentStepResponse`, `SubagentSummary`             | Contrato persistido en steps coalesced                         |
+| `SseReconstructOptions`                                     | Reconstrucción SSE → `body.json` (sin campos legacy `sseRaw*`) |
 
 **Retirados en P1/P2** (no exportar ni reintroducir): `StepMeta`, `InteractionType`, `InteractionOutcome`, `AuditInteractionContext`, `InteractionMetadata`, `PendingWebSearchToolUse`, `PendingWebFetchToolUse`, `ResolvedInternalTool`, módulo `audit-paths.ts` (routing canónico: `session-routing.ts`).
 
@@ -308,13 +308,13 @@ Todo lo demás (incluido SSE vía `stream_chunk`): `eventBus.publish(...)` → `
 
 ### Handlers relevantes
 
-| Handler                        | Rol                                                           |
-| ------------------------------ | ------------------------------------------------------------- |
+| Handler                        | Rol                                                                                      |
+| ------------------------------ | ---------------------------------------------------------------------------------------- |
 | `AuditWorkflowHandler`         | Clasificación, apertura/continuación de turnos, wire steps; `withSessionLock` por sesión |
-| `AuditSseResponseHandler`      | Stream SSE + reconstrucción; publica `step_response` / cierre |
-| `AuditStandardResponseHandler` | Respuestas no-SSE                                             |
-| `AuditWorkflowClosureHandler`  | Coordinación de cierre + métricas; delega proyección al bus   |
-| `AuditUpstreamErrorHandler`    | Errores upstream                                              |
+| `AuditSseResponseHandler`      | Stream SSE + reconstrucción; publica `step_response` / cierre                            |
+| `AuditStandardResponseHandler` | Respuestas no-SSE                                                                        |
+| `AuditWorkflowClosureHandler`  | Coordinación de cierre + métricas; delega proyección al bus                              |
+| `AuditUpstreamErrorHandler`    | Errores upstream                                                                         |
 
 ### Cierre de workflow
 

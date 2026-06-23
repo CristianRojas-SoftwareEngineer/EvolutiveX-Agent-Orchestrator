@@ -19,7 +19,10 @@ export class HooksController {
       }
       const event = parseHookEvent(payload);
       if (!event.eventName) {
-        request.log.warn({ body: body.toString().slice(0, 200) }, 'hook payload inválido — eventName vacío');
+        request.log.warn(
+          { body: body.toString().slice(0, 200) },
+          'hook payload inválido — eventName vacío',
+        );
         return;
       }
       this.hookEventHandler.execute(event);

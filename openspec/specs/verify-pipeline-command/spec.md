@@ -4,7 +4,7 @@
 
 ### Requirement: Skill reads the config as source of truth
 
-`.claude/skills/verify-scripts/SKILL.md` MUST read `scripting/verify-config.ts` using the Read tool as
+`.claude/skills/verify-scripts/SKILL.md` MUST read `scripting/maintenance/verify-config.ts` using the Read tool as
 step 1 of its protocol. The skill SHALL derive the 38-step list from the read file. The skill MUST
 NOT hardcode the list of step ids, the dependency graph, or the kind/script/args of any step.
 
@@ -22,7 +22,7 @@ NOT hardcode the list of step ids, the dependency graph, or the kind/script/args
 
 ### Requirement: Skill invokes the script and parses the JSON report
 
-The skill MUST invoke `scripting/verify-package-scripts.ts` via Bash with the `--json` flag (or
+The skill MUST invoke `scripting/maintenance/verify-package-scripts.ts` via Bash with the `--json` flag (or
 equivalent) and read the resulting `verify-report.json`. The skill SHALL use the parsed JSON to
 fill the markdown table it presents to the user. The skill MUST NOT re-derive the pass/fail status
 of any step from inline inspection; the JSON is the source of truth.

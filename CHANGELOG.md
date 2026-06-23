@@ -3,7 +3,9 @@
 All notable changes are derived from conventional commits. Do not edit by hand.
 
 ## [Unreleased]
+
 ### Added
+
 - proyectar lifecycle spec-delta al tablero Kanban
 - adoptar pipeline spec-driven secuencial con schema local
 - agregar skill claude-code-model-config refinada
@@ -90,11 +92,12 @@ All notable changes are derived from conventional commits. Do not edit by hand.
 - migración a arquitectura SOLID con Fastify y documentación completa en español
 
 ### Changed
+
 - eliminar LOG_HTTP_LEVEL
 - consolidar command-manager en skill-manager
 - completar cierre de optimize-changelog-generator
 - optimizar generate-changelog con pasada única e instalar hook post-commit
-- absorber aprendizajes sm-* en OpenSpec y eliminar la familia experimental
+- absorber aprendizajes sm-\* en OpenSpec y eliminar la familia experimental
 - renombrar skill investigation a investigate
 - renombrar y consolidar create-plan e investigation con recorrido post-ejecución
 - dividir create-plan en create-plan-to-implement y create-plan-to-investigate
@@ -140,6 +143,7 @@ All notable changes are derived from conventional commits. Do not edit by hand.
 - reemplazar 'any' por tipos estrictos del SDK de Anthropic
 
 ### Fixed
+
 - normalizar archivados con -- y c<NNNNN> global
 - elevar observabilidad en el borde hooks del proxy
 - corregir recursión infinita del hook post-commit con lock file
@@ -165,7 +169,7 @@ All notable changes are derived from conventional commits. Do not edit by hand.
 - persistir tool_result y métricas wire residuales
 - corregir gaps de proyección causal en workflows wire
 - aplicar 7 correcciones a los artefactos del change
-- alinear todas las skills sm-* con el flujo causa→solución secuencial
+- alinear todas las skills sm-\* con el flujo causa→solución secuencial
 - corregir flujo secuencial causa→solución, no simultáneo
 - garantizar eliminación transaccional de node_modules en Windows
 - clasificar continuation por el último mensaje, no por el historial
@@ -221,6 +225,7 @@ All notable changes are derived from conventional commits. Do not edit by hand.
 - migrar ts-node a tsx por compatibilidad con Node.js 24
 
 ### Documentation
+
 - reorganizar documentación de reportes y referencias
 - refactorizar guías de agentes y meta-skills
 - corregir referencias rotas a documentos eliminados
@@ -267,7 +272,7 @@ All notable changes are derived from conventional commits. Do not edit by hand.
 - especificar relay Stop unificado y doble toast
 - corregir asimetría install:voice y skills legacy
 - sincronizar documentación con el instalador unificado setup
-- cerrar migración y documentar sessions:*
+- cerrar migración y documentar sessions:\*
 - sincronizar change add-notifications-branding con la implementación real
 - sincronizar spec y docs con la cobertura de 14 entradas
 - alinear comandos de UserPromptSubmit y Stop con --stdin-json
@@ -307,4 +312,3 @@ All notable changes are derived from conventional commits. Do not edit by hand.
 - sincronizar documentación con correcciones del MarkdownRendererService
 - agregar CLAUDE.md con pautas de comportamiento para agentes LLM
 - auditoría, sincronización y validación final del Smart Code Proxy
-

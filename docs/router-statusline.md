@@ -4,18 +4,18 @@ Especificación del statusline de Smart Code Proxy: diseño visual, fuentes de d
 
 ## Implementación
 
-| Artefacto                     | Ruta                                                                            |
-| ----------------------------- | ------------------------------------------------------------------------------- |
-| Script principal              | [`scripting/router-status.ts`](../scripting/router-status.ts)                   |
-| Instalador                    | [`scripting/install-statusline.ts`](../scripting/install-statusline.ts)         |
-| Lectura/escritura de settings | [`scripting/shared/claude-settings.ts`](../scripting/shared/claude-settings.ts) |
-| Tests                         | `tests/scripting/router-status-*.test.ts`                                       |
+| Artefacto                     | Ruta                                                                                                                                                      |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Script principal              | [`scripting/provider/router-status.ts`](../scripting/provider/router-status.ts)                                                                           |
+| Instalador                    | [`scripting/install/setup.ts`](../scripting/install/setup.ts) + [`scripting/install/features/statusline.ts`](../scripting/install/features/statusline.ts) |
+| Lectura/escritura de settings | [`scripting/shared/claude-settings.ts`](../scripting/shared/claude-settings.ts)                                                                           |
+| Tests                         | `tests/scripting/router-status-*.test.ts`                                                                                                                 |
 
 ---
 
 ## 1. Resumen
 
-El statusline es el comando que Claude Code invoca en cada actualización de la barra de estado. Smart Code Proxy proporciona [`scripting/router-status.ts`](../scripting/router-status.ts), que renderiza tablas Unicode con información de sesión, proveedor upstream, consumo de tokens por nivel de razonamiento y, cuando aplica, límites de suscripción OAuth.
+El statusline es el comando que Claude Code invoca en cada actualización de la barra de estado. Smart Code Proxy proporciona [`scripting/provider/router-status.ts`](../scripting/provider/router-status.ts), que renderiza tablas Unicode con información de sesión, proveedor upstream, consumo de tokens por nivel de razonamiento y, cuando aplica, límites de suscripción OAuth.
 
 Claude Code envía el contexto de la sesión actual por **stdin** (JSON, `$ctx`). El script combina esos datos con la configuración en `~/.claude/settings.json → env` y con artefactos del repositorio del proxy (`configs/.env`, `routing/providers/`, `sessions/`).
 
@@ -37,19 +37,19 @@ Instalación: [`npm run install:statusline`](#9-integración) (véase [how-to-st
 
 `router-status.ts` lee exactamente estas fuentes en el flujo soportado:
 
-| Dato                          | Fuente                                                          | Campo                                                                                             |
-| ----------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| Session ID                    | stdin (`$ctx`)                                                  | `ctx.session_id`                                                                                  |
-| Modelo activo                 | stdin (`$ctx`)                                                  | `ctx.model.display_name`                                                                          |
-| Tamaño de contexto            | stdin (`$ctx`)                                                  | `ctx.context_window.context_window_size`                                                          |
-| Porcentaje de uso de contexto | stdin (`$ctx`)                                                  | `ctx.context_window.used_percentage`                                                              |
-| Rate limits (solo OAuth)      | stdin (`$ctx`)                                                  | `ctx.rate_limits.five_hour`, `ctx.rate_limits.seven_day`                                          |
-| Provider upstream activo      | `configs/.env`                                                  | `UPSTREAM_ORIGIN`                                                                                 |
-| Nombre del proveedor          | `routing/providers/*/config.json` → cruce con `UPSTREAM_ORIGIN` | `config.ANTHROPIC_BASE_URL`                                                                       |
-| Método de auth                | `~/.claude/settings.json → env`                                 | `ANTHROPIC_API_KEY` / `ANTHROPIC_AUTH_TOKEN`                                                      |
+| Dato                          | Fuente                                                          | Campo                                                                                                                              |
+| ----------------------------- | --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Session ID                    | stdin (`$ctx`)                                                  | `ctx.session_id`                                                                                                                   |
+| Modelo activo                 | stdin (`$ctx`)                                                  | `ctx.model.display_name`                                                                                                           |
+| Tamaño de contexto            | stdin (`$ctx`)                                                  | `ctx.context_window.context_window_size`                                                                                           |
+| Porcentaje de uso de contexto | stdin (`$ctx`)                                                  | `ctx.context_window.used_percentage`                                                                                               |
+| Rate limits (solo OAuth)      | stdin (`$ctx`)                                                  | `ctx.rate_limits.five_hour`, `ctx.rate_limits.seven_day`                                                                           |
+| Provider upstream activo      | `configs/.env`                                                  | `UPSTREAM_ORIGIN`                                                                                                                  |
+| Nombre del proveedor          | `routing/providers/*/config.json` → cruce con `UPSTREAM_ORIGIN` | `config.ANTHROPIC_BASE_URL`                                                                                                        |
+| Método de auth                | `~/.claude/settings.json → env`                                 | `ANTHROPIC_API_KEY` / `ANTHROPIC_AUTH_TOKEN`                                                                                       |
 | Modelos por nivel             | `~/.claude/settings.json → env`                                 | `ANTHROPIC_DEFAULT_HAIKU_MODEL`, `ANTHROPIC_DEFAULT_SONNET_MODEL`, `ANTHROPIC_DEFAULT_OPUS_MODEL`, `ANTHROPIC_DEFAULT_FABLE_MODEL` |
-| Display name de modelo        | `routing/providers/<p>/models/<m>/metadata.json`                | `displayName`                                                                                     |
-| Métricas acumuladas de sesión | `sessions/<ctx.session_id>/session-metrics.json`                | contadores por `modelId`                                                                          |
+| Display name de modelo        | `routing/providers/<p>/models/<m>/metadata.json`                | `displayName`                                                                                                                      |
+| Métricas acumuladas de sesión | `sessions/<ctx.session_id>/session-metrics.json`                | contadores por `modelId`                                                                                                           |
 
 ### Variables de entorno de Claude Code
 
@@ -131,7 +131,7 @@ El statusline refleja el cambio en el siguiente refresh (no requiere reiniciar C
 
 | Columna           | Contenido                                                                                                                                                           | Fuente                                                               | Alineación |
 | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- | ---------- |
-| Nivel             | `Lite` / `Standard` / `Reasoning` / `Frontier`                                                                                                                        | texto fijo por slot                                                  | izquierda  |
+| Nivel             | `Lite` / `Standard` / `Reasoning` / `Frontier`                                                                                                                      | texto fijo por slot                                                  | izquierda  |
 | Modelo            | display name del modelo del nivel; **columna elástica**: se expande con relleno o se trunca con `...` para anclar Tabla 2 al ancho del bloque superior (véase §4.2) | `metadata.json → displayName` (o `modelId` si falta)                 | izquierda  |
 | # Workflows       | ejecuciones agénticas finalizadas atribuidas a este nivel                                                                                                           | `session-metrics.json → models[modelId].finalized_runs`              | derecha    |
 | # Steps           | hops de inferencia con `usage` del nivel en la sesión                                                                                                               | `session-metrics.json → models[modelId].billable_hops`               | derecha    |
@@ -170,12 +170,12 @@ Celdas no calculables (porcentaje o tiempo de reinicio ausente/inválido) muestr
 
 **Columnas (4):**
 
-| Columna           | Contenido                                      | Fuente                                                                         | Alineación |
-| ----------------- | ---------------------------------------------- | ------------------------------------------------------------------------------ | ---------- |
-| Cuota             | `"Cuota actual (5h)"` / `"Cuota semanal (7d)"` | texto fijo                                                                     | izquierda  |
-| Barra + %         | barra + `XX%`, o `"-"` si no calculable        | stdin `ctx.rate_limits.*.used_percentage` o `subscription-quota.json`        | izquierda  |
-| Etiqueta reinicio | texto fijo `"Reinicio en"`                     | —                                                                              | izquierda  |
-| Tiempo restante   | `"Xh Ym"` / `"Xd Yh"` / `"Ahora"` / `"-"`      | `*.resets_at` (epoch segundos) en la fuente activa                             | derecha    |
+| Columna           | Contenido                                      | Fuente                                                                | Alineación |
+| ----------------- | ---------------------------------------------- | --------------------------------------------------------------------- | ---------- |
+| Cuota             | `"Cuota actual (5h)"` / `"Cuota semanal (7d)"` | texto fijo                                                            | izquierda  |
+| Barra + %         | barra + `XX%`, o `"-"` si no calculable        | stdin `ctx.rate_limits.*.used_percentage` o `subscription-quota.json` | izquierda  |
+| Etiqueta reinicio | texto fijo `"Reinicio en"`                     | —                                                                     | izquierda  |
+| Tiempo restante   | `"Xh Ym"` / `"Xd Yh"` / `"Ahora"` / `"-"`      | `*.resets_at` (epoch segundos) en la fuente activa                    | derecha    |
 
 **Barra de progreso:** 8 bloques (`█` / `░`), colores dinámicos según porcentaje (verde/naranja/rojo), misma lógica que la Tabla 1.
 
@@ -269,13 +269,13 @@ El statusline persiste estado ligero por sesión para mejorar la lectura entre r
 
 **Campos:**
 
-| Campo                    | Uso                                                                                                                                                                                               |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `contextUsagePercentage` | Fallback de la barra de contexto (Tabla 1) cuando stdin no trae `ctx.context_window.used_percentage` **usable** (`number`, `Number.isFinite`, `> 0`)                                              |
-| `metricsSnapshot`        | Snapshot `{ lite, standard, reasoning, frontier }` con contadores por nivel (`billableHops`, `finalizedRuns`, tokens) para atenuar (`dim`) o resaltar (`value`) celdas numéricas en Tabla 2 vía `cellColor` |
-| `lastRenderedMtimeMs`    | `mtime` de `session-metrics.json` en el último render completo de Tabla 2                                                                                                                         |
-| `lastRenderedMetricsSize`| Tamaño en bytes de `session-metrics.json` en el último render completo de Tabla 2                                                                                                                 |
-| `lastRenderedTable2Output`| Texto completo del último render de Tabla 2 (para reimpresión sin re-agregar)                                                                                                                    |
+| Campo                      | Uso                                                                                                                                                                                                         |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `contextUsagePercentage`   | Fallback de la barra de contexto (Tabla 1) cuando stdin no trae `ctx.context_window.used_percentage` **usable** (`number`, `Number.isFinite`, `> 0`)                                                        |
+| `metricsSnapshot`          | Snapshot `{ lite, standard, reasoning, frontier }` con contadores por nivel (`billableHops`, `finalizedRuns`, tokens) para atenuar (`dim`) o resaltar (`value`) celdas numéricas en Tabla 2 vía `cellColor` |
+| `lastRenderedMtimeMs`      | `mtime` de `session-metrics.json` en el último render completo de Tabla 2                                                                                                                                   |
+| `lastRenderedMetricsSize`  | Tamaño en bytes de `session-metrics.json` en el último render completo de Tabla 2                                                                                                                           |
+| `lastRenderedTable2Output` | Texto completo del último render de Tabla 2 (para reimpresión sin re-agregar)                                                                                                                               |
 
 **Cierre temprano:** en cada invocación, `router-status.ts` compara `mtime` y `size` de `session-metrics.json` con `lastRenderedMtimeMs` y `lastRenderedMetricsSize`. Si no cambió, reimprime `lastRenderedTable2Output` sin re-agregar métricas (~5–10 ms).
 
@@ -355,11 +355,12 @@ O solo el statusline:
 npm run install:statusline
 ```
 
-Ambos usan el mismo instalador subyacente ([`scripting/install-statusline.ts`](../scripting/install-statusline.ts)) y escriben en `~/.claude/settings.json`:
+Ambos usan el instalador unificado (`npm run setup:install`, orquestado por [`scripting/install/setup.ts`](../scripting/install/setup.ts) + [`scripting/install/features/statusline.ts`](../scripting/install/features/statusline.ts)) y escriben en `~/.claude/settings.json`:
 
-- `statusLine` con `type: "command"`, `padding: 0` y un comando generado por `buildNpxTsxCommand`: `npx --prefix "<ROOT>"` + `tsx "<RUTA_ABSOLUTA>/scripting/router-status.ts"` (ruta del script **absoluta**, separadores **`/`**, citada para cmd/PowerShell o shell POSIX según el SO)
+- `statusLine` con `type: "command"`, `padding: 0` y un comando generado por `buildNpxTsxCommand`: `npx --prefix "<ROOT>"` + `tsx "<RUTA_ABSOLUTA>/scripting/provider/router-status.ts"` (ruta del script **absoluta**, separadores **`/`**, citada para cmd/PowerShell o shell POSIX según el SO)
 
 > Claude Code admite el campo opcional `statusLine.refreshInterval` (re-ejecución periódica del comando cada N segundos). **Este proyecto no lo escribe** en `setup:install`; la cadencia queda en los triggers nativos de Claude Code (mensaje del asistente, `/compact`, permisos, vim).
+
 - `env.EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT` con la ruta absoluta nativa del proxy (para resolver `sessions/`, `routing/` y `configs/.env` aunque Claude Code abra otro workspace)
 
 Reinicie Claude Code tras instalar. Opciones: `--dry-run`, `--force` (sobrescribir un statusLine ajeno), `--uninstall`. Si mueve el clon del repo, vuelva a ejecutar el instalador.
@@ -371,12 +372,12 @@ Si prefiere editar a mano, el bloque equivalente es:
 ```json
 "statusLine": {
   "type": "command",
-  "command": "npx --prefix \"<RUTA_ABSOLUTA_DEL_PROXY>\" tsx \"<RUTA_ABSOLUTA_DEL_PROXY>/scripting/router-status.ts\"",
+  "command": "npx --prefix \"<RUTA_ABSOLUTA_DEL_PROXY>\" tsx \"<RUTA_ABSOLUTA_DEL_PROXY>/scripting/provider/router-status.ts\"",
   "padding": 0
 }
 ```
 
-Use `/` en la ruta del script aunque el proxy esté en Windows (p. ej. `C:/Users/.../Smart Code Proxy/scripting/router-status.ts`). Prefiera `npm run install:statusline` para no citar mal las rutas.
+Use `/` en la ruta del script aunque el proxy esté en Windows (p. ej. `C:/Users/.../Smart Code Proxy/scripting/provider/router-status.ts`). Prefiera `npm run install:statusline` para no citar mal las rutas.
 
 y en `env`: `"EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT": "<RUTA_ABSOLUTA_DEL_PROXY>"`.
 
@@ -384,7 +385,7 @@ y en `env`: `"EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT": "<RUTA_ABSOLUTA_DEL_PROXY>"`.
 
 **`configure-provider.ts`** escribe las variables `ANTHROPIC_*` en `~/.claude/settings.json → env` mediante `ClaudeSettingsEnvManager` (auth y modelos por nivel). No modifica `statusLine` ni `EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT`.
 
-**`install-statusline.ts`** (véase instalación recomendada arriba) escribe `statusLine` y `env.EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT`.
+**`install/setup.ts`** (`npm run setup:install`, véase instalación recomendada arriba) escribe `statusLine` y `env.EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT` mediante `applyStatuslineInstall` en `install/features/statusline.ts`.
 
 **`router-status.ts`** lee el bloque `env` completo en cada invocación: `ANTHROPIC_*` (dispatch y clasificación), `EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT` (rutas a `sessions/`, `routing/` y `configs/.env`).
 
@@ -394,19 +395,19 @@ y en `env`: `"EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT": "<RUTA_ABSOLUTA_DEL_PROXY>"`.
 
 ### Comportamiento ante entradas inválidas
 
-| Condición                                                                    | Comportamiento esperado                                                                                                                     |
-| ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ctx.session_id` sin carpeta coincidente en `sessions/`                      | Tabla 2 se renderiza en cero/sin datos                                                                                                      |
-| `session-metrics.json` ausente o malformado                                  | Tabla 2 se renderiza en cero/sin datos                                                                                                      |
-| `modelId` de un registro no coincide con ningún modelo configurado           | El registro no se suma a ningún nivel                                                                                                       |
-| `ANTHROPIC_DEFAULT_*_MODEL` ausentes o vacías                                | Fallback heurístico por términos `haiku`/`opus`/`sonnet` en el `modelId`; `null` si no hay coincidencia                                     |
-| `cacheReadInputTokens` es `null`                                             | Se trata como `0` en la suma (`coerceMetricNumber` en el lector del statusline; mismo criterio para `count`, `inputTokens`, `outputTokens`) |
-| `displayName` ausente en `metadata.json` (Tabla 2)                           | Se muestra `modelId` como texto de la columna Modelo                                                                                        |
-| `ctx.context_window.used_percentage` ausente, no finito o `0`                | Usar `contextUsagePercentage` de `.statusline-state.json` si existe; si no, barra al `0%`                                                   |
-| OAuth sin `five_hour` ni `seven_day` en `ctx.rate_limits`                    | No se muestra Tabla 3 (salvo `subscription-quota.json` con proveedor habilitado)                                                          |
-| Bearer con `SUBSCRIPTION_QUOTA.enabled` pero sin `subscription-quota.json`   | No se muestra Tabla 3 hasta el primer hop facturable del proxy                                                                            |
-| `subscription-quota.json` corrupto o sin ventanas válidas                    | No se muestra Tabla 3; Tabla 1 sin alteraciones                                                                                             |
-| `.statusline-state.json` ausente, corrupto o ilegible                        | Ignorar caché; Tabla 2 sin diff de celdas; Tabla 1 sin % de contexto cacheado                                                               |
+| Condición                                                                  | Comportamiento esperado                                                                                                                     |
+| -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ctx.session_id` sin carpeta coincidente en `sessions/`                    | Tabla 2 se renderiza en cero/sin datos                                                                                                      |
+| `session-metrics.json` ausente o malformado                                | Tabla 2 se renderiza en cero/sin datos                                                                                                      |
+| `modelId` de un registro no coincide con ningún modelo configurado         | El registro no se suma a ningún nivel                                                                                                       |
+| `ANTHROPIC_DEFAULT_*_MODEL` ausentes o vacías                              | Fallback heurístico por términos `haiku`/`opus`/`sonnet` en el `modelId`; `null` si no hay coincidencia                                     |
+| `cacheReadInputTokens` es `null`                                           | Se trata como `0` en la suma (`coerceMetricNumber` en el lector del statusline; mismo criterio para `count`, `inputTokens`, `outputTokens`) |
+| `displayName` ausente en `metadata.json` (Tabla 2)                         | Se muestra `modelId` como texto de la columna Modelo                                                                                        |
+| `ctx.context_window.used_percentage` ausente, no finito o `0`              | Usar `contextUsagePercentage` de `.statusline-state.json` si existe; si no, barra al `0%`                                                   |
+| OAuth sin `five_hour` ni `seven_day` en `ctx.rate_limits`                  | No se muestra Tabla 3 (salvo `subscription-quota.json` con proveedor habilitado)                                                            |
+| Bearer con `SUBSCRIPTION_QUOTA.enabled` pero sin `subscription-quota.json` | No se muestra Tabla 3 hasta el primer hop facturable del proxy                                                                              |
+| `subscription-quota.json` corrupto o sin ventanas válidas                  | No se muestra Tabla 3; Tabla 1 sin alteraciones                                                                                             |
+| `.statusline-state.json` ausente, corrupto o ilegible                      | Ignorar caché; Tabla 2 sin diff de celdas; Tabla 1 sin % de contexto cacheado                                                               |
 
 ### Fuera de alcance
 

@@ -2,15 +2,15 @@
 
 ## Purpose
 
-CLI dedicado (`install-statusline`) para registrar en `~/.claude/settings.json` el comando del statusline de Smart Code Proxy y la ruta absoluta del repositorio (`EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT`), de forma idempotente y multiplataforma, sin alterar las variables `ANTHROPIC_*` gestionadas por `configure-provider`.
+CLI unificado (`npm run setup:install`, orquestado por `scripting/install/setup.ts`) para registrar en `~/.claude/settings.json` el comando del statusline de Smart Code Proxy y la ruta absoluta del repositorio (`EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT`), de forma idempotente y multiplataforma, sin alterar las variables `ANTHROPIC_*` gestionadas por `configure-provider`.
 ## Requirements
 ### Requirement: Instalación del statusline en settings global
 
-El sistema SHALL proporcionar un comando CLI (`install-statusline`) ejecutable desde la raíz del repositorio Smart Code Proxy que configure el statusline en `~/.claude/settings.json` sin modificar variables `ANTHROPIC_*` gestionadas por `configure-provider`.
+El sistema SHALL proporcionar un comando CLI (`npm run setup:install`, implementado en `scripting/install/setup.ts`) ejecutable desde la raíz del repositorio Smart Code Proxy que configure el statusline en `~/.claude/settings.json` sin modificar variables `ANTHROPIC_*` gestionadas por `configure-provider`.
 
 #### Scenario: Instalación exitosa
 
-- **GIVEN** el repositorio contiene `scripting/router-status.ts`
+- **GIVEN** el repositorio contiene `scripting/provider/router-status.ts`
 - **WHEN** el usuario ejecuta el instalador sin `--dry-run` desde la raíz del repo (o con `--root` apuntando a ella)
 - **THEN** `settings.statusLine.type` SHALL ser `command`
 - **AND** `settings.statusLine.padding` SHALL ser `0`
@@ -63,11 +63,11 @@ El instalador SHALL admitir `--uninstall` que elimine `statusLine` y la clave `e
 
 ### Requirement: Validación previa a escribir
 
-El instalador SHALL validar que la raíz del proxy contiene `scripting/router-status.ts` y el directorio `routing/providers` antes de persistir configuración.
+El instalador SHALL validar que la raíz del proxy contiene `scripting/provider/router-status.ts` y el directorio `routing/providers` antes de persistir configuración.
 
 #### Scenario: Raíz inválida
 
-- **GIVEN** `--root` o el cwd no contienen `scripting/router-status.ts`
+- **GIVEN** `--root` o el cwd no contienen `scripting/provider/router-status.ts`
 - **WHEN** el usuario ejecuta el instalador
 - **THEN** el proceso SHALL fallar con código de salida distinto de cero
 - **AND** no SHALL escribir en `settings.json`

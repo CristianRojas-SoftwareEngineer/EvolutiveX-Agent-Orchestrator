@@ -6,10 +6,10 @@ Plugin de logging HTTP estructurado que emite logs en los hooks `onRequest` y `p
 
 ## Variables de entorno
 
-| Variable            | Default | Descripción                                              |
-|---------------------|---------|----------------------------------------------------------|
-| `LOG_HTTP_BODIES`    | `false` | Activar logging del body de request como texto/Preview.  |
-| `LOG_HTTP_HEADERS`  | `true`  | Activar logging de headers request y response.            |
+| Variable           | Default | Descripción                                             |
+| ------------------ | ------- | ------------------------------------------------------- |
+| `LOG_HTTP_BODIES`  | `false` | Activar logging del body de request como texto/Preview. |
+| `LOG_HTTP_HEADERS` | `true`  | Activar logging de headers request y response.          |
 
 > ⚠️ **Advertencia:** No usar en producción con usuarios activos hasta que se implemente redacción de campos sensibles. Este plugin es solo para debugging en entornos de desarrollo.
 
@@ -33,7 +33,7 @@ Plugin de logging HTTP estructurado que emite logs en los hooks `onRequest` y `p
 }
 ```
 
-Para content-types de texto (JSON, text/*, form-urlencoded) el body se loguea como string UTF-8 completo. Para binarios se loguea `bodyLength` + `bodyPreview` (primeros 256 bytes).
+Para content-types de texto (JSON, text/\*, form-urlencoded) el body se loguea como string UTF-8 completo. Para binarios se loguea `bodyLength` + `bodyPreview` (primeros 256 bytes).
 
 ### Sin body (solo headers + response)
 

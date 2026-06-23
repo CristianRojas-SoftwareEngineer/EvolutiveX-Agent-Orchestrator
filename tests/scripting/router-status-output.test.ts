@@ -7,7 +7,7 @@ import {
   resolveAuthMethodFromEnv,
   type ClaudeCodeContext,
   type ClaudeSettingsEnv,
-} from '../../scripting/router-status.js';
+} from '../../scripting/provider/router-status.js';
 
 const ANSI_REGEX = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, 'g');
 function stripAnsi(s: string): string {
@@ -41,7 +41,9 @@ describe('buildStatuslineOutput', () => {
   }
 
   it('muestra Tabla 1 y Tabla 2 side-by-side sin session_id ni carpeta (§3.2)', () => {
-    const settings: ClaudeSettingsEnv = { EVOLUTIVEX_AGENT_ORCHESTRATOR__STATUSLINE_ROUTER_DETAILS: 'on' };
+    const settings: ClaudeSettingsEnv = {
+      EVOLUTIVEX_AGENT_ORCHESTRATOR__STATUSLINE_ROUTER_DETAILS: 'on',
+    };
     const out = buildStatuslineOutput({}, settings, { sessionsRoot: emptySessionsRoot() });
     expect(out).toContain('Sesión actual');
     expect(out).toContain('Trabajo por niveles de razonamiento');
@@ -81,7 +83,12 @@ describe('buildStatuslineOutput', () => {
       join(projectRoot, 'routing', 'providers', 'minimax', 'config.json'),
       JSON.stringify({
         ANTHROPIC_BASE_URL: 'https://api.minimax.io/anthropic',
-        SUBSCRIPTION_QUOTA: { enabled: true, adapter: 'minimax_token_plan_remains', endpoint: 'x', auth_credential: 'ANTHROPIC_AUTH_TOKEN' },
+        SUBSCRIPTION_QUOTA: {
+          enabled: true,
+          adapter: 'minimax_token_plan_remains',
+          endpoint: 'x',
+          auth_credential: 'ANTHROPIC_AUTH_TOKEN',
+        },
       }),
       'utf-8',
     );
@@ -97,11 +104,10 @@ describe('buildStatuslineOutput', () => {
     );
 
     const settings: ClaudeSettingsEnv = { ANTHROPIC_AUTH_TOKEN: 'test-token' };
-    const out = buildStatuslineOutput(
-      { session_id: sessionId },
-      settings,
-      { sessionsRoot: root, projectRoot },
-    );
+    const out = buildStatuslineOutput({ session_id: sessionId }, settings, {
+      sessionsRoot: root,
+      projectRoot,
+    });
     expect(out).toContain('Límites de uso por suscripción');
     expect(out).toContain('Cuota actual (5h)');
     expect(out).toContain('14%');
@@ -125,7 +131,12 @@ describe('buildStatuslineOutput', () => {
       join(projectRoot, 'routing', 'providers', 'minimax', 'config.json'),
       JSON.stringify({
         ANTHROPIC_BASE_URL: 'https://api.minimax.io/anthropic',
-        SUBSCRIPTION_QUOTA: { enabled: true, adapter: 'minimax_token_plan_remains', endpoint: 'x', auth_credential: 'ANTHROPIC_AUTH_TOKEN' },
+        SUBSCRIPTION_QUOTA: {
+          enabled: true,
+          adapter: 'minimax_token_plan_remains',
+          endpoint: 'x',
+          auth_credential: 'ANTHROPIC_AUTH_TOKEN',
+        },
       }),
       'utf-8',
     );
@@ -141,11 +152,10 @@ describe('buildStatuslineOutput', () => {
     );
 
     const settings: ClaudeSettingsEnv = { ANTHROPIC_AUTH_TOKEN: 'test-token' };
-    const out = buildStatuslineOutput(
-      { session_id: sessionId },
-      settings,
-      { sessionsRoot: root, projectRoot },
-    );
+    const out = buildStatuslineOutput({ session_id: sessionId }, settings, {
+      sessionsRoot: root,
+      projectRoot,
+    });
     expect(out).toContain('Límites de uso por suscripción');
     const cuotaLine = out.split('\n').find((l) => l.includes('Cuota actual (5h)'));
     expect(cuotaLine).toBeDefined();
@@ -307,14 +317,18 @@ describe('buildStatuslineOutput', () => {
   });
 
   it('muestra Tabla 2 cuando EVOLUTIVEX_AGENT_ORCHESTRATOR__STATUSLINE_ROUTER_DETAILS = "on"', () => {
-    const settings: ClaudeSettingsEnv = { EVOLUTIVEX_AGENT_ORCHESTRATOR__STATUSLINE_ROUTER_DETAILS: 'on' };
+    const settings: ClaudeSettingsEnv = {
+      EVOLUTIVEX_AGENT_ORCHESTRATOR__STATUSLINE_ROUTER_DETAILS: 'on',
+    };
     const out = buildStatuslineOutput({}, settings, { sessionsRoot: emptySessionsRoot() });
     expect(out).toContain('Sesión actual');
     expect(out).toContain('Trabajo por niveles de razonamiento');
   });
 
   it('Tabla 2 muestra cuatro filas fijas incluyendo Frontier con paleta ANSI', () => {
-    const settings: ClaudeSettingsEnv = { EVOLUTIVEX_AGENT_ORCHESTRATOR__STATUSLINE_ROUTER_DETAILS: 'on' };
+    const settings: ClaudeSettingsEnv = {
+      EVOLUTIVEX_AGENT_ORCHESTRATOR__STATUSLINE_ROUTER_DETAILS: 'on',
+    };
     const out = buildStatuslineOutput({}, settings, { sessionsRoot: emptySessionsRoot() });
     expect(out).toContain('Lite');
     expect(out).toContain('Standard');
@@ -444,7 +458,9 @@ describe('buildStatuslineOutput', () => {
   });
 
   it('oculta Tabla 2 cuando EVOLUTIVEX_AGENT_ORCHESTRATOR__STATUSLINE_ROUTER_DETAILS = "off"', () => {
-    const settings: ClaudeSettingsEnv = { EVOLUTIVEX_AGENT_ORCHESTRATOR__STATUSLINE_ROUTER_DETAILS: 'off' };
+    const settings: ClaudeSettingsEnv = {
+      EVOLUTIVEX_AGENT_ORCHESTRATOR__STATUSLINE_ROUTER_DETAILS: 'off',
+    };
     const out = buildStatuslineOutput({}, settings, { sessionsRoot: emptySessionsRoot() });
     expect(out).toContain('Sesión actual');
     expect(out).not.toContain('Trabajo por niveles de razonamiento');
@@ -577,9 +593,9 @@ describe('buildStatuslineOutput', () => {
     };
 
     buildStatuslineOutput({ session_id: sessionId }, settings, { sessionsRoot: root });
-    const cache = JSON.parse(
-      readFileSync(join(sessionDir, '.statusline-state.json'), 'utf-8'),
-    ) as { lastRenderedMtimeMs?: number };
+    const cache = JSON.parse(readFileSync(join(sessionDir, '.statusline-state.json'), 'utf-8')) as {
+      lastRenderedMtimeMs?: number;
+    };
     expect(cache.lastRenderedMtimeMs).toBe(0);
   });
 });

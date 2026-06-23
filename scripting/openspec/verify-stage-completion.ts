@@ -181,7 +181,14 @@ function parseCanonReferences(content: string): DeltaOperations {
     const section = line.match(/^##\s+(ADDED|MODIFIED|REMOVED|RENAMED)\s+Requirements\b/i);
     if (section) {
       const kind = section[1].toUpperCase();
-      op = kind === 'REMOVED' ? 'removed' : kind === 'MODIFIED' ? 'modified' : kind === 'RENAMED' ? 'renamed' : 'other';
+      op =
+        kind === 'REMOVED'
+          ? 'removed'
+          : kind === 'MODIFIED'
+            ? 'modified'
+            : kind === 'RENAMED'
+              ? 'renamed'
+              : 'other';
       continue;
     }
     if (line.startsWith('## ')) {
@@ -229,7 +236,9 @@ const changesDir = resolveDefaultChangesDir();
 const changeRoot = join(changesDir, changeName);
 
 if (statSync(changeRoot, { throwIfNoEntry: false })?.isDirectory() !== true) {
-  console.error(`CRITICAL: no se encontró el directorio del change "${changeName}" bajo ${changesDir}`);
+  console.error(
+    `CRITICAL: no se encontró el directorio del change "${changeName}" bajo ${changesDir}`,
+  );
   process.exit(1);
 }
 
@@ -239,7 +248,9 @@ let status: Map<string, string>;
 try {
   status = readArtifactStatus(changeName);
 } catch (error) {
-  console.error(`CRITICAL: no se pudo resolver el estado de "${changeName}" vía openspec status --json.`);
+  console.error(
+    `CRITICAL: no se pudo resolver el estado de "${changeName}" vía openspec status --json.`,
+  );
   console.error(`  ${error instanceof Error ? error.message : String(error)}`);
   process.exit(1);
 }
@@ -249,7 +260,9 @@ const failures: string[] = [];
 // 1. Doneness por artefacto (DAG hasta --through inclusive).
 for (const artifact of requiredArtifacts) {
   if (status.get(artifact) !== 'done') {
-    failures.push(`artefacto "${artifact}" no está en estado done (estado: ${status.get(artifact) ?? 'ausente'}).`);
+    failures.push(
+      `artefacto "${artifact}" no está en estado done (estado: ${status.get(artifact) ?? 'ausente'}).`,
+    );
   }
 }
 
@@ -283,7 +296,11 @@ if (requiredArtifacts.includes('specs')) {
 
   const classification = proposalContent
     ? classifyDelta(proposalContent)
-    : ({ klass: 'behavioral', declaredCapabilities: [], nonCanonicalItems: [] } as DeltaClassification);
+    : ({
+        klass: 'behavioral',
+        declaredCapabilities: [],
+        nonCanonicalItems: [],
+      } as DeltaClassification);
 
   // El glob de specs nunca puede estar vacío, sea cual sea la clase.
   if (specFiles.length === 0) {
@@ -299,7 +316,9 @@ if (requiredArtifacts.includes('specs')) {
   } else if (classification.klass === 'non-canonical') {
     // Rama no canónica: ≥1 ítem declarado, ≥1 registro no vacío, sin operaciones canónicas.
     if (classification.nonCanonicalItems.length === 0) {
-      failures.push('la subsección `### Non-canonical change` no lista ningún ítem no canónico (≥1 requerido).');
+      failures.push(
+        'la subsección `### Non-canonical change` no lista ningún ítem no canónico (≥1 requerido).',
+      );
     }
     for (const file of specFiles) {
       const content = readFileSync(file, 'utf8').trim();
@@ -322,7 +341,9 @@ if (requiredArtifacts.includes('specs')) {
         continue;
       }
       if (!specHasRequirementWithScenario(content)) {
-        failures.push(`spec "${rel}" no contiene ≥1 \`### Requirement:\` con ≥1 \`#### Scenario:\`.`);
+        failures.push(
+          `spec "${rel}" no contiene ≥1 \`### Requirement:\` con ≥1 \`#### Scenario:\`.`,
+        );
       }
       // El nombre de la capability es el directorio padre del spec relativo a specs/.
       const relParts = file.slice(specsDir.length + 1).split(/[\\/]/);
@@ -330,7 +351,9 @@ if (requiredArtifacts.includes('specs')) {
       const { canonReferences } = parseCanonReferences(content);
       if (canonReferences.length > 0) {
         const canonSpec = cap ? readTrimmed(join(canonicalSpecsDir, cap, 'spec.md')) : null;
-        const canonNames = new Set((canonSpec ? parseRequirementNames(canonSpec) : []).map(normalizeRequirementName));
+        const canonNames = new Set(
+          (canonSpec ? parseRequirementNames(canonSpec) : []).map(normalizeRequirementName),
+        );
         for (const ref of canonReferences) {
           if (!canonNames.has(ref)) {
             failures.push(
@@ -346,9 +369,13 @@ if (requiredArtifacts.includes('specs')) {
       const capSpec = join(specsDir, cap, 'spec.md');
       const capContent = readTrimmed(capSpec);
       if (!capContent) {
-        failures.push(`la capability "${cap}" declarada en proposal.md no tiene su \`specs/${cap}/spec.md\` (paridad rota).`);
+        failures.push(
+          `la capability "${cap}" declarada en proposal.md no tiene su \`specs/${cap}/spec.md\` (paridad rota).`,
+        );
       } else if (!specHasRequirementWithScenario(capContent)) {
-        failures.push(`el spec de la capability "${cap}" no contiene ≥1 \`### Requirement:\` con ≥1 \`#### Scenario:\`.`);
+        failures.push(
+          `el spec de la capability "${cap}" no contiene ≥1 \`### Requirement:\` con ≥1 \`#### Scenario:\`.`,
+        );
       }
     }
   }

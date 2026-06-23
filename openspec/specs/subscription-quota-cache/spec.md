@@ -36,7 +36,7 @@ Los campos SHALL cumplir:
 
 ### Requirement: Resolución de proveedor activo desde UPSTREAM_ORIGIN
 
-El proxy SHALL resolver el nombre de proveedor cruzando `configs/.env → UPSTREAM_ORIGIN` con `routing/providers/*/config.json → ANTHROPIC_BASE_URL`, con la misma semántica que `resolveActiveProvider` en `scripting/router-status.ts`.
+El proxy SHALL resolver el nombre de proveedor cruzando `configs/.env → UPSTREAM_ORIGIN` con `routing/providers/*/config.json → ANTHROPIC_BASE_URL`, con la misma semántica que `resolveActiveProvider` en `scripting/provider/router-status.ts`.
 
 #### Scenario: UPSTREAM_ORIGIN coincide con un config.json
 

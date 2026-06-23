@@ -108,10 +108,7 @@ export type RequestClassification =
  * Clasificación del tipo de request HTTP según el contenido del body.
  * Tipo canónico para la clasificación semántica del request en el proxy.
  */
-export type WorkflowRequestKind =
-  | 'client-preflight'
-  | 'agentic'
-  | 'side-request';
+export type WorkflowRequestKind = 'client-preflight' | 'agentic' | 'side-request';
 
 /** Semántica del hop HTTP dentro de un workflow de turno. */
 export type StepKind = 'agentic' | 'side-request';

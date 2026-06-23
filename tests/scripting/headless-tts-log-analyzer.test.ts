@@ -9,11 +9,11 @@ import {
   inferMessageType,
   isExpectedSessionStartFallback,
   parseJsonlLines,
-} from '../../scripting/headless-tts-gateway-test/log-analyzer.js';
+} from '../../scripting/headless/modules/log-analyzer.js';
 import {
   FALLBACK_SPEECH,
   STOP_FALLBACK_TEXT,
-} from '../../scripting/headless-tts-gateway-test/fallback-speech.js';
+} from '../../scripting/headless/modules/fallback-speech.js';
 
 function line(obj: Record<string, unknown>): string {
   return JSON.stringify(obj);

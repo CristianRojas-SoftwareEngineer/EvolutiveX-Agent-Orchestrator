@@ -117,7 +117,7 @@ El relay externo `scripting/task-in-progress-hook-ux.ts` se eliminó; el filtro 
 
 ### Requirement: Entrada canónica unificada en plantilla de hooks
 
-La plantilla canónica `configs/hooks.json` SHALL contener una única entrada bajo `hooks.PostToolUse` con `matcher: "*"` apuntando a `scripting/post-hook-event.ts`. Ya NO SHALL existir la entrada separada con `matcher: "TaskUpdate"` y `scripting/task-in-progress-hook-ux.ts`: el filtrado por `toolName === 'TaskUpdate' && toolInput.status === 'in_progress'` lo hace el gateway sobre el payload parseado.
+La plantilla canónica `configs/hooks.json` SHALL contener una única entrada bajo `hooks.PostToolUse` con `matcher: "*"` apuntando a `scripting/hooks/post-hook-event.ts`. Ya NO SHALL existir la entrada separada con `matcher: "TaskUpdate"` y `scripting/task-in-progress-hook-ux.ts`: el filtrado por `toolName === 'TaskUpdate' && toolInput.status === 'in_progress'` lo hace el gateway sobre el payload parseado.
 
 ```json
 {
@@ -125,7 +125,7 @@ La plantilla canónica `configs/hooks.json` SHALL contener una única entrada ba
   "hooks": [
     {
       "type": "command",
-      "command": "npx --prefix \"${EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT}\" tsx \"${EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT}/scripting/post-hook-event.ts\""
+      "command": "npx --prefix \"${EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT}\" tsx \"${EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT}/scripting/hooks/post-hook-event.ts\""
     }
   ]
 }

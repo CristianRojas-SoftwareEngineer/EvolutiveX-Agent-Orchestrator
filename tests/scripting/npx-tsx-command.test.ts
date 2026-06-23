@@ -35,17 +35,17 @@ describe('buildNpxTsxCommand', () => {
 
   it('genera rutas absolutas con / en el comando (Windows)', () => {
     Object.defineProperty(process, 'platform', { value: 'win32' });
-    const cmd = buildNpxTsxCommand('C:\\Proxy', 'scripting/router-status.ts', ['--flag']);
+    const cmd = buildNpxTsxCommand('C:\\Proxy', 'scripting/provider/router-status.ts', ['--flag']);
     expect(cmd).toMatch(
-      /^npx --prefix "C:\/Proxy" tsx "C:\/Proxy\/scripting\/router-status\.ts" --flag$/,
+      /^npx --prefix "C:\/Proxy" tsx "C:\/Proxy\/scripting\/provider\/router-status\.ts" --flag$/,
     );
   });
 
   it('cita con comillas simples y sin backslashes (Unix)', () => {
     Object.defineProperty(process, 'platform', { value: 'linux' });
-    const cmd = buildNpxTsxCommand('/home/user/Proxy', 'scripting/router-status.ts');
+    const cmd = buildNpxTsxCommand('/home/user/Proxy', 'scripting/provider/router-status.ts');
     expect(cmd).not.toContain('\\');
     expect(cmd).not.toContain('"');
-    expect(cmd).toMatch(/^npx --prefix '[^']+' tsx '[^']+\/scripting\/router-status\.ts'$/);
+    expect(cmd).toMatch(/^npx --prefix '[^']+' tsx '[^']+\/scripting\/provider\/router-status\.ts'$/);
   });
 });

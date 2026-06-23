@@ -34,12 +34,12 @@ Se escribe a nivel de sesión (`sessions/<session-id>/session-metrics.json`):
 }
 ```
 
-| Campo canónico | Columna Tabla 2 | Semántica |
-|----------------|-----------------|-----------|
-| `models[*].billable_hops` | `# Steps` por nivel | Hops cerrados con `usage` (main y subagent) |
-| `models[*].finalized_runs` | `# Workflows` por nivel | Ejecuciones agénticas finalizadas atribuidas a ese `modelId` |
-| `session_totals.billable_hops` | `# Steps` fila Totales | Σ `billable_hops` por modelo |
-| `session_totals.finalized_runs` | `# Workflows` fila Totales | `finalized_workflow_ids.length` (conteo estructural) |
+| Campo canónico                  | Columna Tabla 2            | Semántica                                                    |
+| ------------------------------- | -------------------------- | ------------------------------------------------------------ |
+| `models[*].billable_hops`       | `# Steps` por nivel        | Hops cerrados con `usage` (main y subagent)                  |
+| `models[*].finalized_runs`      | `# Workflows` por nivel    | Ejecuciones agénticas finalizadas atribuidas a ese `modelId` |
+| `session_totals.billable_hops`  | `# Steps` fila Totales     | Σ `billable_hops` por modelo                                 |
+| `session_totals.finalized_runs` | `# Workflows` fila Totales | `finalized_workflow_ids.length` (conteo estructural)         |
 
 > **`finalized_runs`:** +1 por ejecución agéntica (`kind: 'main'` o `kind: 'subagent'`) al cierre E2E, atribuida al modelo del **primer hop `stepKind: 'agentic'` con `usage`** (orden por `index`). Un main multi-modelo cuenta **una** ejecución en el slot del hop agéntico primario, no +1 por cada modelo que participó en hops.
 
@@ -51,21 +51,21 @@ Cada clave en `models` es el `modelId` (`step.inferenceRequest.model`). Los nomb
 
 #### Escritura (`SessionMetricsService`)
 
-| Método | Cuándo | Qué actualiza |
-|--------|--------|---------------|
-| `updateFromStep(sessionDir, step)` | Tras hop agéntico (main o subagent) con `usage` disponible, independientemente de `stop_reason` | `billable_hops`, tokens, `cache_efficiency`, `session_totals.billable_hops`; **no** `finalized_runs` |
-| `finalizeWorkflowMetrics(sessionDir, workflowId, closedSteps)` | Hook `Stop` / `StopFailure` / `SubagentStop` en workflow agéntico (G16′) | `finalized_runs` (+1 al modelo atribuido); `billable_hops`/tokens solo para steps no volcados per-step. Registra el `workflowId` en `finalized_workflow_ids` **incondicionalmente** (incluso sin usage o sin modelo atribuido), garantizando idempotencia entre sus tres callers |
+| Método                                                         | Cuándo                                                                                          | Qué actualiza                                                                                                                                                                                                                                                                    |
+| -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `updateFromStep(sessionDir, step)`                             | Tras hop agéntico (main o subagent) con `usage` disponible, independientemente de `stop_reason` | `billable_hops`, tokens, `cache_efficiency`, `session_totals.billable_hops`; **no** `finalized_runs`                                                                                                                                                                             |
+| `finalizeWorkflowMetrics(sessionDir, workflowId, closedSteps)` | Hook `Stop` / `StopFailure` / `SubagentStop` en workflow agéntico (G16′)                        | `finalized_runs` (+1 al modelo atribuido); `billable_hops`/tokens solo para steps no volcados per-step. Registra el `workflowId` en `finalized_workflow_ids` **incondicionalmente** (incluso sin usage o sin modelo atribuido), garantizando idempotencia entre sus tres callers |
 
 **Invariante G16′:** escriben métricas los workflows `kind: 'main'` y `kind: 'subagent'`. Preflights y side-requests standalone no cierran ejecución agéntica (aunque un side-request con `usage` sí suma en `billable_hops` vía `updateFromStep`).
 
 **Idempotencia:** sidecar `session-metrics-applied.json` con `applied_step_ids` y `finalized_workflow_ids`.
 
-| Componente | Rol |
-|------------|-----|
-| `AuditHookEventHandler` | `close()` + `finalizeWorkflowMetrics` (main y subagent) |
-| `AuditSseResponseHandler` / `AuditStandardResponseHandler` | `persistBillableStepMetricsIfNeeded` → `updateFromStep` + refresh de cuota |
-| `persist-billable-step-metrics.util.ts` | G16′ + `usage`; opcionalmente `SubscriptionQuotaService.refreshIfNeeded` |
-| `SubscriptionQuotaService` | Tras hop facturable: fetch TTL a API del proveedor → `subscription-quota.json` |
+| Componente                                                 | Rol                                                                            |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `AuditHookEventHandler`                                    | `close()` + `finalizeWorkflowMetrics` (main y subagent)                        |
+| `AuditSseResponseHandler` / `AuditStandardResponseHandler` | `persistBillableStepMetricsIfNeeded` → `updateFromStep` + refresh de cuota     |
+| `persist-billable-step-metrics.util.ts`                    | G16′ + `usage`; opcionalmente `SubscriptionQuotaService.refreshIfNeeded`       |
+| `SubscriptionQuotaService`                                 | Tras hop facturable: fetch TTL a API del proveedor → `subscription-quota.json` |
 
 #### Archivo `subscription-quota.json`
 
@@ -77,7 +77,7 @@ Se escribe en la raíz de la sesión (`sessions/<session-id>/subscription-quota.
 
 Errores de red en el fetch no abortan el hop; se preserva el archivo previo si existía.
 
-#### Lectura en el statusline (`scripting/router-status.ts`)
+#### Lectura en el statusline (`scripting/provider/router-status.ts`)
 
 `aggregateSessionMetrics` lee **solo** el schema canónico (`billable_hops`, `finalized_runs`, tokens en snake_case). La fila **Totales** toma `# Steps` y tokens desde `session_totals`; `# Workflows` se deriva de la **suma de los niveles renderizados** (lite + standard + reasoning + frontier) para que la tabla sea internamente consistente (en `session_totals.finalized_runs` cuentan también workflows sin modelo atribuido, que no tienen fila por nivel).
 

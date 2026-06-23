@@ -1,6 +1,6 @@
 ## Summary
 
-Script dedicado `scripting/clean-modules.ts` que envuelve rimraf con pre-limpieza de procesos en Windows y verificación post-borrado con auto-recuperación. Garantiza que `node_modules/` se elimina completamente o el entorno se restaura automáticamente.
+Script dedicado `scripting/maintenance/clean-modules.ts` que envuelve rimraf con pre-limpieza de procesos en Windows y verificación post-borrado con auto-recuperación. Garantiza que `node_modules/` se elimina completamente o el entorno se restaura automáticamente.
 
 En Linux/macOS delega directamente a rimraf sin pre-limpieza ni verificación.
 

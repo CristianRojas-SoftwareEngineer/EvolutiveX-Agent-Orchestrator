@@ -1,6 +1,7 @@
 # AGENTS GUIDELINES
 
 <!-- <language_efficiency> -->
+
 ## 0. Language & Token Efficiency
 
 **Optimize for clarity externally, efficiency internally.**
@@ -19,6 +20,7 @@
 ---
 
 <!-- <think_before_coding> -->
+
 ## 1. Think Before Coding
 
 **Don't assume. Don't hide confusion. Surface tradeoffs.**
@@ -34,6 +36,7 @@ Before implementing:
 ---
 
 <!-- <goal_driven_execution> -->
+
 ## 2. Goal-Driven Execution
 
 **Define success criteria. Loop until verified.**
@@ -55,11 +58,13 @@ For multi-step tasks, state a brief plan:
 ```
 
 Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
+
 <!-- </goal_driven_execution> -->
 
 ---
 
 <!-- <simplicity_first> -->
+
 ## 3. Simplicity First
 
 **Minimum code that solves the problem. Nothing speculative.**
@@ -99,6 +104,7 @@ The same principle extends beyond code to files, tooling, and process: do not ad
 ---
 
 <!-- <surgical_changes> -->
+
 ## 4. Surgical Changes
 
 **Touch only what you must. Clean up only your own mess.**
@@ -115,11 +121,13 @@ When your changes create orphans:
 - Remove imports/variables/functions that YOUR changes made unused.
 
 The test: Every changed line should trace directly to the user's request.
+
 <!-- </surgical_changes> -->
 
 ---
 
 <!-- <version_control> -->
+
 ## 5. Version Control
 
 **Make every commit self-explanatory and descriptive.**
@@ -128,10 +136,12 @@ The test: Every changed line should trace directly to the user's request.
 <!-- </version_control> -->
 
 <!-- BEGIN AGENT KANBAN — DO NOT EDIT THIS SECTION -->
+
 ## Agent Kanban
 
 Read `.agentkanban/INSTRUCTION.md` for task workflow rules.
 Read `.agentkanban/memory.md` for project context.
 
 If a task file (`.agentkanban/tasks/**/*.md`) was referenced earlier in this conversation, re-read it before responding and always respond in and at the end the task file.
+
 <!-- END AGENT KANBAN -->

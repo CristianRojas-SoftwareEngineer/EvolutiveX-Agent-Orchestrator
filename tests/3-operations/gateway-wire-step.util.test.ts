@@ -28,11 +28,15 @@ function makeRequestStep(workflowId: string, index: number): IStep {
 describe('gateway-wire-step.util', () => {
   it('enrichOpenWireStepWithResponse: un hop → un IStep con request y response', () => {
     const repo = new WorkflowRepositoryService();
-    const wf = repo.openWorkflow('session-1', { agentId: undefined, isSubagentRequest: false }, {
-      forceNew: true,
-      layoutIndex: 0,
-      workflowKind: 'agentic',
-    });
+    const wf = repo.openWorkflow(
+      'session-1',
+      { agentId: undefined, isSubagentRequest: false },
+      {
+        forceNew: true,
+        layoutIndex: 0,
+        workflowKind: 'agentic',
+      },
+    );
 
     const requestStep = makeRequestStep(wf.id, 1);
     repo.registerStep(wf.id, requestStep);
@@ -61,11 +65,15 @@ describe('gateway-wire-step.util', () => {
 
   it('registerWireStepInCorrelator: 3 hops → 3 steps (no 6)', () => {
     const repo = new WorkflowRepositoryService();
-    const wf = repo.openWorkflow('session-wire', { agentId: undefined, isSubagentRequest: false }, {
-      forceNew: true,
-      layoutIndex: 1,
-      workflowKind: 'agentic',
-    });
+    const wf = repo.openWorkflow(
+      'session-wire',
+      { agentId: undefined, isSubagentRequest: false },
+      {
+        forceNew: true,
+        layoutIndex: 1,
+        workflowKind: 'agentic',
+      },
+    );
 
     for (let hop = 0; hop < 3; hop++) {
       repo.registerStep(wf.id, makeRequestStep(wf.id, hop + 1));
@@ -100,11 +108,15 @@ describe('gateway-wire-step.util', () => {
 
   it('tool_use: cierra el step al completar el hop', () => {
     const repo = new WorkflowRepositoryService();
-    const wf = repo.openWorkflow('session-tu', { agentId: undefined, isSubagentRequest: false }, {
-      forceNew: true,
-      layoutIndex: 0,
-      workflowKind: 'agentic',
-    });
+    const wf = repo.openWorkflow(
+      'session-tu',
+      { agentId: undefined, isSubagentRequest: false },
+      {
+        forceNew: true,
+        layoutIndex: 0,
+        workflowKind: 'agentic',
+      },
+    );
     repo.registerStep(wf.id, makeRequestStep(wf.id, 1));
 
     const enriched = enrichOpenWireStepWithResponse(
@@ -128,11 +140,15 @@ describe('gateway-wire-step.util', () => {
 
   it('registerWireStepInCorrelator: 3× tool_use + end_turn → stepCount 4', () => {
     const repo = new WorkflowRepositoryService();
-    const wf = repo.openWorkflow('session-4hop', { agentId: undefined, isSubagentRequest: false }, {
-      forceNew: true,
-      layoutIndex: 2,
-      workflowKind: 'agentic',
-    });
+    const wf = repo.openWorkflow(
+      'session-4hop',
+      { agentId: undefined, isSubagentRequest: false },
+      {
+        forceNew: true,
+        layoutIndex: 2,
+        workflowKind: 'agentic',
+      },
+    );
 
     for (let hop = 0; hop < 4; hop++) {
       repo.registerStep(wf.id, makeRequestStep(wf.id, hop + 1));
@@ -162,11 +178,15 @@ describe('gateway-wire-step.util', () => {
 
   it('registerWireStepInCorrelator fallback: tool_use sin step previo cierra el step', () => {
     const repo = new WorkflowRepositoryService();
-    const wf = repo.openWorkflow('session-fb', { agentId: undefined, isSubagentRequest: false }, {
-      forceNew: true,
-      layoutIndex: 3,
-      workflowKind: 'agentic',
-    });
+    const wf = repo.openWorkflow(
+      'session-fb',
+      { agentId: undefined, isSubagentRequest: false },
+      {
+        forceNew: true,
+        layoutIndex: 3,
+        workflowKind: 'agentic',
+      },
+    );
 
     const responseStep = buildWireStep({
       workflow: wf,
@@ -189,11 +209,15 @@ describe('gateway-wire-step.util', () => {
 
   it('enrichWireStepWithResponseByIndex: dos steps abiertos enriquece el índice correcto', () => {
     const repo = new WorkflowRepositoryService();
-    const wf = repo.openWorkflow('session-conc', { agentId: undefined, isSubagentRequest: false }, {
-      forceNew: true,
-      layoutIndex: 1,
-      workflowKind: 'agentic',
-    });
+    const wf = repo.openWorkflow(
+      'session-conc',
+      { agentId: undefined, isSubagentRequest: false },
+      {
+        forceNew: true,
+        layoutIndex: 1,
+        workflowKind: 'agentic',
+      },
+    );
 
     repo.registerStep(wf.id, makeRequestStep(wf.id, 1));
     repo.registerStep(wf.id, makeRequestStep(wf.id, 2));
@@ -221,7 +245,9 @@ describe('gateway-wire-step.util', () => {
       {
         assistantMessage: {
           role: 'assistant',
-          content: [{ type: 'tool_use', id: 'tu-bash', name: 'Bash', input: { command: 'git show' } }],
+          content: [
+            { type: 'tool_use', id: 'tu-bash', name: 'Bash', input: { command: 'git show' } },
+          ],
         },
         usage: { input_tokens: 10, output_tokens: 5 },
         stopReason: 'tool_use',
@@ -243,11 +269,15 @@ describe('gateway-wire-step.util', () => {
 
   it('enrichOpenWireStepWithResponse: con dos abiertos enriquece el último (heurística fallback)', () => {
     const repo = new WorkflowRepositoryService();
-    const wf = repo.openWorkflow('session-heur', { agentId: undefined, isSubagentRequest: false }, {
-      forceNew: true,
-      layoutIndex: 2,
-      workflowKind: 'agentic',
-    });
+    const wf = repo.openWorkflow(
+      'session-heur',
+      { agentId: undefined, isSubagentRequest: false },
+      {
+        forceNew: true,
+        layoutIndex: 2,
+        workflowKind: 'agentic',
+      },
+    );
 
     repo.registerStep(wf.id, makeRequestStep(wf.id, 1));
     repo.registerStep(wf.id, makeRequestStep(wf.id, 2));
@@ -265,7 +295,10 @@ describe('gateway-wire-step.util', () => {
     );
 
     const updated = repo.getWorkflow(wf.id)!;
-    expect(updated.steps[1].assistantMessage.content[0]).toMatchObject({ type: 'text', text: 'last-open' });
+    expect(updated.steps[1].assistantMessage.content[0]).toMatchObject({
+      type: 'text',
+      text: 'last-open',
+    });
     expect(updated.steps[0].assistantMessage.content).toHaveLength(0);
   });
 
@@ -273,10 +306,14 @@ describe('gateway-wire-step.util', () => {
     const repo = new WorkflowRepositoryService();
     const sessionId = 'session-turnN';
     // Turno N≥2: id con sufijo -turn-N, distinto de sessionId.
-    const wf = repo.openWorkflow(sessionId, { agentId: undefined, isSubagentRequest: false }, {
-      layoutIndex: 3,
-      workflowKind: 'agentic',
-    });
+    const wf = repo.openWorkflow(
+      sessionId,
+      { agentId: undefined, isSubagentRequest: false },
+      {
+        layoutIndex: 3,
+        workflowKind: 'agentic',
+      },
+    );
     expect(wf.id).toBe(`${sessionId}-turn-3`);
 
     // Step agéntico que cierra con tool_use dejando un tool cliente (ExitPlanMode) pendiente.
@@ -314,7 +351,11 @@ describe('gateway-wire-step.util', () => {
     expect(repo.getWireMeta(wf.id)?.awaitingContinuation).toBe(true);
 
     // Side-request (p. ej. haiku) adjunto al mismo workflow que cierra con end_turn.
-    const sideStep: IStep = { ...makeRequestStep(wf.id, 2), id: 'step-side', stepKind: 'side-request' };
+    const sideStep: IStep = {
+      ...makeRequestStep(wf.id, 2),
+      id: 'step-side',
+      stepKind: 'side-request',
+    };
     repo.registerStep(wf.id, sideStep);
     enrichOpenWireStepWithResponse(
       repo,
@@ -337,11 +378,15 @@ describe('gateway-wire-step.util', () => {
 
   it('resolveOpenWireStepIndex: apunta al step abierto, no a steps.length', () => {
     const repo = new WorkflowRepositoryService();
-    const wf = repo.openWorkflow('session-idx', { agentId: undefined, isSubagentRequest: false }, {
-      forceNew: true,
-      layoutIndex: 0,
-      workflowKind: 'agentic',
-    });
+    const wf = repo.openWorkflow(
+      'session-idx',
+      { agentId: undefined, isSubagentRequest: false },
+      {
+        forceNew: true,
+        layoutIndex: 0,
+        workflowKind: 'agentic',
+      },
+    );
     repo.registerStep(wf.id, makeRequestStep(wf.id, 1));
 
     expect(resolveOpenWireStepIndex(repo.getWorkflow(wf.id)!)).toBe(1);

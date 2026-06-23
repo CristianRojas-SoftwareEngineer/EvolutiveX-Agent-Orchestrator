@@ -319,8 +319,14 @@ describe('AuditHookEventHandler', () => {
     const readyToClose = vi.fn().mockReturnValue(false);
     const repo = makeRepo({ getWorkflowBySessionId, readyToClose });
     const handler = new AuditHookEventHandler(
-      repo, '/tmp/sessions', makeSessionMetrics(),
-      undefined, tts, undefined, 3, notifier,
+      repo,
+      '/tmp/sessions',
+      makeSessionMetrics(),
+      undefined,
+      tts,
+      undefined,
+      3,
+      notifier,
     );
     handler.execute({
       eventName: 'Stop',
@@ -345,8 +351,14 @@ describe('AuditHookEventHandler', () => {
     const readyToClose = vi.fn().mockReturnValue(false);
     const repo = makeRepo({ getWorkflowBySessionId, readyToClose });
     const handler = new AuditHookEventHandler(
-      repo, '/tmp/sessions', makeSessionMetrics(),
-      undefined, tts, undefined, 3, notifier,
+      repo,
+      '/tmp/sessions',
+      makeSessionMetrics(),
+      undefined,
+      tts,
+      undefined,
+      3,
+      notifier,
     );
 
     handler.execute({ eventName: 'Stop', sessionId: 'session-1' });
@@ -376,8 +388,16 @@ describe('AuditHookEventHandler UserPromptSubmit con TTS', () => {
     const contextExtractor = { extractUserPromptSubmitContext, extractLastNMessages: vi.fn() };
     const repo = makeRepo();
     const handler = new AuditHookEventHandler(
-      repo, '/tmp/sessions', makeSessionMetrics(),
-      undefined, tts, contextExtractor, 3, undefined, undefined, 'fake-openrouter-key',
+      repo,
+      '/tmp/sessions',
+      makeSessionMetrics(),
+      undefined,
+      tts,
+      contextExtractor,
+      3,
+      undefined,
+      undefined,
+      'fake-openrouter-key',
     );
 
     handler.execute({
@@ -422,8 +442,16 @@ describe('AuditHookEventHandler UserPromptSubmit con TTS', () => {
     const contextExtractor = { extractUserPromptSubmitContext, extractLastNMessages: vi.fn() };
     const repo = makeRepo();
     const handler = new AuditHookEventHandler(
-      repo, '/tmp/sessions', makeSessionMetrics(),
-      undefined, tts, contextExtractor, 3, undefined, undefined, 'fake-openrouter-key',
+      repo,
+      '/tmp/sessions',
+      makeSessionMetrics(),
+      undefined,
+      tts,
+      contextExtractor,
+      3,
+      undefined,
+      undefined,
+      'fake-openrouter-key',
     );
 
     handler.execute({
@@ -450,11 +478,22 @@ describe('AuditHookEventHandler UserPromptSubmit con TTS', () => {
 
     const speak = vi.fn().mockResolvedValue(undefined);
     const tts = { speak, initialize: vi.fn() };
-    const contextExtractor = { extractUserPromptSubmitContext: vi.fn(), extractLastNMessages: vi.fn() };
+    const contextExtractor = {
+      extractUserPromptSubmitContext: vi.fn(),
+      extractLastNMessages: vi.fn(),
+    };
     const repo = makeRepo();
     const handler = new AuditHookEventHandler(
-      repo, '/tmp/sessions', makeSessionMetrics(),
-      undefined, tts, contextExtractor, 3, undefined, undefined, undefined, // sin API key
+      repo,
+      '/tmp/sessions',
+      makeSessionMetrics(),
+      undefined,
+      tts,
+      contextExtractor,
+      3,
+      undefined,
+      undefined,
+      undefined, // sin API key
     );
 
     handler.execute({

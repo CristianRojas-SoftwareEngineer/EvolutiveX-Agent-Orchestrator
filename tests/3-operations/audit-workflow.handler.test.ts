@@ -419,13 +419,9 @@ describe('AuditWorkflowHandler', () => {
     // Vía canónica: continuation completa el tool desde tool_result en body.
     const toolResults = eventBus.events.filter((e) => e.type === 'tool_result');
     expect(toolResults.length).toBeGreaterThanOrEqual(1);
-    const closedTool = wf!.steps
-      .flatMap((s) => s.toolUses)
-      .find((t) => t.id === 'tool-x');
+    const closedTool = wf!.steps.flatMap((s) => s.toolUses).find((t) => t.id === 'tool-x');
     expect(closedTool?.status).toBe('completed');
-    expect(closedTool?.result).toEqual(
-      expect.objectContaining({ isError: false, result: 'ok' }),
-    );
+    expect(closedTool?.result).toEqual(expect.objectContaining({ isError: false, result: 'ok' }));
   });
 
   it('debería ignorar preflight-quota sin proyección causal', async () => {
@@ -604,11 +600,7 @@ describe('AuditWorkflowHandler', () => {
       seedClientSideTool(repo, sessionId, toolUseId, 'Bash');
     });
 
-    const hookHandler = new AuditHookEventHandler(
-      workflowRepo,
-      AUDIT_BASE,
-      makeSessionMetrics(),
-    );
+    const hookHandler = new AuditHookEventHandler(workflowRepo, AUDIT_BASE, makeSessionMetrics());
     hookHandler.execute({
       eventName: 'PostToolUse',
       sessionId,
@@ -669,11 +661,7 @@ describe('fixture golden sesión 8c440211 — Bash continuation', () => {
         seedClientSideTool(repo, sessionId, tc.toolUseId, 'Bash');
       });
 
-      const hookHandler = new AuditHookEventHandler(
-        workflowRepo,
-        AUDIT_BASE,
-        makeSessionMetrics(),
-      );
+      const hookHandler = new AuditHookEventHandler(workflowRepo, AUDIT_BASE, makeSessionMetrics());
       hookHandler.execute({
         eventName: tc.isError ? 'PostToolUseFailure' : 'PostToolUse',
         sessionId,

@@ -204,9 +204,7 @@ export function readSubscriptionQuotaFromProviderDir(
       auth_credential: obj.auth_credential,
       model_filter: typeof obj.model_filter === 'string' ? obj.model_filter : undefined,
       refresh_interval_seconds:
-        typeof obj.refresh_interval_seconds === 'number'
-          ? obj.refresh_interval_seconds
-          : undefined,
+        typeof obj.refresh_interval_seconds === 'number' ? obj.refresh_interval_seconds : undefined,
     };
   } catch {
     return undefined;

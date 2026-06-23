@@ -155,23 +155,23 @@ Para instalar las **13 claves** de hooks de SCP en `~/.claude/settings.json` (us
 
 Adicionalmente, el archivo `.claude/settings.json` del proyecto registra **13 claves** de hooks de Claude Code (8 del lifecycle + 5 de sesión/tareas que antes bypaseaban el gateway), sobrescribiendo las entradas equivalentes del user-level (`C:\Users\Cristian\.claude\settings.json`) para esas claves (mecanismo de merge de Claude Code: el proyecto tiene precedencia). Las 13 claves son:
 
-| Hook                 | Matcher           | Comando                                                |
-| -------------------- | ----------------- | ------------------------------------------------------ |
-| `UserPromptSubmit`   | —                 | `post-hook-event.ts` (gateway emite toast del prompt)  |
-| `PreToolUse`         | `*`               | `post-hook-event.ts` (gateway decide toast `AskUserQuestion`) |
-| `PostToolUse`        | `*`               | `post-hook-event.ts` (gateway decide toast `TaskUpdate+in_progress`) |
-| `PostToolUseFailure` | —                 | `post-hook-event.ts`                                   |
-| `SubagentStart`      | —                 | `post-hook-event.ts` (gateway emite toast `"Subagente iniciado"`) |
-| `SubagentStop`       | —                 | `post-hook-event.ts` (gateway emite toast `"Subagente terminado"`) |
-| `Stop`               | —                 | `post-hook-event.ts` (gateway genera voz y toast de continuidad) |
-| `StopFailure`        | —                 | `post-hook-event.ts` (gateway emite toast con detalle del error) |
-| `SessionStart`       | `startup\|resume` | `post-hook-event.ts` (gateway emite toast `"Sesión iniciada"`) |
+| Hook                 | Matcher           | Comando                                                                                           |
+| -------------------- | ----------------- | ------------------------------------------------------------------------------------------------- |
+| `UserPromptSubmit`   | —                 | `post-hook-event.ts` (gateway emite toast del prompt)                                             |
+| `PreToolUse`         | `*`               | `post-hook-event.ts` (gateway decide toast `AskUserQuestion`)                                     |
+| `PostToolUse`        | `*`               | `post-hook-event.ts` (gateway decide toast `TaskUpdate+in_progress`)                              |
+| `PostToolUseFailure` | —                 | `post-hook-event.ts`                                                                              |
+| `SubagentStart`      | —                 | `post-hook-event.ts` (gateway emite toast `"Subagente iniciado"`)                                 |
+| `SubagentStop`       | —                 | `post-hook-event.ts` (gateway emite toast `"Subagente terminado"`)                                |
+| `Stop`               | —                 | `post-hook-event.ts` (gateway genera voz y toast de continuidad)                                  |
+| `StopFailure`        | —                 | `post-hook-event.ts` (gateway emite toast con detalle del error)                                  |
+| `SessionStart`       | `startup\|resume` | `post-hook-event.ts` (gateway emite toast `"Sesión iniciada"`)                                    |
 | `SessionEnd`         | —                 | `hooks/session-end-hook.ts` (`node` directo, síncrono; gateway emite toast `"Sesión finalizada"`) |
-| `PermissionRequest`  | —                 | `post-hook-event.ts` (gateway emite toast con `tool_name` + preview) |
-| `TaskCreated`        | —                 | `post-hook-event.ts` (gateway emite toast `"Tarea creada"`) |
-| `TaskCompleted`      | —                 | `post-hook-event.ts` (gateway emite toast `"Tarea completada"`) |
+| `PermissionRequest`  | —                 | `post-hook-event.ts` (gateway emite toast con `tool_name` + preview)                              |
+| `TaskCreated`        | —                 | `post-hook-event.ts` (gateway emite toast `"Tarea creada"`)                                       |
+| `TaskCompleted`      | —                 | `post-hook-event.ts` (gateway emite toast `"Tarea completada"`)                                   |
 
-**Patrón de relay único:** 12 de los 13 hooks apuntan al mismo script [`post-hook-event.ts`](scripting/post-hook-event.ts) — un proceso que lee stdin **una vez** (UTF-8) y reenvía con `fetch` a `$ANTHROPIC_BASE_URL/hooks` (default `http://127.0.0.1:8787`). `SessionEnd` es la excepción: usa [`hooks/session-end-hook.ts`](scripting/hooks/session-end-hook.ts), un cliente HTTP autocontenido invocado con `node` directo (sin `npx`/`tsx`) para eliminar el cold-start y entregar el `POST /hooks` de forma síncrona dentro de la ventana de teardown; requiere Node con type-stripping nativo de TypeScript (≥ 22.18 / 23.6). El gateway (`AuditHookEventHandler`) es el único punto que decide qué toast emitir (estático, dinámico, condicional) y qué voz sintetizar. Esto elimina la race condition de Windows (varios procesos leyendo el mismo stdin), elimina 3 scripts de relay (`gateway-hook-notify.ts`, `pre-tool-use-hook-ux.ts`, `task-in-progress-hook-ux.ts`) y reduce el instalador a reconocer los scripts gestionados. Detalle: [`docs/notifications.md`](docs/notifications.md) y [`docs/gateway-architecture.md` §18](docs/gateway-architecture.md#18-plano-c--hooks-claude-code).
+**Patrón de relay único:** 12 de los 13 hooks apuntan al mismo script [`scripting/hooks/post-hook-event.ts`](scripting/hooks/post-hook-event.ts) — un proceso que lee stdin **una vez** (UTF-8) y reenvía con `fetch` a `$ANTHROPIC_BASE_URL/hooks` (default `http://127.0.0.1:8787`). `SessionEnd` es la excepción: usa [`scripting/hooks/session-end-hook.ts`](scripting/hooks/session-end-hook.ts), un cliente HTTP autocontenido invocado con `node` directo (sin `npx`/`tsx`) para eliminar el cold-start y entregar el `POST /hooks` de forma síncrona dentro de la ventana de teardown; requiere Node con type-stripping nativo de TypeScript (≥ 22.18 / 23.6). El gateway (`AuditHookEventHandler`) es el único punto que decide qué toast emitir (estático, dinámico, condicional) y qué voz sintetizar. Esto elimina la race condition de Windows (varios procesos leyendo el mismo stdin), elimina 3 scripts de relay (`gateway-hook-notify.ts`, `pre-tool-use-hook-ux.ts`, `task-in-progress-hook-ux.ts`) y reduce el instalador a reconocer los scripts gestionados. Detalle: [`docs/notifications.md`](docs/notifications.md) y [`docs/gateway-architecture.md` §18](docs/gateway-architecture.md#18-plano-c--hooks-claude-code).
 
 ### Notifications
 
@@ -204,7 +204,7 @@ Todo volcado que se trunca genera un archivo `.omitted.txt` documentando la omis
 ### Instrucciones de Inicio Rápido
 
 1.  **Instalar dependencias**: `npm install`
-2.  **Hook de changelog** (opcional): `bash scripting/install-changelog-hook` instala el hook git `post-commit` que mantiene `CHANGELOG.md` sincronizado tras cada commit. El hook no se versiona — reinstalar tras cada clone.
+2.  **Hook de changelog** (opcional): `bash scripting/changelog/install-changelog-hook` instala el hook git `post-commit` que mantiene `CHANGELOG.md` sincronizado tras cada commit. El hook no se versiona — reinstalar tras cada clone.
 3.  **Configurar proveedor** (opcional): `npm run configure:provider` (asistente interactivo para configurar API keys y modelos de diferentes proveedores).
 4.  **Integraciones Claude Code** (opcional): `npm run setup:install` instala statusline, voz y hooks en `~/.claude/settings.json` en un único paso (admite `--dry-run`, `--force`, flags `--statusline`/`--voice`/`--hooks`). Para desinstalar: `npm run setup:uninstall`. Ver [`docs/notifications.md`](docs/notifications.md) y [`docs/router-statusline.md`](docs/router-statusline.md).
 5.  **Referencia multi-agente** (opcional): `npm run create:agents-reference` (Crea hardlink `AGENTS.md` → `CLAUDE.md` para compatibilidad con otros agentes de código).
@@ -228,7 +228,7 @@ CLI npm para el historial de **Claude Code** en `~/.claude` (listar, archivar, r
 | `sessions:sanitize`      | Sanitiza una sesión (`npm run … -- <id>`)    |
 | `sessions:sanitize:all`  | Sanitiza en lote (requiere `-- --force`)     |
 
-Detalle, layout en disco y ejemplos: [scripting/session-manager/README.md](scripting/session-manager/README.md).
+Detalle, layout en disco y ejemplos: [scripting/sessions/README.md](scripting/sessions/README.md).
 
 > Para una guía detallada de onboarding, consultar [docs/how-to-start.md](docs/how-to-start.md).
 

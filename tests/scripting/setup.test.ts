@@ -2,12 +2,12 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { runSetup } from '../../scripting/setup.js';
+import { runSetup } from '../../scripting/install/setup.js';
 import { setClaudeSettingsPathForTests } from '../../scripting/shared/claude-settings.js';
 import * as claudeSettings from '../../scripting/shared/claude-settings.js';
-import { applyStatuslineInstall } from '../../scripting/features/statusline.js';
-import { applyVoiceInstall } from '../../scripting/features/voice.js';
-import { mergeHooks, readCanonicalHooks } from '../../scripting/features/hooks.js';
+import { applyStatuslineInstall } from '../../scripting/install/features/statusline.js';
+import { applyVoiceInstall } from '../../scripting/install/features/voice.js';
+import { mergeHooks, readCanonicalHooks } from '../../scripting/install/features/hooks.js';
 import { createValidProxyRoot } from './helpers/proxy-root-fixture.js';
 import { resolvePosixAbsolutePath } from '../../scripting/shared/npx-tsx-command.js';
 

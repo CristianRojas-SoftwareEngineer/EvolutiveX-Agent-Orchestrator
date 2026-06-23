@@ -24,12 +24,17 @@ export class KanbanBoardProjector {
   async onTaskCreate(event: ClaudeHookEvent): Promise<void> {
     const id = (event.toolResponse?.['task'] as Record<string, unknown> | undefined)?.['id'];
     if (typeof id !== 'string' || !id) {
-      this.logger?.warn({ toolName: event.toolName }, '[Kanban] TaskCreate sin id en tool_response — ignorado');
+      this.logger?.warn(
+        { toolName: event.toolName },
+        '[Kanban] TaskCreate sin id en tool_response — ignorado',
+      );
       return;
     }
 
-    const subject = typeof event.toolInput?.['subject'] === 'string' ? event.toolInput['subject'] : '';
-    const description = typeof event.toolInput?.['description'] === 'string' ? event.toolInput['description'] : '';
+    const subject =
+      typeof event.toolInput?.['subject'] === 'string' ? event.toolInput['subject'] : '';
+    const description =
+      typeof event.toolInput?.['description'] === 'string' ? event.toolInput['description'] : '';
     const metadata = event.toolInput?.['metadata'] as Record<string, unknown> | undefined;
     const group = typeof metadata?.['group'] === 'string' ? metadata['group'] : '';
 
@@ -52,8 +57,10 @@ export class KanbanBoardProjector {
   }
 
   async onTaskUpdate(event: ClaudeHookEvent): Promise<void> {
-    const taskId = typeof event.toolInput?.['taskId'] === 'string' ? event.toolInput['taskId'] : undefined;
-    const status = typeof event.toolInput?.['status'] === 'string' ? event.toolInput['status'] : undefined;
+    const taskId =
+      typeof event.toolInput?.['taskId'] === 'string' ? event.toolInput['taskId'] : undefined;
+    const status =
+      typeof event.toolInput?.['status'] === 'string' ? event.toolInput['status'] : undefined;
 
     if (!taskId || !status) return;
     if (status !== 'in_progress' && status !== 'completed') return;

@@ -122,8 +122,7 @@ the sentinel as part of its freeze (the backstop also self-cleans once the chang
 under `changes/archive/`).
 
 **Deterministic backstop (`Stop` hook).** The one-turn rule is not prose-only: it is
-enforced by `scripting/openspec/enforce-auto-pipeline.mts`, registered as a `Stop`
-hook (additive entry alongside the generic logger). While the AUTO sentinel exists and
+enforced via the `Stop` hook registered in `configs/hooks.json`. While the AUTO sentinel exists and
 the change is not yet archived, the hook returns `{ "decision": "block", "reason }` and
 forbids the turn from ending, naming the next stage to invoke. It allows the turn only
 when: no sentinel exists (GUIDED/normal), a halt sentinel

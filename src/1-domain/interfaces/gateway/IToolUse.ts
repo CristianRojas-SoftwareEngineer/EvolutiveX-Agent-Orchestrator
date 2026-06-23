@@ -1,8 +1,5 @@
 import type { AnthropicContentBlock } from '../../types/anthropic.types.js';
-import type {
-  ToolCompletionAuthority,
-  ToolUseStatus,
-} from '../../types/gateway/tool-use.types.js';
+import type { ToolCompletionAuthority, ToolUseStatus } from '../../types/gateway/tool-use.types.js';
 
 /** Registro de observabilidad de una invocación de herramienta. */
 export interface IToolUse {

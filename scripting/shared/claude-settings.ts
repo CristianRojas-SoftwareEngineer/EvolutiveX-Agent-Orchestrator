@@ -33,7 +33,8 @@ export const EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT_KEY = 'EVOLUTIVEX_AGENT_ORCHESTR
  * Clave en `settings.env` que controla la visibilidad de la Tabla 2 del statusline.
  * Valor `'on'` → visible; cualquier otro valor o ausente → oculta (opt-in).
  */
-export const STATUSLINE_ROUTER_DETAILS_KEY = 'EVOLUTIVEX_AGENT_ORCHESTRATOR__STATUSLINE_ROUTER_DETAILS';
+export const STATUSLINE_ROUTER_DETAILS_KEY =
+  'EVOLUTIVEX_AGENT_ORCHESTRATOR__STATUSLINE_ROUTER_DETAILS';
 
 /**
  * Subconjunto tipado de `settings.json` que manipulan los scripts de este repo.

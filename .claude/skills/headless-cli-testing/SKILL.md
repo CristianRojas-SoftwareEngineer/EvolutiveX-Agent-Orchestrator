@@ -138,63 +138,15 @@ files to confirm the hook cycle completed.
 
 ---
 
-### From code — `runHeadlessSession`
+### From code — using the primitives directly
 
-Handles the full lifecycle (kill-port → start proxy → health check → run claude →
-stop proxy) in a single call. Suitable for automated tests and repeatable scenarios.
-
-#### API
+The high-level `runHeadlessSession` barrel was removed. Compose the full lifecycle
+by importing from the sub-modules under `scripting/headless/session-lib/`:
 
 ```typescript
-import { runHeadlessSession } from './scripting/headless-session/index.js';
-
-const result = await runHeadlessSession({
-  provider: 'anthropic',   // 'anthropic' | 'minimax' | 'openrouter' | 'ollama' | 'default'
-  prompt: 'Describe este archivo',
-  port: 8788,              // optional; default 8788
-  maxTurns: 1,             // optional; default 1
-  claudeTimeoutMs: 180_000,
-  healthTimeoutMs: 30_000,
-  logFile: 'logs-headless.jsonl',      // relative to server/; optional
-  auditDir: 'sessions/headless', // optional
-  extraProxyEnv: {},       // optional: extra env vars injected into the test proxy
-});
-// result: { output, exitCode, isError, logPath, sessionDir, claudeStartedAt }
-```
-
-Log paths are available directly in the result — no need to locate them manually:
-
-```typescript
-console.log(result.logPath);    // absolute path, e.g. …/server/logs-headless.jsonl
-console.log(result.sessionDir); // absolute path, e.g. …/sessions/headless/
-
-// Read the last log entries from code:
-import { readFileSync } from 'node:fs';
-const lines = readFileSync(result.logPath, 'utf-8').trim().split('\n').slice(-20);
-```
-
-#### `extraProxyEnv`
-
-Use this escape hatch to simulate controlled proxy conditions without touching
-global config. Example: test what happens when a secrets file is missing:
-
-```typescript
-await runHeadlessSession({
-  provider: 'default',
-  prompt: 'Di hola',
-  extraProxyEnv: { OPENROUTER_SECRETS_PATH: '/nonexistent/path' },
-});
-```
-
-#### Using the primitives directly
-
-For finer lifecycle control (e.g., reusing a proxy across multiple claude runs),
-import from the sub-modules directly:
-
-```typescript
-import { startProxy, stopProxy, waitHealth } from './scripting/headless-session/proxy-lifecycle.js';
-import { runClaudeHeadless } from './scripting/headless-session/run-claude.js';
-import { buildIsolatedProviderEnv } from './scripting/headless-session/provider-env.js';
+import { startProxy, stopProxy, waitHealth } from './scripting/headless/session-lib/proxy-lifecycle.js';
+import { runClaudeHeadless } from './scripting/headless/session-lib/run-claude.js';
+import { buildIsolatedProviderEnv } from './scripting/headless/session-lib/provider-env.js';
 ```
 
 ---
@@ -202,20 +154,21 @@ import { buildIsolatedProviderEnv } from './scripting/headless-session/provider-
 ## Module architecture
 
 Internal layout for contributors and consumers that need fine-grained lifecycle control.
-Most use cases only need `runHeadlessSession` from `index.ts`.
 
 ```
-scripting/headless-session/
-├── index.ts            ← runHeadlessSession() — high-level API
-├── proxy-lifecycle.ts  ← startProxy, stopProxy, waitHealth, killProcessOnPort, sleep, getLogPath
-├── run-claude.ts       ← runClaudeHeadless, buildClaudeHeadlessArgs, resolveClaudeExecutable
-├── provider-env.ts     ← buildIsolatedProviderEnv (resolves provider config in memory)
-└── env-utils.ts        ← getProxyPort (reads configs/.env), getLogByteOffset
+scripting/headless/
+├── gateway-test.ts         ← TTS test suite entry point (npm run test:headless-tts)
+├── session-lib/
+│   ├── proxy-lifecycle.ts  ← startProxy, stopProxy, waitHealth, killProcessOnPort, sleep, getLogPath
+│   ├── run-claude.ts       ← runClaudeHeadless, buildClaudeHeadlessArgs, resolveClaudeExecutable
+│   ├── provider-env.ts     ← buildIsolatedProviderEnv (resolves provider config in memory)
+│   └── env-utils.ts        ← getProxyPort (reads configs/.env), getLogByteOffset
+└── modules/
+    └── ...                 ← TTS-specific modules (verify-prompt, wait-for-tts, providers, …)
 ```
 
-The TTS test suite (`scripting/headless-tts-gateway-test.ts`) is one consumer of
-these primitives — it imports the sub-modules directly and adds TTS-specific assertions
-on top of the same lifecycle.
+The TTS test suite (`scripting/headless/gateway-test.ts`) imports from `session-lib/` directly
+and adds TTS-specific assertions on top of the same lifecycle.
 
 ---
 

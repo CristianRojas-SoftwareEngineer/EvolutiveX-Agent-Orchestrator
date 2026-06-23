@@ -20,7 +20,7 @@ This skill summarizes design and implementation; for normative requirements see
 For human-facing visual spec see `docs/router-statusline.md`.
 
 **Iterative maintenance:** when `docs/router-statusline.md`, `docs/session-metrics-system.md`,
-or `scripting/router-status.ts` change materially, update the matching section here.
+or `scripting/provider/router-status.ts` change materially, update the matching section here.
 Prefer verifying against code over stale prose in older OpenSpec archives.
 <!-- </overview> -->
 
@@ -37,7 +37,7 @@ Use ASCII diagrams and file-path tables when explaining architecture.
 
 The statusline is an **external command** Claude Code invokes on each status-bar refresh.
 Smart Code Proxy registers a subprocess in `~/.claude/settings.json` that runs
-`scripting/router-status.ts` via `npx` + `tsx`.
+`scripting/provider/router-status.ts` via `npx` + `tsx`.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -47,7 +47,7 @@ Smart Code Proxy registers a subprocess in `~/.claude/settings.json` that runs
                                 │ invokes statusLine.command
                                 ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│              scripting/router-status.ts (Node.js)                    │
+│              scripting/provider/router-status.ts (Node.js)                    │
 │  Reads: settings.json → env, configs/.env, sessions/, routing/       │
 │  Writes: stdout (Unicode tables + ANSI colors)                       │
 └───────────────────────────────┬─────────────────────────────────────┘
@@ -77,8 +77,8 @@ Smart Code Proxy registers a subprocess in `~/.claude/settings.json` that runs
 
 | Layer | File | Role |
 |-------|------|------|
-| CLI entry | `scripting/setup.ts` | Universal installer (`npm run setup:install`) |
-| Feature logic | `scripting/features/statusline.ts` | Builds `statusLine` block + `EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT` |
+| CLI entry | `scripting/install/setup.ts` | Universal installer (`npm run setup:install`) |
+| Feature logic | `scripting/install/features/statusline.ts` | Builds `statusLine` block + `EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT` |
 | Settings I/O | `scripting/shared/claude-settings.ts` | Read/write `~/.claude/settings.json` |
 | Formal spec | `openspec/specs/statusline-installer/spec.md` | Installer requirements |
 
@@ -88,7 +88,7 @@ Smart Code Proxy registers a subprocess in `~/.claude/settings.json` that runs
 {
   "statusLine": {
     "type": "command",
-    "command": "npx --prefix \"<ROOT>\" tsx \"<ROOT>/scripting/router-status.ts\"",
+    "command": "npx --prefix \"<ROOT>\" tsx \"<ROOT>/scripting/provider/router-status.ts\"",
     "padding": 0
   },
   "env": {
@@ -97,8 +97,7 @@ Smart Code Proxy registers a subprocess in `~/.claude/settings.json` that runs
 }
 ```
 
-**Stale doc note:** `docs/router-statusline.md` still references `scripting/install-statusline.ts`;
-that standalone script no longer exists — logic lives in `setup.ts` + `features/statusline.ts`.
+**Installer note:** `docs/router-statusline.md` references `scripting/install/setup.ts` + `scripting/install/features/statusline.ts` — the unified installer replaced the old standalone `install-statusline.ts`.
 
 **Refresh interval:** this project does **not** write `statusLine.refreshInterval` on install;
 cadence follows Claude Code native triggers (assistant message, `/compact`, permissions, vim).
@@ -124,7 +123,7 @@ CLI helpers (`package.json`):
 - `npm run statusline:router-details:off`
 - `npm run statusline:router-details:toggle`
 
-Implementation: `scripting/statusline-router-details.ts`.
+Implementation: `scripting/provider/statusline-router-details.ts`.
 Spec: `openspec/specs/statusline-router-details-toggle/spec.md`.
 <!-- </installation> -->
 
@@ -164,7 +163,7 @@ Configured by `configure-provider.ts` into `settings.env`. The statusline **read
 
 ### Classification (`classifyModelWithEnv`)
 
-Location: `scripting/router-status.ts` (exported for tests).
+Location: `scripting/provider/router-status.ts` (exported for tests).
 
 Evaluation order: **haiku → fable → opus → sonnet** (substring match of `modelId` against configured variable).
 
@@ -194,7 +193,7 @@ Partial configuration is supported: configured levels use variable match; unconf
 |------|------|-------|
 | Visual + mapping | `docs/router-statusline.md` §3.2, §5 | Columns, slot ↔ env ↔ API |
 | Metrics semantics | `docs/session-metrics-system.md` | Slot/model aggregation, `finalized_runs` attribution |
-| Implementation | `scripting/router-status.ts` | `classifyModelWithEnv`, `aggregateSessionMetrics`, `renderTokenTable` |
+| Implementation | `scripting/provider/router-status.ts` | `classifyModelWithEnv`, `aggregateSessionMetrics`, `renderTokenTable` |
 | Domain types | `src/1-domain/types/gateway/session-metrics.types.ts` | `ISessionMetrics`, `IModelSessionMetrics` |
 | Attribution | `src/1-domain/services/gateway/resolve-attributed-model-id.ts` | Which `modelId` receives `finalized_runs` |
 | Formal scenarios | `openspec/specs/statusline-runtime/spec.md` | e.g. «Un prompt con dos subagentes distribuye trabajo por slot» |
@@ -303,11 +302,11 @@ Four columns: quota label, bar+%, «Reinicio en», time remaining.
 
 | File | Responsibility |
 |------|----------------|
-| `scripting/router-status.ts` | Full render pipeline, slot classification, aggregation, cache |
-| `scripting/features/statusline.ts` | Install/uninstall statusLine + `EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT` |
-| `scripting/setup.ts` | `npm run setup:install` orchestration |
+| `scripting/provider/router-status.ts` | Full render pipeline, slot classification, aggregation, cache |
+| `scripting/install/features/statusline.ts` | Install/uninstall statusLine + `EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT` |
+| `scripting/install/setup.ts` | `npm run setup:install` orchestration |
 | `scripting/shared/claude-settings.ts` | Settings keys (`EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT`, router-details toggle) |
-| `scripting/statusline-router-details.ts` | Toggle Tabla 2 in settings |
+| `scripting/provider/statusline-router-details.ts` | Toggle Tabla 2 in settings |
 
 ### Human documentation
 
@@ -330,7 +329,7 @@ Four columns: quota label, bar+%, «Reinicio en», time remaining.
 | File | Coverage |
 |------|----------|
 | `tests/scripting/router-status-output.test.ts` | Output / layout |
-| `tests/scripting/features/statusline.test.ts` | Installer feature |
+| `tests/scripting/install/features/statusline.test.ts` | Installer feature |
 | `tests/scripting/statusline-router-details.test.ts` | Toggle CLI |
 
 ### Related skills
@@ -361,7 +360,7 @@ buildStatuslineOutput()
 
 - Respond to the user in **Spanish**; keep path and identifier literals as in the repo.
 - This is a **reference** skill — do not implement statusline changes unless the user exits explore/plan mode and requests implementation.
-- Prefer reading `scripting/router-status.ts` and `docs/router-statusline.md` when facts may have drifted since this skill was last updated.
+- Prefer reading `scripting/provider/router-status.ts` and `docs/router-statusline.md` when facts may have drifted since this skill was last updated.
 - Distinguish **slot** (reasoning level: Lite/Standard/Reasoning/Frontier) from unrelated «slot» terms in other domains (e.g. artifact-structuring slot assignment).
 <!-- </constraints> -->
 
@@ -370,7 +369,7 @@ buildStatuslineOutput()
 
 When extending the statusline or answering deep questions:
 
-1. **Verify in code** — `scripting/router-status.ts` is source of truth for behavior.
+1. **Verify in code** — `scripting/provider/router-status.ts` is source of truth for behavior.
 2. **Sync docs** — update `docs/router-statusline.md` / `docs/session-metrics-system.md` in the same change when behavior changes.
 3. **Sync this skill** — update the matching XML section (`<slots>`, `<table2_composition>`, etc.).
 4. **OpenSpec** — new requirements go to delta specs under `openspec/changes/` then merge to `openspec/specs/statusline-runtime/spec.md`.

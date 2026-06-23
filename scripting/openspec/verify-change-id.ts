@@ -50,10 +50,14 @@ if (conflict) {
 
 // Verificar que el change solicitado existe en el filesystem
 const all = collectChangeDirectories(changesDir);
-const exists = all.some((entry) => entry.normalizedName === changeName || entry.rawName === changeName);
+const exists = all.some(
+  (entry) => entry.normalizedName === changeName || entry.rawName === changeName,
+);
 
 if (!exists) {
-  console.error(`Advertencia: no se encontró el directorio del change "${changeName}" bajo ${changesDir}`);
+  console.error(
+    `Advertencia: no se encontró el directorio del change "${changeName}" bajo ${changesDir}`,
+  );
   process.exit(1);
 }
 

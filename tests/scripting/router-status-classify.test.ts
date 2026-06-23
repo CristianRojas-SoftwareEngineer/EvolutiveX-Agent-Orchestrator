@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { classifyModelWithEnv, type ClaudeSettingsEnv } from '../../scripting/router-status.js';
+import {
+  classifyModelWithEnv,
+  type ClaudeSettingsEnv,
+} from '../../scripting/provider/router-status.js';
 
 const configuredEnv: ClaudeSettingsEnv = {
   ANTHROPIC_DEFAULT_HAIKU_MODEL: 'm1-haiku',

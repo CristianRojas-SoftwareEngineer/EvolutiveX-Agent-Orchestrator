@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import {
   buildIsolatedProviderEnv,
   DEFAULT_UPSTREAM,
-} from '../../scripting/headless-session/provider-env.js';
+} from '../../scripting/headless/session-lib/provider-env.js';
 import { MANAGED_ENV_VARS } from '../../scripting/shared/provider-config.js';
 
 const TEST_PORT = 8788;
@@ -89,8 +89,6 @@ describe('buildIsolatedProviderEnv', () => {
   });
 
   it('provider inexistente lanza error', () => {
-    expect(() => buildIsolatedProviderEnv('no-existe', TEST_PORT, basePath)).toThrow(
-      /no existe/,
-    );
+    expect(() => buildIsolatedProviderEnv('no-existe', TEST_PORT, basePath)).toThrow(/no existe/);
   });
 });

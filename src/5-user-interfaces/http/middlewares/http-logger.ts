@@ -15,12 +15,18 @@ export interface HttpLoggerConfig {
  * - Content-types de texto (JSON, text/*, form-urlencoded) → string UTF-8 completo.
  * - Binarios → solo length + preview (primeros 256 bytes).
  */
-function serializeBody(buf: Buffer, contentType: string | undefined): {
+function serializeBody(
+  buf: Buffer,
+  contentType: string | undefined,
+): {
   body?: string;
   bodyLength: number;
   bodyPreview?: string;
 } {
-  if (!contentType || !/^(application\/json|text\/|application\/x-www-form-urlencoded)/i.test(contentType)) {
+  if (
+    !contentType ||
+    !/^(application\/json|text\/|application\/x-www-form-urlencoded)/i.test(contentType)
+  ) {
     return {
       bodyLength: buf.length,
       bodyPreview: buf.subarray(0, 256).toString('utf-8'),
@@ -36,7 +42,9 @@ function serializeBody(buf: Buffer, contentType: string | undefined): {
  * Extrae los headers tal cual para incluir en el log.
  * Sin filtrado en esta iteración (D4 del design).
  */
-function pickHeaders(headers: Record<string, unknown> | undefined): Record<string, unknown> | undefined {
+function pickHeaders(
+  headers: Record<string, unknown> | undefined,
+): Record<string, unknown> | undefined {
   return headers;
 }
 

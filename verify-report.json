@@ -1,14 +1,14 @@
 {
   "schemaVersion": 1,
-  "startedAt": "2026-06-07T23:08:16.435Z",
-  "finishedAt": "2026-06-07T23:10:07.781Z",
+  "startedAt": "2026-06-23T04:05:45.434Z",
+  "finishedAt": "2026-06-23T04:08:11.576Z",
   "steps": [
     {
       "id": "help",
       "script": "help",
       "kind": "blocking",
       "status": "pass",
-      "durationMs": 923,
+      "durationMs": 931,
       "failureReason": null,
       "skippedReason": null
     },
@@ -17,7 +17,7 @@
       "script": "configure:provider",
       "kind": "blocking",
       "status": "pass",
-      "durationMs": 976,
+      "durationMs": 982,
       "failureReason": null,
       "skippedReason": null
     },
@@ -26,7 +26,7 @@
       "script": "setup:install",
       "kind": "blocking",
       "status": "pass",
-      "durationMs": 934,
+      "durationMs": 1059,
       "failureReason": null,
       "skippedReason": null
     },
@@ -35,7 +35,7 @@
       "script": "setup:uninstall",
       "kind": "blocking",
       "status": "pass",
-      "durationMs": 926,
+      "durationMs": 967,
       "failureReason": null,
       "skippedReason": null
     },
@@ -44,7 +44,7 @@
       "script": "statusline:router-details:on",
       "kind": "blocking",
       "status": "pass",
-      "durationMs": 926,
+      "durationMs": 962,
       "failureReason": null,
       "skippedReason": null
     },
@@ -53,7 +53,7 @@
       "script": "statusline:router-details:off",
       "kind": "blocking",
       "status": "pass",
-      "durationMs": 924,
+      "durationMs": 949,
       "failureReason": null,
       "skippedReason": null
     },
@@ -62,7 +62,7 @@
       "script": "statusline:router-details:toggle",
       "kind": "blocking",
       "status": "pass",
-      "durationMs": 943,
+      "durationMs": 956,
       "failureReason": null,
       "skippedReason": null
     },
@@ -71,7 +71,7 @@
       "script": "create:agents-reference",
       "kind": "blocking",
       "status": "pass",
-      "durationMs": 928,
+      "durationMs": 942,
       "failureReason": null,
       "skippedReason": null
     },
@@ -89,7 +89,7 @@
       "script": "notifications:register",
       "kind": "blocking",
       "status": "pass",
-      "durationMs": 938,
+      "durationMs": 951,
       "failureReason": null,
       "skippedReason": null
     },
@@ -98,7 +98,7 @@
       "script": "lint",
       "kind": "blocking",
       "status": "pass",
-      "durationMs": 3123,
+      "durationMs": 3502,
       "failureReason": null,
       "skippedReason": null
     },
@@ -107,7 +107,7 @@
       "script": "typecheck",
       "kind": "blocking",
       "status": "pass",
-      "durationMs": 3419,
+      "durationMs": 3454,
       "failureReason": null,
       "skippedReason": null
     },
@@ -116,7 +116,7 @@
       "script": "test:unit",
       "kind": "blocking",
       "status": "pass",
-      "durationMs": 4340,
+      "durationMs": 4870,
       "failureReason": null,
       "skippedReason": null
     },
@@ -125,7 +125,7 @@
       "script": "test:integration",
       "kind": "blocking",
       "status": "pass",
-      "durationMs": 4256,
+      "durationMs": 4963,
       "failureReason": null,
       "skippedReason": null
     },
@@ -134,7 +134,7 @@
       "script": "format",
       "kind": "blocking",
       "status": "pass",
-      "durationMs": 4174,
+      "durationMs": 4485,
       "failureReason": null,
       "skippedReason": null
     },
@@ -143,7 +143,7 @@
       "script": "lint:fix",
       "kind": "blocking",
       "status": "pass",
-      "durationMs": 3053,
+      "durationMs": 3671,
       "failureReason": null,
       "skippedReason": null
     },
@@ -152,7 +152,7 @@
       "script": "clean:dist",
       "kind": "destructive",
       "status": "pass",
-      "durationMs": 723,
+      "durationMs": 737,
       "failureReason": null,
       "skippedReason": null
     },
@@ -161,7 +161,7 @@
       "script": "build:js",
       "kind": "blocking",
       "status": "pass",
-      "durationMs": 1124,
+      "durationMs": 1126,
       "failureReason": null,
       "skippedReason": null
     },
@@ -170,7 +170,7 @@
       "script": "build:types",
       "kind": "blocking",
       "status": "pass",
-      "durationMs": 2676,
+      "durationMs": 2679,
       "failureReason": null,
       "skippedReason": null
     },
@@ -179,7 +179,7 @@
       "script": "build",
       "kind": "blocking",
       "status": "pass",
-      "durationMs": 4445,
+      "durationMs": 4546,
       "failureReason": null,
       "skippedReason": null
     },
@@ -188,7 +188,7 @@
       "script": "test:quick",
       "kind": "blocking",
       "status": "pass",
-      "durationMs": 4680,
+      "durationMs": 10120,
       "failureReason": null,
       "skippedReason": null
     },
@@ -197,7 +197,7 @@
       "script": "test",
       "kind": "blocking",
       "status": "pass",
-      "durationMs": 4813,
+      "durationMs": 10173,
       "failureReason": null,
       "skippedReason": null
     },
@@ -205,19 +205,19 @@
       "id": "start",
       "script": "start",
       "kind": "background",
-      "status": "pass",
+      "status": "fail",
       "durationMs": 3021,
-      "failureReason": null,
-      "skippedReason": "Coincidió patrón 'listening'; proceso arrancado en puerto 10689 y terminado."
+      "failureReason": "Patrón de arranque no encontrado tras 15s. Salida: \n> smart-code-proxy@1.0.0 start\n> node dist/index.js\n\n\nFalta --event-type (o usa --stdin-json con payload)\n",
+      "skippedReason": null
     },
     {
       "id": "dev",
       "script": "dev",
       "kind": "background",
       "status": "pass",
-      "durationMs": 3546,
+      "durationMs": 3549,
       "failureReason": null,
-      "skippedReason": "Coincidió patrón 'listening'; proceso arrancado en puerto 13439 y terminado."
+      "skippedReason": "Coincidió patrón 'listening'; proceso arrancado en puerto 10980 y terminado."
     },
     {
       "id": "test-watch",
@@ -226,14 +226,14 @@
       "status": "pass",
       "durationMs": 3038,
       "failureReason": null,
-      "skippedReason": "Coincidió patrón 'RUN'; proceso arrancado en puerto 16865 y terminado."
+      "skippedReason": "Coincidió patrón 'RUN'; proceso arrancado en puerto 11778 y terminado."
     },
     {
       "id": "sessions-list",
       "script": "sessions:list",
       "kind": "blocking",
       "status": "pass",
-      "durationMs": 1846,
+      "durationMs": 2299,
       "failureReason": null,
       "skippedReason": null
     },
@@ -242,7 +242,7 @@
       "script": "sessions:list-archived",
       "kind": "blocking",
       "status": "pass",
-      "durationMs": 966,
+      "durationMs": 969,
       "failureReason": null,
       "skippedReason": null
     },
@@ -251,7 +251,7 @@
       "script": "sessions:sanitize:scan",
       "kind": "blocking",
       "status": "pass",
-      "durationMs": 1345,
+      "durationMs": 2478,
       "failureReason": null,
       "skippedReason": null
     },
@@ -260,7 +260,7 @@
       "script": "sessions:archive",
       "kind": "blocking",
       "status": "pass",
-      "durationMs": 969,
+      "durationMs": 1000,
       "failureReason": null,
       "skippedReason": null
     },
@@ -269,7 +269,7 @@
       "script": "sessions:restore",
       "kind": "blocking",
       "status": "pass",
-      "durationMs": 959,
+      "durationMs": 976,
       "failureReason": null,
       "skippedReason": null
     },
@@ -278,7 +278,7 @@
       "script": "sessions:delete",
       "kind": "blocking",
       "status": "pass",
-      "durationMs": 963,
+      "durationMs": 988,
       "failureReason": null,
       "skippedReason": null
     },
@@ -287,7 +287,7 @@
       "script": "sessions:sanitize",
       "kind": "blocking",
       "status": "pass",
-      "durationMs": 968,
+      "durationMs": 972,
       "failureReason": null,
       "skippedReason": null
     },
@@ -296,7 +296,7 @@
       "script": "sessions:sanitize:all",
       "kind": "blocking",
       "status": "pass",
-      "durationMs": 1521,
+      "durationMs": 5516,
       "failureReason": null,
       "skippedReason": null
     },
@@ -305,7 +305,7 @@
       "script": "clean:sessions",
       "kind": "destructive",
       "status": "pass",
-      "durationMs": 1826,
+      "durationMs": 10010,
       "failureReason": null,
       "skippedReason": null
     },
@@ -314,7 +314,7 @@
       "script": "clean:logs",
       "kind": "destructive",
       "status": "pass",
-      "durationMs": 807,
+      "durationMs": 825,
       "failureReason": null,
       "skippedReason": null
     },
@@ -323,7 +323,7 @@
       "script": "clean:modules",
       "kind": "destructive",
       "status": "pass",
-      "durationMs": 6203,
+      "durationMs": 6890,
       "failureReason": null,
       "skippedReason": null
     },
@@ -332,7 +332,7 @@
       "script": "",
       "kind": "restore",
       "status": "pass",
-      "durationMs": 10866,
+      "durationMs": 13502,
       "failureReason": null,
       "skippedReason": null
     },
@@ -341,7 +341,7 @@
       "script": "clean:all",
       "kind": "destructive",
       "status": "pass",
-      "durationMs": 7411,
+      "durationMs": 8366,
       "failureReason": null,
       "skippedReason": null
     },
@@ -350,7 +350,7 @@
       "script": "",
       "kind": "restore",
       "status": "pass",
-      "durationMs": 11146,
+      "durationMs": 13056,
       "failureReason": null,
       "skippedReason": null
     },
@@ -359,7 +359,7 @@
       "script": "build",
       "kind": "restore",
       "status": "pass",
-      "durationMs": 4685,
+      "durationMs": 5656,
       "failureReason": null,
       "skippedReason": null
     }
@@ -421,6 +421,12 @@
       "lint",
       "lint:fix",
       "notifications:register",
+      "openspec:apply-sequential-schema",
+      "openspec:create-specification-delta",
+      "openspec:next-change-id",
+      "openspec:verify-change-id",
+      "openspec:verify-stage-completion",
+      "postinstall",
       "sessions:archive",
       "sessions:delete",
       "sessions:list",
@@ -436,6 +442,7 @@
       "statusline:router-details:on",
       "statusline:router-details:toggle",
       "test",
+      "test:headless-tts",
       "test:integration",
       "test:quick",
       "test:unit",
@@ -443,10 +450,23 @@
       "typecheck",
       "verify:package-scripts"
     ],
-    "missingFromConfig": [],
+    "missingFromConfig": [
+      "openspec:apply-sequential-schema",
+      "openspec:create-specification-delta",
+      "openspec:next-change-id",
+      "openspec:verify-change-id",
+      "openspec:verify-stage-completion",
+      "postinstall",
+      "test:headless-tts"
+    ],
     "missingFromPackageJson": []
   },
-  "failures": [],
+  "failures": [
+    {
+      "stepId": "start",
+      "reason": "Patrón de arranque no encontrado tras 15s. Salida: \n> smart-code-proxy@1.0.0 start\n> node dist/index.js\n\n\nFalta --event-type (o usa --stdin-json con payload)\n"
+    }
+  ],
   "workspaceState": {
     "nodeModulesRestored": true,
     "buildArtifactsPresent": true,

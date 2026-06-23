@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# scripting/changelog/install-changelog-hook — instala .git/hooks/post-commit para regenerar
+# CHANGELOG.md tras cada commit y enmendarlo al mismo commit.
+# Idempotente: reemplaza si ya existe. .git/hooks/ no se versiona — reinstalar tras cada clone.
+# Advertencia: git commit --amend cambia el SHA del commit original.
+set -euo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+HOOK="$REPO_ROOT/.git/hooks/post-commit"
+
+cat > "$HOOK" <<'HOOK_EOF'
+#!/usr/bin/env bash
+# post-commit: regenera CHANGELOG.md y lo incluye en el commit via --amend.
+# Guard contra recursión: git dispara post-commit también en --amend.
+set -euo pipefail
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+LOCK="$REPO_ROOT/.git/post-commit.lock"
+[ -f "$LOCK" ] && exit 0
+touch "$LOCK"
+trap "rm -f '$LOCK'" EXIT
+bash "$REPO_ROOT/scripting/changelog/generate-changelog"
+git -C "$REPO_ROOT" add CHANGELOG.md
+git -C "$REPO_ROOT" commit --amend --no-edit --no-verify
+HOOK_EOF
+
+chmod +x "$HOOK"
+echo "Hook post-commit instalado en $HOOK"

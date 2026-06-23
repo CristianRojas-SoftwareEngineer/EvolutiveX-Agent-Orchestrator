@@ -272,11 +272,7 @@ export class AuditSseResponseHandler {
           startedAt: now,
           closedAt: now,
         });
-        return registerWireStepInCorrelator(
-          this.workflowRepo,
-          fallback,
-          assembled.stopReason,
-        );
+        return registerWireStepInCorrelator(this.workflowRepo, fallback, assembled.stopReason);
       })();
     if (wireStep) {
       void persistBillableStepMetricsIfNeeded(
@@ -291,11 +287,7 @@ export class AuditSseResponseHandler {
     if (workflowAfterClose?.result != null) {
       const sessionDir = resolveSessionDir(this.auditBaseDir, workflow.sessionId);
       const closedSteps = workflowAfterClose.steps.filter((s) => s.closedAt != null);
-      void this.sessionMetrics.finalizeWorkflowMetrics(
-        sessionDir,
-        workflow.id,
-        closedSteps,
-      );
+      void this.sessionMetrics.finalizeWorkflowMetrics(sessionDir, workflow.id, closedSteps);
     }
     return wireStep;
   }

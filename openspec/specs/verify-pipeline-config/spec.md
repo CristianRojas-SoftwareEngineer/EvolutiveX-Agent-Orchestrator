@@ -4,9 +4,9 @@
 
 ### Requirement: Shared verify configuration module
 
-The system SHALL provide a TypeScript module `scripting/verify-config.ts` that exports a `VERIFY_STEPS`
+The system SHALL provide a TypeScript module `scripting/maintenance/verify-config.ts` that exports a `VERIFY_STEPS`
 constant and a `VerifyStep` type. The module is the single source of truth for the verify pipeline and
-is consumed by both `scripting/verify-package-scripts.ts` and `.claude/skills/verify-scripts/SKILL.md`.
+is consumed by both `scripting/maintenance/verify-package-scripts.ts` and `.claude/skills/verify-scripts/SKILL.md`.
 
 #### Scenario: Module is importable from the script
 

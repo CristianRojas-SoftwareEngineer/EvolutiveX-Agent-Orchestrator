@@ -1,14 +1,14 @@
 # Spec: changelog-single-pass
 
 ## Requirement: single-git-log-invocation
-El script `scripting/generate-changelog` lee el historial git en exactamente una invocación de `git log`, independientemente del número de tags de versión y del número de secciones del changelog.
+El script `scripting/changelog/generate-changelog` lee el historial git en exactamente una invocación de `git log`, independientemente del número de tags de versión y del número de secciones del changelog.
 
 #### Scenario: historial sin tags
-- **WHEN** se ejecuta `scripting/generate-changelog` en un repo sin tags de versión
+- **WHEN** se ejecuta `scripting/changelog/generate-changelog` en un repo sin tags de versión
 - **THEN** se invoca `git log` exactamente una vez y se produce la sección `[Unreleased]` con todas las entradas clasificadas
 
 #### Scenario: historial con múltiples tags
-- **WHEN** se ejecuta `scripting/generate-changelog` en un repo con N tags de versión
+- **WHEN** se ejecuta `scripting/changelog/generate-changelog` en un repo con N tags de versión
 - **THEN** se invoca `git log` exactamente una vez; el script detecta los límites de cada release a partir de los refs incluidos en la salida de esa única invocación; la fecha de cada release se obtiene del campo `%as` de esa misma pasada
 
 ---

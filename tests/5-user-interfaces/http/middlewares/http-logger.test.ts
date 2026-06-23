@@ -48,9 +48,13 @@ function createTestApp(cfg: HttpLoggerConfig) {
 
   // Buffer catch-all parser (same as app.ts) para que request.body sea Buffer
   app.removeAllContentTypeParsers();
-  app.addContentTypeParser('*', { parseAs: 'buffer', bodyLimit: 50 * 1024 * 1024 }, (_req, body, done) => {
-    done(null, body);
-  });
+  app.addContentTypeParser(
+    '*',
+    { parseAs: 'buffer', bodyLimit: 50 * 1024 * 1024 },
+    (_req, body, done) => {
+      done(null, body);
+    },
+  );
 
   // Ruta POST que devuelve el body tal cual
   app.post('/echo', async (req) => req.body);

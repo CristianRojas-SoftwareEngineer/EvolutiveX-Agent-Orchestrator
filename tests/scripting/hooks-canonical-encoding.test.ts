@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { NOTIFICATION_EVENT_KEYS } from '../../src/2-services/notifications/event-notification-profile.js';
-import { readCanonicalHooks } from '../../scripting/features/hooks.js';
+import { readCanonicalHooks } from '../../scripting/install/features/hooks.js';
 
 const ACCENT_SAMPLE = 'Prueba tildes: sesión, configuración, acción, niño';
 
@@ -103,10 +103,9 @@ describe('hooks canónicos y encoding', () => {
             );
             expect(entry.command, `${key} debe invocarse con node directo`).toContain('node ');
             expect(entry.command, `${key} no debe usar tsx`).not.toContain('tsx');
-            expect(
-              entry.command,
-              `${key} no debe usar relay detached`,
-            ).not.toContain('detached-session-end-relay.ts');
+            expect(entry.command, `${key} no debe usar relay detached`).not.toContain(
+              'detached-session-end-relay.ts',
+            );
           }
         }
       }

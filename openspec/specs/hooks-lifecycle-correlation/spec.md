@@ -323,7 +323,7 @@ El repositorio SHALL registrar las entradas del lifecycle de hooks de Claude Cod
 
 ### Requirement: Todos los eventos de hook ciclan por `POST /hooks`
 
-Todos los **13 eventos** de Claude Code gestionados por SCP SHALL ciclar por el endpoint `POST /hooks`. Doce eventos SHALL usar `scripting/post-hook-event.ts` como comando relay en `configs/hooks.json`; el evento `SessionEnd` SHALL usar `scripting/hooks/session-end-hook.ts` (cliente HTTP autocontenido invocado con `node` directo). El gateway (`AuditHookEventHandler`) es el único punto de decisión de efectos (toast, TTS, audit): los scripts relay nunca deciden efectos locales.
+Todos los **13 eventos** de Claude Code gestionados por SCP SHALL ciclar por el endpoint `POST /hooks`. Doce eventos SHALL usar `scripting/hooks/post-hook-event.ts` como comando relay en `configs/hooks.json`; el evento `SessionEnd` SHALL usar `scripting/hooks/session-end-hook.ts` (cliente HTTP autocontenido invocado con `node` directo). El gateway (`AuditHookEventHandler`) es el único punto de decisión de efectos (toast, TTS, audit): los scripts relay nunca deciden efectos locales.
 
 Los eventos que antes emitían toast directamente desde scripts (`gateway-hook-notify.ts`, `pre-tool-use-hook-ux.ts`, `task-in-progress-hook-ux.ts`) o desde `notifications/cli.ts` (`SessionStart`, `SessionEnd`, `PermissionRequest`, `TaskCreated`, `TaskCompleted`) ahora ciclan por el gateway: el relay → `POST /hooks` → `AuditHookEventHandler.executeAsync` → `emitToast`.
 
@@ -331,13 +331,13 @@ Los eventos condicionales (`PreToolUse[AskUserQuestion]`, `PostToolUse[TaskUpdat
 
 Ninguna clave SHALL contener un segundo comando en paralelo que lea stdin por separado (race condition de Windows eliminada de raíz: un solo relay por evento).
 
-**Módulos normativos:** `scripting/post-hook-event.ts` (relay de los 12 eventos); `scripting/hooks/session-end-hook.ts` (relay de `SessionEnd`); `src/3-operations/audit-hook-event.handler.ts` (único punto de despacho de efectos).
+**Módulos normativos:** `scripting/hooks/post-hook-event.ts` (relay de los 12 eventos); `scripting/hooks/session-end-hook.ts` (relay de `SessionEnd`); `src/3-operations/audit-hook-event.handler.ts` (único punto de despacho de efectos).
 
 #### Scenario: Todos los eventos en hooks.json usan el relay canónico como comando
 
 - **GIVEN** `configs/hooks.json` instalado por SCP
 - **WHEN** se inspeccionan todos los comandos de hook de todos los eventos
-- **THEN** los doce eventos distintos de `SessionEnd` SHALL referenciar únicamente `scripting/post-hook-event.ts`
+- **THEN** los doce eventos distintos de `SessionEnd` SHALL referenciar únicamente `scripting/hooks/post-hook-event.ts`
 - **AND** `SessionEnd` SHALL referenciar únicamente `scripting/hooks/session-end-hook.ts`
 - **AND** SHALL no existir ningún comando que referencie `scripting/gateway-hook-notify.ts`, `scripting/pre-tool-use-hook-ux.ts`, `scripting/task-in-progress-hook-ux.ts`, ni `src/2-services/notifications/cli.ts`
 
@@ -386,7 +386,7 @@ Ninguna clave SHALL contener un segundo comando en paralelo que lea stdin por se
 
 El sistema SHALL proporcionar un mecanismo de instalación de las **13 claves** de hooks de SCP en `~/.claude/settings.json` (user-level) mediante el script `setup --hooks` o `setup:hooks`. La instalación SHALL ser **merge selectivo** que preserve configs ajenas a SCP en las mismas claves.
 
-Las 13 claves gestionadas por SCP SHALL ser: `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PostToolUseFailure`, `SubagentStart`, `SubagentStop`, `Stop`, `StopFailure`, `SessionStart`, `SessionEnd`, `PermissionRequest`, `TaskCreated`, `TaskCompleted`. Cada clave SHALL contener un único comando relay SCP: las doce restantes apuntan a `scripting/post-hook-event.ts`; `SessionEnd` apunta a `scripting/hooks/session-end-hook.ts`.
+Las 13 claves gestionadas por SCP SHALL ser: `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PostToolUseFailure`, `SubagentStart`, `SubagentStop`, `Stop`, `StopFailure`, `SessionStart`, `SessionEnd`, `PermissionRequest`, `TaskCreated`, `TaskCompleted`. Cada clave SHALL contener un único comando relay SCP: las doce restantes apuntan a `scripting/hooks/post-hook-event.ts`; `SessionEnd` apunta a `scripting/hooks/session-end-hook.ts`.
 
 La entrada `SessionStart` en `configs/hooks.json` SHALL omitir el campo `"matcher"` para que Claude Code despache el hook para todos los valores de `source` (`startup`, `resume`, `clear`, `compact`). **No SHALL existir un campo `"matcher"` en la entrada `SessionStart` de `configs/hooks.json`.**
 
@@ -518,7 +518,7 @@ El script `scripting/hooks/session-end-hook.ts` SHALL ser un **cliente HTTP delg
 del contrato estable `/hooks`: SHALL leer el payload JSON de stdin y hacer un único
 `POST /hooks` (URL resuelta vía `ANTHROPIC_BASE_URL`, no acoplada a host:puerto
 literal). SHALL ser autocontenido —solo `node:` builtins y `fetch` global— sin imports
-relativos (no SHALL importar `scripting/post-hook-event.ts` ni compartir lógica con
+relativos (no SHALL importar `scripting/hooks/post-hook-event.ts` ni compartir lógica con
 otros relays), de modo que `node` lo ejecute sin resolver módulos del repo. SHALL usar
 únicamente sintaxis borrable (erasable-only) para que el type-stripping nativo de Node
 funcione, y SHALL ser agnóstico al SO (solo API de Node, sin shell ni utilidades

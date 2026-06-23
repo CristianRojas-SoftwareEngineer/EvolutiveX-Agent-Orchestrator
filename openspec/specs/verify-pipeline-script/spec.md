@@ -4,7 +4,7 @@
 
 ### Requirement: Script iterates over the shared config
 
-`scripting/verify-package-scripts.ts` SHALL iterate over `VERIFY_STEPS` to drive its execution loop. The
+`scripting/maintenance/verify-package-scripts.ts` SHALL iterate over `VERIFY_STEPS` to drive its execution loop. The
 script MUST NOT contain hardcoded invocations of `invokeBlockingStep` or `invokeBackgroundStep` with
 string literals. The hardcoded `expectedWorkflowScripts` array MUST be removed.
 

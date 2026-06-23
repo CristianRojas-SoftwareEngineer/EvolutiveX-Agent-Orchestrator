@@ -2,7 +2,11 @@ import fastify from 'fastify';
 import { randomUUID } from 'node:crypto';
 import { proxyRoutes } from './5-user-interfaces/http/proxy.routes.js';
 import { HooksController } from './5-user-interfaces/http/hooks.controller.js';
-import { createHttpOnRequestHook, createHttpPreValidationHook, createHttpOnResponseHook } from './5-user-interfaces/http/middlewares/http-logger.js';
+import {
+  createHttpOnRequestHook,
+  createHttpPreValidationHook,
+  createHttpOnResponseHook,
+} from './5-user-interfaces/http/middlewares/http-logger.js';
 import type { ProxyDependencies } from './4-api/composition-root.js';
 import type { Logger } from './1-domain/types/logger.types.js';
 

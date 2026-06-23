@@ -7,7 +7,7 @@ disable-model-invocation: true
 # Full verification of package.json scripts
 
 <!-- <overview> -->
-Run `scripting/verify-package-scripts.ts` (the canonical verifier) and translate its JSON report into a Spanish markdown table. The skill is a thin orchestration layer: it enforces preconditions, invokes the script, parses the report, and formats the output. It does **not** enumerate, order, or invoke npm scripts itself — that responsibility lives entirely in `scripting/verify-config.ts`, the single source of truth.
+Run `scripting/maintenance/verify-package-scripts.ts` (the canonical verifier) and translate its JSON report into a Spanish markdown table. The skill is a thin orchestration layer: it enforces preconditions, invokes the script, parses the report, and formats the output. It does **not** enumerate, order, or invoke npm scripts itself — that responsibility lives entirely in `scripting/maintenance/verify-config.ts`, the single source of truth.
 <!-- </overview> -->
 
 <!-- <user_communication> -->
@@ -36,22 +36,22 @@ The script itself handles the `node_modules/` existence check and runs `npm inst
 
 **This procedure must invoke the canonical verifier and produce the report from its JSON output. No step enumeration, no inline `npm run` invocations, no parallel execution paths.**
 
-The source of truth is `scripting/verify-config.ts`. If the user requests adding, removing, or reordering a verify step, the correct response is to edit that file — not to add inline steps in this skill. The previous 38-step enumeration that lived here has been **migrated** to the config and must not reappear.
+The source of truth is `scripting/maintenance/verify-config.ts`. If the user requests adding, removing, or reordering a verify step, the correct response is to edit that file — not to add inline steps in this skill. The previous 38-step enumeration that lived here has been **migrated** to the config and must not reappear.
 <!-- </critical> -->
 <!-- </constraints> -->
 
 <!-- <execution> -->
 ## Execution
 
-1. **Read the config** with the Read tool: `scripting/verify-config.ts`. The file declares `VERIFY_STEPS: VerifyStep[]`. Use the `id` field of each entry as the step identifier; the `kind` and `args` fields describe execution; the `verifier`, `dependsOn`, and `riskControls` fields describe post-conditions. Do not modify the file.
+1. **Read the config** with the Read tool: `scripting/maintenance/verify-config.ts`. The file declares `VERIFY_STEPS: VerifyStep[]`. Use the `id` field of each entry as the step identifier; the `kind` and `args` fields describe execution; the `verifier`, `dependsOn`, and `riskControls` fields describe post-conditions. Do not modify the file.
 
 2. **Invoke the script** with Bash:
    ```bash
-   npx tsx scripting/verify-package-scripts.ts
+   npx tsx scripting/maintenance/verify-package-scripts.ts
    ```
    The script prints an ASCII table to stdout and writes `verify-report.json` to the repository root. Do not pass `--strict-coverage` here; the default behavior (exit 0 on pass, 1 on any step failure) is the right contract for agent-driven verification. Capture the script's exit code.
 
-3. **Read the JSON report** with the Read tool: `verify-report.json`. Its shape is documented in `scripting/verify-report-schema.md`. The relevant fields are:
+3. **Read the JSON report** with the Read tool: `verify-report.json`. Its shape is documented in `scripting/maintenance/verify-report-schema.md`. The relevant fields are:
    - `steps[]` — one entry per `VERIFY_STEPS` row.
    - `coverage` — `missingFromConfig` and `missingFromPackageJson` arrays.
    - `failures[]` — step-level failure details.

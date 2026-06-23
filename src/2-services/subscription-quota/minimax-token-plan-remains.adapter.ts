@@ -26,7 +26,12 @@ function computeUsedPercentage(
   usageCount: number | undefined,
   remainingPercent: number | undefined,
 ): number | null {
-  if (typeof totalCount === 'number' && totalCount > 0 && typeof usageCount === 'number' && usageCount >= 0) {
+  if (
+    typeof totalCount === 'number' &&
+    totalCount > 0 &&
+    typeof usageCount === 'number' &&
+    usageCount >= 0
+  ) {
     return Math.round((usageCount / totalCount) * 100);
   }
   if (
@@ -74,8 +79,7 @@ export function mapMinimaxTokenPlanRemains(
   const remains = response.model_remains ?? [];
   if (remains.length === 0) return {};
 
-  const entry =
-    remains.find((m) => m.model_name === modelFilter) ?? remains[0];
+  const entry = remains.find((m) => m.model_name === modelFilter) ?? remains[0];
 
   const fiveHour = buildWindow(
     computeUsedPercentage(

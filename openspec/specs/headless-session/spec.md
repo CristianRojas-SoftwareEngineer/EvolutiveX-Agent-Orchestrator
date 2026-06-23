@@ -49,7 +49,7 @@ Las sesiones headless SHALL escribir logs en un archivo separado del log princip
 
 ### Requirement: Módulos genéricos accesibles por path directo
 Los módulos `proxy-lifecycle`, `run-claude`, `provider-env` y `env-utils` SHALL residir en
-`scripting/headless-session/` y ser importables por path para consumidores que necesiten
+`scripting/headless/session-lib/` y ser importables por path para consumidores que necesiten
 control fino del ciclo de vida (como la suite TTS existente).
 
 #### Scenario: Importación directa de primitivo

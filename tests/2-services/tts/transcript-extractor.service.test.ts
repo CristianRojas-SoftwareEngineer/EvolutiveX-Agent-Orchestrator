@@ -16,7 +16,11 @@ describe('TranscriptContextExtractor', () => {
 
   afterEach(() => {
     for (const f of tempFiles.splice(0)) {
-      try { unlinkSync(f); } catch { /* ignorar */ }
+      try {
+        unlinkSync(f);
+      } catch {
+        /* ignorar */
+      }
     }
   });
 
@@ -87,7 +91,11 @@ describe('TranscriptContextExtractor.extractUserPromptSubmitContext', () => {
 
   afterEach(() => {
     for (const f of tempFiles.splice(0)) {
-      try { unlinkSync(f); } catch { /* ignorar */ }
+      try {
+        unlinkSync(f);
+      } catch {
+        /* ignorar */
+      }
     }
   });
 
@@ -156,9 +164,7 @@ describe('TranscriptContextExtractor.extractUserPromptSubmitContext', () => {
   });
 
   it('devuelve lastAssistantResponse undefined si no hay assistant previo', async () => {
-    const path = writeTempJsonl([
-      { message: { role: 'user', content: 'única petición' } },
-    ]);
+    const path = writeTempJsonl([{ message: { role: 'user', content: 'única petición' } }]);
     tempFiles.push(path);
 
     const result = await extractor.extractUserPromptSubmitContext(path, 'prompt nuevo');

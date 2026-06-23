@@ -6,7 +6,7 @@ import {
   coerceMetricNumber,
   aggregateSessionMetrics,
   type ClaudeSettingsEnv,
-} from '../../scripting/router-status.js';
+} from '../../scripting/provider/router-status.js';
 
 const configuredEnv: ClaudeSettingsEnv = {
   ANTHROPIC_DEFAULT_HAIKU_MODEL: 'm1-haiku',

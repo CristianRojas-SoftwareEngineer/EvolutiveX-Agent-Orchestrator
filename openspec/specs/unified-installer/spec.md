@@ -2,7 +2,7 @@
 
 ## Purpose
 
-CLI unificado (`setup:install` / `setup:uninstall`) para instalar, configurar y desinstalar las características de Smart Code Proxy (statusline, voz, hooks) sobre `~/.claude/settings.json` en Windows, Linux y macOS mediante el orquestador `scripting/setup.ts`.
+CLI unificado (`setup:install` / `setup:uninstall`) para instalar, configurar y desinstalar las características de Smart Code Proxy (statusline, voz, hooks) sobre `~/.claude/settings.json` en Windows, Linux y macOS mediante el orquestador `scripting/install/setup.ts`.
 
 ---
 ## Requirements
@@ -30,7 +30,7 @@ El sistema SHALL proporcionar un script CLI con flags `--statusline`, `--voice` 
 #### Scenario: Flag --hooks instala el conjunto unificado de 13 claves con relay único
 
 - **WHEN** el usuario ejecuta `npm run setup:install -- --hooks`
-- **THEN** el script SHALL instalar el conjunto de hooks definido en `configs/hooks.json` (13 claves con un único comando por bloque apuntando a `scripting/post-hook-event.ts`)
+- **THEN** el script SHALL instalar el conjunto de hooks definido en `configs/hooks.json` (13 claves con un único comando por bloque apuntando a `scripting/hooks/post-hook-event.ts`)
 - **AND** SHALL no modificar `statusLine` ni `voice*` existentes en `settings.json`
 
 ---
@@ -65,7 +65,7 @@ El script SHALL admitir `--uninstall` como modificador de dirección: en lugar d
 
 ### Requirement: Instalación y desinstalación de la característica de voz
 
-El script SHALL gestionar las claves `voiceEnabled` y `voice` en `~/.claude/settings.json` mediante funciones `applyVoiceInstall` y `applyVoiceUninstall` exportadas desde `scripting/features/voice.ts`. La instalación no requiere validación de archivos en disco.
+El script SHALL gestionar las claves `voiceEnabled` y `voice` en `~/.claude/settings.json` mediante funciones `applyVoiceInstall` y `applyVoiceUninstall` exportadas desde `scripting/install/features/voice.ts`. La instalación no requiere validación de archivos en disco.
 
 #### Scenario: Instalación de voz con modo hold (default)
 
@@ -106,7 +106,7 @@ El script SHALL cumplir las 5 garantías del patrón seguro (establecido por el 
 
 #### Scenario: S1 aborta antes de tocar settings.json
 
-- **GIVEN** `--root` no contiene `scripting/post-hook-event.ts`
+- **GIVEN** `--root` no contiene `scripting/hooks/post-hook-event.ts`
 - **WHEN** el usuario ejecuta `npm run setup:install -- --hooks`
 - **THEN** el script SHALL abortar con exit code 1 sin escribir en `settings.json`
 
@@ -151,7 +151,7 @@ El script SHALL cumplir las 5 garantías del patrón seguro (establecido por el 
 
 ### Requirement: Lectura y escritura única de settings.json
 
-El script SHALL leer `~/.claude/settings.json` una sola vez al inicio, aplicar todas las transformaciones de features en cadena sobre el mismo objeto en memoria, y persistir el resultado con una sola escritura al final. Las funciones `applyStatuslineInstall/Uninstall`, `applyVoiceInstall/Uninstall` y las funciones de `scripting/features/hooks.ts` SHALL recibir el objeto settings y devolver uno nuevo sin efectos de escritura propios cuando son invocadas desde `setup.ts`.
+El script SHALL leer `~/.claude/settings.json` una sola vez al inicio, aplicar todas las transformaciones de features en cadena sobre el mismo objeto en memoria, y persistir el resultado con una sola escritura al final. Las funciones `applyStatuslineInstall/Uninstall`, `applyVoiceInstall/Uninstall` y las funciones de `scripting/install/features/hooks.ts` SHALL recibir el objeto settings y devolver uno nuevo sin efectos de escritura propios cuando son invocadas desde `setup.ts`.
 
 #### Scenario: Instalación de tres features produce una sola escritura
 
@@ -192,20 +192,20 @@ En modo install, el script SHALL validar únicamente las features seleccionadas 
 
 | Feature       | Validación requerida                                    |
 |---------------|---------------------------------------------------------|
-| statusline    | `scripting/router-status.ts` y `routing/providers/` existen |
+| statusline    | `scripting/provider/router-status.ts` y `routing/providers/` existen |
 | voice         | ninguna                                                 |
-| hooks         | `configs/hooks.json` y `scripting/post-hook-event.ts` existen |
+| hooks         | `configs/hooks.json` y `scripting/hooks/post-hook-event.ts` existen |
 
 #### Scenario: Raíz inválida aborta sin escribir
 
-- **GIVEN** `--root` no contiene `scripting/router-status.ts`
+- **GIVEN** `--root` no contiene `scripting/provider/router-status.ts`
 - **WHEN** el usuario ejecuta `npm run setup:install -- --statusline`
 - **THEN** el script SHALL terminar con código de salida distinto de cero
 - **AND** SHALL no modificar `settings.json`
 
 #### Scenario: Validación solo aplica a las features seleccionadas
 
-- **GIVEN** `--root` no contiene `scripting/router-status.ts`
+- **GIVEN** `--root` no contiene `scripting/provider/router-status.ts`
 - **WHEN** el usuario ejecuta `npm run setup:install -- --voice`
 - **THEN** el script SHALL instalar voz correctamente sin error de validación
 
@@ -237,7 +237,7 @@ La función `applyStatuslineUninstall` SHALL aceptar un parámetro `force: boole
 
 ### Requirement: Indivisibilidad de --hooks
 
-El flag `--hooks` SHALL instalar el conjunto indivisible de las **13 claves** de hooks declaradas en `configs/hooks.json`, cada una con un único comando que apunta a `scripting/post-hook-event.ts`. Este es el patrón de relay único: el script de transporte no decide efectos (toast, TTS, audit) — solo reenvía el payload a `POST /hooks`; el gateway (`AuditHookEventHandler`) es el único punto de despacho de efectos.
+El flag `--hooks` SHALL instalar el conjunto indivisible de las **13 claves** de hooks declaradas en `configs/hooks.json`, cada una con un único comando que apunta a `scripting/hooks/post-hook-event.ts`. Este es el patrón de relay único: el script de transporte no decide efectos (toast, TTS, audit) — solo reenvía el payload a `POST /hooks`; el gateway (`AuditHookEventHandler`) es el único punto de despacho de efectos.
 
 No SHALL existir ningún bloque de hook en `configs/hooks.json` que use un script diferente a `post-hook-event.ts` como comando directo. Los scripts antiguos `gateway-hook-notify.ts`, `pre-tool-use-hook-ux.ts` y `task-in-progress-hook-ux.ts` fueron eliminados (sus lógicas de filtrado y formateo migraron al gateway).
 
@@ -245,7 +245,7 @@ No SHALL existir ningún bloque de hook en `configs/hooks.json` que use un scrip
 
 - **WHEN** el usuario ejecuta `npm run setup:install -- --hooks`
 - **THEN** `settings.hooks` SHALL contener las 13 claves definidas en `configs/hooks.json`
-- **AND** cada bloque SHALL contener un único comando apuntando a `scripting/post-hook-event.ts`
+- **AND** cada bloque SHALL contener un único comando apuntando a `scripting/hooks/post-hook-event.ts`
 
 #### Scenario: No existe flag para instalar solo notificaciones
 
@@ -302,7 +302,7 @@ solo al comando del statusline— al resto de las entradas generadas:
   de runtime de Claude Code).
 - `env.EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT`: valor POSIX absoluto.
 
-El orquestador `scripting/setup.ts` SHALL normalizar la raíz del proxy con
+El orquestador `scripting/install/setup.ts` SHALL normalizar la raíz del proxy con
 `resolvePosixAbsolutePath` antes de propagarla a cualquier función de feature.
 
 #### Scenario: Install en Windows produce comandos con forward slashes

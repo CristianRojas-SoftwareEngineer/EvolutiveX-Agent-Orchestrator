@@ -6,7 +6,7 @@ import {
   buildStatuslineOutput,
   resolveProjectRoot,
   type ClaudeSettingsEnv,
-} from '../../scripting/router-status.js';
+} from '../../scripting/provider/router-status.js';
 import { EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT_KEY } from '../../scripting/shared/claude-settings.js';
 import { createValidProxyRoot } from './helpers/proxy-root-fixture.js';
 

@@ -1,8 +1,5 @@
 import type { AnthropicContentBlock } from '../../types/anthropic.types.js';
-import type {
-  ToolCompletionAuthority,
-  ToolUseStatus,
-} from '../../types/gateway/tool-use.types.js';
+import type { ToolCompletionAuthority, ToolUseStatus } from '../../types/gateway/tool-use.types.js';
 import type { IToolUse } from '../../interfaces/gateway/IToolUse.js';
 
 export class ToolUse implements IToolUse {

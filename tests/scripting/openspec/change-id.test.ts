@@ -199,7 +199,9 @@ describe('collectChangeDirectories', () => {
     const phaseName = '2026-05-29--c00008-gateway-g4-audit-projection';
     mkdirSync(join(changesDir, 'archive', parent, 'phases', phaseName), { recursive: true });
 
-    const phaseEntries = collectChangeDirectories(changesDir).filter((e) => e.rawName === phaseName);
+    const phaseEntries = collectChangeDirectories(changesDir).filter(
+      (e) => e.rawName === phaseName,
+    );
     expect(phaseEntries).toHaveLength(1);
     expect(phaseEntries[0].numericId).toBe(8);
   });

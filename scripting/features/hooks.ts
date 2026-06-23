@@ -75,8 +75,6 @@ export function resolveHooksBlock(hooks: HooksBlock, scpRoot: string): HooksBloc
  * Un comando es de SCP si su path normalizado contiene:
  * - `post-hook-event`
  * - `session-end-hook`
- * - `detached-session-end-relay` (legacy; conservado solo para limpiar
- *   instalaciones previas en la reinstalación/uninstall)
  * - La ruta resolved del repo (sin backslash)
  */
 export function isScpManagedCommand(command: string | undefined, scpRoot: string): boolean {
@@ -86,7 +84,6 @@ export function isScpManagedCommand(command: string | undefined, scpRoot: string
   return (
     normalized.includes('post-hook-event') ||
     normalized.includes('session-end-hook') ||
-    normalized.includes('detached-session-end-relay') ||
     normalized.includes(rootNormalized)
   );
 }

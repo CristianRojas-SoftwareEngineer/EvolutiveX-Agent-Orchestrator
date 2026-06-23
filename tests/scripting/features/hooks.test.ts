@@ -28,15 +28,6 @@ describe('isScpManagedCommand', () => {
     ).toBe(true);
   });
 
-  it('detecta detached-session-end-relay (legacy, para limpiar instalaciones viejas)', () => {
-    expect(
-      isScpManagedCommand(
-        'npx tsx /c/repos/scp/scripting/detached-session-end-relay.ts',
-        scpRoot,
-      ),
-    ).toBe(true);
-  });
-
   it('detecta post-hook-event', () => {
     expect(isScpManagedCommand('npx tsx /c/repos/scp/scripting/post-hook-event.ts', scpRoot)).toBe(
       true,

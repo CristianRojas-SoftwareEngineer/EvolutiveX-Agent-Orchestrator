@@ -29,13 +29,6 @@ const OLD_SNIPPET = `    created: z
 
 const NEW_SNIPPET = `    created: z
         .string()
-        .regex(/^\\d{4}-\\d{2}-\\d{2}T[\\d:.+-]+Z?$/, {
-        message: 'created must be ISO 8601 format',
-    })
-        .optional(),`;
-
-const DUAL_SNIPPET = `    created: z
-        .string()
         .regex(/^\\d{4}-\\d{2}-\\d{2}(T[\\d:.+-]+Z?)?$/, {
         message: 'created must be YYYY-MM-DD or ISO 8601 format',
     })
@@ -50,17 +43,8 @@ function main(): void {
         process.exit(0);
     }
 
-    if (content.includes("message: 'created must be ISO 8601 format'")) {
-        console.log('openspec change-metadata ya parcheado (ISO estricto)');
-        return;
-    }
-    if (content.includes(DUAL_SNIPPET)) {
-        writeFileSync(SCHEMA_PATH, content.replace(DUAL_SNIPPET, NEW_SNIPPET), 'utf8');
-        console.log('openspec change-metadata actualizado a created ISO estricto');
-        return;
-    }
-    if (content.includes('ISO 8601 format')) {
-        console.log('openspec change-metadata ya parcheado');
+    if (content.includes("message: 'created must be YYYY-MM-DD or ISO 8601 format'")) {
+        console.log('openspec change-metadata ya parcheado (dual YYYY-MM-DD / ISO 8601)');
         return;
     }
     if (!content.includes(OLD_SNIPPET)) {
@@ -68,7 +52,7 @@ function main(): void {
         process.exit(1);
     }
     writeFileSync(SCHEMA_PATH, content.replace(OLD_SNIPPET, NEW_SNIPPET), 'utf8');
-    console.log('Parcheado openspec change-metadata para created ISO 8601');
+    console.log('Parcheado openspec change-metadata: created acepta YYYY-MM-DD o ISO 8601 completo');
 }
 
 main();

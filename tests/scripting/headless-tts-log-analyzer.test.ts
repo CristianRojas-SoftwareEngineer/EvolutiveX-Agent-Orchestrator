@@ -38,10 +38,10 @@ describe('isExpectedSessionStartFallback', () => {
     expect(inferMessageType(200, [fallback])).toBe('dynamic');
   });
 
-  it('acepta UserPromptSubmit sin clave de OpenRouter (TTS aún no configurado)', () => {
+  it('acepta UserPromptSubmit sin clave de Gemini (TTS aún no configurado)', () => {
     const fallback = {
       eventName: 'UserPromptSubmit',
-      reason: 'no-openrouter-key',
+      reason: 'no-gemini-key',
       fallbackText: FALLBACK_SPEECH.UserPromptSubmit,
     };
     expect(isExpectedSessionStartFallback(fallback)).toBe(true);
@@ -213,7 +213,7 @@ describe('inferMessageType', () => {
           tag: '[TTS-FALLBACK]',
           eventName: 'Stop',
           usedFallback: true,
-          reason: 'no-openrouter-key',
+          reason: 'no-gemini-key',
           fallbackText: STOP_FALLBACK_TEXT,
         }),
       ),

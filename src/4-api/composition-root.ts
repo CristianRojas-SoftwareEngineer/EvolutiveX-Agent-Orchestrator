@@ -19,7 +19,7 @@ import { AuditSseResponseHandler } from '../3-operations/audit-sse-response.hand
 import { AuditStandardResponseHandler } from '../3-operations/audit-standard-response.handler.js';
 import { AuditUpstreamErrorHandler } from '../3-operations/audit-upstream-error.handler.js';
 import { FilterToolsHandler } from '../3-operations/filter-tools.handler.js';
-import { SapiTTSService } from '../2-services/tts/sapi-tts.service.js';
+import { GeminiTTSService } from '../2-services/tts/gemini-tts.service.js';
 import { TranscriptContextExtractor } from '../2-services/tts/transcript-extractor.service.js';
 import { DesktopNotificationAdapter } from '../2-services/notifications/DesktopNotificationAdapter.js';
 import { resolveBranding } from '../2-services/notifications/cli.js';
@@ -99,9 +99,12 @@ export async function createProxyDependencies(
   const auditUpstreamErrorHandler = new AuditUpstreamErrorHandler(workflowRepo);
   const filterToolsHandler = new FilterToolsHandler(config);
 
+  // Credencial TTS dedicada: leída una vez al arranque desde el secrets de Gemini
+  const ttsApiKey = await resolveTtsApiKey();
+
   // Servicios de TTS — opcionales; se desactivan si TTS_ENABLED=false
   const ttsEnabled = config.TTS_ENABLED !== false;
-  const ttsService = ttsEnabled ? new SapiTTSService() : undefined;
+  const ttsService = ttsEnabled ? new GeminiTTSService(ttsApiKey) : undefined;
   const contextExtractor = ttsEnabled ? new TranscriptContextExtractor() : undefined;
 
   if (ttsService) {
@@ -114,9 +117,6 @@ export async function createProxyDependencies(
 
   // Branding por defecto para el toast del Stop (appId + icono fallback global)
   const toastBranding = resolveBranding({ sound: false, silent: false, stdinJson: false });
-
-  // Credencial TTS dedicada: leída una vez al arranque desde el secrets de OpenRouter
-  const ttsApiKey = await resolveTtsApiKey();
 
   const kanbanProjector = new KanbanBoardProjector(
     path.join(process.cwd(), '.agentkanban'),
@@ -154,15 +154,15 @@ export async function createProxyDependencies(
 
 export type ProxyDependencies = Awaited<ReturnType<typeof createProxyDependencies>>;
 
-/** Lee la API key de OpenRouter para el provider TTS dedicado. Devuelve `undefined` si el archivo no existe o no contiene la clave. Acepta override de ruta via OPENROUTER_SECRETS_PATH (para tests). */
+/** Lee la API key de Gemini para el provider TTS dedicado. Devuelve `undefined` si el archivo no existe o no contiene la clave. Acepta override de ruta via GEMINI_SECRETS_PATH (para tests). */
 async function resolveTtsApiKey(): Promise<string | undefined> {
   const secretsPath =
-    process.env['OPENROUTER_SECRETS_PATH'] ??
-    path.join(process.cwd(), 'routing', 'providers', 'openrouter', 'secrets.json');
+    process.env['GEMINI_SECRETS_PATH'] ??
+    path.join(process.cwd(), 'routing', 'providers', 'gemini', 'secrets.json');
   try {
     const raw = await fs.readFile(secretsPath, 'utf8');
     const parsed = JSON.parse(raw) as Record<string, unknown>;
-    const key = parsed['ANTHROPIC_AUTH_TOKEN'];
+    const key = parsed['GEMINI_API_KEY'];
     return typeof key === 'string' && key.trim() ? key.trim() : undefined;
   } catch {
     return undefined;

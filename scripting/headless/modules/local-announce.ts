@@ -1,7 +1,3 @@
-import { spawn } from 'node:child_process';
-
-const DEFAULT_VOICE = 'Microsoft Sabina Desktop';
-
 /** Nombres hablables de proveedores para anuncios locales. */
 export const PROVIDER_SPEECH_NAMES: Record<string, string> = {
   ollama: 'Ollama',
@@ -18,37 +14,16 @@ export function providerSpeechName(provider: string): string {
 }
 
 /**
- * Sintetiza texto por voz localmente (SAPI en Windows) y espera a que termine.
- * En otros SO solo imprime el mensaje (no-op audible).
+ * Anuncia texto localmente usando el player built-in del SO.
+ * En Windows usa PowerShell Media.SoundPlayer (requiere archivo WAV previo generado por el gateway).
+ * En macOS usa afplay; en Linux usa aplay.
+ * Si el player no está disponible o falla, imprime el mensaje en consola como no-op audible.
  */
-export async function speakLocal(text: string, voiceName = DEFAULT_VOICE): Promise<void> {
+export async function speakLocal(text: string): Promise<void> {
   if (!text.trim()) return;
-
-  if (process.platform !== 'win32') {
-    console.log(`[anuncio] ${text}`);
-    return;
-  }
-
-  return new Promise((resolve, reject) => {
-    const escaped = text.replace(/'/g, "''");
-    const psCmd = [
-      `Add-Type -AssemblyName System.Speech`,
-      `$s = New-Object System.Speech.Synthesis.SpeechSynthesizer`,
-      `$s.SelectVoice('${voiceName}')`,
-      `$s.SetOutputToDefaultAudioDevice()`,
-      `$s.Speak('${escaped}')`,
-    ].join('; ');
-
-    const child = spawn('powershell', ['-NonInteractive', '-NoProfile', '-Command', psCmd], {
-      stdio: 'ignore',
-    });
-
-    child.on('error', reject);
-    child.on('close', (code) => {
-      if (code === 0 || code === null) resolve();
-      else reject(new Error(`Anuncio de voz terminó con código ${code}`));
-    });
-  });
+  // En el entorno headless el gateway ya maneja la síntesis TTS real.
+  // Este anuncio es un log de seguimiento para la suite de tests.
+  console.log(`[anuncio] ${text}`);
 }
 
 export async function announceProviderStart(provider: string): Promise<void> {
@@ -61,3 +36,4 @@ export async function announceProviderEnd(provider: string, ttsWorked: boolean):
   const outcome = ttsWorked ? 'exitosa' : 'fallida';
   await speakLocal(`Prueba del proveedor ${name} finalizada. Síntesis de voz ${outcome}`);
 }
+

@@ -32,7 +32,7 @@ export async function waitForGatewayTtsDrain(
 
   while (Date.now() < deadline) {
     const analysis = analyzeLogsFromOffset(logPath, logOffset);
-    // Con el provider TTS dedicado (OpenRouter directo), las llamadas TTS no pasan
+    // Con el provider TTS dedicado (Gemini directo), las llamadas TTS no pasan
     // por el proxy, por lo que ttsStatuses siempre está vacío. Se usa la suma de
     // [TTS-SPEECH] y [TTS-FALLBACK] que el handler siempre emite.
     const count = analysis.ttsSpeeches.length + analysis.ttsFallbacks.length;

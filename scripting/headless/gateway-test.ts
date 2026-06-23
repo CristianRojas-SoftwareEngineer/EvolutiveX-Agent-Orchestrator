@@ -268,7 +268,7 @@ async function testProvider(provider: string, opts: CliOptions): Promise<Provide
     );
 
     // Éxito: Stop dinámico detectado por [TTS-SPEECH] (provider TTS dedicado no pasa por proxy).
-    // UserPromptSubmit sin historial (no-messages/no-openrouter-key) es esperado al primer prompt.
+    // UserPromptSubmit sin historial (no-messages/no-gemini-key) es esperado al primer prompt.
     const stopSpeech = logAnalysis.ttsSpeeches.some((s) => s.eventName === 'Stop');
     const ttsWorked =
       promptCheck.ok && !silentFallback && !logAnalysis.stopUsedFallback && stopSpeech;
@@ -356,9 +356,9 @@ function buildResult(
 }
 
 /**
- * Escenario de fallback sin clave TTS: arranca el proxy con OPENROUTER_SECRETS_PATH
+ * Escenario de fallback sin clave TTS: arranca el proxy con GEMINI_SECRETS_PATH
  * apuntando a una ruta inexistente, corre un prompt headless y verifica que el log
- * emite [TTS-FALLBACK] reason: no-openrouter-key. No produce TTS de voz (fallback).
+ * emite [TTS-FALLBACK] reason: no-gemini-key. No produce TTS de voz (fallback).
  * Devuelve true si el escenario pasó.
  */
 async function testFallbackScenario(opts: CliOptions): Promise<boolean> {
@@ -371,7 +371,7 @@ async function testFallbackScenario(opts: CliOptions): Promise<boolean> {
   await sleep(1000);
 
   // Provider de sesión: default (OAuth) — no importa; lo que cambia es que el proxy
-  // no puede leer la clave TTS de OpenRouter.
+  // no puede leer la clave TTS de Gemini.
   let providerEnv: ReturnType<typeof buildIsolatedProviderEnv>;
   try {
     providerEnv = buildIsolatedProviderEnv('default', port);
@@ -388,12 +388,12 @@ async function testFallbackScenario(opts: CliOptions): Promise<boolean> {
   let passed = false;
 
   try {
-    // OPENROUTER_SECRETS_PATH a ruta inexistente → resolveTtsApiKey devuelve undefined
+    // GEMINI_SECRETS_PATH a ruta inexistente → resolveTtsApiKey devuelve undefined
     proxyHandle = startProxy(PROJECT_ROOT, port, {
       ...proxyEnv,
       LOG_FILE: logPath,
       AUDIT_BASE_DIR: join(PROJECT_ROOT, TEST_AUDIT_BASE_DIR),
-      OPENROUTER_SECRETS_PATH: '/nonexistent/tts-secrets.json',
+      GEMINI_SECRETS_PATH: '/nonexistent/tts-secrets.json',
     });
     const healthy = await waitHealth(port, opts.healthTimeout);
     if (!healthy) {
@@ -430,13 +430,13 @@ async function testFallbackScenario(opts: CliOptions): Promise<boolean> {
     );
 
     const logAnalysis = analyzeLogsFromOffset(logPath, logOffset);
-    const noKeyFallback = logAnalysis.ttsFallbacks.some((f) => f.reason === 'no-openrouter-key');
+    const noKeyFallback = logAnalysis.ttsFallbacks.some((f) => f.reason === 'no-gemini-key');
 
     if (noKeyFallback) {
-      console.log(chalk.green('  ✓ Fallback no-openrouter-key detectado'));
+      console.log(chalk.green('  ✓ Fallback no-gemini-key detectado'));
       passed = true;
     } else {
-      console.log(chalk.red('  ✗ No se detectó [TTS-FALLBACK] reason: no-openrouter-key'));
+      console.log(chalk.red('  ✗ No se detectó [TTS-FALLBACK] reason: no-gemini-key'));
       console.log(
         chalk.gray(
           `  Fallbacks encontrados: ${JSON.stringify(logAnalysis.ttsFallbacks.map((f) => f.reason))}`,

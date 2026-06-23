@@ -19,8 +19,8 @@ import { FALLBACK_SPEECH } from '../2-services/tts/fallback-speech.constants.js'
 import { resolveSessionDir } from './audit-workflow-closure.handler.js';
 import { KanbanBoardProjector } from './kanban-board.projector.js';
 
-const TTS_OPENROUTER_URL = 'https://openrouter.ai/api/v1/messages';
-const TTS_MODEL = 'poolside/laguna-xs.2:free';
+const GEMINI_FLASH_URL =
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
 const TTS_MAX_TOKENS = 128;
 
 const VOICE_ASSISTANT_SYSTEM_PROMPT =
@@ -39,19 +39,6 @@ const CONTINUITY_SYSTEM_PROMPT =
   'Texto plano para ser leído en voz alta: sin markdown, sin asteriscos, ' +
   'comillas, guiones ni símbolos. Sin puntos al final de las oraciones. Habla en primera persona.';
 
-type MessageContentBlock = { type: string; text?: string };
-
-function extractSpeakableTextFromContent(content: MessageContentBlock[] | undefined): string {
-  if (!content?.length) return '';
-  return content
-    .filter(
-      (b): b is { type: 'text'; text: string } => b.type === 'text' && typeof b.text === 'string',
-    )
-    .map((b) => b.text.trim())
-    .filter(Boolean)
-    .join(' ')
-    .trim();
-}
 
 export class AuditHookEventHandler {
   constructor(
@@ -331,7 +318,7 @@ export class AuditHookEventHandler {
     const fallback = FALLBACK_SPEECH[eventName] ?? 'Procesando.';
 
     if (!this.ttsApiKey) {
-      this.logTtsFallback(eventName, 'no-openrouter-key', fallback);
+      this.logTtsFallback(eventName, 'no-gemini-key', fallback);
       return fallback;
     }
     if (messages.length === 0) {
@@ -343,29 +330,23 @@ export class AuditHookEventHandler {
       const systemPrompt =
         mode === 'prompt' ? VOICE_ASSISTANT_SYSTEM_PROMPT : CONTINUITY_SYSTEM_PROMPT;
 
-      const chatHistory = messages.map((m) => ({
-        role: (m.role === 'system' ? 'user' : m.role) as 'user' | 'assistant',
-        content: m.role === 'system' ? `[Sistema]: ${m.text}` : m.text,
+      // Gemini usa role "model" (no "assistant") y no acepta role "system" en contents
+      const contents = messages.map((m) => ({
+        role: (m.role === 'assistant' ? 'model' : 'user') as 'user' | 'model',
+        parts: [{ text: m.role === 'system' ? `[Sistema]: ${m.text}` : m.text }],
       }));
 
-      if (chatHistory.at(-1)?.role !== 'user') {
-        chatHistory.push({ role: 'user', content: '¿Qué pasó en este turno?' });
+      if (contents.at(-1)?.role !== 'user') {
+        contents.push({ role: 'user', parts: [{ text: '¿Qué pasó en este turno?' }] });
       }
 
-      const res = await fetch(TTS_OPENROUTER_URL, {
+      const res = await fetch(`${GEMINI_FLASH_URL}?key=${this.ttsApiKey}`, {
         method: 'POST',
-        headers: {
-          authorization: `Bearer ${this.ttsApiKey}`,
-          'content-type': 'application/json',
-          'HTTP-Referer': 'https://smartcodeproxy.local',
-          'X-Title': 'Smart Code Proxy',
-        },
+        headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          model: TTS_MODEL,
-          messages: chatHistory,
-          system: systemPrompt,
-          max_tokens: TTS_MAX_TOKENS,
-          reasoning: { effort: 'none' },
+          contents,
+          systemInstruction: { parts: [{ text: systemPrompt }] },
+          generationConfig: { maxOutputTokens: TTS_MAX_TOKENS },
         }),
       });
 
@@ -374,8 +355,15 @@ export class AuditHookEventHandler {
         return fallback;
       }
 
-      const data = (await res.json()) as { content?: MessageContentBlock[] };
-      const text = extractSpeakableTextFromContent(data.content);
+      const data = (await res.json()) as {
+        candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+      };
+      // Las partes de Gemini tienen { text } sin campo `type`; extraer directamente.
+      const text = (data.candidates?.[0]?.content?.parts ?? [])
+        .map((p) => (typeof p.text === 'string' ? p.text.trim() : ''))
+        .filter(Boolean)
+        .join(' ')
+        .trim();
 
       if (!text) {
         this.logTtsFallback(eventName, 'empty-response', fallback);

@@ -370,11 +370,13 @@ describe('AuditHookEventHandler', () => {
 
 describe('AuditHookEventHandler UserPromptSubmit con TTS', () => {
   it('UserPromptSubmit con transcript previo envía al LLM la tríada user/assistant/user', async () => {
-    // Mockear fetch global para capturar la petición a OpenRouter
+    // Mockear fetch global para capturar la petición a Gemini Flash
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
-      json: async () => ({ content: [{ type: 'text', text: 'Voy a refactorizar' }] }),
+      json: async () => ({
+        candidates: [{ content: { parts: [{ text: 'Voy a refactorizar' }] } }],
+      }),
     });
     vi.stubGlobal('fetch', fetchMock);
 
@@ -397,7 +399,7 @@ describe('AuditHookEventHandler UserPromptSubmit con TTS', () => {
       3,
       undefined,
       undefined,
-      'fake-openrouter-key',
+      'fake-gemini-key',
     );
 
     handler.execute({
@@ -412,13 +414,12 @@ describe('AuditHookEventHandler UserPromptSubmit con TTS', () => {
 
     expect(fetchMock).toHaveBeenCalledOnce();
     const body = JSON.parse(fetchMock.mock.calls[0][1].body);
-    expect(body.messages).toEqual([
-      { role: 'user', content: 'petición anterior del usuario' },
-      { role: 'assistant', content: 'respuesta del turno previo' },
-      { role: 'user', content: 'prompt actual' },
+    expect(body.contents).toEqual([
+      { role: 'user', parts: [{ text: 'petición anterior del usuario' }] },
+      { role: 'model', parts: [{ text: 'respuesta del turno previo' }] },
+      { role: 'user', parts: [{ text: 'prompt actual' }] },
     ]);
-    expect(body.system).toContain('Responde SOLO a la nueva petición');
-    expect(body.model).toBe('poolside/laguna-xs.2:free');
+    expect(body.systemInstruction.parts[0].text).toContain('Responde SOLO a la nueva petición');
     expect(speak).toHaveBeenCalledWith('Voy a refactorizar');
 
     vi.unstubAllGlobals();
@@ -428,7 +429,9 @@ describe('AuditHookEventHandler UserPromptSubmit con TTS', () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
-      json: async () => ({ content: [{ type: 'text', text: 'Entendido, voy a investigar' }] }),
+      json: async () => ({
+        candidates: [{ content: { parts: [{ text: 'Entendido, voy a investigar' }] } }],
+      }),
     });
     vi.stubGlobal('fetch', fetchMock);
 
@@ -451,7 +454,7 @@ describe('AuditHookEventHandler UserPromptSubmit con TTS', () => {
       3,
       undefined,
       undefined,
-      'fake-openrouter-key',
+      'fake-gemini-key',
     );
 
     handler.execute({
@@ -465,8 +468,8 @@ describe('AuditHookEventHandler UserPromptSubmit con TTS', () => {
     await new Promise((r) => setTimeout(r, 100));
 
     const body = JSON.parse(fetchMock.mock.calls[0][1].body);
-    expect(body.messages).toEqual([{ role: 'user', content: 'primer mensaje' }]);
-    expect(body.system).toContain('Responde SOLO a la nueva petición');
+    expect(body.contents).toEqual([{ role: 'user', parts: [{ text: 'primer mensaje' }] }]);
+    expect(body.systemInstruction.parts[0].text).toContain('Responde SOLO a la nueva petición');
     expect(speak).toHaveBeenCalledWith('Entendido, voy a investigar');
 
     vi.unstubAllGlobals();

@@ -42,7 +42,7 @@ Al recibir un evento `UserPromptSubmit`, el sistema SHALL componer un contexto c
 - **WHEN** el backend construye el contexto para el LLM
 - **THEN** SHALL enviar un `messages` con un único elemento: `{role: "user", content: <event.prompt>}`
 - **AND** SHALL usar el system prompt `VOICE_ASSISTANT_SYSTEM_PROMPT` reformulado
-- **AND** si la llamada a OpenRouter falla o no hay clave, SHALL reproducir `FALLBACK_SPEECH.UserPromptSubmit`
+- **AND** si la llamada a Gemini falla o no hay clave, SHALL reproducir `FALLBACK_SPEECH.UserPromptSubmit`
 
 #### Scenario: El contexto no incluye el prompt anterior como objetivo
 - **GIVEN** el hook `UserPromptSubmit` es recibido con un `transcript_path` válido
@@ -69,37 +69,46 @@ Al recibir `Stop`, `SubagentStop` o `StopFailure`, el sistema SHALL extraer los 
 
 ---
 
-### Requirement: Provider dedicado de inferencia TTS (OpenRouter)
-La generación del texto de resumen TTS SHALL usar siempre un provider dedicado, independiente del provider activo de la sesión: OpenRouter (`https://openrouter.ai/api/v1/messages`) con el modelo fijo `poolside/laguna-xs.2:free`, `max_tokens: 512` y `reasoning: { effort: 'none' }`. La credencial SHALL ser el `ANTHROPIC_AUTH_TOKEN` de `routing/providers/openrouter/secrets.json`, resuelta en el arranque e inyectada por el composition root. La llamada SHALL ir directa al upstream de OpenRouter (no a través del proxy local) con headers `Authorization: Bearer <key>`, `HTTP-Referer` y `X-Title`.
+### Requirement: Provider dedicado de inferencia TTS (OpenRouter → Gemini)
+La generación del texto de intención/resumen TTS SHALL usar siempre un provider dedicado, independiente del provider activo de la sesión: Gemini Flash (`gemini-2.5-flash`) para la generación del texto de intención o resumen, y Gemini TTS (`gemini-2.5-flash-preview-tts`) para la síntesis de voz. La credencial SHALL ser el `GEMINI_API_KEY` de `routing/providers/gemini/secrets.json`, resuelta en el arranque e inyectada por el composition root. La llamada SHALL ir directa a la API de Gemini (no a través del proxy local).
 
-Si la credencial no está disponible, el sistema SHALL emitir `[TTS-FALLBACK]` con `reason: no-openrouter-key` y usar el mensaje genérico de fallback sin intentar ninguna llamada. No SHALL haber validación proactiva de la clave ni fallback al provider de la sesión: cualquier fallo de la llamada (HTTP no-2xx, timeout, respuesta sin bloques `text`) SHALL caer al fallback genérico con su `reason` correspondiente.
+La síntesis SHALL usar `gemini-2.5-flash-preview-tts`, que devuelve PCM 24kHz/16-bit mono codificado en base64; el sistema SHALL añadir un encabezado WAV estándar al PCM y escribir el resultado en un archivo temporal, reproduciéndolo con el player built-in del SO según `process.platform`: PowerShell `Media.SoundPlayer` en Windows, `afplay` en macOS, `aplay`/`paplay` en Linux.
 
-#### Scenario: Sesión con cualquier provider genera resumen vía OpenRouter
+Si la credencial no está disponible, el sistema SHALL emitir `[TTS-FALLBACK]` con `reason: no-gemini-key` y usar el mensaje genérico de fallback sin intentar ninguna llamada. No SHALL haber validación proactiva de la clave ni fallback al provider de la sesión: cualquier fallo de la llamada (HTTP no-2xx, timeout, respuesta vacía) SHALL caer al fallback genérico con su `reason` correspondiente.
+
+#### Scenario: Sesión con cualquier provider genera texto vía Gemini Flash
 - **GIVEN** que la sesión activa usa MiniMax (o Anthropic, u Ollama) como provider
-- **AND** `routing/providers/openrouter/secrets.json` contiene una API key
+- **AND** `routing/providers/gemini/secrets.json` contiene una API key
 - **WHEN** el handler procesa un evento `Stop`
-- **THEN** SHALL llamar a `https://openrouter.ai/api/v1/messages` con el modelo `poolside/laguna-xs.2:free` y bearer de OpenRouter
+- **THEN** SHALL llamar a `gemini-2.5-flash` para generar el texto de continuidad
 - **AND** el provider de la sesión NO SHALL recibir ninguna petición de inferencia TTS
 
-#### Scenario: Sin clave de OpenRouter usa fallback genérico
-- **GIVEN** que `routing/providers/openrouter/secrets.json` no existe o no contiene clave
+#### Scenario: Sin clave de Gemini usa fallback genérico
+- **GIVEN** que `routing/providers/gemini/secrets.json` no existe o no contiene clave
 - **WHEN** el handler procesa un evento `Stop`
-- **THEN** SHALL emitir `[TTS-FALLBACK]` con `reason: "no-openrouter-key"`
+- **THEN** SHALL emitir `[TTS-FALLBACK]` con `reason: "no-gemini-key"`
 - **AND** SHALL reproducir el mensaje de fallback definido para `Stop` sin hacer ninguna petición HTTP
 
-#### Scenario: Fallo de OpenRouter cae al fallback sin reintentos hacia el provider de sesión
-- **GIVEN** que OpenRouter responde con error (ej. 429) o la petición agota el timeout
+#### Scenario: Fallo de Gemini cae al fallback sin reintentos hacia el provider de sesión
+- **GIVEN** que la API de Gemini responde con error (ej. 429) o la petición agota el timeout
 - **WHEN** el handler procesa un evento `Stop`
 - **THEN** SHALL emitir `[TTS-FALLBACK]` con el `reason` correspondiente (`http-429`, `exception`, etc.)
 - **AND** NO SHALL intentar la inferencia contra el provider de la sesión
 
+#### Scenario: Síntesis con Gemini TTS produce audio WAV reproducible por player del SO
+- **GIVEN** que `gemini-2.5-flash-preview-tts` devuelve PCM 24kHz/16-bit mono en base64
+- **WHEN** el servicio TTS procesa la respuesta
+- **THEN** SHALL envolver el PCM en un encabezado WAV estándar y escribirlo en un archivo temporal
+- **AND** SHALL reproducirlo con el player built-in del SO según `process.platform`
+- **AND** SHALL eliminar el archivo temporal tras la reproducción
+
 ---
 
 ### Requirement: Robustez en la Inferencia y Reproducción de Audio
-Cualquier fallo al leer el transcript, al invocar al LLM para el resumen/respuesta, o al reproducir el audio NO SHALL afectar el ciclo de vida normal de Claude Code ni bloquear las respuestas del proxy. Cada fallo SHALL ser registrado como `[TTS-FALLBACK]` con `reason` identificando la causa (`no-openrouter-key`, `no-messages`, `http-NNN`, `empty-response`, `exception`), de forma que sea detectable sin afectar el flujo principal. La reproducción de audio SHALL completarse antes de que el handler retorne; el servicio TTS SHALL esperar al cierre del proceso de síntesis.
+Cualquier fallo al leer el transcript, al invocar a Gemini para el resumen/respuesta, o al reproducir el audio NO SHALL afectar el ciclo de vida normal de Claude Code ni bloquear las respuestas del proxy. Cada fallo SHALL ser registrado como `[TTS-FALLBACK]` con `reason` identificando la causa (`no-gemini-key`, `no-messages`, `http-NNN`, `empty-response`, `exception`), de forma que sea detectable sin afectar el flujo principal. La reproducción de audio SHALL completarse antes de que el handler retorne; el servicio TTS SHALL esperar al cierre del proceso de síntesis.
 
 #### Scenario: Falla de la API de resumen
-- **GIVEN** un fallo de conexión al LLM o falta de API Key de OpenRouter
+- **GIVEN** un fallo de conexión a Gemini o falta de API Key de Gemini
 - **WHEN** se procesa un hook `Stop`
 - **THEN** el sistema SHALL usar una locución de fallback predefinida (ej. "El asistente terminó el trabajo.") y reproducirla.
 - **AND** SHALL emitir `[TTS-FALLBACK]` con `reason` identificando la causa del fallo
@@ -113,14 +122,14 @@ Cualquier fallo al leer el transcript, al invocar al LLM para el resumen/respues
 
 ### Requirement: Toast de continuidad del Stop emitido por el gateway
 
-Al recibir el evento `Stop`, `AuditHookEventHandler` SHALL generar el texto de continuidad **una sola vez** (vía el provider TTS dedicado de OpenRouter) y emitirlo por **dos canales independientes a partir del mismo texto**:
+Al recibir el evento `Stop`, `AuditHookEventHandler` SHALL generar el texto de continuidad **una sola vez** (vía el provider TTS dedicado de Gemini) y emitirlo por **dos canales independientes a partir del mismo texto**:
 
 1. Voz, mediante el servicio TTS local (comportamiento ya existente).
 2. Un toast de escritorio, mediante `INotificationService` inyectado en el handler.
 
 El toast SHALL tener título `"Stop"` y cuerpo igual al texto de continuidad truncado a un máximo de 250 caracteres. La generación del texto es independiente del provider de la sesión, por lo que el resultado SHALL ser consistente con cualquier provider Anthropic-compatible activo (Anthropic, Minimax, Ollama, etc.).
 
-Si no hay servicio de notificación inyectado, o si la emisión del toast falla, el handler SHALL continuar sin propagar el error; el fallo del toast NO SHALL afectar la voz, la auditoría ni la respuesta HTTP del hook. Si el texto generado no está disponible (sin clave de OpenRouter, sin contexto o error de LLM), el handler SHALL usar el mismo texto de fallback que la voz para el cuerpo del toast.
+Si no hay servicio de notificación inyectado, o si la emisión del toast falla, el handler SHALL continuar sin propagar el error; el fallo del toast NO SHALL afectar la voz, la auditoría ni la respuesta HTTP del hook. Si el texto generado no está disponible (sin clave de Gemini, sin contexto o error de LLM), el handler SHALL usar el mismo texto de fallback que la voz para el cuerpo del toast.
 
 #### Scenario: Stop con provider no-Anthropic genera voz y toast consistentes
 
@@ -140,7 +149,7 @@ Si no hay servicio de notificación inyectado, o si la emisión del toast falla,
 
 #### Scenario: Sin texto generado usa fallback en ambos canales
 
-- **GIVEN** el evento `Stop` llega sin clave de OpenRouter disponible o sin contexto extraíble
+- **GIVEN** el evento `Stop` llega sin clave de Gemini disponible o sin contexto extraíble
 - **WHEN** `AuditHookEventHandler` procesa el evento
 - **THEN** SHALL usar el texto de fallback definido para `Stop`
 - **AND** SHALL reproducir ese fallback por voz
@@ -164,7 +173,7 @@ El sistema SHALL extraer únicamente los bloques con `type === "text"` de la res
 ---
 
 ### Requirement: Logging estructurado de fallback y mensaje dinámico
-Cada vez que el sistema active un fallback TTS, SHALL emitir una entrada de log con tag `[TTS-FALLBACK]` incluyendo: `eventName`, `usedFallback: true`, `reason` (uno de: `no-openrouter-key`, `no-messages`, `http-NNN`, `empty-response`, `exception`) y `fallbackText`. Cada vez que se genere un mensaje dinámico, SHALL emitir `[TTS-SPEECH]` con `eventName`, `usedFallback: false` y una vista previa del texto (`textPreview`, máximo 120 caracteres).
+Cada vez que el sistema active un fallback TTS, SHALL emitir una entrada de log con tag `[TTS-FALLBACK]` incluyendo: `eventName`, `usedFallback: true`, `reason` (uno de: `no-gemini-key`, `no-messages`, `http-NNN`, `empty-response`, `exception`) y `fallbackText`. Cada vez que se genere un mensaje dinámico, SHALL emitir `[TTS-SPEECH]` con `eventName`, `usedFallback: false` y una vista previa del texto (`textPreview`, máximo 120 caracteres).
 
 #### Scenario: Fallback por error HTTP emite log con código
 - **GIVEN** que la llamada de inferencia TTS recibe un status HTTP distinto de 200 (ej. 429)
@@ -209,7 +218,7 @@ El extractor de contexto SHALL exponer un método que lea el transcript JSONL de
 El system prompt del modo `prompt` SHALL instruir explícitamente al LLM a responder SOLO al tercer mensaje del array (el prompt actual), describiendo el array como "petición anterior del usuario, tu última respuesta, y la nueva petición del usuario".
 
 #### Scenario: System prompt declarativo del orden de los mensajes
-- **WHEN** el handler construye la llamada a OpenRouter en `mode='prompt'`
+- **WHEN** el handler construye la llamada a Gemini en `mode='prompt'`
 - **THEN** SHALL usar el `system` field cuyo texto mencione explícitamente "la nueva petición del usuario" como objetivo de la respuesta
 
 ---

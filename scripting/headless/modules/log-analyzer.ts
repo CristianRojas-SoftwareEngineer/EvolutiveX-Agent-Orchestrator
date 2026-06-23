@@ -3,7 +3,7 @@ import { FALLBACK_SPEECH, STOP_FALLBACK_TEXT } from './fallback-speech.js';
 import type { LogAnalysisResult, TtsFallbackEvent, TtsSpeechEvent } from './types.js';
 
 /** Razones de fallback aceptables en UserPromptSubmit al inicio (sin historial o sin clave TTS). */
-const EXPECTED_USER_PROMPT_SUBMIT_REASONS = new Set(['no-messages', 'no-openrouter-key']);
+const EXPECTED_USER_PROMPT_SUBMIT_REASONS = new Set(['no-messages', 'no-gemini-key']);
 
 interface LogEntry {
   reqId?: string;
@@ -177,7 +177,7 @@ export function filterActionableTtsFallbacks(fallbacks: TtsFallbackEvent[]): Tts
 /**
  * Infiere tipo de mensaje Stop a partir de logs TTS.
  * Prioridad: fallbacks accionables > [TTS-SPEECH] presente > ttsStatus HTTP > unknown.
- * Con el provider TTS dedicado (OpenRouter directo), ttsStatus siempre es null;
+ * Con el provider TTS dedicado (Gemini directo), ttsStatus siempre es null;
  * se detecta éxito por la presencia de [TTS-SPEECH].
  */
 export function inferMessageType(

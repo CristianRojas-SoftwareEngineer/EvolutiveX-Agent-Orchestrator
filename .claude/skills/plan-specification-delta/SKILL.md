@@ -33,14 +33,18 @@ in **English** for token efficiency. Canonical policy: `<language_policy>` in
    node_modules/.bin/openspec instructions tasks --change "<name>" --json
    ```
    The JSON returns `instruction`, `template`, `context`, `rules`, `dependencies`,
-   and `resolvedOutputPath`. The schema requires the exact `- [ ] X.Y description`
-   checkbox format under `## numbered headings` — the apply stage parses it.
+   and `resolvedOutputPath`. Follow the schema's format verbatim: the mandatory base
+   is the `- [ ] X.Y description` checkbox format under `## numbered headings` — the
+   apply stage parses it — plus the schema's **optional, degradable inline tags**
+   (`~state` / `@assignee` after the description). The schema is the single source of
+   truth for the exact grammar; never re-describe it here.
 2. Read the proposal, specs, and design (dependencies) for context. Follow
    `instruction` and `template` exactly to write the task list, and write it to
    **`resolvedOutputPath`**. Apply `context`/`rules` as constraints; never copy them
    into the file.
 3. Re-run `openspec status --change "<name>" --json`, report completion (the delta is
-   now apply-ready), and hand control back to the orchestrator.
+   now apply-ready) inline; the orchestrator resolves and invokes the next stage in the
+   same turn.
 
 ## Cleanup tasks
 

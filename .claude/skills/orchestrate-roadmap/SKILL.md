@@ -51,7 +51,7 @@ next*; the delta orchestrator decides *which stage is next within the phase*.
 **L2 location invariant (CRITICAL).** Each L2 phase delta lives at
 `openspec/changes/<l2-name>/` (the CLI-indexed root) for its full lifecycle. Do **not**
 nest an L2 inside the L1 folder during the phase loop — it breaks `openspec
-list/validate/apply/archive` for that L2. The nested layout under the orchestrator is
+list/apply/archive` for that L2. The nested layout under the orchestrator is
 a **post-archive** convention only, applied at roadmap close-out.
 <!-- </two_level_model> -->
 
@@ -127,7 +127,10 @@ upfront — the registry enumerates them; each is created when its phase begins.
 For each phase, prerequisites first:
 
 1. **Dependency gate** — confirm every prerequisite phase is `archivada`
-   per the registry DAG. Not satisfied → CRITICAL, block.
+   per the registry DAG. Not satisfied → CRITICAL, block. For each prerequisite
+   phase, also verify its L2 directory is absent from `<changesDir>/`: if the
+   directory exists despite the registry showing `archivada`, it is CRITICAL —
+   the archive move was incomplete; run corrective archiving before proceeding.
 2. **Run the phase** — invoke `orchestrate-specification-delta` **once** for this
    phase's L2 delta (it drives explore→archive, including its own verify gate, sync,
    commit, and clean worktree). Never call stage skills directly.
@@ -157,7 +160,9 @@ checks that read the L1 registry/governance — never re-implementing the delta 
   back-reference to the orchestrator, and that id exists in the registry. Missing →
   CRITICAL.
 - **Dependency gate**: every prerequisite phase is `archivada` per the
-  registry DAG (verified before the phase starts). Violated → CRITICAL.
+  registry DAG (verified before the phase starts), and the L2 directory is
+  physically absent from `<changesDir>/` (registry + disk must agree).
+  Violated → CRITICAL.
 - **Definition of Done**: each applicable L1 governance requirement maps to
   evidence (gate passed, scope respected, tests green). Unmet → CRITICAL.
 

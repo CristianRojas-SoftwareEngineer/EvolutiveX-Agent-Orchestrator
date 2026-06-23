@@ -35,12 +35,21 @@ in **English** for token efficiency. Canonical policy: `<language_policy>` in
    ```
    The JSON returns `instruction`, `template`, `context`, `rules`, `dependencies`,
    and `resolvedOutputPath`.
-2. Read the proposal and the delta specs (dependencies) for context. Follow
-   `instruction` and `template` exactly to write the design, and write it to
+2. Read the proposal and the delta specs (dependencies) for context.
+3. **Resolve open decisions before writing.** After reading the dependencies, identify
+   every architectural or design choice that has more than one viable approach and
+   cannot be decided unilaterally (e.g. data-access pattern, layer placement, caching
+   strategy, API contract shape). If any such decisions exist, sub-invoke
+   [resolve-open-decisions](../resolve-open-decisions/SKILL.md) (Pattern A of
+   `artifact-structuring`) before writing a single line of `design.md`. Pass the list
+   of open decisions with their candidate options and the active change name. Receive
+   the resolved decisions as a hand-off and incorporate them into the design.
+4. Follow `instruction` and `template` exactly to write the design, and write it to
    **`resolvedOutputPath`**. Apply `context`/`rules` as constraints; never copy them
-   into the file.
-3. Re-run `openspec status --change "<name>" --json`, report completion and the next
-   `ready` artifact, and hand control back to the orchestrator.
+   into the file. Reflect the resolved decisions; do not re-open them.
+5. Re-run `openspec status --change "<name>" --json`, report completion and the next
+   `ready` artifact inline; the orchestrator resolves and invokes the next stage in the
+   same turn.
 
 ## Legacy migration strategy
 
@@ -56,4 +65,7 @@ concrete cleanup tasks.
 - Write to `resolvedOutputPath` from the instructions JSON; never the bare
   `outputPath` pattern.
 - `context`/`rules` are constraints for you, never content for the artifact.
+- Open design decisions must be resolved via `resolve-open-decisions` **before**
+  writing `design.md` — never inline a "¿A o B?" question or resolve a choice
+  unilaterally.
 <!-- </constraints> -->

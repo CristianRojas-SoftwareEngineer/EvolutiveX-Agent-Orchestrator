@@ -2,8 +2,8 @@
 name: create-specification-delta
 description: >
   Stage 2 of the specification-delta pipeline. Materializes the delta: derives the
-  incremental identifier c<NNNNN>-<slug> by stateless scan, then wraps the native
-  openspec new change command to scaffold openspec/changes/<name>/ with .openspec.yaml.
+  incremental identifier c<NNNNN>-<slug> by stateless scan, then runs the canonical
+  create script to scaffold openspec/changes/<name>/ with enriched .openspec.yaml.
   This is the only stage where the numeric id is minted. Invoked only by
   orchestrate-specification-delta.
 when_to_use: >
@@ -85,16 +85,17 @@ Archived folder: `2026-06-16--c00068-fix-change-id-increment`
 The same rule applies to all changes, including the L1/L2 changes of a roadmap (where
 the `phaseid` lives inside the slug: `c<NNNNN>-<prefix>-<phaseid>-<slug>`).
 
-## Step 2 — Scaffold via the native command
-
-Wrap the native command (`new` is a group whose only subcommand is `change`):
+## Step 2 — Scaffold via the canonical script
 
 ```bash
-node_modules/.bin/openspec new change "c<NNNNN>-<slug>"
+npm run openspec:create-specification-delta -- --slug "<slug>"
 ```
 
-This creates `openspec/changes/c<NNNNN>-<slug>/` with `.openspec.yaml` using the
-active schema (`sequential-spec-driven-design` from `openspec/config.yaml`).
+Stdout is the minted change name (`c<NNNNN>-<slug>`). The script derives the id
+internally via `computeNextChangeId`, writes `.openspec.yaml` (schema, created, title,
+status, updated), `conversation.md` stub, and gates on `openspec status --change … --json`.
+
+Optional: `--title "<human title>"`, `--json`, `--dry-run`.
 
 ## Step 3 — Confirm via the status JSON
 
@@ -104,15 +105,15 @@ node_modules/.bin/openspec status --change "c<NNNNN>-<slug>" --json
 
 Use `planningHome`, `changeRoot`, `artifactPaths`, and `nextSteps` from the JSON —
 never assume `openspec/changes/<name>/`. Report the minted name, location, the schema
-and its artifact sequence, and the first `ready` artifact. Hand control back to the
-orchestrator.
+and its artifact sequence, and the first `ready` artifact. Report the result inline;
+the orchestrator resolves and invokes the next stage in the same turn.
 <!-- </workflow> -->
 
 <!-- <constraints> -->
 - Mint the id **only here**; never re-derive numbering in other stages.
 - Derive `c<NNNNN>` **only** via `npm run openspec:next-change-id`; never scan inline.
 - The `c` prefix is mandatory and lowercase; the integer is zero-padded to 5 digits.
-- Scaffold strictly via `openspec new change`; do not hand-create the folder.
+- Scaffold strictly via `npm run openspec:create-specification-delta`; do not hand-create the folder or call `openspec new change`.
 - Do not create any planning artifact (proposal/specs/design/tasks) here.
 - If a change with the derived name already exists, re-scan — do not overwrite.
 <!-- </constraints> -->

@@ -2,10 +2,16 @@
 name: define-specification-delta
 description: >
   Stage 4 of the specification-delta pipeline. Thin wrapper that writes the delta
-  specs (the WHAT) under specs/**/*.md. Delegates all writing guidance and glob
-  iteration to the schema via openspec instructions specs --change <name> --json and
-  writes to resolvedOutputPath. Declares the legacy to retire as REMOVED requirements.
-  Invoked only by orchestrate-specification-delta.
+  specs (the WHAT) under specs/**/*.md. Delegates the per-capability writing format to
+  the schema via openspec instructions specs --change <name> --json and writes to
+  resolvedOutputPath. Branches by the delta class declared in the proposal:
+  *behavioral* → one delta-spec per capability (REMOVED/MODIFIED casings against
+  openspec/specs/); *non-canonical* (`### Non-canonical change`) → a non-canonical
+  record under specs/<area>/spec.md (retirements or additions) with no
+  `## ADDED/MODIFIED/REMOVED/RENAMED` headers. specs/ is never empty in either case.
+  Enforces completion via
+  openspec:verify-stage-completion before returning. Invoked only by
+  orchestrate-specification-delta.
 when_to_use: >
   Used by orchestrate-specification-delta after proposal.md, to write the delta specs.
   Not a standalone entry point.
@@ -35,25 +41,54 @@ in **English** for token efficiency. Canonical policy: `<language_policy>` in
    ```
    The JSON returns `instruction`, `template`, `context`, `rules`, `dependencies`,
    and `resolvedOutputPath` (a glob, `specs/**/*.md`, resolved under the change dir).
-2. Read the proposal's Capabilities section (a dependency) for context. Follow what
-   the instructions return for the per-capability iteration — **delegate the glob
-   iteration entirely** to the schema; do not embed capability-by-capability logic
-   here. Write one spec file per capability at the path the schema's `instruction`
-   and the resolved glob dictate (a concrete `specs/<capability>/spec.md`).
-3. Re-run `openspec status --change "<name>" --json`, report completion and the next
-   `ready` artifact, and hand control back to the orchestrator.
+2. Read the proposal's Capabilities section (a dependency); it declares the delta's
+   **class**. Branch the write accordingly — `specs/` is **never** empty either way:
+   - **Behavioral** (New/Modified Capabilities): write one delta-spec per capability at
+     `specs/<capability>/spec.md` with ≥1 requirement (ADDED/MODIFIED/REMOVED/RENAMED).
+     Every `REMOVED`/`MODIFIED` requirement, and every `RENAMED` FROM, MUST match a
+     requirement that exists in `openspec/specs/<capability>/spec.md` (with `**Reason**`
+     and `**Migration**`) — never an orphan REMOVED for code that was never canonical.
+   - **Non-canonical** (`### Non-canonical change`): write a non-canonical *record* at
+     `specs/<area>/spec.md` under a `## Non-canonical record` section documenting the
+     non-canonical items in prose (retirements OR additions such as test suites/tooling),
+     with NO `## ADDED/MODIFIED/REMOVED/RENAMED` headers (so `synchronize` never promotes
+     it to the canon).
+   Follow the schema's `instruction` for the per-class writing format; the proposal's
+   Capabilities — not the model's discretion — determine which files exist and their form.
+3. Run the completion gate as a hard check before returning control:
+   ```bash
+   npm run openspec:verify-stage-completion -- --change "<name>" --through specs
+   ```
+   A non-zero exit is a **hard block**: it names the missing/empty spec or the broken
+   proposal↔specs parity. Fix the specs and re-run until it exits zero; do not report
+   completion while it fails.
+4. Re-run `openspec status --change "<name>" --json`, report completion and the next
+   `ready` artifact inline; the orchestrator resolves and invokes the next stage in the
+   same turn.
 
 ## Legacy declared a priori
 
 This is the **first link** of the legacy-remediation threading (define → design →
-plan → apply). Declare every behavior/contract being replaced as a **REMOVED**
-requirement, each with `**Reason**` and `**Migration**` (per the schema's delta-spec
-rules). `design` will then plan the migration/retirement strategy and `plan` the
-cleanup tasks. Do not invent cleanup beyond what the change actually replaces.
+plan → apply). Declare every *canonical* behavior/contract being replaced as a
+**REMOVED**/**MODIFIED** requirement that casts against a requirement existing in
+`openspec/specs/`, each with `**Reason**` and `**Migration**` (per the schema's delta-
+spec rules). A *non-canonical* change (retiring dead code OR adding tests/tooling with no
+canonical counterpart) is NOT a REMOVED requirement — it is an entry in the non-canonical
+record branch. `design` will then plan the migration/retirement strategy and `plan` the
+tasks. Do not invent cleanup beyond what the change actually replaces.
 <!-- </workflow> -->
 
 <!-- <constraints> -->
-- Never embed writing prose or capability-iteration logic — the schema owns both.
+- Never embed writing prose — the schema owns the per-capability writing format.
+- Never leave `specs/` empty and never skip a capability declared in the proposal;
+  cover behavioral capabilities with ≥1 requirement (ADDED/MODIFIED/REMOVED/RENAMED,
+  every REMOVED/MODIFIED/RENAMED-FROM casings against `openspec/specs/`), and cover
+  non-canonical changes (retirements or additions) with a non-canonical record (no
+  operation headers).
+- Never declare a `REMOVED`/`MODIFIED` requirement whose name does not exist in
+  `openspec/specs/<cap>/spec.md` (no orphan REMOVED).
+- Never return control while `openspec:verify-stage-completion --through specs` exits
+  non-zero.
 - Never create proposal, design, or tasks here.
 - Write to `resolvedOutputPath` from the instructions JSON; never the bare
   `outputPath` pattern.

@@ -63,10 +63,12 @@ For each task still marked `- [ ]` in `tasks.md` (in the order the approved plan
 governs):
 
 - Announce «Trabajando en task N/M: <description>».
-- Emit `TaskCreate({ subject: <task subject>, description: <task description>, metadata: { source: 'spec-delta', taskNum: N, group: <group if applicable> } })` immediately after announcing; preserve the returned `tool_response.task.id` as `taskId` for the closing call.
+- Emit `TaskCreate({ subject: <task subject>, description: <task description>, metadata: { source: 'spec-delta', slug: <change>, taskNum: N, group: <group if applicable>, assignee: <@assignee if the line carries one> } })` immediately after announcing; preserve the returned `tool_response.task.id` as `taskId` for the closing call.
+  > `TaskCreate`/`TaskUpdate` are harness session tracking — they do NOT replace the `tasks.md` write for either the `~doing` or `[x]` transitions.
+- Write `~doing` to the task's inline state tag in `tasks.md` **before making any code change**: edit the line in place, setting the state tag to `~doing`. This is an immediate, individual write — do not defer it.
 - Make the minimal, focused code changes the task requires (AGENTS.md §3/§4).
-- Mark the checkbox `- [x]` **immediately** on completing that task.
-- Emit `TaskUpdate({ taskId: <taskId from above>, status: 'completed', metadata: { source: 'spec-delta' } })` immediately after marking the checkbox.
+- Mark the checkbox `- [ ]` → `- [x]` **in place immediately** on completing that task — do not move the task to another section or reorder it. **Preserve any inline tags** (`~state` / `@assignee`) that follow the description: edit only the checkbox. The `[x]` checkbox is the truth for done (no `~done` needed); a now-stale `~doing` next to the `[x]` may be left as-is or dropped, but never let it override the checkbox.
+- Emit `TaskUpdate({ taskId: <taskId from above>, status: 'completed', metadata: { source: 'spec-delta', slug: <change>, taskNum: N } })` immediately after marking the checkbox.
 
 Pause conditions: ambiguous task; an implementation that reveals a design flaw (fix
 the code to match `design.md`, or update `design.md` to reflect the real decision —
@@ -82,8 +84,8 @@ the residue is gone.
 
 ## Step 4 — Close
 
-Recount `- [x]` vs `- [ ]`. Report completion (or remaining tasks) and hand control
-back to the orchestrator for the verify gate.
+Recount `- [x]` vs `- [ ]`. Report completion (or remaining tasks) inline; the
+orchestrator resolves and invokes the verify gate in the same turn.
 <!-- </workflow> -->
 
 <!-- <constraints> -->
@@ -94,4 +96,8 @@ back to the orchestrator for the verify gate.
   scoped (AGENTS.md §3/§4).
 - Execute only the cleanup tasks already planned; never invent cleanup here.
 - `tasks.md` is owned by this stage; the sub-invoked `create-plan` never edits it.
+- Never batch `tasks.md` edits to the end of the loop; each state transition (`→ doing`, `→ done`) is a separate, immediate write to disk.
+- After any edit to a change's `tasks.md` (marking `~doing`, `[x]`, or adding tasks), run
+  `npm run openspec:sync-tasks-meta -- --slug "<change>"` so `.tasks-meta.yaml` stays aligned
+  when the extension is not running. Idempotent; safe to re-run.
 <!-- </constraints> -->

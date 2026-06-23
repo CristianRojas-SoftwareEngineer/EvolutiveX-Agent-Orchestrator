@@ -61,6 +61,16 @@ merge stages. Delegate each one by its exact slug via the Skill tool.
 
 Resolve the next stage from `node_modules/.bin/openspec status --change "<name>"
 --json`, not from memory. Stages 3–6 are the four artifact writers, in this order.
+
+**Stage-completion gate**: between each artifact stage and the next, and before `apply`,
+run the deterministic completion gate and treat a non-zero exit as a hard stop (see
+`<invariants>`). Run it in BOTH modes:
+
+```bash
+npm run openspec:verify-stage-completion -- --change "<name>" --through specs   # before design
+npm run openspec:verify-stage-completion -- --change "<name>" --through design  # before plan
+npm run openspec:verify-stage-completion -- --change "<name>" --through tasks   # before apply
+```
 <!-- </stage_pipeline> -->
 
 <!-- <mode_selection> -->
@@ -87,9 +97,67 @@ each. An explicit `--mode auto|guided` overrides classification.
 
 ## AUTO mode
 
-Run stages 1→10 back-to-back with no checkpoints. Surface a one-line status (the
-`<output_template>`) after each stage. Do not pause for confirmation. The only stop is
-the verify gate.
+**Step 0 — write the AUTO sentinel (before stage 1).** On entering AUTO, write
+`openspec/.workbench/auto-pipeline.json` with
+`{ change, mode: "auto", stage: "<stage 1>", startedAt: <ISO>, stuckCount: 0 }`. This
+sentinel is the contract the deterministic backstop reads (see **Deterministic
+backstop** below). The directory `openspec/.workbench/` is gitignored — the sentinel
+is ephemeral session state.
+
+**Conductor loop: one turn, stages 1→10.** AUTO runs as a loop that never yields the
+turn until stage 10 completes. Each iteration:
+1. Update the sentinel's `stage` field to the current stage, then delegate that stage
+   to its skill via the Skill tool.
+2. Emit the `<output_template>` status as an **informational log** — this is text
+   output only, **never a turn boundary**. Emitting the status does NOT end the turn.
+3. Resolve the next stage via `openspec status --change "<name>" --json`.
+4. Invoke it immediately via the Skill tool in **the same turn** — no pause, no
+   prompt, no confirmation.
+
+Repeat until stage 10 (`archive-specification-delta`) completes — archive + commit +
+clean worktree — or an admissible stop is reached. **The turn ends only at one of
+those two conditions.** Stopping after any earlier stage (e.g. after `verify` or
+after `synchronize`) is never a valid AUTO end state. The `archive` stage **removes**
+the sentinel as part of its freeze (the backstop also self-cleans once the change is
+under `changes/archive/`).
+
+**Deterministic backstop (`Stop` hook).** The one-turn rule is not prose-only: it is
+enforced by `scripting/openspec/enforce-auto-pipeline.mts`, registered as a `Stop`
+hook (additive entry alongside the generic logger). While the AUTO sentinel exists and
+the change is not yet archived, the hook returns `{ "decision": "block", "reason }` and
+forbids the turn from ending, naming the next stage to invoke. It allows the turn only
+when: no sentinel exists (GUIDED/normal), a halt sentinel
+(`auto-pipeline.halt.json`) is present (legitimate cession), the change is archived, or
+its loop-guard fires (the `stage` did not advance across repeated `Stop` events beyond
+the threshold → it writes a diagnostic halt and releases the turn). The hook's decision
+is the pure, filesystem-only function `decideAutoPipeline`; the prose here and the hook
+are defense in depth, not alternatives. **Admissible stop #3 (below) requires writing
+`openspec/.workbench/auto-pipeline.halt.json` so the backstop permits the cession.**
+
+**Archive commit authorization**: invoking this workflow in AUTO mode is explicit
+authorization for the commit that `archive-specification-delta` (stage 10) performs.
+No separate confirmation is required — do not prompt for it.
+
+**Sub-invoked plan gate**: when `apply-specification-delta` sub-invokes `create-plan`,
+the plan approval gate is **auto-approved in AUTO mode**. Proceed with the generated
+plan without surfacing it for user confirmation; include it in the one-line status of
+the `apply` stage.
+
+**Admissible stops (exhaustive list):**
+1. **Verify CRITICAL** — the hard gate in `<invariants>`: stop and route back to
+   `apply-specification-delta` if the verify report contains any CRITICAL finding.
+2. **Stage-completion gate** — non-zero exit from `openspec:verify-stage-completion`;
+   route back to the incomplete stage until the gate exits zero.
+3. **Unresolvable design decision** — if a stage surfaces a genuine architectural
+   choice that cannot be resolved unilaterally, write
+   `openspec/.workbench/auto-pipeline.halt.json` (so the deterministic backstop permits
+   the cession), stop, delegate to `resolve-open-decisions`, resolve with the user,
+   then remove the halt sentinel and **resume the pipeline** without restarting it.
+   Note to the user that a decision appearing in AUTO signals a likely misclassification
+   of the request.
+
+No other stop condition exists in AUTO. Any other user-facing pause, confirmation
+prompt, or approval gate from a sub-invoked skill is suppressed in this mode.
 
 ## GUIDED mode
 
@@ -99,6 +167,12 @@ Run the same stages 1→10, pausing to hand control back to the user:
   edits, confirm before the next.
 - During apply: if an artifact proves wrong, let the user edit it, then resume.
 - After verify: present the report, let the user decide on WARNINGs.
+
+**Open design decisions:** whenever a stage exposes architectural or design choices
+that cannot be resolved unilaterally, the stage delegates to
+[resolve-open-decisions](../resolve-open-decisions/SKILL.md) before writing its
+artifact. This is the canonical mechanism — never substitute it with an inline
+"¿A o B?" in conversation or with an unilateral choice.
 
 GUIDED is also the **first-time mode**: when the user is new to the system, add
 didactic narration (what each stage is, why it exists, what is about to happen) over
@@ -113,6 +187,14 @@ These hold in BOTH modes, without exception:
   pipeline and route back to `apply-specification-delta`. Never run `synchronize` or
   `archive` over a delta with unresolved CRITICAL findings — not even in AUTO mode. A
   failing test suite is CRITICAL: it hard-blocks the gate like any 4C finding.
+- The **stage-completion gate is hard**: a non-zero exit from
+  `npm run openspec:verify-stage-completion -- --change <name> --through <artifact>` is a
+  hard stop in BOTH AUTO and GUIDED. It runs before advancing to `design` (`--through
+  specs`), to `plan` (`--through design`), and to `apply` (`--through tasks`). On a
+  non-zero exit, do NOT advance; route back to the incomplete stage named in stderr (an
+  empty/missing spec or broken proposal↔specs parity routes back to `define`) and re-run
+  the gate until it exits zero. No delta progresses with an incomplete DAG artifact —
+  completeness is decided by the script's exit code, not by the model's judgment.
 - This skill **delegates**; it never inlines a stage's work. No stage skill embeds
   another (`archive` does not synchronize; `synchronize` does not archive). A single
   stage may bundle the atomic tasks its concern requires (the commit + clean worktree
@@ -121,6 +203,12 @@ These hold in BOTH modes, without exception:
 - Stages 3–6 contain no writing guidance: each calls `openspec instructions <artifact>
   --change <name> --json` and follows the returned instruction. The schema is the
   single source of truth for artifact content.
+- **AUTO termination (AUTO only)**: in AUTO mode the pipeline advances stage by stage
+  within the same turn; the turn ends **only** when stage 10 (`archive`) completes or
+  an admissible stop (defined in `## AUTO mode`) is reached. Completing a stage and
+  emitting its status report is never a valid turn-ending condition in AUTO — the next
+  stage must be invoked immediately in the same turn. This invariant does not apply to
+  GUIDED, where pauses between stages are intentional.
 <!-- </invariants> -->
 
 <!-- <output_template> -->

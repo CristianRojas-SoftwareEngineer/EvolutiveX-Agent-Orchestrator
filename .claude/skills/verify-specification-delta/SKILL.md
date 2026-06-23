@@ -58,7 +58,9 @@ not only the evidence mapped requirement by requirement.
 
 - **Completeness**: count `- [x]` vs `- [ ]` in `tasks.md`; for each requirement in
   the delta specs, search the codebase for evidence. Incomplete task or unimplemented
-  requirement → **CRITICAL**.
+  requirement → **CRITICAL**. The optional inline tags (`~state` / `@assignee`) sit
+  after the checkbox+description, so they do not affect the `- [x]`/`- [ ]` count — no
+  functional change to this check.
 - **Correctness**: map each requirement to `file:line` evidence; check scenario
   coverage. Divergence from spec intent → **WARNING**; uncovered scenario → WARNING.
 - **Coherence**: compare the implementation to `design.md` decisions; flag pattern
@@ -118,7 +120,8 @@ Consistency) plus grouped issue lists
 (CRITICAL/WARNING/SUGGESTION) with `file:line` references and actionable
 recommendations. Verdict: **FAIL** if any CRITICAL exists (the orchestrator routes
 back to `apply`); otherwise **PASS** (warnings are surfaced for the user to decide).
-Hand the report back to the orchestrator.
+Report the verdict inline; the orchestrator resolves and invokes the next stage in the
+same turn.
 
 ## Optional escalation (measured context pressure only)
 

@@ -67,7 +67,8 @@ lines for the user.
 
 Report the capabilities updated and the docs edited; state that the change remains
 **active** (sync does not archive). The canonical state is now coherent — the
-precondition for `archive` (stage 10). Hand control back to the orchestrator.
+precondition for `archive` (stage 10). Report the result inline; the orchestrator
+resolves and invokes the next stage in the same turn.
 <!-- </workflow> -->
 
 <!-- <constraints> -->

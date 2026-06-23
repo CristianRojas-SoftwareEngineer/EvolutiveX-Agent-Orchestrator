@@ -88,11 +88,22 @@ Procedure when escalating:
 Capturing insights into OpenSpec artifacts is always a later, separate stage of the
 pipeline (`create` onward) — never part of the sub-invocation.
 
+## Resolving open decisions during exploration
+
+Exploration may surface competing options where the user must choose a path before
+the delta continues. When this happens, do **not** pose an inline "¿A o B?" question
+in prose. Sub-invoke [resolve-open-decisions](../resolve-open-decisions/SKILL.md)
+(Pattern A of `artifact-structuring`): pass the open decisions with their candidate
+options, receive the resolved decisions as a hand-off, and continue exploration on
+top of those choices. This respects the read-only nature of this stage — the skill
+mutates nothing.
+
 ## Ending
 
 There is no required ending. Discovery may flow toward creating a delta, or just
 provide clarity. When things crystallize, optionally summarize the problem, the
-approach (if one emerged), and open questions. Hand control back to the orchestrator.
+approach (if one emerged), and open questions. Report the result inline; the
+orchestrator resolves and invokes the next stage in the same turn.
 <!-- </workflow> -->
 
 <!-- <constraints> -->

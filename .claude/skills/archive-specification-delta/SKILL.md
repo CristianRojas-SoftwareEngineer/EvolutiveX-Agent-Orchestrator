@@ -53,6 +53,22 @@ mkdir -p "<changesDir>/archive"
 mv "<changesDir>/<name>" "<changesDir>/archive/YYYY-MM-DD--<name>"
 ```
 
+On Windows, if `mv` fails with `Permission denied`, use instead:
+
+```powershell
+powershell -Command "Move-Item -Path '<changesDir>/<name>' -Destination '<changesDir>/archive/YYYY-MM-DD--<name>'"
+```
+
+**Post-mv verification (mandatory before Step 3):**
+
+```bash
+test -d "<changesDir>/archive/YYYY-MM-DD--<name>"
+test ! -d "<changesDir>/<name>"
+```
+
+If either check fails → CRITICAL: the move did not complete — do not proceed to
+Step 3, report the failure and the fallback command above.
+
 If the target already exists, stop with an error (suggest a different date or
 renaming the existing archive). `.openspec.yaml` moves with the directory.
 
@@ -74,7 +90,8 @@ EOF
 ## Step 4 — Confirm a clean worktree
 
 Verify `git status --short` is clean (the freeze is complete). Report the change name,
-the archive location, and the commit hash. Hand control back to the orchestrator.
+the archive location, and the commit hash inline; this is stage 10, the pipeline's
+terminal stage — the AUTO run is now complete.
 <!-- </workflow> -->
 
 <!-- <constraints> -->
@@ -86,4 +103,7 @@ the archive location, and the commit hash. Hand control back to the orchestrator
 - The commit body is in Spanish with the three conventional-commits blocks; first line
   ≤72 chars, imperative, no trailing period.
 - Leave the worktree clean — an unclean tree means the freeze is incomplete.
+- After Step 2, the target directory must exist and the source directory must be
+  absent before Step 3 runs. A failed `mv` is CRITICAL — never commit without
+  confirming the move succeeded.
 <!-- </constraints> -->

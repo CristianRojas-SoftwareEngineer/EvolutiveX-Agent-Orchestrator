@@ -41,7 +41,28 @@ in **English** for token efficiency. Canonical policy: `<language_policy>` in
    (never to the bare `outputPath` pattern). Apply `context`/`rules` as constraints;
    never copy them into the file.
 3. Re-run `openspec status --change "<name>" --json`, report completion and the next
-   `ready` artifact, and hand control back to the orchestrator.
+   `ready` artifact inline; the orchestrator resolves and invokes the next stage in the
+   same turn.
+
+## Capabilities parity (mandatory)
+
+The Capabilities section is the contract `define` must fulfill, and it declares the delta's
+**structural class**: a delta is EITHER *behavioral* OR *non-canonical*, never both. Route
+each What Changes item accordingly:
+
+- Touches agreed/canonical behavior (adds, modifies, or removes a requirement that exists
+  in `openspec/specs/`) → a **New** or **Modified** capability (behavioral delta).
+- Has no canonical counterpart — whether it *retires* dead code (files, reference trees,
+  zombies) or *adds* non-canonical artifacts (integration tests, tooling, CI scripts) with
+  no requirement in `openspec/specs/` → an entry under **### Non-canonical change**
+  (non-canonical delta).
+
+A `REMOVED`/`MODIFIED` capability MUST have a counterpart requirement in
+`openspec/specs/<cap>/spec.md`; never declare one for code that was never canonical — that
+is a non-canonical item, not a `REMOVED`. Declaring "none"/«ninguna» across all subsections
+while What Changes lists changes is **prohibited** (it strands `define`), and so is
+declaring both classes at once. `openspec:verify-stage-completion` (run downstream) hard-
+blocks every one of these.
 <!-- </workflow> -->
 
 <!-- <constraints> -->

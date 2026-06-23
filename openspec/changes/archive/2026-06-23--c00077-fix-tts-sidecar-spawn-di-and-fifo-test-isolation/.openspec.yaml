@@ -1,0 +1,5 @@
+schema: sequential-spec-driven-design
+created: 2026-06-23T20:36:08.544Z
+title: Corregir inyección de spawn en sidecar TTS y aislamiento del test FIFO
+status: proposed
+updated: 2026-06-23T20:36:08.544Z

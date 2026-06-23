@@ -142,7 +142,7 @@ describe('Test de Integración - Decompresión Gzip', () => {
     await new Promise((r) => setTimeout(r, 300));
     await sessionPersistence.flush();
 
-    const sessionRoot = path.join(path.dirname(tempSessionsDir), 'sessions', 'test-gzip');
+    const sessionRoot = path.join(tempSessionsDir, 'test-gzip');
     const bodyPaths = (await findFilesNamed(sessionRoot, 'body.json')).filter((p) =>
       p.includes(`${path.sep}response${path.sep}`),
     );

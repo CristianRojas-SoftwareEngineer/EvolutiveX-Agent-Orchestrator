@@ -4,6 +4,8 @@ import type { ITtsSidecarService } from '../../1-domain/ports/ITtsSidecarService
 import { SidecarExecutionError, SidecarNotInstalledError } from '../../1-domain/ports/ITtsSidecarService.js';
 import { resolveSidecarAssets } from './sidecar-resolver.js';
 
+type SpawnFn = typeof spawn;
+
 interface SpeakResponse {
   status?: 'ok' | 'error';
   message?: string;
@@ -22,10 +24,12 @@ interface SpeakResponse {
 export class PiperSidecarService implements ITtsSidecarService {
   private readonly timeoutMs: number;
   private readonly logger?: Logger;
+  private readonly spawnFn: SpawnFn;
 
-  constructor(opts: { timeoutMs?: number; logger?: Logger } = {}) {
+  constructor(opts: { timeoutMs?: number; logger?: Logger; spawnFn?: SpawnFn } = {}) {
     this.timeoutMs = opts.timeoutMs ?? this.parseTimeoutFromEnv();
     this.logger = opts.logger;
+    this.spawnFn = opts.spawnFn ?? spawn;
   }
 
   /**
@@ -88,9 +92,13 @@ export class PiperSidecarService implements ITtsSidecarService {
     }
 
     return new Promise<void>((resolve, reject) => {
-      const child = spawn(assets.binaryPath, ['--model', assets.voiceModelPath, '--config', assets.voiceConfigPath], {
+      const child = this.spawnFn(assets.binaryPath, ['--model', assets.voiceModelPath, '--config', assets.voiceConfigPath], {
         stdio: ['pipe', 'pipe', 'pipe'],
         windowsHide: true,
+      });
+
+      child.stdin?.on('error', () => {
+        // EPIPE silencioso: el sidecar cerró el pipe antes de que terminemos de escribir.
       });
 
       let stdoutBuf = '';
@@ -109,33 +117,35 @@ export class PiperSidecarService implements ITtsSidecarService {
 
       child.stdout?.on('data', (chunk: Buffer) => {
         stdoutBuf += chunk.toString('utf8');
-        const nl = stdoutBuf.indexOf('\n');
-        if (nl >= 0) {
+        let nl: number;
+        while ((nl = stdoutBuf.indexOf('\n')) >= 0) {
           const line = stdoutBuf.slice(0, nl).trim();
           stdoutBuf = stdoutBuf.slice(nl + 1);
-          if (line) {
-            try {
-              const parsed = JSON.parse(line) as SpeakResponse;
-              if (parsed.status === 'ok') {
-                clearTimeout(timer);
-                settle(() => resolve());
-              } else if (parsed.status === 'error') {
-                clearTimeout(timer);
-                if (!child.killed) child.kill('SIGKILL');
-                settle(() =>
-                  reject(
-                    new SidecarExecutionError(
-                      `sidecar reportó error: ${parsed.message ?? '(sin mensaje)'}`,
-                      'non-zero-exit',
-                    ),
-                  ),
-                );
-              }
-            } catch {
+          if (!line) continue;
+          try {
+            const parsed = JSON.parse(line) as SpeakResponse;
+            if (parsed.status === 'ok') {
+              clearTimeout(timer);
+              settle(() => resolve());
+              break;
+            } else if (parsed.status === 'error') {
               clearTimeout(timer);
               if (!child.killed) child.kill('SIGKILL');
-              settle(() => reject(new SidecarExecutionError('JSON inválido desde sidecar', 'invalid-json')));
+              settle(() =>
+                reject(
+                  new SidecarExecutionError(
+                    `sidecar reportó error: ${parsed.message ?? '(sin mensaje)'}`,
+                    'non-zero-exit',
+                  ),
+                ),
+              );
+              break;
             }
+          } catch {
+            clearTimeout(timer);
+            if (!child.killed) child.kill('SIGKILL');
+            settle(() => reject(new SidecarExecutionError('JSON inválido desde sidecar', 'invalid-json')));
+            break;
           }
         }
       });

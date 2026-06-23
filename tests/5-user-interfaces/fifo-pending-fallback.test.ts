@@ -109,6 +109,7 @@ describe('Test E2E - Fallback FIFO para N pendings sin cabeceras de agente (plan
   let proxyApp: FastifyInstance;
   let tempSessionsDir: string;
   let originalEnv: NodeJS.ProcessEnv;
+  let sessionPersistence: { flush(): Promise<void> };
 
   beforeAll(async () => {
     let requestCount = 0;
@@ -150,6 +151,7 @@ describe('Test E2E - Fallback FIFO para N pendings sin cabeceras de agente (plan
     const { createProxyDependencies: createDeps } =
       await import('../../src/4-api/composition-root.js');
     const deps = await createDeps(config, mockLogger, tempSessionsDir);
+    sessionPersistence = deps.sessionPersistence;
     proxyApp = (await import('../../src/app.js')).buildApp(deps, mockLogger);
     await proxyApp.ready();
   });
@@ -158,11 +160,12 @@ describe('Test E2E - Fallback FIFO para N pendings sin cabeceras de agente (plan
     await proxyApp.close();
     mockUpstream.close();
     process.env = { ...originalEnv };
+    await sessionPersistence.flush();
     await fs.rm(tempSessionsDir, { recursive: true, force: true });
   });
 
   it('sin cabeceras de agente + 2 pendings → subagente resuelve por FIFO (correlationMethod fifo-pending)', async () => {
-    const sessionId = 'test-fifo-fallback';
+    const sessionId = 'test-fifo-fallback-' + Date.now();
 
     // Paso 1: request padre → SSE con 2 Agent tool_use → registra toolu_first_agent y toolu_second_agent
     const parentRes = await proxyApp.inject({
@@ -222,7 +225,7 @@ describe('Test E2E - Fallback FIFO para N pendings sin cabeceras de agente (plan
 
     // Verificar que existe una sub-interacción con correlationMethod: 'fifo-pending'.
     // Se busca en meta.json porque state.json se elimina al cerrar la interacción.
-    const sessionDir = path.join(path.dirname(tempSessionsDir), 'sessions', sessionId);
+    const sessionDir = path.join(tempSessionsDir, sessionId);
     const metaFiles = await findJsonFiles(sessionDir, 'meta.json');
 
     const metas = await Promise.all(

@@ -80,6 +80,7 @@ export function buildApp(deps: ProxyDependencies, logger: Logger) {
         'Workflows orphan cerrados en graceful shutdown',
       );
     }
+    await deps.sessionPersistence.flush();
   });
 
   return app;

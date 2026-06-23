@@ -1,8 +1,63 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdtempSync, mkdirSync, writeFileSync, existsSync, chmodSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, chmodSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { EventEmitter } from 'node:events';
+import { PassThrough } from 'node:stream';
+import type { ChildProcess } from 'node:child_process';
 import { PiperSidecarService } from '../../../src/2-services/tts/piper-sidecar.service.js';
+
+type SpawnFn = typeof import('node:child_process').spawn;
+
+/**
+ * Crea un stub mínimo de ChildProcess controlable.
+ * Cuando stdin termina ('finish'), emite stdoutResponse en stdout y luego close(0).
+ * Para simular timeout: pasar stdoutResponse = '' y no cerrar stdin manualmente.
+ */
+function makeChildStub(stdoutResponse: string): { spawnFn: SpawnFn } {
+  const stdin = new PassThrough();
+  const stdout = new PassThrough();
+  const stderr = new PassThrough();
+  const emitter = new EventEmitter();
+  const child = Object.assign(emitter, {
+    stdin,
+    stdout,
+    stderr,
+    killed: false,
+    kill: vi.fn(() => { (child as unknown as { killed: boolean }).killed = true; }),
+    pid: 99999,
+  }) as unknown as ChildProcess;
+  stdin.on('finish', () => {
+    if (stdoutResponse) {
+      stdout.push(stdoutResponse);
+    }
+    stdout.push(null);
+    emitter.emit('close', 0);
+  });
+  const spawnFn = vi.fn().mockReturnValue(child) as unknown as SpawnFn;
+  return { spawnFn };
+}
+
+/** Crea un stub que no responde nada (para simular timeout). kill() emite close de forma asíncrona. */
+function makeHangingChildStub(): { spawnFn: SpawnFn } {
+  const stdin = new PassThrough();
+  const stdout = new PassThrough();
+  const stderr = new PassThrough();
+  const emitter = new EventEmitter();
+  const child = Object.assign(emitter, {
+    stdin,
+    stdout,
+    stderr,
+    killed: false,
+    kill: vi.fn(() => {
+      (child as unknown as { killed: boolean }).killed = true;
+      setImmediate(() => emitter.emit('close', null));
+    }),
+    pid: 99999,
+  }) as unknown as ChildProcess;
+  const spawnFn = vi.fn().mockReturnValue(child) as unknown as SpawnFn;
+  return { spawnFn };
+}
 
 const VOICE = 'es_MX-test-voice';
 
@@ -92,48 +147,33 @@ describe('PiperSidecarService', () => {
   });
 
   it('speak amable omite audio sin lanzar cuando el sidecar falla', async () => {
-    // En Windows el wrapper .cmd + node introduce no-determinismo en el
-    // orden de eventos stdout/close; verificamos la propiedad observable
-    // (speak retorna undefined, no lanza) en lugar del reason específico.
-    const { vendorRoot } = setupMockVendor(`
-      process.stdin.on('data', () => {});
-      process.stdin.on('end', () => {
-        process.stdout.write('{"status":"error","message":"voice-not-found"}\\n');
-        process.exit(0);
-      });
-    `);
+    const { vendorRoot } = setupMockVendor('// stub — el binario real nunca se ejecuta');
     process.env['TTS_SIDECAR_VENDOR_DIR'] = vendorRoot;
+    const { spawnFn } = makeChildStub('{"status":"error","message":"voice-not-found"}\n');
     const warn = vi.fn();
-    const svc = new PiperSidecarService({ timeoutMs: 5000, logger: { warn } as never });
+    const svc = new PiperSidecarService({ timeoutMs: 5000, logger: { warn } as never, spawnFn });
     await expect(svc.speak('hola', VOICE)).resolves.toBeUndefined();
-    expect(warn).toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledWith(expect.objectContaining({ reason: 'non-zero-exit' }), expect.any(String));
   });
 
   it('speak amable maneja JSON inválido del sidecar sin lanzar', async () => {
-    const { vendorRoot } = setupMockVendor(`
-      process.stdin.on('data', () => {});
-      process.stdin.on('end', () => {
-        process.stdout.write('esto no es json\\n');
-        process.exit(0);
-      });
-    `);
+    const { vendorRoot } = setupMockVendor('// stub — el binario real nunca se ejecuta');
     process.env['TTS_SIDECAR_VENDOR_DIR'] = vendorRoot;
+    const { spawnFn } = makeChildStub('esto no es json\n');
     const warn = vi.fn();
-    const svc = new PiperSidecarService({ timeoutMs: 5000, logger: { warn } as never });
+    const svc = new PiperSidecarService({ timeoutMs: 5000, logger: { warn } as never, spawnFn });
     await expect(svc.speak('hola', VOICE)).resolves.toBeUndefined();
-    expect(warn).toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledWith(expect.objectContaining({ reason: 'invalid-json' }), expect.any(String));
   });
 
   it('speak amable maneja timeout del sidecar sin lanzar', async () => {
-    const { vendorRoot } = setupMockVendor(`
-      // No escribe nada, queda colgado
-      setInterval(() => {}, 1000);
-    `);
+    const { vendorRoot } = setupMockVendor('// stub — el binario real nunca se ejecuta');
     process.env['TTS_SIDECAR_VENDOR_DIR'] = vendorRoot;
+    const { spawnFn } = makeHangingChildStub();
     const warn = vi.fn();
-    const svc = new PiperSidecarService({ timeoutMs: 200, logger: { warn } as never });
+    const svc = new PiperSidecarService({ timeoutMs: 50, logger: { warn } as never, spawnFn });
     await expect(svc.speak('hola', VOICE)).resolves.toBeUndefined();
-    expect(warn).toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledWith(expect.objectContaining({ reason: 'timeout' }), expect.any(String));
   });
 
   it('no invoca el sidecar si el texto está vacío', async () => {

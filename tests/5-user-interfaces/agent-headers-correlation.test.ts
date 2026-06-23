@@ -26,6 +26,7 @@ describe('Test E2E - Correlación por cabeceras de agente (plano A)', () => {
   let proxyApp: FastifyInstance;
   let tempSessionsDir: string;
   let originalEnv: NodeJS.ProcessEnv;
+  let sessionPersistence: { flush(): Promise<void> };
 
   beforeAll(async () => {
     mockUpstream = http.createServer((_req, res) => {
@@ -53,6 +54,7 @@ describe('Test E2E - Correlación por cabeceras de agente (plano A)', () => {
     const { createProxyDependencies: createDeps } =
       await import('../../src/4-api/composition-root.js');
     const deps = await createDeps(config, mockLogger, tempSessionsDir);
+    sessionPersistence = deps.sessionPersistence;
     proxyApp = (await import('../../src/app.js')).buildApp(deps, mockLogger);
     await proxyApp.ready();
   });
@@ -61,6 +63,7 @@ describe('Test E2E - Correlación por cabeceras de agente (plano A)', () => {
     await proxyApp.close();
     mockUpstream.close();
     process.env = { ...originalEnv };
+    await sessionPersistence.flush();
     await fs.rm(tempSessionsDir, { recursive: true, force: true });
   });
 
@@ -90,11 +93,12 @@ describe('Test E2E - Correlación por cabeceras de agente (plano A)', () => {
     expect(res.statusCode).toBeGreaterThanOrEqual(200);
     expect(res.statusCode).toBeLessThan(300);
 
-    // Dar margen para escritura en disco
+    // Dar margen para escritura en disco y drenar la cola de persistencia
     await new Promise((r) => setTimeout(r, 500));
+    await sessionPersistence.flush();
 
     // La sesión debe haberse creado en disco
-    const sessionDir = path.join(path.dirname(tempSessionsDir), 'sessions', 'test-agent-headers');
+    const sessionDir = path.join(tempSessionsDir, 'test-agent-headers');
     let sessionExists: boolean;
     try {
       await fs.access(sessionDir);

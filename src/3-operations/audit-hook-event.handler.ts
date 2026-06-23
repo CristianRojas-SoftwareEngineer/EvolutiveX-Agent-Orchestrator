@@ -21,7 +21,7 @@ import { KanbanBoardProjector } from './kanban-board.projector.js';
 
 const GEMINI_FLASH_URL =
   'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
-const TTS_MAX_TOKENS = 128;
+const TTS_MAX_TOKENS = 512;
 
 const VOICE_ASSISTANT_SYSTEM_PROMPT =
   'Eres la voz del asistente Smart Code Proxy. ' +
@@ -346,7 +346,10 @@ export class AuditHookEventHandler {
         body: JSON.stringify({
           contents,
           systemInstruction: { parts: [{ text: systemPrompt }] },
-          generationConfig: { maxOutputTokens: TTS_MAX_TOKENS },
+          generationConfig: {
+            maxOutputTokens: TTS_MAX_TOKENS,
+            thinkingConfig: { thinkingBudget: 0 },
+          },
         }),
       });
 

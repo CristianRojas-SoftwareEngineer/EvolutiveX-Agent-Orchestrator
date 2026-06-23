@@ -1,0 +1,20 @@
+{
+  "version": "0.0.0-placeholder",
+  "binaries": {
+    "windows-amd64": { "file": "windows-amd64/tts-sidecar.exe", "sha256": "0000000000000000000000000000000000000000000000000000000000000000" },
+    "linux-amd64": { "file": "linux-amd64/tts-sidecar", "sha256": "0000000000000000000000000000000000000000000000000000000000000000" },
+    "linux-aarch64": { "file": "linux-aarch64/tts-sidecar", "sha256": "0000000000000000000000000000000000000000000000000000000000000000" },
+    "macos-amd64": { "file": "macos-amd64/tts-sidecar", "sha256": "0000000000000000000000000000000000000000000000000000000000000000" },
+    "macos-aarch64": { "file": "macos-aarch64/tts-sidecar", "sha256": "0000000000000000000000000000000000000000000000000000000000000000" }
+  },
+  "voices": {
+    "es_MX-claude-voice-medium": {
+      "model": "es_MX-claude-voice-medium.onnx",
+      "config": "es_MX-claude-voice-medium.onnx.json",
+      "sha256": {
+        "model": "0000000000000000000000000000000000000000000000000000000000000000",
+        "config": "0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    }
+  }
+}

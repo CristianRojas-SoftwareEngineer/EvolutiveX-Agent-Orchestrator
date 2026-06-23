@@ -1,0 +1,5 @@
+schema: sequential-spec-driven-design
+created: 2026-06-23T19:22:42.675Z
+title: Reemplazo TTS Gemini por sidecar local Rust+Piper
+status: proposed
+updated: 2026-06-23T19:22:42.675Z

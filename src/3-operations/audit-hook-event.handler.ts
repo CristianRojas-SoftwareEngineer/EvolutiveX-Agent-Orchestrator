@@ -15,7 +15,6 @@ import {
   formatTaskInProgressMessage,
 } from '../2-services/notifications/hook-payload-notification-message.js';
 import { SessionMetricsService } from '../2-services/session-metrics.service.js';
-import { FALLBACK_SPEECH } from '../2-services/tts/fallback-speech.constants.js';
 import { resolveSessionDir } from './audit-workflow-closure.handler.js';
 import { KanbanBoardProjector } from './kanban-board.projector.js';
 
@@ -298,6 +297,27 @@ export class AuditHookEventHandler {
     );
   }
 
+  /**
+   * Fallback textual usado cuando el LLM (Gemini Flash) no puede generar el texto
+   * a sintetizar. No es un mensaje de TTS: es el texto que se muestra en stdout y
+   * en el toast de continuidad cuando la generación de texto falla. La decisión
+   * de hablarlo o no la toma el sidecar; este método solo aporta el contenido.
+   */
+  private composeFallbackText(eventName: string): string {
+    switch (eventName) {
+      case 'UserPromptSubmit':
+        return 'Solicitud recibida. Procesando con Claude.';
+      case 'Stop':
+        return 'El asistente terminó su turno.';
+      case 'SubagentStop':
+        return 'El subagente completó su trabajo.';
+      case 'StopFailure':
+        return 'Ocurrió un error durante la ejecución.';
+      default:
+        return 'Procesando.';
+    }
+  }
+
   private logTtsDynamic(eventName: string, text: string): void {
     this.logger?.info(
       {
@@ -315,7 +335,7 @@ export class AuditHookEventHandler {
     messages: SessionMessage[],
     mode: 'prompt' | 'summary',
   ): Promise<string> {
-    const fallback = FALLBACK_SPEECH[eventName] ?? 'Procesando.';
+    const fallback = this.composeFallbackText(eventName);
 
     if (!this.ttsApiKey) {
       this.logTtsFallback(eventName, 'no-gemini-key', fallback);

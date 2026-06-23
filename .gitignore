@@ -22,6 +22,9 @@ sessions/
 server/
 .agentkanban/
 
+# Binarios y modelos del sidecar TTS local (descargados por scripts/postinstall-tts.ts)
+vendor/tts-sidecar/
+
 # Secrets de providers (API keys)
 routing/providers/*/secrets.json
 

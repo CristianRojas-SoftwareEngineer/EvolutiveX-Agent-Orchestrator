@@ -19,7 +19,7 @@ import { AuditSseResponseHandler } from '../3-operations/audit-sse-response.hand
 import { AuditStandardResponseHandler } from '../3-operations/audit-standard-response.handler.js';
 import { AuditUpstreamErrorHandler } from '../3-operations/audit-upstream-error.handler.js';
 import { FilterToolsHandler } from '../3-operations/filter-tools.handler.js';
-import { GeminiTTSService } from '../2-services/tts/gemini-tts.service.js';
+import { PiperSidecarService } from '../2-services/tts/piper-sidecar.service.js';
 import { TranscriptContextExtractor } from '../2-services/tts/transcript-extractor.service.js';
 import { DesktopNotificationAdapter } from '../2-services/notifications/DesktopNotificationAdapter.js';
 import { resolveBranding } from '../2-services/notifications/cli.js';
@@ -99,21 +99,15 @@ export async function createProxyDependencies(
   const auditUpstreamErrorHandler = new AuditUpstreamErrorHandler(workflowRepo);
   const filterToolsHandler = new FilterToolsHandler(config);
 
-  // Credencial TTS dedicada: leída una vez al arranque desde el secrets de Gemini
+  // Credencial TTS dedicada: se sigue usando para generación de texto vía Gemini Flash
+  // (el sidecar local Piper solo se encarga de la síntesis, no del texto a decir).
   const ttsApiKey = await resolveTtsApiKey();
 
-  // Servicios de TTS — opcionales; se desactivan si TTS_ENABLED=false
+  // Servicios de TTS — opcionales; se desactivan si TTS_ENABLED=false.
+  // El sidecar local (PiperSidecarService) reemplaza al adaptador Gemini TTS.
   const ttsEnabled = config.TTS_ENABLED !== false;
-  const ttsService = ttsEnabled ? new GeminiTTSService(ttsApiKey) : undefined;
+  const ttsService = ttsEnabled ? new PiperSidecarService({ logger }) : undefined;
   const contextExtractor = ttsEnabled ? new TranscriptContextExtractor() : undefined;
-
-  if (ttsService) {
-    // Inicializar en segundo plano para no bloquear el arranque del servidor
-    void ttsService.initialize().catch((err: unknown) => {
-      const msg = err instanceof Error ? err.message : String(err);
-      logger.warn({ err: msg }, '[TTS] Fallo en la inicialización del motor TTS; TTS desactivado');
-    });
-  }
 
   // Branding por defecto para el toast del Stop (appId + icono fallback global)
   const toastBranding = resolveBranding({ sound: false, silent: false, stdinJson: false });

@@ -70,55 +70,70 @@ Al recibir `Stop`, `SubagentStop` o `StopFailure`, el sistema SHALL extraer los 
 ---
 
 ### Requirement: Provider dedicado de inferencia TTS (OpenRouter → Gemini)
-La generación del texto de intención/resumen TTS SHALL usar siempre un provider dedicado, independiente del provider activo de la sesión: Gemini Flash (`gemini-2.5-flash`) para la generación del texto de intención o resumen, y Gemini TTS (`gemini-2.5-flash-preview-tts`) para la síntesis de voz. La credencial SHALL ser el `GEMINI_API_KEY` de `routing/providers/gemini/secrets.json`, resuelta en el arranque e inyectada por el composition root. La llamada SHALL ir directa a la API de Gemini (no a través del proxy local).
+La generación del texto de intención/resumen TTS SHALL seguir usando el provider dedicado (Gemini Flash `gemini-2.5-flash` para la generación del texto de intención o resumen) inyectado por el composition root vía `ttsApiKey`. La **síntesis de voz**, en cambio, SHALL migrar a un sidecar local multiplataforma (`tts-sidecar`, binario único que embebe Piper + CPAL, distribuido por plataforma vía postinstall con verificación SHA256). El campo `GEMINI_API_KEY` deja de leerse para fines de síntesis (puede seguir usándose para generación de texto).
 
-La síntesis SHALL usar `gemini-2.5-flash-preview-tts`, que devuelve PCM 24kHz/16-bit mono codificado en base64; el sistema SHALL añadir un encabezado WAV estándar al PCM y escribir el resultado en un archivo temporal, reproduciéndolo con el player built-in del SO según `process.platform`: PowerShell `Media.SoundPlayer` en Windows, `afplay` en macOS, `aplay`/`paplay` en Linux.
+La síntesis SHALL invocar el binario `tts-sidecar` con un contrato JSON por STDIN/STDOUT: `{"cmd":"speak","text":"...","voice":"es_MX"}` → `{"status":"ok"}` o `{"status":"error","message":"..."}`. La voz inicial SHALL ser `es_MX` (México, español latino neutro). El gateway SHALL **NO** depender de ninguna API de audio del SO (no usa PowerShell `Media.SoundPlayer`, ni `afplay`, ni `aplay`/`paplay`); toda la reproducción queda encapsulada en el sidecar.
 
-Si la credencial no está disponible, el sistema SHALL emitir `[TTS-FALLBACK]` con `reason: no-gemini-key` y usar el mensaje genérico de fallback sin intentar ninguna llamada. No SHALL haber validación proactiva de la clave ni fallback al provider de la sesión: cualquier fallo de la llamada (HTTP no-2xx, timeout, respuesta vacía) SHALL caer al fallback genérico con su `reason` correspondiente.
+Si el binario del sidecar no está presente en `vendor/tts-sidecar/<platform>-<arch>/`, el sistema SHALL emitir `[TTS-SIDE]` con `reason: "sidecar-missing"` y SHALL **NO** intentar ninguna síntesis. Si el binario está presente pero el proceso falla (exit code no-cero, timeout, JSON malformado), el sistema SHALL emitir `[TTS-SIDE]` con el `reason` correspondiente (`spawn-failed`, `timeout`, `invalid-json`, `non-zero-exit`) y SHALL **NO** intentar ningún fallback a otro motor. La llamada al sidecar SHALL ser bloqueante desde el punto de vista del handler de hook: el handler SHALL esperar `{"status":"ok"}` por stdout antes de retornar, garantizando que la voz se reproduzca completamente antes de que el hook responda al cliente.
 
 #### Scenario: Sesión con cualquier provider genera texto vía Gemini Flash
 - **GIVEN** que la sesión activa usa MiniMax (o Anthropic, u Ollama) como provider
-- **AND** `routing/providers/gemini/secrets.json` contiene una API key
+- **AND** el handler tiene una API key de Gemini inyectada para generación de texto
 - **WHEN** el handler procesa un evento `Stop`
 - **THEN** SHALL llamar a `gemini-2.5-flash` para generar el texto de continuidad
 - **AND** el provider de la sesión NO SHALL recibir ninguna petición de inferencia TTS
 
-#### Scenario: Sin clave de Gemini usa fallback genérico
+#### Scenario: Síntesis exitosa con sidecar instalado
+- **GIVEN** que el binario `tts-sidecar` está presente en `vendor/tts-sidecar/<platform>-<arch>/`
+- **AND** el modelo `es_MX` está presente en `vendor/tts-sidecar/voices/es_MX/`
+- **WHEN** el handler procesa un evento `Stop`
+- **THEN** SHALL enviar `{"cmd":"speak","text":"<resumen>","voice":"es_MX"}` por stdin al sidecar
+- **AND** SHALL esperar `{"status":"ok"}` por stdout antes de continuar
+- **AND** SHALL emitir `[TTS-SPEECH]` con `usedFallback: false` y `textPreview` del texto reproducido
+
+#### Scenario: Sidecar ausente omite audio sin romper el hook
+- **GIVEN** que el binario `tts-sidecar` **NO** está presente en disco
+- **WHEN** el handler procesa un evento `Stop` o `UserPromptSubmit`
+- **THEN** SHALL emitir `[TTS-SIDE]` con `reason: "sidecar-missing"`
+- **AND** SHALL continuar el procesamiento del hook sin intentar síntesis
+- **AND** SHALL retornar una respuesta HTTP 2xx al cliente
+
+#### Scenario: Fallo del sidecar se reporta sin caer a otro motor
+- **GIVEN** que el sidecar está presente pero el proceso termina con exit code no-cero
+- **WHEN** el handler procesa un evento
+- **THEN** SHALL emitir `[TTS-SIDE]` con `reason: "non-zero-exit"` (o `spawn-failed`, `timeout`, `invalid-json` según el caso)
+- **AND** SHALL **NO** intentar llamar a Gemini, OpenRouter ni SAPI como fallback
+- **AND** SHALL continuar el procesamiento del hook
+
+#### Scenario: Sin dependencia de claves de API externas para la síntesis
 - **GIVEN** que `routing/providers/gemini/secrets.json` no existe o no contiene clave
-- **WHEN** el handler procesa un evento `Stop`
-- **THEN** SHALL emitir `[TTS-FALLBACK]` con `reason: "no-gemini-key"`
-- **AND** SHALL reproducir el mensaje de fallback definido para `Stop` sin hacer ninguna petición HTTP
-
-#### Scenario: Fallo de Gemini cae al fallback sin reintentos hacia el provider de sesión
-- **GIVEN** que la API de Gemini responde con error (ej. 429) o la petición agota el timeout
-- **WHEN** el handler procesa un evento `Stop`
-- **THEN** SHALL emitir `[TTS-FALLBACK]` con el `reason` correspondiente (`http-429`, `exception`, etc.)
-- **AND** NO SHALL intentar la inferencia contra el provider de la sesión
-
-#### Scenario: Síntesis con Gemini TTS produce audio WAV reproducible por player del SO
-- **GIVEN** que `gemini-2.5-flash-preview-tts` devuelve PCM 24kHz/16-bit mono en base64
-- **WHEN** el servicio TTS procesa la respuesta
-- **THEN** SHALL envolver el PCM en un encabezado WAV estándar y escribirlo en un archivo temporal
-- **AND** SHALL reproducirlo con el player built-in del SO según `process.platform`
-- **AND** SHALL eliminar el archivo temporal tras la reproducción
+- **WHEN** el handler procesa un evento
+- **THEN** SHALL invocar el sidecar local normalmente (el sidecar no requiere credenciales para sintetizar)
+- **AND** SHALL emitir `[TTS-SPEECH]` con `usedFallback: false` si el sidecar responde ok
 
 ---
 
 ### Requirement: Robustez en la Inferencia y Reproducción de Audio
-Cualquier fallo al leer el transcript, al invocar a Gemini para el resumen/respuesta, o al reproducir el audio NO SHALL afectar el ciclo de vida normal de Claude Code ni bloquear las respuestas del proxy. Cada fallo SHALL ser registrado como `[TTS-FALLBACK]` con `reason` identificando la causa (`no-gemini-key`, `no-messages`, `http-NNN`, `empty-response`, `exception`), de forma que sea detectable sin afectar el flujo principal. La reproducción de audio SHALL completarse antes de que el handler retorne; el servicio TTS SHALL esperar al cierre del proceso de síntesis.
+Cualquier fallo al leer el transcript, al invocar al LLM para el resumen/respuesta, o al sintetizar audio con el sidecar NO SHALL afectar el ciclo de vida normal de Claude Code ni bloquear las respuestas del proxy. Cada fallo SHALL ser registrado como `[TTS-SIDE]` con `reason` identificando la causa (`sidecar-missing`, `spawn-failed`, `timeout`, `invalid-json`, `non-zero-exit`, `exception`), de forma que sea detectable sin afectar el flujo principal. La reproducción de audio SHALL completarse antes de que el handler retorne; el sidecar SHALL ser invocado de forma bloqueante, con un timeout configurable (default 30s, env `TTS_SIDECAR_TIMEOUT_MS`) tras el cual el handler termina la espera con `reason: "timeout"` y continúa.
 
-#### Scenario: Falla de la API de resumen
-- **GIVEN** un fallo de conexión a Gemini o falta de API Key de Gemini
+#### Scenario: Sidecar ausente no afecta el hook
+- **GIVEN** que el binario del sidecar no está presente en disco
 - **WHEN** se procesa un hook `Stop`
-- **THEN** el sistema SHALL usar una locución de fallback predefinida (ej. "El asistente terminó el trabajo.") y reproducirla.
-- **AND** SHALL emitir `[TTS-FALLBACK]` con `reason` identificando la causa del fallo
-- **AND** la petición HTTP de hook SHALL finalizar con éxito (código 2xx).
+- **THEN** SHALL emitir `[TTS-SIDE]` con `reason: "sidecar-missing"` o `spawn-failed`
+- **AND** SHALL continuar el procesamiento del hook retornando HTTP 2xx
+
+#### Scenario: Timeout del sidecar libera al handler
+- **GIVEN** que el sidecar no responde dentro del timeout configurado (por defecto 30s)
+- **WHEN** se procesa un hook `Stop`
+- **THEN** SHALL matar el proceso del sidecar
+- **AND** SHALL emitir `[TTS-SIDE]` con `reason: "timeout"`
+- **AND** SHALL continuar el procesamiento del hook sin propagar el error
 
 #### Scenario: Síntesis de audio completa antes de retornar
-- **GIVEN** que el servicio TTS local genera audio correctamente
+- **GIVEN** que el sidecar está presente y responde `{"status":"ok"}`
 - **WHEN** el handler invoca `speak(text)`
-- **THEN** SHALL esperar a que el proceso de síntesis cierre completamente antes de continuar
-- **AND** el handler SHALL retornar solo después de que el audio haya terminado de reproducirse
+- **THEN** SHALL esperar a que el sidecar confirme antes de continuar
+- **AND** el handler SHALL retornar solo después de que la voz haya terminado de reproducirse
 
 ### Requirement: Toast de continuidad del Stop emitido por el gateway
 
@@ -173,19 +188,19 @@ El sistema SHALL extraer únicamente los bloques con `type === "text"` de la res
 ---
 
 ### Requirement: Logging estructurado de fallback y mensaje dinámico
-Cada vez que el sistema active un fallback TTS, SHALL emitir una entrada de log con tag `[TTS-FALLBACK]` incluyendo: `eventName`, `usedFallback: true`, `reason` (uno de: `no-gemini-key`, `no-messages`, `http-NNN`, `empty-response`, `exception`) y `fallbackText`. Cada vez que se genere un mensaje dinámico, SHALL emitir `[TTS-SPEECH]` con `eventName`, `usedFallback: false` y una vista previa del texto (`textPreview`, máximo 120 caracteres).
+Cada vez que el sistema active un fallback por fallo del sidecar, SHALL emitir una entrada de log con tag `[TTS-SIDE]` incluyendo: `eventName`, `usedFallback: true`, `reason` (uno de: `sidecar-missing`, `spawn-failed`, `timeout`, `invalid-json`, `non-zero-exit`, `exception`) y `fallbackText` (texto que se habría sintetizado, conservado para diagnóstico). Cada vez que se genere un mensaje dinámico sintetizado por el sidecar, SHALL emitir `[TTS-SPEECH]` con `eventName`, `usedFallback: false` y una vista previa del texto (`textPreview`, máximo 120 caracteres). La etiqueta `[TTS-FALLBACK]` queda retirada del código y del log.
 
-#### Scenario: Fallback por error HTTP emite log con código
-- **GIVEN** que la llamada de inferencia TTS recibe un status HTTP distinto de 200 (ej. 429)
-- **WHEN** el handler procesa la respuesta
-- **THEN** SHALL emitir `[TTS-FALLBACK]` con `reason: "http-429"` (o el código correspondiente)
+#### Scenario: Fallo del sidecar emite log tipificado
+- **GIVEN** que el sidecar falla (binario ausente, timeout, JSON malformado, exit code no-cero, etc.)
+- **WHEN** el handler procesa el evento
+- **THEN** SHALL emitir `[TTS-SIDE]` con el `reason` correspondiente
 - **AND** el log SHALL estar escrito en `server/logs.jsonl` antes de retornar la respuesta del hook
 
-#### Scenario: Mensaje dinámico emite log TTS-SPEECH
-- **GIVEN** que la inferencia TTS produce texto dinámico correctamente
-- **WHEN** el handler finaliza la extracción
+#### Scenario: Mensaje dinámico sintetizado emite log TTS-SPEECH
+- **GIVEN** que el sidecar responde `{"status":"ok"}` al comando `speak`
+- **WHEN** el handler finaliza la síntesis
 - **THEN** SHALL emitir `[TTS-SPEECH]` con `usedFallback: false`
-- **AND** el campo `textPreview` SHALL contener los primeros 120 caracteres del texto generado
+- **AND** el campo `textPreview` SHALL contener los primeros 120 caracteres del texto reproducido
 
 ---
 

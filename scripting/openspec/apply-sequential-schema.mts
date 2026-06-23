@@ -1,12 +1,35 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import chalk from 'chalk';
 
 const SOURCE_SCHEMA = 'spec-driven';
 const TARGET_SCHEMA = 'sequential-spec-driven-design';
-const DESIGN_REQUIRES = ['proposal', 'specs'] as const;
-const TASKS_REQUIRES = ['proposal', 'specs', 'design'] as const;
+
+/** Repo donde vive el script (fuente canónica del schema local). */
+const SOURCE_REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+
+const CANONICAL_FILES = [
+  {
+    label: 'schema.yaml',
+    source: join(SOURCE_REPO_ROOT, 'openspec', 'schemas', TARGET_SCHEMA, 'schema.yaml'),
+    dest: (cwd: string) => join(cwd, 'openspec', 'schemas', TARGET_SCHEMA, 'schema.yaml'),
+  },
+  {
+    label: 'templates/tasks.md',
+    source: join(
+      SOURCE_REPO_ROOT,
+      'openspec',
+      'schemas',
+      TARGET_SCHEMA,
+      'templates',
+      'tasks.md',
+    ),
+    dest: (cwd: string) =>
+      join(cwd, 'openspec', 'schemas', TARGET_SCHEMA, 'templates', 'tasks.md'),
+  },
+] as const;
 
 type Options = {
   cwd: string;
@@ -42,10 +65,10 @@ function parseArgs(argv: string[]): Options {
 
 function printHelp(): void {
   console.log(`
-Uso: tsx scripting/apply-sequential-openspec-schema.mts [opciones]
+Uso: tsx scripting/openspec/apply-sequential-openspec-schema.mts [opciones]
 
-Aplica el DAG secuencial OpenSpec (proposal → specs → design → tasks)
-en un proyecto con @fission-ai/openspec 1.4.x.
+Aplica el schema local ${TARGET_SCHEMA} en un proyecto con @fission-ai/openspec 1.4.x:
+fork del built-in → copia schema.yaml y templates/tasks.md desde este repositorio.
 
 Opciones:
   --cwd <ruta>   Directorio raíz del proyecto destino (default: cwd actual)
@@ -71,6 +94,22 @@ function run(cmd: string, cwd: string): string {
   return execSync(cmd, { cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
 }
 
+function normalizeFileContent(content: string): string {
+  const normalized = content.replace(/\r\n/g, '\n');
+  return normalized.endsWith('\n') ? normalized : `${normalized}\n`;
+}
+
+function assertCanonicalSchemaSourcesExist(): void {
+  for (const file of CANONICAL_FILES) {
+    if (!existsSync(file.source)) {
+      throw new Error(
+        `Falta el schema canónico en este repositorio: ${file.source}\n` +
+          'Edita openspec/schemas/ aquí y vuelve a ejecutar el script en el proyecto destino.',
+      );
+    }
+  }
+}
+
 function assertPrerequisites(cwd: string): void {
   const openspecDir = join(cwd, 'openspec');
   const configPath = join(openspecDir, 'config.yaml');
@@ -80,6 +119,8 @@ function assertPrerequisites(cwd: string): void {
       'OpenSpec no está inicializado: falta openspec/ o openspec/config.yaml en el proyecto destino.',
     );
   }
+
+  assertCanonicalSchemaSourcesExist();
 
   try {
     const version = run('npx openspec --version', cwd).trim();
@@ -96,48 +137,38 @@ function schemaPath(cwd: string): string {
   return join(cwd, 'openspec', 'schemas', TARGET_SCHEMA, 'schema.yaml');
 }
 
-function readRequiresForArtifact(content: string, artifactId: string): string[] | null {
-  const lines = content.split(/\r?\n/);
-  for (let i = 0; i < lines.length; i++) {
-    const match = lines[i].match(/^  - id: (\S+)\s*$/);
-    if (!match || match[1] !== artifactId) continue;
+function isSchemaSynced(cwd: string): boolean {
+  return CANONICAL_FILES.every((file) => {
+    const dest = file.dest(cwd);
+    if (!existsSync(dest)) return false;
+    const canonical = normalizeFileContent(readFileSync(file.source, 'utf8'));
+    const current = normalizeFileContent(readFileSync(dest, 'utf8'));
+    return current === canonical;
+  });
+}
 
-    for (let j = i + 1; j < lines.length; j++) {
-      if (/^  - id: /.test(lines[j])) break;
-      if (/^apply:/.test(lines[j])) break;
+function syncCanonicalSchema(cwd: string, dryRun: boolean): string[] {
+  const updated: string[] = [];
 
-      const requiresMatch = lines[j].match(/^    requires:\s*(.*)$/);
-      if (!requiresMatch) continue;
+  for (const file of CANONICAL_FILES) {
+    const canonical = normalizeFileContent(readFileSync(file.source, 'utf8'));
+    const dest = file.dest(cwd);
+    const current = existsSync(dest) ? normalizeFileContent(readFileSync(dest, 'utf8')) : '';
 
-      const inline = requiresMatch[1].trim();
-      if (inline === '[]') return [];
+    if (current === canonical) continue;
 
-      const items: string[] = [];
-      for (let k = j + 1; k < lines.length; k++) {
-        const itemMatch = lines[k].match(/^      - (\S+)\s*$/);
-        if (!itemMatch) break;
-        items.push(itemMatch[1]);
-      }
-      return items;
+    if (dryRun) {
+      logStep(`[dry-run] Sincronizar ${file.label} → ${dest}`);
+      updated.push(file.label);
+      continue;
     }
+
+    mkdirSync(dirname(dest), { recursive: true });
+    writeFileSync(dest, canonical, 'utf8');
+    updated.push(file.label);
   }
-  return null;
-}
 
-function requiresMatch(actual: string[] | null, expected: readonly string[]): boolean {
-  if (!actual || actual.length !== expected.length) return false;
-  return expected.every((item, index) => actual[index] === item);
-}
-
-function isSchemaPatched(cwd: string): boolean {
-  const path = schemaPath(cwd);
-  if (!existsSync(path)) return false;
-
-  const content = readFileSync(path, 'utf8');
-  return (
-    requiresMatch(readRequiresForArtifact(content, 'design'), DESIGN_REQUIRES) &&
-    requiresMatch(readRequiresForArtifact(content, 'tasks'), TASKS_REQUIRES)
-  );
+  return updated;
 }
 
 function readProjectSchema(cwd: string): string | null {
@@ -147,61 +178,12 @@ function readProjectSchema(cwd: string): string | null {
   return match?.[1] ?? null;
 }
 
-function buildRequiresBlock(items: readonly string[]): string[] {
-  if (items.length === 0) return ['    requires: []'];
-  return ['    requires:', ...items.map((item) => `      - ${item}`)];
-}
-
-function patchSchemaRequires(filePath: string): boolean {
-  const lines = readFileSync(filePath, 'utf8').split(/\r?\n/);
-  const patches: Record<string, readonly string[]> = {
-    design: DESIGN_REQUIRES,
-    tasks: TASKS_REQUIRES,
-  };
-
-  let changed = false;
-
-  for (let i = 0; i < lines.length; i++) {
-    const match = lines[i].match(/^  - id: (\S+)\s*$/);
-    if (!match) continue;
-
-    const artifactId = match[1];
-    const expected = patches[artifactId];
-    if (!expected) continue;
-
-    for (let j = i + 1; j < lines.length; j++) {
-      if (/^  - id: /.test(lines[j])) break;
-      if (/^apply:/.test(lines[j])) break;
-
-      if (!/^    requires:/.test(lines[j])) continue;
-
-      let end = j + 1;
-      while (end < lines.length && /^      - /.test(lines[end])) end++;
-
-      const current = readRequiresForArtifact(lines.join('\n'), artifactId);
-      if (requiresMatch(current, expected)) break;
-
-      const replacement = buildRequiresBlock(expected);
-      lines.splice(j, end - j, ...replacement);
-      changed = true;
-      i = j + replacement.length - 1;
-      break;
-    }
-  }
-
-  if (changed) {
-    writeFileSync(filePath, lines.join('\n'), 'utf8');
-  }
-
-  return changed;
-}
-
 function runFork(cwd: string, force: boolean, dryRun: boolean): void {
   const schemaDir = join(cwd, 'openspec', 'schemas', TARGET_SCHEMA);
   const exists = existsSync(schemaDir);
 
-  if (exists && !force && isSchemaPatched(cwd)) {
-    logOk(`Schema ${TARGET_SCHEMA} ya existe con requires correctos`);
+  if (exists && !force && isSchemaSynced(cwd)) {
+    logOk(`Schema ${TARGET_SCHEMA} ya está sincronizado con el origen`);
     return;
   }
 
@@ -392,7 +374,7 @@ function isFullyApplied(cwd: string): boolean {
     !existsSync(readmePath) || readmeHasCanonicalOpenSpecSection(readFileSync(readmePath, 'utf8'));
 
   return (
-    isSchemaPatched(cwd) &&
+    isSchemaSynced(cwd) &&
     readProjectSchema(cwd) === TARGET_SCHEMA &&
     existsSync(schemaPath(cwd)) &&
     readmeOk
@@ -411,7 +393,7 @@ function main(): void {
   assertPrerequisites(cwd);
 
   if (!force && !dryRun && isFullyApplied(cwd)) {
-    logOk('El proyecto ya tiene el DAG secuencial aplicado');
+    logOk('El proyecto ya tiene el schema secuencial sincronizado');
     verifySchema(cwd, false);
     console.log('');
     console.log(chalk.cyan('Listo. Sin cambios necesarios.'));
@@ -420,19 +402,19 @@ function main(): void {
 
   runFork(cwd, force, dryRun);
 
-  const path = schemaPath(cwd);
-  if (!dryRun) {
-    if (!existsSync(path)) {
-      throw new Error(`No se encontró ${path} tras el fork`);
+  if (!dryRun && !existsSync(schemaPath(cwd))) {
+    throw new Error(`No se encontró ${schemaPath(cwd)} tras el fork`);
+  }
+
+  const synced = syncCanonicalSchema(cwd, dryRun);
+  if (dryRun) {
+    if (synced.length === 0) {
+      logStep('[dry-run] schema.yaml y templates/tasks.md ya coinciden con el origen');
     }
-    const patched = patchSchemaRequires(path);
-    if (patched) {
-      logOk('requires de design y tasks parcheados en schema.yaml');
-    } else {
-      logOk('schema.yaml ya tenía requires correctos');
-    }
+  } else if (synced.length === 0) {
+    logOk('schema.yaml y templates/tasks.md ya coinciden con el origen');
   } else {
-    logStep(`[dry-run] Parchear requires en ${path}`);
+    logOk(`Sincronizado desde el repo origen: ${synced.join(', ')}`);
   }
 
   updateProjectConfig(cwd, dryRun);

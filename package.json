@@ -42,6 +42,7 @@
     "statusline:router-details:on": "tsx scripting/statusline-router-details.ts on",
     "statusline:router-details:off": "tsx scripting/statusline-router-details.ts off",
     "statusline:router-details:toggle": "tsx scripting/statusline-router-details.ts toggle",
+    "openspec:apply-sequential-schema": "tsx scripting/openspec/apply-sequential-schema.mts",
     "openspec:next-change-id": "tsx scripting/openspec/next-change-id.ts",
     "openspec:verify-change-id": "tsx scripting/openspec/verify-change-id.ts"
   },

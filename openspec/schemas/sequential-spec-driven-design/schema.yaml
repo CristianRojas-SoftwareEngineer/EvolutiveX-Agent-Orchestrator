@@ -19,9 +19,15 @@ artifacts:
       capabilities, modifications, or removals. Mark breaking changes with
       **BREAKING**.
 
-      - **Capabilities**: Identify which specs will be created or modified:
-        - **New Capabilities**: List capabilities being introduced. Each becomes a new `specs/<name>/spec.md`. Use kebab-case names (e.g., `user-auth`, `data-export`).
-        - **Modified Capabilities**: List existing capabilities whose REQUIREMENTS are changing. Only include if spec-level behavior changes (not just implementation details). Each needs a delta spec file. Check `openspec/specs/` for existing spec names. Leave empty if no requirement changes.
+      - **Capabilities**: Identify the structural class of this delta. A delta is
+      EITHER *behavioral* (touches agreed behavior in the canon) OR *non-canonical*
+      (no requirement in the canon — retirements OR additions like tests/tooling) —
+      never both. Use the matching subsection:
+        - **New Capabilities** (behavioral): List capabilities being introduced. Each becomes a new `specs/<name>/spec.md`. Use kebab-case names (e.g., `user-auth`, `data-export`).
+        - **Modified Capabilities** (behavioral): List existing capabilities whose REQUIREMENTS are changing, including the *retirement of canonical behavior*. Check `openspec/specs/` for existing spec names. Each needs a delta spec file. A `REMOVED`/`MODIFIED` requirement (or the FROM of a `RENAMED`) MUST correspond to a requirement that actually exists in `openspec/specs/<capability>/spec.md` — declaring one without a canonical counterpart is invalid (no orphan `REMOVED`).
+        - **### Non-canonical change** (non-canonical): Use this subsection ONLY when the change has NO requirement in `openspec/specs/` — whether it *retires* code (dead files, reference trees, zombies) or *adds* non-canonical artifacts (integration tests, tooling, CI scripts). List each item with a one-line note on why it has no canonical counterpart. Do NOT declare New/Modified Capabilities in this case; `define` will write a non-canonical *record*, not a delta-spec.
+
+        Every item in **What Changes** that touches canonical behavior MUST map to a New/Modified capability; every item with no canonical counterpart (retirement or addition) MUST be listed under `### Non-canonical change`. Declaring "none"/«ninguna» across the board while What Changes lists changes is invalid, and so is declaring both classes at once; `openspec:verify-stage-completion` will block either.
       - **Impact**: Affected code, APIs, dependencies, or systems.
 
 
@@ -48,8 +54,26 @@ artifacts:
       Create specification files that define WHAT the system should do.
 
 
+      MANDATORY coverage: the `specs/` glob is NEVER empty, but its form depends on
+      the delta class declared in the proposal:
+
+      - **Behavioral delta** (New/Modified Capabilities): produce one delta-spec per
+      capability with ≥1 requirement (ADDED/MODIFIED/REMOVED/RENAMED). Every
+      `REMOVED`/`MODIFIED` requirement, and the FROM of every `RENAMED`, MUST match a
+      requirement that exists in `openspec/specs/<capability>/spec.md` (whitespace-
+      insensitive). Removing canonical behavior is a REMOVED requirement (with
+      **Reason** and **Migration**) — never an orphan REMOVED with no canonical
+      counterpart.
+
+      - **Non-canonical delta** (`### Non-canonical change`): write a non-canonical
+      *record* under `specs/<area>/spec.md` with a `## Non-canonical record` section
+      documenting the non-canonical items in prose (retirements OR additions such as
+      test suites/tooling). The record carries NO `## ADDED/MODIFIED/REMOVED/RENAMED`
+      operation headers, so `synchronize` does not promote it to the canon, yet it is a
+      non-empty file so the `specs` artifact reaches `done`.
+
       Create one spec file per capability listed in the proposal's Capabilities
-      section.
+      section (behavioral), or one record per non-canonical area (non-canonical).
 
       - New capabilities: use the exact kebab-case name from the proposal
       (specs/<capability>/spec.md).
@@ -210,6 +234,38 @@ artifacts:
       - Order tasks by dependency (what must be done first?)
 
 
+      Base format (MANDATORY): the `## N.` numbered headings and the `- [ ] X.Y`
+
+      checkbox+id format are required and must never be replaced by pipeline
+
+      columns (e.g. `## Todo`/`## Doing`/`## Done`). The apply phase marks `[x]`
+
+      in place under these headings and counts checkboxes for progress.
+
+
+      Inline grammar (OPTIONAL, degradable): after the description, a task line MAY
+
+      carry lightweight tags that the tooling co-owning this file (the Workbench
+
+      extension) reads and writes:
+
+      - `~<state>` — pipeline state, one of `~todo` | `~doing`. There are only
+
+        **3 states** (todo/doing/done); `review` lives at the change level
+      (`verify`),
+
+        not per task. Omit `~done`: **the `[x]` checkbox is the truth for done**,
+
+        so a `~doing` (or any state tag) next to an `[x]` is stale and ignored.
+
+      - `@<assignee>` — optional owner.
+
+      Both tags are optional, order-independent, and sit AFTER the description so
+
+      the checkbox parser is unaffected. Any unrecognized trailing token is
+      ignored.
+
+
       Example:
 
       ```
@@ -217,15 +273,15 @@ artifacts:
       ## 1. Setup
 
 
-      - [ ] 1.1 Create new module structure
+      - [ ] 1.1 Create new module structure ~doing @alice
 
-      - [ ] 1.2 Add dependencies to package.json
+      - [ ] 1.2 Add dependencies to package.json ~todo
 
 
       ## 2. Core Implementation
 
 
-      - [ ] 2.1 Implement data export function
+      - [x] 2.1 Implement data export function @alice
 
       - [ ] 2.2 Add CSV formatting utilities
 
@@ -241,6 +297,8 @@ artifacts:
       - design
 apply:
   requires:
+    - specs
+    - design
     - tasks
   tracks: tasks.md
   instruction: |

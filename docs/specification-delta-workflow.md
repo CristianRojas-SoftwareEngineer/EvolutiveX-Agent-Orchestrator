@@ -659,6 +659,18 @@ abiertos:
 - La regla de delegación es lo que mantiene sano el conjunto. Si en algún momento se
   incumple (copiar instrucciones dentro de una skill), reaparece la doble fuente de
   verdad que el diseño busca evitar.
+- **Parche de validación de `created` en `.openspec.yaml`** — OpenSpec 1.4.1 solo acepta
+  `YYYY-MM-DD` en el campo `created` del `.openspec.yaml`. La extensión EvolutiveX
+  Workbench escribe timestamps ISO 8601 completos (`YYYY-MM-DDThh:mm:ssZ`), que el
+  validador Zod rechaza; los comandos `openspec instructions`, `openspec new change` y
+  `openspec status` fallarían al encontrar ese formato. El script
+  `scripting/openspec/patch-openspec-change-metadata.mts` extiende el regex a formato
+  dual `(YYYY-MM-DD | ISO 8601 completo)` directamente en
+  `node_modules/@fission-ai/openspec/dist/core/change-metadata/schema.js`. Está
+  registrado como `postinstall` en `package.json` para reaplicarse automáticamente tras
+  cada `npm install`. No existe punto de extensión oficial en OpenSpec 1.4.1 para
+  sobreescribir esta validación sin tocar `node_modules/`; cuando se publique una versión
+  que lo soporte, este parche debe retirarse.
 
 En balance: el ecosistema convierte un workflow con dos formas divergentes y etapas
 opcionales en un único pipeline secuencial, mandatorio y orquestado, a cambio de

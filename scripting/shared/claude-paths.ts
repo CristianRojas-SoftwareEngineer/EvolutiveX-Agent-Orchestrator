@@ -29,29 +29,44 @@ export function getSessionTagsPath(): string {
   return join(getClaudeDir(), 'session-tags.json');
 }
 
-/** `/c/Users/Cristian/foo` → `C:\Users\Cristian\foo` */
+/**
+ * Normaliza rutas al formato nativo del SO de ejecución.
+ * - win32: convierte /c/Users/... → C:\Users\... (Git Bash / MSYS) y /C/... → C:\...
+ * - posix: retorna la ruta sin cambios (ya está en formato nativo).
+ */
 export function posixToWindows(pathStr: string): string {
-  const m = /^\/([a-zA-Z])\/(.*)$/.exec(pathStr);
-  if (m) {
-    const drive = m[1]!.toUpperCase();
-    const rest = m[2]!.replace(/\//g, '\\');
-    return `${drive}:\\${rest}`;
+  if (process.platform === 'win32') {
+    const m = /^\/([a-zA-Z])\/(.*)$/.exec(pathStr);
+    if (m) {
+      const drive = m[1]!.toUpperCase();
+      const rest = m[2]!.replace(/\//g, '\\');
+      return `${drive}:\\${rest}`;
+    }
+    return pathStr.replace(/\//g, '\\');
   }
-  return pathStr.replace(/\//g, '\\');
+  return pathStr;
 }
 
-/** `C:\Users\Cristian\Foo` → `C--Users-Cristian-Foo` (misma regla que Claude Code / PS1). */
+/**
+ * Convierte una ruta al slug que usa Claude Code para nombrar ~/.claude/projects/<slug>.
+ * Algoritmo canónico verificado contra los slugs reales:
+ * - win32: `C:\Users\Cristian\Foo` → `C--Users-Cristian-Foo`
+ * - posix: `/home/user/foo` → `-home-user-foo` (pwd | sed 's/\\//-/g')
+ */
 export function projectPathToSlug(windowsPath: string): string {
-  const normalized = windowsPath.replace(/\\/g, '/');
-  const m = /^([A-Za-z]):\/?(.*)$/.exec(normalized);
-  if (m) {
-    const drive = m[1]!.toUpperCase();
-    const rest = m[2]!.replace(/\/$/, '');
-    // Claude Code sustituye separadores y espacios por guiones en el slug del proyecto.
-    const encoded = rest.replace(/[/. ]/g, '-');
-    return `${drive}--${encoded}`;
+  if (process.platform === 'win32') {
+    const normalized = windowsPath.replace(/\\/g, '/');
+    const m = /^([A-Za-z]):\/?(.*)$/.exec(normalized);
+    if (m) {
+      const drive = m[1]!.toUpperCase();
+      const rest = m[2]!.replace(/\/$/, '');
+      const encoded = rest.replace(/[/. ]/g, '-');
+      return `${drive}--${encoded}`;
+    }
+    return windowsPath.replace(/[\\/:*?"<>|]/g, '-');
   }
-  return windowsPath.replace(/[\\/:*?"<>|]/g, '-');
+  // Posix: algoritmo canónico de Claude Code (cada / → -)
+  return windowsPath.replace(/\//g, '-');
 }
 
 export function resolveProjectDir(projectArg: string): string {

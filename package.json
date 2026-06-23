@@ -25,6 +25,8 @@
     "clean:modules": "tsx scripting/maintenance/clean-modules.ts",
     "clean:sessions": "rimraf sessions",
     "clean:logs": "rimraf server",
+    "changelog:generate": "tsx scripting/changelog/generate-changelog.ts",
+    "changelog:install-hook": "tsx scripting/changelog/install-changelog-hook.ts",
     "configure:provider": "tsx scripting/provider/configure-provider.ts",
     "setup:install": "tsx scripting/install/setup.ts",
     "setup:uninstall": "tsx scripting/install/setup.ts --uninstall",

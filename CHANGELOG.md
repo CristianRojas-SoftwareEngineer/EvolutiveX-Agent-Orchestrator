@@ -3,9 +3,9 @@
 All notable changes are derived from conventional commits. Do not edit by hand.
 
 ## [Unreleased]
-
 ### Added
-
+- sincronizar scripts autónomos desde Workbench
+- sanear texto de voz y forzar resúmenes de alto nivel
 - proyectar lifecycle spec-delta al tablero Kanban
 - adoptar pipeline spec-driven secuencial con schema local
 - agregar skill claude-code-model-config refinada
@@ -34,7 +34,7 @@ All notable changes are derived from conventional commits. Do not edit by hand.
 - anclar ancho de Tabla 2 al bloque Tabla 1 + Tabla 3
 - agregar # Workflows en Tabla 2 y corregir Stop handler
 - separar cache en columnas Cache Creación y Cache Lectura
-- reordenar layout T1
+- reordenar layout T1|T3 arriba y T2 abajo
 - instalador unificado de statusline, notificaciones y voz
 - instalar hooks globales en ~/.claude
 - copy por evento y mensajes dinámicos stdin
@@ -67,7 +67,7 @@ All notable changes are derived from conventional commits. Do not edit by hand.
 - implementar borde hooks con endpoint POST /hooks y AuditHookEventHandler
 - implementar join determinista tool_use_id↔subagente con política FIFO (plano B §23)
 - implementar correlación determinista por cabeceras de agente (plano A)
-- instalador de statusline y resolución EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT
+- instalador de statusline y resolución SMART_CODE_PROXY_ROOT
 - crear espejos faltantes entre Claude Code y Windsurf
 - mejorar legibilidad, consistencia y observabilidad de body.parsed.md
 - mostrar Tabla 2 con placeholders vacíos al inicio de sesión
@@ -90,14 +90,17 @@ All notable changes are derived from conventional commits. Do not edit by hand.
 - transform body.parsed.md to conversational format
 - implementa PROXY_UNREDACT_THINKING para capturar thinking legible
 - migración a arquitectura SOLID con Fastify y documentación completa en español
-
+- initial commit for Fastify + TypeScript SOLID API
 ### Changed
-
+- reorganizar scripting/ por dominio
+- sincronizar skills compartidas con versión refinada del Workbench
+- reemplazar script apply-sequential por versión refinada del Workbench
+- eliminar detección legacy de detached-session-end-relay
 - eliminar LOG_HTTP_LEVEL
 - consolidar command-manager en skill-manager
 - completar cierre de optimize-changelog-generator
 - optimizar generate-changelog con pasada única e instalar hook post-commit
-- absorber aprendizajes sm-\* en OpenSpec y eliminar la familia experimental
+- absorber aprendizajes sm-* en OpenSpec y eliminar la familia experimental
 - renombrar skill investigation a investigate
 - renombrar y consolidar create-plan e investigation con recorrido post-ejecución
 - dividir create-plan en create-plan-to-implement y create-plan-to-investigate
@@ -141,9 +144,12 @@ All notable changes are derived from conventional commits. Do not edit by hand.
 - migra a API dir-based y elimina métodos legacy
 - implementar PKA de 6 capas, ports, inyección de dependencias y hardening de tooling
 - reemplazar 'any' por tipos estrictos del SDK de Anthropic
-
 ### Fixed
-
+- aplicar parche dual a openspec change-metadata
+- degradar postinstall a script manual
+- entregar SessionEnd con node directo síncrono
+- relay detached para SessionEnd
+- marcar SessionEnd como async en plantilla canónica
 - normalizar archivados con -- y c<NNNNN> global
 - elevar observabilidad en el borde hooks del proxy
 - corregir recursión infinita del hook post-commit con lock file
@@ -169,7 +175,7 @@ All notable changes are derived from conventional commits. Do not edit by hand.
 - persistir tool_result y métricas wire residuales
 - corregir gaps de proyección causal en workflows wire
 - aplicar 7 correcciones a los artefactos del change
-- alinear todas las skills sm-\* con el flujo causa→solución secuencial
+- alinear todas las skills sm-* con el flujo causa→solución secuencial
 - corregir flujo secuencial causa→solución, no simultáneo
 - garantizar eliminación transaccional de node_modules en Windows
 - clasificar continuation por el último mensaje, no por el historial
@@ -223,9 +229,10 @@ All notable changes are derived from conventional commits. Do not edit by hand.
 - actualizar content-length al filtrar tools del body
 - corregir omisión de cuerpos de petición en logs de auditoría
 - migrar ts-node a tsx por compatibilidad con Node.js 24
-
 ### Documentation
-
+- sincronizar desde Workbench y documentar parche
+- documentar parche postinstall de openspec
+- completar renombrado de vars env en specs y plantillas
 - reorganizar documentación de reportes y referencias
 - refactorizar guías de agentes y meta-skills
 - corregir referencias rotas a documentos eliminados
@@ -272,7 +279,7 @@ All notable changes are derived from conventional commits. Do not edit by hand.
 - especificar relay Stop unificado y doble toast
 - corregir asimetría install:voice y skills legacy
 - sincronizar documentación con el instalador unificado setup
-- cerrar migración y documentar sessions:\*
+- cerrar migración y documentar sessions:*
 - sincronizar change add-notifications-branding con la implementación real
 - sincronizar spec y docs con la cobertura de 14 entradas
 - alinear comandos de UserPromptSubmit y Stop con --stdin-json

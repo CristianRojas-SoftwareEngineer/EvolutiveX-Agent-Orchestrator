@@ -20,6 +20,7 @@
 - [Customización de schema](#customización-de-schema)
 - [Contrato CLI](#contrato-cli)
 - [Workspaces, migración y troubleshooting](#workspaces-migración-y-troubleshooting)
+  - [Configuración de entorno recomendada](#configuración-de-entorno-recomendada)
 - [Mantenimiento y limitaciones](#mantenimiento-y-limitaciones)
 
 ---
@@ -167,8 +168,52 @@ progreso real; las **tasks de limpieza** que ejecutarán el retiro de legacy dis
 agrupada bajo `## encabezados numerados`; la fase de apply parsea el formato
 `- [ ]` para rastrear el progreso.
 
+**Formato enriquecido (contrato canónico).** Sobre la base obligatoria (`## N.`
+numerados + `- [ ] X.Y descripción`) el schema admite una **gramática inline opcional y
+degradable** tras la descripción: `~<estado>` (`~todo` | `~doing`; solo 3 estados —
+`review` vive a nivel de change/`verify`) y `@<responsable>`. Regla decisiva: **el
+checkbox es la verdad para *done*** — `[x]` ⇒ done sin necesidad de `~done`, y un
+`~doing` junto a un `[x]` es obsoleto y se ignora. Los tags van **después** del
+checkbox+descripción, así que `task-progress` (el único módulo del CLI que lee
+`tasks.md`, con el regex `^[-*]\s+\[[\sx]\]`) no se ve afectado: el conteo de
+checkboxes es idéntico con o sin tags.
+
+**Co-propiedad con la extensión Workbench.** `tasks.md` es co-poseído: además del
+pipeline (`plan` lo genera, `apply` marca `[x]` **in place**, `verify` cuenta
+checkboxes), la extensión *EvolutiveX Workbench* co-lee y co-edita el archivo desde su
+tablero de Tasks. Ambos respetan el mismo contrato: encabezados `## N.` numerados,
+identificadores `X.Y` estables y marcado in place (nunca reorganizar en columnas de
+pipeline). Por eso `apply` debe **preservar los tags inline** al marcar `[x]`, y la
+extensión serializa in place sin tocar la estructura numerada. El formato enriquecido
+**no requiere modificar el CLI** (es permisivo): vive en este schema y en las skills.
+
+> **Sincronización del contrato.** Este contrato es **espejo** de `docs/10-migracion-tareas-y-gui.md`
+> del *EvolutiveX Workbench* (su fuente autocontenida). Cualquier cambio del formato canónico debe
+> aplicarse en **ambos** sitios para mantenerlos sincronizados.
+
 No debe contener: justificación amplia de diseño; prosa de requisitos; justificación
 de negocio; tasks demasiado gruesas para verificar.
+
+### Frontera de entrada al pipeline
+
+No todo cambio entra al pipeline de specification-delta. La frontera es:
+
+- **Cambio canon-afectante o fase de roadmap → pipeline.** Si el cambio toca el
+  comportamiento acordado en `openspec/specs/` (añade, modifica o retira un requisito
+  existente), o es una **fase de un roadmap** (`orchestrate-roadmap`, donde cada fase es
+  un L2 specification-delta), corre por el pipeline completo. Esta es la clase
+  **conductual**.
+- **Cambio no canónico standalone → commit plano / `create-plan`.** Un cambio que no
+  toca el canon y no es una fase de roadmap —retiros de código muerto o adiciones de
+  tooling/tests/CI por sí solos— **no necesita** el pipeline: resuélvelo con un commit
+  plano o, si requiere planificación, con `create-plan`. Solo entra al pipeline como
+  delta **no canónico** cuando ya forma parte de una fase o de un delta en curso.
+- **Delta mixto → conductual.** Cuando un mismo delta toca el canon **y** además trae
+  trabajo sin contraparte canónica, se clasifica como **conductual**: las tareas no
+  canónicas viven en `tasks.md`/Impact sin artefacto especial (sin subsección
+  `### Non-canonical change` ni registro `## Non-canonical record`). Declarar ambas
+  subsecciones a la vez sigue siendo `invalid`; la clase no canónica se reserva para
+  deltas que **no** tocan el canon en absoluto (retiros o adiciones puros).
 
 ---
 
@@ -216,16 +261,13 @@ responsabilidad única.
 Notas de nomenclatura:
 
 - `create-` se usa en lugar de `new-` para que todos los nombres sean verbos
-  (consistencia gramatical), aun a costa de no calcar el comando nativo, que es
-  `openspec new change <name>` (subcomando `change` del grupo `new`); la skill
-  `create-specification-delta` envuelve ese comando nativo.
+  (consistencia gramatical). La skill `create-specification-delta` invoca el script
+  `npm run openspec:create-specification-delta`.
 - `define-specification-delta` es el nombre más literalmente exacto: esa skill escribe
   el delta de especificación propiamente dicho.
-- El identificador numérico incremental se materializa **solo** en `create`: recibe
-  el slug descriptivo, deriva el siguiente entero por escaneo de `openspec/changes/` y
-  `openspec/changes/archive/`, compone el nombre `c<NNNNN>-<slug>` y lo pasa a
-  `openspec new change`. Las demás etapas operan sobre el nombre completo vía
-  `--change`, sin lógica de numeración.
+- El identificador numérico incremental se materializa **solo** en `create`: el script
+  deriva `c<NNNNN>` vía `openspec:next-change-id`, compone `c<NNNNN>-<slug>` y scaffold
+  la carpeta. Las demás etapas operan sobre el nombre completo vía `--change`.
 
 ### Contratos de composición
 
@@ -234,9 +276,15 @@ Dos etapas no son autocontenidas, por diseño, y siguen el
 
 - `explore-specification-delta` sub-invoca la skill `investigate` para la
   investigación estructurada; no reimplementa esa lógica.
-- `apply-specification-delta` sub-invoca `create-plan` antes de implementar.
+- `apply-specification-delta` sub-invoca `create-plan` antes de implementar. Tras editar
+  `tasks.md` debe ejecutar `npm run openspec:sync-tasks-meta -- --slug <change>` para
+  mantener `.tasks-meta.yaml` alineado cuando la extensión no está activa.
 
 Las otras ocho etapas son autocontenidas.
+
+### Contrato ISO en timestamps
+
+`created` y `updated` en `.openspec.yaml` y en `.tasks-meta.yaml` SHALL ser ISO 8601 completo. El scaffold (`create-specification-delta`) y las mutaciones del store son el único camino de escritura. El scanner **no** infiere fechas desde git ni acepta `YYYY-MM-DD` en lectura: datos inválidos → `—` en Dashboard. Ver `docs/04-persistencia-y-stores.md` §4.
 
 ### Remediación de legacy distribuida
 
@@ -311,8 +359,13 @@ El mismo pipeline de diez etapas, ejecutado a dos niveles de autonomía:
 
 - **AUTO** (automático): para deltas de baja incertidumbre (fix ya identificado,
   cambio localizado, sin decisiones arquitectónicas). El orquestador recorre las
-  etapas de corrido, sin pausas. Único corte: si `verify` reporta CRITICAL, se
-  detiene.
+  etapas de corrido, sin pausas, en un único turno. Único corte: una parada admisible
+  (CRITICAL en `verify`, gate de completitud en rojo, o cesión legítima por decisión
+  irresoluble). El comportamiento de un solo turno no es solo prosa: lo respalda un
+  **backstop determinista** (hook `Stop`, `scripting/openspec/enforce-auto-pipeline.mts`)
+  que, mientras el centinela `openspec/.workbench/auto-pipeline.json` exista y el change
+  no esté archivado, impide el fin de turno y nombra la próxima etapa a invocar. Ver la
+  capability `pipeline-auto-continuation`.
 - **GUIDED** (semi-automático): para deltas de alta incertidumbre (feature nueva, bug
   sin diagnosticar, decisión arquitectónica). El orquestador recorre **las mismas**
   etapas, pero pausa en checkpoints para revisión humana: tras `explore`, tras
@@ -519,8 +572,11 @@ Interactive/human-oriented (no `--json`): `openspec init`, `openspec view`,
 `openspec config edit`, `openspec feedback`, `openspec completion install`.
 
 Script/agent-oriented (`--json`): `openspec list`, `openspec show`,
-`openspec validate`, `openspec status`, `openspec instructions`,
-`openspec templates`, `openspec schemas`, and workspace subcommands.
+`openspec status`, `openspec instructions`, `openspec templates`,
+`openspec schemas`, and workspace subcommands. The CLI `openspec validate` is
+**not** part of this pipeline (see «Common agent commands» below): delta
+completeness/validation is owned exclusively by the project gate
+`npm run openspec:verify-stage-completion`.
 
 ### `openspec new change <name>`
 
@@ -589,14 +645,57 @@ delegate to `openspec instructions` and never embed a hardcoded path.
 ### Common agent commands
 
 - `openspec list --json` — active changes (`{"changes":[...]}`).
-- `openspec validate --strict` / `openspec validate <name>` — validate specs/changes.
 - `openspec show <name>` — inspect a change or spec.
 - `openspec schemas --json` / `openspec schema which` — discover/identify schemas.
 - `openspec templates` — inspect resolved template paths.
 
+**Validation gate (the only one this pipeline uses).** Delta completeness and
+validation are owned by the project script, never by the CLI `openspec validate`:
+
+```bash
+npm run openspec:verify-stage-completion -- --change "<name>" --through <proposal|specs|design|tasks>
+```
+
+Its exit code is the source of truth (non-zero = hard block; `CRITICAL` messages
+name each violation). Do **not** use `openspec validate` to validate a delta: it
+only knows the built-in `spec-driven` schema and rejects valid registros no canónicos
+(a delta whose `specs/` carries no `## ADDED/MODIFIED/REMOVED/RENAMED`
+headers). The CLI `validate` is reserved for **schema** validation inside
+`apply-sequential-schema` (`npx openspec schema validate`), which is unrelated to
+delta validation.
+
 ---
 
 ## Workspaces, migración y troubleshooting
+
+### Configuración de entorno recomendada
+
+En máquinas con Git para Windows, la instalación por defecto establece
+`core.autocrlf=true` a nivel system. Esta configuración convierte los LF del índice
+a CRLF en checkout, pero no normaliza los archivos creados fuera de `git checkout`
+(scripts, agentes, la extensión VS Code). El resultado son "cambios fantasmas":
+archivos reportados como modificados en `git status` sin ningún cambio lógico.
+
+Este repo declara `* text=auto eol=lf` en `.gitattributes`, lo que fija la política
+de fin de línea como contrato del repositorio, independientemente de la configuración
+local de git. Sin embargo, se recomienda también cambiar la configuración global a
+`input` en cada máquina de desarrollo:
+
+```bash
+git config --global core.autocrlf input
+```
+
+**Por qué `input` y no `false`**: `input` aplica la conversión CRLF→LF al stagear
+(si el archivo en disco llega con CRLF, git lo normaliza antes de escribir el blob),
+pero no convierte LF→CRLF en checkout. Esto complementa el `.gitattributes`: el repo
+siempre almacena LF, y `input` actúa como red de seguridad si un editor escribe CRLF.
+`false` también funciona con el `.gitattributes`, pero no atrapa CRLFs de editores que
+no respetan la política del repo.
+
+**Nota**: este cambio aplica a nivel `--global` y afecta todos los repos de la
+máquina. Si trabajas con repos que requieren CRLF, evalúa si este cambio global es
+apropiado — en ese caso, el `.gitattributes` de este repo es suficiente garantía y
+puedes omitir el cambio global.
 
 ### Workspaces
 
@@ -633,8 +732,12 @@ explícitamente en la tarea actual — sobrescriben las skills mantenidas a mano
 - Resolución de schema equivocada → inspecciona los metadatos del change,
   `openspec/config.yaml` y cualquier override `--schema`.
 - Artefactos de baja calidad → enriquece `context`/`rules` en `openspec/config.yaml`.
-- Falla la validación → inspecciona `openspec validate`, `openspec status` y los
-  archivos spec/change relevantes.
+- Falla la validación → ejecuta el gate del proyecto
+  `npm run openspec:verify-stage-completion -- --change "<name>" --through <artifact>`
+  (su exit code y sus mensajes `CRITICAL` son la fuente de verdad) e inspecciona
+  `openspec status` y los archivos spec/change relevantes. No uses `openspec validate`
+  del CLI para validar un delta: solo conoce el schema built-in y rechaza registros no
+  canónicos válidos (retiros o adiciones sin cabeceras de operación).
 - Archive se queja de sync faltante → el sync es la etapa 9 obligatoria
   (`synchronize-specification-delta`) que corre antes de archivar; archive ya no
   re-sincroniza.

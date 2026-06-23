@@ -1,4 +1,8 @@
-import type { WorkflowKind, WorkflowStatus } from '../../types/gateway/workflow.types.js';
+import type {
+  WorkflowCloseAuthority,
+  WorkflowKind,
+  WorkflowStatus,
+} from '../../types/gateway/workflow.types.js';
 import type { IStep } from './IStep.js';
 import type { IWorkflowResult } from './IWorkflowResult.js';
 
@@ -10,6 +14,8 @@ export interface IWorkflow {
   sessionId: string;
   /** Clasificación: principal del usuario o subagente. */
   kind: WorkflowKind;
+  /** Autoridad explícita de cierre del workflow (hook vs stop terminal SSE). */
+  closeAuthority: WorkflowCloseAuthority;
   /** Tipo de agente (de hook `agent_type` / `SubagentStart`). */
   agentType?: string;
   /** ID del agente (de hook `agent_id` para subagentes). */

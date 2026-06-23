@@ -64,7 +64,15 @@ function makeWorkflowRepo(overrides: Partial<IWorkflowRepository> = {}): IWorkfl
 }
 
 function stubWorkflow(id = 'session-1'): IWorkflow {
-  return { id, sessionId: id, kind: 'main', status: 'running', steps: [], startedAt: new Date() };
+  return {
+    id,
+    sessionId: id,
+    kind: 'main',
+    closeAuthority: 'stop-hook',
+    status: 'running',
+    steps: [],
+    startedAt: new Date(),
+  };
 }
 
 function stubWorkflowWithOpenStep(index: number, id = 'session-1'): IWorkflow {

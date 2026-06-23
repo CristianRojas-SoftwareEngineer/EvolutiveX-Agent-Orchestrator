@@ -24,6 +24,7 @@ function makeWorkflow(kind: IWorkflow['kind']): IWorkflow {
     id: 'wf-1',
     sessionId: 'session-1',
     kind,
+    closeAuthority: 'stop-hook',
     status: 'running',
     steps: [],
     startedAt: new Date(),

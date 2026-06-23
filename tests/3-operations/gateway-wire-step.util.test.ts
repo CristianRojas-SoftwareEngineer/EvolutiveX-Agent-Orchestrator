@@ -392,4 +392,118 @@ describe('gateway-wire-step.util', () => {
     expect(resolveOpenWireStepIndex(repo.getWorkflow(wf.id)!)).toBe(1);
     expect(wf.steps.length).toBe(1);
   });
+
+  it('turn-N (closeAuthority stop-hook) NO se fuerza a cerrar en end_turn — lo cierra el hook', () => {
+    const repo = new WorkflowRepositoryService();
+    const sessionId = 'session-turnN-regr';
+    // Turno N≥2: sin forceNew, layoutIndex>1 → id `-turn-N`, closeAuthority 'stop-hook'.
+    const wf = repo.openWorkflow(
+      sessionId,
+      { agentId: undefined, isSubagentRequest: false },
+      { layoutIndex: 2, workflowKind: 'agentic' },
+    );
+    expect(wf.id).toBe(`${sessionId}-turn-2`);
+    expect(wf.closeAuthority).toBe('stop-hook');
+
+    // Step agéntico normal (no side-request) que cierra con end_turn terminal.
+    repo.registerStep(wf.id, makeRequestStep(wf.id, 1));
+    enrichOpenWireStepWithResponse(
+      repo,
+      wf.id,
+      {
+        assistantMessage: { role: 'assistant', content: [{ type: 'text', text: 'listo' }] },
+        usage: { input_tokens: 1, output_tokens: 1 },
+        stopReason: 'end_turn',
+        closedAt: new Date(),
+      },
+      'end_turn',
+    );
+
+    const updated = repo.getWorkflow(wf.id)!;
+    // El step cierra, pero el workflow permanece abierto: lo cerrará el hook Stop.
+    expect(updated.steps[0].closedAt).toBeDefined();
+    expect(updated.result == null).toBe(true);
+    expect(repo.getWorkflowBySessionId(sessionId)?.id).toBe(wf.id);
+  });
+
+  it('huérfano (closeAuthority sse) SÍ se fuerza a cerrar en end_turn con steps reales', () => {
+    const repo = new WorkflowRepositoryService();
+    const sessionId = 'session-orphan-regr';
+    // Wire huérfano: forceNew → id `-wire-N`, closeAuthority 'sse'.
+    const wf = repo.openWorkflow(
+      sessionId,
+      { agentId: undefined, isSubagentRequest: false },
+      { forceNew: true, layoutIndex: 5, workflowKind: 'agentic' },
+    );
+    expect(wf.id).toBe(`${sessionId}-wire-5`);
+    expect(wf.closeAuthority).toBe('sse');
+
+    repo.registerStep(wf.id, makeRequestStep(wf.id, 1));
+    enrichOpenWireStepWithResponse(
+      repo,
+      wf.id,
+      {
+        assistantMessage: { role: 'assistant', content: [{ type: 'text', text: 'huérfano' }] },
+        usage: { input_tokens: 1, output_tokens: 1 },
+        stopReason: 'end_turn',
+        closedAt: new Date(),
+      },
+      'end_turn',
+    );
+
+    const updated = repo.getWorkflow(wf.id)!;
+    // forceClose con el step ya cerrado: stepCount >= 1 (nunca un cierre de 0 steps).
+    expect(updated.result != null).toBe(true);
+    expect(updated.result?.stepCount).toBe(1);
+  });
+
+  it('primer turno (id===sessionId) y subagente conservan cierre por hook en end_turn', () => {
+    const repo = new WorkflowRepositoryService();
+
+    // Primer turno: sin forceNew, layoutIndex 1 → id === sessionId, closeAuthority 'stop-hook'.
+    const sessionId = 'session-first';
+    const turn = repo.openWorkflow(
+      sessionId,
+      { agentId: undefined, isSubagentRequest: false },
+      { layoutIndex: 1, workflowKind: 'agentic' },
+    );
+    expect(turn.id).toBe(sessionId);
+    expect(turn.closeAuthority).toBe('stop-hook');
+    repo.registerStep(turn.id, makeRequestStep(turn.id, 1));
+    enrichOpenWireStepWithResponse(
+      repo,
+      turn.id,
+      {
+        assistantMessage: { role: 'assistant', content: [{ type: 'text', text: 'ok' }] },
+        usage: { input_tokens: 1, output_tokens: 1 },
+        stopReason: 'end_turn',
+        closedAt: new Date(),
+      },
+      'end_turn',
+    );
+    expect(repo.getWorkflow(turn.id)!.result == null).toBe(true);
+
+    // Subagente: openSubagentWorkflow → closeAuthority 'stop-hook'.
+    const sub = repo.openSubagentWorkflow(
+      sessionId,
+      { agentId: 'agent-1', isSubagentRequest: true },
+      turn.id,
+      'toolu_spawn',
+      { layoutIndex: 2 },
+    );
+    expect(sub.closeAuthority).toBe('stop-hook');
+    repo.registerStep(sub.id, makeRequestStep(sub.id, 1));
+    enrichOpenWireStepWithResponse(
+      repo,
+      sub.id,
+      {
+        assistantMessage: { role: 'assistant', content: [{ type: 'text', text: 'sub ok' }] },
+        usage: { input_tokens: 1, output_tokens: 1 },
+        stopReason: 'end_turn',
+        closedAt: new Date(),
+      },
+      'end_turn',
+    );
+    expect(repo.getWorkflow(sub.id)!.result == null).toBe(true);
+  });
 });

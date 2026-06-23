@@ -146,6 +146,7 @@ All notable changes are derived from conventional commits. Do not edit by hand.
 - implementar PKA de 6 capas, ports, inyección de dependencias y hardening de tooling
 - reemplazar 'any' por tipos estrictos del SDK de Anthropic
 ### Fixed
+- ampliar presupuesto de tokens y desactivar thinking en intención TTS
 - hacer multiplataforma bifurcando por process.platform y reescribiendo scripts bash a ts
 - aplicar parche dual a openspec change-metadata
 - degradar postinstall a script manual

@@ -662,8 +662,11 @@ export class AuditWorkflowHandler {
         params.rawBody,
         headersForAudit,
       );
-      // I3: no cerrar prematuramente — el workflow degradado queda abierto y cierra
-      // por reaper o shutdown con sus steps reales.
+      // I3: no cerrar prematuramente al crear (forceClose con 0 steps quemaba la guarda
+      // de idempotencia de finalizeWorkflowMetrics). El huérfano tiene closeAuthority 'sse'
+      // y queda abierto; cierra por una de dos rutas disjuntas, siempre con steps reales:
+      // stop terminal SSE vía closeWireWorkflowOnTerminalStop (tras closeStep), o el reaper/
+      // shutdown si queda en awaitingContinuation.
       this.workflowRepo.patchWireMeta(workflow.id, { continuationOrphan: true });
       return this.resultFromWorkflow(
         workflow,

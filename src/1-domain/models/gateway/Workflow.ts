@@ -1,4 +1,8 @@
-import type { WorkflowKind, WorkflowStatus } from '../../types/gateway/workflow.types.js';
+import type {
+  WorkflowCloseAuthority,
+  WorkflowKind,
+  WorkflowStatus,
+} from '../../types/gateway/workflow.types.js';
 import type { IWorkflow } from '../../interfaces/gateway/IWorkflow.js';
 import type { IStep } from '../../interfaces/gateway/IStep.js';
 import type { IWorkflowResult } from '../../interfaces/gateway/IWorkflowResult.js';
@@ -7,6 +11,7 @@ export class Workflow implements IWorkflow {
   id: string;
   sessionId: string;
   kind: WorkflowKind;
+  closeAuthority: WorkflowCloseAuthority;
   agentType?: string;
   agentId?: string;
   prompt?: string;
@@ -23,6 +28,7 @@ export class Workflow implements IWorkflow {
     this.id = data.id;
     this.sessionId = data.sessionId;
     this.kind = data.kind;
+    this.closeAuthority = data.closeAuthority;
     this.agentType = data.agentType;
     this.agentId = data.agentId;
     this.prompt = data.prompt;

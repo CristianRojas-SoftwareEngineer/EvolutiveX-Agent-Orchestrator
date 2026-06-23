@@ -45,6 +45,7 @@ function stubWorkflow(id = 'session-1'): IWorkflow {
     id,
     sessionId: id,
     kind: 'main',
+    closeAuthority: 'stop-hook',
     status: 'running',
     steps: [
       {

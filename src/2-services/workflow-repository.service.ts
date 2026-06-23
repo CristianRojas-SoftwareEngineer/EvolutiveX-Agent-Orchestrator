@@ -132,6 +132,8 @@ export class WorkflowRepositoryService implements IWorkflowRepository {
       id: workflowId,
       sessionId,
       kind: 'main',
+      // Turno E2E (primero o `-turn-N`) cierra por hook; wire huérfano (`forceNew`) por SSE.
+      closeAuthority: options.forceNew ? 'sse' : 'stop-hook',
       agentId: agentCtx.agentId,
       status: 'running',
       steps: [],
@@ -179,6 +181,8 @@ export class WorkflowRepositoryService implements IWorkflowRepository {
       id: workflowId,
       sessionId,
       kind: 'subagent',
+      // Sub-workflow cierra por hook `SubagentStop`.
+      closeAuthority: 'stop-hook',
       agentId: agentCtx.agentId,
       status: 'running',
       steps: [],
@@ -306,6 +310,7 @@ export class WorkflowRepositoryService implements IWorkflowRepository {
           id: workflowId,
           sessionId: hook.sessionId,
           kind: 'main',
+          closeAuthority: 'stop-hook',
           status: 'failed',
           steps: [],
           startedAt: new Date(),

@@ -40,7 +40,15 @@ function makeRepo(overrides: Partial<IWorkflowRepository> = {}): IWorkflowReposi
 }
 
 function stubWorkflow(id = 'session-1'): IWorkflow {
-  return { id, sessionId: id, kind: 'main', status: 'running', steps: [], startedAt: new Date() };
+  return {
+    id,
+    sessionId: id,
+    kind: 'main',
+    closeAuthority: 'stop-hook',
+    status: 'running',
+    steps: [],
+    startedAt: new Date(),
+  };
 }
 
 const BASE_PARAMS = {

@@ -10,6 +10,7 @@ function makeWorkflow(overrides: Partial<IWorkflow> = {}): IWorkflow {
     id: 'wf1',
     sessionId: 'sess1',
     kind: 'main',
+    closeAuthority: 'stop-hook',
     status: 'running',
     steps: [],
     startedAt: new Date(),

@@ -218,9 +218,12 @@ function extractTextFromAssistantMessage(message: AnthropicMessage): string | un
 }
 
 /**
- * Tras stop terminal en SSE: el step ya cerró. Workflows E2E (turno main o subagente)
- * no hacen forceClose aquí — cierran vía hook Stop / SubagentStop.
- * Workflows wire huérfanos (id !== sessionId, kind main) sí cierran en SSE.
+ * Tras stop terminal en SSE: el step ya cerró. La autoridad de cierre la declara
+ * `workflow.closeAuthority` (fijada en la creación), no el esquema de `id`:
+ * - `'stop-hook'` (turnos E2E —primero y `-turn-N`— y subagentes): no hacen forceClose
+ *   aquí; cierran vía hook Stop / SubagentStop / StopFailure.
+ * - `'sse'` (workflows wire huérfanos de continuation): cierran aquí vía forceClose,
+ *   siempre con el step ya cerrado por `closeStep` (nunca un cierre de 0 steps).
  */
 function closeWireWorkflowOnTerminalStop(
   repo: IWorkflowRepository,
@@ -228,8 +231,7 @@ function closeWireWorkflowOnTerminalStop(
   stopReason: string | undefined,
   step: IStep,
 ): void {
-  if (workflow.id === workflow.sessionId) return;
-  if (workflow.kind === 'subagent') return;
+  if (workflow.closeAuthority !== 'sse') return;
   if (workflow.result != null) return;
   // I1: el stop_reason de un side-request nunca decide el destino del workflow padre.
   if (step.stepKind === 'side-request') return;

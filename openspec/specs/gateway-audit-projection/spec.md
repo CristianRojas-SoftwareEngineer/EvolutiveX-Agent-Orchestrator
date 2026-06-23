@@ -322,11 +322,11 @@ Esta invariante es consistente con la semántica del protocolo Anthropic Message
 
 ### Requirement: Cierre de workflows wire en stop terminal SSE
 
-Cuando `enrichOpenWireStepWithResponse` o `closeWireWorkflowOnTerminalStop` procesan un step con `stopReason` terminal (`end_turn`, `max_tokens`, o ausente tras stream completo), el correlador SHALL invocar `closeStep` y SHALL NOT emitir `workflow_complete` para workflows E2E de ciclo completo (workflow de turno con `workflowId === sessionId` y sub-workflows con `kind: subagent`).
+Cuando `enrichOpenWireStepWithResponse` o `closeWireWorkflowOnTerminalStop` procesan un step con `stopReason` terminal (`end_turn`, `max_tokens`, o ausente tras stream completo), el correlador SHALL invocar `closeStep` y SHALL NOT emitir `workflow_complete` para workflows con `closeAuthority: 'stop-hook'` (turnos E2E —primero `workflowId === sessionId` y posteriores `${sessionId}-turn-N`— y sub-workflows `kind: subagent`).
 
 El cierre del workflow E2E SHALL permanecer exclusivamente vía hook (`Stop`, `SubagentStop`, `StopFailure`).
 
-Workflows wire huérfanos (`workflowId !== sessionId`, `kind: main`) MAY cerrarse por SSE `end_turn` vía `forceClose`.
+Workflows con `closeAuthority: 'sse'` (wire huérfanos de continuation, `workflowId !== sessionId`, `kind: main`) SHALL cerrarse por SSE terminal vía `forceClose`, con sus steps ya cerrados por `closeStep` (nunca un cierre de 0 steps).
 
 Cuando `enrichOpenWireStepWithResponse` procesa un step con `stopReason === 'tool_use'`, el correlador SHALL asignar `closedAt` al step y SHALL invocar `closeStep` antes de retornar, de modo que cada hop HTTP completo cuente para `stepCount`.
 
@@ -334,11 +334,26 @@ Cuando `registerWireStepInCorrelator` cae en la rama fallback (no hay step abier
 
 #### Scenario: end_turn cierra step sin workflow_complete en turno
 
-- **GIVEN** un workflow de turno `workflowId === sessionId` con step agentic abierto
+- **GIVEN** un workflow de turno `workflowId === sessionId` (`closeAuthority: 'stop-hook'`) con step agentic abierto
 - **WHEN** llega una respuesta SSE con `stopReason: end_turn`
 - **THEN** el step SHALL cerrarse con `closedAt` definido
 - **AND** el correlador SHALL NOT emitir `workflow_complete` para el workflow de turno
 - **AND** el workflow SHALL permanecer `running` hasta hook `Stop`
+
+#### Scenario: end_turn no cierra workflow turn-N (closeAuthority stop-hook)
+
+- **GIVEN** un workflow `turn-N` (`workflowId === \`${sessionId}-turn-2\``, `closeAuthority: 'stop-hook'`) con step agentic abierto
+- **WHEN** llega una respuesta SSE con `stopReason: end_turn`
+- **THEN** el step SHALL cerrarse con `closedAt` definido
+- **AND** el correlador SHALL NOT emitir `workflow_complete` para el workflow `turn-N`
+- **AND** el workflow SHALL permanecer `running` hasta hook `Stop`
+
+#### Scenario: huérfano end_turn cierra vía forceClose (closeAuthority sse)
+
+- **GIVEN** un workflow wire huérfano (`workflowId !== sessionId`, `kind: main`, `closeAuthority: 'sse'`) con step ya cerrado
+- **WHEN** llega una respuesta SSE con `stopReason: end_turn`
+- **THEN** `closeWireWorkflowOnTerminalStop` SHALL invocar `forceClose` con `stepCount >= 1`
+- **AND** el correlador SHALL emitir `workflow_complete` para el workflow huérfano
 
 #### Scenario: Sub-workflow end_turn no cierra sub-workflow
 

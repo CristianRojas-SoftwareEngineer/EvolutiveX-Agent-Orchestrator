@@ -21,6 +21,9 @@ import { AuditUpstreamErrorHandler } from '../3-operations/audit-upstream-error.
 import { FilterToolsHandler } from '../3-operations/filter-tools.handler.js';
 import { PiperSidecarService } from '../2-services/tts/piper-sidecar.service.js';
 import { TranscriptContextExtractor } from '../2-services/tts/transcript-extractor.service.js';
+import { GeminiTtsTextProvider } from '../2-services/tts/gemini-tts-text-provider.js';
+import { OpenRouterTtsTextProvider } from '../2-services/tts/openrouter-tts-text-provider.js';
+import { TtsTextProviderChain } from '../2-services/tts/tts-text-provider-chain.js';
 import { DesktopNotificationAdapter } from '../2-services/notifications/DesktopNotificationAdapter.js';
 import { resolveBranding } from '../2-services/notifications/cli.js';
 import { ProxyEnvironmentConfig } from '../1-domain/types/config.types.js';
@@ -99,15 +102,21 @@ export async function createProxyDependencies(
   const auditUpstreamErrorHandler = new AuditUpstreamErrorHandler(workflowRepo);
   const filterToolsHandler = new FilterToolsHandler(config);
 
-  // Credencial TTS dedicada: se sigue usando para generación de texto vía Gemini Flash
-  // (el sidecar local Piper solo se encarga de la síntesis, no del texto a decir).
-  const ttsApiKey = await resolveTtsApiKey();
-
   // Servicios de TTS — opcionales; se desactivan si TTS_ENABLED=false.
   // El sidecar local (PiperSidecarService) reemplaza al adaptador Gemini TTS.
   const ttsEnabled = config.TTS_ENABLED !== false;
   const ttsService = ttsEnabled ? new PiperSidecarService({ logger }) : undefined;
   const contextExtractor = ttsEnabled ? new TranscriptContextExtractor() : undefined;
+
+  // Cadena de providers para generación de texto TTS: Gemini → OpenRouter → fallback estático.
+  const ttsApiKey = await resolveTtsApiKey();
+  const openRouterKey = await resolveOpenRouterApiKey();
+  const ttsTextProvider = ttsEnabled
+    ? new TtsTextProviderChain(
+        new GeminiTtsTextProvider(ttsApiKey),
+        new OpenRouterTtsTextProvider(openRouterKey),
+      )
+    : undefined;
 
   // Branding por defecto para el toast del Stop (appId + icono fallback global)
   const toastBranding = resolveBranding({ sound: false, silent: false, stdinJson: false });
@@ -127,7 +136,7 @@ export async function createProxyDependencies(
     config.TTS_CONTEXT_N ?? 3,
     new DesktopNotificationAdapter(),
     toastBranding,
-    ttsApiKey,
+    ttsTextProvider,
     kanbanProjector,
   );
 
@@ -157,6 +166,25 @@ async function resolveTtsApiKey(): Promise<string | undefined> {
     const raw = await fs.readFile(secretsPath, 'utf8');
     const parsed = JSON.parse(raw) as Record<string, unknown>;
     const key = parsed['GEMINI_API_KEY'];
+    return typeof key === 'string' && key.trim() ? key.trim() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Lee el bearer token de OpenRouter para el provider TTS de fallback. Devuelve `undefined` si el archivo no existe o no contiene la clave. */
+async function resolveOpenRouterApiKey(): Promise<string | undefined> {
+  const secretsPath = path.join(
+    process.cwd(),
+    'routing',
+    'providers',
+    'openrouter',
+    'secrets.json',
+  );
+  try {
+    const raw = await fs.readFile(secretsPath, 'utf8');
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const key = parsed['ANTHROPIC_AUTH_TOKEN'];
     return typeof key === 'string' && key.trim() ? key.trim() : undefined;
   } catch {
     return undefined;

@@ -370,17 +370,7 @@ describe('AuditHookEventHandler', () => {
 });
 
 describe('AuditHookEventHandler UserPromptSubmit con TTS', () => {
-  it('UserPromptSubmit con transcript previo envía al LLM la tríada user/assistant/user', async () => {
-    // Mockear fetch global para capturar la petición a Gemini Flash
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: async () => ({
-        candidates: [{ content: { parts: [{ text: 'Voy a refactorizar' }] } }],
-      }),
-    });
-    vi.stubGlobal('fetch', fetchMock);
-
+  it('UserPromptSubmit con transcript previo delega al provider con la tríada user/assistant/user', async () => {
     const speak = vi.fn().mockResolvedValue(undefined);
     const tts = { speak, initialize: vi.fn() };
     const extractUserPromptSubmitContext = vi.fn().mockResolvedValue({
@@ -390,6 +380,8 @@ describe('AuditHookEventHandler UserPromptSubmit con TTS', () => {
     });
     const contextExtractor = { extractUserPromptSubmitContext, extractLastNMessages: vi.fn() };
     const repo = makeRepo();
+    const generateText = vi.fn().mockResolvedValue('Voy a refactorizar');
+    const ttsTextProvider = { generateText };
     const handler = new AuditHookEventHandler(
       repo,
       '/tmp/sessions',
@@ -400,7 +392,7 @@ describe('AuditHookEventHandler UserPromptSubmit con TTS', () => {
       3,
       undefined,
       undefined,
-      'fake-gemini-key',
+      ttsTextProvider,
     );
 
     handler.execute({
@@ -413,29 +405,18 @@ describe('AuditHookEventHandler UserPromptSubmit con TTS', () => {
 
     await new Promise((r) => setTimeout(r, 100));
 
-    expect(fetchMock).toHaveBeenCalledOnce();
-    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
-    expect(body.contents).toEqual([
-      { role: 'user', parts: [{ text: 'petición anterior del usuario' }] },
-      { role: 'model', parts: [{ text: 'respuesta del turno previo' }] },
-      { role: 'user', parts: [{ text: 'prompt actual' }] },
+    expect(generateText).toHaveBeenCalledOnce();
+    const [, messages, mode] = generateText.mock.calls[0] as [string, unknown[], string];
+    expect(mode).toBe('prompt');
+    expect(messages).toEqual([
+      { role: 'user', text: 'petición anterior del usuario' },
+      { role: 'assistant', text: 'respuesta del turno previo' },
+      { role: 'user', text: 'prompt actual' },
     ]);
-    expect(body.systemInstruction.parts[0].text).toContain('Responde SOLO a la nueva petición');
     expect(speak).toHaveBeenCalledWith('Voy a refactorizar');
-
-    vi.unstubAllGlobals();
   });
 
-  it('UserPromptSubmit sin contexto previo envía al LLM solo el prompt actual', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: async () => ({
-        candidates: [{ content: { parts: [{ text: 'Entendido, voy a investigar' }] } }],
-      }),
-    });
-    vi.stubGlobal('fetch', fetchMock);
-
+  it('UserPromptSubmit sin contexto previo delega al provider solo el prompt actual', async () => {
     const speak = vi.fn().mockResolvedValue(undefined);
     const tts = { speak, initialize: vi.fn() };
     const extractUserPromptSubmitContext = vi.fn().mockResolvedValue({
@@ -445,6 +426,8 @@ describe('AuditHookEventHandler UserPromptSubmit con TTS', () => {
     });
     const contextExtractor = { extractUserPromptSubmitContext, extractLastNMessages: vi.fn() };
     const repo = makeRepo();
+    const generateText = vi.fn().mockResolvedValue('Entendido, voy a investigar');
+    const ttsTextProvider = { generateText };
     const handler = new AuditHookEventHandler(
       repo,
       '/tmp/sessions',
@@ -455,7 +438,7 @@ describe('AuditHookEventHandler UserPromptSubmit con TTS', () => {
       3,
       undefined,
       undefined,
-      'fake-gemini-key',
+      ttsTextProvider,
     );
 
     handler.execute({
@@ -468,12 +451,11 @@ describe('AuditHookEventHandler UserPromptSubmit con TTS', () => {
 
     await new Promise((r) => setTimeout(r, 100));
 
-    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
-    expect(body.contents).toEqual([{ role: 'user', parts: [{ text: 'primer mensaje' }] }]);
-    expect(body.systemInstruction.parts[0].text).toContain('Responde SOLO a la nueva petición');
+    expect(generateText).toHaveBeenCalledOnce();
+    const [, messages, mode] = generateText.mock.calls[0] as [string, unknown[], string];
+    expect(mode).toBe('prompt');
+    expect(messages).toEqual([{ role: 'user', text: 'primer mensaje' }]);
     expect(speak).toHaveBeenCalledWith('Entendido, voy a investigar');
-
-    vi.unstubAllGlobals();
   });
 
   it('UserPromptSubmit sin clave OpenRouter reproduce fallback sin llamar a fetch', async () => {

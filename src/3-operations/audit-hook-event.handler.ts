@@ -3,6 +3,7 @@ import type { Logger } from '../1-domain/types/logger.types.js';
 import type { ClaudeHookEvent } from '../1-domain/types/hook.types.js';
 import type { ITTSService } from '../1-domain/ports/ITTSService.js';
 import type { IContextExtractor, SessionMessage } from '../1-domain/ports/IContextExtractor.js';
+import type { ITtsTextProvider } from '../1-domain/ports/ITtsTextProvider.js';
 import type { INotificationService } from '../2-services/notifications/INotificationService.js';
 import type { NotificationEvent } from '../2-services/notifications/types.js';
 import {
@@ -18,26 +19,6 @@ import { SessionMetricsService } from '../2-services/session-metrics.service.js'
 import { resolveSessionDir } from './audit-workflow-closure.handler.js';
 import { KanbanBoardProjector } from './kanban-board.projector.js';
 
-const GEMINI_FLASH_URL =
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
-const TTS_MAX_TOKENS = 512;
-
-const VOICE_ASSISTANT_SYSTEM_PROMPT =
-  'Eres la voz del asistente Smart Code Proxy. ' +
-  'Recibirás tres mensajes: la petición anterior del usuario, ' +
-  'tu última respuesta, y la nueva petición del usuario. ' +
-  'Responde SOLO a la nueva petición (la tercera) en una sola oración breve y natural en español, ' +
-  'confirmando que procederás a investigar o ejecutar lo solicitado. ' +
-  'Texto plano para ser leído en voz alta: sin markdown, sin asteriscos, ' +
-  'comillas, guiones ni símbolos. Sin puntos al final.';
-
-const CONTINUITY_SYSTEM_PROMPT =
-  'Eres la voz del asistente de continuidad de Smart Code Proxy. ' +
-  'Narra en alto nivel, en una o dos frases cortas en español, una síntesis de lo realizado. ' +
-  'Parafrasea; no expliques detalle técnico punto por punto ni enumeres pasos. ' +
-  'Texto plano para ser leído en voz alta: sin markdown, sin asteriscos, ' +
-  'comillas, guiones ni símbolos. Sin puntos al final de las oraciones. Habla en primera persona.';
-
 
 export class AuditHookEventHandler {
   constructor(
@@ -50,7 +31,7 @@ export class AuditHookEventHandler {
     private readonly contextN: number = 3,
     private readonly notifier?: INotificationService,
     private readonly toastBranding?: { appId?: string; icon?: string },
-    private readonly ttsApiKey?: string,
+    private readonly ttsTextProvider?: ITtsTextProvider,
     private readonly kanbanProjector?: KanbanBoardProjector,
   ) {}
 
@@ -337,62 +318,13 @@ export class AuditHookEventHandler {
   ): Promise<string> {
     const fallback = this.composeFallbackText(eventName);
 
-    if (!this.ttsApiKey) {
-      this.logTtsFallback(eventName, 'no-gemini-key', fallback);
-      return fallback;
-    }
-    if (messages.length === 0) {
-      this.logTtsFallback(eventName, 'no-messages', fallback);
+    if (!this.ttsTextProvider || messages.length === 0) {
+      this.logTtsFallback(eventName, !this.ttsTextProvider ? 'no-provider' : 'no-messages', fallback);
       return fallback;
     }
 
     try {
-      const systemPrompt =
-        mode === 'prompt' ? VOICE_ASSISTANT_SYSTEM_PROMPT : CONTINUITY_SYSTEM_PROMPT;
-
-      // Gemini usa role "model" (no "assistant") y no acepta role "system" en contents
-      const contents = messages.map((m) => ({
-        role: (m.role === 'assistant' ? 'model' : 'user') as 'user' | 'model',
-        parts: [{ text: m.role === 'system' ? `[Sistema]: ${m.text}` : m.text }],
-      }));
-
-      if (contents.at(-1)?.role !== 'user') {
-        contents.push({ role: 'user', parts: [{ text: '¿Qué pasó en este turno?' }] });
-      }
-
-      const res = await fetch(`${GEMINI_FLASH_URL}?key=${this.ttsApiKey}`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          contents,
-          systemInstruction: { parts: [{ text: systemPrompt }] },
-          generationConfig: {
-            maxOutputTokens: TTS_MAX_TOKENS,
-            thinkingConfig: { thinkingBudget: 0 },
-          },
-        }),
-      });
-
-      if (!res.ok) {
-        this.logTtsFallback(eventName, `http-${res.status}`, fallback);
-        return fallback;
-      }
-
-      const data = (await res.json()) as {
-        candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-      };
-      // Las partes de Gemini tienen { text } sin campo `type`; extraer directamente.
-      const text = (data.candidates?.[0]?.content?.parts ?? [])
-        .map((p) => (typeof p.text === 'string' ? p.text.trim() : ''))
-        .filter(Boolean)
-        .join(' ')
-        .trim();
-
-      if (!text) {
-        this.logTtsFallback(eventName, 'empty-response', fallback);
-        return fallback;
-      }
-
+      const text = await this.ttsTextProvider.generateText(eventName, messages, mode);
       this.logTtsDynamic(eventName, text);
       return text;
     } catch {

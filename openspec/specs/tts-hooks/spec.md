@@ -70,46 +70,55 @@ Al recibir `Stop`, `SubagentStop` o `StopFailure`, el sistema SHALL extraer los 
 ---
 
 ### Requirement: Provider dedicado de inferencia TTS (OpenRouter → Gemini)
-La generación del texto de intención/resumen TTS SHALL seguir usando el provider dedicado (Gemini Flash `gemini-2.5-flash` para la generación del texto de intención o resumen) inyectado por el composition root vía `ttsApiKey`. La **síntesis de voz**, en cambio, SHALL migrar a un sidecar local multiplataforma (`tts-sidecar`, binario único que embebe Piper + CPAL, distribuido por plataforma vía postinstall con verificación SHA256). El campo `GEMINI_API_KEY` deja de leerse para fines de síntesis (puede seguir usándose para generación de texto).
+La generación del texto de intención/resumen TTS SHALL usar el puerto `ITtsTextProvider` inyectado por el composition root. La implementación por defecto SHALL seguir una cadena de dos providers: primero `GeminiTtsTextProvider` con el modelo `gemini-3.1-flash-lite`, y si Gemini falla (429, 5xx, error de red o respuesta vacía), SHALL caer a `OpenRouterTtsTextProvider` con el modelo `poolside/laguna-xs.2:free` usando la API Anthropic-compatible de OpenRouter (`https://openrouter.ai/api`, bearer `ANTHROPIC_AUTH_TOKEN` leído de `routing/providers/openrouter/secrets.json`). Si ambos providers fallan, SHALL devolver el texto de fallback estático según el tipo de evento. La credencial de Gemini SHALL seguir leyéndose de `routing/providers/gemini/secrets.json`. El campo `ttsApiKey` inyectado directamente en el handler SHALL ser eliminado; las implementaciones de los providers gestionan sus propias credenciales. La **síntesis de voz** continúa en el sidecar local (sin cambio). El provider de la sesión activa NO SHALL recibir ninguna petición de inferencia TTS.
 
-La síntesis SHALL invocar el binario `tts-sidecar` con un contrato JSON por STDIN/STDOUT: `{"cmd":"speak","text":"...","voice":"es_MX"}` → `{"status":"ok"}` o `{"status":"error","message":"..."}`. La voz inicial SHALL ser `es_MX` (México, español latino neutro). El gateway SHALL **NO** depender de ninguna API de audio del SO (no usa PowerShell `Media.SoundPlayer`, ni `afplay`, ni `aplay`/`paplay`); toda la reproducción queda encapsulada en el sidecar.
+#### Scenario: Gemini responde con éxito en el primer intento
+- **GIVEN** que `GeminiTtsTextProvider` está configurado con una clave Gemini válida
+- **AND** el modelo `gemini-3.1-flash-lite` responde HTTP 200 con texto no vacío
+- **WHEN** el handler invoca `generateText`
+- **THEN** SHALL devolver el texto de Gemini sin intentar OpenRouter
+- **AND** SHALL emitir `[TTS-SPEECH]` con `usedFallback: false`
 
-Si el binario del sidecar no está presente en `vendor/tts-sidecar/<platform>-<arch>/`, el sistema SHALL emitir `[TTS-SIDE]` con `reason: "sidecar-missing"` y SHALL **NO** intentar ninguna síntesis. Si el binario está presente pero el proceso falla (exit code no-cero, timeout, JSON malformado), el sistema SHALL emitir `[TTS-SIDE]` con el `reason` correspondiente (`spawn-failed`, `timeout`, `invalid-json`, `non-zero-exit`) y SHALL **NO** intentar ningún fallback a otro motor. La llamada al sidecar SHALL ser bloqueante desde el punto de vista del handler de hook: el handler SHALL esperar `{"status":"ok"}` por stdout antes de retornar, garantizando que la voz se reproduzca completamente antes de que el hook responda al cliente.
+#### Scenario: Gemini falla con 429 activa el fallback a OpenRouter
+- **GIVEN** que `GeminiTtsTextProvider` recibe un HTTP 429 de Gemini
+- **WHEN** el handler invoca `generateText`
+- **THEN** SHALL intentar la generación con `OpenRouterTtsTextProvider` (modelo `poolside/laguna-xs.2:free`)
+- **AND** si OpenRouter responde con éxito SHALL devolver ese texto
+- **AND** SHALL emitir `[TTS-SPEECH]` con `usedFallback: false`
 
-#### Scenario: Sesión con cualquier provider genera texto vía Gemini Flash
+#### Scenario: Ambos providers fallan activa el fallback estático
+- **GIVEN** que `GeminiTtsTextProvider` falla con error de red
+- **AND** `OpenRouterTtsTextProvider` también falla
+- **WHEN** el handler invoca `generateText`
+- **THEN** SHALL devolver el texto de `composeFallbackText(eventName)` sin lanzar excepción
+- **AND** SHALL emitir `[TTS-FALLBACK]` con `reason` que identifica el fallo
+
+#### Scenario: Sin clave Gemini el primer provider cae a OpenRouter
+- **GIVEN** que `routing/providers/gemini/secrets.json` no existe o no contiene `GEMINI_API_KEY`
+- **WHEN** el handler invoca `generateText`
+- **THEN** `GeminiTtsTextProvider` SHALL fallar inmediatamente sin llamada HTTP
+- **AND** `OpenRouterTtsTextProvider` SHALL ser intentado como fallback
+
+#### Scenario: Sesión con cualquier provider genera texto vía la cadena ITtsTextProvider
 - **GIVEN** que la sesión activa usa MiniMax (o Anthropic, u Ollama) como provider
-- **AND** el handler tiene una API key de Gemini inyectada para generación de texto
+- **AND** el handler tiene un `ITtsTextProvider` inyectado
 - **WHEN** el handler procesa un evento `Stop`
-- **THEN** SHALL llamar a `gemini-2.5-flash` para generar el texto de continuidad
+- **THEN** SHALL invocar `generateText` en el puerto inyectado
 - **AND** el provider de la sesión NO SHALL recibir ninguna petición de inferencia TTS
 
-#### Scenario: Síntesis exitosa con sidecar instalado
-- **GIVEN** que el binario `tts-sidecar` está presente en `vendor/tts-sidecar/<platform>-<arch>/`
-- **AND** el modelo `es_MX` está presente en `vendor/tts-sidecar/voices/es_MX/`
-- **WHEN** el handler procesa un evento `Stop`
-- **THEN** SHALL enviar `{"cmd":"speak","text":"<resumen>","voice":"es_MX"}` por stdin al sidecar
-- **AND** SHALL esperar `{"status":"ok"}` por stdout antes de continuar
-- **AND** SHALL emitir `[TTS-SPEECH]` con `usedFallback: false` y `textPreview` del texto reproducido
+---
 
-#### Scenario: Sidecar ausente omite audio sin romper el hook
-- **GIVEN** que el binario `tts-sidecar` **NO** está presente en disco
-- **WHEN** el handler procesa un evento `Stop` o `UserPromptSubmit`
-- **THEN** SHALL emitir `[TTS-SIDE]` con `reason: "sidecar-missing"`
-- **AND** SHALL continuar el procesamiento del hook sin intentar síntesis
-- **AND** SHALL retornar una respuesta HTTP 2xx al cliente
+### Requirement: Puerto de dominio ITtsTextProvider
+El sistema SHALL exponer el puerto `ITtsTextProvider` en `src/1-domain/ports/ITtsTextProvider.ts` con un único método `generateText(eventName: string, messages: SessionMessage[], mode: 'prompt' | 'summary'): Promise<string>`. El método SHALL siempre devolver un string no vacío: si los providers fallan, devuelve el texto de fallback estático correspondiente al `eventName`. El handler `AuditHookEventHandler` SHALL recibir este puerto por constructor como `ttsTextProvider?: ITtsTextProvider` en lugar del parámetro `ttsApiKey?: string`.
 
-#### Scenario: Fallo del sidecar se reporta sin caer a otro motor
-- **GIVEN** que el sidecar está presente pero el proceso termina con exit code no-cero
-- **WHEN** el handler procesa un evento
-- **THEN** SHALL emitir `[TTS-SIDE]` con `reason: "non-zero-exit"` (o `spawn-failed`, `timeout`, `invalid-json` según el caso)
-- **AND** SHALL **NO** intentar llamar a Gemini, OpenRouter ni SAPI como fallback
-- **AND** SHALL continuar el procesamiento del hook
+#### Scenario: Provider disponible genera texto dinámico
+- **WHEN** `AuditHookEventHandler` invoca `generateText` con mensajes no vacíos
+- **THEN** SHALL devolver el texto generado por el primer provider de la cadena que responda con éxito
+- **AND** SHALL emitir `[TTS-SPEECH]` con `usedFallback: false`
 
-#### Scenario: Sin dependencia de claves de API externas para la síntesis
-- **GIVEN** que `routing/providers/gemini/secrets.json` no existe o no contiene clave
-- **WHEN** el handler procesa un evento
-- **THEN** SHALL invocar el sidecar local normalmente (el sidecar no requiere credenciales para sintetizar)
-- **AND** SHALL emitir `[TTS-SPEECH]` con `usedFallback: false` si el sidecar responde ok
+#### Scenario: Provider ausente devuelve texto de fallback
+- **WHEN** no se inyecta `ITtsTextProvider` en el constructor del handler
+- **THEN** SHALL devolver el texto de fallback estático de `composeFallbackText(eventName)` sin lanzar excepción
 
 ---
 

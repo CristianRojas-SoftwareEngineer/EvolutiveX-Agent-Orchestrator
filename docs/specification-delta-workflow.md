@@ -16,6 +16,7 @@
 - [La regla de delegación](#la-regla-de-delegación)
 - [Los dos modos: AUTO y GUIDED](#los-dos-modos-auto-y-guided)
 - [Orquestación](#orquestación)
+- [Arquitectura de tres niveles](#arquitectura-de-tres-niveles)
 - [La capa de roadmap](#la-capa-de-roadmap)
 - [Customización de schema](#customización-de-schema)
 - [Contrato CLI](#contrato-cli)
@@ -386,10 +387,20 @@ velocidades. `verify` y `synchronize` corren en ambos.
 ## Orquestación
 
 `orchestrate-specification-delta` es el único punto de contacto del usuario; las
-skills de etapa nunca se invocan directamente. Sigue el patrón híbrido XML + Markdown
-(XML solo para los bloques que necesitan frontera dura: pipeline, selección de modo,
-invariantes, plantilla de salida) y un frontmatter mínimo (`name` + `description` +
-`when_to_use` + `argument-hint`).
+skills de etapa y los subagentes de fase nunca se invocan directamente. La
+implementación vigente es un **agente nativo de Claude Code** (declarado en
+`.claude/agents/orchestrate-specification-delta.md`) que sigue el patrón híbrido
+XML + Markdown (XML solo para los bloques que necesitan frontera dura: pipeline,
+selección de modo, invariantes, plantilla de salida) y un frontmatter declarativo
+de agente (`name` + `description` con trigger phrases en inglés y español +
+`tools` con `Agent`, `Skill`, `Bash`, `Read`, `Write`, `Edit`, `Glob`, `Grep`).
+
+Este agente reemplaza al skill del mismo nombre que existía hasta el delta
+`c00080-refactor-orchestrate-multi-agent`. La razón del reemplazo y la
+estructura interna en tres niveles se documentan en la sección
+[Arquitectura de tres niveles](#arquitectura-de-tres-niveles) más abajo. Para el
+propósito de esta sección basta con saber que el orquestador **delega** todo el
+trabajo: nunca inlinea el trabajo de un subagente de fase ni de una skill de etapa.
 
 Además de conducir el pipeline, embebe solo el **mínimo operativo de referencia** que
 necesita para enrutar (modelo mental + catálogo de etapas). El contrato de la CLI
@@ -424,15 +435,233 @@ Se sostienen en AMBOS modos, sin excepción:
   `synchronize` ni `archive` sobre un delta con hallazgos CRITICAL sin resolver —ni
   siquiera en modo AUTO. Una suite de tests en rojo es CRITICAL: bloquea el gate igual
   que cualquier hallazgo 4C.
-- El orquestador **delega**; nunca inlinea el trabajo de una etapa. Ninguna etapa
-  embebe a otra (`archive` no sincroniza; `synchronize` no archiva). Una etapa sí
-  puede agrupar las tareas atómicas que su _concern_ exige (el commit + worktree
-  limpio pertenecen al _concern_ de freeze de `archive`; el sync de README/docs
-  pertenece al _concern_ de estado canónico de `synchronize`) — no son etapas
-  embebidas.
+- El orquestador **delega**; nunca inlinea el trabajo de una etapa, una fase o un
+  subagente. Ninguna etapa embebe a otra (`archive` no sincroniza; `synchronize` no
+  archiva). Una etapa sí puede agrupar las tareas atómicas que su _concern_ exige (el
+  commit + worktree limpio pertenecen al _concern_ de freeze de `archive`; el sync de
+  README/docs pertenece al _concern_ de estado canónico de `synchronize`) — no son
+  etapas embebidas. Del mismo modo, el bucle `apply ↔ verify` pertenece al _concern_
+  del subagente Implementador y se ejecuta dentro de su ventana de contexto, no como
+  spawns separados del orquestador.
 - Las etapas 3–6 no contienen guía de redacción: cada una llama `openspec instructions
 <artifact> --change <name> --json` y sigue lo devuelto. El schema es la única fuente
   de verdad del contenido de los artefactos.
+
+---
+
+## Arquitectura de tres niveles
+
+El orquestador no ejecuta las diez etapas por sí solo. Delega en una arquitectura
+de tres niveles — **agente nativo + cuatro subagentes de fase + diez skills de
+etapa** — donde cada nivel se compone con el inferior mediante una herramienta
+distinta (`Agent` o `Skill`) y, por tanto, mantiene una ventana de contexto
+independiente. Esta sección documenta el diseño vigente desde el delta
+`c00080-refactor-orchestrate-multi-agent`, qué problema resuelve, cómo se
+compone cada nivel, y cómo cambia la operativa respecto al modelo anterior.
+
+### Por qué tres niveles
+
+Ejecutar las diez etapas dentro de una sola ventana de contexto compacta el
+estado acumulado (lecturas de codebase, artefactos intermedios, reportes de
+verify) antes de completar `apply` o `verify` en deltas medianos o grandes. La
+calidad del entregable decae porque el modelo pierde acceso a los primeros
+detalles cuando los últimos los desplazan.
+
+Distribuir el pipeline en cuatro ventanas independientes elimina esa regresión:
+
+- Cada **fase** corre con un contexto acotado al trabajo que le corresponde:
+  la fase de exploración no carga el plan; la fase de implementación no carga
+  los artefactos de planificación ya resueltos como ruido.
+- Cada nivel se compone con el inferior mediante una **herramienta distinta**
+  (`Agent` para subagentes, `Skill` para etapas), que es el mecanismo de
+  aislamiento de contexto que ofrece el harness.
+- El **handoff entre niveles** es un JSON estable y validado por el nivel
+  superior. El contrato explícito reemplaza la confianza implícita que
+  existía cuando un único skill orquestador ejecutaba todo en línea.
+
+### Los tres niveles
+
+```
+Nivel 1 — Orquestador nativo (Claude Code agent)
+  .claude/agents/orchestrate-specification-delta.md
+  ↓ spawn vía Agent(subagent_type=...)
+Nivel 2 — Subagentes de fase (Claude Code agents)
+  .claude/agents/explorer-specification-delta.md
+  .claude/agents/planner-specification-delta.md
+  .claude/agents/implementer-specification-delta.md
+  .claude/agents/closer-specification-delta.md
+  ↓ invocan vía Skill("...") por slug exacto
+Nivel 3 — Skills de etapa (10 unidades lógicas)
+  .claude/skills/{explore,create,propose,define,design,plan,apply,verify,synchronize,archive}-specification-delta/SKILL.md
+```
+
+**Nivel 1 — Orquestador nativo (`orchestrate-specification-delta`).** Único
+punto de contacto del usuario. Posee solo el control de flujo: modo AUTO/GUIDED,
+selección del próximo subagente, lectura y validación del handoff JSON,
+transición entre fases, mantenimiento del sentinel y reporte al usuario. Sus
+herramientas declaradas son `Agent`, `Skill`, `Bash`, `Read`, `Write`, `Edit`,
+`Glob`, `Grep`. No implementa trabajo de fase ni de etapa; su cuerpo está
+optimizado para enrutar.
+
+**Nivel 2 — Subagentes de fase.** Cada fase tiene un subagente dedicado, con
+`subagent_type` propio. Su responsabilidad es cerrada: ejecutan su fase y
+retornan un handoff JSON estable al orquestador.
+
+| Fase | `subagent_type` | Etapas dentro | Stages (1–10) |
+|---|---|---|---|
+| 1/4 | `explorer-specification-delta`    | explore (read-only)                      | 1     |
+| 2/4 | `planner-specification-delta`     | create → propose → define → design → plan | 2–6   |
+| 3/4 | `implementer-specification-delta` | apply ↔ verify (loop interno)            | 7, 8   |
+| 4/4 | `closer-specification-delta`      | synchronize → archive                    | 9, 10  |
+
+El bucle `apply ↔ verify` pertenece a la fase de implementación y se ejecuta
+dentro del subagente Implementador, no como spawns separados del orquestador.
+Esto preserva el contexto entre iteraciones (cada iteración informa a la
+siguiente) y evita la latencia de un spawn por iteración.
+
+**Nivel 3 — Skills de etapa.** Las diez unidades lógicas del pipeline
+(`explore`, `create`, `propose`, `define`, `design`, `plan`, `apply`, `verify`,
+`synchronize`, `archive`). Cada skill es invocable por el subagente de su fase
+vía `Skill("...")` por su slug exacto. Ningún usuario ni ningún subagente
+externo a su fase las invoca: la regla de delegación se preserva.
+
+### Handoffs entre niveles
+
+El contrato entre niveles es JSON estable y validado. El orquestador no avanza
+al siguiente subagente si el handoff no cumple el esquema de su fase.
+
+```json
+// Explorador (fase 1/4)
+{ "report": "<markdown inline>", "slug": "<kebab-case>", "probes_cleaned": true }
+
+// Planificador (fase 2/4)
+{ "change": "c<NNNNN>-<slug>", "apply_ready": true,
+  "artifacts": { "proposal": "done", "specs": "done", "design": "done", "tasks": "done" } }
+
+// Implementador (fase 3/4)
+{ "change": "c<NNNNN>-<slug>", "verify": "PASS", "critical_findings": 0 }
+
+// Closer (fase 4/4)
+{ "change": "c<NNNNN>-<slug>",
+  "archive_path": "openspec/changes/archive/<date>--<name>/",
+  "commit": "<sha>" }
+```
+
+El campo `probes_cleaned` del Explorador codifica la invariante de limpieza: si
+el subagente escribió probes temporales (instrumentación para contrastar
+alternativas), debe haberlas borrado antes de retornar; `git status --short`
+debe estar vacío. Un `probes_cleaned: false` es un error duro.
+
+### Sentinel AUTO: dos campos coexistentes
+
+En modo AUTO el orquestador mantiene `openspec/.workbench/auto-pipeline.json`
+con **dos campos** que rastrean granularidades distintas y **son propiedad de
+distintos niveles**:
+
+- `phase` (valores `"explorer" | "planner" | "implementer" | "closer"`) — lo
+  escribe el **orquestador** (fire-and-forget) antes de cada `Agent(...)`
+  spawn. Identifica cuál de los cuatro subagentes está activo.
+- `stage` (valores `1..10`) — lo escribe el **subagente de fase** (fire-and-
+  forget) justo antes de invocar cada `Skill(...)`. Identifica cuál de las
+  diez etapas está en ejecución dentro de la fase activa.
+
+Ambos campos coexisten: un lector puede inspeccionar `phase` para saber qué
+subagente está activo y `stage` para saber qué etapa está corriendo, **sin
+asumir uno en función del otro**. El subagente Closer elimina el archivo
+completo al confirmar el archivado, como parte del freeze.
+
+### Reporte al usuario: doble numeración
+
+Cada transición de fase y de etapa emite un reporte en español con doble
+numeración, eliminando cualquier divergencia entre etapas:
+
+```
+## Specification-Delta Run: {{delta-name}}
+**Modo:** {{AUTO | GUIDED}}
+**Fase:** [{{i}}/4] {{phase-slug}}
+**Etapa:** [{{j}}/10] {{stage-slug}}
+{{stage-specific summary}}
+**Siguiente:** {{next-phase or "completo"}}
+```
+
+Donde `i ∈ {1..4}` es el ordinal de la fase activa y `j ∈ {1..10}` el ordinal
+de la etapa. Los slugs son los nombres de archivo exactos (sin `.md`) del
+subagente de fase y de la skill de etapa. El reporte lo emite el orquestador
+en cada transición; los subagentes emiten su línea de fase y las skills emiten
+su línea de etapa, componiendo el bloque unificado.
+
+### Cómo invocar al orquestador en la práctica
+
+El orquestador es un agente nativo de Claude Code. El usuario lo invoca en una
+sesión de Claude Code mediante una frase natural que active el agente, o
+explícitamente por nombre con un modo:
+
+```
+Ejecuta el siguiente delta con el agente nativo orchestrate-specification-delta
+en modo AUTO: "<descripción del cambio>"
+```
+
+```
+orchestrate-specification-delta --mode guided --change <c<NNNNN>-<slug>>
+```
+
+Las trigger phrases declaradas en el frontmatter del agente (en inglés con
+cobertura en español) incluyen: `spec delta`, `open spec`, `delta de
+especificación`, `pipeline de 10 etapas`, `AUTO mode`, `GUIDED mode`, y la
+mención de querer aplicar algo bajo `openspec/changes/<name>/`.
+
+**No se invocan manualmente los subagentes ni las skills de etapa.** El
+orquestador es el único punto de contacto para un delta. Para una orquestación
+de mayor altitud (un roadmap de muchos deltas encadenados), se invoca a
+`orchestrate-roadmap`, que sí es un skill, y este invoca al orquestador nativo
+una vez por fase.
+
+### Comparativa con el modelo anterior (un único skill)
+
+| Aspecto | Antes (skill monolítico) | Ahora (tres niveles) |
+|---|---|---|
+| Punto de entrada | Slash command `/orchestrate-specification-delta --mode auto` | Agente nativo invocado por nombre o por trigger phrase |
+| Ventanas de contexto | Una sola, para las diez etapas | Cuatro independientes, una por fase |
+| Riesgo de compactación en deltas grandes | Alto (≥ 5 etapas compactadas antes de `verify`) | Bajo (cada fase carga solo su concern) |
+| Tracking del progreso en sentinel | Solo `stage` (string 1–10) | `phase` (string de 4 valores) **+** `stage` (integer 1–10), coexistentes |
+| Quién invoca cada skill de etapa | El skill orquestador, dentro de su propio contexto | El subagente de la fase apropiada, dentro de su propio contexto |
+| Handoff entre niveles | Implícito (texto libre en línea) | JSON estable por fase, validado por el nivel superior |
+| Bucle `apply ↔ verify` | Dentro del orquestador (mismo contexto) | Dentro del subagente Implementador (contexto aislado) |
+| Qué se reporta en cada transición | `Etapa [j/10]` | Doble línea `Fase [i/4] <phase-slug>` **+** `Etapa [j/10] <stage-slug>` |
+
+### Lo que NO cambió
+
+- El pipeline de diez etapas, en su orden y semántica, permanece idéntico.
+- Los 10 skills de etapa no se modificaron; la diferencia es **quién los
+  invoca**, no qué hacen.
+- El DAG lineal de artefactos (`proposal → specs → design → tasks`) y los
+  tres gates de stage-completion (`--through specs`, `--through design`,
+  `--through tasks`) siguen siendo obligatorios en ambos modos.
+- Las invariantes duras (verify gate, stage-completion gate, no skipping de
+  etapas, no embeber etapas entre sí) se mantienen.
+- El contrato CLI consumido por el orquestador (`openspec status --json`,
+  `openspec instructions --json`) no cambió: el orquestador nativo consume los
+  mismos comandos que el skill anterior.
+- La frontera entre `orchestrate-specification-delta` y `orchestrate-roadmap`
+  es la misma: el roadmap decide **qué fase sigue**, el delta orquestador
+  decide **qué etapa sigue dentro de la fase**.
+
+### Limitaciones conocidas
+
+- **Backstop determinístico del modo AUTO**: el `Stop` hook descrito en
+  `configs/hooks.json` (función pura `decideAutoPipeline`) lee el sentinel y
+  bloquea el fin del turno hasta que la fase Closer complete. La
+  implementación completa del hook en `scripting/hooks/post-hook-event.ts` es
+  un delta de seguimiento; hasta que se implemente, el modo AUTO depende de
+  la disciplina del propio orquestador para no ceder el turno. El orquestador
+  está diseñado para que esa disciplina sea suficiente, pero la defensa en
+  profundidad del hook aún no está cableada.
+- **El bucle `apply ↔ verify` consume contexto**: aunque el bucle vive dentro
+  del subagente Implementador, su contexto sigue siendo finito. En deltas con
+  muchos CRITICAL findings iterativos, el subagente puede llegar al límite
+  antes de alcanzar `verify PASS`. La mitigación es diseñar tasks pequeñas y
+  verificables, no delegar al bucle decisiones que el `design.md` debería
+  resolver.
 
 ---
 

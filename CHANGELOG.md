@@ -4,6 +4,7 @@ All notable changes are derived from conventional commits. Do not edit by hand.
 
 ## [Unreleased]
 ### Added
+- introducir orquestación multi-agente en 4 fases
 - introducir ITtsTextProvider con cadena Gemini→OpenRouter para texto TTS
 - reemplazar motor Gemini TTS por sidecar local Piper+CPAL
 - reemplazar SAPI/OpenRouter por Gemini en capa TTS
@@ -148,6 +149,7 @@ All notable changes are derived from conventional commits. Do not edit by hand.
 - implementar PKA de 6 capas, ports, inyección de dependencias y hardening de tooling
 - reemplazar 'any' por tipos estrictos del SDK de Anthropic
 ### Fixed
+- declarar AskUserQuestion y TodoWrite en agentes del pipeline
 - declarar idioma español para artefactos OpenSpec
 - inyectar spawnFn en sidecar y corregir aislamiento de tests E2E
 - introducir closeAuthority explícito en el cierre de workflow
@@ -238,6 +240,7 @@ All notable changes are derived from conventional commits. Do not edit by hand.
 - corregir omisión de cuerpos de petición en logs de auditoría
 - migrar ts-node a tsx por compatibilidad con Node.js 24
 ### Documentation
+- documentar arquitectura de tres niveles del orquestador
 - sincronizar desde Workbench y documentar parche
 - documentar parche postinstall de openspec
 - completar renombrado de vars env en specs y plantillas

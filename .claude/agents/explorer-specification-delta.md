@@ -168,8 +168,9 @@ one stage skill of this phase:
 {
   "change": "c<NNNNN>-<slug>",
   "mode": "auto",
-  "phase": "explorer",       // written by the orchestrator before spawn
-  "stage": 1,                // written by THIS subagent, just before Skill()
+  "phase": "explorer",             // written by the orchestrator before spawn
+  "stage": 1,                      // written by THIS subagent, just before Skill()
+  "lastProgressKey": "explorer#1", // written by the orchestrator on initial sentinel
   "startedAt": "2026-...",
   "stuckCount": 0
 }

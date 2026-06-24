@@ -21,6 +21,7 @@ coverage/
 sessions/
 server/
 .agentkanban/
+openspec/.workbench/
 
 # Binarios y modelos del sidecar TTS local (descargados por scripts/postinstall-tts.ts)
 vendor/tts-sidecar/

@@ -174,8 +174,13 @@ fields** tracking two different granularities:
 - `stage` (integer 1–10; **ownership: phase subagent**) — the active stage
   skill ordinal within the active phase. Updated fire-and-forget by the phase
   subagent just before each `Skill(...)` invocation.
+- `lastProgressKey` (string `"phase#stage"`; **ownership: phase subagent**) —
+  clave compuesta escrita **atómicamente con `stage`** (write-to-tmp + rename).
+  El backstop la compara en cada invocación del hook `Stop` para detectar
+  congelamiento en cualquiera de los dos ejes. El orquestador **nunca** escribe
+  este campo.
 
-The two fields coexist and are **independent**: a reader may inspect `phase`
+The three fields coexist and are **independent**: a reader may inspect `phase`
 to know which subagent is active and `stage` to know which stage skill is in
 execution, without deriving one from the other.
 
@@ -190,6 +195,7 @@ sentinel update.
   "mode": "auto",
   "phase": "planner",
   "stage": 3,
+  "lastProgressKey": "planner#3",
   "startedAt": "2026-06-23T...",
   "stuckCount": 0
 }
@@ -199,11 +205,6 @@ sentinel update.
 subagent removes `openspec/.workbench/auto-pipeline.json` as part of its
 freeze, after confirming the archive commit. The directory
 `openspec/.workbench/` is gitignored — the sentinel is ephemeral session state.
-
-**Backstop gap.** The deterministic `Stop` hook described in
-`<backstop>` reads this sentinel but its full implementation is a follow-up
-delta; until then, AUTO mode relies on this orchestrator's own discipline to
-not yield the turn.
 <!-- </sentinel_schema> -->
 
 <!-- <mode_selection> -->
@@ -325,10 +326,12 @@ hook are defense in depth, not alternatives.
 `openspec/.workbench/auto-pipeline.halt.json` so the backstop permits the
 cession.**
 
-**Implementation status.** The full hook implementation in
-`scripting/hooks/post-hook-event.ts` is a follow-up delta; until it ships,
-AUTO mode depends on this orchestrator's own discipline to not yield the
-turn. This is documented as a gap in the delta's `design.md` Risks section.
+**Implementation status: IMPLEMENTADO.** El hook está en
+`scripting/openspec/enforce-auto-pipeline.mts` y registrado como segunda entrada
+en el array `Stop` de `configs/hooks.json`. Exporta la función pura
+`decideAutoPipeline` (testeable, sin efectos secundarios) y el envoltorio
+`applyEffect` que materializa los efectos de filesystem (borrar centinela,
+escribir halt diagnóstico, persistir stuckCount atómicamente).
 <!-- </backstop> -->
 
 <!-- <invariants> -->

@@ -182,6 +182,12 @@ invocation:
 | `design-specification-delta`     | 5 |
 | `plan-specification-delta`       | 6 |
 
+Each `stage` write also sets `lastProgressKey = "${phase}#${stage}"` in the
+same atomic operation (write-to-tmp + rename). The backstop's loop-guard reads
+this composite key to detect freezing in either dimension. **Never write
+`stage` without `lastProgressKey`**, and never write them in two separate
+operations.
+
 **Write protocol**: write to
 `openspec/.workbench/auto-pipeline.json.tmp` then atomic rename to
 `openspec/.workbench/auto-pipeline.json`. Fire-and-forget — never block the

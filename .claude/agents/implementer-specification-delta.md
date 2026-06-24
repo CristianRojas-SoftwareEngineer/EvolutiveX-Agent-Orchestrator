@@ -164,6 +164,12 @@ Updates are **fire-and-forget** at the named moments:
 | Just before `Skill("apply-specification-delta")`  | 7 |
 | Just before `Skill("verify-specification-delta")` | 8 |
 
+Each `stage` write also sets `lastProgressKey = "${phase}#${stage}"` in the
+same atomic operation (write-to-tmp + rename). The backstop's loop-guard reads
+this composite key to detect freezing in either dimension. **Never write
+`stage` without `lastProgressKey`**, and never write them in two separate
+operations.
+
 Each loop iteration triggers **two** sentinel writes (one per stage skill).
 The orchestrator's `phase = "implementer"` field persists across the loop
 (written once by the orchestrator before spawn; not rewritten by this

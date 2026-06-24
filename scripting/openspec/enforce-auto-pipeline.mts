@@ -113,7 +113,8 @@ export function decideAutoPipeline(input: DecisionInput): Decision {
 
     if (nextStuck > threshold) {
         // Atasco real: liberar el turno con un halt diagnóstico para no enclavar la sesión.
-        return { block: false, effect: 'writeHalt' };
+        // Se propaga el sentinel para que el envoltorio escriba phase/stage en el halt.
+        return { block: false, effect: 'writeHalt', nextSentinel: sentinel };
     }
 
     // (e) Pipeline en vuelo: bloquear y persistir el contador / la clave observada.
@@ -169,7 +170,7 @@ function readSentinel(root: string): AutoPipelineSentinel | null {
 }
 
 /** Detecta si `change` reside bajo `openspec/changes/archive/` (incluido prefijo de fecha). */
-function isChangeArchived(root: string, change: string): boolean {
+export function isChangeArchived(root: string, change: string): boolean {
     const archiveDir = path.join(root, 'openspec', 'changes', 'archive');
     try {
         if (fs.existsSync(path.join(archiveDir, change))) return true;

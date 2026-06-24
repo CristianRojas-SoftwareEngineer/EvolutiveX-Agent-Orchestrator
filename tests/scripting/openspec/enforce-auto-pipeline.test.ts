@@ -1,10 +1,15 @@
-import { describe, expect, it } from 'vitest';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import {
     DEFAULT_LOOP_GUARD_THRESHOLD,
     type AutoPipelineSentinel,
     type DecisionInput,
     decideAutoPipeline,
+    isChangeArchived,
 } from '../../../scripting/openspec/enforce-auto-pipeline.mjs';
 
 // Centinela base reutilizable en los tests
@@ -101,6 +106,12 @@ describe('rama (d) — loop-guard', () => {
         );
         expect(result.block).toBe(false);
         expect(result.effect).toBe('writeHalt');
+        // S1: la decisión writeHalt debe propagar el sentinel para que el envoltorio
+        // escriba phase/stage en el halt diagnóstico (conforme a la spec canónica).
+        expect(result.nextSentinel?.phase).toBeDefined();
+        expect(result.nextSentinel?.stage).toBeDefined();
+        expect(result.nextSentinel?.phase).toBe('implementer');
+        expect(result.nextSentinel?.stage).toBe(7);
     });
 
     it('reinicia stuckCount cuando la phase avanza (stage constante)', () => {
@@ -180,5 +191,45 @@ describe('rama (e) — pipeline en vuelo', () => {
         const result = decideAutoPipeline(makeInput({ sentinel }));
         expect(result.effect).toBe('persistSentinel');
         expect(result.nextSentinel?.lastProgressKey).toBe('closer#10');
+    });
+});
+
+// ─── Detección de archivado (W2): isChangeArchived sobre filesystem real ────────
+
+describe('isChangeArchived', () => {
+    const change = 'c00081-auto-pipeline-backstop';
+    let root: string;
+
+    beforeAll(() => {
+        root = fs.mkdtempSync(path.join(os.tmpdir(), 'enforce-archive-'));
+        fs.mkdirSync(path.join(root, 'openspec', 'changes', 'archive'), { recursive: true });
+    });
+
+    afterAll(() => {
+        fs.rmSync(root, { recursive: true, force: true });
+    });
+
+    it('detecta el change con nombre exacto bajo archive/', () => {
+        const dir = path.join(root, 'openspec', 'changes', 'archive', change);
+        fs.mkdirSync(dir, { recursive: true });
+        expect(isChangeArchived(root, change)).toBe(true);
+        fs.rmSync(dir, { recursive: true, force: true });
+    });
+
+    it('detecta el change con prefijo de fecha YYYY-MM-DD--<change>', () => {
+        const dir = path.join(root, 'openspec', 'changes', 'archive', `2026-06-24--${change}`);
+        fs.mkdirSync(dir, { recursive: true });
+        expect(isChangeArchived(root, change)).toBe(true);
+        fs.rmSync(dir, { recursive: true, force: true });
+    });
+
+    it('retorna false cuando el change no está archivado', () => {
+        expect(isChangeArchived(root, change)).toBe(false);
+    });
+
+    it('retorna false (sin lanzar) cuando el directorio archive no existe', () => {
+        const emptyRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'enforce-noarchive-'));
+        expect(isChangeArchived(emptyRoot, change)).toBe(false);
+        fs.rmSync(emptyRoot, { recursive: true, force: true });
     });
 });

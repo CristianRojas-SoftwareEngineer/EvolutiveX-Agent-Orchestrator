@@ -97,6 +97,20 @@ loop:
        - Route back to step 1 (apply again).
        - Do NOT return to the orchestrator.
   6. If verify report has no CRITICAL findings:
+       - Write the phase-completion marker `openspec/.workbench/implementer.done`
+         atomically (writeFileSync + renameSync), immediately before preparing
+         the handoff JSON:
+         ```bash
+         marker=$(node -e "
+           const fs = require('fs');
+           const path = 'openspec/.workbench/implementer.done';
+           const tmp = path + '.tmp';
+           const obj = { change: '<change-id>', completedAt: new Date().toISOString() };
+           fs.writeFileSync(tmp, JSON.stringify(obj));
+           fs.renameSync(tmp, path);
+           console.log('Implementer marker written:', obj.change);
+         ")
+         ```
        - Exit the loop; prepare the handoff JSON with verify="PASS" and
          critical_findings=0.
 ```
@@ -194,11 +208,17 @@ subagent).
 `openspec/.workbench/auto-pipeline.json`. Fire-and-forget — never block the
 skill invocation on a sentinel write.
 
+**This subagent also writes the phase-completion marker** `implementer.done`
+just before returning the handoff JSON (after verify PASS, 0 CRITICAL). This
+marker is written in BOTH modes (AUTO and GUIDED), immediately before preparing
+the handoff JSON. See step 6 of the `apply_verify_loop`.
+
 **This subagent never writes `phase`** — that is the orchestrator's field.
 **This subagent never deletes the sentinel** — that is the closer
 subagent's job during freeze.
 
-In GUIDED mode the sentinel is not written.
+In GUIDED mode the AUTO sentinel is not written; the phase marker `implementer.done`
+IS written (the orchestrator validates it in both modes).
 <!-- </sentinel_writes> -->
 
 <!-- <reporting_template> -->

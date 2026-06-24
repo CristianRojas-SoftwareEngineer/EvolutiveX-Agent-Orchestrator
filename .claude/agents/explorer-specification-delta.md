@@ -117,7 +117,24 @@ orchestrator. The schema is stable and the orchestrator validates it against
    Fase [1/4] explorer-specification-delta
    ```
 
-6. **Return the handoff JSON** to the orchestrator. The orchestrator will
+6. **Write the phase-completion marker** — immediately before returning the
+   handoff JSON, write the atomic phase marker so the orchestrator can validate
+   the handoff deterministically:
+
+   ```bash
+   # Protocol: writeFileSync(.tmp) + renameSync(.done) — atomic at OS level
+   marker=$(node -e "
+     const fs = require('fs');
+     const path = 'openspec/.workbench/explorer.done';
+     const tmp = path + '.tmp';
+     const obj = { change: '<change-id>', completedAt: new Date().toISOString() };
+     fs.writeFileSync(tmp, JSON.stringify(obj));
+     fs.renameSync(tmp, path);
+     console.log('Explorer marker written:', obj.change);
+   ")
+   ```
+
+7. **Return the handoff JSON** to the orchestrator. The orchestrator will
    validate `probes_cleaned == true` before advancing.
 <!-- </workflow> -->
 
@@ -159,9 +176,10 @@ The orchestrator rejects handoffs that violate this schema.
 <!-- <sentinel_writes> -->
 ## Sentinel writes (AUTO mode only)
 
-In AUTO mode, this subagent owns the `stage` field of the AUTO sentinel. The
-subagent updates `stage` **fire-and-forget** immediately before invoking the
-one stage skill of this phase:
+In AUTO mode, this subagent owns two write obligations before returning:
+
+**1. AUTO sentinel `stage` field** — update `stage` fire-and-forget immediately
+before invoking the one stage skill of this phase:
 
 ```json
 // Just before Skill("explore-specification-delta")
@@ -170,21 +188,28 @@ one stage skill of this phase:
   "mode": "auto",
   "phase": "explorer",             // written by the orchestrator before spawn
   "stage": 1,                      // written by THIS subagent, just before Skill()
-  "lastProgressKey": "explorer#1", // written by the orchestrator on initial sentinel
+  "lastProgressKey": "explorer#1",
   "startedAt": "2026-...",
   "stuckCount": 0
 }
 ```
 
-**Write protocol**: write to `openspec/.workbench/auto-pipeline.json.tmp`
-then atomic rename to `openspec/.workbench/auto-pipeline.json`. Fire-and-forget
-— never block the skill invocation on a sentinel write.
+**2. Phase-completion marker** — write `openspec/.workbench/explorer.done`
+atomically (writeFileSync + renameSync) immediately before returning the handoff
+JSON. This is the gate that lets the orchestrator validate the handoff
+deterministically. The marker content is:
+`{ "change": "<change-id>", "completedAt": "<ISO-8601>" }`.
 
-**This subagent never writes `phase`** — that is the orchestrator's field.
-**This subagent never deletes the sentinel** — that is the closer subagent's
-job during freeze.
+**Write protocol for the phase marker**: write to `.workbench/explorer.done.tmp`
+then atomic rename to `.workbench/explorer.done`. Fire-and-forget — never block
+the handoff return on a marker write.
 
-In GUIDED mode the sentinel is not written.
+**This subagent never writes `phase` in the sentinel** — that is the
+orchestrator's field. **This subagent never deletes the sentinel** — that is
+the closer subagent's job during freeze.
+
+In GUIDED mode the AUTO sentinel is not written; the phase marker IS written
+(the orchestrator validates it in both modes).
 <!-- </sentinel_writes> -->
 
 <!-- <reporting_template> -->

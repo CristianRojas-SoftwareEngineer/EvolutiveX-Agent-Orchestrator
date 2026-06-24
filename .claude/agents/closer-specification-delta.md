@@ -95,9 +95,16 @@ performs. No separate confirmation is required — do not prompt for it.
 ## AUTO sentinel cleanup (this subagent's freeze responsibility)
 
 After `Skill("archive-specification-delta")` completes successfully, this
-subagent **removes** the AUTO sentinel as part of the freeze:
+subagent **removes** the AUTO sentinel and all phase-completion markers as
+part of the freeze:
 
 ```bash
+# Phase-completion markers (written by explorer, planner, implementer)
+rm -f openspec/.workbench/explorer.done
+rm -f openspec/.workbench/planner.done
+rm -f openspec/.workbench/implementer.done
+
+# AUTO sentinel and halt sentinel
 rm -f openspec/.workbench/auto-pipeline.json
 rm -f openspec/.workbench/auto-pipeline.halt.json   # if present
 ```

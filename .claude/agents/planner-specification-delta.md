@@ -126,6 +126,32 @@ empty/missing spec or broken proposal↔specs parity routes back to `define`)
 and re-run the gate.
 <!-- </completion_gates> -->
 
+<!-- <phase_marker_write> -->
+## Phase-completion marker (both modes)
+
+Immediately before returning the handoff JSON (after all five stage skills and
+all three completion gates have succeeded), write the atomic phase marker so
+the orchestrator can validate the handoff deterministically:
+
+```bash
+marker=$(node -e "
+  const fs = require('fs');
+  const path = 'openspec/.workbench/planner.done';
+  const tmp = path + '.tmp';
+  const obj = { change: '<change-id>', completedAt: new Date().toISOString() };
+  fs.writeFileSync(tmp, JSON.stringify(obj));
+  fs.renameSync(tmp, path);
+  console.log('Planner marker written:', obj.change);
+")
+```
+
+**Write protocol**: write to `.workbench/planner.done.tmp` then atomic rename
+to `.workbench/planner.done`. Fire-and-forget — never block the handoff return.
+
+In both AUTO and GUIDED modes this marker is written; the orchestrator validates
+it in both modes.
+<!-- </phase_marker_write> -->
+
 <!-- <handoff_schema> -->
 ## Stable handoff schema
 
@@ -193,11 +219,16 @@ operations.
 `openspec/.workbench/auto-pipeline.json`. Fire-and-forget — never block the
 skill invocation on a sentinel write.
 
+**This subagent also writes the phase-completion marker** `planner.done`
+(see `phase_marker_write` section) — this marker is written in BOTH modes
+(AUTO and GUIDED), immediately before returning the handoff JSON.
+
 **This subagent never writes `phase`** — that is the orchestrator's field
 (written before spawn). **This subagent never deletes the sentinel** — that
 is the closer subagent's job during freeze.
 
-In GUIDED mode the sentinel is not written.
+In GUIDED mode the AUTO sentinel is not written; the phase marker `planner.done`
+IS written (the orchestrator validates it in both modes).
 <!-- </sentinel_writes> -->
 
 <!-- <reporting_template> -->

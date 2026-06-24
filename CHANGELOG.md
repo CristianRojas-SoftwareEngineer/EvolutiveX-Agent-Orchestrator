@@ -150,6 +150,7 @@ All notable changes are derived from conventional commits. Do not edit by hand.
 - implementar PKA de 6 capas, ports, inyección de dependencias y hardening de tooling
 - reemplazar 'any' por tipos estrictos del SDK de Anthropic
 ### Fixed
+- resolver colisión del plan-gate de create-plan en modo AUTO
 - completar halt diagnóstico y cubrir detección de archivado
 - declarar AskUserQuestion y TodoWrite en agentes del pipeline
 - declarar idioma español para artefactos OpenSpec

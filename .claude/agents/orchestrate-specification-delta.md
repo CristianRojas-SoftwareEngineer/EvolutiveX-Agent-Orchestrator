@@ -232,8 +232,12 @@ classification.
 
 ## AUTO mode
 
-**Step 0 — write the AUTO sentinel (before phase 1).** On entering AUTO, write
-`openspec/.workbench/auto-pipeline.json` with
+**Step 0 — orphan marker check and write the AUTO sentinel (before phase 1).**
+Before writing the AUTO sentinel, check for orphan markers from previous runs:
+for each phase in `["explorer", "planner", "implementer"]`, if the corresponding
+`<phase>.done` marker exists and its `change` field does not match the current
+pipeline's `change`, reject before spawning any subagent. On entering AUTO,
+write `openspec/.workbench/auto-pipeline.json` with
 `{ change, mode: "auto", phase: "explorer", stage: 1, startedAt: <ISO>, stuckCount: 0 }`.
 This sentinel is the contract the deterministic backstop reads (see
 `<backstop>` below). The directory `openspec/.workbench/` is gitignored.
@@ -246,10 +250,16 @@ yields the turn until phase 4 completes. Each iteration:
 2. Spawn the phase subagent via `Agent(subagent_type=<phase>-specification-delta,
    prompt=<briefing>)`.
 3. Read the structured JSON handoff and validate against `<handoff_schemas>`.
-4. Emit the `<reporting_template>` status as an **informational log** — this
+4. **Validate the phase-completion marker** via
+   `validatePhaseMarker(phase, expectedChange)` from
+   `scripting/openspec/read-phase-marker.ts`. On any marker error
+   (MarkerAbsent / MarkerCorrupt / MarkerEmpty / MarkerWrongChange), emit the
+   `<phase_handoff_diagnostic>` and hard-stop the pipeline. For the closer
+   phase, use `isChangeArchived` instead of a marker.
+5. Emit the `<reporting_template>` status as an **informational log** — this
    is text output only, **never a turn boundary**. Emitting the status does NOT
    end the turn.
-5. Advance to the next phase via the same mechanism — no pause, no prompt,
+6. Advance to the next phase via the same mechanism — no pause, no prompt,
    no confirmation.
 
 Repeat until phase 4 (`closer-specification-delta`) completes — archive +
@@ -290,13 +300,10 @@ in this mode.
 ## GUIDED mode
 
 Run the same phases 1→4, pausing to hand control back to the user:
-- After phase 1 (explorer): present findings, confirm direction before phase 2.
-- After phase 2 (planner): present the four planning artifacts, allow edits,
-  confirm before phase 3.
-- During phase 3 (implementer): if an artifact proves wrong, let the user edit
-  it, then resume.
-- After phase 3 (implementer): present the verify report, let the user decide
-  on WARNINGs before phase 4.
+- After phase 1 (explorer): validate `explorer.done` marker, present findings, confirm direction before phase 2.
+- After phase 2 (planner): validate `planner.done` marker, present the four planning artifacts, allow edits, confirm before phase 3.
+- During phase 3 (implementer): if an artifact proves wrong, let the user edit it, then resume.
+- After phase 3 (implementer): validate `implementer.done` marker, present the verify report, let the user decide on WARNINGs before phase 4.
 
 **Open design decisions:** whenever a phase exposes architectural or design
 choices that cannot be resolved unilaterally, the phase delegates to
@@ -310,6 +317,72 @@ happen) over the same path. There is no separate tutorial and no throwaway
 practice delta — the newcomer learns working on their real delta, with the
 checkpoints as teaching points. This absorbs the old `onboard` role without a
 separate skill.
+
+<!-- <phase_handoff_gate> -->
+## Phase handoff gate (both modes)
+
+After receiving the structured JSON handoff from each phase subagent and validating
+its schema, the orchestrator **also** validates the phase-completion marker
+atomically written by that subagent. This is the deterministic gate that closes
+the gap between "handoff JSON received" and "phase actually completed its work".
+
+**Marker validation** — reads `openspec/.workbench/<phase>.done` via the pure
+function `readPhaseMarker` (from `scripting/openspec/read-phase-marker.ts`) and
+then `validatePhaseMarker`:
+
+```typescript
+import { readPhaseMarker, validatePhaseMarker, MarkerAbsent, MarkerCorrupt, MarkerEmpty, MarkerWrongChange } from "./scripting/openspec/read-phase-marker";
+
+// After receiving explorer handoff (phase 1/4):
+const marker = readPhaseMarker("explorer"); // throws MarkerAbsent/Corrupt/Empty
+validatePhaseMarker("explorer", expectedChange); // throws MarkerWrongChange
+
+// After receiving planner handoff (phase 2/4):
+const marker = readPhaseMarker("planner");
+validatePhaseMarker("planner", expectedChange);
+
+// After receiving implementer handoff (phase 3/4):
+const marker = readPhaseMarker("implementer");
+validatePhaseMarker("implementer", expectedChange);
+
+// Closer (phase 4/4): no marker — signal is isChangeArchived in .openspec.yaml
+```
+
+**Fail-closed behavior**: any marker error produces a hard-stop with a
+Spanish diagnostic (see `phase_handoff_diagnostic`).
+
+**Cleanup**: after all four phases complete, the closer removes the three
+markers (explorer.done, planner.done, implementer.done) along with the AUTO
+sentinel during its freeze.
+
+**Orphan policy**: if the orchestrator starts a pipeline and finds orphan
+markers from a previous run (marker.change !== current change), it rejects
+before spawning any subagent. Detection happens in the phase 1 conductor step.
+<!-- </phase_handoff_gate> -->
+
+<!-- <phase_handoff_diagnostic> -->
+## Spanish diagnostic for marker failures
+
+When a marker validation fails, emit this diagnostic **before stopping**:
+
+```
+Fase <phase>: marcador fallido — causa: <CAUSA>.
+  Valor observado: <valor o descripcion del error>.
+  Pipeline detenido.
+```
+
+Where `<CAUSA>` is one of:
+- `ABSENT` — archivo inexistente (ENOENT)
+- `CORRUPT` — archivo corrupto, vacio, o JSON invalido
+- `WRONG_CHANGE` — el marcador tiene un change diferente al del pipeline actual
+
+Example:
+```
+Fase planner: marcador fallido — causa: ABSENT.
+  Valor observado: archivo openspec/.workbench/planner.done no existe.
+  Pipeline detenido.
+```
+<!-- </phase_handoff_diagnostic> -->
 
 <!-- <backstop> -->
 ## Deterministic backstop (`Stop` hook)

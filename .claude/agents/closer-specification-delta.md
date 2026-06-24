@@ -91,6 +91,33 @@ explicit authorization for the commit that `archive-specification-delta`
 performs. No separate confirmation is required — do not prompt for it.
 <!-- </stage_invocations> -->
 
+<!-- <timings_sidecar_write> -->
+## Timings sidecar (both modes)
+
+Immediately before the sentinel cleanup, write `openspec/.workbench/closer.timings.json`
+atomically (writeFileSync + renameSync) with the per-stage timing data from
+`tool_result.usage` of each `Skill(...)` call:
+
+```bash
+timings=$(node -e "
+  const fs = require('fs');
+  const path = 'openspec/.workbench/closer.timings.json';
+  const tmp = path + '.tmp';
+  const stages = [
+    { stage: 9,  slug: 'synchronize-specification-delta', startedAt: '<%= it.syncStartedAt %>',    completedAt: '<%= it.syncCompletedAt %>',    durationMs: <%= it.syncDurationMs %> },
+    { stage: 10, slug: 'archive-specification-delta',      startedAt: '<%= it.archiveStartedAt %>', completedAt: '<%= it.archiveCompletedAt %>', durationMs: <%= it.archiveDurationMs %> }
+  ];
+  const obj = { change: '<change-id>', stages };
+  fs.writeFileSync(tmp, JSON.stringify(obj));
+  fs.renameSync(tmp, path);
+  console.log('Closer timings written');
+")
+```
+
+Replace each `<%= it.xxx %>` placeholder with the actual recorded value from
+`tool_result.usage` of the corresponding `Skill(...)` call.
+<!-- </timings_sidecar_write> -->
+
 <!-- <sentinel_cleanup> -->
 ## AUTO sentinel cleanup (this subagent's freeze responsibility)
 
@@ -103,6 +130,12 @@ part of the freeze:
 rm -f openspec/.workbench/explorer.done
 rm -f openspec/.workbench/planner.done
 rm -f openspec/.workbench/implementer.done
+
+# Timings sidecars (written by each phase subagent)
+rm -f openspec/.workbench/explorer.timings.json
+rm -f openspec/.workbench/planner.timings.json
+rm -f openspec/.workbench/implementer.timings.json
+rm -f openspec/.workbench/closer.timings.json
 
 # AUTO sentinel and halt sentinel
 rm -f openspec/.workbench/auto-pipeline.json

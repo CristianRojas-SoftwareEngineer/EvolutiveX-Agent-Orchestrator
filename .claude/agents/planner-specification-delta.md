@@ -152,6 +152,40 @@ In both AUTO and GUIDED modes this marker is written; the orchestrator validates
 it in both modes.
 <!-- </phase_marker_write> -->
 
+<!-- <timings_sidecar_write> -->
+## Timings sidecar (both modes)
+
+Immediately after the phase marker, write `openspec/.workbench/planner.timings.json`
+atomically (writeFileSync + renameSync) with the per-stage timing data. Each
+stage skill's timing comes from the `tool_result.usage` of its `Skill(...)` call:
+
+```bash
+timings=$(node -e "
+  const fs = require('fs');
+  const path = 'openspec/.workbench/planner.timings.json';
+  const tmp = path + '.tmp';
+  const stages = [
+    { stage: 2, slug: 'create-specification-delta',     startedAt: '<%= it.createStartedAt %>',    completedAt: '<%= it.createCompletedAt %>',    durationMs: <%= it.createDurationMs %> },
+    { stage: 3, slug: 'propose-specification-delta',   startedAt: '<%= it.proposeStartedAt %>',  completedAt: '<%= it.proposeCompletedAt %>',  durationMs: <%= it.proposeDurationMs %> },
+    { stage: 4, slug: 'define-specification-delta',     startedAt: '<%= it.defineStartedAt %>',    completedAt: '<%= it.defineCompletedAt %>',    durationMs: <%= it.defineDurationMs %> },
+    { stage: 5, slug: 'design-specification-delta',    startedAt: '<%= it.designStartedAt %>',    completedAt: '<%= it.designCompletedAt %>',    durationMs: <%= it.designDurationMs %> },
+    { stage: 6, slug: 'plan-specification-delta',      startedAt: '<%= it.planStartedAt %>',      completedAt: '<%= it.planCompletedAt %>',      durationMs: <%= it.planDurationMs %> }
+  ];
+  const obj = { change: '<change-id>', stages };
+  fs.writeFileSync(tmp, JSON.stringify(obj));
+  fs.renameSync(tmp, path);
+  console.log('Planner timings written');
+")
+```
+
+Replace each `<%= it.xxx %>` placeholder with the actual recorded value from
+`tool_result.usage` of the corresponding `Skill(...)` call inside this subagent.
+The `startedAt` comes from the `startedAt` field of the tool result; `completedAt`
+is derived as `startedAt + duration_ms`; `durationMs` is `duration_ms`.
+If a stage skill call did not return usage data, use `Date.now()`-derived values
+as fallback for that stage only.
+<!-- </timings_sidecar_write> -->
+
 <!-- <handoff_schema> -->
 ## Stable handoff schema
 

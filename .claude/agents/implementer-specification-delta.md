@@ -111,6 +111,43 @@ loop:
            console.log('Implementer marker written:', obj.change);
          ")
          ```
+       - Write the timings sidecar `openspec/.workbench/implementer.timings.json`
+         atomically (writeFileSync + renameSync), immediately after the marker.
+         Include the full `stages[]` with `iterations[]` from every loop iteration:
+         ```bash
+         timings=$(node -e "
+           const fs = require('fs');
+           const path = 'openspec/.workbench/implementer.timings.json';
+           const tmp = path + '.tmp';
+           // it.iterations: array of { applyStartedAt, applyCompletedAt, applyDurationMs,
+           //                              verifyStartedAt, verifyCompletedAt, verifyDurationMs, passed }
+           const stages = [
+             {
+               stage: 7,
+               slug: 'apply-specification-delta',
+               startedAt: '<%= it.loopStartedAt %>',
+               completedAt: '<%= it.loopLastApplyCompletedAt %>',
+               durationMs: <%= it.loopTotalApplyMs %>,
+               iterations: it.iterations.map(iter => ({
+                 applyMs: iter.applyDurationMs,
+                 verifyMs: iter.verifyDurationMs,
+                 passed: iter.passed
+               }))
+             },
+             {
+               stage: 8,
+               slug: 'verify-specification-delta',
+               startedAt: '<%= it.loopFirstVerifyStartedAt %>',
+               completedAt: '<%= it.loopLastVerifyCompletedAt %>',
+               durationMs: <%= it.loopTotalVerifyMs %>
+             }
+           ];
+           const obj = { change: '<change-id>', stages };
+           fs.writeFileSync(tmp, JSON.stringify(obj));
+           fs.renameSync(tmp, path);
+           console.log('Implementer timings written');
+         ")
+         ```
        - Exit the loop; prepare the handoff JSON with verify="PASS" and
          critical_findings=0.
 ```

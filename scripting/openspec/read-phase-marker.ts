@@ -19,6 +19,32 @@ import * as fs from "fs";
 import * as path from "path";
 
 /**
+ * Sidecar de duracion de fase. Usado por el reader unificado readPhaseSidecar.
+ * Para archivos `.done`, `stages` esta ausente y `completedAt` esta presente.
+ * Para `.timings.json`, `stages` esta presente y `completedAt` esta ausente.
+ */
+export interface PhaseSidecar {
+  change: string;
+  stages?: StageTiming[];
+  completedAt?: string;
+}
+
+export interface StageTiming {
+  stage: number;
+  slug: string;
+  startedAt: string;
+  completedAt: string;
+  durationMs: number;
+  iterations?: LoopIteration[];
+}
+
+export interface LoopIteration {
+  applyMs: number;
+  verifyMs: number;
+  passed: boolean;
+}
+
+/**
  * Errores tipados emitidos por readPhaseMarker.
  * Fail-closed: cualquier condicion de error produce una excepcion tipada,
  * nunca un retorno ambiguo.
@@ -67,7 +93,167 @@ export interface PhaseMarker {
 }
 
 /**
+ * SidecarMode: controla la politica de error del reader unificado.
+ * - 'closed': MarkerAbsent, MarkerCorrupt, MarkerEmpty lanzan excepcion (fail-closed).
+ * - 'open':   MarkerAbsent, MarkerCorrupt, MarkerEmpty retornan null (fail-open).
+ */
+type SidecarMode = "closed" | "open";
+
+/**
+ * Lee un sidecar de fase (`.done` o `.timings.json`) con politica de error configurable.
+ *
+ * @param phase       - Nombre de la fase: "explorer" | "planner" | "implementer"
+ * @param suffix      - '.done' | '.timings.json'
+ * @param mode        - 'closed' (excepcion) | 'open' (retorna null)
+ * @param workbenchRoot - Directorio base de workbench (default: openspec/.workbench)
+ * @returns PhaseSidecar | null (null solo en modo 'open' ante error)
+ * @throws MarkerAbsent   - modo closed, archivo inexistente (ENOENT)
+ * @throws MarkerCorrupt  - modo closed, directorio (EISDIR), JSON invalido, o estructura invalida
+ * @throws MarkerEmpty    - modo closed, archivo existe pero esta vacio
+ * @throws Error          - ENOSPC, EACCES u otro error de E/S propagado tal cual (ambos modos)
+ */
+export function readPhaseSidecar(
+  phase: string,
+  suffix: ".done" | ".timings.json",
+  mode: SidecarMode,
+  workbenchRoot = path.join(process.cwd(), "openspec", ".workbench")
+): PhaseSidecar | null {
+  const markerPath = path.join(workbenchRoot, `${phase}${suffix}`);
+
+  let content: string;
+  try {
+    content = fs.readFileSync(markerPath, "utf8");
+  } catch (err: unknown) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === "ENOENT") {
+      if (mode === "open") return null;
+      throw new MarkerAbsent(phase);
+    }
+    if (code === "EISDIR") {
+      if (mode === "open") return null;
+      throw new MarkerCorrupt(phase, "es un directorio");
+    }
+    throw err;
+  }
+
+  if (content.length === 0) {
+    if (mode === "open") return null;
+    throw new MarkerEmpty(phase);
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(content);
+  } catch {
+    if (mode === "open") return null;
+    throw new MarkerCorrupt(phase, "JSON invalido");
+  }
+
+  if (typeof parsed !== "object" || parsed === null) {
+    if (mode === "open") return null;
+    throw new MarkerCorrupt(phase, "no es un objeto");
+  }
+
+  const obj = parsed as Record<string, unknown>;
+
+  if (typeof obj.change !== "string" || obj.change.length === 0) {
+    if (mode === "open") return null;
+    throw new MarkerCorrupt(phase, "campo 'change' debe ser string no vacio");
+  }
+
+  // Schema differs by suffix:
+  // - .done:        requiere completedAt, stages debe estar ausente
+  // - .timings.json: requiere stages (array), completedAt debe estar ausente
+  if (suffix === ".done") {
+    if (typeof obj.completedAt !== "string") {
+      if (mode === "open") return null;
+      throw new MarkerCorrupt(phase, "campo 'completedAt' debe ser string");
+    }
+    if (obj.stages !== undefined) {
+      if (mode === "open") return null;
+      throw new MarkerCorrupt(phase, "archivo .done no debe contener campo 'stages'");
+    }
+    return { change: obj.change as string, completedAt: obj.completedAt as string };
+  }
+
+  // .timings.json: requiere stages array
+  if (!Array.isArray(obj.stages)) {
+    if (mode === "open") return null;
+    throw new MarkerCorrupt(phase, "campo 'stages' debe ser array");
+  }
+
+  // Validate each stage entry
+  for (let i = 0; i < obj.stages.length; i++) {
+    const stage = obj.stages[i] as Record<string, unknown>;
+    if (typeof stage !== "object" || stage === null) {
+      if (mode === "open") return null;
+      throw new MarkerCorrupt(phase, `stages[${i}] no es un objeto`);
+    }
+    if (typeof stage.stage !== "number" || !Number.isInteger(stage.stage) || stage.stage < 1) {
+      if (mode === "open") return null;
+      throw new MarkerCorrupt(phase, `stages[${i}].stage debe ser entero >= 1`);
+    }
+    if (typeof stage.slug !== "string" || stage.slug.length === 0) {
+      if (mode === "open") return null;
+      throw new MarkerCorrupt(phase, `stages[${i}].slug debe ser string no vacio`);
+    }
+    if (typeof stage.startedAt !== "string") {
+      if (mode === "open") return null;
+      throw new MarkerCorrupt(phase, `stages[${i}].startedAt debe ser string`);
+    }
+    if (typeof stage.completedAt !== "string") {
+      if (mode === "open") return null;
+      throw new MarkerCorrupt(phase, `stages[${i}].completedAt debe ser string`);
+    }
+    if (typeof stage.durationMs !== "number" || !Number.isFinite(stage.durationMs)) {
+      if (mode === "open") return null;
+      throw new MarkerCorrupt(phase, `stages[${i}].durationMs debe ser numero finito`);
+    }
+    if (stage.durationMs < 0) {
+      if (mode === "open") return null;
+      throw new MarkerCorrupt(phase, `stages[${i}].durationMs no puede ser negativo`);
+    }
+    if (stage.durationMs > 86400000) {
+      if (mode === "open") return null;
+      throw new MarkerCorrupt(phase, `stages[${i}].durationMs no puede exceder 24h (86400000ms)`);
+    }
+    // Validate iterations if present
+    if (stage.iterations !== undefined) {
+      if (!Array.isArray(stage.iterations)) {
+        if (mode === "open") return null;
+        throw new MarkerCorrupt(phase, `stages[${i}].iterations debe ser array`);
+      }
+      for (let j = 0; j < stage.iterations.length; j++) {
+        const iter = stage.iterations[j] as Record<string, unknown>;
+        if (typeof iter !== "object" || iter === null) {
+          if (mode === "open") return null;
+          throw new MarkerCorrupt(phase, `stages[${i}].iterations[${j}] no es un objeto`);
+        }
+        if (typeof iter.applyMs !== "number" || !Number.isFinite(iter.applyMs) || iter.applyMs < 0) {
+          if (mode === "open") return null;
+          throw new MarkerCorrupt(phase, `stages[${i}].iterations[${j}].applyMs debe ser numero finito no negativo`);
+        }
+        if (typeof iter.verifyMs !== "number" || !Number.isFinite(iter.verifyMs) || iter.verifyMs < 0) {
+          if (mode === "open") return null;
+          throw new MarkerCorrupt(phase, `stages[${i}].iterations[${j}].verifyMs debe ser numero finito no negativo`);
+        }
+        if (typeof iter.passed !== "boolean") {
+          if (mode === "open") return null;
+          throw new MarkerCorrupt(phase, `stages[${i}].iterations[${j}].passed debe ser booleano`);
+        }
+      }
+    }
+  }
+
+  return {
+    change: obj.change as string,
+    stages: obj.stages as StageTiming[],
+  };
+}
+
+/**
  * Lee el marcador de completitud de una fase en modo fail-closed.
+ * Delegacion pura a readPhaseSidecar para mantener backward compatibility.
  *
  * @param phase - Nombre de la fase: "explorer" | "planner" | "implementer"
  * @param workbenchRoot - Directorio base de workbench (default: openspec/.workbench)
@@ -82,68 +268,8 @@ export function readPhaseMarker(
   phase: string,
   workbenchRoot = path.join(process.cwd(), "openspec", ".workbench")
 ): PhaseMarker {
-  const markerPath = path.join(workbenchRoot, `${phase}.done`);
-
-  let content: string;
-  try {
-    // El flag 'utf8' hace que readFileSync lance ENOENT si no existe
-    // y EISDIR si es un directorio
-    content = fs.readFileSync(markerPath, "utf8");
-  } catch (err: unknown) {
-    const code = (err as NodeJS.ErrnoException).code;
-    if (code === "ENOENT") {
-      throw new MarkerAbsent(phase);
-    }
-    if (code === "EISDIR") {
-      throw new MarkerCorrupt(phase, "es un directorio");
-    }
-    // Propagar ENOSPC, EACCES y cualquier otro error de E/S tal cual
-    throw err;
-  }
-
-  if (content.length === 0) {
-    throw new MarkerEmpty(phase);
-  }
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(content);
-  } catch {
-    throw new MarkerCorrupt(phase, "JSON invalido");
-  }
-
-  if (
-    typeof parsed !== "object" ||
-    parsed === null ||
-    !("change" in parsed) ||
-    !("completedAt" in parsed)
-  ) {
-    throw new MarkerCorrupt(
-      phase,
-      "falta campo 'change' o 'completedAt'"
-    );
-  }
-
-  const marker = parsed as { change: unknown; completedAt: unknown };
-
-  if (
-    typeof marker.change !== "string" ||
-    marker.change.length === 0
-  ) {
-    throw new MarkerCorrupt(
-      phase,
-      "campo 'change' debe ser string no vacio"
-    );
-  }
-
-  if (typeof marker.completedAt !== "string") {
-    throw new MarkerCorrupt(
-      phase,
-      "campo 'completedAt' debe ser string"
-    );
-  }
-
-  return { change: marker.change, completedAt: marker.completedAt };
+  const sidecar = readPhaseSidecar(phase, ".done", "closed", workbenchRoot) as PhaseMarker;
+  return { change: sidecar.change, completedAt: sidecar.completedAt };
 }
 
 /**

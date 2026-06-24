@@ -134,7 +134,38 @@ orchestrator. The schema is stable and the orchestrator validates it against
    ")
    ```
 
-7. **Return the handoff JSON** to the orchestrator. The orchestrator will
+7. **Write the timings sidecar** — immediately after the phase marker, write
+   `openspec/.workbench/explorer.timings.json` atomically (writeFileSync + renameSync)
+   with the stage timing data. The harness provides `startedAt`/`completedAt`/`duration_ms`
+   for each stage skill invocation:
+
+   ```bash
+   timings=$(node -e "
+     const fs = require('fs');
+     const path = 'openspec/.workbench/explorer.timings.json';
+     const tmp = path + '.tmp';
+     const obj = {
+       change: '<change-id>',
+       stages: [
+         {
+           stage: 1,
+           slug: 'explore-specification-delta',
+           startedAt: '<%= it.harnessStartedAt %>',
+           completedAt: '<%= it.harnessCompletedAt %>',
+           durationMs: '<%= it.harnessDurationMs %>'
+         }
+       ]
+     };
+     fs.writeFileSync(tmp, JSON.stringify(obj));
+     fs.renameSync(tmp, path);
+     console.log('Explorer timings written');
+   ")
+   ```
+   Replace `<%= it.harnessStartedAt %>`, `<%= it.harnessCompletedAt %>`, and
+   `<%= it.harnessDurationMs %>` with the actual values from the harness context
+   (`startedAt`, `completedAt`, and `duration_ms` from the `tool_result.usage`).
+
+8. **Return the handoff JSON** to the orchestrator. The orchestrator will
    validate `probes_cleaned == true` before advancing.
 <!-- </workflow> -->
 

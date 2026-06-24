@@ -105,10 +105,18 @@ subagent spawned via the Agent tool:
 2. Spawn the phase subagent via
    `Agent(subagent_type="<phase>-specification-delta", prompt=<briefing>)`.
 3. Read the subagent's structured JSON handoff on completion.
-4. Validate the handoff against the per-phase schema (see
+4. **Read the phase timings sidecar** — use `readPhaseSidecar(phase, '.timings.json', 'open')`
+   from `scripting/openspec/read-phase-marker.ts`. If it returns `null` (absent or corrupt),
+   show "—" for both duration lines. If it returns data, compute:
+   - `phaseStartedAt = stages[0].startedAt`
+   - `phaseCompletedAt = stages[stages.length-1].completedAt`
+   - `phaseDurationMs = phaseCompletedAt - phaseStartedAt` (if unavailable, fall back to
+     `tool_result.usage.duration_ms` from the `Agent(...)` call)
+   Format durations as human-readable strings (e.g., "4m 12s", "38s").
+5. Validate the handoff against the per-phase schema (see
    `<handoff_schemas>`); on schema mismatch, hard-stop and surface the
    discrepancy to the user.
-5. In GUIDED mode, present the handoff to the user and pause for confirmation
+6. In GUIDED mode, present the handoff to the user and pause for confirmation
    before advancing. In AUTO mode, advance immediately.
 
 After phase 4, the pipeline is complete. The sentinel is removed by the closer
@@ -465,6 +473,7 @@ double-line numeration that eliminates the previous divergence between `explore`
 ## Specification-Delta Run: {{delta-name}}
 **Modo:** {{AUTO | GUIDED}}
 **Fase:** [{{i}}/4] {{phase-slug}}
+**Fase duracion:** {{phaseDurationHuman}} ({{phaseDurationMs}}ms)
 **Etapa:** [{{j}}/10] {{stage-slug}}
 {{stage-specific summary}}
 **Siguiente:** {{next-phase or "completo"}}
@@ -477,12 +486,22 @@ Where:
   (`1`=explore, `2`=create, ..., `10`=archive).
 - `<phase-slug>` and `<stage-slug>` are the exact file names (without `.md`)
   of the active phase subagent and stage skill respectively.
+- `phaseDurationHuman` is the human-readable duration of the phase (e.g., "4m 12s",
+  "38s"), or "—" if the timings sidecar is absent or corrupt.
+- `phaseDurationMs` is the raw millisecond value, or "—" if unavailable.
 
 When the active phase is between two stage skill invocations (e.g. during the
 implementer's `apply ↔ verify` loop), the `Etapa` line reflects the stage
 about to be invoked next (or just-completed) — the implementer subagent
 updates `j` as it transitions. The orchestrator's own status line uses the
 `j` it observed in the most recent sentinel write from the subagent.
+
+**Timings integration:** after each phase subagent returns, the orchestrator
+reads `openspec/.workbench/<phase>.timings.json` via
+`readPhaseSidecar(phase, '.timings.json', 'open')`. If the sidecar is absent or
+corrupt, both `phaseDurationHuman` and `phaseDurationMs` show "—". If present,
+`phaseDurationMs` is computed as `stages[stages.length-1].completedAt - stages[0].startedAt`
+with fallback to `tool_result.usage.duration_ms` from the `Agent(...)` call.
 
 **Why this contract:** numeration stable and traceable (the user can say
 "estamos en Fase 2/4 Etapa 4/10" without ambiguity); divergence eliminated

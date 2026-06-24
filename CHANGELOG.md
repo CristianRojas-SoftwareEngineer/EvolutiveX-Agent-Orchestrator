@@ -4,6 +4,7 @@ All notable changes are derived from conventional commits. Do not edit by hand.
 
 ## [Unreleased]
 ### Added
+- validar handoff de subagentes con gate determinista
 - introducir backstop determinista para pipeline AUTO
 - introducir orquestación multi-agente en 4 fases
 - introducir ITtsTextProvider con cadena Gemini→OpenRouter para texto TTS

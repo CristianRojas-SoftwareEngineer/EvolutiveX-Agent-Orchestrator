@@ -45,6 +45,8 @@ Assume Spanish by default for all user-facing text.
 
 **Generated plans and reports** (e.g. `/create-plan` plans, `/investigate` reports): invariant reasoning text in the skill artifact is English; the deliverable to the user is Spanish, including translated fundamental considerations.
 
+**OpenSpec artefacts under `openspec/changes/<change>/` and `openspec/specs/`** (proposal, specs, design, tasks, non-canonical records): content is **user-facing** — the user reads and commits it — and therefore MUST be written in Spanish by default, per AGENTS.md §0. Skills that author these artefacts (`propose-`, `define-`, `design-`, `plan-specification-delta`) MUST declare this constraint explicitly in their `<constraints>` block.
+
 **Output templates in skills:** use English placeholders in SKILL.md (e.g. `## Summary`); require Spanish in delivered output via `<constraints>`.
 
 **Technical terms:** keep standard terms in English when translation adds ambiguity (e.g. `prompt`, `token`, `API`, `streaming`, `frontmatter`, `undertrigger`).

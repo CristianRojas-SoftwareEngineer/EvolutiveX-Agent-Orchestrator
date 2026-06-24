@@ -60,6 +60,10 @@ concrete cleanup tasks.
 <!-- </workflow> -->
 
 <!-- <constraints> -->
+- Artifact content (proposal/specs/design/tasks) MUST be written in **Spanish** per
+  the `<language_policy>` of [artifact-structuring](../artifact-structuring/SKILL.md)
+  and AGENTS.md §0. Technical terms (skill, gate, sentinel, handoff, etc.) remain in
+  English when translation adds ambiguity.
 - Never embed writing prose in this skill — the schema is the single source of truth.
 - Never create proposal, specs, or tasks here.
 - Write to `resolvedOutputPath` from the instructions JSON; never the bare

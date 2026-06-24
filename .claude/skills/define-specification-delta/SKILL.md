@@ -79,6 +79,10 @@ tasks. Do not invent cleanup beyond what the change actually replaces.
 <!-- </workflow> -->
 
 <!-- <constraints> -->
+- Artifact content (proposal/specs/design/tasks) MUST be written in **Spanish** per
+  the `<language_policy>` of [artifact-structuring](../artifact-structuring/SKILL.md)
+  and AGENTS.md §0. Non-canonical records included. Technical terms (skill, gate,
+  sentinel, handoff, etc.) remain in English when translation adds ambiguity.
 - Never embed writing prose — the schema owns the per-capability writing format.
 - Never leave `specs/` empty and never skip a capability declared in the proposal;
   cover behavioral capabilities with ≥1 requirement (ADDED/MODIFIED/REMOVED/RENAMED,

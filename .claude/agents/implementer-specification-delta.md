@@ -41,6 +41,7 @@ Task: implementer-specification-delta
 Mode: {{AUTO | GUIDED}}
 Change: <c<NNNNN>-<slug>  — the minted change from phase 2/4>
 Plan gate status: <apply-ready, with all four planning artifacts on disk>
+                  <AUTO: create-plan gate is AUTO-APPROVED — do not cede the turn>
 ```
 
 The subagent uses `Change` to resolve the worktree via `openspec status
@@ -79,8 +80,11 @@ iteration.
 loop:
   1. Update sentinel: stage = 7 (fire-and-forget, just before apply)
   2. Skill("apply-specification-delta", --change <name>)
-       - apply-specification-delta may sub-invoke create-plan; in AUTO mode
-         the plan gate is auto-approved (per the orchestrator's AUTO rules).
+       - apply-specification-delta sub-invokes create-plan. In AUTO the plan
+         gate is AUTO-APPROVED: do NOT end your turn presenting the plan and do
+         NOT await confirmation — producing the plan is not "done". Continue
+         straight into the implementation. The plan is an internal step, never
+         your deliverable (see the invariant below).
        - apply implements the tasks in tasks.md.
   3. Update sentinel: stage = 8 (fire-and-forget, just before verify)
   4. Skill("verify-specification-delta", --change <name>)
@@ -140,6 +144,16 @@ The orchestrator rejects handoffs where `verify != "PASS"` or
 <!-- <invariants> -->
 ## Invariants
 
+- **The create-plan gate is AUTO-APPROVED in AUTO** — when
+  `apply-specification-delta` sub-invokes `create-plan`, never end the turn
+  presenting the plan and never await confirmation. Generating the plan is an
+  internal step, NOT your deliverable; your only deliverable is the handoff
+  JSON `{ change, verify, critical_findings }` after a green verify. Reading
+  "produced the plan" as "finished" is the failure to avoid. This subagent has
+  no `EnterPlanMode`/`ExitPlanMode` tool: `create-plan` runs its no-plan-mode
+  fallback ("refrain until approved"), which must NOT be read as license to
+  cede — in AUTO the approval is implicit and immediate. (In GUIDED the gate is
+  presented to the user normally.)
 - **The loop is internal** — the orchestrator never spawns a separate apply
   or verify subagent per iteration.
 - **A failing test suite is CRITICAL** — it hard-blocks the gate like any
@@ -207,6 +221,8 @@ sees both stage reports interleaved within the same phase report.
 <!-- <constraints> -->
 - The apply↔verify loop is internal — never spawn a separate subagent for
   apply or verify per iteration.
+- In AUTO, the `create-plan` gate is auto-approved — never cede the turn
+  presenting the plan; the plan is an internal step, not the deliverable.
 - The verify gate is hard; route back to apply on any CRITICAL finding.
 - Never run synchronize or archive; that is the closer phase.
 - Never write the sentinel's `phase` field; that is the orchestrator's

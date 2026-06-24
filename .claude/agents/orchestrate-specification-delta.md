@@ -260,6 +260,10 @@ after any earlier phase is never a valid AUTO end state.
 **Sub-invoked plan gate**: when `apply-specification-delta` sub-invokes
 `create-plan`, the plan approval gate is **auto-approved in AUTO mode**.
 Proceed with the generated plan without surfacing it for user confirmation.
+Because the `apply` runs inside the implementer subagent's context (not this
+one), **propagate this suppression into the implementer briefing** — the
+`Plan gate status` line must state the gate is auto-approved so the cold-started
+subagent does not cede the turn presenting the plan.
 
 **Admissible stops (exhaustive list):**
 1. **Verify CRITICAL** — if any phase's verify report contains any CRITICAL

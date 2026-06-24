@@ -277,9 +277,12 @@ Dos etapas no son autocontenidas, por diseño, y siguen el
 
 - `explore-specification-delta` sub-invoca la skill `investigate` para la
   investigación estructurada; no reimplementa esa lógica.
-- `apply-specification-delta` sub-invoca `create-plan` antes de implementar. Tras editar
-  `tasks.md` debe ejecutar `npm run openspec:sync-tasks-meta -- --slug <change>` para
-  mantener `.tasks-meta.yaml` alineado cuando la extensión no está activa.
+- `apply-specification-delta` sub-invoca `create-plan` antes de implementar. El gate de
+  aprobación del plan es **condicional al modo**: en GUIDED se presenta al usuario; en AUTO
+  está **auto-aprobado** —el subagente implementer no cede el turno presentando el plan, lo
+  trata como paso interno y continúa al loop de implementación—. El plan nunca es el
+  entregable. Tras editar `tasks.md` debe ejecutar `npm run openspec:sync-tasks-meta -- --slug <change>`
+  para mantener `.tasks-meta.yaml` alineado cuando la extensión no está activa.
 
 Las otras ocho etapas son autocontenidas.
 

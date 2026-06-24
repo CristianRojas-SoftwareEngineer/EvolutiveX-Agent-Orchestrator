@@ -53,8 +53,18 @@ of [artifact-structuring](../artifact-structuring/SKILL.md):
 - **Constraint**: the plan's tasks refine `tasks.md` without contradicting its scope.
   Closure (verify/sync/archive) belongs to later pipeline stages, not to this plan.
 
-The plan's approval gate is presented to the user as-is; without an approved plan,
-implementation does not start. After approval, sync `tasks.md` to reflect the
+**Plan-gate handling is mode-conditional** (the invoking flow declares the mode):
+
+- **GUIDED**: the plan's approval gate is presented to the user as-is; without an
+  approved plan, implementation does not start.
+- **AUTO**: the plan gate is **auto-approved** — do NOT present it and do NOT cede
+  the turn awaiting confirmation. Treat the generated plan as internally approved
+  and continue straight into the implement loop (Step 2). The plan is never the
+  deliverable; producing it is not "done". This overrides `create-plan`'s default
+  stop-to-confirm behavior, including its no-plan-mode fallback ("refrain until
+  approved"), which otherwise would end the turn here.
+
+After approval (explicit in GUIDED, auto in AUTO), sync `tasks.md` to reflect the
 refinement (this stage owns `tasks.md`, not `create-plan`).
 
 ## Step 2 — Implement loop
@@ -89,7 +99,8 @@ orchestrator resolves and invokes the verify gate in the same turn.
 <!-- </workflow> -->
 
 <!-- <constraints> -->
-- Always plan first (Step 1.5) before touching code.
+- Always plan first (Step 1.5) before touching code. In AUTO the plan gate is
+  auto-approved: never cede the turn presenting the plan; continue into the loop.
 - Honor the workspace guard: stop on `workspace-planning` with empty
   `allowedEditRoots`.
 - Mark each task's checkbox immediately after completing it; keep changes minimal and

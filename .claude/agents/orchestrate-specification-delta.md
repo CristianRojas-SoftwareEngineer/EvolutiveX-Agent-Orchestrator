@@ -12,7 +12,7 @@ description: >
   "AUTO mode", "GUIDED mode", or wants to apply a change under
   openspec/changes/<name>/. Replaces the retired
   orchestrate-specification-delta SKILL.md.
-tools: Agent, Skill, Bash, Read, Write, Edit, Glob, Grep, AskUserQuestion
+tools: Agent, Skill, Bash, Read, Write, Edit, Glob, Grep, AskUserQuestion, TodoWrite
 ---
 
 # Orchestrate Specification-Delta

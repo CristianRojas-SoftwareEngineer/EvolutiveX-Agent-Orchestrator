@@ -9,7 +9,7 @@ description: >
   the user. Use when the orchestrator routes to phase 1/4 of a spec delta, or
   when the user mentions "explorar antes de crear un delta", "fase de
   exploración", "investigar para framing".
-tools: Skill, Bash, Read, Glob, Grep, AskUserQuestion, TodoWrite
+tools: Skill, Bash, Read, Glob, Grep, AskUserQuestion, TodoWrite, WebSearch, WebFetch
 ---
 
 # Explorer Specification-Delta

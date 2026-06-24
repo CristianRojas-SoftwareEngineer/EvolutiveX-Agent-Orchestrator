@@ -9,7 +9,7 @@ description: >
   orchestrate-specification-delta, never directly by the user. Use when the
   orchestrator routes to phase 4/4 of a spec delta, or when the user mentions
   "fase de cierre", "archive", "synchronize specs", "freeze delta".
-tools: Skill, Bash, Read, Glob, Grep, Edit, Write
+tools: Skill, Bash, Read, Glob, Grep, Edit, Write, TodoWrite
 ---
 
 # Closer Specification-Delta

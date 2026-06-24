@@ -10,7 +10,7 @@ description: >
   never directly by the user. Use when the orchestrator routes to phase 3/4
   of a spec delta, or when the user mentions "fase de implementación",
   "apply ↔ verify loop", "verify gate".
-tools: Skill, Bash, Read, Glob, Grep, Edit, Write
+tools: Skill, Bash, Read, Glob, Grep, Edit, Write, AskUserQuestion, TodoWrite
 ---
 
 # Implementer Specification-Delta

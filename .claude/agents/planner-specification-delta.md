@@ -10,7 +10,7 @@ description: >
   by the user. Use when the orchestrator routes to phase 2/4 of a spec delta,
   or when the user mentions "fase de planificación", "crear proposal",
   "design.md", "tasks.md".
-tools: Skill, Bash, Read, Glob, Grep
+tools: Skill, Bash, Read, Glob, Grep, AskUserQuestion, TodoWrite
 ---
 
 # Planner Specification-Delta

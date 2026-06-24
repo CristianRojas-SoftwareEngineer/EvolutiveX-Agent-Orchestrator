@@ -1,4 +1,4 @@
-Ejecuta `/orchestrate-specification-delta --mode auto` para implementar el siguiente cambio.
+Invoca al agente nativo `orchestrate-specification-delta` con --mode auto para implementar el siguiente cambio.
 
 ---
 

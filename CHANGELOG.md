@@ -4,6 +4,7 @@ All notable changes are derived from conventional commits. Do not edit by hand.
 
 ## [Unreleased]
 ### Added
+- introducir ITtsTextProvider con cadena Gemini→OpenRouter para texto TTS
 - reemplazar motor Gemini TTS por sidecar local Piper+CPAL
 - reemplazar SAPI/OpenRouter por Gemini en capa TTS
 - sincronizar scripts autónomos desde Workbench
@@ -147,6 +148,7 @@ All notable changes are derived from conventional commits. Do not edit by hand.
 - implementar PKA de 6 capas, ports, inyección de dependencias y hardening de tooling
 - reemplazar 'any' por tipos estrictos del SDK de Anthropic
 ### Fixed
+- declarar idioma español para artefactos OpenSpec
 - inyectar spawnFn en sidecar y corregir aislamiento de tests E2E
 - introducir closeAuthority explícito en el cierre de workflow
 - ampliar presupuesto de tokens y desactivar thinking en intención TTS

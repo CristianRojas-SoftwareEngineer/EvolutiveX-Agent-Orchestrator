@@ -32,3 +32,4 @@ routing/providers/*/secrets.json
 # Claude/Windsurf config
 .windsurf/
 .claude/settings.json
+.claude/continuity-prompt.md

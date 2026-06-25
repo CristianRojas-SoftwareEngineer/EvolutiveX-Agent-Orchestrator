@@ -7,7 +7,7 @@ import {
   MarkerCorrupt,
   MarkerEmpty,
   MarkerAbsent,
-} from "../../../scripting/openspec/read-phase-marker";
+} from "../../../scripting/openspec/read-phase-marker.js";
 
 const WORKBENCH = "tests/scripting/openspec/_test_workbench_timings";
 

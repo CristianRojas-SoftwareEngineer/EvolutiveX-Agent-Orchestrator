@@ -31,7 +31,7 @@ export function sidecarBinaryName(): string {
  *
  * Variables de entorno:
  * - `TTS_SIDECAR_VENDOR_DIR`: override del directorio vendor (default `vendor/tts-sidecar`).
- * - `TTS_SIDECAR_VOICE`: voz a usar (default `es_MX-claude-voice-medium`).
+ * - `TTS_SIDECAR_VOICE`: voz a usar (default `es_MX-claude-high`).
  */
 export function resolveSidecarAssets(): ITtsSidecarAssets {
   const vendorDir = process.env['TTS_SIDECAR_VENDOR_DIR'] ?? path.join(process.cwd(), 'vendor', 'tts-sidecar');
@@ -45,7 +45,7 @@ export function resolveSidecarAssets(): ITtsSidecarAssets {
   }
 
   const binaryPath = path.join(vendorDir, targetId, sidecarBinaryName());
-  const voice = process.env['TTS_SIDECAR_VOICE'] ?? 'es_MX-claude-voice-medium';
+  const voice = process.env['TTS_SIDECAR_VOICE'] ?? 'es_MX-claude-high';
   const voicesDir = path.join(vendorDir, 'voices');
   const voiceModelPath = path.join(voicesDir, voice, `${voice}.onnx`);
   const voiceConfigPath = path.join(voicesDir, voice, `${voice}.onnx.json`);

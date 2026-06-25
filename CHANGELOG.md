@@ -4,6 +4,7 @@ All notable changes are derived from conventional commits. Do not edit by hand.
 
 ## [Unreleased]
 ### Added
+- instrumentar sidecars de timings por etapa con reader unificado
 - validar handoff de subagentes con gate determinista
 - introducir backstop determinista para pipeline AUTO
 - introducir orquestación multi-agente en 4 fases
@@ -151,6 +152,7 @@ All notable changes are derived from conventional commits. Do not edit by hand.
 - implementar PKA de 6 capas, ports, inyección de dependencias y hardening de tooling
 - reemplazar 'any' por tipos estrictos del SDK de Anthropic
 ### Fixed
+- alinear herramientas de subagentes con sus responsabilidades
 - resolver colisión del plan-gate de create-plan en modo AUTO
 - completar halt diagnóstico y cubrir detección de archivado
 - declarar AskUserQuestion y TodoWrite en agentes del pipeline

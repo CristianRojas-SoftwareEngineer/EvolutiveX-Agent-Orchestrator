@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import * as fs from "fs";
 import * as path from "path";
-import { readPhaseMarker, validatePhaseMarker, MarkerAbsent, MarkerCorrupt, MarkerEmpty, MarkerWrongChange } from "../../../scripting/openspec/read-phase-marker";
+import { readPhaseMarker, validatePhaseMarker, MarkerAbsent, MarkerCorrupt, MarkerEmpty, MarkerWrongChange } from "../../../scripting/openspec/read-phase-marker.js";
 
 const WORKBENCH = "tests/scripting/openspec/_test_workbench";
 

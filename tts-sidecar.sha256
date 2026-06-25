@@ -1,19 +1,20 @@
 {
-  "version": "0.0.0-placeholder",
+  "version": "0.1.0",
+  "baseUrl": "https://github.com/<owner>/<repo>/releases/download/tts-sidecar-v0.1.0/",
   "binaries": {
-    "windows-amd64": { "file": "windows-amd64/tts-sidecar.exe", "sha256": "0000000000000000000000000000000000000000000000000000000000000000" },
-    "linux-amd64": { "file": "linux-amd64/tts-sidecar", "sha256": "0000000000000000000000000000000000000000000000000000000000000000" },
-    "linux-aarch64": { "file": "linux-aarch64/tts-sidecar", "sha256": "0000000000000000000000000000000000000000000000000000000000000000" },
-    "macos-amd64": { "file": "macos-amd64/tts-sidecar", "sha256": "0000000000000000000000000000000000000000000000000000000000000000" },
-    "macos-aarch64": { "file": "macos-aarch64/tts-sidecar", "sha256": "0000000000000000000000000000000000000000000000000000000000000000" }
+    "windows-amd64": { "file": "windows-amd64.zip", "sha256": "PLACEHOLDER_UPDATE_AFTER_CI" },
+    "linux-amd64":   { "file": "linux-amd64.zip",   "sha256": "PLACEHOLDER_UPDATE_AFTER_CI" },
+    "linux-aarch64": { "file": "linux-aarch64.zip", "sha256": "PLACEHOLDER_UPDATE_AFTER_CI" },
+    "macos-amd64":   { "file": "macos-amd64.zip",   "sha256": "PLACEHOLDER_UPDATE_AFTER_CI" },
+    "macos-aarch64": { "file": "macos-aarch64.zip", "sha256": "PLACEHOLDER_UPDATE_AFTER_CI" }
   },
   "voices": {
-    "es_MX-claude-voice-medium": {
-      "model": "es_MX-claude-voice-medium.onnx",
-      "config": "es_MX-claude-voice-medium.onnx.json",
+    "es_MX-claude-high": {
+      "model":  "voices/es_MX-claude-high/es_MX-claude-high.onnx",
+      "config": "voices/es_MX-claude-high/es_MX-claude-high.onnx.json",
       "sha256": {
-        "model": "0000000000000000000000000000000000000000000000000000000000000000",
-        "config": "0000000000000000000000000000000000000000000000000000000000000000"
+        "model":  "PLACEHOLDER_UPDATE_AFTER_CI",
+        "config": "PLACEHOLDER_UPDATE_AFTER_CI"
       }
     }
   }

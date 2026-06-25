@@ -1,0 +1,16 @@
+# Excluir directorios de runtime y binarios descargados del tarball NPM.
+# vendor/tts-sidecar/ puede contener ~100 MB de binarios; excluirlo es crítico.
+vendor/
+
+# Código fuente del crate Rust (no necesario en el paquete publicado).
+sidecar/
+
+# Workflows de CI (no necesarios para consumidores del paquete).
+.github/
+
+# Artefactos de planificación interna (no necesarios para consumidores).
+openspec/
+
+# Archivos de entorno (nunca publicar en NPM).
+*.env
+*.env.*

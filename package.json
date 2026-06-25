@@ -49,14 +49,25 @@
     "openspec:apply-sequential-schema": "tsx scripting/openspec/apply-sequential-schema.ts",
     "openspec:next-change-id": "tsx scripting/openspec/next-change-id.ts",
     "openspec:verify-change-id": "tsx scripting/openspec/verify-change-id.ts",
-    "postinstall": "tsx scripting/openspec/patch-openspec-change-metadata.ts"
+    "tts:setup": "node dist/scripts/postinstall-tts.js",
+    "postinstall": "tsx scripting/openspec/patch-openspec-change-metadata.ts; node dist/scripts/postinstall-tts.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "module",
+  "files": [
+    "dist",
+    "src",
+    "scripts",
+    "tts-sidecar.sha256",
+    "configs",
+    "README.md",
+    "LICENSE"
+  ],
   "dependencies": {
     "@anthropic-ai/sdk": "^0.92.0",
+    "adm-zip": "^0.5.10",
     "@fastify/http-proxy": "^11.4.4",
     "commander": "^13.1.0",
     "fastify": "^5.8.5",
@@ -66,6 +77,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@types/adm-zip": "^0.5.5",
     "@fission-ai/openspec": "^1.4.1",
     "@types/node": "^25.6.0",
     "@types/node-notifier": "^8.0.5",

@@ -59,7 +59,7 @@ export class PiperSidecarService implements ITtsSidecarService {
   async speak(text: string, voice: string): Promise<void>;
   async speak(text: string, voice?: string): Promise<void> {
     if (!text.trim()) return;
-    const voiceName = voice ?? process.env['TTS_SIDECAR_VOICE'] ?? 'es_MX-claude-voice-medium';
+    const voiceName = voice ?? process.env['TTS_SIDECAR_VOICE'] ?? 'es_MX-claude-high';
     try {
       await this.invokeSidecar(text, voiceName);
     } catch (err) {

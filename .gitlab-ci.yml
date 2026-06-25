@@ -79,8 +79,7 @@ build:windows-amd64:
   <<: *build_template
   image: rust:1.78
   tags:
-    - windows
-    - windows-1809
+    - saas-windows-medium-amd64
   variables:
     TARGET_ID: "windows-amd64"
     RUST_TRIPLE: "x86_64-pc-windows-msvc"
@@ -94,8 +93,7 @@ build:linux-amd64:
   <<: *build_template
   image: rust:1.78
   tags:
-    - linux
-    - docker
+    - saas-linux-medium-amd64
   variables:
     TARGET_ID: "linux-amd64"
     RUST_TRIPLE: "x86_64-unknown-linux-gnu"
@@ -107,8 +105,7 @@ build:linux-aarch64:
   <<: *build_template
   image: rust:1.78
   tags:
-    - linux
-    - docker
+    - saas-linux-medium-amd64
   variables:
     TARGET_ID: "linux-aarch64"
     RUST_TRIPLE: "aarch64-unknown-linux-gnu"
@@ -120,8 +117,7 @@ build:macos-amd64:
   <<: *build_template
   image: rust:1.78
   tags:
-    - macos
-    - macos-13
+    - saas-macos-medium-m1
   variables:
     TARGET_ID: "macos-amd64"
     RUST_TRIPLE: "x86_64-apple-darwin"
@@ -136,8 +132,7 @@ build:macos-aarch64:
   <<: *build_template
   image: rust:1.78
   tags:
-    - macos
-    - macos-14
+    - saas-macos-medium-m1
   variables:
     TARGET_ID: "macos-aarch64"
     RUST_TRIPLE: "aarch64-apple-darwin"
@@ -154,8 +149,7 @@ release:
   stage: collect
   image: rust:1.78
   tags:
-    - linux
-    - docker
+    - saas-linux-medium-amd64
   needs:
     - build:windows-amd64
     - build:linux-amd64

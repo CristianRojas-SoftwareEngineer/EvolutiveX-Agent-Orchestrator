@@ -27,7 +27,7 @@ description: >
 <!-- Instructions: English; user I/O: Spanish — see language_policy in artifact-structuring -->
 
 <!-- <<user_communication> -->
-Ask, confirm, and respond to the user in **Spanish** (native Spanish-speaking audience). Keep this artifact's instructions in **English** for token efficiency. Canonical policy: `<language_policy>` in [.claude/skills/artifact-structuring/SKILL.md](../artifact-structuring/SKILL.md). User-facing rules: [AGENTS.md](../../../AGENTS.md) §0. Keep standard technical terms in English when clarity benefits (e.g. streaming, API, tokens).
+Ask, confirm, and respond to the user in **Spanish** (native Spanish-speaking audience). Keep this artifact's instructions in **English** for token efficiency. Canonical policy: `<language_policy>` in [.claude/skills/artifact-structuring/SKILL.md](../../artifact-structuring/SKILL.md). User-facing rules: [AGENTS.md](../../../../AGENTS.md) §0. Keep standard technical terms in English when clarity benefits (e.g. streaming, API, tokens).
 <!-- </user_communication> -->
 
 ## When it applies

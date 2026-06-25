@@ -33,7 +33,7 @@ section here. Prefer official docs + `scripting/shared/provider-config.ts` over 
 Ask, confirm, and respond to the user in **Spanish** (native Spanish-speaking audience).
 Keep this artifact's instructions in **English** for token efficiency.
 Canonical policy: `<language_policy>` in [artifact-structuring](../artifact-structuring/SKILL.md).
-User-facing rules: [AGENTS.md](../../AGENTS.md) §0.
+User-facing rules: [AGENTS.md](../../../AGENTS.md) §0.
 Keep standard technical terms in English when clarity benefits (e.g. alias, fallback, effort, settings).
 <!-- </user_communication> -->
 
@@ -126,7 +126,7 @@ Fable 5 is the most capable model for tasks larger than a single sitting — lon
 
 - **Not the default** on any account type. Select with `/model fable` or the `fable` / `best` alias.
 - **Best practices:** describe outcomes not steps; hand ambiguous problems; skip verification reminders; size up larger tasks.
-- **Safety classifiers** on cybersecurity/biology content trigger [automatic fallback](#automatic_fallback) to Opus.
+- **Safety classifiers** on cybersecurity/biology content trigger [automatic fallback](#automatic-model-fallback-fable-5-content-based) to Opus.
 - **Unavailable** under [zero data retention](https://code.claude.com/docs/en/zero-data-retention).
 - **Thinking cannot be disabled** on Fable 5.
 <!-- </fable_5> -->

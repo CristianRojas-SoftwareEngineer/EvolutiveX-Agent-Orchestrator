@@ -11,13 +11,16 @@ description: Run Claude Code non-interactively (claude -p / --print) against an 
 2. [Isolation model](#isolation-model-required-when-running-from-a-live-claude-code-session)
 3. [Running a headless session](#running-a-headless-session)
    - [From the terminal](#from-the-terminal)
-   - [From code — `runHeadlessSession`](#from-code--runheadlesssession)
+   - [From code — using the primitives directly](#from-code--using-the-primitives-directly)
 4. [Module architecture](#module-architecture)
 5. [TTS testing reference](#tts-testing-reference)
 
 ---
 
 <!-- <<overview> -->
+
+## Overview
+
 The **headless execution mechanism** runs Smart Code Proxy + Claude Code (`claude -p`) in
 a fully isolated environment: a dedicated test proxy port, in-memory provider configuration,
 and separate log/audit paths. No global state is mutated — `~/.claude/settings.json` and

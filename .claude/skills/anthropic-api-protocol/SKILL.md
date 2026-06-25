@@ -15,7 +15,7 @@ Complete reference for the Anthropic API protocol (Messages API): request/respon
 <!-- </overview> -->
 
 <!-- <<user_communication> -->
-Ask, confirm, and respond to the user in **Spanish** (native Spanish-speaking audience). Keep this artifact's instructions in **English** for token efficiency. Canonical policy: `<language_policy>` in [artifact-structuring](../artifact-structuring/SKILL.md). User-facing rules: [AGENTS.md](../../AGENTS.md) §0. Keep standard technical terms in English when clarity benefits (e.g. streaming, SSE, tokens, cache hits).
+Ask, confirm, and respond to the user in **Spanish** (native Spanish-speaking audience). Keep this artifact's instructions in **English** for token efficiency. Canonical policy: `<language_policy>` in [artifact-structuring](../artifact-structuring/SKILL.md). User-facing rules: [AGENTS.md](../../../AGENTS.md) §0. Keep standard technical terms in English when clarity benefits (e.g. streaming, SSE, tokens, cache hits).
 <!-- </user_communication> -->
 
 <!-- <<request_schema> -->

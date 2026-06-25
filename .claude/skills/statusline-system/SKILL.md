@@ -28,7 +28,7 @@ Prefer verifying against code over stale prose in older OpenSpec archives.
 Ask, confirm, and respond to the user in **Spanish** (native Spanish-speaking audience).
 Keep this artifact's instructions in **English** for token efficiency.
 Canonical policy: `<language_policy>` in [artifact-structuring](../artifact-structuring/SKILL.md).
-User-facing rules: [AGENTS.md](../../AGENTS.md) §0.
+User-facing rules: [AGENTS.md](../../../AGENTS.md) §0.
 Use ASCII diagrams and file-path tables when explaining architecture.
 <!-- </user_communication> -->
 

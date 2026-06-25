@@ -188,8 +188,8 @@ pipeline). Por eso `apply` debe **preservar los tags inline** al marcar `[x]`, y
 extensión serializa in place sin tocar la estructura numerada. El formato enriquecido
 **no requiere modificar el CLI** (es permisivo): vive en este schema y en las skills.
 
-> **Sincronización del contrato.** Este contrato es **espejo** de `docs/10-migracion-tareas-y-gui.md`
-> del _EvolutiveX Workbench_ (su fuente autocontenida). Cualquier cambio del formato canónico debe
+> **Sincronización del contrato.** Este contrato es **espejo** del workflow documentado en
+> el _EvolutiveX Workbench_ (su fuente autocontenida). Cualquier cambio del formato canónico debe
 > aplicarse en **ambos** sitios para mantenerlos sincronizados.
 
 No debe contener: justificación amplia de diseño; prosa de requisitos; justificación
@@ -288,7 +288,7 @@ Las otras ocho etapas son autocontenidas.
 
 ### Contrato ISO en timestamps
 
-`created` y `updated` en `.openspec.yaml` y en `.tasks-meta.yaml` SHALL ser ISO 8601 completo. El scaffold (`create-specification-delta`) y las mutaciones del store son el único camino de escritura. El scanner **no** infiere fechas desde git ni acepta `YYYY-MM-DD` en lectura: datos inválidos → `—` en Dashboard. Ver `docs/04-persistencia-y-stores.md` §4.
+`created` y `updated` en `.openspec.yaml` y en `.tasks-meta.yaml` SHALL ser ISO 8601 completo. El scaffold (`create-specification-delta`) y las mutaciones del store son el único camino de escritura. El scanner **no** infiere fechas desde git ni acepta `YYYY-MM-DD` en lectura: datos inválidos → `—` en Dashboard.
 
 ### Remediación de legacy distribuida
 

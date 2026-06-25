@@ -45,13 +45,13 @@ Detect which stage the user is in and act per `<routing>`. If they prefer to ite
 | Improve `description` only | `<description_optimization>` | Truncated catalog, `/doctor`, `skillOverrides` → [references/claude-code-platform.md](references/claude-code-platform.md) |
 | Test / validate | `<testing_process>` | Full matrix, TEST-CASES, `context: fork` → [references/testing-workflows.md](references/testing-workflows.md) |
 | Edit existing skill | `<updating_skills>` | — |
-| XML/Markdown format | — | [.claude/skills/artifact-structuring/SKILL.md](.claude/skills/artifact-structuring/SKILL.md); do not duplicate Boundary Rule here |
+| XML/Markdown format | — | [artifact-structuring/SKILL.md](../artifact-structuring/SKILL.md); do not duplicate Boundary Rule here |
 | Language policy (EN artifacts / ES user) | — | `<language_policy>` in [.claude/skills/artifact-structuring/SKILL.md](../artifact-structuring/SKILL.md) |
 | Plan skill improvements (no impl yet) | — | Delegate to `/create-plan` ([.claude/skills/create-plan/SKILL.md](../create-plan/SKILL.md)) |
 <!-- </routing> -->
 
 <!-- <<user_communication> -->
-Ask, confirm, and respond to the user in **Spanish** (native Spanish-speaking audience). Keep this artifact's instructions in **English** for token efficiency. Canonical policy: `<language_policy>` in [artifact-structuring](../artifact-structuring/SKILL.md). User-facing rules: [AGENTS.md](../../AGENTS.md) §0.
+Ask, confirm, and respond to the user in **Spanish** (native Spanish-speaking audience). Keep this artifact's instructions in **English** for token efficiency. Canonical policy: `<language_policy>` in [artifact-structuring](../artifact-structuring/SKILL.md). User-facing rules: [AGENTS.md](../../../AGENTS.md) §0.
 
 Adapt vocabulary to the user's level:
 

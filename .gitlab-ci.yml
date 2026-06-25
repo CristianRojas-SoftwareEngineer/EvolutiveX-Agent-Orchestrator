@@ -32,7 +32,7 @@ workflow:
 
 # Definición de los 5 jobs de build en paralelo.
 # Notas técnicas (ver docs/ci-pipeline.md):
-# - Linux runners (saas-linux-medium-amd64) usan Docker executor con `image: rust:1.85`.
+# - Linux runners (saas-linux-medium-amd64) usan Docker executor con `image: rust:1.88`.
 #   Rust 1.78 falla porque dependencias transitivas de clap 4.5+ requieren edition2024
 #   (estabilizado en Rust 1.85).
 # - Windows runner (saas-windows-medium-amd64) usa instance executor. NO tiene rustup
@@ -43,8 +43,11 @@ workflow:
 .build_template: &build_template
   stage: build
   script:
-    - apt-get update -qq
-    - apt-get install -y -qq zip
+    - |
+      if [ "$RUNNER_OS" = "Linux" ]; then
+        apt-get update -qq
+        apt-get install -y -qq zip
+      fi
     - |
       if [ "$RUNNER_OS" = "Linux" ]; then
         apt-get install -y -qq libespeak-ng-dev espeak-ng-data
@@ -98,11 +101,13 @@ build:windows-amd64:
     # provee rustc + cargo + rustup en PATH para el resto del job.
     - choco install -y rust-ms
     - choco install -y espeak-ng
+    # Recargar PATH para que rustup quede disponible en la sesión actual.
+    - $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
     - rustup default stable
 
 build:linux-amd64:
   <<: *build_template
-  image: rust:1.85
+  image: rust:1.88
   tags:
     - saas-linux-medium-amd64
   variables:
@@ -114,7 +119,7 @@ build:linux-amd64:
 
 build:linux-aarch64:
   <<: *build_template
-  image: rust:1.85
+  image: rust:1.88
   tags:
     - saas-linux-medium-amd64
   variables:
@@ -165,7 +170,7 @@ build:macos-aarch64:
 # (opcional) y deja los artefactos finales listos para descargar.
 release:
   stage: collect
-  image: rust:1.85
+  image: rust:1.88
   tags:
     - saas-linux-medium-amd64
   needs:
@@ -175,8 +180,11 @@ release:
     - build:macos-amd64
     - build:macos-aarch64
   script:
-    - apt-get update -qq
-    - apt-get install -y -qq jq
+    - |
+      if [ "$RUNNER_OS" = "Linux" ]; then
+        apt-get update -qq
+        apt-get install -y -qq jq
+      fi
     # Descargar voz desde Hugging Face
     - mkdir -p "voices/${VOICE}"
     - curl -fSL "${HF_BASE}/${VOICE}.onnx" -o "voices/${VOICE}/${VOICE}.onnx"

@@ -1,0 +1,230 @@
+# Pipeline GitLab CI para compilar el sidecar TTS (sherpa-onnx + CPAL)
+# para 5 targets y descargar los artefactos para subirlos a GitHub Releases.
+#
+# Triggers:
+# - Tags que coincidan con tts-sidecar-v*
+# - Manual desde la UI de GitLab (botón "Run pipeline")
+#
+# Mapeo triple Rust (job) → targetId npm (asset publicado):
+# ┌──────────────────────────────┬────────────────────────┬─────────────────────┐
+# │ Triple Rust                  │ Runner                 │ Asset publicado      │
+# ├──────────────────────────────┼────────────────────────┼─────────────────────┤
+# │ x86_64-pc-windows-msvc       │ windows runner         │ windows-amd64.zip   │
+# │ x86_64-unknown-linux-gnu     │ linux runner           │ linux-amd64.zip     │
+# │ aarch64-unknown-linux-gnu    │ linux runner (cross)   │ linux-aarch64.zip   │
+# │ x86_64-apple-darwin          │ macos-13 runner        │ macos-amd64.zip     │
+# │ aarch64-apple-darwin         │ macos-14 runner        │ macos-aarch64.zip   │
+# └──────────────────────────────┴────────────────────────┴─────────────────────┘
+
+stages:
+  - build
+  - collect
+
+variables:
+  VOICE: "es_MX-claude-high"
+  HF_BASE: "https://huggingface.co/rhasspy/piper-voices/resolve/main/es/es_MX/claude/high"
+
+# Solo corre este pipeline para tags tts-sidecar-v* o ejecución manual.
+workflow:
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /^tts-sidecar-v/'
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+
+# Definición de los 5 jobs de build en paralelo.
+.build_template: &build_template
+  stage: build
+  script:
+    - apt-get update -qq
+    - apt-get install -y -qq zip
+    - |
+      if [ "$RUNNER_OS" = "Linux" ]; then
+        apt-get install -y -qq libespeak-ng-dev espeak-ng-data
+      fi
+    - |
+      if [ "$CROSS" = "true" ]; then
+        apt-get install -y -qq gcc-aarch64-linux-gnu
+      fi
+    - rustup target add "$RUST_TRIPLE"
+    - |
+      if [ "$CROSS" = "true" ]; then
+        export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc
+      fi
+    - cargo build --release --manifest-path sidecar/Cargo.toml --target "$RUST_TRIPLE"
+    # Preparar staging
+    - mkdir -p "staging/$TARGET_ID"
+    - cp "sidecar/target/$RUST_TRIPLE/release/$BINARY_NAME" "staging/$TARGET_ID/$BINARY_NAME"
+    # Bundlear espeak-ng según plataforma
+    - |
+      if [ "$RUNNER_OS" = "Linux" ]; then
+        LIB_PATH=$(find /usr -name "libespeak-ng.so*" | head -1)
+        [ -n "$LIB_PATH" ] && cp "$LIB_PATH" "staging/$TARGET_ID/libespeak-ng.so.1"
+        if [ -d "/usr/lib/x86_64-linux-gnu/espeak-ng-data" ]; then
+          cp -r "/usr/lib/x86_64-linux-gnu/espeak-ng-data" "staging/$TARGET_ID/"
+        elif [ -d "/usr/share/espeak-ng-data" ]; then
+          cp -r "/usr/share/espeak-ng-data" "staging/$TARGET_ID/"
+        fi
+      fi
+    - cd staging
+    - zip -r "../${TARGET_ID}.zip" "${TARGET_ID}/"
+    - cd ..
+    # Calcular SHA256
+    - echo "${TARGET_ID}=$(sha256sum "${TARGET_ID}.zip" | awk '{print $1}')" > "${TARGET_ID}.sha256.txt"
+  artifacts:
+    paths:
+      - "${TARGET_ID}.zip"
+      - "${TARGET_ID}.sha256.txt"
+    expire_in: 7 days
+
+build:windows-amd64:
+  <<: *build_template
+  image: rust:1.78
+  tags:
+    - windows
+    - windows-1809
+  variables:
+    TARGET_ID: "windows-amd64"
+    RUST_TRIPLE: "x86_64-pc-windows-msvc"
+    BINARY_NAME: "tts-sidecar.exe"
+    CROSS: "false"
+  before_script:
+    - choco install -y espeak-ng
+    - rustup target add x86_64-pc-windows-msvc
+
+build:linux-amd64:
+  <<: *build_template
+  image: rust:1.78
+  tags:
+    - linux
+    - docker
+  variables:
+    TARGET_ID: "linux-amd64"
+    RUST_TRIPLE: "x86_64-unknown-linux-gnu"
+    BINARY_NAME: "tts-sidecar"
+    CROSS: "false"
+    RUNNER_OS: "Linux"
+
+build:linux-aarch64:
+  <<: *build_template
+  image: rust:1.78
+  tags:
+    - linux
+    - docker
+  variables:
+    TARGET_ID: "linux-aarch64"
+    RUST_TRIPLE: "aarch64-unknown-linux-gnu"
+    BINARY_NAME: "tts-sidecar"
+    CROSS: "true"
+    RUNNER_OS: "Linux"
+
+build:macos-amd64:
+  <<: *build_template
+  image: rust:1.78
+  tags:
+    - macos
+    - macos-13
+  variables:
+    TARGET_ID: "macos-amd64"
+    RUST_TRIPLE: "x86_64-apple-darwin"
+    BINARY_NAME: "tts-sidecar"
+    CROSS: "false"
+    RUNNER_OS: "macOS"
+  before_script:
+    - brew install espeak-ng
+    - rustup target add x86_64-apple-darwin
+
+build:macos-aarch64:
+  <<: *build_template
+  image: rust:1.78
+  tags:
+    - macos
+    - macos-14
+  variables:
+    TARGET_ID: "macos-aarch64"
+    RUST_TRIPLE: "aarch64-apple-darwin"
+    BINARY_NAME: "tts-sidecar"
+    CROSS: "false"
+    RUNNER_OS: "macOS"
+  before_script:
+    - brew install espeak-ng
+    - rustup target add aarch64-apple-darwin
+
+# Job "release": descarga la voz, calcula SHA256, publica Release en GitLab
+# (opcional) y deja los artefactos finales listos para descargar.
+release:
+  stage: collect
+  image: rust:1.78
+  tags:
+    - linux
+    - docker
+  needs:
+    - build:windows-amd64
+    - build:linux-amd64
+    - build:linux-aarch64
+    - build:macos-amd64
+    - build:macos-aarch64
+  script:
+    - apt-get update -qq
+    - apt-get install -y -qq jq
+    # Descargar voz desde Hugging Face
+    - mkdir -p "voices/${VOICE}"
+    - curl -fSL "${HF_BASE}/${VOICE}.onnx" -o "voices/${VOICE}/${VOICE}.onnx"
+    - curl -fSL "${HF_BASE}/${VOICE}.onnx.json" -o "voices/${VOICE}/${VOICE}.onnx.json"
+    # Calcular SHA256 de los archivos de voz
+    - VOICE_MODEL_HASH=$(sha256sum "voices/${VOICE}/${VOICE}.onnx" | awk '{print $1}')
+    - VOICE_CONFIG_HASH=$(sha256sum "voices/${VOICE}/${VOICE}.onnx.json" | awk '{print $1}')
+    # Recopilar hashes SHA256 de los 5 builds desde sus artifacts
+    - WINDOWS_HASH=$(cat windows-amd64.sha256.txt | cut -d= -f2)
+    - LINUX_X64_HASH=$(cat linux-amd64.sha256.txt | cut -d= -f2)
+    - LINUX_ARM_HASH=$(cat linux-aarch64.sha256.txt | cut -d= -f2)
+    - MACOS_X64_HASH=$(cat macos-amd64.sha256.txt | cut -d= -f2)
+    - MACOS_ARM_HASH=$(cat macos-aarch64.sha256.txt | cut -d= -f2)
+    # Versión extraída del tag (ej: tts-sidecar-v0.1.0 → 0.1.0)
+    - VERSION="${CI_COMMIT_TAG#tts-sidecar-v}"
+    - BASE_URL="https://github.com/CristianRojas-SoftwareEngineer/EvolutiveX-Agent-Orchestrator/releases/download/tts-sidecar-v${VERSION}/"
+    # Generar tts-sidecar.sha256 con hashes reales
+    - |
+      cat > tts-sidecar.sha256 << EOF
+      {
+        "version": "${VERSION}",
+        "baseUrl": "${BASE_URL}",
+        "binaries": {
+          "windows-amd64": { "file": "windows-amd64.zip", "sha256": "${WINDOWS_HASH}" },
+          "linux-amd64":   { "file": "linux-amd64.zip",   "sha256": "${LINUX_X64_HASH}" },
+          "linux-aarch64": { "file": "linux-aarch64.zip", "sha256": "${LINUX_ARM_HASH}" },
+          "macos-amd64":   { "file": "macos-amd64.zip",   "sha256": "${MACOS_X64_HASH}" },
+          "macos-aarch64": { "file": "macos-aarch64.zip", "sha256": "${MACOS_ARM_HASH}" }
+        },
+        "voices": {
+          "${VOICE}": {
+            "model": "voices/${VOICE}/${VOICE}.onnx",
+            "config": "voices/${VOICE}/${VOICE}.onnx.json",
+            "sha256": {
+              "model": "${VOICE_MODEL_HASH}",
+              "config": "${VOICE_CONFIG_HASH}"
+            }
+          }
+        }
+      }
+      EOF
+    # Re-empaquetar assets finales con la estructura que espera GitHub Releases
+    - mkdir -p release-assets
+    - cp windows-amd64.zip release-assets/
+    - cp linux-amd64.zip release-assets/
+    - cp linux-aarch64.zip release-assets/
+    - cp macos-amd64.zip release-assets/
+    - cp macos-aarch64.zip release-assets/
+    - mkdir -p "release-assets/voices/${VOICE}"
+    - cp "voices/${VOICE}/${VOICE}.onnx" "release-assets/voices/${VOICE}/"
+    - cp "voices/${VOICE}/${VOICE}.onnx.json" "release-assets/voices/${VOICE}/"
+    # Imprimir resumen para inspección
+    - echo "=== tts-sidecar.sha256 generado ==="
+    - cat tts-sidecar.sha256
+    - echo ""
+    - echo "=== Assets finales listos para descargar ==="
+    - ls -la release-assets/
+    - ls -la release-assets/voices/${VOICE}/
+  artifacts:
+    paths:
+      - tts-sidecar.sha256
+      - release-assets/
+    expire_in: 30 days

@@ -2,6 +2,7 @@
 name = "tts-sidecar"
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.88"
 description = "Sidecar de síntesis de voz TTS basado en sherpa-onnx y CPAL para el proxy de Claude Code"
 license = "MIT"
 

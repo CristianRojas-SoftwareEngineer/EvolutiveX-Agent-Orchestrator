@@ -1,34 +1,113 @@
-2026-06-25T16:56:25.992334Z 00O [0KRunning with gitlab-runner 19.1.0~pre.1227.g817ab3ac (817ab3ac)[0;m
-2026-06-25T16:56:25.992347Z 00O [0K  on blue-1.saas-macos-medium-m1.runners-manager.gitlab.com/default yixBWUVoR, system ID: s_609aff5a2d25[0;m
-2026-06-25T16:56:25.992353Z 00O [0K  feature flags: FF_LOG_IMAGES_CONFIGURED_FOR_JOB:true, FF_USE_GIT_PROACTIVE_AUTH:true[0;m
-2026-06-25T16:56:25.992382Z 00O [0K[36;1mResolving secrets[0;m[0;m
-2026-06-25T16:56:25.992579Z 00O section_start:1782406585:prepare_executor
+2026-06-25T18:22:05.775014Z 00O [0KRunning with gitlab-runner 19.1.0~pre.1227.g817ab3ac (817ab3ac)[0;m
+2026-06-25T18:22:05.775031Z 00O [0K  on blue-1.saas-macos-medium-m1.runners-manager.gitlab.com/default yixBWUVoR, system ID: s_609aff5a2d25[0;m
+2026-06-25T18:22:05.775036Z 00O [0K  feature flags: FF_LOG_IMAGES_CONFIGURED_FOR_JOB:true, FF_USE_GIT_PROACTIVE_AUTH:true[0;m
+2026-06-25T18:22:05.775067Z 00O [0K[36;1mResolving secrets[0;m[0;m
+2026-06-25T18:22:05.775257Z 00O section_start:1782411725:prepare_executor
 [0K
-2026-06-25T16:56:25.992584Z 00O+[0K[36;1mPreparing the "instance" executor[0;m[0;m
-2026-06-25T16:56:25.992762Z 00O [0K[0;m
-2026-06-25T16:56:25.992767Z 00O [31;1mERROR: The "rust:1.78" image is not present on list of allowed images:[0;m
-2026-06-25T16:56:25.993433Z 00O [0K- macos-15-xcode-16[0;m
-2026-06-25T16:56:25.993436Z 00O [0K- macos-26-xcode-26[0;m
-2026-06-25T16:56:25.993437Z 00O [0K[0;m
-2026-06-25T16:56:25.993441Z 00O [0KPlease check runner's allowed_images configuration: https://docs.gitlab.com/runner/configuration/advanced-configuration/[0;m
-2026-06-25T16:56:25.993459Z 00O [31;1mERROR: Preparation failed: disallowed image[0;m
-2026-06-25T16:56:25.993485Z 00O [32;1mWill be retried in 3s ...[0;m
-2026-06-25T16:56:28.993914Z 00O [0K[0;m
-2026-06-25T16:56:28.993921Z 00O [31;1mERROR: The "rust:1.78" image is not present on list of allowed images:[0;m
-2026-06-25T16:56:28.994480Z 00O [0K- macos-15-xcode-16[0;m
-2026-06-25T16:56:28.994483Z 00O [0K- macos-26-xcode-26[0;m
-2026-06-25T16:56:28.994484Z 00O [0K[0;m
-2026-06-25T16:56:28.994488Z 00O [0KPlease check runner's allowed_images configuration: https://docs.gitlab.com/runner/configuration/advanced-configuration/[0;m
-2026-06-25T16:56:28.994497Z 00O [31;1mERROR: Preparation failed: disallowed image[0;m
-2026-06-25T16:56:28.994522Z 00O [32;1mWill be retried in 3s ...[0;m
-2026-06-25T16:56:31.995597Z 00O [0K[0;m
-2026-06-25T16:56:31.995604Z 00O [31;1mERROR: The "rust:1.78" image is not present on list of allowed images:[0;m
-2026-06-25T16:56:31.996245Z 00O [0K- macos-15-xcode-16[0;m
-2026-06-25T16:56:31.996247Z 00O [0K- macos-26-xcode-26[0;m
-2026-06-25T16:56:31.996249Z 00O [0K[0;m
-2026-06-25T16:56:31.996253Z 00O [0KPlease check runner's allowed_images configuration: https://docs.gitlab.com/runner/configuration/advanced-configuration/[0;m
-2026-06-25T16:56:31.996264Z 00O [31;1mERROR: Preparation failed: disallowed image[0;m
-2026-06-25T16:56:31.996281Z 00O [32;1mWill be retried in 3s ...[0;m
-2026-06-25T16:56:34.996994Z 00O section_end:1782406594:prepare_executor
+2026-06-25T18:22:05.775261Z 00O+[0K[36;1mPreparing the "instance" executor[0;m[0;m
+2026-06-25T18:22:05.775450Z 00O [0KPreparing instance...[0;m
+2026-06-25T18:22:05.775503Z 00O [0KDialing instance i-01f9da06c9fd47a17...[0;m
+2026-06-25T18:22:05.977451Z 00O [0KInstance i-01f9da06c9fd47a17 connected[0;m
+2026-06-25T18:22:05.977459Z 00O [0KEnforcing VM Isolation[0;m
+2026-06-25T18:22:05.977624Z 00O [0KCreating nesting VM tunnel[0;m
+2026-06-25T18:22:05.977672Z 00O [0KDialing nesting daemon[0;m
+2026-06-25T18:22:05.977781Z 00O [0KCreating nesting VM macos-26-xcode-26[0;m
+2026-06-25T18:22:06.543833Z 00O [32;1mCreated nesting VM wd6a1ael 127.0.0.1:52681[0;m
+2026-06-25T18:22:25.105739Z 00O section_end:1782411745:prepare_executor
 [0K
-2026-06-25T16:56:34.997774Z 00O [31;1mERROR: Job failed (system failure): disallowed image[0;m
+2026-06-25T18:22:25.105848Z 00O+section_start:1782411745:prepare_script
+[0K
+2026-06-25T18:22:25.105853Z 00O+[0K[36;1mPreparing environment[0;m[0;m
+2026-06-25T18:22:39.520606Z 01O Running on Manageds-Virtual-Machine.local via runners-manager-saas-macos-medium-m1-blue-1...
+2026-06-25T18:22:39.577495Z 00O section_end:1782411759:prepare_script
+[0K
+2026-06-25T18:22:39.578270Z 00O+section_start:1782411759:get_sources
+[0K
+2026-06-25T18:22:39.578276Z 00O+[0K[36;1mGetting source from Git repository[0;m[0;m
+2026-06-25T18:22:41.052922Z 01O [32;1mGitaly correlation ID: a115fee16f7e6474-ATL[0;m
+2026-06-25T18:22:41.109458Z 01O [32;1mFetching changes with git depth set to 20...[0;m
+2026-06-25T18:22:41.125712Z 01O Initialized empty Git repository in /Users/gitlab/builds/cristianrojas-softwareengineer-group/EvolutiveX-Agent-Orchestrator/.git/
+2026-06-25T18:22:41.182425Z 01O [32;1mCreated fresh repository.[0;m
+2026-06-25T18:22:42.147977Z 01E fatal: failed to store: -25308
+2026-06-25T18:22:42.733346Z 01O [32;1mChecking out d2463887 as detached HEAD (ref is tts-sidecar-v0.1.0)...[0;m
+2026-06-25T18:22:44.049656Z 01O 
+2026-06-25T18:22:44.049659Z 01O [32;1mSkipping Git submodules setup[0;m
+2026-06-25T18:22:44.049688Z 00O section_end:1782411764:get_sources
+[0K
+2026-06-25T18:22:44.050951Z 00O+section_start:1782411764:step_script
+[0K
+2026-06-25T18:22:44.050960Z 00O+[0K[36;1mExecuting "step_script" stage of the job script[0;m[0;m
+2026-06-25T18:22:45.145365Z 01O [32;1m$ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y[0;m
+2026-06-25T18:22:45.269347Z 01E info: downloading installer
+2026-06-25T18:22:46.032594Z 01E warn: It looks like you have an existing installation of Rust at:
+2026-06-25T18:22:46.032597Z 01E warn: /Users/gitlab/.asdf/shims
+2026-06-25T18:22:46.032597Z 01E warn: It is recommended that rustup be the primary Rust installation.
+2026-06-25T18:22:46.032598Z 01E warn: Otherwise you may have confusion unless you are careful with your PATH.
+2026-06-25T18:22:46.032599Z 01E warn: If you are sure that you want both rustup and your already installed Rust
+2026-06-25T18:22:46.032599Z 01E warn: then please reply `y' or `yes' or set RUSTUP_INIT_SKIP_PATH_CHECK to yes
+2026-06-25T18:22:46.032600Z 01E warn: or pass `-y' to ignore all ignorable checks.
+2026-06-25T18:22:46.032600Z 01E error: cannot install while Rust is installed
+2026-06-25T18:22:46.032601Z 01E warn: continuing (because the -y flag is set and the error is ignorable)
+2026-06-25T18:22:46.032601Z 01E warn: It looks like you have an existing rustup settings file at:
+2026-06-25T18:22:46.032602Z 01E warn: /Users/gitlab/.rustup/settings.toml
+2026-06-25T18:22:46.032602Z 01E warn: Rustup will install the default toolchain as specified in the settings file,
+2026-06-25T18:22:46.032603Z 01E warn: instead of the one inferred from the default host triple.
+2026-06-25T18:22:46.173977Z 01E info: profile set to default
+2026-06-25T18:22:46.173980Z 01E info: default host triple is aarch64-apple-darwin
+2026-06-25T18:22:46.173980Z 01E info: syncing channel updates for stable-aarch64-apple-darwin
+2026-06-25T18:22:46.397630Z 01E info: latest update on 2026-05-28 for version 1.96.0 (ac68faa20 2026-05-25)
+2026-06-25T18:22:46.397633Z 01E info: downloading 6 components
+2026-06-25T18:23:45.701189Z 01E info: default toolchain set to stable-aarch64-apple-darwin
+2026-06-25T18:23:45.701191Z 01O 
+2026-06-25T18:23:48.995437Z 01O   stable-aarch64-apple-darwin installed - rustc 1.96.0 (ac68faa20 2026-05-25)
+2026-06-25T18:23:48.995442Z 01O 
+2026-06-25T18:23:48.995442Z 01O 
+2026-06-25T18:23:48.995443Z 01O Rust is installed now. Great!
+2026-06-25T18:23:48.995443Z 01O 
+2026-06-25T18:23:48.995444Z 01O To get started you may need to restart your current shell.
+2026-06-25T18:23:48.995444Z 01O This would reload your PATH environment variable to include
+2026-06-25T18:23:48.995445Z 01O Cargo's bin directory ($HOME/.cargo/bin).
+2026-06-25T18:23:48.995445Z 01O 
+2026-06-25T18:23:48.995445Z 01O To configure your current shell, you need to source
+2026-06-25T18:23:48.995446Z 01O the corresponding env file under $HOME/.cargo.
+2026-06-25T18:23:48.995446Z 01O 
+2026-06-25T18:23:48.995447Z 01O This is usually done by running one of the following (note the leading DOT):
+2026-06-25T18:23:48.995447Z 01O . "$HOME/.cargo/env"            # For sh/bash/zsh/ash/dash/pdksh
+2026-06-25T18:23:48.995448Z 01O source "$HOME/.cargo/env.fish"  # For fish
+2026-06-25T18:23:48.995449Z 01O source "~/.cargo/env.nu"  # For nushell
+2026-06-25T18:23:48.995449Z 01O source "$HOME/.cargo/env.tcsh"  # For tcsh
+2026-06-25T18:23:48.995449Z 01O . "$HOME/.cargo/env.ps1"        # For pwsh
+2026-06-25T18:23:48.995450Z 01O source "$HOME/.cargo/env.xsh"   # For xonsh
+2026-06-25T18:23:49.085758Z 01O [32;1m$ source $HOME/.cargo/env[0;m
+2026-06-25T18:23:49.085761Z 01O [32;1m$ rustup default stable[0;m
+2026-06-25T18:23:52.488275Z 01E info: using existing install for stable-aarch64-apple-darwin
+2026-06-25T18:23:52.544176Z 01O 
+2026-06-25T18:23:52.544179Z 01O   stable-aarch64-apple-darwin unchanged - rustc 1.96.0 (ac68faa20 2026-05-25)
+2026-06-25T18:23:52.544180Z 01O 
+2026-06-25T18:23:52.544180Z 01O [32;1m$ brew install espeak-ng[0;m
+2026-06-25T18:23:52.544193Z 01E info: default toolchain set to stable-aarch64-apple-darwin
+2026-06-25T18:23:58.247977Z 01E ✔︎ JSON API formula_tap_migrations.jws.json
+2026-06-25T18:23:58.247982Z 01E ✔︎ JSON API cask_tap_migrations.jws.json
+2026-06-25T18:23:59.898120Z 01O Inspect the formula dependency plan before installing with `brew install --ask`.
+2026-06-25T18:23:59.898125Z 01O Enable ask mode by setting `HOMEBREW_ASK=1`.
+2026-06-25T18:23:59.898126Z 01O Hide these hints with `HOMEBREW_NO_ENV_HINTS=1` (see `man brew`).
+2026-06-25T18:23:59.898126Z 01O ==> Fetching downloads for: espeak-ng
+2026-06-25T18:24:00.067716Z 01E ✔︎ Bottle Manifest espeak-ng (1.52.0)
+2026-06-25T18:24:00.398760Z 01E ✔︎ Bottle Manifest pcaudiolib (1.3)
+2026-06-25T18:24:00.504231Z 01E ✔︎ Bottle pcaudiolib (1.3)
+2026-06-25T18:24:01.039036Z 01E ✔︎ Bottle espeak-ng (1.52.0)
+2026-06-25T18:24:01.111779Z 01O ==> Installing espeak-ng dependency: pcaudiolib
+2026-06-25T18:24:01.111782Z 01O ==> Pouring pcaudiolib--1.3.arm64_tahoe.bottle.tar.gz
+2026-06-25T18:24:01.217622Z 01O 🍺  /opt/homebrew/Cellar/pcaudiolib/1.3: 14 files, 174.1KB
+2026-06-25T18:24:01.217624Z 01O ==> Pouring espeak-ng--1.52.0.arm64_tahoe.bottle.tar.gz
+2026-06-25T18:24:01.602467Z 01O 🍺  /opt/homebrew/Cellar/espeak-ng/1.52.0: 538 files, 26.1MB
+2026-06-25T18:24:01.659585Z 01O [32;1m$ apt-get update -qq[0;m
+2026-06-25T18:24:01.659594Z 01E bash: line 192: apt-get: command not found
+2026-06-25T18:24:01.659624Z 00O section_end:1782411841:step_script
+[0K
+2026-06-25T18:24:01.660618Z 00O+section_start:1782411841:cleanup_file_variables
+[0K
+2026-06-25T18:24:01.660624Z 00O+[0K[36;1mCleaning up project directory and file based variables[0;m[0;m
+2026-06-25T18:24:02.571603Z 00O section_end:1782411842:cleanup_file_variables
+[0K
+2026-06-25T18:24:03.218109Z 00O [31;1mERROR: Job failed: run exit (exit code: 127): Process exited with status 127[0;m

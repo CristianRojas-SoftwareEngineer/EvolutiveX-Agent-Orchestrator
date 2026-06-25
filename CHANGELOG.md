@@ -3,6 +3,8 @@
 All notable changes are derived from conventional commits. Do not edit by hand.
 
 ## [Unreleased]
+### Fixed
+- corregir comentario de cabecera y guard apt-get en job release
 
 ## [tts-sidecar-v0.1.0] -- 2026-06-25
 ### Added
@@ -155,6 +157,7 @@ All notable changes are derived from conventional commits. Do not edit by hand.
 - implementar PKA de 6 capas, ports, inyección de dependencias y hardening de tooling
 - reemplazar 'any' por tipos estrictos del SDK de Anthropic
 ### Fixed
+- corregir pipeline GitLab para compilar 5 targets con edition2024
 - alinear herramientas de subagentes con sus responsabilidades
 - resolver colisión del plan-gate de create-plan en modo AUTO
 - completar halt diagnóstico y cubrir detección de archivado

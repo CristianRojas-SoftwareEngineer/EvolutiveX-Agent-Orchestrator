@@ -2,7 +2,7 @@
 
 > **DEPRECADO en este proyecto (2026-06-03).** El perfil global ya no usa CCR; el upstream es Smart Code Proxy (`ANTHROPIC_BASE_URL` → `:8787`). Limpieza de desarrollo: `npm run clean:all`. Este documento se conserva solo como referencia histórica del producto externo.
 
-> **Ubicación de instalación** (si aún existiera): `C:\Users\Cristian\AppData\Roaming\npm\node_modules\@musistudio\claude-code-router`  
+> **Ubicación de instalación** (si aún existiera): `C:\Users\user\AppData\Roaming\npm\node_modules\@musistudio\claude-code-router`  
 > **Versión**: 2.0.0  
 > **Repositorio**: https://github.com/musistudio/claude-code-router
 
@@ -758,7 +758,7 @@ CCR usa siempre `/v1/chat/completions` para todos los providers OpenAI-compatibl
 
 | Recurso                | Ubicación                                                                           |
 | ---------------------- | ----------------------------------------------------------------------------------- |
-| CCR Instalado          | `C:\Users\Cristian\AppData\Roaming\npm\node_modules\@musistudio\claude-code-router` |
+| CCR Instalado          | `C:\Users\user\AppData\Roaming\npm\node_modules\@musistudio\claude-code-router` |
 | Transformers Core      | `packages/core/src/transformer/`                                                    |
 | Interfaz Transformer   | `packages/core/src/types/transformer.ts`                                            |
 | OpenRouter Transformer | `packages/core/src/transformer/openrouter.transformer.ts`                           |

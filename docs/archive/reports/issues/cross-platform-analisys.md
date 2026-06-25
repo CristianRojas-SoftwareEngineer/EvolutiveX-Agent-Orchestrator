@@ -27,7 +27,7 @@ documentada; la preocupación legítima sería los **espacios** en `Smart Code P
 ## Ruta bajo análisis
 
 ```
-C:\Users\Cristian\Desktop\Proyectos\Smart Code Proxy\assets\notifications\
+C:\Users\user\Desktop\Proyectos\Smart Code Proxy\assets\notifications\
 ```
 
 Características de esta ruta:
@@ -54,7 +54,7 @@ notificación visual.
 snoretoast-x64.exe
   -t "EXP 1A — repo path"
   -m "Body image desde repo (con espacios en la ruta)"
-  -p "C:\Users\Cristian\Desktop\Proyectos\Smart Code Proxy\assets\notifications\events\task-created.png"
+  -p "C:\Users\user\Desktop\Proyectos\Smart Code Proxy\assets\notifications\events\task-created.png"
   -appID AIAssistant.Proxy
 ```
 
@@ -74,8 +74,8 @@ rutas estables.
 **Configuración temporal**:
 
 ```
-Icon    = C:\Users\Cristian\Desktop\Proyectos\Smart Code Proxy\assets\notifications\ai-assistant.ico
-IconUri = C:\Users\Cristian\Desktop\Proyectos\Smart Code Proxy\assets\notifications\ai-assistant.png
+Icon    = C:\Users\user\Desktop\Proyectos\Smart Code Proxy\assets\notifications\ai-assistant.ico
+IconUri = C:\Users\user\Desktop\Proyectos\Smart Code Proxy\assets\notifications\ai-assistant.png
 ```
 
 **Resultado**: ✅ El ícono de AI Assistant apareció correctamente en el encabezado del toast.

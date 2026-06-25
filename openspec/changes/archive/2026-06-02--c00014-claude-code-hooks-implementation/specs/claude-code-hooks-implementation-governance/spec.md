@@ -135,7 +135,7 @@ Las 8 entradas del lifecycle (`UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `
 
 #### Scenario: Entradas del proyecto sobrescriben las del user-level
 
-- **GIVEN** `C:\Users\Cristian\.claude\settings.json` (user-level) contiene la entrada `SubagentStart` con un comando de notificación
+- **GIVEN** `C:\Users\user\.claude\settings.json` (user-level) contiene la entrada `SubagentStart` con un comando de notificación
 - **AND** `.claude/settings.json` del proyecto contiene la entrada `SubagentStart` con un comando `POST /hooks`
 - **WHEN** Claude Code dispara el hook `SubagentStart`
 - **THEN** SHALL ejecutarse únicamente el comando del proyecto, no el del user-level

@@ -30,7 +30,7 @@ El resultado es byte-equivalente a lo que habría emitido el upstream si no hubi
 
 ## Cómo funciona el `fetch` mockeado
 
-El servicio `SseReconstructService` (`@c:\Users\Cristian\Desktop\Proyectos\Smart Code Proxy\src\2-services\sse-reconstruct.service.ts`) instancia un cliente de Anthropic con un `fetch` custom que devuelve un `Response` con los bytes reensamblados desde `sse.jsonl`:
+El servicio `SseReconstructService` (`@c:\Users\user\Desktop\Proyectos\Smart Code Proxy\src\2-services\sse-reconstruct.service.ts`) instancia un cliente de Anthropic con un `fetch` custom que devuelve un `Response` con los bytes reensamblados desde `sse.jsonl`:
 
 ```ts
 const mockFetch = async () =>
@@ -99,7 +99,7 @@ En cualquier otro caso usa `client.messages.stream()`. Esta decisión es **runti
 
 ## Qué hacer si el SDK futuro endurece la validación
 
-Si una versión futura de `@anthropic-ai/sdk` empieza a rechazar strings arbitrarios en `params.model`, basta con editar la constante en `@c:\Users\Cristian\Desktop\Proyectos\Smart Code Proxy\src\2-services\sse-reconstruct.service.ts` para usar un nombre de modelo aceptado por esa versión. No es necesario exponer la decisión como variable de entorno: quien actualice el SDK puede ajustar la constante en la misma PR.
+Si una versión futura de `@anthropic-ai/sdk` empieza a rechazar strings arbitrarios en `params.model`, basta con editar la constante en `@c:\Users\user\Desktop\Proyectos\Smart Code Proxy\src\2-services\sse-reconstruct.service.ts` para usar un nombre de modelo aceptado por esa versión. No es necesario exponer la decisión como variable de entorno: quien actualice el SDK puede ajustar la constante en la misma PR.
 
 ## Reconstrucción por Step
 

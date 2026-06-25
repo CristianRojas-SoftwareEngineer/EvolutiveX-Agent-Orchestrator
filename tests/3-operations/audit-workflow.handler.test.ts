@@ -638,7 +638,7 @@ describe('fixture golden sesión 8c440211 — Bash continuation', () => {
     {
       toolUseId: 'call_13b871734f694ea9a07ef3f5',
       content:
-        'commit 0585d9196ecbb73ef4dcdc5d17f70b37dcfce9a7\nAuthor: Cristian Rojas <cristian.rojas.software.engineer@gmail.com>\nDate',
+        'commit 0585d9196ecbb73ef4dcdc5d17f70b37dcfce9a7\nAuthor: Example User <user@example.com>\nDate',
       isError: false,
     },
     {

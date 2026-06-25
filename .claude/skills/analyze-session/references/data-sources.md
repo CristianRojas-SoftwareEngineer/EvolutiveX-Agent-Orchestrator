@@ -6,11 +6,11 @@ description: Exact paths and harness-vs-proxy source distinction for analyze-ses
 
 ## 1. Claude Code session store (harness)
 
-Base location: `C:\Users\Cristian\.claude\projects\C--Users-Cristian-Desktop-Proyectos-Smart-Code-Proxy\{session-id}`
+Base location: `C:\Users\user\.claude\projects\C--Users-user-Desktop-Proyectos-Smart-Code-Proxy\{session-id}`
 
 Relevant files:
-- `C:\Users\Cristian\.claude\projects\C--Users-Cristian-Desktop-Proyectos-Smart-Code-Proxy\{session-id}.jsonl`: Main session log recorded by the harness
-- `C:\Users\Cristian\.claude\projects\C--Users-Cristian-Desktop-Proyectos-Smart-Code-Proxy\{session-id}\`: Directory with subagent files created during the session
+- `C:\Users\user\.claude\projects\C--Users-user-Desktop-Proyectos-Smart-Code-Proxy\{session-id}.jsonl`: Main session log recorded by the harness
+- `C:\Users\user\.claude\projects\C--Users-user-Desktop-Proyectos-Smart-Code-Proxy\{session-id}\`: Directory with subagent files created during the session
 
 ## 2. Smart Code Proxy audit trail (layout `causal-workflows-v1`)
 

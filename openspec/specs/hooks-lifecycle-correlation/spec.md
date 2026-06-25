@@ -314,7 +314,7 @@ El repositorio SHALL registrar las entradas del lifecycle de hooks de Claude Cod
 
 #### Scenario: Las entradas del proyecto sobrescriben las del user-level
 
-- **GIVEN** el archivo `C:\Users\Cristian\.claude\settings.json` (user-level) contiene una entrada `SubagentStart` con un comando de notificación
+- **GIVEN** el archivo `C:\Users\user\.claude\settings.json` (user-level) contiene una entrada `SubagentStart` con un comando de notificación
 - **AND** el archivo `.claude/settings.json` del proyecto contiene una entrada `SubagentStart` con un comando que invoca `POST /hooks`
 - **WHEN** Claude Code dispara el hook `SubagentStart`
 - **THEN** SHALL ejecutarse únicamente el comando del proyecto, no el del user-level

@@ -1,6 +1,6 @@
 ## Context
 
-El gateway HTTP (`src/`) procesa hoy el tráfico `wire` (plano A/B de `gateway-design.md`) y mantiene un correlador de workflows en `src/3-operations/audit-workflow.handler.ts`. La spec canónica `openspec/specs/hooks-lifecycle-correlation/spec.md` describe el endpoint `POST /hooks`, el parsing puro del evento de hook (`parseHookEvent` en capa 1) y el despacho al `AuditHookEventHandler` (capa 3), pero los hooks que disparan ese endpoint **no están configurados en `.claude/settings.json`**: hoy el archivo del proyecto está vacío (`{}`) y el de usuario (`C:\Users\Cristian\.claude\settings.json`) tiene notificaciones para algunos eventos pero ningún enrutamiento a `POST /hooks`. Resultado: 256 warnings `[audit] No se encontró workflow padre para continuation` en `server/logs.jsonl` por correlación heurística fallida.
+El gateway HTTP (`src/`) procesa hoy el tráfico `wire` (plano A/B de `gateway-design.md`) y mantiene un correlador de workflows en `src/3-operations/audit-workflow.handler.ts`. La spec canónica `openspec/specs/hooks-lifecycle-correlation/spec.md` describe el endpoint `POST /hooks`, el parsing puro del evento de hook (`parseHookEvent` en capa 1) y el despacho al `AuditHookEventHandler` (capa 3), pero los hooks que disparan ese endpoint **no están configurados en `.claude/settings.json`**: hoy el archivo del proyecto está vacío (`{}`) y el de usuario (`C:\Users\user\.claude\settings.json`) tiene notificaciones para algunos eventos pero ningún enrutamiento a `POST /hooks`. Resultado: 256 warnings `[audit] No se encontró workflow padre para continuation` en `server/logs.jsonl` por correlación heurística fallida.
 
 En paralelo, el sistema de notificaciones de escritorio (`C:\AI\claude-code-notifications.ts` + `C:\AI\src/notifications/*` + `C:\AI/notifications-config.json` + `C:\AI/package.json` con `commander` y `node-notifier`) vive fuera del versionado del repo. Esto genera tres problemas estructurales:
 
@@ -165,7 +165,7 @@ La política es:
 
 ### H1: 8 hooks del lifecycle registrados en `.claude/settings.json` del proyecto (sobrescribiendo user-level)
 
-**Decisión:** Las 8 entradas del lifecycle se registran en `.claude/settings.json` del proyecto (Smart Code Proxy), no en `C:\Users\Cristian\.claude\settings.json` del usuario. Las entradas del proyecto **sobrescriben** las del user-level para las claves presentes (mecanismo de merge de Claude Code: project tiene precedencia sobre user).
+**Decisión:** Las 8 entradas del lifecycle se registran en `.claude/settings.json` del proyecto (Smart Code Proxy), no en `C:\Users\user\.claude\settings.json` del usuario. Las entradas del proyecto **sobrescriben** las del user-level para las claves presentes (mecanismo de merge de Claude Code: project tiene precedencia sobre user).
 
 **Rationale:** El proyecto debe ser self-contained y versionable. La configuración de hooks de un repo es una decisión del proyecto, no del usuario individual. Esto sigue el principio de la spec `hooks-lifecycle-correlation` (el contrato de hooks es del proxy, no del harness del usuario). Las 5 entradas que el user-level ya tenía configuradas (con notificación + sin `POST /hooks`) se reescriben a nivel de proyecto con el contrato ampliado (doble comando donde aplique: `POST /hooks` + notificación apuntando a `C:\AI/...` hasta N2).
 

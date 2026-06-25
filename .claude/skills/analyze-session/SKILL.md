@@ -11,7 +11,7 @@ Comparative analysis between the native Claude Code harness log and Smart Code P
 <!-- </overview> -->
 
 <!-- <user_communication> -->
-Ask, confirm, and respond to the user in **Spanish** (native Spanish-speaking audience). Keep this artifact's instructions in **English** for token efficiency. Canonical policy: `<language_policy>` in [.claude/skills/artifact-structuring/SKILL.md](../artifact-structuring/SKILL.md). User-facing rules: [AGENTS.md](../../AGENTS.md) §0.
+Ask, confirm, and respond to the user in **Spanish** (native Spanish-speaking audience). Keep this artifact's instructions in **English** for token efficiency. Canonical policy: `<language_policy>` in [.claude/skills/artifact-structuring/SKILL.md](../artifact-structuring/SKILL.md). User-facing rules: [AGENTS.md](../../../AGENTS.md) §0.
 <!-- </user_communication> -->
 
 <!-- <parameters> -->
@@ -96,7 +96,7 @@ The exact file paths for each source live in [references/data-sources.md](refere
 Run this single command to obtain the complete directory and file hierarchy:
 
 ```powershell
-tree /F "C:\Users\Cristian\Desktop\Proyectos\Smart Code Proxy\sessions\{session-id}"
+tree /F "C:\Users\user\Desktop\Proyectos\Smart Code Proxy\sessions\{session-id}"
 ```
 
 **Expected output (typical format — layout `causal-workflows-v1`):**
@@ -172,7 +172,7 @@ Save this command output and refer to it throughout the analysis.
 
 ### Step 3: Initial contextualization
 
-1. **Baseline (native harness)**: Read the session `.jsonl` file at `C:\Users\Cristian\.claude\projects\C--Users-Cristian-Desktop-Proyectos-Smart-Code-Proxy\{session-id}.jsonl`
+1. **Baseline (native harness)**: Read the session `.jsonl` file at `C:\Users\user\.claude\projects\C--Users-user-Desktop-Proyectos-Smart-Code-Proxy\{session-id}.jsonl`
 2. **Proxy audit trail**: Read `sessions/{session-id}/workflows/01/meta.json` from the first workflow (typically agentic)
 3. **Proxy runtime log**: Filter `server/logs.jsonl` for lines referencing `{session-id}` (or the session time window). Inventory warnings, errors, and `[audit]` messages.
 4. **Proxy event timeline**: Read `sessions/{session-id}/events.ndjson`. Count events by `type` and `workflowId`; note missing or unexpected event sequences.
@@ -184,7 +184,7 @@ The exact base paths for these sources are listed in [references/data-sources.md
 ### Step 4: Comparative analysis of hierarchical structure
 
 **In the native harness:**
-1. List subagent files at `C:\Users\Cristian\.claude\projects\C--Users-Cristian-Desktop-Proyectos-Smart-Code-Proxy\{session-id}\`
+1. List subagent files at `C:\Users\user\.claude\projects\C--Users-user-Desktop-Proyectos-Smart-Code-Proxy\{session-id}\`
 2. Identify nesting tree per harness format
 3. Note how the harness correlates tool_use with subagent files
 

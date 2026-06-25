@@ -641,7 +641,7 @@ Las 5 claves de UX `SessionStart`, `SessionEnd`, `PermissionRequest`, `TaskCreat
 Las 6 claves de UX (`SessionStart`, `SessionEnd`, `PermissionRequest`,
 `TaskCreated`, `TaskCompleted`, `TaskInProgress`) declaradas
 en `.claude/settings.json` del proyecto **sobrescriben** las entradas
-equivalentes del user-level (`C:\Users\Cristian\.claude\settings.json`)
+equivalentes del user-level (`C:\Users\user\.claude\settings.json`)
 para esas claves. Es la regla nativa de merge de Claude Code:
 project-level sobrescribe user-level por clave completa, no por comandos
 dentro de la clave.

@@ -102,7 +102,7 @@ Ideal para depurar comportamientos erráticos en herramientas de CLI (como `clau
 
 <a name="archivos-auditoria"></a>
 
-## 📂 Referencia de Archivos de Auditoría
+## Referencia de Archivos de Auditoría
 
 Layout vigente (`causal-workflows-v1`) bajo `./sessions/<session-id>/`:
 
@@ -153,7 +153,7 @@ Personaliza el comportamiento ajustando estas variables en tu entorno o en un ar
 
 Para instalar las **13 claves** de hooks de SCP en `~/.claude/settings.json` (user-level) con merge selectivo que preserva configs ajenas del usuario: `npm run setup:install -- --hooks`. Con `--dry-run` para previsualizar, `--force` para sobrescribir configs ajenas (con backup automático), `npm run setup:uninstall -- --hooks` para desinstalar solo los hooks de SCP. La plantilla canónica versionada vive en [`configs/hooks.json`](configs/hooks.json).
 
-Adicionalmente, el archivo `.claude/settings.json` del proyecto registra **13 claves** de hooks de Claude Code (8 del lifecycle + 5 de sesión/tareas que antes bypaseaban el gateway), sobrescribiendo las entradas equivalentes del user-level (`C:\Users\Cristian\.claude\settings.json`) para esas claves (mecanismo de merge de Claude Code: el proyecto tiene precedencia). Las 13 claves son:
+Adicionalmente, el archivo `.claude/settings.json` del proyecto registra **13 claves** de hooks de Claude Code (8 del lifecycle + 5 de sesión/tareas que antes bypaseaban el gateway), sobrescribiendo las entradas equivalentes del user-level (`C:\Users\user\.claude\settings.json`) para esas claves (mecanismo de merge de Claude Code: el proyecto tiene precedencia). Las 13 claves son:
 
 | Hook                 | Matcher           | Comando                                                                                           |
 | -------------------- | ----------------- | ------------------------------------------------------------------------------------------------- |
@@ -316,7 +316,7 @@ Para más detalles y comandos alternativos, consulta `docs/dockerization.md`.
 
 ### Interpretación de Auditoría
 
-Tras cada ciclo auditado, se genera (o actualiza) `./sessions/<session-id>/workflows/NN/`, documentado en la [§ Referencia de Archivos de Auditoría](#archivos-auditoria) y en [`docs/session-audit-model.md`](docs/session-audit-model.md).
+Tras cada ciclo auditado, se genera (o actualiza) `./sessions/<session-id>/workflows/NN/`, documentado en la [§ Referencia de Archivos de Auditoría](#referencia-de-archivos-de-auditoria) y en [`docs/session-audit-model.md`](docs/session-audit-model.md).
 
 ### Fix de Colisión de Steps y Reconstrucción SSE
 
@@ -345,8 +345,6 @@ El proxy intercepta métricas de uso de tokens que pueden ser cuantificadas. Con
 
 - [Cómo empezar (on-boarding)](./docs/how-to-start.md)
 - [Peticiones sin sesión (pre-sesión)](./docs/health-check-handling.md)
-- [Coste por interacción: Claude Code y la API de Anthropic](./docs/how-to-calculate-anthropic-api-costs.md)
-- [Coste por generación: OpenRouter y la API Chat Completions](./docs/how-to-calculate-openrouter-api-costs.md)
 
 ## OpenSpec
 
@@ -357,3 +355,11 @@ Los artefactos de un cambio se generan en secuencia estricta:
 **proposal → specs → design → tasks**
 
 La configuración activa está en [`openspec/config.yaml`](./openspec/config.yaml).
+
+---
+
+## Licencia
+
+Copyright (C) 2026 Cristian Rojas <cristian.rojas.software.engineer@gmail.com>
+
+Este proyecto se distribuye bajo la licencia [GNU GPL v3](LICENSE) (`GPL-3.0-or-later`).

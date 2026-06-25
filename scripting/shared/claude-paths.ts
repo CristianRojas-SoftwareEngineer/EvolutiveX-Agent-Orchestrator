@@ -50,7 +50,7 @@ export function posixToWindows(pathStr: string): string {
 /**
  * Convierte una ruta al slug que usa Claude Code para nombrar ~/.claude/projects/<slug>.
  * Algoritmo canónico verificado contra los slugs reales:
- * - win32: `C:\Users\Cristian\Foo` → `C--Users-Cristian-Foo`
+ * - win32: `C:\Users\user\Foo` → `C--Users-user-Foo`
  * - posix: `/home/user/foo` → `-home-user-foo` (pwd | sed 's/\\//-/g')
  */
 export function projectPathToSlug(windowsPath: string): string {

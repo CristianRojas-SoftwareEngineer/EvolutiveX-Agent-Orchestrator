@@ -1,0 +1,156 @@
+2026-06-25T16:56:25.637229Z 00O [0KRunning with gitlab-runner 18.8.0 (9ffb4aa0)[0;m
+2026-06-25T16:56:25.637229Z 00O [0K  on gitlab-com-saas-windows-medium-amd64 oLZhebXKk, system ID: s_1a31f6141cb7[0;m
+2026-06-25T16:56:25.637229Z 00O [0K[36;1mResolving secrets[0;m[0;m
+2026-06-25T16:56:25.637229Z 00O section_start:1782406585:prepare_executor
+2026-06-25T16:56:25.637229Z 00O+[0K[0K[36;1mPreparing the "custom" executor[0;m[0;m
+2026-06-25T16:56:25.722199Z 00O [0KUsing Custom executor with driver autoscaler 0.1.5 (272a703)...[0;m
+2026-06-25T16:56:25.787963Z 00O Creating virtual machine for the job...
+2026-06-25T17:00:33.812754Z 00O Virtual machine created!
+2026-06-25T17:00:33.836379Z 00O section_end:1782406833:prepare_executor
+2026-06-25T17:00:33.836379Z 00O+[0Ksection_start:1782406833:prepare_script
+2026-06-25T17:00:33.836379Z 00O+[0K[0K[36;1mPreparing environment[0;m[0;m
+2026-06-25T17:00:44.933332Z 01O Running on PACKER-69A69578 via 
+2026-06-25T17:00:44.933634Z 01O runner-w21h2sm-15039027698...
+2026-06-25T17:00:45.566649Z 00O section_end:1782406845:prepare_script
+2026-06-25T17:00:45.566649Z 00O+[0Ksection_start:1782406845:get_sources
+2026-06-25T17:00:45.568660Z 00O+[0K[0K[36;1mGetting source from Git repository[0;m[0;m
+2026-06-25T17:01:02.561493Z 01O [32;1mGitaly correlation ID: a11581645b456125-ATL[0;m
+2026-06-25T17:01:03.428907Z 01O [32;1mFetching changes with git depth set to 20...[0;m
+2026-06-25T17:01:03.429513Z 01O Initialized empty Git repository in C:/GitLab-Runner/builds/cristianrojas-softwareengineer-group/EvolutiveX-Agent-Orchestrator/.git/
+2026-06-25T17:01:03.972272Z 01O [32;1mCreated fresh repository.[0;m
+2026-06-25T17:01:13.956341Z 01O fatal: Unable to persist credentials with the 'wincredman' credential store.
+2026-06-25T17:01:13.956341Z 01O See https://aka.ms/gcm/credstores for more information.
+2026-06-25T17:01:15.283681Z 01O [32;1mChecking out 126c82fd as detached HEAD (ref is tts-sidecar-v0.1.0)...[0;m
+2026-06-25T17:01:18.638269Z 01O git-lfs/3.7.1 (GitHub; windows amd64; go 1.25.1; git b84b3384)
+2026-06-25T17:01:19.705261Z 01O 
+2026-06-25T17:01:19.705261Z 01O [32;1mSkipping Git submodules setup[0;m
+2026-06-25T17:01:19.728711Z 00O section_end:1782406879:get_sources
+2026-06-25T17:01:19.728711Z 00O+[0Ksection_start:1782406879:step_script
+2026-06-25T17:01:19.730886Z 00O+[0K[0K[36;1mExecuting "step_script" stage of the job script[0;m[0;m
+2026-06-25T17:01:19.733592Z 00O [0;33mWARNING: Starting with version 17.0 the 'build_script' stage will be replaced with 'step_script': https://gitlab.com/groups/gitlab-org/-/epics/6112[0;m
+2026-06-25T17:01:27.271597Z 01O [32;1m$ choco install -y espeak-ng[0;m
+2026-06-25T17:01:32.778314Z 01O Chocolatey v2.6.0
+2026-06-25T17:01:33.333328Z 01O Installing the following packages:
+2026-06-25T17:01:33.333328Z 01O espeak-ng
+2026-06-25T17:01:33.333328Z 01O By installing, you accept licenses for the packages.
+2026-06-25T17:01:39.676477Z 01O Downloading package from source 'https://community.chocolatey.org/api/v2/'
+2026-06-25T17:01:39.676477Z 01O 
+Progress: Downloading espeak-ng 1.52.0... 17%
+Progress: Downloading espeak-ng 1.52.0... 51%
+Progress: Downloading espeak-ng 1.52.0... 85%
+Progress: Downloading espeak-ng 1.52.0... 100%
+2026-06-25T17:01:40.430328Z 01O 
+2026-06-25T17:01:40.430504Z 01O espeak-ng v1.52.0 [Approved]
+2026-06-25T17:01:40.430504Z 01O espeak-ng package files install completed. Performing other installation steps.
+2026-06-25T17:01:55.972871Z 01O Downloading espeak-ng 
+2026-06-25T17:01:55.972871Z 01O   from 'https://github.com/espeak-ng/espeak-ng/releases/download/1.52.0/espeak-ng.msi'
+2026-06-25T17:01:55.972871Z 01O 
+Progress: 0% - Saving 13.46 KB of 12.17 MB
+Progress: 1% - Saving 143.18 KB of 12.17 MB
+Progress: 2% - Saving 303.18 KB of 12.17 MB
+Progress: 3% - Saving 456.56 KB of 12.17 MB
+Progress: 4% - Saving 616.56 KB of 12.17 MB
+Progress: 6% - Saving 770.38 KB of 12.17 MB
+Progress: 7% - Saving 924.19 KB of 12.17 MB
+Progress: 8% - Saving 1.06 MB of 12.17 MB
+Progress: 9% - Saving 1.22 MB of 12.17 MB
+Progress: 11% - Saving 1.36 MB of 12.17 MB
+Progress: 12% - Saving 1.52 MB of 12.17 MB
+Progress: 13% - Saving 1.67 MB of 12.17 MB
+Progress: 15% - Saving 1.83 MB of 12.17 MB
+Progress: 16% - Saving 1.98 MB of 12.17 MB
+Progress: 17% - Saving 2.14 MB of 12.17 MB
+Progress: 18% - Saving 2.29 MB of 12.17 MB
+Progress: 20% - Saving 2.45 MB of 12.17 MB
+Progress: 21% - Saving 2.6 MB of 12.17 MB
+Progress: 22% - Saving 2.73 MB of 12.17 MB
+Progress: 23% - Saving 2.85 MB of 12.17 MB
+Progress: 24% - Saving 3 MB of 12.17 MB
+Progress: 25% - Saving 3.15 MB of 12.17 MB
+Progress: 27% - Saving 3.31 MB of 12.17 MB
+Progress: 28% - Saving 3.46 MB of 12.17 MB
+Progress: 29% - Saving 3.61 MB of 12.17 MB
+Progress: 30% - Saving 3.77 MB of 12.17 MB
+Progress: 32% - Saving 3.92 MB of 12.17 MB
+Progress: 33% - Saving 4.08 MB of 12.17 MB
+Progress: 34% - Saving 4.23 MB of 12.17 MB
+Progress: 36% - Saving 4.39 MB of 12.17 MB
+Progress: 37% - Saving 4.54 MB of 12.17 MB
+Progress: 38% - Saving 4.7 MB of 12.17 MB
+Progress: 39% - Saving 4.85 MB of 12.17 MB
+Progress: 41% - Saving 5 MB of 12.17 MB
+Progress: 42% - Saving 5.15 MB of 12.17 MB
+Progress: 43% - Saving 5.31 MB of 12.17 MB
+Progress: 44% - Saving 5.46 MB of 12.17 MB
+Progress: 46% - Saving 5.62 MB of 12.17 MB
+Progress: 47% - Saving 5.77 MB of 12.17 MB
+Progress: 48% - Saving 5.93 MB of 12.17 MB
+Progress: 49% - Saving 6.08 MB of 12.17 MB
+Progress: 51% - Saving 6.24 MB of 12.17 MB
+Progress: 52% - Saving 6.37 MB of 12.17 MB
+Progress: 53% - Saving 6.53 MB of 12.17 MB
+Progress: 54% - Saving 6.66 MB of 12.17 MB
+Progress: 55% - Saving 6.8 MB of 12.17 MB
+Progress: 57% - Saving 6.95 MB of 12.17 MB
+Progress: 58% - Saving 7.1 MB of 12.17 MB
+Progress: 59% - Saving 7.25 MB of 12.17 MB
+Progress: 60% - Saving 7.41 MB of 12.17 MB
+Progress: 62% - Saving 7.56 MB of 12.17 MB
+Progress: 63% - Saving 7.72 MB of 12.17 MB
+Progress: 64% - Saving 7.87 MB of 12.17 MB
+Progress: 65% - Saving 8.01 MB of 12.17 MB
+Progress: 67% - Saving 8.16 MB of 12.17 MB
+Progress: 68% - Saving 8.31 MB of 12.17 MB
+Progress: 69% - Saving 8.46 MB of 12.17 MB
+Progress: 70% - Saving 8.6 MB of 12.17 MB
+Progress: 71% - Saving 8.75 MB of 12.17 MB
+Progress: 73% - Saving 8.9 MB of 12.17 MB
+Progress: 74% - Saving 9.06 MB of 12.17 MB
+Progress: 75% - Saving 9.21 MB of 12.17 MB
+Progress: 76% - Saving 9.37 MB of 12.17 MB
+Progress: 78% - Saving 9.52 MB of 12.17 MB
+Progress: 79% - Saving 9.68 MB of 12.17 MB
+Progress: 80% - Saving 9.84 MB of 12.17 MB
+Progress: 82% - Saving 9.99 MB of 12.17 MB
+Progress: 83% - Saving 10.14 MB of 12.17 MB
+Progress: 84% - Saving 10.29 MB of 12.17 MB
+Progress: 85% - Saving 10.45 MB of 12.17 MB
+Progress: 87% - Saving 10.61 MB of 12.17 MB
+Progress: 88% - Saving 10.76 MB of 12.17 MB
+Progress: 89% - Saving 10.92 MB of 12.17 MB
+Progress: 90% - Saving 11.08 MB of 12.17 MB
+Progress: 92% - Saving 11.23 MB of 12.17 MB
+Progress: 93% - Saving 11.39 MB of 12.17 MB
+Progress: 94% - Saving 11.54 MB of 12.17 MB
+Progress: 96% - Saving 11.7 MB of 12.17 MB
+Progress: 97% - Saving 11.86 MB of 12.17 MB
+Progress: 98% - Saving 12.01 MB of 12.17 MB
+Progress: 99% - Saving 12.17 MB of 12.17 MB
+Progress: 100% - Completed download of C:\Users\gitlab_runner\AppData\Local\Temp\chocolatey\espeak-ng\1.52.0\espeak-ng.msi (12.17 MB).
+2026-06-25T17:01:55.972871Z 01O Download of espeak-ng.msi (12.17 MB) completed.
+2026-06-25T17:02:00.310848Z 01O Hashes match.
+2026-06-25T17:02:00.310848Z 01O Installing espeak-ng...
+2026-06-25T17:02:07.189180Z 01O espeak-ng has been installed.
+2026-06-25T17:02:07.189180Z 01O   espeak-ng may be able to be automatically uninstalled.
+2026-06-25T17:02:07.189180Z 01O Environment Vars (like PATH) have changed. Close/reopen your shell to
+2026-06-25T17:02:07.189180Z 01O  see the changes (or in powershell/cmd.exe just type `refreshenv`).
+2026-06-25T17:02:07.189180Z 01O  The install of espeak-ng was successful.
+2026-06-25T17:02:07.189180Z 01O   Software installed as 'msi', install location is likely default.
+2026-06-25T17:02:07.189180Z 01O 
+2026-06-25T17:02:07.189180Z 01O Chocolatey installed 1/1 packages. 
+2026-06-25T17:02:07.189180Z 01O  See the log for details (C:\ProgramData\chocolatey\logs\chocolatey.log).
+2026-06-25T17:02:07.189180Z 01O [32;1m$ rustup target add x86_64-pc-windows-msvc[0;m
+2026-06-25T17:02:23.535835Z 01O rustup : The term 'rustup' is not recognized as the name of a cmdlet, function, script file, or operable program. 
+2026-06-25T17:02:23.536197Z 01O Check the spelling of the name, or if a path was included, verify that the path is correct and try again.
+2026-06-25T17:02:23.536197Z 01O At line:1 char:1
+2026-06-25T17:02:23.536197Z 01O + rustup target add x86_64-pc-windows-msvc
+2026-06-25T17:02:23.536197Z 01O + ~~~~~~
+2026-06-25T17:02:23.536197Z 01O     + CategoryInfo          : ObjectNotFound: (rustup:String) [], CommandNotFoundException
+2026-06-25T17:02:23.536197Z 01O     + FullyQualifiedErrorId : CommandNotFoundException
+2026-06-25T17:02:23.536197Z 01O  
+2026-06-25T17:02:23.557985Z 00O section_end:1782406943:step_script
+2026-06-25T17:02:23.557985Z 00O+[0Ksection_start:1782406943:cleanup_file_variables
+2026-06-25T17:02:23.566611Z 00O+[0K[0K[36;1mCleaning up project directory and file based variables[0;m[0;m
+2026-06-25T17:02:30.031623Z 00O section_end:1782406950:cleanup_file_variables
+2026-06-25T17:02:30.031623Z 00O+[0K
+2026-06-25T17:03:10.823974Z 00O [31;1mERROR: Job failed: exit status 1[0;m

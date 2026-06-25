@@ -6,15 +6,15 @@
 # - Manual desde la UI de GitLab (botón "Run pipeline")
 #
 # Mapeo triple Rust (job) → targetId npm (asset publicado):
-# ┌──────────────────────────────┬────────────────────────┬─────────────────────┐
-# │ Triple Rust                  │ Runner                 │ Asset publicado      │
-# ├──────────────────────────────┼────────────────────────┼─────────────────────┤
-# │ x86_64-pc-windows-msvc       │ windows runner         │ windows-amd64.zip   │
-# │ x86_64-unknown-linux-gnu     │ linux runner           │ linux-amd64.zip     │
-# │ aarch64-unknown-linux-gnu    │ linux runner (cross)   │ linux-aarch64.zip   │
-# │ x86_64-apple-darwin          │ macos-13 runner        │ macos-amd64.zip     │
-# │ aarch64-apple-darwin         │ macos-14 runner        │ macos-aarch64.zip   │
-# └──────────────────────────────┴────────────────────────┴─────────────────────┘
+# ┌──────────────────────────────┬────────────────────────────┬─────────────────────┐
+# │ Triple Rust                  │ Runner                     │ Asset publicado      │
+# ├──────────────────────────────┼────────────────────────────┼─────────────────────┤
+# │ x86_64-pc-windows-msvc       │ saas-windows-medium-amd64  │ windows-amd64.zip   │
+# │ x86_64-unknown-linux-gnu     │ saas-linux-medium-amd64    │ linux-amd64.zip     │
+# │ aarch64-unknown-linux-gnu    │ saas-linux-medium-amd64    │ linux-aarch64.zip   │
+# │ x86_64-apple-darwin          │ saas-macos-medium-m1       │ macos-amd64.zip     │
+# │ aarch64-apple-darwin         │ saas-macos-medium-m1       │ macos-aarch64.zip   │
+# └──────────────────────────────┴────────────────────────────┴─────────────────────┘
 
 stages:
   - build
@@ -31,6 +31,15 @@ workflow:
     - if: '$CI_PIPELINE_SOURCE == "web"'
 
 # Definición de los 5 jobs de build en paralelo.
+# Notas técnicas (ver docs/ci-pipeline.md):
+# - Linux runners (saas-linux-medium-amd64) usan Docker executor con `image: rust:1.85`.
+#   Rust 1.78 falla porque dependencias transitivas de clap 4.5+ requieren edition2024
+#   (estabilizado en Rust 1.85).
+# - Windows runner (saas-windows-medium-amd64) usa instance executor. NO tiene rustup
+#   preinstalado, así que se instala vía chocolatey en `before_script`.
+# - macOS runners (saas-macos-medium-m1) usan instance executor y SOLO aceptan imágenes
+#   `macos-*-xcode-*`. La keyword `image: rust:1.78` es rechazada por allowed_images.
+#   Rust se instala vía rustup script + brew para espeak-ng.
 .build_template: &build_template
   stage: build
   script:
@@ -77,7 +86,6 @@ workflow:
 
 build:windows-amd64:
   <<: *build_template
-  image: rust:1.78
   tags:
     - saas-windows-medium-amd64
   variables:
@@ -86,12 +94,15 @@ build:windows-amd64:
     BINARY_NAME: "tts-sidecar.exe"
     CROSS: "false"
   before_script:
+    # El Windows runner es una VM con chocolatey pero SIN rust. Instalar rust-ms
+    # provee rustc + cargo + rustup en PATH para el resto del job.
+    - choco install -y rust-ms
     - choco install -y espeak-ng
-    - rustup target add x86_64-pc-windows-msvc
+    - rustup default stable
 
 build:linux-amd64:
   <<: *build_template
-  image: rust:1.78
+  image: rust:1.85
   tags:
     - saas-linux-medium-amd64
   variables:
@@ -103,7 +114,7 @@ build:linux-amd64:
 
 build:linux-aarch64:
   <<: *build_template
-  image: rust:1.78
+  image: rust:1.85
   tags:
     - saas-linux-medium-amd64
   variables:
@@ -115,7 +126,7 @@ build:linux-aarch64:
 
 build:macos-amd64:
   <<: *build_template
-  image: rust:1.78
+  image: macos-26-xcode-26
   tags:
     - saas-macos-medium-m1
   variables:
@@ -125,12 +136,17 @@ build:macos-amd64:
     CROSS: "false"
     RUNNER_OS: "macOS"
   before_script:
+    # El macOS runner es una VM con Xcode pero SIN rust. Instalar rustup script
+    # + brew espeak-ng. La imagen `macos-26-xcode-26` es la única soportada por
+    # allowed_images del instance runner (ver docs/ci-pipeline.md).
+    - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+    - source $HOME/.cargo/env
+    - rustup default stable
     - brew install espeak-ng
-    - rustup target add x86_64-apple-darwin
 
 build:macos-aarch64:
   <<: *build_template
-  image: rust:1.78
+  image: macos-26-xcode-26
   tags:
     - saas-macos-medium-m1
   variables:
@@ -140,14 +156,16 @@ build:macos-aarch64:
     CROSS: "false"
     RUNNER_OS: "macOS"
   before_script:
+    - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+    - source $HOME/.cargo/env
+    - rustup default stable
     - brew install espeak-ng
-    - rustup target add aarch64-apple-darwin
 
 # Job "release": descarga la voz, calcula SHA256, publica Release en GitLab
 # (opcional) y deja los artefactos finales listos para descargar.
 release:
   stage: collect
-  image: rust:1.78
+  image: rust:1.85
   tags:
     - saas-linux-medium-amd64
   needs:

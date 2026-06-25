@@ -1,11 +1,4 @@
-# Especificación: tts-sidecar-binary-distribution
-
-## Propósito
-Definir los requisitos del pipeline de CI que produce, empaqueta y publica los binarios del sidecar TTS (`tts-sidecar`, basado en sherpa-onnx + CPAL) para cinco plataformas, de forma que el postinstall NPM pueda descargarlos y verificarlos con SHA256 real.
-
----
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Pipeline de CI para binarios sherpa-onnx en 5 plataformas
 El sistema SHALL ejecutar un pipeline de GitLab CI (`.gitlab-ci.yml`) con una estrategia matrix que compile el binario `tts-sidecar` (basado en sherpa-onnx + CPAL) **desde el crate versionado en `sidecar/`** (NO desde `vendor/tts-sidecar/`, que está gitignored y solo aloja la instalación de runtime) para cinco targets. La correspondencia entre el target del job CI (triple Rust) y el runner SaaS de GitLab SHALL ser exactamente la siguiente:
@@ -22,7 +15,7 @@ La imagen Docker para los jobs de Linux (linux-amd64, linux-aarch64) SHALL ser `
 
 El job de Windows (windows-amd64) SHALL instalar Rust mediante `choco install -y rust-ms` antes de compilar, para garantizar una instalación correcta de la toolchain en el runner Windows.
 
-Los jobs de macOS (macos-amd64, macos-aarch64) SHALL usar `image: macos-26-xcode-26` (única imagen permitida por `allowed_images` del instance runner) y SHALL instalar rustup via `curl https://sh.rustup.rs | sh -s -- -y` seguido de `rustup default stable`. La toolchain exacta puede variar entre builds según cuándo se ejecute el pipeline; los binarios publicados son los que produce esa toolchain y los SHA256 del manifiesto `tts-sidecar.sha256` los reflejan.
+Los jobs de macOS (macos-amd64, macos-aarch64) SHALL usar `image: macos-26-xcode-26` y SHALL instalar rustup via `curl sh.rustup.rs -s -- --default toolchain 1.85` para garantizar la versión exacta de Rust.
 
 Cada job SHALL bundlear `libespeak-ng` (`libespeak-ng.{dll,so,dylib}`) y `espeak-ng-data/` dentro del ZIP, junto al binario, bajo el directorio `<targetId>/` en la raíz del ZIP. El layout exacto SHALL ser:
 
@@ -43,7 +36,7 @@ El pipeline SHALL crear la Release con el tag `tts-sidecar-v<semver>` donde `<se
 El pipeline SHALL generar `tts-sidecar.sha256` con SHA256 reales (reemplazando los placeholders `0000…` y `0.0.0-placeholder`) tanto para los 5 ZIPs como para los 2 archivos de voz, y SHALL commitear ese archivo al repo como parte del job de release.
 
 #### Scenario: CI matrix compila para los 5 targets sin errores
-- **WHEN** se dispara el pipeline `.gitlab-ci.yml` (en push de tag `tts-sidecar-v*` o manual via web)
+- **WHEN** se dispara el pipeline `.gitlab-ci.yml` (en push de tag `tts-sidecar-v*` o manual via `workflow_dispatch` en GitLab)
 - **THEN** SHALL haber exactamente 5 jobs de build más 1 job de release
 - **AND** cada job de build SHALL completar con código 0
 - **AND** cada job SHALL producir un ZIP con el layout declarado arriba
@@ -63,58 +56,3 @@ El pipeline SHALL generar `tts-sidecar.sha256` con SHA256 reales (reemplazando l
 - **AND** SHALL existir el directorio `vendor/tts-sidecar/windows-amd64/espeak-ng-data/` con al menos un archivo adentro
 - **AND** SHALL NO existir ningún archivo suelto en la raíz de `vendor/tts-sidecar/` que no esté bajo un subdirectorio `<targetId>/`
 
----
-
-### Requirement: Manifiesto `tts-sidecar.sha256` con estructura versionada
-El sistema SHALL mantener un archivo `tts-sidecar.sha256` en la raíz del repo con la siguiente estructura:
-
-```json
-{
-  "version": "<semver del crate, p. ej. 0.1.0>",
-  "binaries": {
-    "<targetId>": {
-      "file": "<targetId>.zip",
-      "sha256": "<sha256 hex del archivo ZIP>"
-    }
-  },
-  "voices": {
-    "<voice>": {
-      "model":  "voices/<voice>/<voice>.onnx",
-      "config": "voices/<voice>/<voice>.onnx.json",
-      "sha256": {
-        "model":  "<sha256 hex del .onnx>",
-        "config": "<sha256 hex del .onnx.json>"
-      }
-    }
-  }
-}
-```
-
-Donde `<targetId>` SHALL ser uno de: `windows-amd64`, `linux-amd64`, `linux-aarch64`, `macos-amd64`, `macos-aarch64`.
-
-El campo `binaries.<targetId>.file` SHALL apuntar al **archivo ZIP** (no al binario extraído dentro del ZIP). El campo `binaries.<targetId>.sha256` SHALL ser el SHA256 del ZIP completo.
-
-El campo `voices.<voice>.model` y `voices.<voice>.config` SHALL ser paths **relativos a `TTS_SIDECAR_BASE_URL`** (p. ej. `voices/es_MX-claude-high/es_MX-claude-high.onnx`), de modo que la URL de descarga se construye como `<BASE_URL><model>` directamente. El `postinstall-tts.ts` SHALL colocar el archivo descargado en `vendor/tts-sidecar/voices/<voice>/<basename>` (usando solo el nombre base del path), y SHALL NOT re-anteponer el prefijo `voices/<voice>/` al valor del manifiesto.
-
-Inicialmente (antes del primer run del pipeline) el archivo contiene placeholders (`version: "0.0.0-placeholder"`, hashes `0000…`). El pipeline SHALL reemplazar los placeholders con valores reales en su job de release.
-
-#### Scenario: Estructura del manifiesto es la esperada
-- **WHEN** el implementer lee `tts-sidecar.sha256`
-- **THEN** SHALL tener el campo `version` con semver (o placeholder)
-- **AND** SHALL tener el campo `binaries` con exactamente 5 entradas (una por `targetId` soportado)
-- **AND** SHALL tener el campo `voices` con al menos la entrada `es_MX-claude-high`
-- **AND** SHALL NO tener la entrada `es_MX-claude-voice-medium` (nombre incorrecto que este delta elimina)
-
----
-
-### Requirement: Trigger del pipeline sobre tags `tts-sidecar-v*`
-El pipeline SHALL dispararse en `push` de tags que coincidan con el patrón `tts-sidecar-v*` (p. ej. `tts-sidecar-v0.1.0`, `tts-sidecar-v1.2.3`). NO SHALL dispararse en pushes a ramas (las Releases se crean solo desde tags explícitos del sidecar). El pipeline SHALL también soportar ejecución manual desde la UI de GitLab (útil para regenerar la Release sin bump de versión).
-
-#### Scenario: Push de tag dispara el pipeline
-- **WHEN** se pushea el tag `tts-sidecar-v0.1.0`
-- **THEN** SHALL ejecutarse el pipeline automáticamente
-- **AND** SHALL crear la Release `tts-sidecar-v0.1.0` con los assets
-
-#### Scenario: Push a rama NO dispara el pipeline
-- **WHEN** se pushea un commit a `main` o cualquier rama
-- **THEN** SHALL NO ejecutarse el pipeline (solo tags `tts-sidecar-v*` lo disparan)

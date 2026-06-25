@@ -3,7 +3,10 @@
 All notable changes are derived from conventional commits. Do not edit by hand.
 
 ## [Unreleased]
+
+## [tts-sidecar-v0.1.0] -- 2026-06-25
 ### Added
+- distribuir binarios sidecar sherpa-onnx para 5 plataformas
 - instrumentar sidecars de timings por etapa con reader unificado
 - validar handoff de subagentes con gate determinista
 - introducir backstop determinista para pipeline AUTO
@@ -246,6 +249,7 @@ All notable changes are derived from conventional commits. Do not edit by hand.
 - corregir omisión de cuerpos de petición en logs de auditoría
 - migrar ts-node a tsx por compatibilidad con Node.js 24
 ### Documentation
+- reparar enlaces y anclas internas rotas en documentación
 - documentar arquitectura de tres niveles del orquestador
 - sincronizar desde Workbench y documentar parche
 - documentar parche postinstall de openspec
@@ -253,7 +257,7 @@ All notable changes are derived from conventional commits. Do not edit by hand.
 - reorganizar documentación de reportes y referencias
 - refactorizar guías de agentes y meta-skills
 - corregir referencias rotas a documentos eliminados
-- sincronizar specs con fix de workflow-lifecycle del commit d5a08e9
+- sincronizar specs con fix de workflow-lifecycle del commit e7134af
 - reestructurar narrativa y agregar tabla de contenido
 - traducir al inglés los fragmentos en español del cuerpo de la skill
 - corregir estructura y coherencia narrativa de la skill

@@ -1,0 +1,34 @@
+2026-06-25T16:56:26.388214Z 00O [0KRunning with gitlab-runner 19.1.0~pre.1227.g817ab3ac (817ab3ac)[0;m
+2026-06-25T16:56:26.388226Z 00O [0K  on blue-2.saas-macos-medium-m1.runners-manager.gitlab.com/default tCo7q1eWG, system ID: s_f10a77c3f6e9[0;m
+2026-06-25T16:56:26.388232Z 00O [0K  feature flags: FF_LOG_IMAGES_CONFIGURED_FOR_JOB:true, FF_USE_GIT_PROACTIVE_AUTH:true[0;m
+2026-06-25T16:56:26.388250Z 00O [0K[36;1mResolving secrets[0;m[0;m
+2026-06-25T16:56:26.388444Z 00O section_start:1782406586:prepare_executor
+[0K
+2026-06-25T16:56:26.388449Z 00O+[0K[36;1mPreparing the "instance" executor[0;m[0;m
+2026-06-25T16:56:26.388601Z 00O [0K[0;m
+2026-06-25T16:56:26.388604Z 00O [31;1mERROR: The "rust:1.78" image is not present on list of allowed images:[0;m
+2026-06-25T16:56:26.389214Z 00O [0K- macos-15-xcode-16[0;m
+2026-06-25T16:56:26.389218Z 00O [0K- macos-26-xcode-26[0;m
+2026-06-25T16:56:26.389219Z 00O [0K[0;m
+2026-06-25T16:56:26.389222Z 00O [0KPlease check runner's allowed_images configuration: https://docs.gitlab.com/runner/configuration/advanced-configuration/[0;m
+2026-06-25T16:56:26.389231Z 00O [31;1mERROR: Preparation failed: disallowed image[0;m
+2026-06-25T16:56:26.389251Z 00O [32;1mWill be retried in 3s ...[0;m
+2026-06-25T16:56:29.389814Z 00O [0K[0;m
+2026-06-25T16:56:29.389823Z 00O [31;1mERROR: The "rust:1.78" image is not present on list of allowed images:[0;m
+2026-06-25T16:56:29.390549Z 00O [0K- macos-15-xcode-16[0;m
+2026-06-25T16:56:29.390555Z 00O [0K- macos-26-xcode-26[0;m
+2026-06-25T16:56:29.390557Z 00O [0K[0;m
+2026-06-25T16:56:29.390561Z 00O [0KPlease check runner's allowed_images configuration: https://docs.gitlab.com/runner/configuration/advanced-configuration/[0;m
+2026-06-25T16:56:29.390570Z 00O [31;1mERROR: Preparation failed: disallowed image[0;m
+2026-06-25T16:56:29.390590Z 00O [32;1mWill be retried in 3s ...[0;m
+2026-06-25T16:56:32.391882Z 00O [0K[0;m
+2026-06-25T16:56:32.391889Z 00O [31;1mERROR: The "rust:1.78" image is not present on list of allowed images:[0;m
+2026-06-25T16:56:32.392440Z 00O [0K- macos-15-xcode-16[0;m
+2026-06-25T16:56:32.392443Z 00O [0K- macos-26-xcode-26[0;m
+2026-06-25T16:56:32.392444Z 00O [0K[0;m
+2026-06-25T16:56:32.392448Z 00O [0KPlease check runner's allowed_images configuration: https://docs.gitlab.com/runner/configuration/advanced-configuration/[0;m
+2026-06-25T16:56:32.392456Z 00O [31;1mERROR: Preparation failed: disallowed image[0;m
+2026-06-25T16:56:32.392470Z 00O [32;1mWill be retried in 3s ...[0;m
+2026-06-25T16:56:35.393357Z 00O section_end:1782406595:prepare_executor
+[0K
+2026-06-25T16:56:35.394085Z 00O [31;1mERROR: Job failed (system failure): disallowed image[0;m

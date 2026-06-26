@@ -117,6 +117,12 @@ const scripts: NpmScript[] = [
     description: 'Sanitiza en lote todas las sesiones corruptas (--force)',
     category: 'local',
   },
+  {
+    name: 'continuity:write',
+    description:
+      'Escribe el prompt de continuidad a .claude/continuity-prompt.md (multiplataforma). Uso: npm run continuity:write -- "contenido"',
+    category: 'local',
+  },
 
   // Producción
   {

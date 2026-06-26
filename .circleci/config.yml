@@ -41,7 +41,44 @@ jobs:
       - store_artifacts:
           path: windows-amd64.sha256.txt
 
+  build-macos-amd64:
+    macos:
+      xcode: "15.4"
+    resource_class: macos.x86.medium.gen2
+    working_directory: ~/EvolutiveX-Agent-Orchestrator
+    steps:
+      - checkout
+      - run:
+          name: "Instalar Rust via rustup"
+          command: |
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+            echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> $BASH_ENV
+      - run:
+          name: "Agregar target x86_64-apple-darwin"
+          command: |
+            source $HOME/.cargo/env
+            rustup target add x86_64-apple-darwin
+      - run:
+          name: "Compilar tts-sidecar"
+          command: |
+            source $HOME/.cargo/env
+            cargo build --release --manifest-path sidecar/Cargo.toml --target x86_64-apple-darwin
+      - run:
+          name: "Empaquetar artefacto"
+          command: |
+            mkdir -p staging/macos-amd64
+            cp sidecar/target/x86_64-apple-darwin/release/tts-sidecar staging/macos-amd64/
+            cd staging
+            zip -r ../macos-amd64.zip macos-amd64/
+            cd ..
+            sha256sum macos-amd64.zip | awk '{print "macos-amd64=" $1}' > macos-amd64.sha256.txt
+      - store_artifacts:
+          path: macos-amd64.zip
+      - store_artifacts:
+          path: macos-amd64.sha256.txt
+
 workflows:
   build-workflow:
     jobs:
       - build-windows-amd64
+      - build-macos-amd64

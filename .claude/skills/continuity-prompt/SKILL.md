@@ -98,7 +98,7 @@ Execute while the session still has full context — **before** the user runs `/
 
 2. **Draft the continuity prompt** using the canonical template in `<output_template>`. Keep it **compact but dense** — target well under post-compaction re-attachment budgets (~5000 tokens per invoked skill after compaction).
 
-3. **Persist (mandatory — primary deliverable)**: write the continuity prompt to `.claude/continuity-prompt.md` (or the custom path from `$ARGUMENTS` after `generate`). Overwrite on each run. Do not ask for confirmation. This file is what `resume` will read after compaction.
+3. **Persist (mandatory — primary deliverable)**: write the continuity prompt to `.claude/continuity-prompt.md` (or the custom path from `$ARGUMENTS` after `generate`). **Overwrite without reading first** — successive generates are independent sessions; the previous file is irrelevant. Do not ask for confirmation. This file is what `resume` will read after compaction.
 
 4. **Confirm in chat**: one-line confirmation that the file was written (path only). Optionally show the full prompt in a fenced markdown block for human review — never skip step 3 in favor of chat-only delivery.
 
@@ -189,7 +189,7 @@ Instrucción post-compactación: Ejecuta `/continuity-prompt resume` para leer e
 <!-- <constraints> -->
 ## Constraints
 
-- **Generate**: only facts from the current session; mark uncertainty explicitly (e.g. "no verificado en disco"); **always** persist to the canonical path (or custom path in `$ARGUMENTS`) — the file is the transfer artifact; never skip the file write.
+- **Generate**: only facts from the current session; mark uncertainty explicitly (e.g. "no verificado en disco"); **overwrite the file without reading the previous one** — successive generates are independent sessions; **never skip the file write**.
 - **Resume**: **read the persisted file from disk first** (mandatory); then re-read every source cited inside that file before code mutations. Do not substitute chat memory or pasted text when the file exists.
 - **Density**: prefer pointers and verdicts over narrative; every line should earn its tokens.
 - **No git**: do not stage or commit `.claude/continuity-prompt.md` without explicit user request.

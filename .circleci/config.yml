@@ -5,8 +5,7 @@ jobs:
   build-windows-amd64:
     machine:
       image: windows-server-2022-stable
-    resource_class: windows.medium
-    working_directory: ~/EvolutiveX-Agent-Orchestrator
+    resource_class: medium
     steps:
       - checkout
       - run:

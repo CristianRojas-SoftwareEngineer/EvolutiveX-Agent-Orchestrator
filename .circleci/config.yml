@@ -1,44 +1,29 @@
 # CircleCI CI pipeline — sidecar TTS
-# Versión 2.1 de CircleCI pipeline engine.
 version: 2.1
 
-# Jobs definen las unidades de trabajo ejecutable.
-# Cada job corre en un executor (máquina virtual).
 jobs:
-  # ── Job: windows-amd64 ──────────────────────────────────────────
-  # Valida la compilación del sidecar en Windows.
-  # Una vez confirmado, se agregan los jobs de Linux y macOS.
   build-windows-amd64:
     machine:
-      # Imagen Windows Server 2022 proporcionada por CircleCI.
-      # El executor de Windows en CircleCI usa VMs pre-configuradas
-      # con chocolatey y otras herramientas de Windows preinstaladas.
       image: windows-server-2022
     resource_class: windows.medium
     working_directory: ~/EvolutiveX-Agent-Orchestrator
     steps:
       - checkout
-      # Instalar Rust via rustup (el script de instalación).
-      # No usa chocolatey para rust porque el instalador de rustup
-      # es más confiable y no depende de que chocolatey esté en el PATH.
       - run:
           name: "Instalar Rust via rustup"
           command: |
             curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
             echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> $BASH_ENV
-      # Agregar el target MSVC para compilación nativa Windows.
       - run:
           name: "Agregar target x86_64-pc-windows-msvc"
           command: |
             source $HOME/.cargo/env
             rustup target add x86_64-pc-windows-msvc
-      # Compilar el sidecar.
       - run:
           name: "Compilar tts-sidecar"
           command: |
             source $HOME/.cargo/env
             cargo build --release --manifest-path sidecar/Cargo.toml --target x86_64-pc-windows-msvc
-      # Empaquetar el binario en un ZIP.
       - run:
           name: "Empaquetar artefacto"
           command: |
@@ -48,15 +33,12 @@ jobs:
             zip -r ../windows-amd64.zip windows-amd64/
             cd ..
             sha256sum windows-amd64.zip | awk '{print "windows-amd64=" $1}' > windows-amd64.sha256.txt
-      # Persistir artefactos por 7 días.
       - store_artifacts:
           path: windows-amd64.zip
       - store_artifacts:
           path: windows-amd64.sha256.txt
 
-# Workflows orquestan los jobs.
 workflows:
-  # Todo push a main ejecuta el pipeline completo.
   version: 2
   build-workflow:
     jobs:

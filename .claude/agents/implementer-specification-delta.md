@@ -98,55 +98,12 @@ loop:
        - Do NOT return to the orchestrator.
   6. If verify report has no CRITICAL findings:
        - Write the phase-completion marker `openspec/.workbench/implementer.done`
-         atomically (writeFileSync + renameSync), immediately before preparing
-         the handoff JSON:
+         y el sidecar `implementer.timings.json` vía `close-phase.ts`, inmediatamente
+         antes de preparar el handoff JSON. El valor `<n>` es la duración real
+         (`tool_result.usage.duration_ms`) pasada por el orquestador en el contexto
+         de invocación; el subagente NO calcula ni inventa esa duración:
          ```bash
-         marker=$(node -e "
-           const fs = require('fs');
-           const path = 'openspec/.workbench/implementer.done';
-           const tmp = path + '.tmp';
-           const obj = { change: '<change-id>', completedAt: new Date().toISOString() };
-           fs.writeFileSync(tmp, JSON.stringify(obj));
-           fs.renameSync(tmp, path);
-           console.log('Implementer marker written:', obj.change);
-         ")
-         ```
-       - Write the timings sidecar `openspec/.workbench/implementer.timings.json`
-         atomically (writeFileSync + renameSync), immediately after the marker.
-         Include the full `stages[]` with `iterations[]` from every loop iteration:
-         ```bash
-         timings=$(node -e "
-           const fs = require('fs');
-           const path = 'openspec/.workbench/implementer.timings.json';
-           const tmp = path + '.tmp';
-           // it.iterations: array of { applyStartedAt, applyCompletedAt, applyDurationMs,
-           //                              verifyStartedAt, verifyCompletedAt, verifyDurationMs, passed }
-           const stages = [
-             {
-               stage: 7,
-               slug: 'apply-specification-delta',
-               startedAt: '<%= it.loopStartedAt %>',
-               completedAt: '<%= it.loopLastApplyCompletedAt %>',
-               durationMs: <%= it.loopTotalApplyMs %>,
-               iterations: it.iterations.map(iter => ({
-                 applyMs: iter.applyDurationMs,
-                 verifyMs: iter.verifyDurationMs,
-                 passed: iter.passed
-               }))
-             },
-             {
-               stage: 8,
-               slug: 'verify-specification-delta',
-               startedAt: '<%= it.loopFirstVerifyStartedAt %>',
-               completedAt: '<%= it.loopLastVerifyCompletedAt %>',
-               durationMs: <%= it.loopTotalVerifyMs %>
-             }
-           ];
-           const obj = { change: '<change-id>', stages };
-           fs.writeFileSync(tmp, JSON.stringify(obj));
-           fs.renameSync(tmp, path);
-           console.log('Implementer timings written');
-         ")
+         npm run openspec:close-phase -- --phase implementer --change "<change-id>" --duration-ms <n>
          ```
        - Exit the loop; prepare the handoff JSON with verify="PASS" and
          critical_findings=0.
@@ -158,9 +115,10 @@ marker (`implementer.done`) and the timings sidecar
 JSON is returned — never after, never "intended". Returning the handoff while
 the marker is absent is a hard error: the orchestrator's gate fails-closed
 (`MarkerAbsent`) and stops the pipeline. The order is non-negotiable:
-(1) write `implementer.done`, (2) write `implementer.timings.json`, (3) only
-then return the handoff. Do not announce the intention to write the marker as a
-substitute for writing it.
+(1) invoke `npm run openspec:close-phase -- --phase implementer --change "<change-id>" --duration-ms <n>`
+(which writes `implementer.done` and `implementer.timings.json` atomically),
+(2) only then return the handoff. Do not announce the intention to write the
+marker as a substitute for writing it.
 
 **Why the loop is internal**: each iteration may need to read or write
 substantial code, and the context of a single iteration informs the next.

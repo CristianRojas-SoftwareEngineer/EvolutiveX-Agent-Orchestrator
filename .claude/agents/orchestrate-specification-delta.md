@@ -314,6 +314,15 @@ next phase with the decision open. Note: a sub-agent may also send a
 treat those as advisory - respond inline if it unblocks the iteration, or
 fold them into the eventual handoff otherwise.
 
+**Limitation: `NEEDS_DECISION` from the explorer (phase 1).** The explorer
+runs before the change ID is minted; its `NEEDS_DECISION` handoff carries a
+`resumeToken` (the explorer's `agentId`) but no `change` field. Resume it via
+`SendMessage(to: <resumeToken>)` exactly as for any other phase. After the
+explorer finally returns its nominal handoff, the pipeline continues to the
+planner as normal. Do not attempt to validate a phase marker for the explorer
+during a `NEEDS_DECISION` round-trip — the marker is only written when the
+explorer emits its nominal handoff.
+
 **Immediate-resolution policy (propagate in every briefing).** Open design
 decisions are resolved **the instant they are detected**, in the phase/stage
 where they surface — **never deferred** to a later stage or phase. Each phase
@@ -400,11 +409,27 @@ classification.
 ## AUTO mode
 
 **Step 0 — orphan marker check and write the AUTO sentinel (before phase 1).**
-Before writing the AUTO sentinel, check for orphan markers from previous runs:
-for each phase in `["explorer", "planner", "implementer"]`, if the corresponding
-`<phase>.done` marker exists and its `change` field does not match the current
-pipeline's `change`, reject before spawning any subagent. On entering AUTO,
-write `openspec/.workbench/auto-pipeline.json` with
+Before writing the AUTO sentinel, check for **stale markers** from prior runs
+(orphan check, pre-change): for each phase in `["explorer", "planner", "implementer"]`,
+if the corresponding `<phase>.done` marker exists, it is inherently orphaned
+at this point — the pipeline has not yet minted a change ID, so any pre-existing
+marker belongs to a previous (incomplete) run. Reject before spawning any
+subagent and ask the user to run the closer to clean up or to remove the markers
+manually.
+
+Note: the full **change-ID-based** orphan check (verifying that existing markers
+have a `change` field matching the current pipeline's `change`) runs **after the
+planner handoff**, when the real change ID is first known (see "Orphan policy"
+in the `<phase_handoff_gate>` section). The step 0 check is simpler: any
+pre-existing marker is a stale artifact.
+
+`expected=null` in the orphan check context: at step 0, the sentinel's `change`
+field is `null` because the change ID is unknown. `null` means "no change is
+expected to exist yet; if a `.done` marker exists, it is from a previous run
+and is orphaned." After the planner handoff, `expected` becomes the real
+change ID (`handoff.change`).
+
+On entering AUTO, write `openspec/.workbench/auto-pipeline.json` with
 `{ change: null, mode: "auto", phase: "explorer", stage: 1, startedAt: <ISO>, stuckCount: 0 }`.
 `change` is set to `null` here — the real ID is **unknown until the planner
 runs `create-specification-delta`**, which is the only source of truth for
@@ -452,12 +477,18 @@ reached. **The turn ends only at one of those two conditions.** Stopping
 after any earlier phase is never a valid AUTO end state.
 
 **Sub-invoked plan gate**: when `apply-specification-delta` sub-invokes
-`create-plan`, the plan approval gate is **auto-approved in AUTO mode**.
-Proceed with the generated plan without surfacing it for user confirmation.
-Because the `apply` runs inside the implementer subagent's context (not this
-one), **propagate this suppression into the implementer briefing** — the
-`Plan gate status` line must state the gate is auto-approved so the cold-started
-subagent does not cede the turn presenting the plan.
+`create-plan`, the plan approval gate behavior depends on the mode:
+- **AUTO**: auto-approved — proceed with the generated plan without surfacing
+  it for user confirmation. Because the `apply` runs inside the implementer
+  subagent's context (not this one), **propagate this suppression into the
+  implementer briefing** — the `Plan gate status` line must state the gate is
+  auto-approved so the cold-started subagent does not cede the turn presenting
+  the plan.
+- **GUIDED**: the plan is presented to the user for review and confirmation
+  before implementation begins. The implementer subagent pauses at the plan gate,
+  presents the plan, and waits for explicit approval before proceeding with the
+  `apply` implementation. This is a normal GUIDED checkpoint — the user may
+  edit the plan or approve it as-is.
 
 **Admissible stops (exhaustive list):**
 1. **Verify CRITICAL** — if any phase's verify report contains any CRITICAL
@@ -676,12 +707,23 @@ about to be invoked next (or just-completed) — the implementer subagent
 updates `j` as it transitions. The orchestrator's own status line uses the
 `j` it observed in the most recent sentinel write from the subagent.
 
-**Timings integration:** after each phase subagent returns, the orchestrator
-reads `openspec/.workbench/<phase>.timings.json` via
-`readPhaseSidecar(phase, '.timings.json', 'open')`. If the sidecar is absent or
-corrupt, both `phaseDurationHuman` and `phaseDurationMs` show "—". If present,
-`phaseDurationMs` is computed as `stages[stages.length-1].completedAt - stages[0].startedAt`
-with fallback to `tool_result.usage.duration_ms` from the `Agent(...)` call.
+**Timings integration:** el orquestador DEBE emitir la línea `Fase duración`
+en cada transición de fase. El procedimiento canónico es:
+
+1. Leer `openspec/.workbench/<phase>.timings.json` vía
+   `readPhaseSidecar(phase, '.timings.json', 'open')`.
+2. Si el sidecar está presente y válido, usar su campo `durationMs` (número
+   finito) para `phaseDurationMs`.
+3. **Fallback obligatorio**: si el sidecar está ausente, malformado, o su
+   `durationMs` no es un número finito (NaN, Infinity, string), el orquestador
+   cae al valor real del harness `tool_result.usage.duration_ms` del `Agent(...)`
+   call que invocó el subagente. Este fallback garantiza que la línea `Fase duración`
+   nunca muestra "—" cuando el harness proporcionó datos.
+4. Si ni el sidecar ni el harness proveen un valor finito, mostrar "—".
+
+Fuente autoritativa de duración: el harness (campo `duration_ms` del
+`tool_result.usage`). El sidecar es derivado/secundario — si es inválido,
+el fallback al harness preserva la exactitud de la presentación al usuario.
 
 **Why this contract:** numeration stable and traceable (the user can say
 "estamos en Fase 2/4 Etapa 4/10" without ambiguity); divergence eliminated

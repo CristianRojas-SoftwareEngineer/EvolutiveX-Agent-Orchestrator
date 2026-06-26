@@ -72,13 +72,19 @@ user.
 <!-- <stage_invocations> -->
 ## Sequential stage invocations
 
-This subagent invokes the following two stage skills in strict order via the
-Skill tool:
+This subagent invokes the following stage skills **in strict order** via the
+Skill tool, with a deterministic gate between synchronize and archive:
 
 1. `Skill("synchronize-specification-delta", --change "<name>")` — merge
    delta specs into `openspec/specs/`, update README and docs. Stage ordinal:
    **9/10**.
-2. `Skill("archive-specification-delta", --change "<name>")` — move the
+2. **Gate post-synchronize** — before archive, verify that synchronize completed
+   correctly:
+   ```bash
+   npm run openspec:verify-stage-completion -- --change "<name>" --through synchronized
+   ```
+   Exit 0 → proceed to archive. Non-zero exit → hard-stop; do not invoke archive.
+3. `Skill("archive-specification-delta", --change "<name>")` — move the
    change folder under `openspec/changes/archive/`, emit the conventional
    commit, and leave the worktree clean. Stage ordinal: **10/10**.
 
@@ -94,28 +100,20 @@ performs. No separate confirmation is required — do not prompt for it.
 <!-- <timings_sidecar_write> -->
 ## Timings sidecar (both modes)
 
-Immediately before the sentinel cleanup, write `openspec/.workbench/closer.timings.json`
-atomically (writeFileSync + renameSync) with the per-stage timing data from
-`tool_result.usage` of each `Skill(...)` call:
+Inmediatamente antes de la limpieza del sentinel, escribe `closer.timings.json`
+y limpia el workbench invocando `close-phase.ts`. El valor `<n>` es la duración
+real del harness (`tool_result.usage.duration_ms` del Agent tool que invocó este
+subagente), pasado por el orquestador en el contexto de invocación:
 
 ```bash
-timings=$(node -e "
-  const fs = require('fs');
-  const path = 'openspec/.workbench/closer.timings.json';
-  const tmp = path + '.tmp';
-  const stages = [
-    { stage: 9,  slug: 'synchronize-specification-delta', startedAt: '<%= it.syncStartedAt %>',    completedAt: '<%= it.syncCompletedAt %>',    durationMs: <%= it.syncDurationMs %> },
-    { stage: 10, slug: 'archive-specification-delta',      startedAt: '<%= it.archiveStartedAt %>', completedAt: '<%= it.archiveCompletedAt %>', durationMs: <%= it.archiveDurationMs %> }
-  ];
-  const obj = { change: '<change-id>', stages };
-  fs.writeFileSync(tmp, JSON.stringify(obj));
-  fs.renameSync(tmp, path);
-  console.log('Closer timings written');
-")
+npm run openspec:close-phase -- --phase closer --change "<change-id>" --duration-ms <n>
 ```
 
-Replace each `<%= it.xxx %>` placeholder with the actual recorded value from
-`tool_result.usage` of the corresponding `Skill(...)` call.
+`close-phase.ts` con `--phase closer` escribe atómicamente `closer.timings.json`
+**y también ejecuta la limpieza del workbench** (marcadores `.done`, sidecars
+`.timings.json`, sentinel `auto-pipeline.json` y `auto-pipeline.halt.json`).
+No es necesario ejecutar comandos `rm -f` manuales adicionales — el script
+encapsula todo ese trabajo.
 <!-- </timings_sidecar_write> -->
 
 <!-- <sentinel_cleanup> -->
@@ -123,24 +121,13 @@ Replace each `<%= it.xxx %>` placeholder with the actual recorded value from
 
 After `Skill("archive-specification-delta")` completes successfully, this
 subagent **removes** the AUTO sentinel and all phase-completion markers as
-part of the freeze:
+part of the freeze. La limpieza la ejecuta `close-phase.ts` con `--phase closer`
+(invocado en la sección anterior); no son necesarios `rm -f` manuales adicionales.
 
-```bash
-# Phase-completion markers (written by explorer, planner, implementer)
-rm -f openspec/.workbench/explorer.done
-rm -f openspec/.workbench/planner.done
-rm -f openspec/.workbench/implementer.done
-
-# Timings sidecars (written by each phase subagent)
-rm -f openspec/.workbench/explorer.timings.json
-rm -f openspec/.workbench/planner.timings.json
-rm -f openspec/.workbench/implementer.timings.json
-rm -f openspec/.workbench/closer.timings.json
-
-# AUTO sentinel and halt sentinel
-rm -f openspec/.workbench/auto-pipeline.json
-rm -f openspec/.workbench/auto-pipeline.halt.json   # if present
-```
+Los archivos que `close-phase.ts` limpia son:
+- Marcadores de fase: `explorer.done`, `planner.done`, `implementer.done`
+- Sidecars de timings: `explorer.timings.json`, `planner.timings.json`, `implementer.timings.json`, `closer.timings.json`
+- Sentinel AUTO: `auto-pipeline.json`, `auto-pipeline.halt.json`
 
 The sentinel removal is the deterministic backstop's signal that the change
 is fully archived — once removed, the backstop permits the turn to end.

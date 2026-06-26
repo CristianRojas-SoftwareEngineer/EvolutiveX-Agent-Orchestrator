@@ -134,49 +134,17 @@ orchestrator. The schema is stable and the orchestrator validates it against
    `handoff.slug`, not against a change ID.
 
    ```bash
-   # Protocol: writeFileSync(.tmp) + renameSync(.done) — atomic at OS level.
-   # The marker's `change` field holds the SLUG, because no change ID exists yet.
-   marker=$(node -e "
-     const fs = require('fs');
-     const path = 'openspec/.workbench/explorer.done';
-     const tmp = path + '.tmp';
-     const obj = { change: '<slug>', completedAt: new Date().toISOString() };
-     fs.writeFileSync(tmp, JSON.stringify(obj));
-     fs.renameSync(tmp, path);
-     console.log('Explorer marker written (slug):', obj.change);
-   ")
+   # Protocol: invoca close-phase.ts que ejecuta writePhaseMarker + sidecar atómicos.
+   # El marcador registra el SLUG (no un change ID) porque el change aún no existe.
+   # <slug> = el slug producido en el handoff; <n> = duration_ms del tool_result.usage.
+   npm run openspec:close-phase -- --phase explorer --change "<slug>" --duration-ms <n>
    ```
 
-7. **Write the timings sidecar** — immediately after the phase marker, write
-   `openspec/.workbench/explorer.timings.json` atomically (writeFileSync + renameSync)
-   with the stage timing data. The harness provides `startedAt`/`completedAt`/`duration_ms`
-   for each stage skill invocation:
-
-   ```bash
-   timings=$(node -e "
-     const fs = require('fs');
-     const path = 'openspec/.workbench/explorer.timings.json';
-     const tmp = path + '.tmp';
-     const obj = {
-       change: '<change-id>',
-       stages: [
-         {
-           stage: 1,
-           slug: 'explore-specification-delta',
-           startedAt: '<%= it.harnessStartedAt %>',
-           completedAt: '<%= it.harnessCompletedAt %>',
-           durationMs: '<%= it.harnessDurationMs %>'
-         }
-       ]
-     };
-     fs.writeFileSync(tmp, JSON.stringify(obj));
-     fs.renameSync(tmp, path);
-     console.log('Explorer timings written');
-   ")
-   ```
-   Replace `<%= it.harnessStartedAt %>`, `<%= it.harnessCompletedAt %>`, and
-   `<%= it.harnessDurationMs %>` with the actual values from the harness context
-   (`startedAt`, `completedAt`, and `duration_ms` from the `tool_result.usage`).
+   `close-phase.ts` escribe atómicamente `explorer.done` (con el slug como campo
+   `change`) y `explorer.timings.json` (con `durationMs` como número). El valor
+   `<n>` es la duración real medida por el harness (`tool_result.usage.duration_ms`
+   que el orquestador pasa en el contexto de invocación); el subagente NO calcula
+   ni inventa esa duración.
 
 8. **Return the handoff JSON** to the orchestrator. The orchestrator will
    validate `probes_cleaned == true` before advancing.

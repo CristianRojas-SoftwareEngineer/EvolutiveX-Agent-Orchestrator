@@ -127,69 +127,43 @@ and re-run the gate.
 
 ### Execution template
 
-```typescript
-import { writePhaseMarker } from "../../scripting/openspec/read-phase-marker";
-
-// 1. Run the five stage skills (create → propose → define → design → plan)
-// 2. Run the three stage-completion gates (--through specs, --through design, --through tasks)
-// 3. Write phase marker
-writePhaseMarker("planner", change);
-// 4. Return handoff JSON
+```bash
+# 1. Run the five stage skills (create → propose → define → design → plan)
+# 2. Run the three stage-completion gates (--through specs, --through design, --through tasks)
+# 3. Write phase marker + timings sidecar via close-phase.ts
+# <change> = handoff.change; <n> = duration_ms del tool_result.usage del Agent tool
+npm run openspec:close-phase -- --phase planner --change "<change>" --duration-ms <n>
+# 4. Return handoff JSON
 ```
 <!-- </completion_gates> -->
 
 <!-- <phase_marker_write> -->
-## Phase-completion marker (both modes)
+## Phase-completion marker y timings sidecar (ambos modos)
 
-Immediately before returning the handoff JSON (after all five stage skills and
-all three completion gates have succeeded), call the shared `writePhaseMarker`
-function to write the atomic phase marker so the orchestrator can validate the
-handoff deterministically:
+Inmediatamente antes de devolver el handoff JSON (después de los cinco stage skills
+y los tres gates de completitud), invoca `close-phase.ts` que escribe de forma
+atómica `planner.done` y `planner.timings.json`. El valor `<n>` es la duración real
+medida por el harness (`tool_result.usage.duration_ms` del Agent tool que invocó
+este subagente); el subagente NO calcula ni inventa esa duración.
 
-```typescript
-import { writePhaseMarker } from "../../scripting/openspec/read-phase-marker";
-
-writePhaseMarker("planner", change);
+```bash
+npm run openspec:close-phase -- --phase planner --change "<change>" --duration-ms <n>
 ```
 
-**Protocol**: `writePhaseMarker` implements atomic write (`writeFileSync` tmp +
-`renameSync` final) internally. Fire-and-forget — never block the handoff
-return. In both AUTO and GUIDED modes this marker is written; the orchestrator
-validates it in both modes.
+`close-phase.ts` implementa internamente la escritura atómica (`writeFileSync` tmp +
+`renameSync` final) tanto para el marcador como para el sidecar. Fire-and-forget —
+nunca bloquear el retorno del handoff. En ambos modos (AUTO y GUIDED) el marcador
+se escribe; el orquestador lo valida en ambos modos.
 <!-- </phase_marker_write> -->
 
 <!-- <timings_sidecar_write> -->
-## Timings sidecar (both modes)
+## Timings sidecar (ambos modos)
 
-Immediately after the phase marker, write `openspec/.workbench/planner.timings.json`
-atomically (writeFileSync + renameSync) with the per-stage timing data. Each
-stage skill's timing comes from the `tool_result.usage` of its `Skill(...)` call:
-
-```bash
-timings=$(node -e "
-  const fs = require('fs');
-  const path = 'openspec/.workbench/planner.timings.json';
-  const tmp = path + '.tmp';
-  const stages = [
-    { stage: 2, slug: 'create-specification-delta',     startedAt: '<%= it.createStartedAt %>',    completedAt: '<%= it.createCompletedAt %>',    durationMs: <%= it.createDurationMs %> },
-    { stage: 3, slug: 'propose-specification-delta',   startedAt: '<%= it.proposeStartedAt %>',  completedAt: '<%= it.proposeCompletedAt %>',  durationMs: <%= it.proposeDurationMs %> },
-    { stage: 4, slug: 'define-specification-delta',     startedAt: '<%= it.defineStartedAt %>',    completedAt: '<%= it.defineCompletedAt %>',    durationMs: <%= it.defineDurationMs %> },
-    { stage: 5, slug: 'design-specification-delta',    startedAt: '<%= it.designStartedAt %>',    completedAt: '<%= it.designCompletedAt %>',    durationMs: <%= it.designDurationMs %> },
-    { stage: 6, slug: 'plan-specification-delta',      startedAt: '<%= it.planStartedAt %>',      completedAt: '<%= it.planCompletedAt %>',      durationMs: <%= it.planDurationMs %> }
-  ];
-  const obj = { change: '<change-id>', stages };
-  fs.writeFileSync(tmp, JSON.stringify(obj));
-  fs.renameSync(tmp, path);
-  console.log('Planner timings written');
-")
-```
-
-Replace each `<%= it.xxx %>` placeholder with the actual recorded value from
-`tool_result.usage` of the corresponding `Skill(...)` call inside this subagent.
-The `startedAt` comes from the `startedAt` field of the tool result; `completedAt`
-is derived as `startedAt + duration_ms`; `durationMs` is `duration_ms`.
-If a stage skill call did not return usage data, use `Date.now()`-derived values
-as fallback for that stage only.
+El sidecar `planner.timings.json` es escrito por `close-phase.ts` como parte de la
+invocación descrita arriba. El campo `durationMs` es numérico (nunca string) y
+corresponde al `tool_result.usage.duration_ms` del Agent tool (duración real del
+harness, pasada por el orquestador en el contexto de invocación). El subagente no
+puede medir su propia duración; el orquestador es la fuente autoritativa.
 <!-- </timings_sidecar_write> -->
 
 <!-- <handoff_schema> -->

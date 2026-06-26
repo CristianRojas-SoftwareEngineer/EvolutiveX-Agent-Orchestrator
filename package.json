@@ -49,6 +49,7 @@
     "openspec:apply-sequential-schema": "tsx scripting/openspec/apply-sequential-schema.ts",
     "openspec:next-change-id": "tsx scripting/openspec/next-change-id.ts",
     "openspec:verify-change-id": "tsx scripting/openspec/verify-change-id.ts",
+    "openspec:close-phase": "tsx scripting/openspec/close-phase.ts",
     "tts:setup": "node dist/scripts/postinstall-tts.js",
     "postinstall": "tsx scripting/openspec/patch-openspec-change-metadata.ts; node dist/scripts/postinstall-tts.js"
   },

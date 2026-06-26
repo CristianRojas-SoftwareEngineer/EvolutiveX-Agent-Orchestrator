@@ -6,8 +6,11 @@ import { join } from 'path';
 
 import { resolveDefaultChangesDir } from './change-id.js';
 
-/** Orden canónico del DAG de artefactos de planificación. */
-const ARTIFACT_ORDER = ['proposal', 'specs', 'design', 'tasks'] as const;
+/**
+ * Orden canónico del DAG: los cuatro primeros son artefactos de planificación;
+ * 'synchronized' es el único nivel post-plan (estado del change tras synchronize).
+ */
+const ARTIFACT_ORDER = ['proposal', 'specs', 'design', 'tasks', 'synchronized'] as const;
 type Artifact = (typeof ARTIFACT_ORDER)[number];
 
 function parseArgs(argv: string[]): { changeName: string | null; through: string | null } {
@@ -219,7 +222,7 @@ const { changeName, through } = parseArgs(process.argv.slice(2));
 
 if (!changeName) {
   console.error(
-    'Uso: npm run openspec:verify-stage-completion -- --change <cNNNNN-slug> --through <proposal|specs|design|tasks>',
+    'Uso: npm run openspec:verify-stage-completion -- --change <cNNNNN-slug> --through <proposal|specs|design|tasks|synchronized>',
   );
   process.exit(1);
 }
@@ -258,7 +261,15 @@ try {
 const failures: string[] = [];
 
 // 1. Doneness por artefacto (DAG hasta --through inclusive).
+// Solo verifica artefactos que existen en el status JSON. 'synchronized' es un
+// estado del change, no un artefacto de archivo, luego se verifica por su presencia
+// en .openspec.yaml (sección 4), no aquí.
 for (const artifact of requiredArtifacts) {
+  if (!status.has(artifact)) {
+    // Artefacto no existe en el status JSON — es un estado (ej. 'synchronized').
+    // Se verifica por el campo status en .openspec.yaml (sección 4).
+    continue;
+  }
   if (status.get(artifact) !== 'done') {
     failures.push(
       `artefacto "${artifact}" no está en estado done (estado: ${status.get(artifact) ?? 'ausente'}).`,
@@ -377,6 +388,27 @@ if (requiredArtifacts.includes('specs')) {
           `el spec de la capability "${cap}" no contiene ≥1 \`### Requirement:\` con ≥1 \`#### Scenario:\`.`,
         );
       }
+    }
+  }
+}
+
+// 4. Verificación del estado 'synchronized' (nivel post-plan).
+if (throughArtifact === 'synchronized') {
+  // Lee el .openspec.yaml del change y verifica que status === 'synchronized'.
+  const opspecYaml = readTrimmed(join(changeRoot, '.openspec.yaml'));
+  if (!opspecYaml) {
+    failures.push(
+      `el archivo ".openspec.yaml" del change "${changeName}" está ausente o vacío — no se puede verificar el estado synchronized.`,
+    );
+  } else {
+    // Extrae el campo status del YAML de forma robusta (sin dependencia de parser YAML).
+    const statusMatch = opspecYaml.match(/^status:\s*(\S+)/m);
+    const changeStatus = statusMatch ? statusMatch[1].replace(/['"]/g, '') : null;
+    if (changeStatus !== 'synchronized') {
+      failures.push(
+        `el campo "status" en .openspec.yaml es "${changeStatus ?? 'ausente'}" pero se esperaba "synchronized". ` +
+          `Synchronize debe completarse antes de archivar.`,
+      );
     }
   }
 }

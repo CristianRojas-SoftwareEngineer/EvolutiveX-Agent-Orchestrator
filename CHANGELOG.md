@@ -4,6 +4,7 @@ All notable changes are derived from conventional commits. Do not edit by hand.
 
 ## [Unreleased]
 ### Fixed
+- corregir dos agujeros del backstop AUTO
 - corregir contrato de marcadores de fase del pipeline
 
 ## [tts-sidecar-v0.1.3] -- 2026-06-26

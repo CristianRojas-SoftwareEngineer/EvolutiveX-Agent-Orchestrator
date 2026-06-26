@@ -426,11 +426,17 @@ yields the turn until phase 4 completes. Each iteration:
    value for all subsequent steps. On phase 2 (planner), update the AUTO
    sentinel immediately with this value — this is the first moment the orchestrator
    knows the real change ID (it was computed by `create-specification-delta`).
-   The orphan policy (step 0) used `null` as the expected value; from now on,
-   all `validatePhaseMarker` calls use `handoff.change`.
+   The orphan policy (step 0) used `null` as the expected value; from phase 2
+   onward, all `validatePhaseMarker` calls use `handoff.change`.
+   **Phase 1 (explorer) is the exception**: the explorer runs *before* the change
+   exists (the planner mints it), so it cannot know the canonical change ID. Its
+   handoff carries `slug`, not `change`. Validate the explorer marker against
+   `handoff.slug` — never against a change ID, and never against a guessed one.
 5. **Validate the phase-completion marker** via
-   `validatePhaseMarker(phase, handoff.change)` from
-   `scripting/openspec/read-phase-marker.ts`. On any marker error
+   `validatePhaseMarker(phase, expected)` from
+   `scripting/openspec/read-phase-marker.ts`, where `expected` is `handoff.slug`
+   for the explorer (phase 1) and `handoff.change` for planner/implementer
+   (phases 2–3). On any marker error
    (MarkerAbsent / MarkerCorrupt / MarkerEmpty / MarkerWrongChange), emit the
    `<phase_handoff_diagnostic>` and hard-stop the pipeline. For the closer
    phase, use `isChangeArchived` instead of a marker.
@@ -512,8 +518,10 @@ then `validatePhaseMarker`:
 import { readPhaseMarker, validatePhaseMarker, MarkerAbsent, MarkerCorrupt, MarkerEmpty, MarkerWrongChange } from "./scripting/openspec/read-phase-marker";
 
 // After receiving explorer handoff (phase 1/4):
+// The explorer precedes change creation, so its marker stores the SLUG, not a
+// change ID. Validate against handoff.slug — there is no change ID yet.
 const marker = readPhaseMarker("explorer"); // throws MarkerAbsent/Corrupt/Empty
-validatePhaseMarker("explorer", handoff.change); // throws MarkerWrongChange
+validatePhaseMarker("explorer", handoff.slug); // throws MarkerWrongChange
 
 // After receiving planner handoff (phase 2/4):
 const marker = readPhaseMarker("planner");

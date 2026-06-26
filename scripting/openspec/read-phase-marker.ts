@@ -313,6 +313,16 @@ export function writePhaseMarker(
       "su senal de completitud es isChangeArchived en .openspec.yaml"
     );
   }
+  // Guarda de tipo: el segundo parametro debe ser un string no vacio (el ID del
+  // change o el slug en fase explorer). Pasar un objeto corrompe la estructura
+  // del marcador silenciosamente (anidaria { change: { ... } }), que luego falla
+  // la validacion de readPhaseSidecar. Fallar ruidosamente aqui evita ese bug.
+  if (typeof change !== "string" || change.length === 0) {
+    throw new TypeError(
+      `writePhaseMarker: 'change' debe ser un string no vacio, ` +
+      `se recibio ${typeof change}`
+    );
+  }
   const markerPath = path.join(workbenchRoot, `${phase}.done`);
   const tmpPath = markerPath + ".tmp";
   const obj: PhaseMarker = {

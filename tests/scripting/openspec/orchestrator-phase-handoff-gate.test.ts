@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import * as fs from "fs";
 import * as path from "path";
-import { readPhaseMarker, validatePhaseMarker, MarkerAbsent, MarkerCorrupt, MarkerEmpty, MarkerWrongChange } from "../../../scripting/openspec/read-phase-marker.js";
+import { readPhaseMarker, validatePhaseMarker, writePhaseMarker, MarkerAbsent, MarkerCorrupt, MarkerEmpty, MarkerWrongChange } from "../../../scripting/openspec/read-phase-marker.js";
 
 const WORKBENCH = "tests/scripting/openspec/_test_workbench";
 
@@ -152,5 +152,25 @@ describe("tipo de errores", () => {
     expect(err.message).toContain("planner");
     expect(err.message).toContain("c00082-test");
     expect(err.message).toContain("c00082-old");
+  });
+});
+
+describe("writePhaseMarker — guarda de tipo del parametro 'change'", () => {
+  it("lanza TypeError cuando 'change' es un objeto (mal uso del API)", () => {
+    expect(() =>
+      // @ts-expect-error: probamos deliberadamente el mal uso en runtime
+      writePhaseMarker("implementer", { change: "x", completedAt: "y" }, WORKBENCH)
+    ).toThrow(TypeError);
+  });
+
+  it("lanza TypeError cuando 'change' es un string vacio", () => {
+    expect(() => writePhaseMarker("implementer", "", WORKBENCH)).toThrow(TypeError);
+  });
+
+  it("escribe un marcador valido cuando 'change' es un string no vacio", () => {
+    writePhaseMarker("implementer", "c00082-test", WORKBENCH);
+    const marker = readPhaseMarker("implementer", WORKBENCH);
+    expect(marker.change).toBe("c00082-test");
+    expect(typeof marker.completedAt).toBe("string");
   });
 });

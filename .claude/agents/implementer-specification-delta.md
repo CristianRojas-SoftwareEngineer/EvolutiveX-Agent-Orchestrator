@@ -152,6 +152,16 @@ loop:
          critical_findings=0.
 ```
 
+**Side effects are a HARD precondition of the handoff.** The phase-completion
+marker (`implementer.done`) and the timings sidecar
+(`implementer.timings.json`) MUST both be written to disk **before** the handoff
+JSON is returned — never after, never "intended". Returning the handoff while
+the marker is absent is a hard error: the orchestrator's gate fails-closed
+(`MarkerAbsent`) and stops the pipeline. The order is non-negotiable:
+(1) write `implementer.done`, (2) write `implementer.timings.json`, (3) only
+then return the handoff. Do not announce the intention to write the marker as a
+substitute for writing it.
+
 **Why the loop is internal**: each iteration may need to read or write
 substantial code, and the context of a single iteration informs the next.
 Spawning a new subagent per iteration would lose that context and add

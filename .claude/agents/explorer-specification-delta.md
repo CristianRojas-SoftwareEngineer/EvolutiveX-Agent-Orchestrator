@@ -126,18 +126,24 @@ orchestrator. The schema is stable and the orchestrator validates it against
 
 6. **Write the phase-completion marker** — immediately before returning the
    handoff JSON, write the atomic phase marker so the orchestrator can validate
-   the handoff deterministically:
+   the handoff deterministically. **Critical**: the explorer runs *before* the
+   change exists (the planner mints the canonical `c<NNNNN>-<slug>` ID in phase
+   2). The explorer therefore **must not guess a change ID** — it records the
+   **slug** it produced (the same value returned in the handoff's `slug` field)
+   as the marker's `change` field. The orchestrator validates this marker against
+   `handoff.slug`, not against a change ID.
 
    ```bash
-   # Protocol: writeFileSync(.tmp) + renameSync(.done) — atomic at OS level
+   # Protocol: writeFileSync(.tmp) + renameSync(.done) — atomic at OS level.
+   # The marker's `change` field holds the SLUG, because no change ID exists yet.
    marker=$(node -e "
      const fs = require('fs');
      const path = 'openspec/.workbench/explorer.done';
      const tmp = path + '.tmp';
-     const obj = { change: '<change-id>', completedAt: new Date().toISOString() };
+     const obj = { change: '<slug>', completedAt: new Date().toISOString() };
      fs.writeFileSync(tmp, JSON.stringify(obj));
      fs.renameSync(tmp, path);
-     console.log('Explorer marker written:', obj.change);
+     console.log('Explorer marker written (slug):', obj.change);
    ")
    ```
 
@@ -236,7 +242,10 @@ before invoking the one stage skill of this phase:
 atomically (writeFileSync + renameSync) immediately before returning the handoff
 JSON. This is the gate that lets the orchestrator validate the handoff
 deterministically. The marker content is:
-`{ "change": "<change-id>", "completedAt": "<ISO-8601>" }`.
+`{ "change": "<slug>", "completedAt": "<ISO-8601>" }`. The `change` field holds
+the **slug** (not a change ID), because the canonical change ID does not exist
+until the planner mints it in phase 2. The orchestrator validates this marker
+against `handoff.slug`.
 
 **Write protocol for the phase marker**: write to `.workbench/explorer.done.tmp`
 then atomic rename to `.workbench/explorer.done`. Fire-and-forget — never block

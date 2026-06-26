@@ -85,6 +85,20 @@ the code to match `design.md`, or update `design.md` to reflect the real decisio
 never diverge silently); a build/typecheck/test failure that is not a typo; or a user
 interrupt.
 
+**Resolve any open design decisions on the spot.** If a task surfaces a
+design decision that cannot be resolved unilaterally (e.g. a task description
+is ambiguous between two viable approaches, an implementation reveals an
+under-specified boundary), resolve it **on the spot** before continuing the
+loop. Sub-invoke [resolve-open-decisions](../resolve-open-decisions/SKILL.md)
+(Pattern A) inline; do not defer it to a later task or stage. **Fallback**: if
+you cannot ask the user inline, return a `NEEDS_DECISION` handoff with your
+`agentId` as `resumeToken` so the orchestrator resolves it and resumes you with
+`SendMessage` (context intact — your loop position is preserved). Canonical
+contract: "Resolución inmediata de decisiones abiertas" in
+`docs/specification-delta-workflow.md`. This policy is distinct from the
+mode-conditional `create-plan` gate above (which is an internal approval, not
+an open design decision).
+
 ## Step 3 — Execute the planned cleanup
 
 The cleanup tasks already live in `tasks.md` (the legacy-remediation threading's

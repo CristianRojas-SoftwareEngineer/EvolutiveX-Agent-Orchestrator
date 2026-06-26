@@ -12,7 +12,7 @@ description: >
   "AUTO mode", "GUIDED mode", or wants to apply a change under
   openspec/changes/<name>/. Replaces the retired
   orchestrate-specification-delta SKILL.md.
-tools: Agent, Skill, Bash, Read, Write, Edit, Glob, Grep, AskUserQuestion, TodoWrite
+tools: Agent, SendMessage, ExitPlanMode, Skill, AskUserQuestion, Bash, Read, Glob, Grep, Write, Edit, TaskCreate, TaskList, TaskGet, TaskUpdate, TaskStop, WebSearch, WebFetch, Monitor, LSP, Artifact, EnterPlanMode, EnterWorktree, ExitWorktree
 ---
 
 # Orchestrate Specification-Delta
@@ -36,6 +36,80 @@ instructions in **English** for token efficiency. Canonical policy:
 `<language_policy>` in [artifact-structuring](../skills/artifact-structuring/SKILL.md).
 User-facing rules: [AGENTS.md](../../AGENTS.md) §0.
 <!-- </user_communication> -->
+
+<!-- <capability_policy> -->
+## Capability policy (toolset)
+
+This agent's `tools:` frontmatter is the canonical declaration of what it can
+do. Tools not listed are unavailable (defense in depth — the harness refuses
+them at runtime).
+
+**Declared tools** (ordered by role):
+
+1. **Control de flujo de subagentes y planes** — `Agent, SendMessage, ExitPlanMode, EnterPlanMode`
+2. **Worktrees aislados** — `EnterWorktree, ExitWorktree`
+3. **Skills y decisión humana** — `Skill, AskUserQuestion`
+4. **Acceso a filesystem y código** — `Bash, Read, Glob, Grep, Write, Edit, LSP`
+5. **Tracking de sesión (Agent Kanban)** — `TaskCreate, TaskList, TaskGet, TaskUpdate, TaskStop`
+6. **Investigación externa** — `WebSearch, WebFetch`
+7. **Observabilidad** — `Monitor`
+8. **Publicación de artefactos** — `Artifact`
+
+Lista lineal equivalente (mismo orden que el frontmatter):
+`Agent, SendMessage, ExitPlanMode, Skill, AskUserQuestion, Bash, Read, Glob, Grep, Write, Edit, TaskCreate, TaskList, TaskGet, TaskUpdate, TaskStop, WebSearch, WebFetch, Monitor, LSP, Artifact, EnterPlanMode, EnterWorktree, ExitWorktree`.
+
+> **Note on role-grouped ordering vs. frontmatter order.** The frontmatter
+> keeps the canonical tool names (harness order) but groups them by role here
+> for readability. The two are kept in lock-step: any future change to the
+> frontmatter must be reflected in this list.
+
+**Tools removed here vs. earlier revisions:** `TodoWrite` (legacy harness
+task-tracking tool — superseded by the Agent Kanban `TaskCreate`/`TaskList`/
+`TaskGet`/`TaskUpdate`/`TaskStop` family; no body code in this workflow used
+`TodoWrite`, so removing it is a pure dead-code cleanup); `TaskOutput`
+(retrieves output of backgrounded tasks — this orchestrator spawns subagents
+synchronously via `Agent` and never backgrounds them, so `TaskOutput` has no
+consumer); `Workflow` (executes a dynamic workflow that orchestrates many
+subagents in the background — the conductor loop in `<phase_routing>` is the
+workflow; introducing `Workflow` here would duplicate that loop with a
+different abstraction).
+
+**Tools present here, absent in earlier revisions, with role justification:**
+
+- `SendMessage` — *"Envía un mensaje a un miembro del equipo de agentes, o
+  reanuda un subagent por su ID de agente. Los mensajes de protocolo de equipo
+  estructurados requieren equipos de agentes."* Used here to resume phase
+  subagents with their context intact (see `<resume_and_decisions>`). The Agent
+  Teams prerequisite is satisfied: agent teams are enabled in this harness.
+- `ExitPlanMode` / `EnterPlanMode` — present the plan for approval and enter
+  plan mode respectively. The orchestrator closes plan-approval gates with
+  `ExitPlanMode` and uses `EnterPlanMode` when designing the high-level delta
+  shape before delegating to subagents.
+- `EnterWorktree` / `ExitWorktree` — create and exit an isolated git worktree.
+  When a delta is too large for a single working copy (e.g. multi-repo
+  changes), the orchestrator can spin an isolated worktree via the `Agent`
+  tool's `isolation: "worktree"` parameter or directly with `EnterWorktree`.
+- `TaskCreate, TaskList, TaskGet, TaskUpdate, TaskStop` — Agent Kanban
+  session tracking for the orchestrator's own progress (not the implementer's
+  `tasks.md` — that is owned by the apply stage).
+- `WebSearch, WebFetch` — so the orchestrator can pull external context
+  (release notes, vendor docs) without spawning the explorer for trivial
+  lookups; explorer remains the primary investigator.
+- `Monitor` — *"Ejecuta un comando en segundo plano y devuelve cada línea de
+  salida a Claude, para que pueda reaccionar a entradas de registro, cambios de
+  archivos, o estado sondeado a mitad de la conversación."* Used by the
+  orchestrator to watch long-running external processes (e.g. CI build logs)
+  in real time without blocking on a `Bash` invocation.
+- `LSP` — *"Inteligencia de código a través de servidores de lenguaje: saltar
+  a definiciones, encontrar referencias, reportar errores de tipo y
+  advertencias."* Available to the orchestrator when reviewing the diff or
+  resolving type errors that span subagent handoffs.
+- `Artifact` — *"Publica un archivo HTML o Markdown como un artifact: una
+  página privada e interactiva en claude.ai que puede compartir dentro de su
+  organización."* Optional: if a delta produces a release report or a
+  metrics dashboard, the orchestrator publishes it as an Artifact. Requires
+  Team/Enterprise plan and claude.ai login.
+<!-- </capability_policy> -->
 
 <!-- <mental_model> -->
 ## Mental model (operational minimum)
@@ -116,8 +190,15 @@ subagent spawned via the Agent tool:
 5. Validate the handoff against the per-phase schema (see
    `<handoff_schemas>`); on schema mismatch, hard-stop and surface the
    discrepancy to the user.
+   - **If the handoff is `NEEDS_DECISION`**: resolve its `decisions` with the
+     user, then resume the **same** subagent with `SendMessage(to: <resumeToken>)`
+     passing the resolved decisions (see `<resume_and_decisions>`). Do NOT
+     re-spawn the phase with `Agent` and do NOT advance until it returns its
+     nominal handoff.
 6. In GUIDED mode, present the handoff to the user and pause for confirmation
-   before advancing. In AUTO mode, advance immediately.
+   before advancing. In AUTO mode, advance immediately. To continue a paused
+   subagent (e.g. after a GUIDED edit), use `SendMessage`, never a fresh
+   `Agent(...)` call.
 
 After phase 4, the pipeline is complete. The sentinel is removed by the closer
 subagent as part of its freeze.
@@ -164,11 +245,89 @@ pipeline and surfaces the mismatch.
   "archive_path": "openspec/changes/archive/<date>--<name>/",
   "commit": "<sha>"
 }
+
+// NEEDS_DECISION — fallback any phase may emit instead of its nominal handoff
+{
+  "status": "NEEDS_DECISION",
+  "decisions": [
+    { "question": "<atomic decision>", "options": ["<a>", "<b>", "..."] }
+  ],
+  "resumeToken": "<agentId>"
+}
 ```
 
 The orchestrator extracts specific fields (`change`, `slug`, `critical_findings`,
 `archive_path`, `commit`) and reuses them in the briefing of subsequent phases.
 <!-- </handoff_schemas> -->
+
+<!-- <resume_and_decisions> -->
+## Bidirectional communication with subagents & open-decision policy
+
+**Two directions of `SendMessage` between this orchestrator and the four phase
+subagents.** The official Claude Code docs guarantee that team-coordination
+tools like `SendMessage` are *«always available for a teammate even when
+`tools` restricts other tools»* (`https://code.claude.com/docs/es/agent-teams`),
+and `SendMessage` is **not** in the closed list of five tools blocked for
+sub-agents (`https://code.claude.com/docs/es/sub-agents`). Both the
+orchestrator and the four sub-agents declare `SendMessage`; both can
+initiate and receive. The conductor loop in `<phase_routing>` is unchanged —
+it remains the only place that spawns phase subagents via `Agent` and routes
+to the next phase - but mid-phase, mid-iteration messaging flows in both
+directions.
+
+**Direction 1 — orchestrator → subagent (resume with context intact).** To
+*continue* an already-spawned subagent — after a `NEEDS_DECISION` handoff,
+after a GUIDED checkpoint where the user edited an artifact, or after any
+interruption — use `SendMessage(to: <agentId>, ...)`. This resumes the
+subagent **with its context intact**: it keeps its briefing, the artifacts
+already produced, and its prior reasoning. The `<agentId>` is returned by the
+original `Agent(...)` spawn (and echoed as `resumeToken` in a `NEEDS_DECISION`
+handoff).
+
+**Direction 2 — subagent → orchestrator (mid-phase messaging).** The four
+phase subagents may `SendMessage(to: <orchestratorId>, ...)` during their
+execution to report progress in long iterations, escalate intermediate
+observations that do not warrant a formal `NEEDS_DECISION` handoff, or ask
+for validation of a sub-step before continuing (especially useful in GUIDED).
+Each sub-agent's `<subagent_to_orchestrator>` block documents its own
+allowed/disallowed cases. This channel is **complementary** to the nominal
+JSON handoff or `NEEDS_DECISION` — it never replaces them; the phase close
+contract remains the structured handoff.
+
+**Anti-pattern (forbidden).** Never continue a subagent by calling `Agent`
+again. A fresh `Agent(...)` call **starts a brand-new subagent with no
+context** — it loses the original briefing and can reinvent scope. This is
+the documented root cause of a real divergence: a re-spawned planner
+reinvented a delta's levers and passed the structural gates because gates do
+not verify semantic fidelity to the intended scope. Use `SendMessage` to
+continue; use `Agent` only to start a phase. The same anti-pattern applies to
+sub-agents: a sub-agent must not call `Agent` to spawn another sub-agent (the
+sub-agent `tools:` does not declare `Agent`).
+
+**Handling `NEEDS_DECISION`.** When a subagent returns a `NEEDS_DECISION`
+handoff, resolve its `decisions` with the user (sub-invoke
+`resolve-open-decisions`, or `AskUserQuestion` for a bounded set), then
+resume the same subagent with `SendMessage(to: <resumeToken>, ...)` passing
+the resolved decisions. Do not re-spawn the phase and do not advance to the
+next phase with the decision open. Note: a sub-agent may also send a
+*mid-phase* `SendMessage` to flag a concern without emitting `NEEDS_DECISION`;
+treat those as advisory - respond inline if it unblocks the iteration, or
+fold them into the eventual handoff otherwise.
+
+**Immediate-resolution policy (propagate in every briefing).** Open design
+decisions are resolved **the instant they are detected**, in the phase/stage
+where they surface — **never deferred** to a later stage or phase. Each phase
+briefing this orchestrator writes must instruct the subagent to: resolve
+inline via `resolve-open-decisions` before writing its artifact, or emit
+`NEEDS_DECISION` as fallback. The orchestrator never advances a phase while
+a surfaced decision remains unresolved. (Canonical contract: see
+"Resolución inmediata de decisiones abiertas" in
+`docs/specification-delta-workflow.md`.)
+
+**Plan-approval gates (`ExitPlanMode`).** When the orchestrator (or a flow it
+drives) needs explicit user approval of a plan, close the plan-mode gate
+with `ExitPlanMode` rather than an informal "¿procedo?" in prose.
+<!-- </resume_and_decisions> -->
 
 <!-- <sentinel_schema> -->
 ## AUTO sentinel schema (`openspec/.workbench/auto-pipeline.json`)

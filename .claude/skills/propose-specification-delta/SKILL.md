@@ -28,7 +28,18 @@ in **English** for token efficiency. Canonical policy: `<language_policy>` in
 <!-- </user_communication> -->
 
 <!-- <workflow> -->
-1. Get the enriched writing instruction from the schema:
+1. **Resolve any open design decisions before writing** — if the briefing or
+   dependencies surface a decision that cannot be resolved unilaterally
+   (more than one viable approach, no canonical answer), sub-invoke
+   [resolve-open-decisions](../resolve-open-decisions/SKILL.md) (Pattern A)
+   **on the spot**, before writing a single line of `proposal.md`. Deferring
+   the decision is forbidden (deferral accumulates decisions and diverges
+   the design). Fallback if you cannot ask the user inline: return a
+   `NEEDS_DECISION` handoff with your `agentId` as `resumeToken` so the
+   orchestrator resolves it and resumes you with `SendMessage`. Canonical
+   contract: "Resolución inmediata de decisiones abiertas" in
+   `docs/specification-delta-workflow.md`.
+2. Get the enriched writing instruction from the schema:
    ```bash
    node_modules/.bin/openspec instructions proposal --change "<name>" --json
    ```
@@ -36,11 +47,11 @@ in **English** for token efficiency. Canonical policy: `<language_policy>` in
    structure), `context` and `rules` (constraints for you, **not** content for the
    file), `dependencies` (completed artifacts to read for context), and
    `resolvedOutputPath` (where to write).
-2. Read any completed dependency files for context. Follow `instruction` and
+3. Read any completed dependency files for context. Follow `instruction` and
    `template` exactly to write the proposal, and write it to **`resolvedOutputPath`**
    (never to the bare `outputPath` pattern). Apply `context`/`rules` as constraints;
    never copy them into the file.
-3. Re-run `openspec status --change "<name>" --json`, report completion and the next
+4. Re-run `openspec status --change "<name>" --json`, report completion and the next
    `ready` artifact inline; the orchestrator resolves and invokes the next stage in the
    same turn.
 

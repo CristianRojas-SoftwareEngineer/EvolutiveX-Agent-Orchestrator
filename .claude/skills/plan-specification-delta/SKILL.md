@@ -28,7 +28,18 @@ in **English** for token efficiency. Canonical policy: `<language_policy>` in
 <!-- </user_communication> -->
 
 <!-- <workflow> -->
-1. Get the enriched writing instruction from the schema:
+1. **Resolve any open design decisions before writing** — if the design leaves a
+   breakdown choice open (e.g. how to chunk a multi-package migration into
+   tasks, ordering of independent cleanup items, whether a reversible change
+   should ship behind a flag) that cannot be resolved unilaterally, sub-invoke
+   [resolve-open-decisions](../resolve-open-decisions/SKILL.md) (Pattern A)
+   **on the spot**, before writing `tasks.md`. Deferring the decision is
+   forbidden (deferral accumulates decisions and diverges the design).
+   Fallback if you cannot ask the user inline: return a `NEEDS_DECISION`
+   handoff with your `agentId` as `resumeToken` so the orchestrator resolves
+   it and resumes you with `SendMessage`. Canonical contract: "Resolución
+   inmediata de decisiones abiertas" in `docs/specification-delta-workflow.md`.
+2. Get the enriched writing instruction from the schema:
    ```bash
    node_modules/.bin/openspec instructions tasks --change "<name>" --json
    ```
@@ -38,11 +49,11 @@ in **English** for token efficiency. Canonical policy: `<language_policy>` in
    apply stage parses it — plus the schema's **optional, degradable inline tags**
    (`~state` / `@assignee` after the description). The schema is the single source of
    truth for the exact grammar; never re-describe it here.
-2. Read the proposal, specs, and design (dependencies) for context. Follow
+3. Read the proposal, specs, and design (dependencies) for context. Follow
    `instruction` and `template` exactly to write the task list, and write it to
    **`resolvedOutputPath`**. Apply `context`/`rules` as constraints; never copy them
    into the file.
-3. Re-run `openspec status --change "<name>" --json`, report completion (the delta is
+4. Re-run `openspec status --change "<name>" --json`, report completion (the delta is
    now apply-ready) inline; the orchestrator resolves and invokes the next stage in the
    same turn.
 

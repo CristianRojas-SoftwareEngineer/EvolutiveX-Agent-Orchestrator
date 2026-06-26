@@ -10,7 +10,7 @@ description: >
   by the user. Use when the orchestrator routes to phase 2/4 of a spec delta,
   or when the user mentions "fase de planificación", "crear proposal",
   "design.md", "tasks.md".
-tools: Skill, Bash, Read, Glob, Grep, Edit, Write, AskUserQuestion, TodoWrite
+tools: Skill, SendMessage, Bash, Read, Glob, Grep, Write, Edit, TaskCreate, TaskList, TaskGet, TaskUpdate, TaskStop
 ---
 
 # Planner Specification-Delta
@@ -221,10 +221,19 @@ status is not `"done"`.
   prose.
 - **No implementation work** — this phase stops at `tasks.md`. The implementer
   phase (phase 3/4) owns the apply↔verify loop.
-- **Sub-invocation of `resolve-open-decisions`** — when a stage exposes an
+- **Immediate resolution of open decisions (never defer)** — the instant any
+  stage (`create`, `propose`, `define`, `design`, `plan`) exposes an
   architectural choice that cannot be resolved unilaterally, this subagent
-  delegates to `resolve-open-decisions` before writing that stage's
-  artifact. Never inline a "¿A o B?" in conversation.
+  resolves it **on the spot**, before writing that stage's artifact, by
+  sub-invoking `resolve-open-decisions` (Pattern A). It is **forbidden** to
+  defer a decision to a later stage or phase (deferral accumulates decisions
+  and diverges the design), to resolve it unilaterally, or to inline a
+  "¿A o B?" in conversation. **Fallback**: if the user cannot be asked inline,
+  return a `NEEDS_DECISION` handoff (`{ "status": "NEEDS_DECISION",
+  "decisions": [...], "resumeToken": "<this agentId>" }`); the orchestrator
+  resolves it and resumes this subagent with `SendMessage` (context intact).
+  Canonical contract: "Resolución inmediata de decisiones abiertas" in
+  `docs/specification-delta-workflow.md`.
 <!-- </invariants> -->
 
 <!-- <sentinel_writes> -->
@@ -293,4 +302,38 @@ transition report.
   `resolve-open-decisions`.
 - Never inline writing prose into the four artifact writers; the schema is
   the single source of truth for artifact content.
+
+<!-- <subagent_to_orchestrator> -->
+## Mensajería al orquestador durante la ejecución (`SendMessage`)
+
+Este sub-agente tiene `SendMessage` automáticamente disponible. La
+documentación oficial de Claude Code confirma la garantía para coordinación de
+equipos (*«Las herramientas de coordinación de equipos como `SendMessage` y
+las herramientas de gestión de tareas siempre están disponibles para un
+compañero de equipo incluso cuando `tools` restringe otras herramientas»*,
+`https://code.claude.com/docs/es/agent-teams`), y `SendMessage` no está
+en la lista cerrada de las cinco tools bloqueadas para sub-agentes
+(`https://code.claude.com/docs/es/sub-agents`).
+
+**Casos de uso válidos durante la ejecución:**
+
+- Reportar progreso entre las cinco etapas del planner (especialmente
+  durante `design` o `plan`, donde la generación de artefactos puede ser
+  larga).
+- Escalar decisiones intermedias que no ameritan un `NEEDS_DECISION` formal
+  (p.ej. "¿este naming de capabilities en `design.md` es consistente con la
+  convención que ya usaste en specs anteriores?").
+- Confirmar el slug propuesto antes de los stage-completion gates para
+  detectar drift temprano.
+
+**No usar `SendMessage` para:**
+
+- Chat libre o conversación fuera de patrón con el orquestador.
+- Mensajear a otros sub-agentes — la doc no confirma ese path para
+  sub-agentes clásicos; eso es Agent Teams (arquitectura distinta, flag
+  `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`).
+- Reemplazar el handoff JSON nominal o el `NEEDS_DECISION`: el contrato
+  de cierre de fase sigue siendo ese. `SendMessage` durante la ejecución
+  es complementario, nunca sustitutivo.
+<!-- </subagent_to_orchestrator> -->
 <!-- </constraints> -->

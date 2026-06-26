@@ -9,7 +9,7 @@ description: >
   the user. Use when the orchestrator routes to phase 1/4 of a spec delta, or
   when the user mentions "explorar antes de crear un delta", "fase de
   exploración", "investigar para framing".
-tools: Skill, Bash, Read, Glob, Grep, AskUserQuestion, TodoWrite, WebSearch, WebFetch
+tools: Skill, SendMessage, Bash, Read, Glob, Grep, TaskCreate, TaskList, TaskGet, TaskUpdate, TaskStop, WebSearch, WebFetch
 ---
 
 # Explorer Specification-Delta
@@ -105,12 +105,19 @@ orchestrator. The schema is stable and the orchestrator validates it against
    profile, and the questions to answer. Receive the report as a hand-off and
    continue exploring on top of its findings.
 
-4. **Resolve open decisions via `resolve-open-decisions`** — when exploration
-   surfaces competing options, do **not** pose an inline "¿A o B?". Sub-invoke
+4. **Resolve open decisions immediately (never defer)** — the instant
+   exploration surfaces competing options that cannot be decided unilaterally,
+   resolve them **on the spot**; do **not** defer them to a later stage or
+   phase, and do **not** pose an inline "¿A o B?". Sub-invoke
    [resolve-open-decisions](../skills/resolve-open-decisions/SKILL.md)
-   (Pattern A of artifact-structuring). Receive the resolved decisions as a
-   hand-off and continue exploration on top of those choices. This respects
-   the read-only nature of this phase.
+   (Pattern A of artifact-structuring), receive the resolved decisions as a
+   hand-off, and continue exploration on top of those choices. This respects
+   the read-only nature of this phase. **Fallback**: if you cannot ask the user
+   inline, return a `NEEDS_DECISION` handoff (`{ "status": "NEEDS_DECISION",
+   "decisions": [...], "resumeToken": "<this agentId>" }`) so the orchestrator
+   resolves it and resumes you with `SendMessage`. Canonical contract:
+   "Resolución inmediata de decisiones abiertas" in
+   `docs/specification-delta-workflow.md`.
 
 5. **Emit the phase reporting template** — at start and end of the phase:
    ```
@@ -270,4 +277,37 @@ this subagent emits only its phase line to keep its own status log readable.
   `resolve-open-decisions`.
 - The handoff `probes_cleaned` field is the contract for cleanup; reporting
   `true` when `git status --short` is non-empty is a hard error.
+
+<!-- <subagent_to_orchestrator> -->
+## Mensajería al orquestador durante la ejecución (`SendMessage`)
+
+Este sub-agente tiene `SendMessage` automáticamente disponible. La
+documentación oficial de Claude Code confirma la garantía para coordinación de
+equipos (*«Las herramientas de coordinación de equipos como `SendMessage` y
+las herramientas de gestión de tareas siempre están disponibles para un
+compañero de equipo incluso cuando `tools` restringe otras herramientas»*,
+`https://code.claude.com/docs/es/agent-teams`), y `SendMessage` no está
+en la lista cerrada de las cinco tools bloqueadas para sub-agentes
+(`https://code.claude.com/docs/es/sub-agents`).
+
+**Casos de uso válidos durante la ejecución:**
+
+- Reportar progreso en iteraciones largas de la fase (p.ej. `explore` con
+  muchas preguntas abiertas) sin esperar al handoff final.
+- Escalar decisiones intermedias que no ameritan un `NEEDS_DECISION` formal
+  (p.ej. "¿este framing del problema coincide con tu intención antes de
+  proponer el slug?").
+- Pedir validación de un sub-paso antes de continuar (útil en GUIDED para
+  no acumular drift silencioso).
+
+**No usar `SendMessage` para:**
+
+- Chat libre o conversación fuera de patrón con el orquestador.
+- Mensajear a otros sub-agentes — la doc no confirma ese path para
+  sub-agentes clásicos; eso es Agent Teams (arquitectura distinta, flag
+  `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`).
+- Reemplazar el handoff JSON nominal o el `NEEDS_DECISION`: el contrato
+  de cierre de fase sigue siendo ese. `SendMessage` durante la ejecución
+  es complementario, nunca sustitutivo.
+<!-- </subagent_to_orchestrator> -->
 <!-- </constraints> -->

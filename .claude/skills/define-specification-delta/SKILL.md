@@ -35,13 +35,24 @@ in **English** for token efficiency. Canonical policy: `<language_policy>` in
 <!-- </user_communication> -->
 
 <!-- <workflow> -->
-1. Get the enriched writing instruction from the schema:
+1. **Resolve any open design decisions before writing** — if the proposal
+   surface or any capability shape leaves a decision open (e.g. where to place a
+   new requirement, how to cast a borderline REMOVED, which spec subtree owns a
+   non-canonical record) that cannot be resolved unilaterally, sub-invoke
+   [resolve-open-decisions](../resolve-open-decisions/SKILL.md) (Pattern A)
+   **on the spot**, before writing a single delta-spec. Deferring the decision
+   is forbidden (deferral accumulates decisions and diverges the design).
+   Fallback if you cannot ask the user inline: return a `NEEDS_DECISION`
+   handoff with your `agentId` as `resumeToken` so the orchestrator resolves
+   it and resumes you with `SendMessage`. Canonical contract: "Resolución
+   inmediata de decisiones abiertas" in `docs/specification-delta-workflow.md`.
+2. Get the enriched writing instruction from the schema:
    ```bash
    node_modules/.bin/openspec instructions specs --change "<name>" --json
    ```
    The JSON returns `instruction`, `template`, `context`, `rules`, `dependencies`,
    and `resolvedOutputPath` (a glob, `specs/**/*.md`, resolved under the change dir).
-2. Read the proposal's Capabilities section (a dependency); it declares the delta's
+3. Read the proposal's Capabilities section (a dependency); it declares the delta's
    **class**. Branch the write accordingly — `specs/` is **never** empty either way:
    - **Behavioral** (New/Modified Capabilities): write one delta-spec per capability at
      `specs/<capability>/spec.md` with ≥1 requirement (ADDED/MODIFIED/REMOVED/RENAMED).
@@ -55,14 +66,14 @@ in **English** for token efficiency. Canonical policy: `<language_policy>` in
      it to the canon).
    Follow the schema's `instruction` for the per-class writing format; the proposal's
    Capabilities — not the model's discretion — determine which files exist and their form.
-3. Run the completion gate as a hard check before returning control:
+4. Run the completion gate as a hard check before returning control:
    ```bash
    npm run openspec:verify-stage-completion -- --change "<name>" --through specs
    ```
    A non-zero exit is a **hard block**: it names the missing/empty spec or the broken
    proposal↔specs parity. Fix the specs and re-run until it exits zero; do not report
    completion while it fails.
-4. Re-run `openspec status --change "<name>" --json`, report completion and the next
+5. Re-run `openspec status --change "<name>" --json`, report completion and the next
    `ready` artifact inline; the orchestrator resolves and invokes the next stage in the
    same turn.
 

@@ -9,7 +9,7 @@ description: >
   orchestrate-specification-delta, never directly by the user. Use when the
   orchestrator routes to phase 4/4 of a spec delta, or when the user mentions
   "fase de cierre", "archive", "synchronize specs", "freeze delta".
-tools: Skill, Bash, Read, Glob, Grep, Edit, Write, TodoWrite
+tools: Skill, SendMessage, Bash, Read, Glob, Grep, Edit, Write, TaskCreate, TaskList, TaskGet, TaskUpdate, TaskStop
 ---
 
 # Closer Specification-Delta
@@ -184,6 +184,17 @@ The orchestrator rejects handoffs where any field is empty or
 - **Archive commit authorization**: in AUTO mode, the commit that
   archive-specification-delta performs is explicitly authorized. Do not
   prompt for confirmation.
+- **Immediate resolution of open decisions (never defer)** — if a design
+  decision that cannot be resolved unilaterally surfaces during `synchronize`
+  or `archive` (e.g. a discrepancy between delta specs and canonical specs that
+  admits multiple reconciliations), resolve it **on the spot** by sub-invoking
+  `resolve-open-decisions` (Pattern A) before proceeding. It is **forbidden**
+  to defer it, to resolve it unilaterally, or to inline a "¿A o B?". **Fallback**:
+  if the user cannot be asked inline, return a `NEEDS_DECISION` handoff
+  (`{ "status": "NEEDS_DECISION", "decisions": [...], "resumeToken": "<this
+  agentId>" }`); the orchestrator resolves it and resumes this subagent with
+  `SendMessage` (context intact). Canonical contract: "Resolución inmediata de
+  decisiones abiertas" in `docs/specification-delta-workflow.md`.
 <!-- </invariants> -->
 
 <!-- <sentinel_writes> -->
@@ -239,4 +250,37 @@ this subagent emits only its phase line. The `Etapa` line cycles between
   invoking this workflow in AUTO is itself the authorization.
 - The handoff `commit` field must be the SHA of the actual archive commit;
   reporting a placeholder or fabricated SHA is a hard error.
+
+<!-- <subagent_to_orchestrator> -->
+## Mensajería al orquestador durante la ejecución (`SendMessage`)
+
+Este sub-agente tiene `SendMessage` automáticamente disponible. La
+documentación oficial de Claude Code confirma la garantía para coordinación de
+equipos (*«Las herramientas de coordinación de equipos como `SendMessage` y
+las herramientas de gestión de tareas siempre están disponibles para un
+compañero de equipo incluso cuando `tools` restringe otras herramientas»*,
+`https://code.claude.com/docs/es/agent-teams`), y `SendMessage` no está
+en la lista cerrada de las cinco tools bloqueadas para sub-agentes
+(`https://code.claude.com/docs/es/sub-agents`).
+
+**Casos de uso válidos durante la ejecución:**
+
+- Reportar progreso entre `synchronize` y `archive` cuando el delta es
+  grande y la sincronización de specs a `openspec/specs/` es larga.
+- Escalar una discrepancia detectada durante la sincronización entre los
+  delta specs y los canonical specs, antes de resolverla con un merge
+  unilateral — útil para que el orquestador decida in situ.
+- Avisar al orquestador de que el commit convencional está a punto de
+  emitirse, para que pueda preparar el mensaje al usuario en GUIDED.
+
+**No usar `SendMessage` para:**
+
+- Chat libre o conversación fuera de patrón con el orquestador.
+- Mensajear a otros sub-agentes — la doc no confirma ese path para
+  sub-agentes clásicos; eso es Agent Teams (arquitectura distinta, flag
+  `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`).
+- Reemplazar el handoff JSON nominal o el `NEEDS_DECISION`: el contrato
+  de cierre de fase sigue siendo ese, con `archive_path` y `commit`.
+  `SendMessage` durante la ejecución es complementario, nunca sustitutivo.
+<!-- </subagent_to_orchestrator> -->
 <!-- </constraints> -->

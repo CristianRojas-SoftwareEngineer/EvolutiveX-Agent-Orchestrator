@@ -502,9 +502,17 @@ Nivel 3 — Skills de etapa (10 unidades lógicas)
 punto de contacto del usuario. Posee solo el control de flujo: modo AUTO/GUIDED,
 selección del próximo subagente, lectura y validación del handoff JSON,
 transición entre fases, mantenimiento del sentinel y reporte al usuario. Sus
-herramientas declaradas son `Agent`, `Skill`, `Bash`, `Read`, `Write`, `Edit`,
-`Glob`, `Grep`. No implementa trabajo de fase ni de etapa; su cuerpo está
-optimizado para enrutar.
+herramientas declaradas (24, ver matriz en «Matriz rol → tools» más abajo) son
+`Agent`, `SendMessage`, `ExitPlanMode`, `EnterPlanMode`, `EnterWorktree`,
+`ExitWorktree`, `Skill`, `AskUserQuestion`, `Bash`, `Read`, `Glob`, `Grep`,
+`Write`, `Edit`, `LSP`, `TaskCreate`, `TaskList`, `TaskGet`, `TaskUpdate`,
+`TaskStop`, `WebSearch`, `WebFetch`, `Monitor`, `Artifact`. El
+subconjunto crítico para su rol: `Agent` (spawnea los cuatro sub-agentes de
+fase), `SendMessage` (reanuda sub-agentes con contexto intacto tras un
+`NEEDS_DECISION`), `ExitPlanMode` (cierra gates de aprobación de plan),
+`AskUserQuestion` (resuelve las decisiones que recibe de los sub-agentes), y la
+familia `Task*` para tracking de sesión. No implementa trabajo de fase ni de
+etapa; su cuerpo está optimizado para enrutar.
 
 **Nivel 2 — Subagentes de fase.** Cada fase tiene un subagente dedicado, con
 `subagent_type` propio. Su responsabilidad es cerrada: ejecutan su fase y
@@ -554,6 +562,233 @@ El campo `probes_cleaned` del Explorador codifica la invariante de limpieza: si
 el subagente escribió probes temporales (instrumentación para contrastar
 alternativas), debe haberlas borrado antes de retornar; `git status --short`
 debe estar vacío. Un `probes_cleaned: false` es un error duro.
+
+#### Handoff `NEEDS_DECISION` (fallback de decisión bloqueante)
+
+Cualquier subagente de fase puede emitir, en lugar de su handoff nominal, un
+handoff `NEEDS_DECISION` cuando detecta una decisión de diseño abierta que **no
+puede resolver inline** con el usuario (p.ej. el harness no enruta su
+`AskUserQuestion` al usuario). Es un **fallback**, no la vía primaria: la
+política es resolver inline en el acto (ver «Resolución inmediata de decisiones
+abiertas» más abajo).
+
+```json
+// Cualquier fase, cuando no puede resolver una decisión inline
+{ "status": "NEEDS_DECISION",
+  "decisions": [
+    { "question": "<decisión atómica>", "options": ["<a>", "<b>", "..."] }
+  ],
+  "resumeToken": "<agentId>" }
+```
+
+Al recibirlo, el orquestador resuelve las decisiones con el usuario (vía
+`resolve-open-decisions` o `AskUserQuestion`) y **reanuda al mismo subagente con
+`SendMessage(to: <resumeToken>, ...)`**, pasando las decisiones resueltas. Nunca
+re-spawnea la fase con `Agent` (ver siguiente sección).
+
+### Reanudación de subagentes con contexto intacto (`SendMessage`)
+
+Para **continuar** un subagente ya spawneado —tras un `NEEDS_DECISION`, tras un
+checkpoint GUIDED en que el usuario editó un artefacto, o por cualquier
+interrupción— el orquestador usa `SendMessage(to: <agentId>, ...)`. Esto reanuda
+al subagente **con su contexto intacto**: conserva el briefing, los artefactos
+ya producidos y el razonamiento previo.
+
+**Anti-patrón prohibido:** continuar un subagente llamando de nuevo a `Agent`.
+Una nueva llamada `Agent` **arranca un subagente fresco sin contexto** — pierde
+el briefing original y puede reinventar el alcance (causa raíz documentada de una
+divergencia real: un planner re-spawneado reinventó las palancas de un delta y
+pasó los gates estructurales porque éstos no verifican fidelidad semántica al
+alcance). El orquestador declara `SendMessage` en su frontmatter justamente para
+tener esta capacidad.
+
+**Dirección inversa (sub-agente → orquestador):** los 4 phase subagents también
+declaran `SendMessage` y pueden enviar mensajes al orquestador durante la
+ejecución (progreso de iteración larga, escalada de observaciones intermedias,
+validación de un sub-paso). Este canal **complementa** la reanudación orq→sub
+pero no la sustituye. La descripción canónica vive en la sección «Comunicación
+bidireccional con sub-agentes» (ver matriz rol → tools más abajo).
+
+### Resolución inmediata de decisiones abiertas (política de las 4 fases)
+
+Una decisión de diseño abierta (más de un enfoque viable, no resoluble
+unilateralmente) **se resuelve en el instante en que se detecta**, en la fase y
+etapa donde aflora. **Se prohíbe aplazarla** a una etapa o fase posterior:
+aplazar acumula decisiones, el diseño diverge y la validación del usuario llega
+demasiado tarde.
+
+- **Vía primaria (inline):** el subagente sub-invoca `resolve-open-decisions`
+  (Pattern A de `artifact-structuring`) en el acto, antes de escribir el
+  artefacto de su etapa, y continúa sobre las decisiones resueltas.
+- **Fallback:** si no puede preguntar inline, emite el handoff `NEEDS_DECISION`
+  y el orquestador resuelve y reanuda con `SendMessage`.
+
+Esta política es invariante en las cuatro fases (`explorer`, `planner`,
+`implementer`, `closer`) y en todas las etapas que escriben artefactos
+(`explore`, `propose`, `define`, `design`, `plan`, `apply`). Prohibido resolver
+una decisión unilateralmente y prohibido el "¿A o B?" en prosa informal.
+
+### Matriz rol → tools (política de capability del workflow)
+
+Las declaraciones `tools:` en los frontmatters de los cinco agentes son la
+**política de capability** del workflow specification-delta. Una tool no
+declarada no está disponible para ese agente (defensa en profundidad: el
+harness la rechaza en runtime). Esta sección es la fuente única que justifica
+qué tool tiene cada rol y por qué; cualquier adición al workflow requiere
+justificación aquí antes de tocar un frontmatter.
+
+| Agente | Tools declaradas (orden canónico del harness) | # | Concern |
+|---|---|---|---|
+| `orchestrate-specification-delta` | `Agent, SendMessage, ExitPlanMode, Skill, AskUserQuestion, Bash, Read, Glob, Grep, Write, Edit, TaskCreate, TaskList, TaskGet, TaskUpdate, TaskStop, WebSearch, WebFetch, Monitor, LSP, Artifact, EnterPlanMode, EnterWorktree, ExitWorktree` | 24 | Control de flujo de subagentes y planes; worktrees aislados; skills y decisión humana; acceso a filesystem y código; tracking de sesión (Agent Kanban); investigación externa; observabilidad; publicación de artefactos. Único agente con `Agent`, `SendMessage`, `ExitPlanMode`, `EnterPlanMode`, `EnterWorktree`, `ExitWorktree`, `Monitor`, `LSP`, `Artifact`, `AskUserQuestion`. |
+| `explorer-specification-delta` | `Skill, SendMessage, Bash, Read, Glob, Grep, TaskCreate, TaskList, TaskGet, TaskUpdate, TaskStop, WebSearch, WebFetch` | 13 | Investigación read-only; resuelve decisiones vía `Skill("resolve-open-decisions")` y emite `NEEDS_DECISION` cuando no puede preguntar inline; tracking de sesión; único sub-agente con `WebSearch`/`WebFetch` (es investigador primario). NO tiene `Write`/`Edit` por concern. Tiene `SendMessage` para mensajería mid-fase al orquestador. |
+| `planner-specification-delta` | `Skill, SendMessage, Bash, Read, Glob, Grep, Write, Edit, TaskCreate, TaskList, TaskGet, TaskUpdate, TaskStop` | 13 | Escribe los 4 artefactos (`proposal`, `specs`, `design`, `tasks`) y ejecuta los 3 stage-completion gates; resuelve decisiones vía `Skill("resolve-open-decisions")`; tracking de sesión. Tiene `SendMessage` para mensajería mid-fase al orquestador. |
+| `implementer-specification-delta` | `Skill, SendMessage, Bash, Read, Glob, Grep, Edit, Write, TaskCreate, TaskList, TaskGet, TaskUpdate, TaskStop` | 13 | Ejecuta el bucle `apply ↔ verify` (interno a su contexto); escribe código y marca tasks; tracking por iteración. Tiene `SendMessage` para reportar progreso entre iteraciones del bucle. |
+| `closer-specification-delta` | `Skill, SendMessage, Bash, Read, Glob, Grep, Edit, Write, TaskCreate, TaskList, TaskGet, TaskUpdate, TaskStop` | 13 | Sincroniza estado canónico y freeze (commit + mover a `archive/`); tracking de sesión. NO tiene `WebSearch`/`WebFetch` (no es investigador). Tiene `SendMessage` para escalar discrepancias detectadas en la sincronización antes del freeze. |
+
+**Tools reservadas al agente principal (no se declaran en sub-agentes).** La
+documentación oficial de Claude Code enumera explícitamente cinco tools que
+*«dependen de la interfaz de usuario o estado de sesión de la conversación
+principal y no están disponibles para subagentes, incluso cuando se enumeran
+en el campo `tools`»* (`https://code.claude.com/docs/es/sub-agents`):
+
+- `AskUserQuestion` — el sub-agente no ve la UI; debe emitir `NEEDS_DECISION`
+  para que el orquestador pregunte.
+- `EnterPlanMode` — idem; reservado al agente principal.
+- `ExitPlanMode` — idem, salvo si el sub-agente tiene `permissionMode: "plan"`,
+  caso que este workflow no usa.
+- `ScheduleWakeup` — idem.
+- `WaitForMcpServers` — idem.
+
+Por construcción, **ninguno de los 4 sub-agentes del workflow spec-delta declara
+estas cinco tools**; el patrón de resolución de decisiones es siempre
+`Skill("resolve-open-decisions")` cuando se puede preguntar inline, o
+`NEEDS_DECISION` + `SendMessage` cuando no, con el orquestador como único punto
+donde se materializa la pregunta al usuario (`AskUserQuestion`).
+
+**Tools denegadas uniformemente en los 4 sub-agentes** (principio de menor
+privilegio; reservadas al orquestador):
+
+- `Agent` — los sub-agentes no spawnan hijos; el único punto de spawn es el
+  orquestador.
+- `ExitPlanMode`, `EnterPlanMode`, `AskUserQuestion` — control de flujo,
+  gates de aprobación de planes y decisión humana exclusivos del
+  orquestador (es quien cierra gates con `ExitPlanMode`, y quien hace las
+  preguntas al usuario). `SendMessage` ya **no** está en esta lista:
+  la doc oficial de Agent Teams (`https://code.claude.com/docs/es/agent-teams`)
+  garantiza que las tools de coordinación de equipo como `SendMessage`
+  están siempre disponibles para compañeros de equipo (sub-agentes)
+  incluso cuando el campo `tools` restringe otras herramientas, y la doc
+  de sub-agents (`https://code.claude.com/docs/es/sub-agents`) no la
+  enumera entre las cinco tools bloqueadas. Ver sección «Comunicación
+  bidireccional con sub-agentes» más abajo.
+- `EnterWorktree`, `ExitWorktree` — gestión de worktrees exclusivos del
+  orquestador (puede decidir `isolation: "worktree"` al spawn).
+- `Monitor` — observabilidad de procesos en background exclusiva del
+  orquestador.
+- `LSP`, `Artifact` — inteligencia de código y publicación de artefactos
+  exclusivas del orquestador.
+- `WebSearch`, `WebFetch` — investigación externa exclusiva del orquestador y del
+  explorer; los demás sub-agentes no investigan.
+
+**Tools retiradas del workflow** (legacy, justificadas en el `<capability_policy>`
+del orquestador y consistentes en los 4 sub-agentes):
+
+- `TodoWrite` — reemplazada completamente por la familia `TaskCreate`/`TaskList`/
+  `TaskGet`/`TaskUpdate`/`TaskStop` (Agent Kanban).
+- `TaskOutput` — sin consumer (los sub-agentes spawnean síncronos; el orquestador
+  también).
+- `Workflow` — duplicaría el conductor loop de `<phase_routing>` del orquestador
+  con otra abstracción.
+
+**TBD cerrado / verificado:**
+
+- `EnterPlanMode` en el planner — **cerrado negativo**. La documentación
+  oficial de Claude Code enumera `EnterPlanMode` entre las cinco tools que
+  *«no están disponibles para subagentes, incluso cuando se enumeran en el
+  campo `tools`»* (`https://code.claude.com/docs/es/sub-agents`). El planner,
+  como sub-agente, no puede usarla aunque la declare. La alternativa canónica
+  sigue siendo `Skill("resolve-open-decisions")` (Pattern A de
+  `artifact-structuring`) o emisión de `NEEDS_DECISION` para que el orquestador
+  pregunte. No se re-abre.
+- `AskUserQuestion` en los 4 sub-agentes — **cerrado negativo** por la misma
+  razón. Inicialmente se les declaró la tool por simetría con el orquestador;
+  la verificación contra la doc oficial mostró que está bloqueada. Se quitó
+  de los 4 frontmatters; el patrón `NEEDS_DECISION` + `SendMessage` cubre el
+  caso de uso.
+- `SendMessage` en los 4 sub-agentes — **cerrado positivo**. La doc oficial
+  de Agent Teams garantiza que *«las herramientas de coordinación de equipos
+  como `SendMessage` y las herramientas de gestión de tareas siempre están
+  disponibles para un compañero de equipo incluso cuando `tools` restringe
+  otras herramientas»* (`https://code.claude.com/docs/es/agent-teams`), y la
+  doc de sub-agents no la enumera entre las cinco tools bloqueadas
+  (`https://code.claude.com/docs/es/sub-agents`). Se añadió a los 4
+  frontmatters de sub-agentes para habilitar el patrón de comunicación
+  bidireccional documentado en `<resume_and_decisions>` del orquestador y
+  en el bloque `<subagent_to_orchestrator>` de cada sub-agente. El handoff
+  JSON nominal y el `NEEDS_DECISION` siguen siendo el contrato de cierre;
+  `SendMessage` durante la ejecución es complementario.
+
+**TBD cerrado / verificado (ronda 2):**
+
+- `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` — **cerrado: no aplicable a este
+  workflow**. La variable habilita **Agent Teams** (arquitectura
+  experimental donde compañeros de equipo se comunican peer-to-peer sin
+  pasar por el agente principal), y **no** es un requisito para usar
+  `SendMessage` en sub-agentes clásicos. Los sub-agentes del workflow
+  spec-delta (los 4 phase subagents de la matriz anterior) usan
+  `SendMessage` **sin** ese flag; basta con declararlo en su frontmatter.
+  Mezclar las dos arquitecturas en el mismo workflow sería fuente de
+  confusión; este workflow sigue siendo de sub-agentes, no de Agent Teams.
+  No se documenta como requisito.
+
+### Comunicación bidireccional con sub-agentes (`SendMessage` en los 4 phase subagents)
+
+A partir de esta versión, los 4 phase subagents del workflow
+(`explorer`, `planner`, `implementer`, `closer`) declaran `SendMessage` en su
+frontmatter. El conductor loop del orquestador (`<phase_routing>` en
+`orchestrate-specification-delta.md`) no cambia: sigue siendo el único punto
+que spawnea cada fase vía `Agent` y enruta a la siguiente. Lo que se abre es
+un **canal complementario de mensajería durante la ejecución** entre los dos
+niveles.
+
+**Garantía documental.** La doc oficial de Claude Code establece que *«las
+herramientas de coordinación de equipos como `SendMessage` y las herramientas
+de gestión de tareas siempre están disponibles para un compañero de equipo
+incluso cuando `tools` restringe otras herramientas»*
+(`https://code.claude.com/docs/es/agent-teams`). Esta garantía está
+formulada para **Agent Teams** (compañeros), pero como `SendMessage` **no**
+está en la lista cerrada de las cinco tools bloqueadas para sub-agentes
+(`https://code.claude.com/docs/es/sub-agents`), también está disponible para
+los phase subagents de este workflow sin necesidad del flag
+`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`.
+
+**Dos direcciones en uso, una sola terminología:**
+
+1. **Orquestador → sub-agente (`SendMessage(to: <agentId>, ...)`).** Patrón
+   ya existente: reanuda el sub-agente con su contexto intacto tras un
+   `NEEDS_DECISION`, tras un checkpoint GUIDED donde el usuario editó un
+   artefacto, o tras cualquier interrupción. Documentado en
+   `<resume_and_decisions>` del orquestador (líneas 263-356 aprox.) y en
+   la sección «Reanudación de subagentes con contexto intacto» (línea 589).
+2. **Sub-agente → orquestador (`SendMessage(to: <orchestratorId>, ...)`).**
+   Patrón nuevo: el sub-agente reporta progreso en iteraciones largas,
+   escala observaciones intermedias que no ameritan un `NEEDS_DECISION`
+   formal, o pide validación de un sub-paso antes de continuar (especialmente
+   útil en GUIDED). Documentado en el bloque `<subagent_to_orchestrator>`
+   de cada uno de los 4 sub-agentes.
+
+**Invariantes del canal:**
+
+- El **handoff JSON nominal** o el `NEEDS_DECISION` siguen siendo el
+  **contrato de cierre de fase**. `SendMessage` durante la ejecución es
+  complementario, nunca sustitutivo.
+- Los sub-agentes **no** se mensajan entre sí. La doc oficial no confirma
+  ese path para sub-agentes clásicos (eso es Agent Teams, arquitectura
+  distinta con flag experimental). Cada sub-agente habla solo con el
+  orquestador.
+- El anti-patrón del orquestador (`Agent` para continuar un sub-agente ya
+  spawneado) **se extiende** al caso simétrico: un sub-agente no spawnea
+  otro sub-agente. Su frontmatter no declara `Agent`.
 
 ### Sentinel AUTO: dos campos coexistentes
 

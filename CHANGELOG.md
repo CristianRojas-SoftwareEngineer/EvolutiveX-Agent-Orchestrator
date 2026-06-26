@@ -3,6 +3,8 @@
 All notable changes are derived from conventional commits. Do not edit by hand.
 
 ## [Unreleased]
+### Added
+- endurecer fase close y sync gate
 ### Fixed
 - corregir dos agujeros del backstop AUTO
 - corregir contrato de marcadores de fase del pipeline

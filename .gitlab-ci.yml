@@ -2,8 +2,9 @@
 # para 5 targets y descargar los artefactos para subirlos a GitHub Releases.
 #
 # Triggers:
-# - Tags que coincidan con tts-sidecar-v*
-# - Manual desde la UI de GitLab (botón "Run pipeline")
+# - Pushes a la rama main (verificación automática en cada commit)
+# - Tags que coincidan con tts-sidecar-v* (builds de release)
+# - Ejecución manual desde la UI de GitLab
 #
 # Mapeo triple Rust (job) → targetId npm (asset publicado):
 # ┌──────────────────────────────┬────────────────────────────┬─────────────────────┐
@@ -24,9 +25,13 @@ variables:
   VOICE: "es_MX-claude-high"
   HF_BASE: "https://huggingface.co/rhasspy/piper-voices/resolve/main/es/es_MX/claude/high"
 
-# Solo corre este pipeline para tags tts-sidecar-v* o ejecución manual.
+# Corre en:
+#   1. Pushes a main (código nuevo → verificación automática)
+#   2. Tags tts-sidecar-v* (builds para release)
+#   3. Ejecución manual desde la UI de GitLab
 workflow:
   rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
     - if: '$CI_COMMIT_TAG =~ /^tts-sidecar-v/'
     - if: '$CI_PIPELINE_SOURCE == "web"'
 
@@ -200,9 +205,11 @@ release:
     - LINUX_ARM_HASH=$(cat linux-aarch64.sha256.txt | cut -d= -f2)
     - MACOS_X64_HASH=$(cat macos-amd64.sha256.txt | cut -d= -f2)
     - MACOS_ARM_HASH=$(cat macos-aarch64.sha256.txt | cut -d= -f2)
-    # Versión extraída del tag (ej: tts-sidecar-v0.1.0 → 0.1.0)
-    - VERSION="${CI_COMMIT_TAG#tts-sidecar-v}"
-    - BASE_URL="https://github.com/CristianRojas-SoftwareEngineer/EvolutiveX-Agent-Orchestrator/releases/download/tts-sidecar-v${VERSION}/"
+    # Versión extraída del tag (ej: tts-sidecar-v0.1.0 → 0.1.0).
+    # Si no hay tag (push a main), usa "main-SHA" como versión.
+    - VERSION="${CI_COMMIT_TAG:+${CI_COMMIT_TAG#tts-sidecar-v}}${CI_COMMIT_TAG:-main-${CI_COMMIT_SHA:0:7}}"
+    # BASE_URL: usa releases en tags; en main usa la rama directamente.
+    - BASE_URL="${CI_COMMIT_TAG:+https://github.com/CristianRojas-SoftwareEngineer/EvolutiveX-Agent-Orchestrator/releases/download/tts-sidecar-v${VERSION}/}"
     # Generar tts-sidecar.sha256 con hashes reales
     - |
       cat > tts-sidecar.sha256 << EOF

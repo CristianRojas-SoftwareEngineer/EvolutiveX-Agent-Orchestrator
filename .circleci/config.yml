@@ -1,44 +1,47 @@
 # CircleCI CI pipeline — sidecar TTS
 version: 2.1
 
+orbs:
+  win: circleci/windows@5.0
+
 jobs:
   build-windows-amd64:
-    machine:
-      image: windows-server-2022-stable
-    resource_class: medium
+    executor:
+      name: win/default
+      size: medium
     steps:
       - checkout
       - run:
-          name: "Instalar Rust via rustup"
+          name: "Descargar e instalar rustup"
           command: |
-            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-            echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> $BASH_ENV
+            Invoke-WebRequest -Uri https://win.rustup.rs -OutFile rustup-init.exe
+            Start-Process -FilePath .\rustup-init.exe -ArgumentList "-y" -Wait
+            Remove-Item rustup-init.exe
       - run:
           name: "Agregar target x86_64-pc-windows-msvc"
           command: |
-            source $HOME/.cargo/env
+            $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
             rustup target add x86_64-pc-windows-msvc
       - run:
           name: "Compilar tts-sidecar"
           command: |
-            source $HOME/.cargo/env
+            $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
             cargo build --release --manifest-path sidecar/Cargo.toml --target x86_64-pc-windows-msvc
       - run:
           name: "Empaquetar artefacto"
           command: |
-            mkdir -p staging/windows-amd64
-            cp sidecar/target/x86_64-pc-windows-msvc/release/tts-sidecar.exe staging/windows-amd64/
-            cd staging
-            zip -r ../windows-amd64.zip windows-amd64/
-            cd ..
-            sha256sum windows-amd64.zip | awk '{print "windows-amd64=" $1}' > windows-amd64.sha256.txt
+            $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
+            New-Item -ItemType Directory -Force -Path staging/windows-amd64 | Out-Null
+            Copy-Item sidecar/target/x86_64-pc-windows-msvc/release/tts-sidecar.exe staging/windows-amd64/
+            Compress-Archive -Path staging/windows-amd64 -DestinationPath windows-amd64.zip -Force
+            $hash = (Get-FileHash -Algorithm SHA256 windows-amd64.zip).Hash
+            "windows-amd64=$hash" | Out-File -FilePath windows-amd64.sha256.txt -Encoding ASCII
       - store_artifacts:
           path: windows-amd64.zip
       - store_artifacts:
           path: windows-amd64.sha256.txt
 
 workflows:
-  version: 2
   build-workflow:
     jobs:
       - build-windows-amd64

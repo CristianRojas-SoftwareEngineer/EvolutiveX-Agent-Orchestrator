@@ -46,6 +46,7 @@
     "statusline:router-details:toggle": "tsx scripting/provider/statusline-router-details.ts toggle",
     "openspec:create-specification-delta": "tsx scripting/openspec/create-specification-delta.ts",
     "openspec:verify-stage-completion": "tsx scripting/openspec/verify-stage-completion.ts",
+    "continuity:write": "cat > .claude/continuity-prompt.md",
     "openspec:apply-sequential-schema": "tsx scripting/openspec/apply-sequential-schema.ts",
     "openspec:next-change-id": "tsx scripting/openspec/next-change-id.ts",
     "openspec:verify-change-id": "tsx scripting/openspec/verify-change-id.ts",

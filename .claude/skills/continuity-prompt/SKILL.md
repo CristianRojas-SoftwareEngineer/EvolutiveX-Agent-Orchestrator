@@ -98,7 +98,15 @@ Execute while the session still has full context — **before** the user runs `/
 
 2. **Draft the continuity prompt** using the canonical template in `<output_template>`. Keep it **compact but dense** — target well under post-compaction re-attachment budgets (~5000 tokens per invoked skill after compaction).
 
-3. **Persist (mandatory — primary deliverable)**: write the continuity prompt to `.claude/continuity-prompt.md` (or the custom path from `$ARGUMENTS` after `generate`). **Overwrite without reading first** — successive generates are independent sessions; the previous file is irrelevant. Do not ask for confirmation. This file is what `resume` will read after compaction.
+3. **Persist (mandatory — primary deliverable)**: overwrite `.claude/continuity-prompt.md` using Bash heredoc via `npm run continuity:write`. **Do NOT use the Write tool** — it requires reading the file first, which is unnecessary overhead for a session-scoped overwrite. Use:
+
+   ```bash
+   npm run continuity:write << 'EOF'
+   # contenido del prompt...
+   EOF
+   ```
+
+   **Overwrite without reading first** — successive generates are independent sessions; the previous file is irrelevant. Do not ask for confirmation. This file is what `resume` will read after compaction.
 
 4. **Confirm in chat**: one-line confirmation that the file was written (path only). Optionally show the full prompt in a fenced markdown block for human review — never skip step 3 in favor of chat-only delivery.
 
@@ -130,7 +138,19 @@ Execute after compaction when working memory is sparse. **The persisted file fro
    - **Divergencias** (if any): prompt vs. current reality.
    - **Siguiente acción**: the concrete step 1 from «Próximos pasos», adjusted only if evidence requires it.
 
-6. **Continue work** from the next action unless the user redirects. Do not reopen closed decisions without new evidence.
+6. **Decision gate (sub-invoke resolve-open-decisions)**: the resume report surfaces a concrete next action, but the user must choose the direction before proceeding. Sub-invoke [resolve-open-decisions](../resolve-open-decisions/SKILL.md) with the following structure:
+   - **Decision 1** (header: "Dirección del workflow"): "¿Cuál es el siguiente paso?"
+     - **Opción A — Proceder con la acción recomendada (Recomendada):** seguir con el paso 1 de «Próximos pasos» tal como está definido en el prompt de continuidad.
+       *Pros: acción ya analizada y cerrada, sin ambigüedad. Contras: no permite ajustar el alcance.*
+     - **Opción B — Modificar la acción:** adaptar, reformular o reordenar los pasos pendientes antes de continuar.
+       *Pros: permite refinar el alcance o la priorización. Contras: requiere definir cambios antes de proceder.*
+     - **Opción C — Otra dirección:** describir una acción diferente, un workflow alternativo, o una prioridad que no esté cubierta en el prompt de continuidad.
+       *Pros: máximo control sobre la dirección. Contras: la acción queda por definir y puede requerir investigación adicional.*
+   After the user answers, proceed based on the choice:
+   - **A → proceed** with the recommended step 1 as written in the prompt.
+   - **B → ask** the user to specify what to change, update the step in memory, then proceed.
+   - **C → ask** the user to describe their direction, then treat it as a new objective and proceed accordingly.
+   Do **not** continue work until the decision is resolved. This gate is the bridge between the briefing and the execution — it replaces any inline "¿procedo?" in prose.
 <!-- </resume_workflow> -->
 
 <!-- <output_template> -->
@@ -189,7 +209,7 @@ Instrucción post-compactación: Ejecuta `/continuity-prompt resume` para leer e
 <!-- <constraints> -->
 ## Constraints
 
-- **Generate**: only facts from the current session; mark uncertainty explicitly (e.g. "no verificado en disco"); **overwrite the file without reading the previous one** — successive generates are independent sessions; **never skip the file write**.
+- **Generate**: only facts from the current session; mark uncertainty explicitly (e.g. "no verificado en disco"); **overwrite via Bash heredoc + `npm run continuity:write`** — not the Write tool; successive generates are independent sessions; **never skip the file write**.
 - **Resume**: **read the persisted file from disk first** (mandatory); then re-read every source cited inside that file before code mutations. Do not substitute chat memory or pasted text when the file exists.
 - **Density**: prefer pointers and verdicts over narrative; every line should earn its tokens.
 - **No git**: do not stage or commit `.claude/continuity-prompt.md` without explicit user request.
@@ -204,19 +224,26 @@ Instrucción post-compactación: Ejecuta `/continuity-prompt resume` para leer e
 
 Input: `/continuity-prompt generate`
 
-Output: File written to `.claude/continuity-prompt.md` (primary); one-line path confirmation; optional fenced block for review; reminder: `/compact` → `/continuity-prompt resume`.
+Output: File overwritten via `npm run continuity:write` + heredoc (Bash); one-line path confirmation; optional fenced block for review; reminder: `/compact` → `/continuity-prompt resume`.
+
+```bash
+npm run continuity:write << 'EOF'
+# Prompt de continuidad
+...
+EOF
+```
 
 **Example 2 — resume**
 
 Input: `/continuity-prompt resume` (`.claude/continuity-prompt.md` exists from a prior `generate`)
 
-Output: **Read file from disk first**; parse content; re-read each path under «Fuentes a re-leer»; `git status`; resume report with «Siguiente acción» aligned to step 1 of the file; proceed unless user stops.
+Output: **Read file from disk first**; parse content; re-read each path under «Fuentes a re-leer»; `git status`; resume report with «Siguiente acción» aligned to step 1 of the file; **sub-invoke resolve-open-decisions** (3-option gate: proceed / modify / other direction); continue work only after user resolves the decision.
 
 **Example 3 — auto-trigger**
 
 Input: «La ventana de contexto está llena y necesito seguir con el delta c00086.»
 
-Output: Recognize pre-compaction intent; run `generate` workflow; write to `.claude/continuity-prompt.md`.
+Output: Recognize pre-compaction intent; run `generate` workflow; overwrite `.claude/continuity-prompt.md` via `npm run continuity:write` + Bash heredoc.
 <!-- </examples> -->
 
 <!-- <verification> -->
@@ -228,7 +255,7 @@ Output: Recognize pre-compaction intent; run `generate` workflow; write to `.cla
 2. Are «Fuentes a re-leer» concrete paths (with line hints when helpful)?
 3. Are closed decisions separated from open questions?
 4. Is the prompt free of `{{placeholders}}`?
-5. Was `.claude/continuity-prompt.md` (or custom path) written on disk?
+5. Was the file overwritten via `npm run continuity:write` + Bash heredoc (not the Write tool)?
 6. Was the post-compact reminder included?
 
 **Before delivering `resume`:**
@@ -238,6 +265,7 @@ Output: Recognize pre-compaction intent; run `generate` workflow; write to `.cla
 3. Was every source cited inside the file re-read?
 4. Was workspace state checked and divergences reported?
 5. Is the resume report in Spanish with all four headings?
-6. Was the next action concrete and tied to the file's ordered steps?
-7. Were no closed decisions reopened without new evidence?
+6. Was `resolve-open-decisions` sub-invoked with the 3-option gate before continuing work?
+7. Did the execution branch match the user's answer (proceed / modify / other direction)?
+8. Was the next action concrete and tied to the file's ordered steps?
 <!-- </verification> -->

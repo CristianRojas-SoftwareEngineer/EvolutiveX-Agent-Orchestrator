@@ -1,47 +1,44 @@
-# CircleCI CI pipeline — sidecar TTS
 version: 2.1
 
-orbs:
-  win: circleci/windows@5.0
-
 jobs:
-  build-windows-amd64:
-    executor:
-      name: win/default
-      size: medium
+  build-macos-amd64:
+    macos:
+      xcode: "15.4.0"
+    resource_class: m4pro.medium
+    working_directory: ~/EvolutiveX-Agent-Orchestrator
     steps:
       - checkout
       - run:
-          name: "Descargar e instalar rustup"
+          name: "Instalar Rust via rustup"
           command: |
-            Invoke-WebRequest -Uri https://win.rustup.rs -OutFile rustup-init.exe
-            Start-Process -FilePath .\rustup-init.exe -ArgumentList "-y" -Wait
-            Remove-Item rustup-init.exe
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+            echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> $BASH_ENV
       - run:
-          name: "Agregar target x86_64-pc-windows-msvc"
+          name: "Instalar espeak-ng"
+          command: brew install espeak-ng
+      - run:
+          name: "Agregar target x86_64-apple-darwin"
           command: |
-            $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
-            rustup target add x86_64-pc-windows-msvc
+            source $HOME/.cargo/env
+            rustup target add x86_64-apple-darwin
       - run:
           name: "Compilar tts-sidecar"
           command: |
-            $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
-            cargo build --release --manifest-path sidecar/Cargo.toml --target x86_64-pc-windows-msvc
+            source $HOME/.cargo/env
+            cargo build --release --manifest-path sidecar/Cargo.toml --target x86_64-apple-darwin
       - run:
           name: "Empaquetar artefacto"
           command: |
-            $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
-            New-Item -ItemType Directory -Force -Path staging/windows-amd64 | Out-Null
-            Copy-Item sidecar/target/x86_64-pc-windows-msvc/release/tts-sidecar.exe staging/windows-amd64/
-            Compress-Archive -Path staging/windows-amd64 -DestinationPath windows-amd64.zip -Force
-            $hash = (Get-FileHash -Algorithm SHA256 windows-amd64.zip).Hash
-            "windows-amd64=$hash" | Out-File -FilePath windows-amd64.sha256.txt -Encoding ASCII
+            mkdir -p staging/macos-amd64
+            cp sidecar/target/x86_64-apple-darwin/release/tts-sidecar staging/macos-amd64/
+            cd staging && zip -r ../macos-amd64.zip macos-amd64/ && cd ..
+            shasum -a 256 macos-amd64.zip | awk '{print "macos-amd64=" $1}' > macos-amd64.sha256.txt
       - store_artifacts:
-          path: windows-amd64.zip
+          path: macos-amd64.zip
       - store_artifacts:
-          path: windows-amd64.sha256.txt
+          path: macos-amd64.sha256.txt
 
 workflows:
-  build-windows-amd64:
+  build-macos-amd64:
     jobs:
-      - build-windows-amd64
+      - build-macos-amd64

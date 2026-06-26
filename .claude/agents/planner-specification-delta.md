@@ -124,32 +124,38 @@ The gate's exit code, not the model's judgment, decides completeness. On a
 non-zero exit, do NOT advance; route back to the stage named in stderr (an
 empty/missing spec or broken proposal↔specs parity routes back to `define`)
 and re-run the gate.
+
+### Execution template
+
+```typescript
+import { writePhaseMarker } from "../../scripting/openspec/read-phase-marker";
+
+// 1. Run the five stage skills (create → propose → define → design → plan)
+// 2. Run the three stage-completion gates (--through specs, --through design, --through tasks)
+// 3. Write phase marker
+writePhaseMarker("planner", change);
+// 4. Return handoff JSON
+```
 <!-- </completion_gates> -->
 
 <!-- <phase_marker_write> -->
 ## Phase-completion marker (both modes)
 
 Immediately before returning the handoff JSON (after all five stage skills and
-all three completion gates have succeeded), write the atomic phase marker so
-the orchestrator can validate the handoff deterministically:
+all three completion gates have succeeded), call the shared `writePhaseMarker`
+function to write the atomic phase marker so the orchestrator can validate the
+handoff deterministically:
 
-```bash
-marker=$(node -e "
-  const fs = require('fs');
-  const path = 'openspec/.workbench/planner.done';
-  const tmp = path + '.tmp';
-  const obj = { change: '<change-id>', completedAt: new Date().toISOString() };
-  fs.writeFileSync(tmp, JSON.stringify(obj));
-  fs.renameSync(tmp, path);
-  console.log('Planner marker written:', obj.change);
-")
+```typescript
+import { writePhaseMarker } from "../../scripting/openspec/read-phase-marker";
+
+writePhaseMarker("planner", change);
 ```
 
-**Write protocol**: write to `.workbench/planner.done.tmp` then atomic rename
-to `.workbench/planner.done`. Fire-and-forget — never block the handoff return.
-
-In both AUTO and GUIDED modes this marker is written; the orchestrator validates
-it in both modes.
+**Protocol**: `writePhaseMarker` implements atomic write (`writeFileSync` tmp +
+`renameSync` final) internally. Fire-and-forget — never block the handoff
+return. In both AUTO and GUIDED modes this marker is written; the orchestrator
+validates it in both modes.
 <!-- </phase_marker_write> -->
 
 <!-- <timings_sidecar_write> -->
@@ -263,8 +269,8 @@ operations.
 skill invocation on a sentinel write.
 
 **This subagent also writes the phase-completion marker** `planner.done`
-(see `phase_marker_write` section) — this marker is written in BOTH modes
-(AUTO and GUIDED), immediately before returning the handoff JSON.
+by calling `writePhaseMarker("planner", change)` — this marker is written in
+BOTH modes (AUTO and GUIDED), immediately before returning the handoff JSON.
 
 **This subagent never writes `phase`** — that is the orchestrator's field
 (written before spawn). **This subagent never deletes the sentinel** — that

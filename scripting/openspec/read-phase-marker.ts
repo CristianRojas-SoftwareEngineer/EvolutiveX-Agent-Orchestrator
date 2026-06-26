@@ -290,3 +290,35 @@ export function validatePhaseMarker(
   }
   return marker;
 }
+
+/**
+ * Escritura atomica del marcador de completitud de fase.
+ * Protocolo: writeFileSync(tmp) + renameSync(final) sobre el mismo inode.
+ * Garantiza que el orquestador nunca lee un archivo a medio escribir.
+ *
+ * @param phase  - Nombre de la fase: "explorer" | "planner" | "implementer"
+ * @param change - ID del change (ej: "c00087-fix-ci-all-runners")
+ * @param workbenchRoot - Directorio base de workbench (default: openspec/.workbench)
+ * @throws Error - fase "closer" no debe escribir marcador (su senal es isChangeArchived)
+ * @throws Error - ENOSPC, EACCES u otro error de E/S propagado tal cual
+ */
+export function writePhaseMarker(
+  phase: string,
+  change: string,
+  workbenchRoot = path.join(process.cwd(), "openspec", ".workbench")
+): void {
+  if (phase === "closer") {
+    throw new Error(
+      "El subagente closer no escribe marcador de fase — " +
+      "su senal de completitud es isChangeArchived en .openspec.yaml"
+    );
+  }
+  const markerPath = path.join(workbenchRoot, `${phase}.done`);
+  const tmpPath = markerPath + ".tmp";
+  const obj: PhaseMarker = {
+    change,
+    completedAt: new Date().toISOString(),
+  };
+  fs.writeFileSync(tmpPath, JSON.stringify(obj), "utf8");
+  fs.renameSync(tmpPath, markerPath);
+}

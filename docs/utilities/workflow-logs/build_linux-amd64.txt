@@ -1,40 +1,39 @@
-2026-06-25T18:22:05.518681Z 00O [0KRunning with gitlab-runner 19.0.0~pre.1138.ga0a1e0e8 (a0a1e0e8)[0;m
-2026-06-25T18:22:05.518699Z 00O [0K  on blue-3.saas-linux-medium-amd64.runners-manager.gitlab.com/default U4xQPDyhm, system ID: s_b59597d5b921[0;m
-2026-06-25T18:22:05.518705Z 00O [0K  feature flags: FF_USE_GIT_PROACTIVE_AUTH:true, FF_HASH_CACHE_KEYS:true[0;m
-2026-06-25T18:22:05.518725Z 00O [0K[36;1mResolving secrets[0;m[0;m
-2026-06-25T18:22:05.518853Z 00O section_start:1782411725:prepare_executor
-2026-06-25T18:22:05.518854Z 00O+[0K[0K[36;1mPreparing the "docker+machine" executor[0;m[0;m
-2026-06-25T18:22:05.651689Z 00O [0KUsing Docker executor with image rust:1.85 ...[0;m
-2026-06-25T18:22:09.030836Z 00O [0KUsing effective pull policy of [always] for container rust:1.85[0;m
-2026-06-25T18:22:09.031485Z 00O [0KPulling docker image rust:1.85 ...[0;m
-2026-06-25T18:22:18.707123Z 00O [0KUsing docker image sha256:d206fa34784c1c49e05c636e682892881896cce563bda7ca0b4cd96e159c8806 for rust:1.85 with digest rust@sha256:e51d0265072d2d9d5d320f6a44dde6b9ef13653b035098febd68cce8fa7c0bc4 ...[0;m
-2026-06-25T18:22:18.707199Z 00O section_end:1782411738:prepare_executor
-2026-06-25T18:22:18.707201Z 00O+[0Ksection_start:1782411738:prepare_script
-2026-06-25T18:22:18.707316Z 00O+[0K[0K[36;1mPreparing environment[0;m[0;m
-2026-06-25T18:22:18.707973Z 00O [0KUsing effective pull policy of [always] for container sha256:98cda1a921b43e3b9c384d510db1ae21219c1667ae18210c8810cf292b4f25f5[0;m
-2026-06-25T18:22:29.030391Z 01O Running on runner-u4xqpdyhm-project-83746546-concurrent-0 via runner-u4xqpdyhm-s-l-m-amd64-1782411653-c47eb9fe...
-2026-06-25T18:22:29.176114Z 00O section_end:1782411749:prepare_script
-2026-06-25T18:22:29.176118Z 00O+[0Ksection_start:1782411749:get_sources
-2026-06-25T18:22:29.176735Z 00O+[0K[0K[36;1mGetting source from Git repository[0;m[0;m
-2026-06-25T18:22:29.482732Z 01O [32;1mGitaly correlation ID: 38a83bec9bee4d0bb337e588b484c746[0;m
-2026-06-25T18:22:29.488570Z 01O [32;1mFetching changes with git depth set to 20...[0;m
-2026-06-25T18:22:29.491478Z 01O Initialized empty Git repository in /builds/cristianrojas-softwareengineer-group/EvolutiveX-Agent-Orchestrator/.git/
-2026-06-25T18:22:29.493889Z 01O [32;1mCreated fresh repository.[0;m
-2026-06-25T18:22:30.225597Z 01O [32;1mChecking out d2463887 as detached HEAD (ref is tts-sidecar-v0.1.0)...[0;m
-2026-06-25T18:22:30.326403Z 01O 
-2026-06-25T18:22:30.326406Z 01O [32;1mSkipping Git submodules setup[0;m
-2026-06-25T18:22:30.326406Z 01O [32;1m$ git remote set-url origin "${CI_REPOSITORY_URL}" || echo 'Not a git repository; skipping'[0;m
-2026-06-25T18:22:30.475934Z 00O section_end:1782411750:get_sources
-2026-06-25T18:22:30.475938Z 00O+[0Ksection_start:1782411750:step_script
-2026-06-25T18:22:30.477201Z 00O+[0K[0K[36;1mExecuting "step_script" stage of the job script[0;m[0;m
-2026-06-25T18:22:30.477218Z 00O [0KUsing effective pull policy of [always] for container rust:1.85[0;m
-2026-06-25T18:22:30.478923Z 00O [0KUsing docker image sha256:d206fa34784c1c49e05c636e682892881896cce563bda7ca0b4cd96e159c8806 for rust:1.85 with digest rust@sha256:e51d0265072d2d9d5d320f6a44dde6b9ef13653b035098febd68cce8fa7c0bc4 ...[0;m
-2026-06-25T18:22:30.796193Z 01O [32;1m$ apt-get update -qq[0;m
-2026-06-25T18:22:32.235356Z 01O [32;1m$ apt-get install -y -qq zip[0;m
-2026-06-25T18:22:33.215875Z 01E debconf: delaying package configuration, since apt-utils is not installed
-2026-06-25T18:22:33.264331Z 01O Selecting previously unselected package zip.
-2026-06-25T18:22:33.264334Z 01O (Reading database ... 
-2026-06-25T18:22:33.266786Z 01O+(Reading database ... 5%
+2026-06-25T20:15:08.244092Z 00O [0KRunning with gitlab-runner 19.0.0~pre.1138.ga0a1e0e8 (a0a1e0e8)[0;m
+2026-06-25T20:15:08.244105Z 00O [0K  on blue-3.saas-linux-medium-amd64.runners-manager.gitlab.com/default U4xQPDyhm, system ID: s_b59597d5b921[0;m
+2026-06-25T20:15:08.244113Z 00O [0K  feature flags: FF_USE_GIT_PROACTIVE_AUTH:true, FF_HASH_CACHE_KEYS:true[0;m
+2026-06-25T20:15:08.244130Z 00O [0K[36;1mResolving secrets[0;m[0;m
+2026-06-25T20:15:08.244285Z 00O section_start:1782418508:prepare_executor
+2026-06-25T20:15:08.244286Z 00O+[0K[0K[36;1mPreparing the "docker+machine" executor[0;m[0;m
+2026-06-25T20:15:08.369114Z 00O [0KUsing Docker executor with image rust:1.88 ...[0;m
+2026-06-25T20:15:11.594991Z 00O [0KUsing effective pull policy of [always] for container rust:1.88[0;m
+2026-06-25T20:15:11.595490Z 00O [0KPulling docker image rust:1.88 ...[0;m
+2026-06-25T20:15:21.444445Z 00O [0KUsing docker image sha256:1dc2982f2cd4ba58fff5557629297b31e4ef59c02d8a38594afe9b02f59c4bd2 for rust:1.88 with digest rust@sha256:af306cfa71d987911a781c37b59d7d67d934f49684058f96cf72079c3626bfe0 ...[0;m
+2026-06-25T20:15:21.444544Z 00O section_end:1782418521:prepare_executor
+2026-06-25T20:15:21.444545Z 00O+[0Ksection_start:1782418521:prepare_script
+2026-06-25T20:15:21.444614Z 00O+[0K[0K[36;1mPreparing environment[0;m[0;m
+2026-06-25T20:15:21.445219Z 00O [0KUsing effective pull policy of [always] for container sha256:be8a15153f9bb9514ae60785e60f57195bb5ed083d6068c4efd0c382c1fd66fd[0;m
+2026-06-25T20:15:32.000580Z 01O Running on runner-u4xqpdyhm-project-83746546-concurrent-0 via runner-u4xqpdyhm-s-l-m-amd64-1782418407-fd042811...
+2026-06-25T20:15:32.162040Z 00O section_end:1782418532:prepare_script
+2026-06-25T20:15:32.162045Z 00O+[0Ksection_start:1782418532:get_sources
+2026-06-25T20:15:32.162667Z 00O+[0K[0K[36;1mGetting source from Git repository[0;m[0;m
+2026-06-25T20:15:32.412883Z 01O [32;1mGitaly correlation ID: de7f16b23316419abab49d3f6e421be2[0;m
+2026-06-25T20:15:32.417170Z 01O [32;1mFetching changes with git depth set to 20...[0;m
+2026-06-25T20:15:32.419510Z 01O Initialized empty Git repository in /builds/cristianrojas-softwareengineer-group/EvolutiveX-Agent-Orchestrator/.git/
+2026-06-25T20:15:32.421134Z 01O [32;1mCreated fresh repository.[0;m
+2026-06-25T20:15:33.178892Z 01O [32;1mChecking out f2ae7d25 as detached HEAD (ref is tts-sidecar-v0.1.0)...[0;m
+2026-06-25T20:15:33.324379Z 01O 
+2026-06-25T20:15:33.324392Z 01O [32;1mSkipping Git submodules setup[0;m
+2026-06-25T20:15:33.324393Z 01O [32;1m$ git remote set-url origin "${CI_REPOSITORY_URL}" || echo 'Not a git repository; skipping'[0;m
+2026-06-25T20:15:33.482552Z 00O section_end:1782418533:get_sources
+2026-06-25T20:15:33.482558Z 00O+[0Ksection_start:1782418533:step_script
+2026-06-25T20:15:33.483742Z 00O+[0K[0K[36;1mExecuting "step_script" stage of the job script[0;m[0;m
+2026-06-25T20:15:33.483760Z 00O [0KUsing effective pull policy of [always] for container rust:1.88[0;m
+2026-06-25T20:15:33.484785Z 00O [0KUsing docker image sha256:1dc2982f2cd4ba58fff5557629297b31e4ef59c02d8a38594afe9b02f59c4bd2 for rust:1.88 with digest rust@sha256:af306cfa71d987911a781c37b59d7d67d934f49684058f96cf72079c3626bfe0 ...[0;m
+2026-06-25T20:15:33.775487Z 01O [32;1m$ if [ "$RUNNER_OS" = "Linux" ]; then # collapsed multi-line command[0;m
+2026-06-25T20:15:36.213512Z 01E debconf: delaying package configuration, since apt-utils is not installed
+2026-06-25T20:15:36.259851Z 01O Selecting previously unselected package zip.
+2026-06-25T20:15:36.259857Z 01O (Reading database ... 
+2026-06-25T20:15:36.266054Z 01O+(Reading database ... 5%
 (Reading database ... 10%
 (Reading database ... 15%
 (Reading database ... 20%
@@ -47,22 +46,22 @@
 (Reading database ... 55%
 (Reading database ... 60%
 (Reading database ... 65%
-2026-06-25T18:22:33.267460Z 01O+(Reading database ... 70%
-2026-06-25T18:22:33.268495Z 01O+(Reading database ... 75%
-2026-06-25T18:22:33.269300Z 01O+(Reading database ... 80%
-2026-06-25T18:22:33.270367Z 01O+(Reading database ... 85%
-2026-06-25T18:22:33.271405Z 01O+(Reading database ... 90%
-2026-06-25T18:22:33.272086Z 01O+(Reading database ... 95%
-2026-06-25T18:22:33.274433Z 01O+(Reading database ... 100%
+2026-06-25T20:15:36.266660Z 01O+(Reading database ... 70%
+2026-06-25T20:15:36.267379Z 01O+(Reading database ... 75%
+2026-06-25T20:15:36.268952Z 01O+(Reading database ... 80%
+2026-06-25T20:15:36.269546Z 01O+(Reading database ... 85%
+2026-06-25T20:15:36.270137Z 01O+(Reading database ... 90%
+2026-06-25T20:15:36.270925Z 01O+(Reading database ... 95%
+2026-06-25T20:15:36.271582Z 01O+(Reading database ... 100%
 (Reading database ... 23250 files and directories currently installed.)
-2026-06-25T18:22:33.275534Z 01O Preparing to unpack .../archives/zip_3.0-13_amd64.deb ...
-2026-06-25T18:22:33.279517Z 01O Unpacking zip (3.0-13) ...
-2026-06-25T18:22:33.335375Z 01O Setting up zip (3.0-13) ...
-2026-06-25T18:22:33.361721Z 01O [32;1m$ if [ "$RUNNER_OS" = "Linux" ]; then # collapsed multi-line command[0;m
-2026-06-25T18:22:34.528761Z 01E debconf: delaying package configuration, since apt-utils is not installed
-2026-06-25T18:22:34.575428Z 01O Selecting previously unselected package libdbus-1-3:amd64.
-2026-06-25T18:22:34.575434Z 01O (Reading database ... 
-2026-06-25T18:22:34.577193Z 01O+(Reading database ... 5%
+2026-06-25T20:15:36.272512Z 01O Preparing to unpack .../archives/zip_3.0-13_amd64.deb ...
+2026-06-25T20:15:36.275450Z 01O Unpacking zip (3.0-13) ...
+2026-06-25T20:15:36.320560Z 01O Setting up zip (3.0-13) ...
+2026-06-25T20:15:36.345496Z 01O [32;1m$ if [ "$RUNNER_OS" = "Linux" ]; then # collapsed multi-line command[0;m
+2026-06-25T20:15:37.388691Z 01E debconf: delaying package configuration, since apt-utils is not installed
+2026-06-25T20:15:37.424323Z 01O Selecting previously unselected package libdbus-1-3:amd64.
+2026-06-25T20:15:37.424327Z 01O (Reading database ... 
+2026-06-25T20:15:37.426266Z 01O+(Reading database ... 5%
 (Reading database ... 10%
 (Reading database ... 15%
 (Reading database ... 20%
@@ -75,255 +74,338 @@
 (Reading database ... 55%
 (Reading database ... 60%
 (Reading database ... 65%
-2026-06-25T18:22:34.577899Z 01O+(Reading database ... 70%
-2026-06-25T18:22:34.578683Z 01O+(Reading database ... 75%
-2026-06-25T18:22:34.579288Z 01O+(Reading database ... 80%
-2026-06-25T18:22:34.580057Z 01O+(Reading database ... 85%
-2026-06-25T18:22:34.580875Z 01O+(Reading database ... 90%
-2026-06-25T18:22:34.581666Z 01O+(Reading database ... 95%
-2026-06-25T18:22:34.583357Z 01O+(Reading database ... 100%
+2026-06-25T20:15:37.426773Z 01O+(Reading database ... 70%
+2026-06-25T20:15:37.427743Z 01O+(Reading database ... 75%
+2026-06-25T20:15:37.430491Z 01O+(Reading database ... 80%
+2026-06-25T20:15:37.431861Z 01O+(Reading database ... 85%
+2026-06-25T20:15:37.432523Z 01O+(Reading database ... 90%
+2026-06-25T20:15:37.433426Z 01O+(Reading database ... 95%
+2026-06-25T20:15:37.434248Z 01O+(Reading database ... 100%
 (Reading database ... 23265 files and directories currently installed.)
-2026-06-25T18:22:34.584460Z 01O Preparing to unpack .../00-libdbus-1-3_1.14.10-1~deb12u1_amd64.deb ...
-2026-06-25T18:22:34.592263Z 01O Unpacking libdbus-1-3:amd64 (1.14.10-1~deb12u1) ...
-2026-06-25T18:22:34.635969Z 01O Selecting previously unselected package dbus-bin.
-2026-06-25T18:22:34.638036Z 01O Preparing to unpack .../01-dbus-bin_1.14.10-1~deb12u1_amd64.deb ...
-2026-06-25T18:22:34.642410Z 01O Unpacking dbus-bin (1.14.10-1~deb12u1) ...
-2026-06-25T18:22:34.673795Z 01O Selecting previously unselected package dbus-session-bus-common.
-2026-06-25T18:22:34.675761Z 01O Preparing to unpack .../02-dbus-session-bus-common_1.14.10-1~deb12u1_all.deb ...
-2026-06-25T18:22:34.680010Z 01O Unpacking dbus-session-bus-common (1.14.10-1~deb12u1) ...
-2026-06-25T18:22:34.720254Z 01O Selecting previously unselected package libapparmor1:amd64.
-2026-06-25T18:22:34.722167Z 01O Preparing to unpack .../03-libapparmor1_3.0.8-3_amd64.deb ...
-2026-06-25T18:22:34.726329Z 01O Unpacking libapparmor1:amd64 (3.0.8-3) ...
-2026-06-25T18:22:34.757670Z 01O Selecting previously unselected package dbus-daemon.
-2026-06-25T18:22:34.759813Z 01O Preparing to unpack .../04-dbus-daemon_1.14.10-1~deb12u1_amd64.deb ...
-2026-06-25T18:22:34.763344Z 01O Unpacking dbus-daemon (1.14.10-1~deb12u1) ...
-2026-06-25T18:22:34.800249Z 01O Selecting previously unselected package dbus-system-bus-common.
-2026-06-25T18:22:34.802124Z 01O Preparing to unpack .../05-dbus-system-bus-common_1.14.10-1~deb12u1_all.deb ...
-2026-06-25T18:22:34.805983Z 01O Unpacking dbus-system-bus-common (1.14.10-1~deb12u1) ...
-2026-06-25T18:22:34.845841Z 01O Selecting previously unselected package dbus.
-2026-06-25T18:22:34.847673Z 01O Preparing to unpack .../06-dbus_1.14.10-1~deb12u1_amd64.deb ...
-2026-06-25T18:22:34.851999Z 01O Unpacking dbus (1.14.10-1~deb12u1) ...
-2026-06-25T18:22:34.887748Z 01O Selecting previously unselected package alsa-topology-conf.
-2026-06-25T18:22:34.889697Z 01O Preparing to unpack .../07-alsa-topology-conf_1.2.5.1-2_all.deb ...
-2026-06-25T18:22:34.893608Z 01O Unpacking alsa-topology-conf (1.2.5.1-2) ...
-2026-06-25T18:22:34.921068Z 01O Selecting previously unselected package libasound2-data.
-2026-06-25T18:22:34.922729Z 01O Preparing to unpack .../08-libasound2-data_1.2.8-1_all.deb ...
-2026-06-25T18:22:34.925873Z 01O Unpacking libasound2-data (1.2.8-1) ...
-2026-06-25T18:22:34.962136Z 01O Selecting previously unselected package libasound2:amd64.
-2026-06-25T18:22:34.963886Z 01O Preparing to unpack .../09-libasound2_1.2.8-1+b1_amd64.deb ...
-2026-06-25T18:22:34.968268Z 01O Unpacking libasound2:amd64 (1.2.8-1+b1) ...
-2026-06-25T18:22:35.014213Z 01O Selecting previously unselected package alsa-ucm-conf.
-2026-06-25T18:22:35.016028Z 01O Preparing to unpack .../10-alsa-ucm-conf_1.2.8-1_all.deb ...
-2026-06-25T18:22:35.020789Z 01O Unpacking alsa-ucm-conf (1.2.8-1) ...
-2026-06-25T18:22:35.074409Z 01O Selecting previously unselected package espeak-ng-data:amd64.
-2026-06-25T18:22:35.076389Z 01O Preparing to unpack .../11-espeak-ng-data_1.51+dfsg-10+deb12u2_amd64.deb ...
-2026-06-25T18:22:35.079157Z 01O Unpacking espeak-ng-data:amd64 (1.51+dfsg-10+deb12u2) ...
-2026-06-25T18:22:35.377045Z 01O Selecting previously unselected package libasyncns0:amd64.
-2026-06-25T18:22:35.389590Z 01O Preparing to unpack .../12-libasyncns0_0.8-6+b3_amd64.deb ...
-2026-06-25T18:22:35.395368Z 01O Unpacking libasyncns0:amd64 (0.8-6+b3) ...
-2026-06-25T18:22:35.451266Z 01O Selecting previously unselected package libogg0:amd64.
-2026-06-25T18:22:35.453158Z 01O Preparing to unpack .../13-libogg0_1.3.5-3_amd64.deb ...
-2026-06-25T18:22:35.456957Z 01O Unpacking libogg0:amd64 (1.3.5-3) ...
-2026-06-25T18:22:35.517066Z 01O Selecting previously unselected package libflac12:amd64.
-2026-06-25T18:22:35.520881Z 01O Preparing to unpack .../14-libflac12_1.4.2+ds-2_amd64.deb ...
-2026-06-25T18:22:35.529432Z 01O Unpacking libflac12:amd64 (1.4.2+ds-2) ...
-2026-06-25T18:22:35.581796Z 01O Selecting previously unselected package libmp3lame0:amd64.
-2026-06-25T18:22:35.583951Z 01O Preparing to unpack .../15-libmp3lame0_3.100-6_amd64.deb ...
-2026-06-25T18:22:35.587202Z 01O Unpacking libmp3lame0:amd64 (3.100-6) ...
-2026-06-25T18:22:35.635007Z 01O Selecting previously unselected package libmpg123-0:amd64.
-2026-06-25T18:22:35.636839Z 01O Preparing to unpack .../16-libmpg123-0_1.31.2-1+deb12u1_amd64.deb ...
-2026-06-25T18:22:35.642404Z 01O Unpacking libmpg123-0:amd64 (1.31.2-1+deb12u1) ...
-2026-06-25T18:22:35.691837Z 01O Selecting previously unselected package libopus0:amd64.
-2026-06-25T18:22:35.694059Z 01O Preparing to unpack .../17-libopus0_1.3.1-3_amd64.deb ...
-2026-06-25T18:22:35.698230Z 01O Unpacking libopus0:amd64 (1.3.1-3) ...
-2026-06-25T18:22:35.745942Z 01O Selecting previously unselected package libvorbis0a:amd64.
-2026-06-25T18:22:35.747892Z 01O Preparing to unpack .../18-libvorbis0a_1.3.7-1_amd64.deb ...
-2026-06-25T18:22:35.752208Z 01O Unpacking libvorbis0a:amd64 (1.3.7-1) ...
-2026-06-25T18:22:35.795442Z 01O Selecting previously unselected package libvorbisenc2:amd64.
-2026-06-25T18:22:35.797348Z 01O Preparing to unpack .../19-libvorbisenc2_1.3.7-1_amd64.deb ...
-2026-06-25T18:22:35.804252Z 01O Unpacking libvorbisenc2:amd64 (1.3.7-1) ...
-2026-06-25T18:22:35.841668Z 01O Selecting previously unselected package libsndfile1:amd64.
-2026-06-25T18:22:35.843643Z 01O Preparing to unpack .../20-libsndfile1_1.2.0-1+deb12u1_amd64.deb ...
-2026-06-25T18:22:35.846942Z 01O Unpacking libsndfile1:amd64 (1.2.0-1+deb12u1) ...
-2026-06-25T18:22:35.891470Z 01O Selecting previously unselected package libx11-xcb1:amd64.
-2026-06-25T18:22:35.893460Z 01O Preparing to unpack .../21-libx11-xcb1_2%3a1.8.4-2+deb12u2_amd64.deb ...
-2026-06-25T18:22:35.897127Z 01O Unpacking libx11-xcb1:amd64 (2:1.8.4-2+deb12u2) ...
-2026-06-25T18:22:35.948410Z 01O Selecting previously unselected package libpulse0:amd64.
-2026-06-25T18:22:35.949868Z 01O Preparing to unpack .../22-libpulse0_16.1+dfsg1-2+b1_amd64.deb ...
-2026-06-25T18:22:35.958079Z 01O Unpacking libpulse0:amd64 (16.1+dfsg1-2+b1) ...
-2026-06-25T18:22:36.030596Z 01O Selecting previously unselected package libpcaudio0:amd64.
-2026-06-25T18:22:36.032635Z 01O Preparing to unpack .../23-libpcaudio0_1.2-2_amd64.deb ...
-2026-06-25T18:22:36.036723Z 01O Unpacking libpcaudio0:amd64 (1.2-2) ...
-2026-06-25T18:22:36.092446Z 01O Selecting previously unselected package libsonic0:amd64.
-2026-06-25T18:22:36.094593Z 01O Preparing to unpack .../24-libsonic0_0.2.0-12_amd64.deb ...
-2026-06-25T18:22:36.102376Z 01O Unpacking libsonic0:amd64 (0.2.0-12) ...
-2026-06-25T18:22:36.152026Z 01O Selecting previously unselected package libespeak-ng1:amd64.
-2026-06-25T18:22:36.154170Z 01O Preparing to unpack .../25-libespeak-ng1_1.51+dfsg-10+deb12u2_amd64.deb ...
-2026-06-25T18:22:36.157945Z 01O Unpacking libespeak-ng1:amd64 (1.51+dfsg-10+deb12u2) ...
-2026-06-25T18:22:36.210936Z 01O Selecting previously unselected package libespeak-ng-dev:amd64.
-2026-06-25T18:22:36.212914Z 01O Preparing to unpack .../26-libespeak-ng-dev_1.51+dfsg-10+deb12u2_amd64.deb ...
-2026-06-25T18:22:36.216753Z 01O Unpacking libespeak-ng-dev:amd64 (1.51+dfsg-10+deb12u2) ...
-2026-06-25T18:22:36.285908Z 01O Setting up libx11-xcb1:amd64 (2:1.8.4-2+deb12u2) ...
-2026-06-25T18:22:36.302554Z 01O Setting up libapparmor1:amd64 (3.0.8-3) ...
-2026-06-25T18:22:36.315592Z 01O Setting up libmpg123-0:amd64 (1.31.2-1+deb12u1) ...
-2026-06-25T18:22:36.330667Z 01O Setting up libogg0:amd64 (1.3.5-3) ...
-2026-06-25T18:22:36.344487Z 01O Setting up libasound2-data (1.2.8-1) ...
-2026-06-25T18:22:36.357712Z 01O Setting up libflac12:amd64 (1.4.2+ds-2) ...
-2026-06-25T18:22:36.370650Z 01O Setting up libdbus-1-3:amd64 (1.14.10-1~deb12u1) ...
-2026-06-25T18:22:36.381960Z 01O Setting up libopus0:amd64 (1.3.1-3) ...
-2026-06-25T18:22:36.393197Z 01O Setting up libvorbis0a:amd64 (1.3.7-1) ...
-2026-06-25T18:22:36.404992Z 01O Setting up libsonic0:amd64 (0.2.0-12) ...
-2026-06-25T18:22:36.416579Z 01O Setting up alsa-topology-conf (1.2.5.1-2) ...
-2026-06-25T18:22:36.429075Z 01O Setting up libasyncns0:amd64 (0.8-6+b3) ...
-2026-06-25T18:22:36.441898Z 01O Setting up dbus-session-bus-common (1.14.10-1~deb12u1) ...
-2026-06-25T18:22:36.452465Z 01O Setting up libasound2:amd64 (1.2.8-1+b1) ...
-2026-06-25T18:22:36.463682Z 01O Setting up dbus-system-bus-common (1.14.10-1~deb12u1) ...
-2026-06-25T18:22:36.555581Z 01O Setting up dbus-bin (1.14.10-1~deb12u1) ...
-2026-06-25T18:22:36.566745Z 01O Setting up libmp3lame0:amd64 (3.100-6) ...
-2026-06-25T18:22:36.578393Z 01O Setting up espeak-ng-data:amd64 (1.51+dfsg-10+deb12u2) ...
-2026-06-25T18:22:36.587553Z 01O Setting up libvorbisenc2:amd64 (1.3.7-1) ...
-2026-06-25T18:22:36.597221Z 01O Setting up alsa-ucm-conf (1.2.8-1) ...
-2026-06-25T18:22:36.607241Z 01O Setting up dbus-daemon (1.14.10-1~deb12u1) ...
-2026-06-25T18:22:36.626758Z 01O Setting up dbus (1.14.10-1~deb12u1) ...
-2026-06-25T18:22:36.662469Z 01O invoke-rc.d: could not determine current runlevel
-2026-06-25T18:22:36.665706Z 01O invoke-rc.d: policy-rc.d denied execution of start.
-2026-06-25T18:22:36.670485Z 01O Setting up libsndfile1:amd64 (1.2.0-1+deb12u1) ...
-2026-06-25T18:22:36.686572Z 01O Setting up libpulse0:amd64 (16.1+dfsg1-2+b1) ...
-2026-06-25T18:22:36.710974Z 01O Setting up libpcaudio0:amd64 (1.2-2) ...
-2026-06-25T18:22:36.724455Z 01O Setting up libespeak-ng1:amd64 (1.51+dfsg-10+deb12u2) ...
-2026-06-25T18:22:36.736868Z 01O Setting up libespeak-ng-dev:amd64 (1.51+dfsg-10+deb12u2) ...
-2026-06-25T18:22:36.752917Z 01O Processing triggers for libc-bin (2.36-9+deb12u10) ...
-2026-06-25T18:22:36.798005Z 01O [32;1m$ if [ "$CROSS" = "true" ]; then # collapsed multi-line command[0;m
-2026-06-25T18:22:36.798006Z 01O [32;1m$ rustup target add "$RUST_TRIPLE"[0;m
-2026-06-25T18:22:36.870248Z 01E info: component 'rust-std' for target 'x86_64-unknown-linux-gnu' is up to date
-2026-06-25T18:22:36.873211Z 01O [32;1m$ if [ "$CROSS" = "true" ]; then # collapsed multi-line command[0;m
-2026-06-25T18:22:36.873212Z 01O [32;1m$ cargo build --release --manifest-path sidecar/Cargo.toml --target "$RUST_TRIPLE"[0;m
-2026-06-25T18:22:36.909456Z 01E     Updating crates.io index
-2026-06-25T18:22:38.703611Z 01E      Locking 188 packages to latest compatible versions
-2026-06-25T18:22:38.709992Z 01E       Adding cpal v0.15.3 (available: v0.18.1)
-2026-06-25T18:22:38.711520Z 01E       Adding icu_collections v2.2.0 (requires Rust 1.86)
-2026-06-25T18:22:38.711521Z 01E       Adding icu_locale_core v2.2.0 (requires Rust 1.86)
-2026-06-25T18:22:38.711569Z 01E       Adding icu_normalizer v2.2.0 (requires Rust 1.86)
-2026-06-25T18:22:38.711570Z 01E       Adding icu_normalizer_data v2.2.0 (requires Rust 1.86)
-2026-06-25T18:22:38.711928Z 01E       Adding icu_properties v2.2.0 (requires Rust 1.86)
-2026-06-25T18:22:38.711929Z 01E       Adding icu_properties_data v2.2.0 (requires Rust 1.86)
-2026-06-25T18:22:38.711929Z 01E       Adding icu_provider v2.2.0 (requires Rust 1.86)
-2026-06-25T18:22:38.711970Z 01E       Adding idna_adapter v1.2.2 (requires Rust 1.86)
-2026-06-25T18:22:38.730393Z 01E       Adding wasip2 v1.0.4+wasi-0.2.12 (requires Rust 1.87.0)
-2026-06-25T18:22:38.739779Z 01E  Downloading crates ...
-2026-06-25T18:22:38.834434Z 01E   Downloaded anstyle-query v1.1.5
-2026-06-25T18:22:38.861385Z 01E   Downloaded adler2 v2.0.1
-2026-06-25T18:22:38.879520Z 01E   Downloaded anstyle-parse v1.0.0
-2026-06-25T18:22:38.881069Z 01E   Downloaded anstream v1.0.0
-2026-06-25T18:22:38.882623Z 01E   Downloaded anstyle v1.0.14
-2026-06-25T18:22:38.883785Z 01E   Downloaded alsa v0.9.1
-2026-06-25T18:22:38.891294Z 01E   Downloaded utf8parse v0.2.2
-2026-06-25T18:22:38.892027Z 01E   Downloaded strsim v0.11.1
-2026-06-25T18:22:38.894034Z 01E   Downloaded clap_lex v1.1.0
-2026-06-25T18:22:38.895502Z 01E   Downloaded alsa-sys v0.3.1
-2026-06-25T18:22:38.896869Z 01E   Downloaded errno v0.3.14
-2026-06-25T18:22:38.903782Z 01E   Downloaded percent-encoding v2.3.2
-2026-06-25T18:22:38.905382Z 01E   Downloaded itoa v1.0.18
-2026-06-25T18:22:38.906935Z 01E   Downloaded cfg-if v1.0.4
-2026-06-25T18:22:38.907920Z 01E   Downloaded quote v1.0.46
-2026-06-25T18:22:38.910290Z 01E   Downloaded zerofrom-derive v0.1.7
-2026-06-25T18:22:38.911314Z 01E   Downloaded heck v0.5.0
-2026-06-25T18:22:38.912149Z 01E   Downloaded stable_deref_trait v1.2.1
-2026-06-25T18:22:38.912713Z 01E   Downloaded idna_adapter v1.2.2
-2026-06-25T18:22:38.913349Z 01E   Downloaded form_urlencoded v1.2.2
-2026-06-25T18:22:38.913911Z 01E   Downloaded dasp_sample v0.11.0
-2026-06-25T18:22:38.918160Z 01E   Downloaded potential_utf v0.1.5
-2026-06-25T18:22:38.919109Z 01E   Downloaded zerofrom v0.1.8
-2026-06-25T18:22:38.919979Z 01E   Downloaded xattr v1.6.1
-2026-06-25T18:22:38.921676Z 01E   Downloaded writeable v0.6.3
-2026-06-25T18:22:38.923362Z 01E   Downloaded yoke-derive v0.8.2
-2026-06-25T18:22:38.924583Z 01E   Downloaded subtle v2.6.1
-2026-06-25T18:22:38.925675Z 01E   Downloaded yoke v0.8.3
-2026-06-25T18:22:38.927284Z 01E   Downloaded displaydoc v0.2.6
-2026-06-25T18:22:38.928576Z 01E   Downloaded pkg-config v0.3.33
-2026-06-25T18:22:38.929935Z 01E   Downloaded filetime v0.2.29
-2026-06-25T18:22:38.931332Z 01E   Downloaded shlex v2.0.1
-2026-06-25T18:22:38.932768Z 01E   Downloaded sherpa-onnx-sys v1.13.3
-2026-06-25T18:22:38.934357Z 01E   Downloaded zerovec-derive v0.11.3
-2026-06-25T18:22:38.935818Z 01E   Downloaded tinystr v0.8.3
-2026-06-25T18:22:38.938218Z 01E   Downloaded zmij v1.0.21
-2026-06-25T18:22:38.940318Z 01E   Downloaded unicode-ident v1.0.24
-2026-06-25T18:22:38.942539Z 01E   Downloaded serde_derive v1.0.228
-2026-06-25T18:22:38.945420Z 01E   Downloaded zerotrie v0.2.4
-2026-06-25T18:22:38.949290Z 01E   Downloaded ureq v2.12.1
-2026-06-25T18:22:38.954341Z 01E   Downloaded zerovec v0.11.6
-2026-06-25T18:22:38.959661Z 01E   Downloaded serde_json v1.0.150
-2026-06-25T18:22:38.965273Z 01E   Downloaded icu_properties_data v2.2.0
-2026-06-25T18:22:38.972881Z 01E   Downloaded webpki-roots v1.0.8
-2026-06-25T18:22:38.976049Z 01E   Downloaded colorchoice v1.0.5
-2026-06-25T18:22:38.977059Z 01E   Downloaded clap_builder v4.6.0
-2026-06-25T18:22:38.982826Z 01E   Downloaded idna v1.1.0
-2026-06-25T18:22:38.986624Z 01E   Downloaded syn v2.0.118
-2026-06-25T18:22:38.995529Z 01E   Downloaded memchr v2.8.2
-2026-06-25T18:22:38.999768Z 01E   Downloaded flate2 v1.1.9
-2026-06-25T18:22:39.003332Z 01E   Downloaded rustls v0.23.41
-2026-06-25T18:22:39.013806Z 01E   Downloaded rustix v1.1.4
-2026-06-25T18:22:39.032813Z 01E   Downloaded cpal v0.15.3
-2026-06-25T18:22:39.036959Z 01E   Downloaded cc v1.2.65
-2026-06-25T18:22:39.040012Z 01E   Downloaded url v2.5.8
-2026-06-25T18:22:39.042983Z 01E   Downloaded tar v0.4.46
-2026-06-25T18:22:39.045531Z 01E   Downloaded serde v1.0.228
-2026-06-25T18:22:39.048713Z 01E   Downloaded rustls-webpki v0.103.13
-2026-06-25T18:22:39.051349Z 01E   Downloaded bzip2-sys v0.1.13+1.0.8
-2026-06-25T18:22:39.062606Z 01E   Downloaded icu_normalizer v2.2.0
-2026-06-25T18:22:39.065773Z 01E   Downloaded log v0.4.33
-2026-06-25T18:22:39.067920Z 01E   Downloaded icu_locale_core v2.2.0
-2026-06-25T18:22:39.072369Z 01E   Downloaded libc v0.2.186
-2026-06-25T18:22:39.101915Z 01E   Downloaded icu_collections v2.2.0
-2026-06-25T18:22:39.106753Z 01E   Downloaded clap v4.6.1
-2026-06-25T18:22:39.112658Z 01E   Downloaded proc-macro2 v1.0.106
-2026-06-25T18:22:39.115441Z 01E   Downloaded miniz_oxide v0.8.9
-2026-06-25T18:22:39.117598Z 01E   Downloaded jobserver v0.1.34
-2026-06-25T18:22:39.119135Z 01E   Downloaded icu_provider v2.2.0
-2026-06-25T18:22:39.121259Z 01E   Downloaded icu_normalizer_data v2.2.0
-2026-06-25T18:22:39.123284Z 01E   Downloaded bzip2 v0.4.4
-2026-06-25T18:22:39.124717Z 01E   Downloaded smallvec v1.15.2
-2026-06-25T18:22:39.125805Z 01E   Downloaded simd-adler32 v0.3.9
-2026-06-25T18:22:39.127263Z 01E   Downloaded sherpa-onnx v1.13.3
-2026-06-25T18:22:39.128922Z 01E   Downloaded serde_core v1.0.228
-2026-06-25T18:22:39.131073Z 01E   Downloaded clap_derive v4.6.1
-2026-06-25T18:22:39.132932Z 01E   Downloaded ring v0.17.14
-2026-06-25T18:22:39.167777Z 01E   Downloaded zeroize v1.9.0
-2026-06-25T18:22:39.169149Z 01E   Downloaded litemap v0.8.2
-2026-06-25T18:22:39.171021Z 01E   Downloaded crc32fast v1.5.0
-2026-06-25T18:22:39.172399Z 01E   Downloaded bitflags v2.13.0
-2026-06-25T18:22:39.175312Z 01E   Downloaded base64 v0.22.1
-2026-06-25T18:22:39.178333Z 01E   Downloaded getrandom v0.2.17
-2026-06-25T18:22:39.180432Z 01E   Downloaded find-msvc-tools v0.1.9
-2026-06-25T18:22:39.181791Z 01E   Downloaded untrusted v0.9.0
-2026-06-25T18:22:39.183228Z 01E   Downloaded synstructure v0.13.2
-2026-06-25T18:22:39.184177Z 01E   Downloaded once_cell v1.21.4
-2026-06-25T18:22:39.186015Z 01E   Downloaded webpki-roots v0.26.11
-2026-06-25T18:22:39.187356Z 01E   Downloaded utf8_iter v1.0.4
-2026-06-25T18:22:39.188640Z 01E   Downloaded linux-raw-sys v0.12.1
-2026-06-25T18:22:39.251445Z 01E   Downloaded is_terminal_polyfill v1.70.2
-2026-06-25T18:22:39.252404Z 01E   Downloaded icu_properties v2.2.0
-2026-06-25T18:22:39.389492Z 01E   Downloaded rustls-pki-types v1.14.1
-2026-06-25T18:22:39.445185Z 01E error: rustc 1.85.1 is not supported by the following packages:
-2026-06-25T18:22:39.445196Z 01E   icu_collections@2.2.0 requires rustc 1.86
-2026-06-25T18:22:39.445197Z 01E   icu_locale_core@2.2.0 requires rustc 1.86
-2026-06-25T18:22:39.445198Z 01E   icu_normalizer@2.2.0 requires rustc 1.86
-2026-06-25T18:22:39.445198Z 01E   icu_normalizer_data@2.2.0 requires rustc 1.86
-2026-06-25T18:22:39.445199Z 01E   icu_normalizer_data@2.2.0 requires rustc 1.86
-2026-06-25T18:22:39.445199Z 01E   icu_normalizer_data@2.2.0 requires rustc 1.86
-2026-06-25T18:22:39.445200Z 01E   icu_properties@2.2.0 requires rustc 1.86
-2026-06-25T18:22:39.445200Z 01E   icu_properties_data@2.2.0 requires rustc 1.86
-2026-06-25T18:22:39.445201Z 01E   icu_properties_data@2.2.0 requires rustc 1.86
-2026-06-25T18:22:39.445201Z 01E   icu_properties_data@2.2.0 requires rustc 1.86
-2026-06-25T18:22:39.445202Z 01E   icu_provider@2.2.0 requires rustc 1.86
-2026-06-25T18:22:39.445202Z 01E   idna_adapter@1.2.2 requires rustc 1.86
-2026-06-25T18:22:39.445203Z 01E Either upgrade rustc or select compatible dependency versions with
-2026-06-25T18:22:39.445203Z 01E `cargo update <name>@<current-ver> --precise <compatible-ver>`
-2026-06-25T18:22:39.445204Z 01E where `<compatible-ver>` is the latest version supporting rustc 1.85.1
-2026-06-25T18:22:39.445204Z 01E 
-2026-06-25T18:22:40.493612Z 00O section_end:1782411760:step_script
-2026-06-25T18:22:40.493617Z 00O+[0Ksection_start:1782411760:cleanup_file_variables
-2026-06-25T18:22:40.494623Z 00O+[0K[0K[36;1mCleaning up project directory and file based variables[0;m[0;m
-2026-06-25T18:22:40.884540Z 00O section_end:1782411760:cleanup_file_variables
-2026-06-25T18:22:40.884544Z 00O+[0K
-2026-06-25T18:22:41.023034Z 00O [31;1mERROR: Job failed: exit code 1[0;m
+2026-06-25T20:15:37.435342Z 01O Preparing to unpack .../00-libdbus-1-3_1.14.10-1~deb12u1_amd64.deb ...
+2026-06-25T20:15:37.440987Z 01O Unpacking libdbus-1-3:amd64 (1.14.10-1~deb12u1) ...
+2026-06-25T20:15:37.472964Z 01O Selecting previously unselected package dbus-bin.
+2026-06-25T20:15:37.474329Z 01O Preparing to unpack .../01-dbus-bin_1.14.10-1~deb12u1_amd64.deb ...
+2026-06-25T20:15:37.477013Z 01O Unpacking dbus-bin (1.14.10-1~deb12u1) ...
+2026-06-25T20:15:37.503658Z 01O Selecting previously unselected package dbus-session-bus-common.
+2026-06-25T20:15:37.505181Z 01O Preparing to unpack .../02-dbus-session-bus-common_1.14.10-1~deb12u1_all.deb ...
+2026-06-25T20:15:37.510718Z 01O Unpacking dbus-session-bus-common (1.14.10-1~deb12u1) ...
+2026-06-25T20:15:37.538493Z 01O Selecting previously unselected package libapparmor1:amd64.
+2026-06-25T20:15:37.539991Z 01O Preparing to unpack .../03-libapparmor1_3.0.8-3_amd64.deb ...
+2026-06-25T20:15:37.542842Z 01O Unpacking libapparmor1:amd64 (3.0.8-3) ...
+2026-06-25T20:15:37.568235Z 01O Selecting previously unselected package dbus-daemon.
+2026-06-25T20:15:37.569646Z 01O Preparing to unpack .../04-dbus-daemon_1.14.10-1~deb12u1_amd64.deb ...
+2026-06-25T20:15:37.572414Z 01O Unpacking dbus-daemon (1.14.10-1~deb12u1) ...
+2026-06-25T20:15:37.602779Z 01O Selecting previously unselected package dbus-system-bus-common.
+2026-06-25T20:15:37.604275Z 01O Preparing to unpack .../05-dbus-system-bus-common_1.14.10-1~deb12u1_all.deb ...
+2026-06-25T20:15:37.606589Z 01O Unpacking dbus-system-bus-common (1.14.10-1~deb12u1) ...
+2026-06-25T20:15:37.638258Z 01O Selecting previously unselected package dbus.
+2026-06-25T20:15:37.639770Z 01O Preparing to unpack .../06-dbus_1.14.10-1~deb12u1_amd64.deb ...
+2026-06-25T20:15:37.642855Z 01O Unpacking dbus (1.14.10-1~deb12u1) ...
+2026-06-25T20:15:37.671800Z 01O Selecting previously unselected package alsa-topology-conf.
+2026-06-25T20:15:37.673743Z 01O Preparing to unpack .../07-alsa-topology-conf_1.2.5.1-2_all.deb ...
+2026-06-25T20:15:37.676514Z 01O Unpacking alsa-topology-conf (1.2.5.1-2) ...
+2026-06-25T20:15:37.698143Z 01O Selecting previously unselected package libasound2-data.
+2026-06-25T20:15:37.699596Z 01O Preparing to unpack .../08-libasound2-data_1.2.8-1_all.deb ...
+2026-06-25T20:15:37.702082Z 01O Unpacking libasound2-data (1.2.8-1) ...
+2026-06-25T20:15:37.731144Z 01O Selecting previously unselected package libasound2:amd64.
+2026-06-25T20:15:37.732937Z 01O Preparing to unpack .../09-libasound2_1.2.8-1+b1_amd64.deb ...
+2026-06-25T20:15:37.736048Z 01O Unpacking libasound2:amd64 (1.2.8-1+b1) ...
+2026-06-25T20:15:37.773395Z 01O Selecting previously unselected package alsa-ucm-conf.
+2026-06-25T20:15:37.774908Z 01O Preparing to unpack .../10-alsa-ucm-conf_1.2.8-1_all.deb ...
+2026-06-25T20:15:37.777146Z 01O Unpacking alsa-ucm-conf (1.2.8-1) ...
+2026-06-25T20:15:37.823579Z 01O Selecting previously unselected package espeak-ng-data:amd64.
+2026-06-25T20:15:37.825309Z 01O Preparing to unpack .../11-espeak-ng-data_1.51+dfsg-10+deb12u2_amd64.deb ...
+2026-06-25T20:15:37.827952Z 01O Unpacking espeak-ng-data:amd64 (1.51+dfsg-10+deb12u2) ...
+2026-06-25T20:15:38.083722Z 01O Selecting previously unselected package libasyncns0:amd64.
+2026-06-25T20:15:38.085463Z 01O Preparing to unpack .../12-libasyncns0_0.8-6+b3_amd64.deb ...
+2026-06-25T20:15:38.088594Z 01O Unpacking libasyncns0:amd64 (0.8-6+b3) ...
+2026-06-25T20:15:38.113598Z 01O Selecting previously unselected package libogg0:amd64.
+2026-06-25T20:15:38.115384Z 01O Preparing to unpack .../13-libogg0_1.3.5-3_amd64.deb ...
+2026-06-25T20:15:38.118059Z 01O Unpacking libogg0:amd64 (1.3.5-3) ...
+2026-06-25T20:15:38.143161Z 01O Selecting previously unselected package libflac12:amd64.
+2026-06-25T20:15:38.144729Z 01O Preparing to unpack .../14-libflac12_1.4.2+ds-2_amd64.deb ...
+2026-06-25T20:15:38.147552Z 01O Unpacking libflac12:amd64 (1.4.2+ds-2) ...
+2026-06-25T20:15:38.182035Z 01O Selecting previously unselected package libmp3lame0:amd64.
+2026-06-25T20:15:38.183529Z 01O Preparing to unpack .../15-libmp3lame0_3.100-6_amd64.deb ...
+2026-06-25T20:15:38.187157Z 01O Unpacking libmp3lame0:amd64 (3.100-6) ...
+2026-06-25T20:15:38.237369Z 01O Selecting previously unselected package libmpg123-0:amd64.
+2026-06-25T20:15:38.239542Z 01O Preparing to unpack .../16-libmpg123-0_1.31.2-1+deb12u1_amd64.deb ...
+2026-06-25T20:15:38.243837Z 01O Unpacking libmpg123-0:amd64 (1.31.2-1+deb12u1) ...
+2026-06-25T20:15:38.278462Z 01O Selecting previously unselected package libopus0:amd64.
+2026-06-25T20:15:38.280110Z 01O Preparing to unpack .../17-libopus0_1.3.1-3_amd64.deb ...
+2026-06-25T20:15:38.283059Z 01O Unpacking libopus0:amd64 (1.3.1-3) ...
+2026-06-25T20:15:38.342629Z 01O Selecting previously unselected package libvorbis0a:amd64.
+2026-06-25T20:15:38.344190Z 01O Preparing to unpack .../18-libvorbis0a_1.3.7-1_amd64.deb ...
+2026-06-25T20:15:38.347205Z 01O Unpacking libvorbis0a:amd64 (1.3.7-1) ...
+2026-06-25T20:15:38.388176Z 01O Selecting previously unselected package libvorbisenc2:amd64.
+2026-06-25T20:15:38.392420Z 01O Preparing to unpack .../19-libvorbisenc2_1.3.7-1_amd64.deb ...
+2026-06-25T20:15:38.395133Z 01O Unpacking libvorbisenc2:amd64 (1.3.7-1) ...
+2026-06-25T20:15:38.425906Z 01O Selecting previously unselected package libsndfile1:amd64.
+2026-06-25T20:15:38.427495Z 01O Preparing to unpack .../20-libsndfile1_1.2.0-1+deb12u1_amd64.deb ...
+2026-06-25T20:15:38.430187Z 01O Unpacking libsndfile1:amd64 (1.2.0-1+deb12u1) ...
+2026-06-25T20:15:38.465031Z 01O Selecting previously unselected package libx11-xcb1:amd64.
+2026-06-25T20:15:38.466806Z 01O Preparing to unpack .../21-libx11-xcb1_2%3a1.8.4-2+deb12u2_amd64.deb ...
+2026-06-25T20:15:38.472592Z 01O Unpacking libx11-xcb1:amd64 (2:1.8.4-2+deb12u2) ...
+2026-06-25T20:15:38.511534Z 01O Selecting previously unselected package libpulse0:amd64.
+2026-06-25T20:15:38.513187Z 01O Preparing to unpack .../22-libpulse0_16.1+dfsg1-2+b1_amd64.deb ...
+2026-06-25T20:15:38.518640Z 01O Unpacking libpulse0:amd64 (16.1+dfsg1-2+b1) ...
+2026-06-25T20:15:38.558150Z 01O Selecting previously unselected package libpcaudio0:amd64.
+2026-06-25T20:15:38.559822Z 01O Preparing to unpack .../23-libpcaudio0_1.2-2_amd64.deb ...
+2026-06-25T20:15:38.562300Z 01O Unpacking libpcaudio0:amd64 (1.2-2) ...
+2026-06-25T20:15:38.591040Z 01O Selecting previously unselected package libsonic0:amd64.
+2026-06-25T20:15:38.593152Z 01O Preparing to unpack .../24-libsonic0_0.2.0-12_amd64.deb ...
+2026-06-25T20:15:38.595952Z 01O Unpacking libsonic0:amd64 (0.2.0-12) ...
+2026-06-25T20:15:38.620850Z 01O Selecting previously unselected package libespeak-ng1:amd64.
+2026-06-25T20:15:38.622843Z 01O Preparing to unpack .../25-libespeak-ng1_1.51+dfsg-10+deb12u2_amd64.deb ...
+2026-06-25T20:15:38.625528Z 01O Unpacking libespeak-ng1:amd64 (1.51+dfsg-10+deb12u2) ...
+2026-06-25T20:15:38.661073Z 01O Selecting previously unselected package libespeak-ng-dev:amd64.
+2026-06-25T20:15:38.663077Z 01O Preparing to unpack .../26-libespeak-ng-dev_1.51+dfsg-10+deb12u2_amd64.deb ...
+2026-06-25T20:15:38.666659Z 01O Unpacking libespeak-ng-dev:amd64 (1.51+dfsg-10+deb12u2) ...
+2026-06-25T20:15:38.714653Z 01O Setting up libx11-xcb1:amd64 (2:1.8.4-2+deb12u2) ...
+2026-06-25T20:15:38.722951Z 01O Setting up libapparmor1:amd64 (3.0.8-3) ...
+2026-06-25T20:15:38.730171Z 01O Setting up libmpg123-0:amd64 (1.31.2-1+deb12u1) ...
+2026-06-25T20:15:38.738221Z 01O Setting up libogg0:amd64 (1.3.5-3) ...
+2026-06-25T20:15:38.746140Z 01O Setting up libasound2-data (1.2.8-1) ...
+2026-06-25T20:15:38.754502Z 01O Setting up libflac12:amd64 (1.4.2+ds-2) ...
+2026-06-25T20:15:38.763430Z 01O Setting up libdbus-1-3:amd64 (1.14.10-1~deb12u1) ...
+2026-06-25T20:15:38.773450Z 01O Setting up libopus0:amd64 (1.3.1-3) ...
+2026-06-25T20:15:38.781476Z 01O Setting up libvorbis0a:amd64 (1.3.7-1) ...
+2026-06-25T20:15:38.790917Z 01O Setting up libsonic0:amd64 (0.2.0-12) ...
+2026-06-25T20:15:38.798140Z 01O Setting up alsa-topology-conf (1.2.5.1-2) ...
+2026-06-25T20:15:38.813991Z 01O Setting up libasyncns0:amd64 (0.8-6+b3) ...
+2026-06-25T20:15:38.821525Z 01O Setting up dbus-session-bus-common (1.14.10-1~deb12u1) ...
+2026-06-25T20:15:38.828484Z 01O Setting up libasound2:amd64 (1.2.8-1+b1) ...
+2026-06-25T20:15:38.837804Z 01O Setting up dbus-system-bus-common (1.14.10-1~deb12u1) ...
+2026-06-25T20:15:38.898035Z 01O Setting up dbus-bin (1.14.10-1~deb12u1) ...
+2026-06-25T20:15:38.905295Z 01O Setting up libmp3lame0:amd64 (3.100-6) ...
+2026-06-25T20:15:38.913264Z 01O Setting up espeak-ng-data:amd64 (1.51+dfsg-10+deb12u2) ...
+2026-06-25T20:15:38.920756Z 01O Setting up libvorbisenc2:amd64 (1.3.7-1) ...
+2026-06-25T20:15:38.928917Z 01O Setting up alsa-ucm-conf (1.2.8-1) ...
+2026-06-25T20:15:38.936171Z 01O Setting up dbus-daemon (1.14.10-1~deb12u1) ...
+2026-06-25T20:15:38.947494Z 01O Setting up dbus (1.14.10-1~deb12u1) ...
+2026-06-25T20:15:38.968636Z 01O invoke-rc.d: could not determine current runlevel
+2026-06-25T20:15:38.970070Z 01O invoke-rc.d: policy-rc.d denied execution of start.
+2026-06-25T20:15:38.972667Z 01O Setting up libsndfile1:amd64 (1.2.0-1+deb12u1) ...
+2026-06-25T20:15:38.979207Z 01O Setting up libpulse0:amd64 (16.1+dfsg1-2+b1) ...
+2026-06-25T20:15:38.991196Z 01O Setting up libpcaudio0:amd64 (1.2-2) ...
+2026-06-25T20:15:39.000240Z 01O Setting up libespeak-ng1:amd64 (1.51+dfsg-10+deb12u2) ...
+2026-06-25T20:15:39.007520Z 01O Setting up libespeak-ng-dev:amd64 (1.51+dfsg-10+deb12u2) ...
+2026-06-25T20:15:39.014569Z 01O Processing triggers for libc-bin (2.36-9+deb12u10) ...
+2026-06-25T20:15:39.053266Z 01O [32;1m$ if [ "$CROSS" = "true" ]; then # collapsed multi-line command[0;m
+2026-06-25T20:15:39.053268Z 01O [32;1m$ rustup target add "$RUST_TRIPLE"[0;m
+2026-06-25T20:15:39.145080Z 01E info: component 'rust-std' for target 'x86_64-unknown-linux-gnu' is up to date
+2026-06-25T20:15:39.148114Z 01O [32;1m$ if [ "$CROSS" = "true" ]; then # collapsed multi-line command[0;m
+2026-06-25T20:15:39.148116Z 01O [32;1m$ cargo build --release --manifest-path sidecar/Cargo.toml --target "$RUST_TRIPLE"[0;m
+2026-06-25T20:15:39.210943Z 01E     Updating crates.io index
+2026-06-25T20:15:40.641209Z 01E  Downloading crates ...
+2026-06-25T20:15:41.054986Z 01E   Downloaded yoke v0.8.3
+2026-06-25T20:15:41.066414Z 01E   Downloaded tar v0.4.46
+2026-06-25T20:15:41.194969Z 01E   Downloaded alsa-sys v0.3.1
+2026-06-25T20:15:41.211035Z 01E   Downloaded getrandom v0.2.17
+2026-06-25T20:15:41.213392Z 01E   Downloaded untrusted v0.9.0
+2026-06-25T20:15:41.222320Z 01E   Downloaded serde_json v1.0.150
+2026-06-25T20:15:41.227976Z 01E   Downloaded once_cell v1.21.4
+2026-06-25T20:15:41.229990Z 01E   Downloaded itoa v1.0.18
+2026-06-25T20:15:41.231128Z 01E   Downloaded clap_lex v1.1.0
+2026-06-25T20:15:41.245680Z 01E   Downloaded is_terminal_polyfill v1.70.2
+2026-06-25T20:15:41.246288Z 01E   Downloaded bzip2 v0.4.4
+2026-06-25T20:15:41.250072Z 01E   Downloaded yoke-derive v0.8.2
+2026-06-25T20:15:41.268462Z 01E   Downloaded crc32fast v1.5.0
+2026-06-25T20:15:41.279907Z 01E   Downloaded webpki-roots v0.26.11
+2026-06-25T20:15:41.280905Z 01E   Downloaded rustix v1.1.4
+2026-06-25T20:15:41.316167Z 01E   Downloaded zerofrom v0.1.8
+2026-06-25T20:15:41.317876Z 01E   Downloaded simd-adler32 v0.3.9
+2026-06-25T20:15:41.319115Z 01E   Downloaded proc-macro2 v1.0.106
+2026-06-25T20:15:41.322654Z 01E   Downloaded clap_derive v4.6.1
+2026-06-25T20:15:41.325807Z 01E   Downloaded zerovec-derive v0.11.3
+2026-06-25T20:15:41.329637Z 01E   Downloaded icu_normalizer v2.2.0
+2026-06-25T20:15:41.334330Z 01E   Downloaded cc v1.2.65
+2026-06-25T20:15:41.366491Z 01E   Downloaded memchr v2.8.2
+2026-06-25T20:15:41.370240Z 01E   Downloaded icu_properties_data v2.2.0
+2026-06-25T20:15:41.382157Z 01E   Downloaded idna v1.1.0
+2026-06-25T20:15:41.393473Z 01E   Downloaded ring v0.17.14
+2026-06-25T20:15:41.422839Z 01E   Downloaded zerofrom-derive v0.1.7
+2026-06-25T20:15:41.423832Z 01E   Downloaded anstyle v1.0.14
+2026-06-25T20:15:41.424942Z 01E   Downloaded strsim v0.11.1
+2026-06-25T20:15:41.446539Z 01E   Downloaded rustls-webpki v0.103.13
+2026-06-25T20:15:41.540719Z 01E   Downloaded linux-raw-sys v0.12.1
+2026-06-25T20:15:42.280558Z 01E   Downloaded base64 v0.22.1
+2026-06-25T20:15:42.403148Z 01E   Downloaded anstyle-parse v1.0.0
+2026-06-25T20:15:42.413324Z 01E   Downloaded pkg-config v0.3.33
+2026-06-25T20:15:42.415468Z 01E   Downloaded find-msvc-tools v0.1.9
+2026-06-25T20:15:42.427522Z 01E   Downloaded idna_adapter v1.2.2
+2026-06-25T20:15:42.438070Z 01E   Downloaded zeroize v1.9.0
+2026-06-25T20:15:42.461005Z 01E   Downloaded icu_properties v2.2.0
+2026-06-25T20:15:42.468323Z 01E   Downloaded ureq v2.12.1
+2026-06-25T20:15:42.472750Z 01E   Downloaded log v0.4.33
+2026-06-25T20:15:42.475791Z 01E   Downloaded adler2 v2.0.1
+2026-06-25T20:15:42.476733Z 01E   Downloaded filetime v0.2.29
+2026-06-25T20:15:42.485108Z 01E   Downloaded displaydoc v0.2.6
+2026-06-25T20:15:42.493239Z 01E   Downloaded quote v1.0.46
+2026-06-25T20:15:42.508681Z 01E   Downloaded serde_derive v1.0.228
+2026-06-25T20:15:42.510600Z 01E   Downloaded synstructure v0.13.2
+2026-06-25T20:15:42.511281Z 01E   Downloaded cpal v0.15.3
+2026-06-25T20:15:42.514873Z 01E   Downloaded sherpa-onnx v1.13.3
+2026-06-25T20:15:42.518577Z 01E   Downloaded form_urlencoded v1.2.2
+2026-06-25T20:15:42.519870Z 01E   Downloaded cfg-if v1.0.4
+2026-06-25T20:15:42.523426Z 01E   Downloaded alsa v0.9.1
+2026-06-25T20:15:42.536082Z 01E   Downloaded xattr v1.6.1
+2026-06-25T20:15:42.537495Z 01E   Downloaded miniz_oxide v0.8.9
+2026-06-25T20:15:42.551194Z 01E   Downloaded zerovec v0.11.6
+2026-06-25T20:15:42.567514Z 01E   Downloaded stable_deref_trait v1.2.1
+2026-06-25T20:15:42.568212Z 01E   Downloaded shlex v2.0.1
+2026-06-25T20:15:42.569073Z 01E   Downloaded clap_builder v4.6.0
+2026-06-25T20:15:42.584484Z 01E   Downloaded libc v0.2.186
+2026-06-25T20:15:42.679547Z 01E   Downloaded unicode-ident v1.0.24
+2026-06-25T20:15:42.685757Z 01E   Downloaded rustls-pki-types v1.14.1
+2026-06-25T20:15:42.687389Z 01E   Downloaded icu_collections v2.2.0
+2026-06-25T20:15:42.701315Z 01E   Downloaded serde v1.0.228
+2026-06-25T20:15:42.723212Z 01E   Downloaded syn v2.0.118
+2026-06-25T20:15:42.748696Z 01E   Downloaded bzip2-sys v0.1.13+1.0.8
+2026-06-25T20:15:42.833467Z 01E   Downloaded anstyle-query v1.1.5
+2026-06-25T20:15:42.978245Z 01E   Downloaded zerotrie v0.2.4
+2026-06-25T20:15:43.043785Z 01E   Downloaded percent-encoding v2.3.2
+2026-06-25T20:15:43.061646Z 01E   Downloaded writeable v0.6.3
+2026-06-25T20:15:43.063197Z 01E   Downloaded heck v0.5.0
+2026-06-25T20:15:43.070383Z 01E   Downloaded serde_core v1.0.228
+2026-06-25T20:15:43.073529Z 01E   Downloaded tinystr v0.8.3
+2026-06-25T20:15:43.077007Z 01E   Downloaded litemap v0.8.2
+2026-06-25T20:15:43.078864Z 01E   Downloaded zmij v1.0.21
+2026-06-25T20:15:43.082760Z 01E   Downloaded anstream v1.0.0
+2026-06-25T20:15:43.084191Z 01E   Downloaded rustls v0.23.41
+2026-06-25T20:15:43.091834Z 01E   Downloaded smallvec v1.15.2
+2026-06-25T20:15:43.092621Z 01E   Downloaded jobserver v0.1.34
+2026-06-25T20:15:43.093679Z 01E   Downloaded icu_normalizer_data v2.2.0
+2026-06-25T20:15:43.118060Z 01E   Downloaded webpki-roots v1.0.8
+2026-06-25T20:15:43.142944Z 01E   Downloaded icu_provider v2.2.0
+2026-06-25T20:15:43.161550Z 01E   Downloaded utf8_iter v1.0.4
+2026-06-25T20:15:43.162670Z 01E   Downloaded utf8parse v0.2.2
+2026-06-25T20:15:43.173765Z 01E   Downloaded url v2.5.8
+2026-06-25T20:15:43.202796Z 01E   Downloaded subtle v2.6.1
+2026-06-25T20:15:43.211931Z 01E   Downloaded dasp_sample v0.11.0
+2026-06-25T20:15:43.215565Z 01E   Downloaded colorchoice v1.0.5
+2026-06-25T20:15:43.216472Z 01E   Downloaded bitflags v2.13.0
+2026-06-25T20:15:43.255918Z 01E   Downloaded errno v0.3.14
+2026-06-25T20:15:43.270813Z 01E   Downloaded clap v4.6.1
+2026-06-25T20:15:43.285706Z 01E   Downloaded flate2 v1.1.9
+2026-06-25T20:15:43.288556Z 01E   Downloaded potential_utf v0.1.5
+2026-06-25T20:15:43.289296Z 01E   Downloaded icu_locale_core v2.2.0
+2026-06-25T20:15:43.343620Z 01E   Downloaded sherpa-onnx-sys v1.13.3
+2026-06-25T20:15:43.377161Z 01E    Compiling proc-macro2 v1.0.106
+2026-06-25T20:15:43.377166Z 01E    Compiling quote v1.0.46
+2026-06-25T20:15:43.377166Z 01E    Compiling unicode-ident v1.0.24
+2026-06-25T20:15:43.377167Z 01E    Compiling libc v0.2.186
+2026-06-25T20:15:43.427848Z 01E    Compiling stable_deref_trait v1.2.1
+2026-06-25T20:15:43.449678Z 01E    Compiling shlex v2.0.1
+2026-06-25T20:15:43.521432Z 01E    Compiling find-msvc-tools v0.1.9
+2026-06-25T20:15:43.536979Z 01E    Compiling cfg-if v1.0.4
+2026-06-25T20:15:43.556103Z 01E    Compiling pkg-config v0.3.33
+2026-06-25T20:15:43.639733Z 01E    Compiling cc v1.2.65
+2026-06-25T20:15:44.078567Z 01E    Compiling syn v2.0.118
+2026-06-25T20:15:44.111367Z 01E    Compiling litemap v0.8.2
+2026-06-25T20:15:44.212256Z 01E    Compiling writeable v0.6.3
+2026-06-25T20:15:44.306871Z 01E    Compiling icu_normalizer_data v2.2.0
+2026-06-25T20:15:44.384753Z 01E    Compiling icu_properties_data v2.2.0
+2026-06-25T20:15:44.416075Z 01E    Compiling utf8_iter v1.0.4
+2026-06-25T20:15:44.472988Z 01E    Compiling zeroize v1.9.0
+2026-06-25T20:15:44.602294Z 01E    Compiling rustls-pki-types v1.14.1
+2026-06-25T20:15:44.622394Z 01E    Compiling smallvec v1.15.2
+2026-06-25T20:15:44.721978Z 01E    Compiling getrandom v0.2.17
+2026-06-25T20:15:44.748546Z 01E    Compiling ring v0.17.14
+2026-06-25T20:15:44.799797Z 01E    Compiling rustix v1.1.4
+2026-06-25T20:15:44.878590Z 01E    Compiling crc32fast v1.5.0
+2026-06-25T20:15:44.980172Z 01E    Compiling untrusted v0.9.0
+2026-06-25T20:15:45.019739Z 01E    Compiling bzip2-sys v0.1.13+1.0.8
+2026-06-25T20:15:45.072766Z 01E    Compiling simd-adler32 v0.3.9
+2026-06-25T20:15:45.165018Z 01E    Compiling bitflags v2.13.0
+2026-06-25T20:15:45.183315Z 01E    Compiling linux-raw-sys v0.12.1
+2026-06-25T20:15:45.280298Z 01E    Compiling adler2 v2.0.1
+2026-06-25T20:15:45.333162Z 01E    Compiling percent-encoding v2.3.2
+2026-06-25T20:15:45.427812Z 01E    Compiling rustls v0.23.41
+2026-06-25T20:15:45.509389Z 01E    Compiling form_urlencoded v1.2.2
+2026-06-25T20:15:45.587758Z 01E    Compiling miniz_oxide v0.8.9
+2026-06-25T20:15:46.495507Z 01E    Compiling webpki-roots v1.0.8
+2026-06-25T20:15:46.533286Z 01E    Compiling subtle v2.6.1
+2026-06-25T20:15:46.591997Z 01E    Compiling log v0.4.33
+2026-06-25T20:15:46.672342Z 01E    Compiling once_cell v1.21.4
+2026-06-25T20:15:46.782888Z 01E    Compiling xattr v1.6.1
+2026-06-25T20:15:46.939707Z 01E    Compiling webpki-roots v0.26.11
+2026-06-25T20:15:46.954702Z 01E    Compiling flate2 v1.1.9
+2026-06-25T20:15:46.984375Z 01E    Compiling synstructure v0.13.2
+2026-06-25T20:15:47.212679Z 01E    Compiling filetime v0.2.29
+2026-06-25T20:15:47.282929Z 01E    Compiling base64 v0.22.1
+2026-06-25T20:15:47.322210Z 01E    Compiling serde_core v1.0.228
+2026-06-25T20:15:47.455289Z 01E    Compiling tar v0.4.46
+2026-06-25T20:15:47.469829Z 01E    Compiling bzip2 v0.4.4
+2026-06-25T20:15:47.559057Z 01E    Compiling rustls-webpki v0.103.13
+2026-06-25T20:15:47.949050Z 01E    Compiling alsa-sys v0.3.1
+2026-06-25T20:15:48.106724Z 01E    Compiling utf8parse v0.2.2
+2026-06-25T20:15:48.135483Z 01E    Compiling zerofrom-derive v0.1.7
+2026-06-25T20:15:48.143614Z 01E    Compiling yoke-derive v0.8.2
+2026-06-25T20:15:48.244754Z 01E    Compiling zerovec-derive v0.11.3
+2026-06-25T20:15:49.116421Z 01E    Compiling displaydoc v0.2.6
+2026-06-25T20:15:49.212029Z 01E    Compiling zerofrom v0.1.8
+2026-06-25T20:15:49.262811Z 01E    Compiling yoke v0.8.3
+2026-06-25T20:15:49.265479Z 01E    Compiling zmij v1.0.21
+2026-06-25T20:15:49.361378Z 01E    Compiling zerovec v0.11.6
+2026-06-25T20:15:49.401449Z 01E    Compiling anstyle-parse v1.0.0
+2026-06-25T20:15:49.765082Z 01E    Compiling zerotrie v0.2.4
+2026-06-25T20:15:49.837430Z 01E    Compiling tinystr v0.8.3
+2026-06-25T20:15:49.922275Z 01E    Compiling icu_locale_core v2.2.0
+2026-06-25T20:15:49.924911Z 01E    Compiling potential_utf v0.1.5
+2026-06-25T20:15:49.979450Z 01E    Compiling icu_collections v2.2.0
+2026-06-25T20:15:50.331837Z 01E error: failed to run custom build command for `alsa-sys v0.3.1`
+2026-06-25T20:15:50.331840Z 01E 
+2026-06-25T20:15:50.331841Z 01E Caused by:
+2026-06-25T20:15:50.331841Z 01E   process didn't exit successfully: `/builds/cristianrojas-softwareengineer-group/EvolutiveX-Agent-Orchestrator/sidecar/target/release/build/alsa-sys-99bd37b0b51c5894/build-script-build` (exit status: 101)
+2026-06-25T20:15:50.331842Z 01E   --- stdout
+2026-06-25T20:15:50.331843Z 01E   cargo:rerun-if-env-changed=ALSA_NO_PKG_CONFIG
+2026-06-25T20:15:50.331843Z 01E   cargo:rerun-if-env-changed=PKG_CONFIG_x86_64-unknown-linux-gnu
+2026-06-25T20:15:50.331844Z 01E   cargo:rerun-if-env-changed=PKG_CONFIG_x86_64_unknown_linux_gnu
+2026-06-25T20:15:50.331844Z 01E   cargo:rerun-if-env-changed=HOST_PKG_CONFIG
+2026-06-25T20:15:50.331845Z 01E   cargo:rerun-if-env-changed=PKG_CONFIG
+2026-06-25T20:15:50.331845Z 01E   cargo:rerun-if-env-changed=ALSA_STATIC
+2026-06-25T20:15:50.331845Z 01E   cargo:rerun-if-env-changed=ALSA_DYNAMIC
+2026-06-25T20:15:50.331846Z 01E   cargo:rerun-if-env-changed=PKG_CONFIG_ALL_STATIC
+2026-06-25T20:15:50.331846Z 01E   cargo:rerun-if-env-changed=PKG_CONFIG_ALL_DYNAMIC
+2026-06-25T20:15:50.331847Z 01E   cargo:rerun-if-env-changed=PKG_CONFIG_PATH_x86_64-unknown-linux-gnu
+2026-06-25T20:15:50.331847Z 01E   cargo:rerun-if-env-changed=PKG_CONFIG_PATH_x86_64_unknown_linux_gnu
+2026-06-25T20:15:50.331848Z 01E   cargo:rerun-if-env-changed=HOST_PKG_CONFIG_PATH
+2026-06-25T20:15:50.331848Z 01E   cargo:rerun-if-env-changed=PKG_CONFIG_PATH
+2026-06-25T20:15:50.331849Z 01E   cargo:rerun-if-env-changed=PKG_CONFIG_LIBDIR_x86_64-unknown-linux-gnu
+2026-06-25T20:15:50.331849Z 01E   cargo:rerun-if-env-changed=PKG_CONFIG_LIBDIR_x86_64_unknown_linux_gnu
+2026-06-25T20:15:50.331850Z 01E   cargo:rerun-if-env-changed=HOST_PKG_CONFIG_LIBDIR
+2026-06-25T20:15:50.331850Z 01E   cargo:rerun-if-env-changed=PKG_CONFIG_LIBDIR
+2026-06-25T20:15:50.331851Z 01E   cargo:rerun-if-env-changed=PKG_CONFIG_SYSROOT_DIR_x86_64-unknown-linux-gnu
+2026-06-25T20:15:50.331851Z 01E   cargo:rerun-if-env-changed=PKG_CONFIG_SYSROOT_DIR_x86_64_unknown_linux_gnu
+2026-06-25T20:15:50.331852Z 01E   cargo:rerun-if-env-changed=HOST_PKG_CONFIG_SYSROOT_DIR
+2026-06-25T20:15:50.331852Z 01E   cargo:rerun-if-env-changed=PKG_CONFIG_SYSROOT_DIR
+2026-06-25T20:15:50.331853Z 01E 
+2026-06-25T20:15:50.331853Z 01E   --- stderr
+2026-06-25T20:15:50.331853Z 01E 
+2026-06-25T20:15:50.331854Z 01E   thread 'main' panicked at /usr/local/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/alsa-sys-0.3.1/build.rs:13:18:
+2026-06-25T20:15:50.331854Z 01E 
+2026-06-25T20:15:50.331855Z 01E   pkg-config exited with status code 1
+2026-06-25T20:15:50.331855Z 01E   > PKG_CONFIG_ALLOW_SYSTEM_LIBS=1 PKG_CONFIG_ALLOW_SYSTEM_CFLAGS=1 pkg-config --libs --cflags alsa
+2026-06-25T20:15:50.331856Z 01E 
+2026-06-25T20:15:50.331856Z 01E   pkg-config output:
+2026-06-25T20:15:50.331856Z 01E     Package alsa was not found in the pkg-config search path.
+2026-06-25T20:15:50.331857Z 01E     Perhaps you should add the directory containing `alsa.pc'
+2026-06-25T20:15:50.331857Z 01E     to the PKG_CONFIG_PATH environment variable
+2026-06-25T20:15:50.331858Z 01E     Package 'alsa', required by 'virtual:world', not found
+2026-06-25T20:15:50.331858Z 01E 
+2026-06-25T20:15:50.331859Z 01E   The system library `alsa` required by crate `alsa-sys` was not found.
+2026-06-25T20:15:50.331880Z 01E   The file `alsa.pc` needs to be installed and the PKG_CONFIG_PATH environment variable must contain its parent directory.
+2026-06-25T20:15:50.331880Z 01E   The PKG_CONFIG_PATH environment variable is not set.
+2026-06-25T20:15:50.331881Z 01E 
+2026-06-25T20:15:50.331881Z 01E   HINT: if you have installed the library, try setting PKG_CONFIG_PATH to the directory containing `alsa.pc`.
+2026-06-25T20:15:50.331882Z 01E 
+2026-06-25T20:15:50.331882Z 01E   note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+2026-06-25T20:15:50.331883Z 01E warning: build failed, waiting for other jobs to finish...
+2026-06-25T20:15:53.293757Z 00O section_end:1782418553:step_script
+2026-06-25T20:15:53.293764Z 00O+[0Ksection_start:1782418553:cleanup_file_variables
+2026-06-25T20:15:53.294704Z 00O+[0K[0K[36;1mCleaning up project directory and file based variables[0;m[0;m
+2026-06-25T20:15:53.670793Z 00O section_end:1782418553:cleanup_file_variables
+2026-06-25T20:15:53.670797Z 00O+[0K
+2026-06-25T20:15:53.863371Z 00O [31;1mERROR: Job failed: exit code 1[0;m

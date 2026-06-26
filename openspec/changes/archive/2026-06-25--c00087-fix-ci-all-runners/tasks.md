@@ -20,5 +20,5 @@
 
 ## 5. Verificacion
 
-- [ ] 5.1 Hacer push de los cambios y verificar que el pipeline CI se dispara automaticamente ~todo
+- [x] 5.1 Hacer push de los cambios y verificar que el pipeline CI se dispara automaticamente ~done
 - [ ] 5.2 Confirmar que los 5 jobs (linux-amd64, linux-aarch64, macos-amd64, macos-aarch64, windows-amd64) pasan sin errores ~todo

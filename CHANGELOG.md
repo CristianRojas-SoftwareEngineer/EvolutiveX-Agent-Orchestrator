@@ -3,11 +3,14 @@
 All notable changes are derived from conventional commits. Do not edit by hand.
 
 ## [Unreleased]
+### Added
+- normalize sub-agent toolsets and enable bidirectional SendMessage
 ### Fixed
-- corregir comentario de cabecera y guard apt-get en job release
+- compile sidecar TTS on all 5 pipeline runners
 
 ## [tts-sidecar-v0.1.0] -- 2026-06-25
 ### Added
+- añadir skill continuity-prompt para compactación
 - distribuir binarios sidecar sherpa-onnx para 5 plataformas
 - instrumentar sidecars de timings por etapa con reader unificado
 - validar handoff de subagentes con gate determinista
@@ -157,6 +160,9 @@ All notable changes are derived from conventional commits. Do not edit by hand.
 - implementar PKA de 6 capas, ports, inyección de dependencias y hardening de tooling
 - reemplazar 'any' por tipos estrictos del SDK de Anthropic
 ### Fixed
+- versionar Cargo.lock completo del sidecar TTS para builds reproducibles
+- corregir MSRV, PATH Windows y guards apt-get en pipeline TTS
+- corregir comentario de cabecera y guard apt-get en job release
 - corregir pipeline GitLab para compilar 5 targets con edition2024
 - alinear herramientas de subagentes con sus responsabilidades
 - resolver colisión del plan-gate de create-plan en modo AUTO

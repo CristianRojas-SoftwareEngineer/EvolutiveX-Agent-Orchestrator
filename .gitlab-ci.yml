@@ -46,7 +46,7 @@ workflow:
     - |
       if [ "$RUNNER_OS" = "Linux" ]; then
         apt-get update -qq
-        apt-get install -y -qq zip
+        apt-get install -y -qq zip libasound2-dev
       fi
     - |
       if [ "$RUNNER_OS" = "Linux" ]; then
@@ -59,6 +59,8 @@ workflow:
     - rustup target add "$RUST_TRIPLE"
     - |
       if [ "$CROSS" = "true" ]; then
+        export PKG_CONFIG_SYSROOT_DIR=/usr/aarch64-linux-gnu
+        export PKG_CONFIG_PATH="/usr/aarch64-linux-gnu/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
         export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc
       fi
     - cargo build --release --manifest-path sidecar/Cargo.toml --target "$RUST_TRIPLE"
@@ -103,7 +105,7 @@ build:windows-amd64:
     - choco install -y espeak-ng
     # Recargar PATH para que rustup quede disponible en la sesión actual.
     - $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
-    - rustup default stable
+    - .cargo\bin\rustup default stable
 
 build:linux-amd64:
   <<: *build_template

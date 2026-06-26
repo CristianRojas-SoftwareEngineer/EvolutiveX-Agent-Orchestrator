@@ -7,7 +7,6 @@
 ///
 /// Args CLI:
 ///   --model <path.onnx>         Ruta al modelo ONNX de la voz
-///   --config <path.onnx.json>   Ruta al config JSON del modelo
 ///
 /// espeak-ng se carga desde el directorio del binario (no del sistema).
 use std::io::{self, BufRead, Write};
@@ -16,7 +15,7 @@ use std::path::PathBuf;
 use clap::Parser;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use serde::{Deserialize, Serialize};
-use sherpa_onnx::{OfflineTts, OfflineTtsConfig};
+use sherpa_onnx::{OfflineTts, OfflineTtsModelConfig};
 
 #[derive(Parser, Debug)]
 #[command(name = "tts-sidecar", about = "Sidecar TTS para síntesis de voz con sherpa-onnx")]
@@ -24,10 +23,6 @@ struct Cli {
     /// Ruta al modelo ONNX de la voz
     #[arg(long)]
     model: PathBuf,
-
-    /// Ruta al archivo de configuración JSON del modelo
-    #[arg(long)]
-    config: PathBuf,
 }
 
 #[derive(Deserialize)]
@@ -60,21 +55,6 @@ fn reply(resp: &SpeakResponse) {
     // Escribir en stdout seguido de newline; flush inmediato para que el host TypeScript lo lea.
     println!("{}", json);
     let _ = io::stdout().flush();
-}
-
-/// Configura espeak-ng para que use el directorio `espeak-ng-data/` junto al binario,
-/// en lugar del path de sistema. Retorna la ruta de datos de espeak si se encuentra.
-fn espeak_data_dir() -> Option<String> {
-    // El binario se ejecuta con `vendor/tts-sidecar/<targetId>/tts-sidecar[.exe]`
-    // y `espeak-ng-data/` está junto al binario.
-    let exe = std::env::current_exe().ok()?;
-    let bin_dir = exe.parent()?;
-    let data_dir = bin_dir.join("espeak-ng-data");
-    if data_dir.exists() {
-        Some(data_dir.to_string_lossy().into_owned())
-    } else {
-        None
-    }
 }
 
 /// Reproduce un array de muestras PCM f32 por el dispositivo de salida por defecto.
@@ -128,19 +108,14 @@ fn play_audio(samples: &[f32], sample_rate: u32) -> Result<(), String> {
 fn main() {
     let cli = Cli::parse();
 
-    // Determinar la ruta de datos de espeak-ng desde el directorio del binario.
-    let espeak_dir = espeak_data_dir().unwrap_or_default();
-
     // Construir la configuración del sintetizador TTS.
-    let config = OfflineTtsConfig {
+    let model_config = OfflineTtsModelConfig {
         model: cli.model.to_string_lossy().into_owned(),
-        config: cli.config.to_string_lossy().into_owned(),
-        espeak_data: espeak_dir,
         ..Default::default()
     };
 
     // Inicializar el sintetizador. Si falla, no podemos continuar.
-    let tts = match OfflineTts::new(&config) {
+    let tts = match OfflineTts::create(&model_config) {
         Ok(t) => t,
         Err(e) => {
             let resp = SpeakResponse::error(format!("init TTS: {}", e));

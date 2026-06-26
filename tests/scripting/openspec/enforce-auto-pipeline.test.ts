@@ -8,6 +8,7 @@ import {
     DEFAULT_LOOP_GUARD_THRESHOLD,
     type AutoPipelineSentinel,
     type DecisionInput,
+    applyEffect,
     decideAutoPipeline,
     isChangeArchived,
 } from '../../../scripting/openspec/enforce-auto-pipeline.mjs';
@@ -231,5 +232,75 @@ describe('isChangeArchived', () => {
         const emptyRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'enforce-noarchive-'));
         expect(isChangeArchived(emptyRoot, change)).toBe(false);
         fs.rmSync(emptyRoot, { recursive: true, force: true });
+    });
+});
+
+// ─── Fix c00090 (a): readSentinel acepta change null en fase explorer ──────────
+
+describe('readSentinel — change null aceptado en fase explorer', () => {
+    it('decideAutoPipeline opera normalmente con sentinel change=null (fase explorer)', () => {
+        // Simula el sentinel que escribe el orquestador antes de crear el change (stage 1).
+        const sentinel: AutoPipelineSentinel = {
+            change: null,
+            mode: 'auto',
+            phase: 'explorer',
+            stage: 1,
+            lastProgressKey: 'explorer#1',
+            startedAt: '2026-06-26T00:00:00.000Z',
+            stuckCount: 0,
+        };
+        const input: DecisionInput = {
+            sentinel,
+            haltPresent: false,
+            isArchived: false,
+            stopHookActive: false,
+            threshold: DEFAULT_LOOP_GUARD_THRESHOLD,
+        };
+        const result = decideAutoPipeline(input);
+        // El backstop debe bloquear (pipeline en vuelo), no ignorar el sentinel.
+        expect(result.block).toBe(true);
+        expect(result.effect).toBe('persistSentinel');
+    });
+});
+
+// ─── Fix c00090 (b): writeHalt borra sentinel del disco ───────────────────────
+
+describe('applyEffect writeHalt — el sentinel queda ausente tras el halt', () => {
+    let root: string;
+
+    beforeAll(() => {
+        root = fs.mkdtempSync(path.join(os.tmpdir(), 'enforce-halt-'));
+        fs.mkdirSync(path.join(root, 'openspec', '.workbench'), { recursive: true });
+    });
+
+    afterAll(() => {
+        fs.rmSync(root, { recursive: true, force: true });
+    });
+
+    it('tras writeHalt auto-pipeline.json no existe y auto-pipeline.halt.json sí existe', () => {
+        // Escribe el sentinel en disco.
+        const sp = path.join(root, 'openspec', '.workbench', 'auto-pipeline.json');
+        const hp = path.join(root, 'openspec', '.workbench', 'auto-pipeline.halt.json');
+        fs.writeFileSync(sp, JSON.stringify({ change: 'c00090', mode: 'auto', phase: 'implementer', stage: 7, lastProgressKey: 'implementer#7', startedAt: '2026-06-26T00:00:00.000Z', stuckCount: 4 }), 'utf8');
+
+        const sentinel = makeSentinel({ stuckCount: DEFAULT_LOOP_GUARD_THRESHOLD, lastProgressKey: 'implementer#7' });
+        applyEffect(root, { block: false, effect: 'writeHalt', nextSentinel: sentinel });
+
+        expect(fs.existsSync(hp)).toBe(true);
+        expect(fs.existsSync(sp)).toBe(false);
+    });
+
+    it('la siguiente invocación sin sentinel cae en rama (a) — allow', () => {
+        // Después del test anterior no hay sentinel → rama (a).
+        const input: DecisionInput = {
+            sentinel: null,
+            haltPresent: false,
+            isArchived: false,
+            stopHookActive: false,
+            threshold: DEFAULT_LOOP_GUARD_THRESHOLD,
+        };
+        const result = decideAutoPipeline(input);
+        expect(result.block).toBe(false);
+        expect(result.effect).toBe('none');
     });
 });

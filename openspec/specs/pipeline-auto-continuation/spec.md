@@ -4,6 +4,21 @@
 
 ## ADDED Requirements
 
+### Requirement: readSentinel acepta sentinel con change null en fase explorer
+El envoltorio SHALL parsear y aceptar el sentinel como válido cuando `change` es `null`
+(o ausente) siempre que `mode === 'auto'` y `phase` y `stage` sean valores válidos.
+El campo `change` SHALL ser obligatorio únicamente a partir de la fase 2 en adelante
+(cuando el id ya fue minteado). Rechazar el sentinel por `change: null` durante la
+fase explorer desactiva el backstop en esa fase, que es un agujero de seguridad.
+
+#### Scenario: Sentinel con change null en fase explorer es aceptado
+- **WHEN** el sentinel contiene `{ mode: "auto", phase: "explorer", stage: 1, change: null }`
+- **THEN** `readSentinel` retorna el sentinel como válido y el backstop opera normalmente
+
+#### Scenario: Sentinel con change null en fase planner o posterior es rechazado
+- **WHEN** el sentinel contiene `{ mode: "auto", phase: "planner", stage: 2, change: null }`
+- **THEN** `readSentinel` retorna null (sentinel inválido) y el backstop permite el paso sin bloquear
+
 ### Requirement: El hook Stop invoca el backstop de continuidad AUTO
 El harness SHALL registrar una entrada en el array `Stop` de `configs/hooks.json` que
 invoque `scripting/openspec/enforce-auto-pipeline.mts` mediante `tsx`. Esta entrada es
@@ -48,7 +63,8 @@ sin cortocircuito fuera de secuencia:
   `YYYY-MM-DD--<change>`) → `Decision { block: false, effect: 'deleteSentinel' }` + el envoltorio borra el sentinel
 - **(d)** Loop-guard: `stopHookActive && lastProgressKey === "${phase}#${stage}"`
   → incrementa `stuckCount`; si supera umbral (3 intentos) → `Decision { block: false, effect: 'writeHalt' }` + el envoltorio
-  escribe halt diagnóstico con `{ reason: "loop-guard", releasedAt, phase, stage }`
+  escribe halt diagnóstico con `{ reason: "loop-guard", releasedAt, phase, stage }` **y borra el sentinel**,
+  de modo que el siguiente turno caiga en la rama (a) y el backstop se rearme cuando el orquestador reescriba el sentinel.
 - **(e)** Cualquier otro caso → `Decision { block: true, effect: 'persistSentinel', nextSentinel: ... }`; el envoltorio
   persiste sentinel con `stuckCount` y `lastProgressKey` actualizados
 
@@ -70,10 +86,15 @@ sin cortocircuito fuera de secuencia:
   `Stop` y `stopHookActive` es true
 - **THEN** la rama (d) incrementa `stuckCount` en el sentinel persistido
 
-#### Scenario: Loop-guard libera tras superar el umbral de congelamiento
+#### Scenario: Loop-guard libera tras superar el umbral y borra el sentinel
 - **WHEN** `stuckCount` supera 3 y `lastProgressKey` sigue congelado
-- **THEN** la rama (d) retorna `Decision { block: false, effect: 'writeHalt' }` y el envoltorio escribe halt con
-  `reason: "loop-guard"`
+- **THEN** la rama (d) retorna `Decision { block: false, effect: 'writeHalt' }`, el envoltorio escribe halt con
+  `reason: "loop-guard"` **y borra el sentinel** (`auto-pipeline.json`), dejando solo `auto-pipeline.halt.json`
+
+#### Scenario: Tras writeHalt el sentinel queda ausente y el siguiente turno permite sin halt permanente
+- **WHEN** la rama (d) disparó writeHalt en el turno anterior (sentinel borrado, halt presente)
+- **THEN** la siguiente invocación del hook: si el halt aún existe activa rama (b); si el halt fue borrado
+  por el orquestador y éste reescribió el sentinel, activa rama (e) normalmente — el backstop se rearma
 
 #### Scenario: Pipeline en vuelo bloquea la cesión del turno
 - **WHEN** el sentinel existe, no hay halt, el change no está archivado y hay progreso

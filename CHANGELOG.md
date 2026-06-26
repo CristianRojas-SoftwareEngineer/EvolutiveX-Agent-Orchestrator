@@ -4,6 +4,11 @@ All notable changes are derived from conventional commits. Do not edit by hand.
 
 ## [Unreleased]
 ### Fixed
+- corregir contrato de marcadores de fase del pipeline
+
+## [tts-sidecar-v0.1.3] -- 2026-06-26
+### Fixed
+- corregir API sherpa-onnx vits y PATH Windows en CI
 - heredoc directo como metodo canonico, sin Write tool ni scripts
 - hacer write-prompt.ts multiplataforma y corregir SKILL.md
 

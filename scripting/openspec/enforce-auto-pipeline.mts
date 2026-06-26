@@ -29,7 +29,8 @@ export const DEFAULT_LOOP_GUARD_THRESHOLD = 3;
 
 /** Forma persistida del centinela `openspec/.workbench/auto-pipeline.json`. */
 export interface AutoPipelineSentinel {
-    change: string;
+    /** Identificador del change; puede ser null en la fase explorer (stage 1). */
+    change: string | null;
     mode: string;
     /** Fase activa (dueño: orquestador). Valores: explorer|planner|implementer|closer. */
     phase: string;
@@ -156,13 +157,19 @@ function readSentinel(root: string): AutoPipelineSentinel | null {
         const parsed = JSON.parse(raw) as AutoPipelineSentinel;
         if (
             !parsed ||
-            typeof parsed.change !== 'string' ||
             parsed.mode !== 'auto' ||
             typeof parsed.phase !== 'string' ||
             typeof parsed.stage !== 'number'
         ) {
             return null;
         }
+        // `change` puede ser null o ausente en la fase explorer (stage 1).
+        // Solo es obligatorio como string no vacío a partir de la fase 2.
+        const changeOk =
+            parsed.change === null ||
+            parsed.change === undefined ||
+            typeof parsed.change === 'string';
+        if (!changeOk) return null;
         return parsed;
     } catch {
         return null;
@@ -209,6 +216,10 @@ export function applyEffect(root: string, decision: Decision): void {
                     ),
                     'utf8',
                 );
+                // Borrar el centinela tras el halt para que el siguiente turno caiga
+                // en rama (a) y el backstop se rearme cuando el orquestador reescriba
+                // el centinela. Evita el apagado permanente vía rama (b) haltPresent.
+                fs.rmSync(sentinelPath(root), { force: true });
             } catch {
                 /* nunca bloquear por error de escritura */
             }
@@ -251,7 +262,10 @@ async function main(): Promise<void> {
         const input: DecisionInput = {
             sentinel,
             haltPresent: fs.existsSync(haltPath(root)),
-            isArchived: sentinel ? isChangeArchived(root, sentinel.change) : false,
+            isArchived:
+                sentinel && sentinel.change
+                    ? isChangeArchived(root, sentinel.change)
+                    : false,
             stopHookActive: payload.stop_hook_active === true,
             threshold: DEFAULT_LOOP_GUARD_THRESHOLD,
         };

@@ -405,7 +405,12 @@ for each phase in `["explorer", "planner", "implementer"]`, if the corresponding
 `<phase>.done` marker exists and its `change` field does not match the current
 pipeline's `change`, reject before spawning any subagent. On entering AUTO,
 write `openspec/.workbench/auto-pipeline.json` with
-`{ change, mode: "auto", phase: "explorer", stage: 1, startedAt: <ISO>, stuckCount: 0 }`.
+`{ change: null, mode: "auto", phase: "explorer", stage: 1, startedAt: <ISO>, stuckCount: 0 }`.
+`change` is set to `null` here — the real ID is **unknown until the planner
+runs `create-specification-delta`**, which is the only source of truth for
+the next change number. The sentinel will be updated **immediately after the
+planner phase handoff** (step 5 below) with the authoritative `change` from
+the planner's JSON handoff. Never compute or guess the change ID.
 This sentinel is the contract the deterministic backstop reads (see
 `<backstop>` below). The directory `openspec/.workbench/` is gitignored.
 
@@ -417,13 +422,19 @@ yields the turn until phase 4 completes. Each iteration:
 2. Spawn the phase subagent via `Agent(subagent_type=<phase>-specification-delta,
    prompt=<briefing>)`.
 3. Read the structured JSON handoff and validate against `<handoff_schemas>`.
-4. **Validate the phase-completion marker** via
-   `validatePhaseMarker(phase, expectedChange)` from
+4. **Canonicalize the change ID**: use `handoff.change` as the authoritative
+   value for all subsequent steps. On phase 2 (planner), update the AUTO
+   sentinel immediately with this value — this is the first moment the orchestrator
+   knows the real change ID (it was computed by `create-specification-delta`).
+   The orphan policy (step 0) used `null` as the expected value; from now on,
+   all `validatePhaseMarker` calls use `handoff.change`.
+5. **Validate the phase-completion marker** via
+   `validatePhaseMarker(phase, handoff.change)` from
    `scripting/openspec/read-phase-marker.ts`. On any marker error
    (MarkerAbsent / MarkerCorrupt / MarkerEmpty / MarkerWrongChange), emit the
    `<phase_handoff_diagnostic>` and hard-stop the pipeline. For the closer
    phase, use `isChangeArchived` instead of a marker.
-5. Emit the `<reporting_template>` status as an **informational log** — this
+6. Emit the `<reporting_template>` status as an **informational log** — this
    is text output only, **never a turn boundary**. Emitting the status does NOT
    end the turn.
 6. Advance to the next phase via the same mechanism — no pause, no prompt,
@@ -502,15 +513,15 @@ import { readPhaseMarker, validatePhaseMarker, MarkerAbsent, MarkerCorrupt, Mark
 
 // After receiving explorer handoff (phase 1/4):
 const marker = readPhaseMarker("explorer"); // throws MarkerAbsent/Corrupt/Empty
-validatePhaseMarker("explorer", expectedChange); // throws MarkerWrongChange
+validatePhaseMarker("explorer", handoff.change); // throws MarkerWrongChange
 
 // After receiving planner handoff (phase 2/4):
 const marker = readPhaseMarker("planner");
-validatePhaseMarker("planner", expectedChange);
+validatePhaseMarker("planner", handoff.change);
 
 // After receiving implementer handoff (phase 3/4):
 const marker = readPhaseMarker("implementer");
-validatePhaseMarker("implementer", expectedChange);
+validatePhaseMarker("implementer", handoff.change);
 
 // Closer (phase 4/4): no marker — signal is isChangeArchived in .openspec.yaml
 ```
@@ -522,9 +533,11 @@ Spanish diagnostic (see `phase_handoff_diagnostic`).
 markers (explorer.done, planner.done, implementer.done) along with the AUTO
 sentinel during its freeze.
 
-**Orphan policy**: if the orchestrator starts a pipeline and finds orphan
-markers from a previous run (marker.change !== current change), it rejects
-before spawning any subagent. Detection happens in the phase 1 conductor step.
+**Orphan policy**: orphan detection runs **after** the planner phase handoff,
+when the real `change` ID is known. The orchestrator checks whether any existing
+marker has a different `change` field; if so, it rejects before advancing to
+phase 3. Detection at step 0 is deferred because the change ID is unknown
+(`null`) until the planner runs `create-specification-delta`.
 <!-- </phase_handoff_gate> -->
 
 <!-- <phase_handoff_diagnostic> -->

@@ -103,9 +103,8 @@ build:windows-amd64:
     # provee rustc + cargo + rustup en PATH para el resto del job.
     - choco install -y rust-ms
     - choco install -y espeak-ng
-    # Recargar PATH para que rustup quede disponible en la sesión actual.
-    - $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
-    - .cargo\bin\rustup default stable
+    # Usar ruta directa a rustup (no se requiere recarga de PATH).
+    - C:\ProgramData\chocolatey\lib\rust-ms\tools\rustup.exe default stable
 
 build:linux-amd64:
   <<: *build_template

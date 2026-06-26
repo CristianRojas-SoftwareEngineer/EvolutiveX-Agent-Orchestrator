@@ -1,0 +1,5 @@
+## Non-canonical record
+
+- **tts-sidecar-sherpa-onnx-fix**: Correccion de errores estructurales en `sidecar/src/main.rs` que impiden la compilacion del sidecar TTS. El archivo contiene uso incorrecto de la API sherpa-onnx 1.13.3: `OfflineTtsModelConfig` se configuro con un campo `model` inexistente cuando debe usar `vits: OfflineTtsVitsModelConfig`; `OfflineTts::create` se uso como si retornara `Result<OfflineTts, Box<dyn Error>>` cuando retorna `Option<OfflineTts>`; y el path del archivo tokens no se derivaba del path del modelo mediante reemplazo de extension `.onnx` → `.onnx.json`. No corresponde a ningun requerimiento en `openspec/specs/`.
+
+- **tts-sidecar-windows-ci-fix**: Correccion de la configuracion CI de Windows en `.gitlab-ci.yml`. La ruta de rustup estaba configurada como `.cargo\bin\rustup` cuando Chocolatey rust-ms instala en `C:\ProgramData\chocolatey\lib\rust-ms\tools\rustup.exe`. Adicionalmente, la sintaxis `$env:PATH` en YAML no se expande correctamente en PowerShell bajo GitLab CI. No corresponde a ningun requerimiento en `openspec/specs/`.

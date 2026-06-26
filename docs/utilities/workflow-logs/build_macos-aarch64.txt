@@ -1,376 +1,390 @@
-2026-06-25T20:15:09.445258Z 00O [0KRunning with gitlab-runner 19.1.0~pre.1227.g817ab3ac (817ab3ac)[0;m
-2026-06-25T20:15:09.445271Z 00O [0K  on blue-1.saas-macos-medium-m1.runners-manager.gitlab.com/default yixBWUVoR, system ID: s_609aff5a2d25[0;m
-2026-06-25T20:15:09.445277Z 00O [0K  feature flags: FF_LOG_IMAGES_CONFIGURED_FOR_JOB:true, FF_USE_GIT_PROACTIVE_AUTH:true[0;m
-2026-06-25T20:15:09.445302Z 00O [0K[36;1mResolving secrets[0;m[0;m
-2026-06-25T20:15:09.445477Z 00O section_start:1782418509:prepare_executor
+2026-06-26T03:51:04.067203Z 00O [0KRunning with gitlab-runner 19.1.0~pre.1227.g817ab3ac (817ab3ac)[0;m
+2026-06-26T03:51:04.067215Z 00O [0K  on blue-1.saas-macos-medium-m1.runners-manager.gitlab.com/default yixBWUVoR, system ID: s_609aff5a2d25[0;m
+2026-06-26T03:51:04.067221Z 00O [0K  feature flags: FF_LOG_IMAGES_CONFIGURED_FOR_JOB:true, FF_USE_GIT_PROACTIVE_AUTH:true[0;m
+2026-06-26T03:51:04.067242Z 00O [0K[36;1mResolving secrets[0;m[0;m
+2026-06-26T03:51:04.067435Z 00O section_start:1782445864:prepare_executor
 [0K
-2026-06-25T20:15:09.445486Z 00O+[0K[36;1mPreparing the "instance" executor[0;m[0;m
-2026-06-25T20:15:09.445653Z 00O [0KPreparing instance...[0;m
-2026-06-25T20:15:09.445702Z 00O [0KDialing instance i-03748b9beba3ff069...[0;m
-2026-06-25T20:15:09.686898Z 00O [0KInstance i-03748b9beba3ff069 connected[0;m
-2026-06-25T20:15:09.686907Z 00O [0KEnforcing VM Isolation[0;m
-2026-06-25T20:15:09.687095Z 00O [0KCreating nesting VM tunnel[0;m
-2026-06-25T20:15:09.687144Z 00O [0KDialing nesting daemon[0;m
-2026-06-25T20:15:09.687286Z 00O [0KCreating nesting VM macos-26-xcode-26[0;m
-2026-06-25T20:15:10.092257Z 00O [32;1mCreated nesting VM u4r83sff 127.0.0.1:60782[0;m
-2026-06-25T20:15:27.151071Z 00O section_end:1782418527:prepare_executor
+2026-06-26T03:51:04.067439Z 00O+[0K[36;1mPreparing the "instance" executor[0;m[0;m
+2026-06-26T03:51:04.067604Z 00O [0KPreparing instance...[0;m
+2026-06-26T03:51:04.067647Z 00O [0KDialing instance i-078939f9e0420d3b2...[0;m
+2026-06-26T03:51:04.317758Z 00O [0KInstance i-078939f9e0420d3b2 connected[0;m
+2026-06-26T03:51:04.317765Z 00O [0KEnforcing VM Isolation[0;m
+2026-06-26T03:51:04.317962Z 00O [0KCreating nesting VM tunnel[0;m
+2026-06-26T03:51:04.318011Z 00O [0KDialing nesting daemon[0;m
+2026-06-26T03:51:04.318144Z 00O [0KCreating nesting VM macos-26-xcode-26[0;m
+2026-06-26T03:51:04.751055Z 00O [32;1mCreated nesting VM vyl2scvr 127.0.0.1:62879[0;m
+2026-06-26T03:51:23.380732Z 00O section_end:1782445883:prepare_executor
 [0K
-2026-06-25T20:15:27.151188Z 00O+section_start:1782418527:prepare_script
+2026-06-26T03:51:23.380837Z 00O+section_start:1782445883:prepare_script
 [0K
-2026-06-25T20:15:27.151192Z 00O+[0K[36;1mPreparing environment[0;m[0;m
-2026-06-25T20:15:41.772527Z 01O Running on Manageds-Virtual-Machine.local via runners-manager-saas-macos-medium-m1-blue-1...
-2026-06-25T20:15:41.829397Z 00O section_end:1782418541:prepare_script
+2026-06-26T03:51:23.380842Z 00O+[0K[36;1mPreparing environment[0;m[0;m
+2026-06-26T03:51:34.777801Z 01O Running on Manageds-Virtual-Machine.local via runners-manager-saas-macos-medium-m1-blue-1...
+2026-06-26T03:51:34.777867Z 00O section_end:1782445894:prepare_script
 [0K
-2026-06-25T20:15:41.830088Z 00O+section_start:1782418541:get_sources
+2026-06-26T03:51:34.778520Z 00O+section_start:1782445894:get_sources
 [0K
-2026-06-25T20:15:41.830094Z 00O+[0K[36;1mGetting source from Git repository[0;m[0;m
-2026-06-25T20:15:43.082785Z 01O [32;1mGitaly correlation ID: a116a47f4f391723-ATL[0;m
-2026-06-25T20:15:43.139375Z 01O [32;1mFetching changes with git depth set to 20...[0;m
-2026-06-25T20:15:43.155752Z 01O Initialized empty Git repository in /Users/gitlab/builds/cristianrojas-softwareengineer-group/EvolutiveX-Agent-Orchestrator/.git/
-2026-06-25T20:15:43.212387Z 01O [32;1mCreated fresh repository.[0;m
-2026-06-25T20:15:44.164573Z 01E fatal: failed to store: -25308
-2026-06-25T20:15:44.862691Z 01O [32;1mChecking out f2ae7d25 as detached HEAD (ref is tts-sidecar-v0.1.0)...[0;m
-2026-06-25T20:15:46.299560Z 01O 
-2026-06-25T20:15:46.299571Z 01O [32;1mSkipping Git submodules setup[0;m
-2026-06-25T20:15:46.299596Z 00O section_end:1782418546:get_sources
+2026-06-26T03:51:34.778526Z 00O+[0K[36;1mGetting source from Git repository[0;m[0;m
+2026-06-26T03:51:35.527569Z 01O [32;1mGitaly correlation ID: a11940574f363110-ATL[0;m
+2026-06-26T03:51:35.584321Z 01O [32;1mFetching changes with git depth set to 20...[0;m
+2026-06-26T03:51:35.584326Z 01O Initialized empty Git repository in /Users/gitlab/builds/cristianrojas-softwareengineer-group/EvolutiveX-Agent-Orchestrator/.git/
+2026-06-26T03:51:35.600302Z 01O [32;1mCreated fresh repository.[0;m
+2026-06-26T03:51:36.473003Z 01E fatal: failed to store: -25308
+2026-06-26T03:51:37.247546Z 01E fatal: failed to store: -25308
+2026-06-26T03:51:37.890265Z 01O [32;1mChecking out 2b355338 as detached HEAD (ref is tts-sidecar-v0.1.1)...[0;m
+2026-06-26T03:51:39.094985Z 01O 
+2026-06-26T03:51:39.094989Z 01O [32;1mSkipping Git submodules setup[0;m
+2026-06-26T03:51:39.095039Z 00O section_end:1782445899:get_sources
 [0K
-2026-06-25T20:15:46.301043Z 00O+section_start:1782418546:step_script
+2026-06-26T03:51:39.096339Z 00O+section_start:1782445899:step_script
 [0K
-2026-06-25T20:15:46.301056Z 00O+[0K[36;1mExecuting "step_script" stage of the job script[0;m[0;m
-2026-06-25T20:15:47.330279Z 01O [32;1m$ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y[0;m
-2026-06-25T20:15:47.418877Z 01E info: downloading installer
-2026-06-25T20:15:48.065983Z 01E warn: It looks like you have an existing installation of Rust at:
-2026-06-25T20:15:48.066009Z 01E warn: /Users/gitlab/.asdf/shims
-2026-06-25T20:15:48.066010Z 01E warn: It is recommended that rustup be the primary Rust installation.
-2026-06-25T20:15:48.066011Z 01E warn: Otherwise you may have confusion unless you are careful with your PATH.
-2026-06-25T20:15:48.066011Z 01E warn: If you are sure that you want both rustup and your already installed Rust
-2026-06-25T20:15:48.066012Z 01E warn: then please reply `y' or `yes' or set RUSTUP_INIT_SKIP_PATH_CHECK to yes
-2026-06-25T20:15:48.066013Z 01E warn: or pass `-y' to ignore all ignorable checks.
-2026-06-25T20:15:48.066013Z 01E error: cannot install while Rust is installed
-2026-06-25T20:15:48.066014Z 01E warn: continuing (because the -y flag is set and the error is ignorable)
-2026-06-25T20:15:48.066015Z 01E warn: It looks like you have an existing rustup settings file at:
-2026-06-25T20:15:48.066015Z 01E warn: /Users/gitlab/.rustup/settings.toml
-2026-06-25T20:15:48.066015Z 01E warn: Rustup will install the default toolchain as specified in the settings file,
-2026-06-25T20:15:48.066016Z 01E warn: instead of the one inferred from the default host triple.
-2026-06-25T20:15:48.155440Z 01E info: profile set to default
-2026-06-25T20:15:48.155446Z 01E info: default host triple is aarch64-apple-darwin
-2026-06-25T20:15:48.155448Z 01E info: syncing channel updates for stable-aarch64-apple-darwin
-2026-06-25T20:15:48.345520Z 01E info: latest update on 2026-05-28 for version 1.96.0 (ac68faa20 2026-05-25)
-2026-06-25T20:15:48.402316Z 01E info: downloading 6 components
-2026-06-25T20:16:46.421469Z 01O 
-2026-06-25T20:16:46.421481Z 01E info: default toolchain set to stable-aarch64-apple-darwin
-2026-06-25T20:16:49.193636Z 01O   stable-aarch64-apple-darwin installed - rustc 1.96.0 (ac68faa20 2026-05-25)
-2026-06-25T20:16:49.193643Z 01O 
-2026-06-25T20:16:49.193644Z 01O 
-2026-06-25T20:16:49.193645Z 01O Rust is installed now. Great!
-2026-06-25T20:16:49.193645Z 01O 
-2026-06-25T20:16:49.193646Z 01O To get started you may need to restart your current shell.
-2026-06-25T20:16:49.193646Z 01O This would reload your PATH environment variable to include
-2026-06-25T20:16:49.193647Z 01O Cargo's bin directory ($HOME/.cargo/bin).
-2026-06-25T20:16:49.193647Z 01O 
-2026-06-25T20:16:49.193648Z 01O To configure your current shell, you need to source
-2026-06-25T20:16:49.193648Z 01O the corresponding env file under $HOME/.cargo.
-2026-06-25T20:16:49.193649Z 01O 
-2026-06-25T20:16:49.193649Z 01O This is usually done by running one of the following (note the leading DOT):
-2026-06-25T20:16:49.193649Z 01O . "$HOME/.cargo/env"            # For sh/bash/zsh/ash/dash/pdksh
-2026-06-25T20:16:49.193650Z 01O source "$HOME/.cargo/env.fish"  # For fish
-2026-06-25T20:16:49.193650Z 01O source "~/.cargo/env.nu"  # For nushell
-2026-06-25T20:16:49.193651Z 01O source "$HOME/.cargo/env.tcsh"  # For tcsh
-2026-06-25T20:16:49.193651Z 01O . "$HOME/.cargo/env.ps1"        # For pwsh
-2026-06-25T20:16:49.193652Z 01O source "$HOME/.cargo/env.xsh"   # For xonsh
-2026-06-25T20:16:49.251855Z 01O [32;1m$ source $HOME/.cargo/env[0;m
-2026-06-25T20:16:49.251863Z 01O [32;1m$ rustup default stable[0;m
-2026-06-25T20:16:52.087732Z 01E info: using existing install for stable-aarch64-apple-darwin
-2026-06-25T20:16:52.144550Z 01O 
-2026-06-25T20:16:52.144554Z 01O   stable-aarch64-apple-darwin unchanged - rustc 1.96.0 (ac68faa20 2026-05-25)
-2026-06-25T20:16:52.144555Z 01O 
-2026-06-25T20:16:52.144556Z 01O [32;1m$ brew install espeak-ng[0;m
-2026-06-25T20:16:52.144570Z 01E info: default toolchain set to stable-aarch64-apple-darwin
-2026-06-25T20:16:56.969162Z 01E ✔︎ JSON API formula_tap_migrations.jws.json
-2026-06-25T20:16:56.969170Z 01E ✔︎ JSON API cask_tap_migrations.jws.json
-2026-06-25T20:16:58.263508Z 01O Inspect the formula dependency plan before installing with `brew install --ask`.
-2026-06-25T20:16:58.263532Z 01O Enable ask mode by setting `HOMEBREW_ASK=1`.
-2026-06-25T20:16:58.263533Z 01O Hide these hints with `HOMEBREW_NO_ENV_HINTS=1` (see `man brew`).
-2026-06-25T20:16:58.263534Z 01O ==> Fetching downloads for: espeak-ng
-2026-06-25T20:16:58.436350Z 01E ✔︎ Bottle Manifest espeak-ng (1.52.0)
-2026-06-25T20:16:58.712839Z 01E ✔︎ Bottle Manifest pcaudiolib (1.3)
-2026-06-25T20:16:58.769419Z 01E ✔︎ Bottle pcaudiolib (1.3)
-2026-06-25T20:16:59.367701Z 01E ✔︎ Bottle espeak-ng (1.52.0)
-2026-06-25T20:16:59.440332Z 01O ==> Installing espeak-ng dependency: pcaudiolib
-2026-06-25T20:16:59.440353Z 01O ==> Pouring pcaudiolib--1.3.arm64_tahoe.bottle.tar.gz
-2026-06-25T20:16:59.529111Z 01O 🍺  /opt/homebrew/Cellar/pcaudiolib/1.3: 14 files, 174.1KB
-2026-06-25T20:16:59.529114Z 01O ==> Pouring espeak-ng--1.52.0.arm64_tahoe.bottle.tar.gz
-2026-06-25T20:16:59.884548Z 01O 🍺  /opt/homebrew/Cellar/espeak-ng/1.52.0: 538 files, 26.1MB
-2026-06-25T20:16:59.941689Z 01O [32;1m$ if [ "$RUNNER_OS" = "Linux" ]; then # collapsed multi-line command[0;m
-2026-06-25T20:16:59.941692Z 01O [32;1m$ if [ "$RUNNER_OS" = "Linux" ]; then # collapsed multi-line command[0;m
-2026-06-25T20:16:59.941693Z 01O [32;1m$ if [ "$CROSS" = "true" ]; then # collapsed multi-line command[0;m
-2026-06-25T20:16:59.941694Z 01O [32;1m$ rustup target add "$RUST_TRIPLE"[0;m
-2026-06-25T20:16:59.958055Z 01E info: component rust-std is up to date
-2026-06-25T20:16:59.958056Z 01O [32;1m$ if [ "$CROSS" = "true" ]; then # collapsed multi-line command[0;m
-2026-06-25T20:16:59.958069Z 01O [32;1m$ cargo build --release --manifest-path sidecar/Cargo.toml --target "$RUST_TRIPLE"[0;m
-2026-06-25T20:17:00.628891Z 01E     Updating crates.io index
-2026-06-25T20:17:01.281172Z 01E  Downloading crates ...
-2026-06-25T20:17:01.337721Z 01E   Downloaded anstyle v1.0.14
-2026-06-25T20:17:01.337725Z 01E   Downloaded sherpa-onnx v1.13.3
-2026-06-25T20:17:01.337725Z 01E   Downloaded zeroize v1.9.0
-2026-06-25T20:17:01.353923Z 01E   Downloaded zmij v1.0.21
-2026-06-25T20:17:01.410821Z 01E   Downloaded xattr v1.6.1
-2026-06-25T20:17:01.410826Z 01E   Downloaded zerovec v0.11.6
-2026-06-25T20:17:01.444510Z 01E   Downloaded zerotrie v0.2.4
-2026-06-25T20:17:01.501901Z 01E   Downloaded zerovec-derive v0.11.3
-2026-06-25T20:17:01.518048Z 01E   Downloaded subtle v2.6.1
-2026-06-25T20:17:01.574866Z 01E   Downloaded once_cell v1.21.4
-2026-06-25T20:17:01.574869Z 01E   Downloaded utf8parse v0.2.2
-2026-06-25T20:17:01.574869Z 01E   Downloaded strsim v0.11.1
-2026-06-25T20:17:01.574870Z 01E   Downloaded shlex v1.3.0
-2026-06-25T20:17:01.574870Z 01E   Downloaded rustix v1.1.4
-2026-06-25T20:17:01.815334Z 01E   Downloaded smallvec v1.15.2
-2026-06-25T20:17:01.871723Z 01E   Downloaded regex-syntax v0.8.11
-2026-06-25T20:17:01.871726Z 01E   Downloaded log v0.4.33
-2026-06-25T20:17:01.914535Z 01E   Downloaded icu_collections v2.2.0
-2026-06-25T20:17:01.971940Z 01E   Downloaded webpki-roots v1.0.8
-2026-06-25T20:17:01.988345Z 01E   Downloaded ureq v2.12.1
-2026-06-25T20:17:02.045471Z 01E   Downloaded cc v1.2.65
-2026-06-25T20:17:02.061787Z 01E   Downloaded serde_core v1.0.228
-2026-06-25T20:17:02.118566Z 01E   Downloaded idna v1.1.0
-2026-06-25T20:17:02.118569Z 01E   Downloaded rustls v0.23.41
-2026-06-25T20:17:02.219484Z 01E   Downloaded icu_normalizer_data v2.2.0
-2026-06-25T20:17:02.252670Z 01E   Downloaded bitflags v1.3.2
-2026-06-25T20:17:02.309716Z 01E   Downloaded regex-automata v0.4.14
-2026-06-25T20:17:02.412181Z 01E   Downloaded quote v1.0.46
-2026-06-25T20:17:02.469388Z 01E   Downloaded potential_utf v0.1.5
-2026-06-25T20:17:02.469390Z 01E   Downloaded ring v0.17.14
-2026-06-25T20:17:02.841955Z 01E   Downloaded pkg-config v0.3.33
-2026-06-25T20:17:02.898677Z 01E   Downloaded filetime v0.2.29
-2026-06-25T20:17:02.898679Z 01E   Downloaded adler2 v2.0.1
-2026-06-25T20:17:02.898680Z 01E   Downloaded rustls-webpki v0.103.13
-2026-06-25T20:17:02.898680Z 01E   Downloaded rustc-hash v2.1.2
-2026-06-25T20:17:02.916264Z 01E   Downloaded bzip2-sys v0.1.13+1.0.8
-2026-06-25T20:17:02.973103Z 01E   Downloaded clap_builder v4.6.0
-2026-06-25T20:17:03.040020Z 01E   Downloaded syn v2.0.118
-2026-06-25T20:17:03.129925Z 01E   Downloaded crc32fast v1.5.0
-2026-06-25T20:17:03.187645Z 01E   Downloaded cpal v0.15.3
-2026-06-25T20:17:03.203811Z 01E   Downloaded bindgen v0.72.1
-2026-06-25T20:17:03.260739Z 01E   Downloaded anstyle-query v1.1.5
-2026-06-25T20:17:03.300279Z 01E   Downloaded aho-corasick v1.1.4
-2026-06-25T20:17:03.357077Z 01E   Downloaded sherpa-onnx-sys v1.13.3
-2026-06-25T20:17:03.357079Z 01E   Downloaded itertools v0.13.0
-2026-06-25T20:17:03.427364Z 01E   Downloaded clap_lex v1.1.0
-2026-06-25T20:17:03.485332Z 01E   Downloaded bzip2 v0.4.4
-2026-06-25T20:17:03.485334Z 01E   Downloaded yoke v0.8.3
-2026-06-25T20:17:03.485334Z 01E   Downloaded utf8_iter v1.0.4
-2026-06-25T20:17:03.502147Z 01E   Downloaded url v2.5.8
-2026-06-25T20:17:03.559495Z 01E   Downloaded tar v0.4.46
-2026-06-25T20:17:03.559498Z 01E   Downloaded serde_json v1.0.150
-2026-06-25T20:17:03.609865Z 01E   Downloaded regex v1.12.4
-2026-06-25T20:17:03.667504Z 01E   Downloaded libc v0.2.186
-2026-06-25T20:17:03.967568Z 01E   Downloaded proc-macro2 v1.0.106
-2026-06-25T20:17:04.024419Z 01E   Downloaded nom v7.1.3
-2026-06-25T20:17:04.057196Z 01E   Downloaded miniz_oxide v0.8.9
-2026-06-25T20:17:04.113565Z 01E   Downloaded flate2 v1.1.9
-2026-06-25T20:17:04.129770Z 01E   Downloaded find-msvc-tools v0.1.9
-2026-06-25T20:17:04.186688Z 01E   Downloaded core-foundation-sys v0.8.7
-2026-06-25T20:17:04.203062Z 01E   Downloaded clap_derive v4.6.1
-2026-06-25T20:17:04.259389Z 01E   Downloaded bitflags v2.13.0
-2026-06-25T20:17:04.275556Z 01E   Downloaded anstream v1.0.0
-2026-06-25T20:17:04.332747Z 01E   Downloaded zerofrom v0.1.8
-2026-06-25T20:17:04.332749Z 01E   Downloaded writeable v0.6.3
-2026-06-25T20:17:04.332752Z 01E   Downloaded synstructure v0.13.2
-2026-06-25T20:17:04.349109Z 01E   Downloaded stable_deref_trait v1.2.1
-2026-06-25T20:17:04.405813Z 01E   Downloaded simd-adler32 v0.3.9
-2026-06-25T20:17:04.405816Z 01E   Downloaded shlex v2.0.1
-2026-06-25T20:17:04.405816Z 01E   Downloaded serde_derive v1.0.228
-2026-06-25T20:17:04.422120Z 01E   Downloaded serde v1.0.228
-2026-06-25T20:17:04.478576Z 01E   Downloaded rustls-pki-types v1.14.1
-2026-06-25T20:17:04.478579Z 01E   Downloaded jobserver v0.1.34
-2026-06-25T20:17:04.495847Z 01E   Downloaded idna_adapter v1.2.2
-2026-06-25T20:17:04.529092Z 01E   Downloaded icu_properties v2.2.0
-2026-06-25T20:17:04.529095Z 01E   Downloaded errno v0.3.14
-2026-06-25T20:17:04.585509Z 01E   Downloaded either v1.16.0
-2026-06-25T20:17:04.585511Z 01E   Downloaded displaydoc v0.2.6
-2026-06-25T20:17:04.585511Z 01E   Downloaded dasp_sample v0.11.0
-2026-06-25T20:17:04.601594Z 01E   Downloaded coreaudio-rs v0.11.3
-2026-06-25T20:17:04.658511Z 01E   Downloaded cfg-if v1.0.4
-2026-06-25T20:17:04.658513Z 01E   Downloaded webpki-roots v0.26.11
-2026-06-25T20:17:04.658514Z 01E   Downloaded untrusted v0.9.0
-2026-06-25T20:17:04.658514Z 01E   Downloaded tinystr v0.8.3
-2026-06-25T20:17:04.692122Z 01E   Downloaded percent-encoding v2.3.2
-2026-06-25T20:17:04.748688Z 01E   Downloaded minimal-lexical v0.2.1
-2026-06-25T20:17:04.748693Z 01E   Downloaded mach2 v0.4.3
-2026-06-25T20:17:04.781603Z 01E   Downloaded litemap v0.8.2
-2026-06-25T20:17:04.838519Z 01E   Downloaded is_terminal_polyfill v1.70.2
-2026-06-25T20:17:04.838522Z 01E   Downloaded icu_provider v2.2.0
-2026-06-25T20:17:04.854588Z 01E   Downloaded icu_locale_core v2.2.0
-2026-06-25T20:17:04.928302Z 01E   Downloaded heck v0.5.0
-2026-06-25T20:17:04.984640Z 01E   Downloaded getrandom v0.2.17
-2026-06-25T20:17:04.984642Z 01E   Downloaded form_urlencoded v1.2.2
-2026-06-25T20:17:05.000847Z 01E   Downloaded colorchoice v1.0.5
-2026-06-25T20:17:05.058022Z 01E   Downloaded clap v4.6.1
-2026-06-25T20:17:05.107209Z 01E   Downloaded anstyle-parse v1.0.0
-2026-06-25T20:17:05.163573Z 01E   Downloaded unicode-ident v1.0.24
-2026-06-25T20:17:05.163578Z 01E   Downloaded libloading v0.8.9
-2026-06-25T20:17:05.179719Z 01E   Downloaded itoa v1.0.18
-2026-06-25T20:17:05.236582Z 01E   Downloaded icu_properties_data v2.2.0
-2026-06-25T20:17:05.337684Z 01E   Downloaded icu_normalizer v2.2.0
-2026-06-25T20:17:05.394678Z 01E   Downloaded glob v0.3.3
-2026-06-25T20:17:05.394679Z 01E   Downloaded coreaudio-sys v0.2.18
-2026-06-25T20:17:05.410927Z 01E   Downloaded zerofrom-derive v0.1.7
-2026-06-25T20:17:05.467565Z 01E   Downloaded memchr v2.8.2
-2026-06-25T20:17:05.467595Z 01E   Downloaded clang-sys v1.8.1
-2026-06-25T20:17:05.500434Z 01E   Downloaded cexpr v0.6.0
-2026-06-25T20:17:05.557629Z 01E   Downloaded yoke-derive v0.8.2
-2026-06-25T20:17:05.557631Z 01E   Downloaded base64 v0.22.1
-2026-06-25T20:17:05.625578Z 01E    Compiling proc-macro2 v1.0.106
-2026-06-25T20:17:05.625579Z 01E    Compiling quote v1.0.46
-2026-06-25T20:17:05.625580Z 01E    Compiling unicode-ident v1.0.24
-2026-06-25T20:17:05.625580Z 01E    Compiling libc v0.2.186
-2026-06-25T20:17:05.750465Z 01E    Compiling cfg-if v1.0.4
-2026-06-25T20:17:05.807940Z 01E    Compiling stable_deref_trait v1.2.1
-2026-06-25T20:17:05.824261Z 01E    Compiling shlex v2.0.1
-2026-06-25T20:17:05.936717Z 01E    Compiling find-msvc-tools v0.1.9
-2026-06-25T20:17:06.105921Z 01E    Compiling cc v1.2.65
-2026-06-25T20:17:07.150220Z 01E    Compiling bitflags v2.13.0
-2026-06-25T20:17:07.312606Z 01E    Compiling litemap v0.8.2
-2026-06-25T20:17:07.478685Z 01E    Compiling writeable v0.6.3
-2026-06-25T20:17:07.621243Z 01E    Compiling icu_normalizer_data v2.2.0
-2026-06-25T20:17:11.017136Z 01E    Compiling icu_properties_data v2.2.0
-2026-06-25T20:17:11.123903Z 01E    Compiling utf8_iter v1.0.4
-2026-06-25T20:17:11.781329Z 01E    Compiling ring v0.17.14
-2026-06-25T20:17:12.107789Z 01E    Compiling glob v0.3.3
-2026-06-25T20:17:12.164688Z 01E    Compiling zeroize v1.9.0
-2026-06-25T20:17:12.215561Z 01E    Compiling rustls-pki-types v1.14.1
-2026-06-25T20:17:12.382035Z 01E    Compiling clang-sys v1.8.1
-2026-06-25T20:17:12.578970Z 01E    Compiling syn v2.0.118
-2026-06-25T20:17:12.767175Z 01E    Compiling smallvec v1.15.2
-2026-06-25T20:17:13.017608Z 01E    Compiling getrandom v0.2.17
-2026-06-25T20:17:13.090358Z 01E    Compiling pkg-config v0.3.33
-2026-06-25T20:17:13.427551Z 01E    Compiling untrusted v0.9.0
-2026-06-25T20:17:13.519225Z 01E    Compiling memchr v2.8.2
-2026-06-25T20:17:13.683291Z 01E    Compiling rustix v1.1.4
-2026-06-25T20:17:14.045562Z 01E    Compiling regex-syntax v0.8.11
-2026-06-25T20:17:14.102501Z 01E    Compiling crc32fast v1.5.0
-2026-06-25T20:17:14.284197Z 01E    Compiling minimal-lexical v0.2.1
-2026-06-25T20:17:14.537284Z 01E    Compiling nom v7.1.3
-2026-06-25T20:17:15.838545Z 01E    Compiling regex-automata v0.4.14
-2026-06-25T20:17:16.016479Z 01E    Compiling synstructure v0.13.2
-2026-06-25T20:17:17.024365Z 01E    Compiling bzip2-sys v0.1.13+1.0.8
-2026-06-25T20:17:17.242398Z 01E    Compiling errno v0.3.14
-2026-06-25T20:17:17.332586Z 01E    Compiling libloading v0.8.9
-2026-06-25T20:17:17.464312Z 01E    Compiling bindgen v0.72.1
-2026-06-25T20:17:17.520573Z 01E    Compiling zerofrom-derive v0.1.7
-2026-06-25T20:17:17.593687Z 01E    Compiling yoke-derive v0.8.2
-2026-06-25T20:17:17.684331Z 01E    Compiling zerovec-derive v0.11.3
-2026-06-25T20:17:17.832717Z 01E    Compiling displaydoc v0.2.6
-2026-06-25T20:17:18.567157Z 01E    Compiling either v1.16.0
-2026-06-25T20:17:18.623432Z 01E    Compiling zerofrom v0.1.8
-2026-06-25T20:17:18.675225Z 01E    Compiling percent-encoding v2.3.2
-2026-06-25T20:17:18.764777Z 01E    Compiling rustls v0.23.41
-2026-06-25T20:17:18.821646Z 01E    Compiling adler2 v2.0.1
-2026-06-25T20:17:18.871316Z 01E    Compiling simd-adler32 v0.3.9
-2026-06-25T20:17:18.927541Z 01E    Compiling yoke v0.8.3
-2026-06-25T20:17:18.994888Z 01E    Compiling miniz_oxide v0.8.9
-2026-06-25T20:17:19.242847Z 01E    Compiling form_urlencoded v1.2.2
-2026-06-25T20:17:19.367816Z 01E    Compiling itertools v0.13.0
-2026-06-25T20:17:19.636688Z 01E    Compiling zerovec v0.11.6
-2026-06-25T20:17:19.762963Z 01E    Compiling zerotrie v0.2.4
-2026-06-25T20:17:20.262654Z 01E    Compiling rustls-webpki v0.103.13
-2026-06-25T20:17:20.582742Z 01E    Compiling tinystr v0.8.3
-2026-06-25T20:17:20.616260Z 01E    Compiling potential_utf v0.1.5
-2026-06-25T20:17:20.713217Z 01E    Compiling icu_locale_core v2.2.0
-2026-06-25T20:17:20.748272Z 01E    Compiling icu_collections v2.2.0
-2026-06-25T20:17:21.869647Z 01E    Compiling icu_provider v2.2.0
-2026-06-25T20:17:22.100078Z 01E    Compiling regex v1.12.4
-2026-06-25T20:17:22.207568Z 01E    Compiling icu_normalizer v2.2.0
-2026-06-25T20:17:22.556605Z 01E    Compiling icu_properties v2.2.0
-2026-06-25T20:17:22.821993Z 01E    Compiling cexpr v0.6.0
-2026-06-25T20:17:22.917939Z 01E    Compiling webpki-roots v1.0.8
-2026-06-25T20:17:23.014858Z 01E    Compiling subtle v2.6.1
-2026-06-25T20:17:23.131671Z 01E    Compiling log v0.4.33
-2026-06-25T20:17:23.252474Z 01E    Compiling once_cell v1.21.4
-2026-06-25T20:17:23.492009Z 01E    Compiling shlex v1.3.0
-2026-06-25T20:17:23.586253Z 01E    Compiling rustc-hash v2.1.2
-2026-06-25T20:17:24.077665Z 01E    Compiling idna_adapter v1.2.2
-2026-06-25T20:17:24.211000Z 01E    Compiling idna v1.1.0
-2026-06-25T20:17:24.816052Z 01E    Compiling url v2.5.8
-2026-06-25T20:17:25.194592Z 01E    Compiling webpki-roots v0.26.11
-2026-06-25T20:17:25.250144Z 01E    Compiling flate2 v1.1.9
-2026-06-25T20:17:25.621333Z 01E    Compiling xattr v1.6.1
-2026-06-25T20:17:25.793596Z 01E    Compiling filetime v0.2.29
-2026-06-25T20:17:25.888108Z 01E    Compiling serde_core v1.0.228
-2026-06-25T20:17:25.960829Z 01E    Compiling base64 v0.22.1
-2026-06-25T20:17:26.299418Z 01E    Compiling tar v0.4.46
-2026-06-25T20:17:26.781677Z 01E    Compiling bzip2 v0.4.4
-2026-06-25T20:17:26.918060Z 01E    Compiling utf8parse v0.2.2
-2026-06-25T20:17:27.046915Z 01E    Compiling zmij v1.0.21
-2026-06-25T20:17:27.789225Z 01E    Compiling ureq v2.12.1
-2026-06-25T20:17:28.282137Z 01E    Compiling anstyle-parse v1.0.0
-2026-06-25T20:17:29.176548Z 01E    Compiling anstyle v1.0.14
-2026-06-25T20:17:29.473592Z 01E    Compiling serde_json v1.0.150
-2026-06-25T20:17:29.733138Z 01E    Compiling anstyle-query v1.1.5
-2026-06-25T20:17:29.825050Z 01E    Compiling colorchoice v1.0.5
-2026-06-25T20:17:29.920039Z 01E    Compiling serde v1.0.228
-2026-06-25T20:17:30.077370Z 01E    Compiling sherpa-onnx-sys v1.13.3
-2026-06-25T20:17:30.233681Z 01E    Compiling is_terminal_polyfill v1.70.2
-2026-06-25T20:17:30.322905Z 01E    Compiling anstream v1.0.0
-2026-06-25T20:17:30.755063Z 01E    Compiling coreaudio-sys v0.2.18
-2026-06-25T20:17:34.054416Z 01E    Compiling serde_derive v1.0.228
-2026-06-25T20:17:36.794068Z 01E    Compiling heck v0.5.0
-2026-06-25T20:17:36.936156Z 01E    Compiling core-foundation-sys v0.8.7
-2026-06-25T20:17:37.102797Z 01E    Compiling itoa v1.0.18
-2026-06-25T20:17:37.177364Z 01E    Compiling clap_lex v1.1.0
-2026-06-25T20:17:37.352543Z 01E    Compiling strsim v0.11.1
-2026-06-25T20:17:37.585803Z 01E    Compiling cpal v0.15.3
-2026-06-25T20:17:37.832551Z 01E    Compiling bitflags v1.3.2
-2026-06-25T20:17:38.265110Z 01E    Compiling clap_builder v4.6.0
-2026-06-25T20:17:39.574057Z 01E    Compiling clap_derive v4.6.1
-2026-06-25T20:17:41.527360Z 01E    Compiling mach2 v0.4.3
-2026-06-25T20:17:41.706153Z 01E    Compiling dasp_sample v0.11.0
-2026-06-25T20:17:41.914298Z 01E    Compiling sherpa-onnx v1.13.3
-2026-06-25T20:17:41.970432Z 01E    Compiling clap v4.6.1
-2026-06-25T20:17:43.159050Z 01E    Compiling coreaudio-rs v0.11.3
-2026-06-25T20:17:46.858598Z 01E    Compiling tts-sidecar v0.1.0 (/Users/gitlab/builds/cristianrojas-softwareengineer-group/EvolutiveX-Agent-Orchestrator/sidecar)
-2026-06-25T20:17:46.932555Z 01E error[E0308]: mismatched types
-2026-06-25T20:17:46.932558Z 01E    --> src/main.rs:136:16
-2026-06-25T20:17:46.932560Z 01E     |
-2026-06-25T20:17:46.932560Z 01E 136 |         model: cli.model.to_string_lossy().into_owned(),
-2026-06-25T20:17:46.932561Z 01E     |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `OfflineTtsModelConfig`, found `String`
-2026-06-25T20:17:46.932562Z 01E 
-2026-06-25T20:17:46.932562Z 01E error[E0560]: struct `OfflineTtsConfig` has no field named `config`
-2026-06-25T20:17:46.932562Z 01E    --> src/main.rs:137:9
-2026-06-25T20:17:46.932563Z 01E     |
-2026-06-25T20:17:46.932563Z 01E 137 |         config: cli.config.to_string_lossy().into_owned(),
-2026-06-25T20:17:46.932564Z 01E     |         ^^^^^^ `OfflineTtsConfig` does not have this field
-2026-06-25T20:17:46.932564Z 01E     |
-2026-06-25T20:17:46.932565Z 01E     = note: available fields are: `rule_fsts`, `max_num_sentences`, `rule_fars`, `silence_scale`
-2026-06-25T20:17:46.932604Z 01E 
-2026-06-25T20:17:46.932604Z 01E error[E0560]: struct `OfflineTtsConfig` has no field named `espeak_data`
-2026-06-25T20:17:46.932605Z 01E    --> src/main.rs:138:9
-2026-06-25T20:17:46.932605Z 01E     |
-2026-06-25T20:17:46.932606Z 01E 138 |         espeak_data: espeak_dir,
-2026-06-25T20:17:46.932606Z 01E     |         ^^^^^^^^^^^ `OfflineTtsConfig` does not have this field
-2026-06-25T20:17:46.932607Z 01E     |
-2026-06-25T20:17:46.932607Z 01E     = note: available fields are: `rule_fsts`, `max_num_sentences`, `rule_fars`, `silence_scale`
-2026-06-25T20:17:46.932608Z 01E 
-2026-06-25T20:17:46.989496Z 01E error[E0599]: no associated function or constant named `new` found for struct `OfflineTts` in the current scope
-2026-06-25T20:17:46.989499Z 01E    --> src/main.rs:143:33
-2026-06-25T20:17:46.989499Z 01E     |
-2026-06-25T20:17:46.989500Z 01E 143 |     let tts = match OfflineTts::new(&config) {
-2026-06-25T20:17:46.989501Z 01E     |                                 ^^^ associated function or constant not found in `OfflineTts`
-2026-06-25T20:17:46.989501Z 01E     |
-2026-06-25T20:17:46.989502Z 01E note: if you're trying to build a new `OfflineTts`, consider using `OfflineTts::create` which returns `std::option::Option<OfflineTts>`
-2026-06-25T20:17:46.989502Z 01E    --> /Users/gitlab/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/sherpa-onnx-1.13.3/src/tts.rs:530:5
-2026-06-25T20:17:46.989503Z 01E     |
-2026-06-25T20:17:46.989503Z 01E 530 |     pub fn create(config: &OfflineTtsConfig) -> Option<Self> {
-2026-06-25T20:17:46.989504Z 01E     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-06-25T20:17:46.989504Z 01E 
-2026-06-25T20:17:46.989505Z 01E Some errors have detailed explanations: E0308, E0560, E0599.
-2026-06-25T20:17:46.989505Z 01E For more information about an error, try `rustc --explain E0308`.
-2026-06-25T20:17:46.989506Z 01E error: could not compile `tts-sidecar` (bin "tts-sidecar") due to 4 previous errors
-2026-06-25T20:17:47.023435Z 00O section_end:1782418667:step_script
+2026-06-26T03:51:39.096348Z 00O+[0K[36;1mExecuting "step_script" stage of the job script[0;m[0;m
+2026-06-26T03:51:39.754751Z 01O [32;1m$ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y[0;m
+2026-06-26T03:51:39.892334Z 01E info: downloading installer
+2026-06-26T03:51:40.657547Z 01E warn: It looks like you have an existing installation of Rust at:
+2026-06-26T03:51:40.657551Z 01E warn: /Users/gitlab/.asdf/shims
+2026-06-26T03:51:40.657551Z 01E warn: It is recommended that rustup be the primary Rust installation.
+2026-06-26T03:51:40.657552Z 01E warn: Otherwise you may have confusion unless you are careful with your PATH.
+2026-06-26T03:51:40.657552Z 01E warn: If you are sure that you want both rustup and your already installed Rust
+2026-06-26T03:51:40.657553Z 01E warn: then please reply `y' or `yes' or set RUSTUP_INIT_SKIP_PATH_CHECK to yes
+2026-06-26T03:51:40.657554Z 01E warn: or pass `-y' to ignore all ignorable checks.
+2026-06-26T03:51:40.657554Z 01E error: cannot install while Rust is installed
+2026-06-26T03:51:40.657555Z 01E warn: continuing (because the -y flag is set and the error is ignorable)
+2026-06-26T03:51:40.657555Z 01E warn: It looks like you have an existing rustup settings file at:
+2026-06-26T03:51:40.657556Z 01E warn: /Users/gitlab/.rustup/settings.toml
+2026-06-26T03:51:40.657556Z 01E warn: Rustup will install the default toolchain as specified in the settings file,
+2026-06-26T03:51:40.657557Z 01E warn: instead of the one inferred from the default host triple.
+2026-06-26T03:51:40.746705Z 01E info: profile set to default
+2026-06-26T03:51:40.746708Z 01E info: default host triple is aarch64-apple-darwin
+2026-06-26T03:51:40.746709Z 01E info: syncing channel updates for stable-aarch64-apple-darwin
+2026-06-26T03:51:40.933137Z 01E info: latest update on 2026-05-28 for version 1.96.0 (ac68faa20 2026-05-25)
+2026-06-26T03:51:40.933140Z 01E info: downloading 6 components
+2026-06-26T03:52:38.195388Z 01E info: default toolchain set to stable-aarch64-apple-darwin
+2026-06-26T03:52:38.195389Z 01O 
+2026-06-26T03:52:40.613383Z 01O   stable-aarch64-apple-darwin installed - rustc 1.96.0 (ac68faa20 2026-05-25)
+2026-06-26T03:52:40.613391Z 01O 
+2026-06-26T03:52:40.613391Z 01O 
+2026-06-26T03:52:40.613392Z 01O Rust is installed now. Great!
+2026-06-26T03:52:40.613392Z 01O 
+2026-06-26T03:52:40.613393Z 01O To get started you may need to restart your current shell.
+2026-06-26T03:52:40.613393Z 01O This would reload your PATH environment variable to include
+2026-06-26T03:52:40.613394Z 01O Cargo's bin directory ($HOME/.cargo/bin).
+2026-06-26T03:52:40.613394Z 01O 
+2026-06-26T03:52:40.613395Z 01O To configure your current shell, you need to source
+2026-06-26T03:52:40.613395Z 01O the corresponding env file under $HOME/.cargo.
+2026-06-26T03:52:40.613396Z 01O 
+2026-06-26T03:52:40.613396Z 01O This is usually done by running one of the following (note the leading DOT):
+2026-06-26T03:52:40.613396Z 01O . "$HOME/.cargo/env"            # For sh/bash/zsh/ash/dash/pdksh
+2026-06-26T03:52:40.613397Z 01O source "$HOME/.cargo/env.fish"  # For fish
+2026-06-26T03:52:40.613397Z 01O source "~/.cargo/env.nu"  # For nushell
+2026-06-26T03:52:40.613398Z 01O source "$HOME/.cargo/env.tcsh"  # For tcsh
+2026-06-26T03:52:40.613398Z 01O . "$HOME/.cargo/env.ps1"        # For pwsh
+2026-06-26T03:52:40.613399Z 01O source "$HOME/.cargo/env.xsh"   # For xonsh
+2026-06-26T03:52:40.670421Z 01O [32;1m$ source $HOME/.cargo/env[0;m
+2026-06-26T03:52:40.670425Z 01O [32;1m$ rustup default stable[0;m
+2026-06-26T03:52:43.440945Z 01E info: using existing install for stable-aarch64-apple-darwin
+2026-06-26T03:52:43.497473Z 01E info: default toolchain set to stable-aarch64-apple-darwin
+2026-06-26T03:52:43.497499Z 01O 
+2026-06-26T03:52:43.497500Z 01O   stable-aarch64-apple-darwin unchanged - rustc 1.96.0 (ac68faa20 2026-05-25)
+2026-06-26T03:52:43.497501Z 01O 
+2026-06-26T03:52:43.497501Z 01O [32;1m$ brew install espeak-ng[0;m
+2026-06-26T03:52:47.265108Z 01E ✔︎ JSON API formula_tap_migrations.jws.json
+2026-06-26T03:52:47.265117Z 01E ✔︎ JSON API cask_tap_migrations.jws.json
+2026-06-26T03:52:48.338956Z 01O Inspect the formula dependency plan before installing with `brew install --ask`.
+2026-06-26T03:52:48.338962Z 01O Enable ask mode by setting `HOMEBREW_ASK=1`.
+2026-06-26T03:52:48.338964Z 01O Hide these hints with `HOMEBREW_NO_ENV_HINTS=1` (see `man brew`).
+2026-06-26T03:52:48.338964Z 01O ==> Fetching downloads for: espeak-ng
+2026-06-26T03:52:48.443756Z 01E ✔︎ Bottle Manifest espeak-ng (1.52.0)
+2026-06-26T03:52:48.679315Z 01E ✔︎ Bottle Manifest pcaudiolib (1.3)
+2026-06-26T03:52:48.735303Z 01E ✔︎ Bottle pcaudiolib (1.3)
+2026-06-26T03:52:49.373769Z 01E ✔︎ Bottle espeak-ng (1.52.0)
+2026-06-26T03:52:49.446193Z 01O ==> Installing espeak-ng dependency: pcaudiolib
+2026-06-26T03:52:49.446198Z 01O ==> Pouring pcaudiolib--1.3.arm64_tahoe.bottle.tar.gz
+2026-06-26T03:52:49.534986Z 01O 🍺  /opt/homebrew/Cellar/pcaudiolib/1.3: 14 files, 174.1KB
+2026-06-26T03:52:49.534989Z 01O ==> Pouring espeak-ng--1.52.0.arm64_tahoe.bottle.tar.gz
+2026-06-26T03:52:49.835017Z 01O 🍺  /opt/homebrew/Cellar/espeak-ng/1.52.0: 538 files, 26.1MB
+2026-06-26T03:52:49.891401Z 01E info: component rust-std is up to date
+2026-06-26T03:52:49.891410Z 01O [32;1m$ if [ "$RUNNER_OS" = "Linux" ]; then # collapsed multi-line command[0;m
+2026-06-26T03:52:49.891411Z 01O [32;1m$ if [ "$RUNNER_OS" = "Linux" ]; then # collapsed multi-line command[0;m
+2026-06-26T03:52:49.891412Z 01O [32;1m$ if [ "$CROSS" = "true" ]; then # collapsed multi-line command[0;m
+2026-06-26T03:52:49.891412Z 01O [32;1m$ rustup target add "$RUST_TRIPLE"[0;m
+2026-06-26T03:52:49.891413Z 01O [32;1m$ if [ "$CROSS" = "true" ]; then # collapsed multi-line command[0;m
+2026-06-26T03:52:49.891413Z 01O [32;1m$ cargo build --release --manifest-path sidecar/Cargo.toml --target "$RUST_TRIPLE"[0;m
+2026-06-26T03:52:50.410332Z 01E     Updating crates.io index
+2026-06-26T03:52:50.776085Z 01E  Downloading crates ...
+2026-06-26T03:52:50.832347Z 01E   Downloaded is_terminal_polyfill v1.70.2
+2026-06-26T03:52:50.832377Z 01E   Downloaded zerovec-derive v0.11.3
+2026-06-26T03:52:50.848173Z 01E   Downloaded yoke v0.8.3
+2026-06-26T03:52:50.848174Z 01E   Downloaded zmij v1.0.21
+2026-06-26T03:52:50.904182Z 01E   Downloaded zerofrom v0.1.8
+2026-06-26T03:52:50.904183Z 01E   Downloaded utf8parse v0.2.2
+2026-06-26T03:52:50.904183Z 01E   Downloaded rustc-hash v2.1.2
+2026-06-26T03:52:50.904184Z 01E   Downloaded percent-encoding v2.3.2
+2026-06-26T03:52:50.904184Z 01E   Downloaded utf8_iter v1.0.4
+2026-06-26T03:52:50.920885Z 01E   Downloaded writeable v0.6.3
+2026-06-26T03:52:50.920886Z 01E   Downloaded unicode-ident v1.0.24
+2026-06-26T03:52:50.977815Z 01E   Downloaded url v2.5.8
+2026-06-26T03:52:50.977818Z 01E   Downloaded serde_derive v1.0.228
+2026-06-26T03:52:50.993659Z 01E   Downloaded tar v0.4.46
+2026-06-26T03:52:51.050268Z 01E   Downloaded ureq v2.12.1
+2026-06-26T03:52:51.066090Z 01E   Downloaded regex v1.12.4
+2026-06-26T03:52:51.122328Z 01E   Downloaded idna v1.1.0
+2026-06-26T03:52:51.138198Z 01E   Downloaded serde_json v1.0.150
+2026-06-26T03:52:51.210050Z 01E   Downloaded webpki-roots v1.0.8
+2026-06-26T03:52:51.266326Z 01E   Downloaded itertools v0.13.0
+2026-06-26T03:52:51.298548Z 01E   Downloaded clap_builder v4.6.0
+2026-06-26T03:52:51.355094Z 01E   Downloaded bindgen v0.72.1
+2026-06-26T03:52:51.403540Z 01E   Downloaded icu_properties_data v2.2.0
+2026-06-26T03:52:51.541213Z 01E   Downloaded minimal-lexical v0.2.1
+2026-06-26T03:52:51.597374Z 01E   Downloaded syn v2.0.118
+2026-06-26T03:52:51.695554Z 01E   Downloaded rustls-webpki v0.103.13
+2026-06-26T03:52:51.752304Z 01E   Downloaded icu_normalizer_data v2.2.0
+2026-06-26T03:52:51.752321Z 01E   Downloaded rustls v0.23.41
+2026-06-26T03:52:51.850489Z 01E   Downloaded regex-syntax v0.8.11
+2026-06-26T03:52:51.907323Z 01E   Downloaded icu_normalizer v2.2.0
+2026-06-26T03:52:51.939385Z 01E   Downloaded rustix v1.1.4
+2026-06-26T03:52:52.225542Z 01E   Downloaded icu_locale_core v2.2.0
+2026-06-26T03:52:52.330876Z 01E   Downloaded icu_collections v2.2.0
+2026-06-26T03:52:52.419390Z 01E   Downloaded cpal v0.15.3
+2026-06-26T03:52:52.492239Z 01E   Downloaded serde v1.0.228
+2026-06-26T03:52:52.492242Z 01E   Downloaded proc-macro2 v1.0.106
+2026-06-26T03:52:52.548482Z 01E   Downloaded memchr v2.8.2
+2026-06-26T03:52:52.564555Z 01E   Downloaded icu_provider v2.2.0
+2026-06-26T03:52:52.621415Z 01E   Downloaded crc32fast v1.5.0
+2026-06-26T03:52:52.621417Z 01E   Downloaded core-foundation-sys v0.8.7
+2026-06-26T03:52:52.653617Z 01E   Downloaded regex-automata v0.4.14
+2026-06-26T03:52:52.759596Z 01E   Downloaded clap_derive v4.6.1
+2026-06-26T03:52:52.816177Z 01E   Downloaded base64 v0.22.1
+2026-06-26T03:52:52.831973Z 01E   Downloaded tinystr v0.8.3
+2026-06-26T03:52:52.888240Z 01E   Downloaded stable_deref_trait v1.2.1
+2026-06-26T03:52:52.888242Z 01E   Downloaded shlex v1.3.0
+2026-06-26T03:52:52.904105Z 01E   Downloaded sherpa-onnx-sys v1.13.3
+2026-06-26T03:52:52.904106Z 01E   Downloaded sherpa-onnx v1.13.3
+2026-06-26T03:52:52.960455Z 01E   Downloaded rustls-pki-types v1.14.1
+2026-06-26T03:52:52.960457Z 01E   Downloaded quote v1.0.46
+2026-06-26T03:52:52.992884Z 01E   Downloaded libloading v0.8.9
+2026-06-26T03:52:53.049265Z 01E   Downloaded jobserver v0.1.34
+2026-06-26T03:52:53.049268Z 01E   Downloaded libc v0.2.186
+2026-06-26T03:52:53.341987Z 01E   Downloaded icu_properties v2.2.0
+2026-06-26T03:52:53.398181Z 01E   Downloaded getrandom v0.2.17
+2026-06-26T03:52:53.398183Z 01E   Downloaded form_urlencoded v1.2.2
+2026-06-26T03:52:53.430433Z 01E   Downloaded displaydoc v0.2.6
+2026-06-26T03:52:53.487301Z 01E   Downloaded clap_lex v1.1.0
+2026-06-26T03:52:53.487303Z 01E   Downloaded webpki-roots v0.26.11
+2026-06-26T03:52:53.487304Z 01E   Downloaded synstructure v0.13.2
+2026-06-26T03:52:53.487304Z 01E   Downloaded smallvec v1.15.2
+2026-06-26T03:52:53.503194Z 01E   Downloaded potential_utf v0.1.5
+2026-06-26T03:52:53.503195Z 01E   Downloaded heck v0.5.0
+2026-06-26T03:52:53.559267Z 01E   Downloaded ring v0.17.14
+2026-06-26T03:52:53.854129Z 01E   Downloaded find-msvc-tools v0.1.9
+2026-06-26T03:52:53.910196Z 01E   Downloaded filetime v0.2.29
+2026-06-26T03:52:53.910199Z 01E   Downloaded dasp_sample v0.11.0
+2026-06-26T03:52:53.926060Z 01E   Downloaded colorchoice v1.0.5
+2026-06-26T03:52:53.982441Z 01E   Downloaded itoa v1.0.18
+2026-06-26T03:52:53.982442Z 01E   Downloaded idna_adapter v1.2.2
+2026-06-26T03:52:53.982443Z 01E   Downloaded glob v0.3.3
+2026-06-26T03:52:53.998249Z 01E   Downloaded coreaudio-sys v0.2.18
+2026-06-26T03:52:54.054466Z 01E   Downloaded flate2 v1.1.9
+2026-06-26T03:52:54.054468Z 01E   Downloaded either v1.16.0
+2026-06-26T03:52:54.086826Z 01E   Downloaded coreaudio-rs v0.11.3
+2026-06-26T03:52:54.143336Z 01E   Downloaded cfg-if v1.0.4
+2026-06-26T03:52:54.143338Z 01E   Downloaded anstream v1.0.0
+2026-06-26T03:52:54.143338Z 01E   Downloaded yoke-derive v0.8.2
+2026-06-26T03:52:54.175719Z 01E   Downloaded xattr v1.6.1
+2026-06-26T03:52:54.175722Z 01E   Downloaded strsim v0.11.1
+2026-06-26T03:52:54.232299Z 01E   Downloaded simd-adler32 v0.3.9
+2026-06-26T03:52:54.232301Z 01E   Downloaded shlex v2.0.1
+2026-06-26T03:52:54.232302Z 01E   Downloaded pkg-config v0.3.33
+2026-06-26T03:52:54.232302Z 01E   Downloaded miniz_oxide v0.8.9
+2026-06-26T03:52:54.232302Z 01E   Downloaded log v0.4.33
+2026-06-26T03:52:54.264210Z 01E   Downloaded litemap v0.8.2
+2026-06-26T03:52:54.320200Z 01E   Downloaded clap v4.6.1
+2026-06-26T03:52:54.368282Z 01E   Downloaded clang-sys v1.8.1
+2026-06-26T03:52:54.424389Z 01E   Downloaded bitflags v2.13.0
+2026-06-26T03:52:54.456638Z 01E   Downloaded bitflags v1.3.2
+2026-06-26T03:52:54.513325Z 01E   Downloaded aho-corasick v1.1.4
+2026-06-26T03:52:54.529260Z 01E   Downloaded zerovec v0.11.6
+2026-06-26T03:52:54.585270Z 01E   Downloaded zeroize v1.9.0
+2026-06-26T03:52:54.617578Z 01E   Downloaded zerofrom-derive v0.1.7
+2026-06-26T03:52:54.674378Z 01E   Downloaded once_cell v1.21.4
+2026-06-26T03:52:54.674381Z 01E   Downloaded nom v7.1.3
+2026-06-26T03:52:54.690268Z 01E   Downloaded mach2 v0.4.3
+2026-06-26T03:52:54.746342Z 01E   Downloaded cc v1.2.65
+2026-06-26T03:52:54.762163Z 01E   Downloaded bzip2-sys v0.1.13+1.0.8
+2026-06-26T03:52:54.818253Z 01E   Downloaded anstyle-parse v1.0.0
+2026-06-26T03:52:54.866589Z 01E   Downloaded anstyle v1.0.14
+2026-06-26T03:52:54.923354Z 01E   Downloaded bzip2 v0.4.4
+2026-06-26T03:52:54.923356Z 01E   Downloaded adler2 v2.0.1
+2026-06-26T03:52:54.923357Z 01E   Downloaded zerotrie v0.2.4
+2026-06-26T03:52:54.923358Z 01E   Downloaded untrusted v0.9.0
+2026-06-26T03:52:54.955883Z 01E   Downloaded subtle v2.6.1
+2026-06-26T03:52:54.971721Z 01E   Downloaded serde_core v1.0.228
+2026-06-26T03:52:55.028615Z 01E   Downloaded errno v0.3.14
+2026-06-26T03:52:55.028618Z 01E   Downloaded cexpr v0.6.0
+2026-06-26T03:52:55.028618Z 01E   Downloaded anstyle-query v1.1.5
+2026-06-26T03:52:55.093857Z 01E    Compiling proc-macro2 v1.0.106
+2026-06-26T03:52:55.093859Z 01E    Compiling unicode-ident v1.0.24
+2026-06-26T03:52:55.093860Z 01E    Compiling quote v1.0.46
+2026-06-26T03:52:55.093860Z 01E    Compiling libc v0.2.186
+2026-06-26T03:52:55.182656Z 01E    Compiling cfg-if v1.0.4
+2026-06-26T03:52:55.239424Z 01E    Compiling stable_deref_trait v1.2.1
+2026-06-26T03:52:55.239427Z 01E    Compiling shlex v2.0.1
+2026-06-26T03:52:55.308704Z 01E    Compiling find-msvc-tools v0.1.9
+2026-06-26T03:52:55.435668Z 01E    Compiling cc v1.2.65
+2026-06-26T03:52:56.265292Z 01E    Compiling bitflags v2.13.0
+2026-06-26T03:52:56.355271Z 01E    Compiling litemap v0.8.2
+2026-06-26T03:52:56.459898Z 01E    Compiling writeable v0.6.3
+2026-06-26T03:52:56.548807Z 01E    Compiling icu_properties_data v2.2.0
+2026-06-26T03:52:59.452610Z 01E    Compiling utf8_iter v1.0.4
+2026-06-26T03:52:59.509210Z 01E    Compiling icu_normalizer_data v2.2.0
+2026-06-26T03:52:59.952993Z 01E    Compiling ring v0.17.14
+2026-06-26T03:53:00.174686Z 01E    Compiling glob v0.3.3
+2026-06-26T03:53:00.231521Z 01E    Compiling zeroize v1.9.0
+2026-06-26T03:53:00.282044Z 01E    Compiling rustls-pki-types v1.14.1
+2026-06-26T03:53:00.371487Z 01E    Compiling clang-sys v1.8.1
+2026-06-26T03:53:00.460548Z 01E    Compiling syn v2.0.118
+2026-06-26T03:53:00.592362Z 01E    Compiling smallvec v1.15.2
+2026-06-26T03:53:00.698302Z 01E    Compiling getrandom v0.2.17
+2026-06-26T03:53:00.770399Z 01E    Compiling untrusted v0.9.0
+2026-06-26T03:53:00.827302Z 01E    Compiling minimal-lexical v0.2.1
+2026-06-26T03:53:00.934727Z 01E    Compiling pkg-config v0.3.33
+2026-06-26T03:53:01.025034Z 01E    Compiling memchr v2.8.2
+2026-06-26T03:53:01.230764Z 01E    Compiling regex-syntax v0.8.11
+2026-06-26T03:53:01.304294Z 01E    Compiling rustix v1.1.4
+2026-06-26T03:53:01.523414Z 01E    Compiling crc32fast v1.5.0
+2026-06-26T03:53:01.977425Z 01E    Compiling regex-automata v0.4.14
+2026-06-26T03:53:02.646907Z 01E    Compiling synstructure v0.13.2
+2026-06-26T03:53:03.019609Z 01E    Compiling nom v7.1.3
+2026-06-26T03:53:03.307183Z 01E    Compiling bzip2-sys v0.1.13+1.0.8
+2026-06-26T03:53:03.490959Z 01E    Compiling errno v0.3.14
+2026-06-26T03:53:03.563056Z 01E    Compiling libloading v0.8.9
+2026-06-26T03:53:03.656260Z 01E    Compiling simd-adler32 v0.3.9
+2026-06-26T03:53:03.712283Z 01E    Compiling zerofrom-derive v0.1.7
+2026-06-26T03:53:03.761525Z 01E    Compiling yoke-derive v0.8.2
+2026-06-26T03:53:03.818233Z 01E    Compiling zerovec-derive v0.11.3
+2026-06-26T03:53:04.032416Z 01E    Compiling displaydoc v0.2.6
+2026-06-26T03:53:04.483348Z 01E    Compiling percent-encoding v2.3.2
+2026-06-26T03:53:04.483352Z 01E    Compiling bindgen v0.72.1
+2026-06-26T03:53:04.515782Z 01E    Compiling zerofrom v0.1.8
+2026-06-26T03:53:04.572127Z 01E    Compiling rustls v0.23.41
+2026-06-26T03:53:04.625036Z 01E    Compiling adler2 v2.0.1
+2026-06-26T03:53:04.697348Z 01E    Compiling either v1.16.0
+2026-06-26T03:53:04.786721Z 01E    Compiling yoke v0.8.3
+2026-06-26T03:53:04.843230Z 01E    Compiling itertools v0.13.0
+2026-06-26T03:53:05.022804Z 01E    Compiling miniz_oxide v0.8.9
+2026-06-26T03:53:05.353392Z 01E    Compiling zerovec v0.11.6
+2026-06-26T03:53:05.410248Z 01E    Compiling zerotrie v0.2.4
+2026-06-26T03:53:05.410249Z 01E    Compiling rustls-webpki v0.103.13
+2026-06-26T03:53:05.705561Z 01E    Compiling form_urlencoded v1.2.2
+2026-06-26T03:53:05.762233Z 01E    Compiling cexpr v0.6.0
+2026-06-26T03:53:06.101424Z 01E    Compiling tinystr v0.8.3
+2026-06-26T03:53:06.206847Z 01E    Compiling icu_locale_core v2.2.0
+2026-06-26T03:53:06.206850Z 01E    Compiling potential_utf v0.1.5
+2026-06-26T03:53:06.279423Z 01E    Compiling icu_collections v2.2.0
+2026-06-26T03:53:06.711723Z 01E    Compiling icu_provider v2.2.0
+2026-06-26T03:53:06.893332Z 01E    Compiling icu_properties v2.2.0
+2026-06-26T03:53:06.893334Z 01E    Compiling icu_normalizer v2.2.0
+2026-06-26T03:53:07.015761Z 01E    Compiling regex v1.12.4
+2026-06-26T03:53:07.260183Z 01E    Compiling webpki-roots v1.0.8
+2026-06-26T03:53:07.316579Z 01E    Compiling subtle v2.6.1
+2026-06-26T03:53:07.316582Z 01E    Compiling log v0.4.33
+2026-06-26T03:53:07.348718Z 01E    Compiling once_cell v1.21.4
+2026-06-26T03:53:07.405268Z 01E    Compiling shlex v1.3.0
+2026-06-26T03:53:07.470740Z 01E    Compiling rustc-hash v2.1.2
+2026-06-26T03:53:07.527340Z 01E    Compiling idna_adapter v1.2.2
+2026-06-26T03:53:07.559610Z 01E    Compiling idna v1.1.0
+2026-06-26T03:53:07.949175Z 01E    Compiling url v2.5.8
+2026-06-26T03:53:08.293406Z 01E    Compiling webpki-roots v0.26.11
+2026-06-26T03:53:08.350260Z 01E    Compiling flate2 v1.1.9
+2026-06-26T03:53:08.436875Z 01E    Compiling xattr v1.6.1
+2026-06-26T03:53:08.577185Z 01E    Compiling filetime v0.2.29
+2026-06-26T03:53:08.577187Z 01E    Compiling serde_core v1.0.228
+2026-06-26T03:53:08.665517Z 01E    Compiling base64 v0.22.1
+2026-06-26T03:53:08.857042Z 01E    Compiling tar v0.4.46
+2026-06-26T03:53:09.100510Z 01E    Compiling bzip2 v0.4.4
+2026-06-26T03:53:09.190862Z 01E    Compiling utf8parse v0.2.2
+2026-06-26T03:53:09.372832Z 01E    Compiling zmij v1.0.21
+2026-06-26T03:53:09.816240Z 01E    Compiling ureq v2.12.1
+2026-06-26T03:53:10.071617Z 01E    Compiling anstyle-parse v1.0.0
+2026-06-26T03:53:10.635411Z 01E    Compiling serde v1.0.228
+2026-06-26T03:53:10.814319Z 01E    Compiling anstyle-query v1.1.5
+2026-06-26T03:53:10.864383Z 01E    Compiling serde_json v1.0.150
+2026-06-26T03:53:11.016336Z 01E    Compiling is_terminal_polyfill v1.70.2
+2026-06-26T03:53:11.072368Z 01E    Compiling sherpa-onnx-sys v1.13.3
+2026-06-26T03:53:11.072370Z 01E    Compiling anstyle v1.0.14
+2026-06-26T03:53:11.148330Z 01E    Compiling coreaudio-sys v0.2.18
+2026-06-26T03:53:11.253098Z 01E    Compiling colorchoice v1.0.5
+2026-06-26T03:53:11.325018Z 01E    Compiling anstream v1.0.0
+2026-06-26T03:53:15.526722Z 01E    Compiling serde_derive v1.0.228
+2026-06-26T03:53:15.943017Z 01E    Compiling clap_lex v1.1.0
+2026-06-26T03:53:16.127515Z 01E    Compiling itoa v1.0.18
+2026-06-26T03:53:16.273429Z 01E    Compiling bitflags v1.3.2
+2026-06-26T03:53:16.330254Z 01E    Compiling strsim v0.11.1
+2026-06-26T03:53:16.718222Z 01E    Compiling heck v0.5.0
+2026-06-26T03:53:16.822978Z 01E    Compiling core-foundation-sys v0.8.7
+2026-06-26T03:53:16.945054Z 01E    Compiling cpal v0.15.3
+2026-06-26T03:53:17.001254Z 01E    Compiling clap_derive v4.6.1
+2026-06-26T03:53:17.364831Z 01E    Compiling clap_builder v4.6.0
+2026-06-26T03:53:18.091512Z 01E    Compiling mach2 v0.4.3
+2026-06-26T03:53:18.414894Z 01E    Compiling dasp_sample v0.11.0
+2026-06-26T03:53:18.617256Z 01E    Compiling sherpa-onnx v1.13.3
+2026-06-26T03:53:19.565534Z 01E    Compiling coreaudio-rs v0.11.3
+2026-06-26T03:53:20.052756Z 01E    Compiling clap v4.6.1
+2026-06-26T03:53:22.102010Z 01E    Compiling tts-sidecar v0.1.0 (/Users/gitlab/builds/cristianrojas-softwareengineer-group/EvolutiveX-Agent-Orchestrator/sidecar)
+2026-06-26T03:53:22.139514Z 01E error[E0560]: struct `OfflineTtsModelConfig` has no field named `model`
+2026-06-26T03:53:22.139518Z 01E    --> src/main.rs:113:9
+2026-06-26T03:53:22.139518Z 01E     |
+2026-06-26T03:53:22.139519Z 01E 113 |         model: cli.model.to_string_lossy().into_owned(),
+2026-06-26T03:53:22.139520Z 01E     |         ^^^^^ `OfflineTtsModelConfig` does not have this field
+2026-06-26T03:53:22.139520Z 01E     |
+2026-06-26T03:53:22.139521Z 01E     = note: available fields are: `vits`, `matcha`, `kokoro`, `kitten`, `zipvoice` ... and 5 others
+2026-06-26T03:53:22.139521Z 01E 
+2026-06-26T03:53:22.139522Z 01E error[E0308]: mismatched types
+2026-06-26T03:53:22.139522Z 01E    --> src/main.rs:118:40
+2026-06-26T03:53:22.139522Z 01E     |
+2026-06-26T03:53:22.139523Z 01E 118 |     let tts = match OfflineTts::create(&model_config) {
+2026-06-26T03:53:22.139523Z 01E     |                     ------------------ ^^^^^^^^^^^^^ expected `&OfflineTtsConfig`, found `&OfflineTtsModelConfig`
+2026-06-26T03:53:22.139524Z 01E     |                     |
+2026-06-26T03:53:22.139524Z 01E     |                     arguments to this function are incorrect
+2026-06-26T03:53:22.139525Z 01E     |
+2026-06-26T03:53:22.139525Z 01E     = note: expected reference `&OfflineTtsConfig`
+2026-06-26T03:53:22.139554Z 01E                found reference `&OfflineTtsModelConfig`
+2026-06-26T03:53:22.139555Z 01E note: associated function defined here
+2026-06-26T03:53:22.139555Z 01E    --> /Users/gitlab/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/sherpa-onnx-1.13.3/src/tts.rs:530:12
+2026-06-26T03:53:22.139556Z 01E     |
+2026-06-26T03:53:22.139556Z 01E 530 |     pub fn create(config: &OfflineTtsConfig) -> Option<Self> {
+2026-06-26T03:53:22.139556Z 01E     |            ^^^^^^
+2026-06-26T03:53:22.139557Z 01E 
+2026-06-26T03:53:22.139557Z 01E error[E0308]: mismatched types
+2026-06-26T03:53:22.139558Z 01E    --> src/main.rs:119:9
+2026-06-26T03:53:22.139558Z 01E     |
+2026-06-26T03:53:22.139558Z 01E 118 |     let tts = match OfflineTts::create(&model_config) {
+2026-06-26T03:53:22.139559Z 01E     |                     --------------------------------- this expression has type `std::option::Option<OfflineTts>`
+2026-06-26T03:53:22.139559Z 01E 119 |         Ok(t) => t,
+2026-06-26T03:53:22.139560Z 01E     |         ^^^^^ expected `Option<OfflineTts>`, found `Result<_, _>`
+2026-06-26T03:53:22.139560Z 01E     |
+2026-06-26T03:53:22.139561Z 01E     = note: expected enum `std::option::Option<OfflineTts>`
+2026-06-26T03:53:22.139561Z 01E                found enum `Result<_, _>`
+2026-06-26T03:53:22.139562Z 01E 
+2026-06-26T03:53:22.155519Z 01E error[E0308]: mismatched types
+2026-06-26T03:53:22.155520Z 01E    --> src/main.rs:120:9
+2026-06-26T03:53:22.155520Z 01E     |
+2026-06-26T03:53:22.155520Z 01E 118 |     let tts = match OfflineTts::create(&model_config) {
+2026-06-26T03:53:22.155521Z 01E     |                     --------------------------------- this expression has type `std::option::Option<OfflineTts>`
+2026-06-26T03:53:22.155522Z 01E 119 |         Ok(t) => t,
+2026-06-26T03:53:22.155522Z 01E 120 |         Err(e) => {
+2026-06-26T03:53:22.155522Z 01E     |         ^^^^^^ expected `Option<OfflineTts>`, found `Result<_, _>`
+2026-06-26T03:53:22.155523Z 01E     |
+2026-06-26T03:53:22.155523Z 01E     = note: expected enum `std::option::Option<OfflineTts>`
+2026-06-26T03:53:22.155524Z 01E                found enum `Result<_, _>`
+2026-06-26T03:53:22.155524Z 01E 
+2026-06-26T03:53:22.155525Z 01E Some errors have detailed explanations: E0308, E0560.
+2026-06-26T03:53:22.155525Z 01E For more information about an error, try `rustc --explain E0308`.
+2026-06-26T03:53:22.212362Z 01E error: could not compile `tts-sidecar` (bin "tts-sidecar") due to 4 previous errors
+2026-06-26T03:53:22.212412Z 00O section_end:1782446002:step_script
 [0K
-2026-06-25T20:17:47.024363Z 00O+section_start:1782418667:cleanup_file_variables
+2026-06-26T03:53:22.213352Z 00O+section_start:1782446002:cleanup_file_variables
 [0K
-2026-06-25T20:17:47.024369Z 00O+[0K[36;1mCleaning up project directory and file based variables[0;m[0;m
-2026-06-25T20:17:48.289157Z 00O section_end:1782418668:cleanup_file_variables
+2026-06-26T03:53:22.213368Z 00O+[0K[36;1mCleaning up project directory and file based variables[0;m[0;m
+2026-06-26T03:53:22.913407Z 00O section_end:1782446002:cleanup_file_variables
 [0K
-2026-06-25T20:17:49.353191Z 00O [31;1mERROR: Job failed: run exit (exit code: 101): Process exited with status 101[0;m
+2026-06-26T03:53:23.344523Z 00O [31;1mERROR: Job failed: run exit (exit code: 101): Process exited with status 101[0;m

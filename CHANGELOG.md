@@ -3,9 +3,15 @@
 All notable changes are derived from conventional commits. Do not edit by hand.
 
 ## [Unreleased]
+### Fixed
+- hacer continuity:write multiplataforma (PowerShell/Windows)
+- crear writePhaseMarker y usarla en subagente planner
+
+## [tts-sidecar-v0.1.1] -- 2026-06-25
 ### Added
 - normalize sub-agent toolsets and enable bidirectional SendMessage
 ### Fixed
+- resolver errores de build en todos los runners
 - compile sidecar TTS on all 5 pipeline runners
 
 ## [tts-sidecar-v0.1.0] -- 2026-06-25

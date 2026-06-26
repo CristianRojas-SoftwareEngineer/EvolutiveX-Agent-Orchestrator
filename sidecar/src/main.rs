@@ -15,7 +15,7 @@ use std::path::PathBuf;
 use clap::Parser;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use serde::{Deserialize, Serialize};
-use sherpa_onnx::{OfflineTts, OfflineTtsModelConfig};
+use sherpa_onnx::{OfflineTts, OfflineTtsConfig, OfflineTtsModelConfig, OfflineTtsVitsModelConfig};
 
 #[derive(Parser, Debug)]
 #[command(name = "tts-sidecar", about = "Sidecar TTS para síntesis de voz con sherpa-onnx")]
@@ -108,17 +108,27 @@ fn play_audio(samples: &[f32], sample_rate: u32) -> Result<(), String> {
 fn main() {
     let cli = Cli::parse();
 
-    // Construir la configuración del sintetizador TTS.
-    let model_config = OfflineTtsModelConfig {
-        model: cli.model.to_string_lossy().into_owned(),
-        ..Default::default()
+    // Derivar el path del archivo de tokens desde el path del modelo.
+    let tokens_path = cli.model.with_extension("onnx.json").to_string_lossy().into_owned();
+
+    // Construir la configuración del sintetizador TTS con la estructura vits.
+    let config = OfflineTtsConfig {
+        model: OfflineTtsModelConfig {
+            vits: Some(OfflineTtsVitsModelConfig {
+                model: Some(cli.model.to_string_lossy().into_owned()),
+                tokens: Some(tokens_path),
+                noise_scale: 0.667,
+                noise_scale_w: 0.8,
+                length_scale: 1.0,
+            }),
+        },
     };
 
     // Inicializar el sintetizador. Si falla, no podemos continuar.
-    let tts = match OfflineTts::create(&model_config) {
-        Ok(t) => t,
-        Err(e) => {
-            let resp = SpeakResponse::error(format!("init TTS: {}", e));
+    let tts = match OfflineTts::create(&config) {
+        Some(t) => t,
+        None => {
+            let resp = SpeakResponse::error("init TTS: create returned None");
             reply(&resp);
             std::process::exit(1);
         }

@@ -182,7 +182,7 @@ fn main() {
             speed: 1.0,
             ..Default::default()
         };
-        let output = match tts.generate_with_config(&cmd.text, &config, None) {
+        let output = match tts.generate_with_config::<Box<dyn FnMut(&[f32], f32) -> bool + 'static>>(&cmd.text, &config, None) {
             Some(o) => o,
             None => {
                 let resp = SpeakResponse::error("generación TTS: generate_with_config devolvió None");

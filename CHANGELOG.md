@@ -4,6 +4,13 @@ All notable changes are derived from conventional commits. Do not edit by hand.
 
 ## [Unreleased]
 ### Fixed
+- heredoc directo como metodo canonico, sin Write tool ni scripts
+- hacer write-prompt.ts multiplataforma y corregir SKILL.md
+
+## [tts-sidecar-v0.1.2] -- 2026-06-26
+### Fixed
+- usar change=null en sentinel y canonicalizar ID solo tras handoff del planner
+- corregir errores de compilacion y config CI Windows
 - hacer continuity:write multiplataforma (PowerShell/Windows)
 - crear writePhaseMarker y usarla en subagente planner
 

@@ -114,14 +114,17 @@ fn main() {
     // Construir la configuración del sintetizador TTS con la estructura vits.
     let config = OfflineTtsConfig {
         model: OfflineTtsModelConfig {
-            vits: Some(OfflineTtsVitsModelConfig {
+            vits: OfflineTtsVitsModelConfig {
                 model: Some(cli.model.to_string_lossy().into_owned()),
                 tokens: Some(tokens_path),
                 noise_scale: 0.667,
                 noise_scale_w: 0.8,
                 length_scale: 1.0,
-            }),
+                ..Default::default()
+            },
+            ..Default::default()
         },
+        ..Default::default()
     };
 
     // Inicializar el sintetizador. Si falla, no podemos continuar.
@@ -173,18 +176,12 @@ fn main() {
         }
 
         // Sintetizar audio.
-        let audio = match tts.generate(&cmd.text, 0, 1.0) {
-            Ok(a) => a,
-            Err(e) => {
-                let resp = SpeakResponse::error(format!("síntesis TTS: {}", e));
-                reply(&resp);
-                continue;
-            }
-        };
+        let output = tts.generate(&cmd.text, 0, 1.0);
+        let sample_rate = output.sample_rate;
+        let samples = &output.samples;
 
         // Reproducir por CPAL.
-        let sample_rate = audio.sample_rate as u32;
-        match play_audio(&audio.samples, sample_rate) {
+        match play_audio(samples, sample_rate as u32) {
             Ok(()) => reply(&SpeakResponse::ok()),
             Err(e) => {
                 let resp = SpeakResponse::error(format!("reproducción de audio: {}", e));

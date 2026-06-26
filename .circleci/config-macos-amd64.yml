@@ -1,15 +1,10 @@
-# CircleCI CI pipeline — sidecar TTS
-# Job: macos-amd64
-#
-# AVISO: macOS puede no estar disponible en el plan free de CircleCI.
-# Si el job falla con "resource class not available", el plan no incluye macOS.
 version: 2.1
 
 jobs:
   build-macos-amd64:
     macos:
-      xcode: "15.4"
-    resource_class: macos.m1.medium.gen1
+      xcode: "15.4.0"
+    resource_class: m4pro.medium
     working_directory: ~/EvolutiveX-Agent-Orchestrator
     steps:
       - checkout
@@ -20,8 +15,7 @@ jobs:
             echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> $BASH_ENV
       - run:
           name: "Instalar espeak-ng"
-          command: |
-            brew install espeak-ng
+          command: brew install espeak-ng
       - run:
           name: "Agregar target x86_64-apple-darwin"
           command: |
@@ -37,10 +31,8 @@ jobs:
           command: |
             mkdir -p staging/macos-amd64
             cp sidecar/target/x86_64-apple-darwin/release/tts-sidecar staging/macos-amd64/
-            cd staging
-            zip -r ../macos-amd64.zip macos-amd64/
-            cd ..
-            sha256sum macos-amd64.zip | awk '{print "macos-amd64=" $1}' > macos-amd64.sha256.txt
+            cd staging && zip -r ../macos-amd64.zip macos-amd64/ && cd ..
+            shasum -a 256 macos-amd64.zip | awk '{print "macos-amd64=" $1}' > macos-amd64.sha256.txt
       - store_artifacts:
           path: macos-amd64.zip
       - store_artifacts:

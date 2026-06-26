@@ -109,7 +109,8 @@ build:windows-amd64:
     - choco install -y rust-ms
     - choco install -y espeak-ng
     # Recargar PATH para que cargo/rustc estén disponibles tras instalar rust-ms.
-    - $env:Path = "$env:USERPROFILE\.cargo\bin;$env:Path"
+    # chocolatey instala rust-ms en C:\ProgramData\chocolatey\lib\rust-ms\tools, NO en ~/.cargo/bin.
+    - $env:Path = "C:\ProgramData\chocolatey\lib\rust-ms\tools;$env:Path"
     - rustup default stable
 
 build:linux-amd64:

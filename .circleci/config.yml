@@ -1,28 +1,63 @@
-# Use the latest 2.1 version of CircleCI pipeline process engine.
-# See: https://circleci.com/docs/reference/configuration-reference
+# CircleCI CI pipeline — sidecar TTS
+# Versión 2.1 de CircleCI pipeline engine.
 version: 2.1
 
-# Define a job to be invoked later in a workflow.
+# Jobs definen las unidades de trabajo ejecutable.
+# Cada job corre en un executor (máquina virtual).
 jobs:
-  say-hello:
-    # Specify the macOS execution environment.
-    # See: https://circleci.com
-    macos:
-      xcode: 15.4.0 # Selecciona la versión de Xcode (y por ende la versión de macOS)
-
-    # El plan Free requiere indicar un tamaño de recurso básico para macOS
-    resource_class: macos.m1.medium.gen1
-
-    # Add steps to the job
+  # ── Job: windows-amd64 ──────────────────────────────────────────
+  # Valida la compilación del sidecar en Windows.
+  # Una vez confirmado, se agregan los jobs de Linux y macOS.
+  build-windows-amd64:
+    machine:
+      # Imagen Windows Server 2022 proporcionada por CircleCI.
+      # El executor de Windows en CircleCI usa VMs pre-configuradas
+      # con chocolatey y otras herramientas de Windows preinstaladas.
+      image: windows-server-2022
+    resource_class: windows.medium
+    working_directory: ~/EvolutiveX-Agent-Orchestrator
     steps:
-      # Checkout the code as the first step.
       - checkout
+      # Instalar Rust via rustup (el script de instalación).
+      # No usa chocolatey para rust porque el instalador de rustup
+      # es más confiable y no depende de que chocolatey esté en el PATH.
       - run:
-          name: "Say hello from Mac"
-          command: "echo Hello, World from $(uname)!"
+          name: "Instalar Rust via rustup"
+          command: |
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+            echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> $BASH_ENV
+      # Agregar el target MSVC para compilación nativa Windows.
+      - run:
+          name: "Agregar target x86_64-pc-windows-msvc"
+          command: |
+            source $HOME/.cargo/env
+            rustup target add x86_64-pc-windows-msvc
+      # Compilar el sidecar.
+      - run:
+          name: "Compilar tts-sidecar"
+          command: |
+            source $HOME/.cargo/env
+            cargo build --release --manifest-path sidecar/Cargo.toml --target x86_64-pc-windows-msvc
+      # Empaquetar el binario en un ZIP.
+      - run:
+          name: "Empaquetar artefacto"
+          command: |
+            mkdir -p staging/windows-amd64
+            cp sidecar/target/x86_64-pc-windows-msvc/release/tts-sidecar.exe staging/windows-amd64/
+            cd staging
+            zip -r ../windows-amd64.zip windows-amd64/
+            cd ..
+            sha256sum windows-amd64.zip | awk '{print "windows-amd64=" $1}' > windows-amd64.sha256.txt
+      # Persistir artefactos por 7 días.
+      - store_artifacts:
+          path: windows-amd64.zip
+      - store_artifacts:
+          path: windows-amd64.sha256.txt
 
-# Orchestrate jobs using workflows
+# Workflows orquestan los jobs.
 workflows:
-  say-hello-workflow:
+  # Todo push a main ejecuta el pipeline completo.
+  version: 2
+  build-workflow:
     jobs:
-      - say-hello
+      - build-windows-amd64

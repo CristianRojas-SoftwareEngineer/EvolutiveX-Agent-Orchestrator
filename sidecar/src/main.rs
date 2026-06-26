@@ -15,7 +15,7 @@ use std::path::PathBuf;
 use clap::Parser;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use serde::{Deserialize, Serialize};
-use sherpa_onnx::{OfflineTts, OfflineTtsConfig, OfflineTtsModelConfig, OfflineTtsVitsModelConfig};
+use sherpa_onnx::{OfflineTts, OfflineTtsConfig, OfflineTtsModelConfig, OfflineTtsVitsModelConfig, GenerationConfig};
 
 #[derive(Parser, Debug)]
 #[command(name = "tts-sidecar", about = "Sidecar TTS para síntesis de voz con sherpa-onnx")]
@@ -176,8 +176,21 @@ fn main() {
         }
 
         // Sintetizar audio.
-        let output = tts.generate(&cmd.text, 0, 1.0);
-        let sample_rate = output.sample_rate;
+        // generate_with_config requiere (text, &GenerationConfig, callback).
+        // speed=1.0 se mapea a GenerationConfig::default() con speed=1.0.
+        let config = GenerationConfig {
+            speed: 1.0,
+            ..Default::default()
+        };
+        let output = match tts.generate_with_config(&cmd.text, &config, None) {
+            Some(o) => o,
+            None => {
+                let resp = SpeakResponse::error("generación TTS: generate_with_config devolvió None");
+                reply(&resp);
+                continue;
+            }
+        };
+        let sample_rate = output.sample_rate as u32;
         let samples = &output.samples;
 
         // Reproducir por CPAL.

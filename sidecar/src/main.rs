@@ -190,8 +190,8 @@ fn main() {
                 continue;
             }
         };
-        let sample_rate = output.sample_rate as u32;
-        let samples = &output.samples;
+        let sample_rate = output.sample_rate();
+        let samples = output.samples();
 
         // Reproducir por CPAL.
         match play_audio(samples, sample_rate as u32) {

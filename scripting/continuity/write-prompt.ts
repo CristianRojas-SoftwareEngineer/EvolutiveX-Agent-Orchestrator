@@ -1,27 +1,48 @@
-import { writeFileSync } from 'node:fs';
+import { openSync, readSync, writeFileSync, closeSync } from 'node:fs';
 import { join } from 'node:path';
 
 /**
- * Escribe el contenido pasado como segundo argumento al archivo
- * `.claude/continuity-prompt.md` en el directorio de trabajo actual.
+ * Escribe contenido al archivo `.claude/continuity-prompt.md` en el cwd.
  *
- * Invocación multiplataforma (funciona en bash, PowerShell, cmd):
- *   npm run continuity:write -- "contenido del prompt"
+ * Entrada (en orden de prioridad):
+ *   1. stdin  → cat archivo.md | npm run continuity:write
+ *   2. argv[2] → npm run continuity:write -- "contenido"
  *
- * El guión doble `--` es necesario para que npm pase el argumento al script
- * sin interpretarlo como opción de npm.
+ * Tested en: Bash, Git Bash, PowerShell. Compatible con contenido multilínea
+ * y caracteres especiales (< > &).
  */
 const CONTENT_ARG_INDEX = 2;
 
 function main(): void {
-  const content = process.argv[CONTENT_ARG_INDEX];
+  let content = process.argv[CONTENT_ARG_INDEX];
+
+  // Si argv[2] no se proporciono, leer stdin via file descriptor 0.
+  if (!content && !process.stdin.isTTY) {
+    const BUFSIZE = 8192;
+    const bufs: Buffer[] = [];
+    // En Windows (Git Bash) /dev/stdin no existe; usar fd 0 directamente.
+    const fd = process.platform === 'win32'
+      ? 0   // fd 0 funciona en todas partes en Windows
+      : openSync('/dev/stdin', 'r');
+    try {
+      const buf = Buffer.alloc(BUFSIZE);
+      let n: number;
+      while ((n = readSync(fd, buf, 0, BUFSIZE, null)) > 0) {
+        bufs.push(Buffer.from(buf.subarray(0, n)));
+      }
+    } finally {
+      if (process.platform !== 'win32') closeSync(fd);
+    }
+    content = Buffer.concat(bufs).toString('utf-8').trim();
+  }
 
   if (!content) {
-    console.error(
-      'Error: se requiere el contenido como argumento.\n' +
-        'Uso: npm run continuity:write -- "contenido del prompt"\n' +
-        'Nota: usar -- para separar los argumentos de npm.',
-    );
+    const help = [
+      'Error: se requiere el contenido via stdin o argv[2].',
+      'Uso (stdin):     cat archivo.md | npm run continuity:write',
+      'Uso (argv[2]):   npm run continuity:write -- "contenido"',
+    ].join('\n');
+    console.error(help);
     process.exit(1);
   }
 

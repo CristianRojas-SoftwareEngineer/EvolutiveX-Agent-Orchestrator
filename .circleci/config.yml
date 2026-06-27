@@ -22,7 +22,8 @@ jobs:
           command: |
             curl --proto '=https' --tlsv1.2 -sSf https://win.rustup.rs -o rustup-init.exe
             ./rustup-init.exe -y --default-toolchain stable
-            ./rustup-init.exe -y --default-host x86_64-pc-windows-gnu --override
+            rustup toolchain install stable-x86_64-pc-windows-gnu
+            rustup target add x86_64-pc-windows-gnu --toolchain stable-x86_64-pc-windows-gnu
       - run:
           name: "Instalar MinGW"
           command: |

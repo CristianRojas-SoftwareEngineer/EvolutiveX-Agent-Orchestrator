@@ -17,75 +17,23 @@ jobs:
           keys:
             - voice-model-es-MX-claude-high-v1
 
-      # FIX 1: Restaurar download cache de pip antes de instalar onnx
-      - restore_cache:
-          keys:
-            - pip-onnx-v1
-
       - run:
-          name: "Instalar Python3 y pip"
-          command: |
-            sudo apt-get update -qq
-            sudo apt-get install -y -qq python3 python3-pip
-
-      - run:
-          name: "Descargar modelo de voz (si no está en caché)"
+          name: "Descargar paquete oficial de sherpa-onnx y extraer todo"
           command: |
             MODEL_DIR="vendor/tts-sidecar/voices/es_MX-claude-high"
             mkdir -p "$MODEL_DIR"
             if [ ! -f "$MODEL_DIR/es_MX-claude-high.onnx" ]; then
-              echo "Descargando modelo ONNX..."
-              curl -L "https://huggingface.co/rhasspy/piper-voices/resolve/main/es/es_MX/claude/high/es_MX-claude-high.onnx" \
-                -o "$MODEL_DIR/es_MX-claude-high.onnx"
+              echo "Descargando paquete oficial de sherpa-onnx..."
+              curl -L "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-es_MX-claude-high.tar.bz2" \
+                -o /tmp/vits-piper.tar.bz2
+              mkdir -p /tmp/vits-piper
+              tar -xjf /tmp/vits-piper.tar.bz2 -C /tmp/vits-piper
+              # Extraer todo el contenido: modelo, tokens y espeak-ng-data
+              cp -r /tmp/vits-piper/vits-piper-es_MX-claude-high/* "$MODEL_DIR/"
+              echo "Extraído del paquete oficial: modelo, tokens y espeak-ng-data"
             else
-              echo "Modelo ONNX ya en caché, omitiendo descarga."
+              echo "Modelo ya en caché, omitiendo descarga."
             fi
-
-      - run:
-          name: "Patchear metadatos ONNX (sherpa-onnx requiere sample_rate, n_speakers, etc.)"
-          command: |
-            pip3 install onnx -q
-            python3 - \<<'PYEOF'
-            import onnx
-
-            model_path = "vendor/tts-sidecar/voices/es_MX-claude-high/es_MX-claude-high.onnx"
-            m = onnx.load(model_path)
-
-            # Agregar metadatos que sherpa-onnx espera y el modelo Piper no tiene
-            fields = {
-                "sample_rate": "22050",
-                "n_speakers": "1",
-                "vocab_size": "256",
-                "language": "es_MX",
-                "model_type": "vits",
-                "comment": "piper-exported-vits",
-                "version": "1.0.0",
-            }
-            for k, v in fields.items():
-                m.metadata_props.add().key = k
-                m.metadata_props[-1].value = v
-
-            onnx.save(m, model_path)
-            print("Metadatos agregados:", list(fields.keys()))
-            PYEOF
-
-      - run:
-          name: "Descargar archivo de tokens para sherpa-onnx"
-          command: |
-            MODEL_DIR="vendor/tts-sidecar/voices/es_MX-claude-high"
-            if [ ! -f "$MODEL_DIR/es_MX-claude-high.onnx.tokens" ]; then
-              echo "Descargando tokens..."
-              curl -L "https://huggingface.co/rhasspy/piper-voices/resolve/main/es/es_MX/claude/high/es_MX-claude-high.onnx.tokens" \
-                -o "$MODEL_DIR/es_MX-claude-high.onnx.tokens"
-            else
-              echo "Tokens ya en caché, omitiendo descarga."
-            fi
-
-      # FIX 1: Guardar download cache de pip (~/.cache/pip) tras instalar onnx
-      - save_cache:
-          key: pip-onnx-v1
-          paths:
-            - ~/.cache/pip
 
       - save_cache:
           key: voice-model-es-MX-claude-high-v1
@@ -116,10 +64,10 @@ jobs:
             - cargo-linux-{{ checksum "sidecar/Cargo.lock" }}
             - cargo-linux-
       - run:
-          name: "Instalar dependencias del sistema (espeak-ng, libasound2)"
+          name: "Instalar dependencias del sistema (libasound2)"
           command: |
             sudo apt-get update -qq
-            sudo apt-get install -y -qq zip libasound2-dev libespeak-ng-dev espeak-ng-data
+            sudo apt-get install -y -qq zip libasound2-dev libespeak-ng-dev
       - run:
           name: "Agregar target Rust x86_64-unknown-linux-gnu"
           command: |
@@ -143,10 +91,9 @@ jobs:
             cp sidecar/target/x86_64-unknown-linux-gnu/release/tts-sidecar staging/linux-amd64/
             LIB_PATH=$(find /usr -name "libespeak-ng.so*" | head -1)
             [ -n "$LIB_PATH" ] && cp "$LIB_PATH" staging/linux-amd64/libespeak-ng.so.1
-            if [ -d "/usr/lib/x86_64-linux-gnu/espeak-ng-data" ]; then
-              cp -r "/usr/lib/x86_64-linux-gnu/espeak-ng-data" staging/linux-amd64/
-            elif [ -d "/usr/share/espeak-ng-data" ]; then
-              cp -r "/usr/share/espeak-ng-data" staging/linux-amd64/
+            # espeak-ng-data viene del workspace (paquete oficial de sherpa-onnx)
+            if [ -d "vendor/tts-sidecar/voices/es_MX-claude-high/espeak-ng-data" ]; then
+              cp -r vendor/tts-sidecar/voices/es_MX-claude-high/espeak-ng-data staging/linux-amd64/
             fi
             # Incluir modelo de voz desde workspace
             mkdir -p staging/linux-amd64/vendor/tts-sidecar/voices
@@ -185,7 +132,6 @@ jobs:
           keys:
             - cargo-win-target-{{ checksum "sidecar/Cargo.lock" }}
             - cargo-win-target-
-      # FIX 3: Restaurar caché de espeak-ng antes de instalarlo
       - restore_cache:
           keys:
             - choco-espeak-ng-v1
@@ -248,9 +194,10 @@ jobs:
             $env:PATH = "$env:CARGO_HOME\bin;$env:PATH"
             New-Item -ItemType Directory -Force -Path staging/windows-amd64 | Out-Null
             Copy-Item sidecar\target\x86_64-pc-windows-msvc\release\tts-sidecar.exe staging\windows-amd64\
-            # Copiar libespeak-ng.dll y espeak-ng-data/ desde instalación de chocolatey
+            # Copiar libespeak-ng.dll desde instalación de chocolatey
             Copy-Item "C:\Program Files\eSpeak NG\libespeak-ng.dll" "staging\windows-amd64\libespeak-ng.dll" -ErrorAction SilentlyContinue
-            Copy-Item -Recurse "C:\Program Files\eSpeak NG\espeak-ng-data" "staging\windows-amd64\" -ErrorAction SilentlyContinue
+            # espeak-ng-data viene del workspace (paquete oficial de sherpa-onnx)
+            Copy-Item -Recurse "vendor\tts-sidecar\voices\es_MX-claude-high\espeak-ng-data" "staging\windows-amd64\" -ErrorAction SilentlyContinue
             # Incluir modelo de voz desde workspace
             New-Item -ItemType Directory -Force -Path "staging\windows-amd64\vendor\tts-sidecar\voices" | Out-Null
             Copy-Item -Recurse "vendor\tts-sidecar\voices\es_MX-claude-high" `
@@ -359,11 +306,9 @@ jobs:
             if [ -n "$ESPEAK_LIB" ]; then
               cp "$ESPEAK_LIB" staging/macos-amd64/
             fi
-            # espeak-ng-data — usar el Cellar directamente si el symlink no está
-            if [ -d "$BREW_PREFIX/opt/espeak-ng/share/espeak-ng-data" ]; then
-              cp -r "$BREW_PREFIX/opt/espeak-ng/share/espeak-ng-data" staging/macos-amd64/
-            elif [ -d "$BREW_PREFIX/share/espeak-ng-data" ]; then
-              cp -r "$BREW_PREFIX/share/espeak-ng-data" staging/macos-amd64/
+            # espeak-ng-data viene del workspace (paquete oficial de sherpa-onnx)
+            if [ -d "vendor/tts-sidecar/voices/es_MX-claude-high/espeak-ng-data" ]; then
+              cp -r vendor/tts-sidecar/voices/es_MX-claude-high/espeak-ng-data staging/macos-amd64/
             fi
             # Incluir modelo de voz desde workspace
             mkdir -p staging/macos-amd64/vendor/tts-sidecar/voices

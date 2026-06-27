@@ -33,10 +33,8 @@ jobs:
             AR="$USERPROFILE/.rustup/toolchains/stable-x86_64-pc-windows-gnu/bin/ar.exe"
             cat > .cargo/config.toml \<< EOF
             [target.x86_64-pc-windows-gnu]
-            ar = "$AR"
-            linker = "$GCC"
-            [target.x86_64-pc-windows-gnu.crt]
-            flavor = "gnu"
+            ar = "C:/Users/circleci/.rustup/toolchains/stable-x86_64-pc-windows-gnu/bin/ar.exe"
+            linker = "C:/Users/circleci/.rustup/toolchains/stable-x86_64-pc-windows-gnu/bin/gcc.exe"
             EOF
       - run:
           name: "Compilar tts-sidecar"

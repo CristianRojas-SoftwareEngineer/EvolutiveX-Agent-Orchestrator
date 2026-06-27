@@ -6,7 +6,7 @@
 ///   Salida error: `{"status":"error","reason":"..."}\n`
 ///
 /// Args CLI:
-///   --model <path.onnx>         Ruta al modelo ONNX de la voz
+///   --model <path.onnx>  Ruta al modelo ONNX de la voz
 ///
 /// espeak-ng se carga desde el directorio del binario (no del sistema).
 use std::io::{self, BufRead, Write};

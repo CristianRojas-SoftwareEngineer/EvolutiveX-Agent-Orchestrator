@@ -50,8 +50,8 @@
     "openspec:next-change-id": "tsx scripting/openspec/next-change-id.ts",
     "openspec:verify-change-id": "tsx scripting/openspec/verify-change-id.ts",
     "openspec:close-phase": "tsx scripting/openspec/close-phase.ts",
-    "tts:setup": "node dist/scripts/postinstall-tts.js",
-    "postinstall": "tsx scripting/openspec/patch-openspec-change-metadata.ts; node dist/scripts/postinstall-tts.js"
+    "tts:setup": "tsx scripts/postinstall-tts.ts",
+    "postinstall": "tsx scripting/openspec/patch-openspec-change-metadata.ts; tsx scripts/postinstall-tts.ts"
   },
   "keywords": [],
   "author": "Cristian Rojas <cristian.rojas.software.engineer@gmail.com>",
@@ -68,8 +68,8 @@
   ],
   "dependencies": {
     "@anthropic-ai/sdk": "^0.92.0",
-    "adm-zip": "^0.5.10",
     "@fastify/http-proxy": "^11.4.4",
+    "adm-zip": "^0.5.17",
     "commander": "^13.1.0",
     "fastify": "^5.8.5",
     "node-notifier": "^10.0.1",
@@ -78,8 +78,8 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@types/adm-zip": "^0.5.5",
     "@fission-ai/openspec": "^1.4.1",
+    "@types/adm-zip": "^0.5.5",
     "@types/node": "^25.6.0",
     "@types/node-notifier": "^8.0.5",
     "chalk": "^5.4.1",

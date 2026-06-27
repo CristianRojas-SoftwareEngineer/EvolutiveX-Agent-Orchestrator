@@ -24,6 +24,10 @@ import { createHash } from 'node:crypto';
 import { createWriteStream, existsSync } from 'node:fs';
 import { mkdir, readFile, chmod, unlink } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 import { pipeline } from 'node:stream/promises';
 import { Readable } from 'node:stream';
 import AdmZip from 'adm-zip';

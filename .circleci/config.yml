@@ -18,6 +18,12 @@ jobs:
             - voice-model-es-MX-claude-high-v1
 
       - run:
+          name: "Instalar Python3 y pip"
+          command: |
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq python3 python3-pip
+
+      - run:
           name: "Descargar modelo de voz (si no está en caché)"
           command: |
             MODEL_DIR="vendor/tts-sidecar/voices/es_MX-claude-high"
@@ -36,6 +42,34 @@ jobs:
             else
               echo "Config JSON ya en caché, omitiendo descarga."
             fi
+
+      - run:
+          name: "Patchear metadatos ONNX (sherpa-onnx requiere sample_rate, n_speakers, etc.)"
+          command: |
+            pip3 install onnx -q
+            python3 - \<<'PYEOF'
+            import onnx
+
+            model_path = "vendor/tts-sidecar/voices/es_MX-claude-high/es_MX-claude-high.onnx"
+            m = onnx.load(model_path)
+
+            # Agregar metadatos que sherpa-onnx espera y el modelo Piper no tiene
+            fields = {
+                "sample_rate": "22050",
+                "n_speakers": "1",
+                "vocab_size": "256",
+                "language": "es_MX",
+                "model_type": "vits",
+                "comment": "piper-exported-vits",
+                "version": "1.0.0",
+            }
+            for k, v in fields.items():
+                m.metadata_props.add().key = k
+                m.metadata_props[-1].value = v
+
+            onnx.save(m, model_path)
+            print("Metadatos agregados:", list(fields.keys()))
+            PYEOF
 
       - save_cache:
           key: voice-model-es-MX-claude-high-v1
@@ -179,6 +213,10 @@ jobs:
             Invoke-WebRequest -Uri $espeakUrl -OutFile espeak-ng.msi
             New-Item -ItemType Directory -Force -Path espeak-ext | Out-Null
             msiexec /a espeak-ng.msi /qb TARGETDIR="$PWD\espeak-ext"
+            Get-ChildItem -Recurse espeak-ext -Name | Out-File espeak-contents.txt
+            Write-Host "=== Contenido de espeak-ext ==="
+            Get-Content espeak-contents.txt
+            Write-Host "=== Fin ==="
       - run:
           name: "Empaquetar binario y dependencias (Windows)"
           shell: powershell.exe
@@ -200,7 +238,7 @@ jobs:
             Copy-Item -Recurse "vendor\tts-sidecar\voices\es_MX-claude-high" `
               "staging\windows-amd64\vendor\tts-sidecar\voices\"
             $ProgressPreference = "SilentlyContinue"
-            Compress-Archive -Path staging\windows-amd64 -DestinationPath windows-amd64.zip -Force
+            Compress-Archive -Path staging\windows-amd64\* -DestinationPath windows-amd64.zip -Force
             $hash = (Get-FileHash windows-amd64.zip -Algorithm SHA256).Hash.ToLower()
             "windows-amd64=$hash" | Out-File windows-amd64.sha256.txt -Encoding ascii
       - store_artifacts:

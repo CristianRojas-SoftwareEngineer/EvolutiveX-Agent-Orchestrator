@@ -7,7 +7,7 @@ Sidecar de síntesis de voz TTS escrito en Rust. Recibe comandos JSON por stdin 
 **Stack:**
 - `sherpa-onnx` — sintetizador TTS (modelos ONNX)
 - `cpal` — reproducción de audio cross-platform
-- `espeak-ng` — sintetizador de respaldo / datos de voz
+- `espeak-ng` — phonemizer para sherpa-onnx (convierte texto a fonemas) + datos de voz
 
 **Protocolo STDIN/JSON:**
 ```
@@ -20,13 +20,11 @@ Salida error: {"status":"error","reason":"..."}
 
 | Job CircleCI | Executor | Target Rust | ZIP output |
 |---|---|---|---|
-| `build:linux-amd64` | Docker `cimg/rust:1.88` | `x86_64-unknown-linux-gnu` | `linux-amd64.zip` |
-| `build:linux-aarch64` | Docker `cimg/rust:1.88` (cross) | `aarch64-unknown-linux-gnu` | `linux-aarch64.zip` |
-| `build:windows-amd64` | `windows-amd64` | `x86_64-pc-windows-msvc` | `windows-amd64.zip` |
-| `build:macos-amd64` | `macos-amd64` | `x86_64-apple-darwin` | `macos-amd64.zip` |
-| `build:macos-aarch64` | `macos-aarch64` | `aarch64-apple-darwin` | `macos-aarch64.zip` |
+| `linux-amd64` | Docker `cimg/rust:1.88.0` | `x86_64-unknown-linux-gnu` | `linux-amd64.zip` |
+| `windows-amd64` | `windows-server-2022-gui` | `x86_64-pc-windows-msvc` | `windows-amd64.zip` |
+| `macos-amd64` | macOS `m4pro.medium` + Xcode 16.4 | `aarch64-apple-darwin` + `x86_64-apple-darwin` → `lipo` | `macos-amd64.zip` |
 
-Los cinco jobs corre en paralelo en el workflow `build-all`. Cada job produce un ZIP con el binario, `libespeak-ng.{dll,so,dylib}` y `espeak-ng-data/`.
+Los tres jobs corren en paralelo en el workflow `build-all`. Cada job produce un ZIP con el binario, `libespeak-ng.{dll,so,dylib}` y `espeak-ng-data/`.
 
 ## Toolchain Rust
 
@@ -83,10 +81,8 @@ Cada job produce un ZIP con el binario, `libespeak-ng` y `espeak-ng-data/`. El l
 | Plataforma | Library | ZIP output |
 |---|---|---|
 | Linux amd64 | `libespeak-ng.so` | `linux-amd64.zip` |
-| Linux aarch64 | `libespeak-ng.so` | `linux-aarch64.zip` |
 | Windows amd64 | `libespeak-ng.dll` | `windows-amd64.zip` |
-| macOS amd64 | `libespeak-ng.dylib` | `macos-amd64.zip` |
-| macOS aarch64 | `libespeak-ng.dylib` | `macos-aarch64.zip` |
+| macOS Universal | `libespeak-ng.dylib` | `macos-amd64.zip` |
 
 El archivo de voz `es_MX-claude-high` (`.onnx` + `.onnx.json`) NO se incluye en el ZIP. Se publica como assets separados bajo `voices/es_MX-claude-high/`.
 
@@ -98,12 +94,12 @@ Archivo: [`.circleci/config.yml`](.circleci/config.yml)
 workflows:
   build-all:
     jobs:
-      - tts-sidecar-linux-x86_64
-      - tts-sidecar-windows-x86_64
-      - tts-sidecar-macos-universal
+      - linux-amd64
+      - windows-amd64
+      - macos-amd64
 ```
 
-Jobs con nombre descriptivo (`tts-sidecar-{os}-{arch}`) y steps con el formato:
+Jobs con nombre descriptivo (`{os}-{arch}`) y steps con el formato:
 
 ```
 {acción} {artifact} ({mode}, {target})

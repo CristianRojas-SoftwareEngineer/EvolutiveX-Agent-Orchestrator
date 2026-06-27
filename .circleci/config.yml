@@ -43,16 +43,16 @@ jobs:
       - run:
           name: "Empaquetar binario y dependencias (Linux)"
           command: |
-            mkdir -p staging
-            cp sidecar/target/x86_64-unknown-linux-gnu/release/tts-sidecar staging/
+            mkdir -p staging/linux-amd64
+            cp sidecar/target/x86_64-unknown-linux-gnu/release/tts-sidecar staging/linux-amd64/
             LIB_PATH=$(find /usr -name "libespeak-ng.so*" | head -1)
-            [ -n "$LIB_PATH" ] && cp "$LIB_PATH" staging/libespeak-ng.so.1
+            [ -n "$LIB_PATH" ] && cp "$LIB_PATH" staging/linux-amd64/libespeak-ng.so.1
             if [ -d "/usr/lib/x86_64-linux-gnu/espeak-ng-data" ]; then
-              cp -r "/usr/lib/x86_64-linux-gnu/espeak-ng-data" staging/
+              cp -r "/usr/lib/x86_64-linux-gnu/espeak-ng-data" staging/linux-amd64/
             elif [ -d "/usr/share/espeak-ng-data" ]; then
-              cp -r "/usr/share/espeak-ng-data" staging/
+              cp -r "/usr/share/espeak-ng-data" staging/linux-amd64/
             fi
-            cd staging && zip -r ../linux-amd64.zip . && cd ..
+            cd staging && zip -r ../linux-amd64.zip linux-amd64 && cd ..
             sha256sum linux-amd64.zip | awk '{print "linux-amd64=" $1}' \
               > linux-amd64.sha256.txt
       - store_artifacts:
@@ -126,23 +126,24 @@ jobs:
             $espeakUrl = "https://github.com/espeak-ng/espeak-ng/releases/download/$espeakVersion/espeak-ng-$espeakVersion-win64.zip"
             Invoke-WebRequest -Uri $espeakUrl -OutFile espeak-ng.zip
             Expand-Archive -Path espeak-ng.zip -DestinationPath espeak-ext -Force
-            Get-ChildItem -Path espeak-ext -Recurse -File | Move-Item -Destination espeak-ng-temp -Force
-            New-Item -ItemType Directory -Force -Path espeak-ng-temp | Out-Null
-            Move-Item espeak-ng-temp/* -Destination espeak-ng-temp -Force
       - run:
           name: "Empaquetar binario y dependencias (Windows)"
           shell: powershell.exe
           command: |
             $env:PATH = "$env:CARGO_HOME\bin;$env:PATH"
-            New-Item -ItemType Directory -Force -Path staging | Out-Null
-            Copy-Item sidecar\target\x86_64-pc-windows-msvc\release\tts-sidecar.exe staging\
-            # Copiar libespeak-ng.dll y espeak-ng-data/
-            Copy-Item espeak-ng-temp/libespeak-ng.dll staging\ -ErrorAction SilentlyContinue
-            if (Test-Path espeak-ng-temp/espeak-ng-data) {
-              Copy-Item -Recurse espeak-ng-temp/espeak-ng-data staging\
+            New-Item -ItemType Directory -Force -Path staging/windows-amd64 | Out-Null
+            Copy-Item sidecar\target\x86_64-pc-windows-msvc\release\tts-sidecar.exe staging\windows-amd64\
+            # Copiar libespeak-ng.dll y espeak-ng-data/ desde el ZIP extraído
+            $espeakDll = Get-ChildItem -Path espeak-ext -Recurse -Name "libespeak-ng.dll" | Select-Object -First 1
+            if ($espeakDll) {
+              Copy-Item "espeak-ext\$espeakDll" "staging\windows-amd64\libespeak-ng.dll"
+            }
+            $espeakData = Get-ChildItem -Path espeak-ext -Directory -Name "espeak-ng-data" | Select-Object -First 1
+            if ($espeakData) {
+              Copy-Item -Recurse "espeak-ext\$espeakData" "staging\windows-amd64\"
             }
             $ProgressPreference = "SilentlyContinue"
-            Compress-Archive -Path staging\* -DestinationPath windows-amd64.zip -Force
+            Compress-Archive -Path staging\windows-amd64 -DestinationPath windows-amd64.zip -Force
             $hash = (Get-FileHash windows-amd64.zip -Algorithm SHA256).Hash.ToLower()
             "windows-amd64=$hash" | Out-File windows-amd64.sha256.txt -Encoding ascii
       - store_artifacts:
@@ -213,16 +214,16 @@ jobs:
       - run:
           name: "Empaquetar binario y dependencias (macOS Universal)"
           command: |
-            mkdir -p staging
-            cp tts-sidecar-macos-universal staging/
+            mkdir -p staging/macos-amd64
+            cp tts-sidecar-macos-universal staging/macos-amd64/
             # Copiar libespeak-ng.dylib
             ESPEAK_LIB=$(find $(brew --prefix)/lib -name "libespeak-ng.dylib" 2>/dev/null | head -1)
-            [ -n "$ESPEAK_LIB" ] && cp "$ESPEAK_LIB" staging/
+            [ -n "$ESPEAK_LIB" ] && cp "$ESPEAK_LIB" staging/macos-amd64/
             # Copiar espeak-ng-data/
             if [ -d "$(brew --prefix)/share/espeak-ng-data" ]; then
-              cp -r "$(brew --prefix)/share/espeak-ng-data" staging/
+              cp -r "$(brew --prefix)/share/espeak-ng-data" staging/macos-amd64/
             fi
-            cd staging && zip -r ../macos-amd64.zip . && cd ..
+            cd staging && zip -r ../macos-amd64.zip macos-amd64 && cd ..
             shasum -a 256 macos-amd64.zip \
               | awk '{print "macos-amd64=" $1}' \
               > macos-amd64.sha256.txt

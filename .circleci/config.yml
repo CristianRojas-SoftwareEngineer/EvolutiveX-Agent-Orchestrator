@@ -11,8 +11,6 @@ jobs:
       - image: cimg/rust:1.88.0
     resource_class: medium
     working_directory: ~/EvolutiveX-Agent-Orchestrator
-    environment:
-      CARGO_HOME: ~/.cargo
     retention:
       caches: 1d
     steps:

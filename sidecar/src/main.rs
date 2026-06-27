@@ -127,7 +127,7 @@ fn main() {
 
     // Si se provee --data-dir, usarlo para que espeak-ng convierta texto a fonemas.
     if let Some(ref data_dir) = cli.data_dir {
-        vits_config.vits_data_dir = Some(data_dir.to_string_lossy().into_owned());
+        vits_config.data_dir = Some(data_dir.to_string_lossy().into_owned());
     }
 
     let config = OfflineTtsConfig {

@@ -6,7 +6,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────────
   # Descarga el modelo de voz una sola vez y lo persiste al workspace.
   # Se comparte con los 3 jobs de compilación en el mismo pipeline.
-  # Entre pipelines, se-restaura desde caché (evita re-descargar).
+  # Entre pipelines, se restaura desde caché (evita re-descargar).
   # ─────────────────────────────────────────────────────────────────
   download-model:
     docker:
@@ -16,6 +16,11 @@ jobs:
       - restore_cache:
           keys:
             - voice-model-es-MX-claude-high-v1
+
+      # FIX 1: Restaurar download cache de pip antes de instalar onnx
+      - restore_cache:
+          keys:
+            - pip-onnx-v1
 
       - run:
           name: "Instalar Python3 y pip"
@@ -70,6 +75,12 @@ jobs:
             onnx.save(m, model_path)
             print("Metadatos agregados:", list(fields.keys()))
             PYEOF
+
+      # FIX 1: Guardar download cache de pip (~/.cache/pip) tras instalar onnx
+      - save_cache:
+          key: pip-onnx-v1
+          paths:
+            - ~/.cache/pip
 
       - save_cache:
           key: voice-model-es-MX-claude-high-v1
@@ -169,6 +180,10 @@ jobs:
           keys:
             - cargo-win-target-{{ checksum "sidecar/Cargo.lock" }}
             - cargo-win-target-
+      # FIX 3: Restaurar caché de espeak-ng antes de instalarlo
+      - restore_cache:
+          keys:
+            - choco-espeak-ng-v1
       - run:
           name: "Instalar Rust toolchain y target MSVC"
           shell: powershell.exe
@@ -194,21 +209,33 @@ jobs:
             cargo build --release `
               --manifest-path sidecar/Cargo.toml `
               --target x86_64-pc-windows-msvc
+      # FIX 2: Agregar ~/.rustup al caché para evitar re-descargar el toolchain
       - save_cache:
           key: cargo-win-registry-{{ checksum "sidecar/Cargo.lock" }}
           paths:
             - C:/Users/circleci/.cargo/registry
             - C:/Users/circleci/.cargo/git
+            - C:/Users/circleci/.rustup
       - save_cache:
           key: cargo-win-target-{{ checksum "sidecar/Cargo.lock" }}
           paths:
             - sidecar\target
+      # FIX 3: Instalar espeak-ng solo si no fue restaurado desde caché
       - run:
           name: "Instalar espeak-ng vía chocolatey"
           shell: powershell.exe
           command: |
             $ProgressPreference = "SilentlyContinue"
-            choco install -y espeak-ng
+            if (-not (Test-Path "C:\Program Files\eSpeak NG\libespeak-ng.dll")) {
+              choco install -y espeak-ng
+            } else {
+              Write-Host "espeak-ng ya en caché, omitiendo instalación."
+            }
+      # FIX 3: Guardar caché de espeak-ng tras la instalación
+      - save_cache:
+          key: choco-espeak-ng-v1
+          paths:
+            - C:/Program Files/eSpeak NG
       - run:
           name: "Empaquetar binario y dependencias (Windows)"
           shell: powershell.exe
@@ -250,6 +277,10 @@ jobs:
           keys:
             - cargo-macos-{{ checksum "sidecar/Cargo.lock" }}
             - cargo-macos-
+      # FIX 4: Restaurar caché de espeak-ng antes de instalarlo
+      - restore_cache:
+          keys:
+            - brew-espeak-ng-v1
       - run:
           name: "Instalar Rust toolchain y targets Apple Darwin"
           command: |
@@ -290,10 +321,22 @@ jobs:
               sidecar/target/x86_64-apple-darwin/release/tts-sidecar \
               -output tts-sidecar-macos-universal
             lipo -info tts-sidecar-macos-universal
+      # FIX 4: Instalar espeak-ng solo si no fue restaurado desde caché
       - run:
           name: "Instalar espeak-ng vía Homebrew"
           command: |
-            brew install espeak-ng
+            if ! brew list espeak-ng &>/dev/null; then
+              brew install espeak-ng
+            else
+              echo "espeak-ng ya en caché, omitiendo instalación."
+            fi
+      # FIX 4: Guardar caché de espeak-ng tras la instalación
+      - save_cache:
+          key: brew-espeak-ng-v1
+          paths:
+            - /opt/homebrew/Cellar/espeak-ng
+            - /opt/homebrew/opt/espeak-ng
+            - /opt/homebrew/share/espeak-ng-data
       - run:
           name: "Empaquetar binario y dependencias (macOS Universal)"
           command: |

@@ -18,13 +18,15 @@ Salida error: {"status":"error","reason":"..."}
 
 ## Plataformas y targets de compilación
 
-| Job CircleCI | Executor | Target Rust | Binary output |
+| Job CircleCI | Executor | Target Rust | ZIP output |
 |---|---|---|---|
-| `tts-sidecar-linux-x86_64` | Docker `cimg/rust:1.88.0` | `x86_64-unknown-linux-gnu` | `tts-sidecar` |
-| `tts-sidecar-windows-x86_64` | `windows-server-2022-gui` | `x86_64-pc-windows-msvc` | `tts-sidecar.exe` |
-| `tts-sidecar-macos-universal` | macOS `m4pro.medium` + Xcode 16.4 | `aarch64-apple-darwin` + `x86_64-apple-darwin` → `lipo` | `tts-sidecar-macos-universal` |
+| `build:linux-amd64` | Docker `cimg/rust:1.88` | `x86_64-unknown-linux-gnu` | `linux-amd64.zip` |
+| `build:linux-aarch64` | Docker `cimg/rust:1.88` (cross) | `aarch64-unknown-linux-gnu` | `linux-aarch64.zip` |
+| `build:windows-amd64` | `windows-amd64` | `x86_64-pc-windows-msvc` | `windows-amd64.zip` |
+| `build:macos-amd64` | `macos-amd64` | `x86_64-apple-darwin` | `macos-amd64.zip` |
+| `build:macos-aarch64` | `macos-aarch64` | `aarch64-apple-darwin` | `macos-aarch64.zip` |
 
-Los tres jobs corren en paralelo en el workflow `build-all`.
+Los cinco jobs corre en paralelo en el workflow `build-all`. Cada job produce un ZIP con el binario, `libespeak-ng.{dll,so,dylib}` y `espeak-ng-data/`.
 
 ## Toolchain Rust
 
@@ -68,32 +70,25 @@ CircleCI en Windows resuelve `%USERPROFILE%` a `C:\Users\circleci`. En `save_cac
 
 ## Empaquetado de artefactos
 
-Cada job produce un artefacto compressado con su binario y las dependencias necesarias:
+Cada job produce un ZIP con el binario, `libespeak-ng` y `espeak-ng-data/`. El layout exacto dentro del ZIP es:
 
-### Linux (`.zip`)
 ```
-staging/
-  tts-sidecar
-  libespeak-ng.so.1      # library
-  espeak-ng-data/        # datos de voz
-tts-sidecar-linux-x86_64.zip
-tts-sidecar-linux-x86_64.sha256.txt
+<targetId>.zip
+└── <targetId>/
+    ├── tts-sidecar[.exe]
+    ├── libespeak-ng.{dll,so,dylib}
+    └── espeak-ng-data/...
 ```
 
-### Windows (`.zip` via PowerShell)
-```
-staging/
-  tts-sidecar.exe
-tts-sidecar-windows-x86_64.zip
-tts-sidecar-windows-x86_64.sha256.txt
-```
+| Plataforma | Library | ZIP output |
+|---|---|---|
+| Linux amd64 | `libespeak-ng.so` | `linux-amd64.zip` |
+| Linux aarch64 | `libespeak-ng.so` | `linux-aarch64.zip` |
+| Windows amd64 | `libespeak-ng.dll` | `windows-amd64.zip` |
+| macOS amd64 | `libespeak-ng.dylib` | `macos-amd64.zip` |
+| macOS aarch64 | `libespeak-ng.dylib` | `macos-aarch64.zip` |
 
-### macOS (`.tar.gz`)
-```
-tts-sidecar-macos-universal    # fat binary (arm64 + x86_64)
-tts-sidecar-macos-universal.tar.gz
-tts-sidecar-macos-universal.sha256.txt
-```
+El archivo de voz `es_MX-claude-high` (`.onnx` + `.onnx.json`) NO se incluye en el ZIP. Se publica como assets separados bajo `voices/es_MX-claude-high/`.
 
 ## Configuración de CircleCI
 
@@ -143,5 +138,5 @@ Solución: no fijar `CARGO_HOME` en el `environment:` del job; la imagen Docker 
 |---|---|---|
 | `sherpa-onnx` | Síntesis TTS con modelos ONNX | Crates.io |
 | `cpal` | Audio output cross-platform | Crates.io |
-| `espeak-ng` | Fallback TTS + datos de voz | Sistema (Linux/macOS) o bundled (Windows) |
+| `espeak-ng` | Phonemizer para sherpa-onnx (convierte texto a fonemas) + datos de voz | Sistema (Linux/macOS) o bundled (Windows) |
 | `rustup` | Gestor de toolchain Rust | Descargado en runtime (Windows/macOS) |

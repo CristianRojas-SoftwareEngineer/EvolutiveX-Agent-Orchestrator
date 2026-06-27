@@ -3,32 +3,14 @@
 All notable changes are derived from conventional commits. Do not edit by hand.
 
 ## [Unreleased]
-### Fixed
-- corregir dos agujeros del backstop AUTO
-- corregir contrato de marcadores de fase del pipeline
-
-## [tts-sidecar-v0.1.3] -- 2026-06-26
-### Fixed
-- corregir API sherpa-onnx vits y PATH Windows en CI
-- heredoc directo como metodo canonico, sin Write tool ni scripts
-- hacer write-prompt.ts multiplataforma y corregir SKILL.md
-
-## [tts-sidecar-v0.1.2] -- 2026-06-26
-### Fixed
-- usar change=null en sentinel y canonicalizar ID solo tras handoff del planner
-- corregir errores de compilacion y config CI Windows
-- hacer continuity:write multiplataforma (PowerShell/Windows)
-- crear writePhaseMarker y usarla en subagente planner
-
-## [tts-sidecar-v0.1.1] -- 2026-06-25
 ### Added
+- diagnóstico profundo de rutas y usuario del executor
+- unificar los 3 jobs en un solo workflow multi-plataforma
+- configs separados para windows, linux y macos
+- agregar job macos-amd64 al workflow
+- pipeline windows-amd64 inicial
+- endurecer fase close y sync gate
 - normalize sub-agent toolsets and enable bidirectional SendMessage
-### Fixed
-- resolver errores de build en todos los runners
-- compile sidecar TTS on all 5 pipeline runners
-
-## [tts-sidecar-v0.1.0] -- 2026-06-25
-### Added
 - añadir skill continuity-prompt para compactación
 - distribuir binarios sidecar sherpa-onnx para 5 plataformas
 - instrumentar sidecars de timings por etapa con reader unificado
@@ -126,6 +108,8 @@ All notable changes are derived from conventional commits. Do not edit by hand.
 - migración a arquitectura SOLID con Fastify y documentación completa en español
 - initial commit for Fastify + TypeScript SOLID API
 ### Changed
+- renombrar jobs y steps; retención 1d; CARGO_HOME en environment
+- separar configs por target para ejecución aislada
 - reorganizar scripting/ por dominio
 - sincronizar skills compartidas con versión refinada del Workbench
 - reemplazar script apply-sequential por versión refinada del Workbench
@@ -179,6 +163,56 @@ All notable changes are derived from conventional commits. Do not edit by hand.
 - implementar PKA de 6 capas, ports, inyección de dependencias y hardening de tooling
 - reemplazar 'any' por tipos estrictos del SDK de Anthropic
 ### Fixed
+- eliminar CARGO_HOME del environment
+- eliminar CARGO_HOME y RUSTUP_HOME del environment
+- forward slashes en save_cache; CARGO_HOME/RUSTUP_HOME explícitos; rustup minimal profile
+- separar caché registry y target; agregar diagnóstico post-restore
+- usar comandos nativos de PowerShell para empaquetado
+- Rust se instala solo si no está en caché (Windows y macOS)
+- cachear toolchain Rust y sidecar/target en Windows y macOS
+- silenciar warning dead_code en campo voice
+- powershell + MSVC target, sin gcc externo
+- rustup-init --override no existe, separar toolchain install
+- \Program Files\Git\tools\mingw64\bin
+- rustup no persiste entre steps — usar full paths
+- instalar MinGW via Chocolatey y buscar gcc en rutas conocidas
+- diagnostico completo con set +e para ver contenido del toolchain GNU
+- buscar gcc.exe directamente en el bin del toolchain GNU
+- usar printf en lugar de heredoc para el TOML
+- guardar diagnostico como artefacto para ver logs offline
+- especificar --toolchain GNU en rustup which
+- diagnostico simplificado + fallback a LOCALAPPDATA
+- instrumentar diagnostico de rustup y usar rustup which para paths reales
+- paths con forward slashes en TOML
+- agregar gcc MinGW al PATH para cc-rs
+- escapar << del heredoc en YAML v2.1
+- cargo config con paths absolutos al gcc del toolchain
+- CC=gcc.exe del toolchain MinGW
+- rustup-init.exe directo y PATH correcto
+- cambiar a target MinGW (x86_64-pc-windows-gnu)
+- rust 1.88 para linux, mingw para windows
+- usar sudo para apt-get en cimg/rust
+- reescribir config con Windows orb y sintaxis PowerShell
+- resource_class medium en vez de windows.medium
+- imagen correcta windows-server-2022-stable
+- resource_class al nivel correcto del job
+- corregir escaping del PATH en job windows-amd64
+- tipo explícito en generate_with_config y correcciones API
+- sample_rate() y samples() son métodos, no campos
+- usar generate_with_config en lugar de generate
+- corregir PATH de rustup en Windows (chocolatey vs rustup.rs)
+- ejecutar pipeline en pushes a main, no solo en tags
+- corregir dos agujeros del backstop AUTO
+- corregir contrato de marcadores de fase del pipeline
+- corregir API sherpa-onnx vits y PATH Windows en CI
+- heredoc directo como metodo canonico, sin Write tool ni scripts
+- hacer write-prompt.ts multiplataforma y corregir SKILL.md
+- usar change=null en sentinel y canonicalizar ID solo tras handoff del planner
+- corregir errores de compilacion y config CI Windows
+- hacer continuity:write multiplataforma (PowerShell/Windows)
+- crear writePhaseMarker y usarla en subagente planner
+- resolver errores de build en todos los runners
+- compile sidecar TTS on all 5 pipeline runners
 - versionar Cargo.lock completo del sidecar TTS para builds reproducibles
 - corregir MSRV, PATH Windows y guards apt-get en pipeline TTS
 - corregir comentario de cabecera y guard apt-get en job release
@@ -277,6 +311,7 @@ All notable changes are derived from conventional commits. Do not edit by hand.
 - corregir omisión de cuerpos de petición en logs de auditoría
 - migrar ts-node a tsx por compatibilidad con Node.js 24
 ### Documentation
+- documentar pipeline de build multi-plataforma de tts-sidecar
 - reparar enlaces y anclas internas rotas en documentación
 - documentar arquitectura de tres niveles del orquestador
 - sincronizar desde Workbench y documentar parche

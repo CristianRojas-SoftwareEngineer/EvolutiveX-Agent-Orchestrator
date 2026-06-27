@@ -8,25 +8,17 @@ Definir los requisitos del pipeline de CI que produce, empaqueta y publica los b
 ## Requirements
 
 ### Requirement: Pipeline de CI para binarios sherpa-onnx en 5 plataformas
-El sistema SHALL ejecutar un pipeline de GitLab CI (`.gitlab-ci.yml`) con una estrategia matrix que compile el binario `tts-sidecar` (basado en sherpa-onnx + CPAL) **desde el crate versionado en `sidecar/`** (NO desde `vendor/tts-sidecar/`, que está gitignored y solo aloja la instalación de runtime) para cinco targets. La correspondencia entre el target del job CI (triple Rust) y el runner SaaS de GitLab SHALL ser exactamente la siguiente:
+El sistema SHALL ejecutar un pipeline de CircleCI que compile el binario `tts-sidecar` (basado en sherpa-onnx + CPAL) para cinco targets. La correspondencia entre el target del job y el executor SHALL ser exactamente la siguiente:
 
-| Triple Rust (job CI)                | Runner GitLab SaaS              | Asset publicado     |
-|-------------------------------------|---------------------------------|---------------------|
-| `x86_64-pc-windows-msvc`            | `saas-windows-medium-amd64`     | `windows-amd64.zip` |
-| `x86_64-unknown-linux-gnu`          | `saas-linux-medium-amd64`       | `linux-amd64.zip`   |
-| `aarch64-unknown-linux-gnu`         | `saas-linux-medium-amd64` (cross) | `linux-aarch64.zip` |
-| `x86_64-apple-darwin`               | `saas-macos-medium-m1`          | `macos-amd64.zip`   |
-| `aarch64-apple-darwin`              | `saas-macos-medium-m1`          | `macos-aarch64.zip` |
+| Triple Rust (job CI)                | Executor CircleCI          | Asset publicado     |
+|-------------------------------------|-----------------------------|---------------------|
+| `x86_64-pc-windows-msvc`            | `windows-amd64`              | `windows-amd64.zip` |
+| `x86_64-unknown-linux-gnu`          | `linux-amd64`               | `linux-amd64.zip`  |
+| `aarch64-unknown-linux-gnu`        | `linux-aarch64`             | `linux-aarch64.zip` |
+| `x86_64-apple-darwin`              | `macos-amd64`               | `macos-amd64.zip`  |
+| `aarch64-apple-darwin`             | `macos-aarch64`             | `macos-aarch64.zip` |
 
-La imagen Docker para los jobs de Linux (linux-amd64, linux-aarch64) SHALL ser `image: rust:1.88`. El job `release` SHALL usar la misma imagen `image: rust:1.88` para mantener consistencia de toolchain.
-
-El job de Windows (`build:windows-amd64`) SHALL instalar Rust mediante `choco install -y rust-ms` y, antes de invocar `rustup`, SHALL recargar el PATH de la sesión PowerShell con la siguiente línea: `$env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")`. Esto garantiza que `rustup` sea reconocido en la sesión activa sin necesidad de abrir un nuevo proceso.
-
-Los jobs de macOS (`macos-amd64`, `macos-aarch64`) SHALL usar `image: macos-26-xcode-26` (única imagen permitida por `allowed_images` del instance runner) y SHALL instalar rustup via `curl https://sh.rustup.rs | sh -s -- -y` seguido de `rustup default stable`. La toolchain exacta puede variar entre builds según cuándo se ejecute el pipeline; los binarios publicados son los que produce esa toolchain y los SHA256 del manifiesto `tts-sidecar.sha256` los reflejan.
-
-La plantilla `.build_template` en `.gitlab-ci.yml` SHALL envolver los comandos `apt-get update` y `apt-get install` en un guard de shell `if [ "$RUNNER_OS" = "Linux" ]; then … fi` de modo que dichos comandos se omitan sin error en runners de macOS y Windows donde `apt-get` no está disponible.
-
-Cada job SHALL bundlear `libespeak-ng` (`libespeak-ng.{dll,so,dylib}`) y `espeak-ng-data/` dentro del ZIP, junto al binario, bajo el directorio `<targetId>/` en la raíz del ZIP. El layout exacto SHALL ser:
+Cada job SHALL bundlear `libespeak-ng` y `espeak-ng-data/` dentro del ZIP, junto al binario, bajo el directorio `<targetId>/` en la raíz del ZIP. El layout exacto SHALL ser:
 
 ```
 <targetId>.zip
@@ -75,6 +67,24 @@ El pipeline SHALL generar `tts-sidecar.sha256` con SHA256 reales (reemplazando l
 - **AND** SHALL existir `vendor/tts-sidecar/windows-amd64/libespeak-ng.dll`
 - **AND** SHALL existir el directorio `vendor/tts-sidecar/windows-amd64/espeak-ng-data/` con al menos un archivo adentro
 - **AND** SHALL NO existir ningún archivo suelto en la raíz de `vendor/tts-sidecar/` que no esté bajo un subdirectorio `<targetId>/`
+
+#### Scenario: macOS build bundlea libespeak-ng.dylib
+- **GIVEN** el job `build:macos-amd64` o `build:macos-aarch64`
+- **WHEN** el pipeline ejecuta los pasos de build
+- **THEN** SHALL copiar `libespeak-ng.dylib` al directorio `<targetId>/` dentro del ZIP
+- **AND** SHALL copiar el directorio `espeak-ng-data/` con su contenido
+
+#### Scenario: Windows build bundlea libespeak-ng.dll
+- **GIVEN** el job `build:windows-amd64`
+- **WHEN** el pipeline ejecuta los pasos de build
+- **THEN** SHALL copiar `libespeak-ng.dll` al directorio `<targetId>/` dentro del ZIP
+- **AND** SHALL copiar el directorio `espeak-ng-data/` con su contenido
+
+#### Scenario: Linux build bundlea libespeak-ng.so
+- **GIVEN** el job `build:linux-amd64` o `build:linux-aarch64`
+- **WHEN** el pipeline ejecuta los pasos de build
+- **THEN** SHALL copiar `libespeak-ng.so` al directorio `<targetId>/` dentro del ZIP
+- **AND** SHALL copiar el directorio `espeak-ng-data/` con su contenido
 
 ---
 

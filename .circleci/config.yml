@@ -42,6 +42,9 @@ jobs:
           name: "Compilar tts-sidecar"
           command: |
             export PATH="$USERPROFILE/.cargo/bin:$PATH"
+            # cc-rs busca gcc.exe en PATH para compilar build scripts de bzip2-sys y ring
+            MINGW_DIR="$USERPROFILE/.rustup/toolchains/stable-x86_64-pc-windows-gnu/bin"
+            export PATH="$MINGW_DIR:$PATH"
             cargo build --release \
               --manifest-path sidecar/Cargo.toml \
               --target x86_64-pc-windows-gnu

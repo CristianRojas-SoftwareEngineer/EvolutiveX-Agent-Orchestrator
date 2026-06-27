@@ -8,15 +8,13 @@ Definir los requisitos del pipeline de CI que produce, empaqueta y publica los b
 ## Requirements
 
 ### Requirement: Pipeline de CI para binarios sherpa-onnx en 5 plataformas
-El sistema SHALL ejecutar un pipeline de CircleCI que compile el binario `tts-sidecar` (basado en sherpa-onnx + CPAL) para cinco targets. La correspondencia entre el target del job y el executor SHALL ser exactamente la siguiente:
+El sistema SHALL ejecutar un pipeline de CircleCI que compile el binario `tts-sidecar` (basado en sherpa-onnx + CPAL) para tres targets. La correspondencia entre el target del job y el executor SHALL ser exactamente la siguiente:
 
-| Triple Rust (job CI)                | Executor CircleCI          | Asset publicado     |
-|-------------------------------------|-----------------------------|---------------------|
-| `x86_64-pc-windows-msvc`            | `windows-amd64`              | `windows-amd64.zip` |
-| `x86_64-unknown-linux-gnu`          | `linux-amd64`               | `linux-amd64.zip`  |
-| `aarch64-unknown-linux-gnu`        | `linux-aarch64`             | `linux-aarch64.zip` |
-| `x86_64-apple-darwin`              | `macos-amd64`               | `macos-amd64.zip`  |
-| `aarch64-apple-darwin`             | `macos-aarch64`             | `macos-aarch64.zip` |
+| Triple Rust (job CI)           | Executor CircleCI          | Asset publicado      |
+|--------------------------------|----------------------------|----------------------|
+| `x86_64-pc-windows-msvc`       | `windows-amd64`            | `windows-amd64.zip`  |
+| `x86_64-unknown-linux-gnu`     | `linux-amd64`              | `linux-amd64.zip`    |
+| `x86_64-apple-darwin` + `aarch64-apple-darwin` → Universal Binary | `macos-amd64` | `macos-amd64.zip` |
 
 Cada job SHALL bundlear `libespeak-ng`, `espeak-ng-data/` y el modelo de voz `es_MX-claude-high` dentro del ZIP, junto al binario, bajo el directorio `<targetId>/` en la raíz del ZIP. El layout exacto SHALL ser:
 
@@ -26,24 +24,26 @@ Cada job SHALL bundlear `libespeak-ng`, `espeak-ng-data/` y el modelo de voz `es
     ├── tts-sidecar[.exe]
     ├── libespeak-ng.{dll,so,dylib}
     ├── espeak-ng-data/...
-    └── voices/
-        └── es_MX-claude-high/
-            ├── es_MX-claude-high.onnx
-            └── es_MX-claude-high.onnx.json
+    └── vendor/
+        └── tts-sidecar/
+            └── voices/
+                └── es_MX-claude-high/
+                    ├── es_MX-claude-high.onnx
+                    └── es_MX-claude-high.onnx.json
 ```
 
 El nombre del archivo ZIP SHALL ser exactamente `<targetId>.zip` (en minúsculas, con guiones, sin prefijo ni extensión adicional). El `postinstall-tts.ts` del paquete NPM depende de este naming exacto.
 
-El modelo de voz `es_MX-claude-high` (archivos `.onnx` y `.onnx.json`) SHALL incluirse dentro del ZIP, bajo el directorio `voices/es_MX-claude-high/`. El postinstall NPM no necesita descargar la voz por separado.
+El modelo de voz `es_MX-claude-high` (archivos `.onnx` y `.onnx.json`) SHALL incluirse dentro del ZIP, bajo el directorio `vendor/tts-sidecar/voices/es_MX-claude-high/`. El postinstall NPM no necesita descargar la voz por separado.
 
 El pipeline SHALL crear la Release con el tag `tts-sidecar-v<semver>` donde `<semver>` es la versión del crate Rust (de `Cargo.toml`). El tag NO SHALL ser el version del repo (p. ej. no `v1.0.0`); SHALL incluir el prefijo `tts-sidecar-` para distinguirlo de otros tags del repo.
 
 El pipeline SHALL generar `tts-sidecar.sha256` con SHA256 reales (reemplazando los placeholders `0000…` y `0.0.0-placeholder`) para los 5 ZIPs, y SHALL commitear ese archivo al repo como parte del job de release.
 
-#### Scenario: CI matrix compila para los 5 targets sin errores
-- **WHEN** se dispara el pipeline `.gitlab-ci.yml` (en push de tag `tts-sidecar-v*` o manual via web)
-- **THEN** SHALL haber exactamente 5 jobs de build más 1 job de release
-- **AND** cada job de build SHALL completar con código 0
+#### Scenario: CI compila para los 3 targets sin errores
+- **WHEN** se dispara el pipeline `.circleci/config.yml` (en push a `circleci-project-setup` o merge a `main`)
+- **THEN** SHALL haber 1 job `download-model` y 3 jobs de build (`linux-amd64`, `windows-amd64`, `macos-amd64`)
+- **AND** cada job SHALL completar con código 0
 - **AND** cada job SHALL producir un ZIP con el layout declarado arriba
 - **AND** el nombre del asset SHALL coincidir con el `targetId` de su triple Rust según la tabla de mapping
 

@@ -1,11 +1,8 @@
 {
   "version": "0.1.0",
-  "baseUrl": "https://github.com/<owner>/<repo>/releases/download/tts-sidecar-v0.1.0/",
   "binaries": {
     "windows-amd64": { "file": "windows-amd64.zip", "sha256": "PLACEHOLDER_UPDATE_AFTER_CI" },
     "linux-amd64":   { "file": "linux-amd64.zip",   "sha256": "PLACEHOLDER_UPDATE_AFTER_CI" },
-    "linux-aarch64": { "file": "linux-aarch64.zip", "sha256": "PLACEHOLDER_UPDATE_AFTER_CI" },
-    "macos-amd64":   { "file": "macos-amd64.zip",   "sha256": "PLACEHOLDER_UPDATE_AFTER_CI" },
-    "macos-aarch64": { "file": "macos-aarch64.zip", "sha256": "PLACEHOLDER_UPDATE_AFTER_CI" }
+    "macos-amd64":   { "file": "macos-amd64.zip",   "sha256": "PLACEHOLDER_UPDATE_AFTER_CI" }
   }
 }

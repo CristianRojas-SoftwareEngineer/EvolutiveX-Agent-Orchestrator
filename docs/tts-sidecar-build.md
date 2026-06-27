@@ -20,11 +20,12 @@ Salida error: {"status":"error","reason":"..."}
 
 | Job CircleCI | Executor | Target Rust | ZIP output |
 |---|---|---|---|
+| `download-model` | Docker `cimg/base:stable` | N/A (descarga modelo de HuggingFace) | Workspace compartido |
 | `linux-amd64` | Docker `cimg/rust:1.88.0` | `x86_64-unknown-linux-gnu` | `linux-amd64.zip` |
 | `windows-amd64` | `windows-server-2022-gui` | `x86_64-pc-windows-msvc` | `windows-amd64.zip` |
 | `macos-amd64` | macOS `m4pro.medium` + Xcode 16.4 | `aarch64-apple-darwin` + `x86_64-apple-darwin` → `lipo` | `macos-amd64.zip` |
 
-Los tres jobs corren en paralelo en el workflow `build-all`. Cada job produce un ZIP con el binario, `libespeak-ng.{dll,so,dylib}` y `espeak-ng-data/`.
+El job `download-model` descarga el modelo de voz desde HuggingFace, aplica el patch de metadatos ONNX (sample_rate, n_speakers, etc.), y comparte el modelo vía workspace con los 3 jobs de compilación. Los tres jobs de build corren en paralelo tras `download-model`.
 
 ## Toolchain Rust
 
@@ -76,10 +77,12 @@ Cada job produce un ZIP con el binario, `libespeak-ng`, `espeak-ng-data/` y el m
     ├── tts-sidecar[.exe]
     ├── libespeak-ng.{dll,so,dylib}
     ├── espeak-ng-data/...
-    └── voices/
-        └── es_MX-claude-high/
-            ├── es_MX-claude-high.onnx
-            └── es_MX-claude-high.onnx.json
+    └── vendor/
+        └── tts-sidecar/
+            └── voices/
+                └── es_MX-claude-high/
+                    ├── es_MX-claude-high.onnx
+                    └── es_MX-claude-high.onnx.json
 ```
 
 | Plataforma | Library | ZIP output |
@@ -98,9 +101,16 @@ Archivo: [`.circleci/config.yml`](.circleci/config.yml)
 workflows:
   build-all:
     jobs:
-      - linux-amd64
-      - windows-amd64
-      - macos-amd64
+      - download-model
+      - linux-amd64:
+          requires:
+            - download-model
+      - windows-amd64:
+          requires:
+            - download-model
+      - macos-amd64:
+          requires:
+            - download-model
 ```
 
 Jobs con nombre descriptivo (`{os}-{arch}`) y steps con el formato:
@@ -113,13 +123,12 @@ Ejemplo: `"Compilar tts-sidecar (release, x86_64-pc-windows-msvc)"`
 
 ## Notas de debugging
 
-### Windows: caché no se restaura
+### Windows: `msiexec /a` no extrae archivos en executor headless
 
-Síntoma: Cargo descarga todas las dependencias en cada run.
+Síntoma: el directorio `espeak-ext/` queda vacío y el bundle no incluye `libespeak-ng.dll` ni `espeak-ng-data/`.
 
-1. Verificar que `%USERPROFILE%` resuelve a `C:\Users\circleci` — `echo $env:USERPROFILE` en PowerShell.
-2. Confirmar que los paths en `save_cache` usan forward slashes (`C:/Users/...`) y no backslashes.
-3. Confirmar que `CARGO_HOME` y `RUSTUP_HOME` están fijados como variables de entorno del job.
+Causa: `msiexec /a` (admin install mode) requiere desktop interactivo y falla silenciosamente en executors headless de CircleCI.
+Solución: usar `choco install -y espeak-ng` que usa el MSI con flags `/quiet /qn` (sin admin mode) y funciona en executors headless. Los archivos quedan en `C:\Program Files\eSpeak NG\`.
 
 ### macOS: `~/.cargo/env` not found
 

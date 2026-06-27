@@ -224,7 +224,7 @@ fn main() {
         // generate_with_config requiere (text, &GenerationConfig, callback).
         // speed=1.0 se mapea a GenerationConfig::default() con speed=1.0.
         let config = GenerationConfig {
-            speed: 1.0,
+            speed: 0.85,
             ..Default::default()
         };
         let output = match tts.generate_with_config::<Box<dyn FnMut(&[f32], f32) -> bool + 'static>>(&cmd.text, &config, None) {

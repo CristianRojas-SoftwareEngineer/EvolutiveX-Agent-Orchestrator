@@ -5,10 +5,8 @@
 export interface ITtsSidecarAssets {
   /** Path al binario `tts-sidecar` (o `tts-sidecar.exe` en Windows). */
   binaryPath: string;
-  /** Path al modelo ONNX de la voz (p.ej. `es_MX-claude-voice-medium.onnx`). */
+  /** Path al modelo ONNX de la voz (p.ej. `es_MX-claude-high.onnx`). */
   voiceModelPath: string;
-  /** Path al archivo de configuración del modelo (`*.onnx.json`). */
-  voiceConfigPath: string;
   /** Path al directorio `espeak-ng-data/` con lang/, dicts/, voices/. */
   espeakDataDir: string;
 }

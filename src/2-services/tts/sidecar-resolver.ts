@@ -48,7 +48,6 @@ export function resolveSidecarAssets(): ITtsSidecarAssets {
   const voice = process.env['TTS_SIDECAR_VOICE'] ?? 'es_MX-claude-high';
   const voicesDir = path.join(vendorDir, targetId, 'vendor', 'tts-sidecar', 'voices');
   const voiceModelPath = path.join(voicesDir, voice, `${voice}.onnx`);
-  const voiceConfigPath = path.join(voicesDir, voice, `${voice}.onnx.json`);
   const espeakDataDir = path.join(vendorDir, targetId, 'espeak-ng-data');
 
   if (!fs.existsSync(binaryPath)) {
@@ -57,12 +56,12 @@ export function resolveSidecarAssets(): ITtsSidecarAssets {
         `Ejecuta \`npm run tts:setup\` con conexión a Internet para descargarlo.`,
     );
   }
-  if (!fs.existsSync(voiceModelPath) || !fs.existsSync(voiceConfigPath)) {
+  if (!fs.existsSync(voiceModelPath)) {
     throw new SidecarNotInstalledError(
-      `Modelo de voz no instalado (esperado: ${voiceModelPath} y ${voiceConfigPath}). ` +
+      `Modelo de voz no instalado (esperado: ${voiceModelPath}). ` +
         `Ejecuta \`npm run tts:setup\` con conexión a Internet para descargarlo.`,
     );
   }
 
-  return { binaryPath, voiceModelPath, voiceConfigPath, espeakDataDir };
+  return { binaryPath, voiceModelPath, espeakDataDir };
 }

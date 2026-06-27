@@ -40,13 +40,6 @@ jobs:
             else
               echo "Modelo ONNX ya en caché, omitiendo descarga."
             fi
-            if [ ! -f "$MODEL_DIR/es_MX-claude-high.onnx.json" ]; then
-              echo "Descargando config JSON..."
-              curl -L "https://huggingface.co/rhasspy/piper-voices/resolve/main/es/es_MX/claude/high/es_MX-claude-high.onnx.json" \
-                -o "$MODEL_DIR/es_MX-claude-high.onnx.json"
-            else
-              echo "Config JSON ya en caché, omitiendo descarga."
-            fi
 
       - run:
           name: "Patchear metadatos ONNX (sherpa-onnx requiere sample_rate, n_speakers, etc.)"
@@ -75,6 +68,18 @@ jobs:
             onnx.save(m, model_path)
             print("Metadatos agregados:", list(fields.keys()))
             PYEOF
+
+      - run:
+          name: "Descargar archivo de tokens para sherpa-onnx"
+          command: |
+            MODEL_DIR="vendor/tts-sidecar/voices/es_MX-claude-high"
+            if [ ! -f "$MODEL_DIR/es_MX-claude-high.onnx.tokens" ]; then
+              echo "Descargando tokens..."
+              curl -L "https://huggingface.co/rhasspy/piper-voices/resolve/main/es/es_MX/claude/high/es_MX-claude-high.onnx.tokens" \
+                -o "$MODEL_DIR/es_MX-claude-high.onnx.tokens"
+            else
+              echo "Tokens ya en caché, omitiendo descarga."
+            fi
 
       # FIX 1: Guardar download cache de pip (~/.cache/pip) tras instalar onnx
       - save_cache:

@@ -113,7 +113,7 @@ fn main() {
     let cli = Cli::parse();
 
     // Derivar el path del archivo de tokens desde el path del modelo.
-    let tokens_path = cli.model.with_extension("onnx.json").to_string_lossy().into_owned();
+    let tokens_path = cli.model.with_extension("onnx.tokens").to_string_lossy().into_owned();
 
     // Construir la configuración del sintetizador TTS con la estructura vits.
     let mut vits_config = OfflineTtsVitsModelConfig {

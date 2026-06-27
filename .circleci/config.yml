@@ -4,6 +4,50 @@ version: 2.1
 
 jobs:
   # ─────────────────────────────────────────────────────────────────
+  # Descarga el modelo de voz una sola vez y lo persiste al workspace.
+  # Se comparte con los 3 jobs de compilación en el mismo pipeline.
+  # Entre pipelines, se-restaura desde caché (evita re-descargar).
+  # ─────────────────────────────────────────────────────────────────
+  download-model:
+    docker:
+      - image: cimg/base:stable
+    working_directory: ~/EvolutiveX-Agent-Orchestrator
+    steps:
+      - restore_cache:
+          keys:
+            - voice-model-es-MX-claude-high-v1
+
+      - run:
+          name: "Descargar modelo de voz (si no está en caché)"
+          command: |
+            MODEL_DIR="vendor/tts-sidecar/voices/es_MX-claude-high"
+            mkdir -p "$MODEL_DIR"
+            if [ ! -f "$MODEL_DIR/es_MX-claude-high.onnx" ]; then
+              echo "Descargando modelo ONNX..."
+              curl -L "https://huggingface.co/rhasspy/piper-voices/resolve/main/es/es_MX/claude/high/es_MX-claude-high.onnx" \
+                -o "$MODEL_DIR/es_MX-claude-high.onnx"
+            else
+              echo "Modelo ONNX ya en caché, omitiendo descarga."
+            fi
+            if [ ! -f "$MODEL_DIR/es_MX-claude-high.onnx.json" ]; then
+              echo "Descargando config JSON..."
+              curl -L "https://huggingface.co/rhasspy/piper-voices/resolve/main/es/es_MX/claude/high/es_MX-claude-high.onnx.json" \
+                -o "$MODEL_DIR/es_MX-claude-high.onnx.json"
+            else
+              echo "Config JSON ya en caché, omitiendo descarga."
+            fi
+
+      - save_cache:
+          key: voice-model-es-MX-claude-high-v1
+          paths:
+            - vendor/tts-sidecar/voices/es_MX-claude-high
+
+      - persist_to_workspace:
+          root: .
+          paths:
+            - vendor/tts-sidecar/voices/es_MX-claude-high
+
+  # ─────────────────────────────────────────────────────────────────
   # Linux x86_64
   # ─────────────────────────────────────────────────────────────────
   linux-amd64:
@@ -15,6 +59,8 @@ jobs:
       caches: 1d
     steps:
       - checkout
+      - attach_workspace:
+          at: ~/EvolutiveX-Agent-Orchestrator
       - restore_cache:
           keys:
             - cargo-linux-{{ checksum "sidecar/Cargo.lock" }}
@@ -52,6 +98,10 @@ jobs:
             elif [ -d "/usr/share/espeak-ng-data" ]; then
               cp -r "/usr/share/espeak-ng-data" staging/linux-amd64/
             fi
+            # Incluir modelo de voz desde workspace
+            mkdir -p staging/linux-amd64/vendor/tts-sidecar/voices
+            cp -r vendor/tts-sidecar/voices/es_MX-claude-high \
+              staging/linux-amd64/vendor/tts-sidecar/voices/
             cd staging && zip -r ../linux-amd64.zip linux-amd64 && cd ..
             sha256sum linux-amd64.zip | awk '{print "linux-amd64=" $1}' \
               > linux-amd64.sha256.txt
@@ -75,6 +125,8 @@ jobs:
       caches: 1d
     steps:
       - checkout
+      - attach_workspace:
+          at: .
       - restore_cache:
           keys:
             - cargo-win-registry-{{ checksum "sidecar/Cargo.lock" }}
@@ -143,6 +195,10 @@ jobs:
             if ($espeakData) {
               Copy-Item -Recurse "espeak-ext\$espeakData" "staging\windows-amd64\"
             }
+            # Incluir modelo de voz desde workspace
+            New-Item -ItemType Directory -Force -Path "staging\windows-amd64\vendor\tts-sidecar\voices" | Out-Null
+            Copy-Item -Recurse "vendor\tts-sidecar\voices\es_MX-claude-high" `
+              "staging\windows-amd64\vendor\tts-sidecar\voices\"
             $ProgressPreference = "SilentlyContinue"
             Compress-Archive -Path staging\windows-amd64 -DestinationPath windows-amd64.zip -Force
             $hash = (Get-FileHash windows-amd64.zip -Algorithm SHA256).Hash.ToLower()
@@ -164,6 +220,8 @@ jobs:
       caches: 1d
     steps:
       - checkout
+      - attach_workspace:
+          at: ~/EvolutiveX-Agent-Orchestrator
       - restore_cache:
           keys:
             - cargo-macos-{{ checksum "sidecar/Cargo.lock" }}
@@ -224,6 +282,10 @@ jobs:
             if [ -d "$(brew --prefix)/share/espeak-ng-data" ]; then
               cp -r "$(brew --prefix)/share/espeak-ng-data" staging/macos-amd64/
             fi
+            # Incluir modelo de voz desde workspace
+            mkdir -p staging/macos-amd64/vendor/tts-sidecar/voices
+            cp -r vendor/tts-sidecar/voices/es_MX-claude-high \
+              staging/macos-amd64/vendor/tts-sidecar/voices/
             cd staging && zip -r ../macos-amd64.zip macos-amd64 && cd ..
             shasum -a 256 macos-amd64.zip \
               | awk '{print "macos-amd64=" $1}' \
@@ -236,6 +298,13 @@ jobs:
 workflows:
   build-all:
     jobs:
-      - linux-amd64
-      - windows-amd64
-      - macos-amd64
+      - download-model
+      - linux-amd64:
+          requires:
+            - download-model
+      - windows-amd64:
+          requires:
+            - download-model
+      - macos-amd64:
+          requires:
+            - download-model

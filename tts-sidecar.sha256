@@ -7,15 +7,5 @@
     "linux-aarch64": { "file": "linux-aarch64.zip", "sha256": "PLACEHOLDER_UPDATE_AFTER_CI" },
     "macos-amd64":   { "file": "macos-amd64.zip",   "sha256": "PLACEHOLDER_UPDATE_AFTER_CI" },
     "macos-aarch64": { "file": "macos-aarch64.zip", "sha256": "PLACEHOLDER_UPDATE_AFTER_CI" }
-  },
-  "voices": {
-    "es_MX-claude-high": {
-      "model":  "voices/es_MX-claude-high/es_MX-claude-high.onnx",
-      "config": "voices/es_MX-claude-high/es_MX-claude-high.onnx.json",
-      "sha256": {
-        "model":  "PLACEHOLDER_UPDATE_AFTER_CI",
-        "config": "PLACEHOLDER_UPDATE_AFTER_CI"
-      }
-    }
   }
 }

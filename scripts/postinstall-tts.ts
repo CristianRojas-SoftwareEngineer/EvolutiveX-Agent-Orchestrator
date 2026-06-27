@@ -1,7 +1,7 @@
 /**
  * Postinstall script: descarga el binario `tts-sidecar` (ZIP por plataforma)
- * y el modelo de voz para la plataforma actual. Se ejecuta en `npm install`
- * (compilado con `node`) y manualmente con `npm run tts:setup`.
+ * y lo extrae. El modelo de voz va dentro del ZIP — no se descarga por separado.
+ * Se ejecuta en `npm install` (compilado con `node`) y manualmente con `npm run tts:setup`.
  *
  * Comportamiento:
  * - Si `TTS_SIDECAR_SKIP_DOWNLOAD=1`, sale con código 0 sin descargar.
@@ -9,9 +9,8 @@
  *   (degradación elegante: el gateway arranca sin voz).
  * - Descarga el ZIP de la plataforma, verifica SHA256 contra `tts-sidecar.sha256`,
  *   extrae con `adm-zip` a `vendor/tts-sidecar/<targetId>/`.
- * - Descarga los archivos de voz (model + config) por separado y los coloca en
- *   `vendor/tts-sidecar/voices/<voice>/<basename>`.
- * - Idempotente: si todo ya está instalado y los SHA coinciden, sale con código 0
+ * - El modelo de voz (`voices/es_MX-claude-high/`) viene dentro del ZIP.
+ * - Idempotente: si el binario ya está instalado y el SHA coincide, sale con código 0
  *   sin re-descargar.
  * - Sale con código 0 en todo path controlado (red, SHA inválido, plataforma).
  *   Solo retorna código ≠ 0 ante errores irrecuperables (manifiesto JSON inválido).
@@ -19,13 +18,12 @@
  * Variables de entorno:
  * - `TTS_SIDECAR_BASE_URL`: URL base de los artefactos (override; el default
  *   real de la constante BASE_URL está abajo — nada carga `.env` en este proceso).
- * - `TTS_SIDECAR_VOICE`: voz a descargar (default `es_MX-claude-high`).
  * - `TTS_SIDECAR_SKIP_DOWNLOAD=1`: atajo para CI/entornos sin red.
  */
 import { createHash } from 'node:crypto';
 import { createWriteStream, existsSync } from 'node:fs';
 import { mkdir, readFile, chmod, unlink } from 'node:fs/promises';
-import { basename, dirname, join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { Readable } from 'node:stream';
 import AdmZip from 'adm-zip';
@@ -36,7 +34,6 @@ const BASE_URL =
   process.env['TTS_SIDECAR_BASE_URL'] ??
   'https://github.com/<owner>/<repo>/releases/download/tts-sidecar-v0.1.0/';
 
-const VOICE = process.env['TTS_SIDECAR_VOICE'] ?? 'es_MX-claude-high';
 const REPO_ROOT = resolve(__dirname, '..');
 const VENDOR_DIR = join(REPO_ROOT, 'vendor', 'tts-sidecar');
 const MANIFEST_PATH = join(REPO_ROOT, 'tts-sidecar.sha256');
@@ -57,16 +54,9 @@ function detectTarget(): Target | null {
   return null;
 }
 
-interface VoiceEntry {
-  model: string;
-  config: string;
-  sha256: { model: string; config: string };
-}
-
 interface Manifest {
   version: string;
   binaries: Record<string, { file: string; sha256: string }>;
-  voices: Record<string, VoiceEntry>;
 }
 
 async function loadManifest(): Promise<Manifest> {
@@ -136,47 +126,29 @@ async function main(): Promise<number> {
     console.error(`[TTS-SIDE] Manifiesto no incluye binario para ${target.id}. El gateway arrancará sin voz.`);
     return 0;
   }
-  const voiceEntry = manifest.voices[VOICE];
-  if (!voiceEntry) {
-    console.error(`[TTS-SIDE] Manifiesto no incluye la voz ${VOICE}. El gateway arrancará sin voz.`);
-    return 0;
-  }
 
   // Paths locales de destino.
   // El ZIP se extrae sobre vendor/tts-sidecar/; el layout del ZIP es <targetId>/...
   const zipDest = join(VENDOR_DIR, binEntry.file);
   const binaryDest = join(VENDOR_DIR, target.id, target.binary);
 
-  // La voz: el manifiesto tiene paths relativos a BASE_URL como
-  // "voices/es_MX-claude-high/es_MX-claude-high.onnx".
-  // Localmente se coloca en vendor/tts-sidecar/voices/<voice>/<basename>.
-  // NO re-anteponer "voices/<voice>/" porque ya está en el path del manifiesto.
-  const modelBasename = basename(voiceEntry.model);
-  const configBasename = basename(voiceEntry.config);
-  const modelDest = join(VENDOR_DIR, 'voices', VOICE, modelBasename);
-  const configDest = join(VENDOR_DIR, 'voices', VOICE, configBasename);
-
-  // Idempotencia: si todo ya está instalado y los SHA coinciden, no re-descargar.
+  // Idempotencia: si el binario ya está instalado y el SHA coincide, no re-descargar.
   try {
     if (
       existsSync(binaryDest) &&
-      existsSync(modelDest) &&
-      existsSync(configDest) &&
-      (await sha256OfFile(zipDest).catch(() => '')) === binEntry.sha256 &&
-      (await sha256OfFile(modelDest)) === voiceEntry.sha256.model &&
-      (await sha256OfFile(configDest)) === voiceEntry.sha256.config
+      (await sha256OfFile(zipDest).catch(() => '')) === binEntry.sha256
     ) {
-      console.log(`[TTS-SIDE] Sidecar y voz ${VOICE} ya instalados en ${VENDOR_DIR}.`);
+      console.log(`[TTS-SIDE] Sidecar ${target.id} ya instalado en ${VENDOR_DIR}.`);
       return 0;
     }
   } catch {
     // Si falla la verificación, continuamos con la descarga.
   }
 
-  console.log(`[TTS-SIDE] Descargando tts-sidecar (${target.id}) y voz ${VOICE}...`);
+  console.log(`[TTS-SIDE] Descargando tts-sidecar (${target.id})...`);
 
   try {
-    // 1. Descargar ZIP del binario.
+    // 1. Descargar ZIP del binario (incluye la voz).
     const zipUrl = new URL(binEntry.file, BASE_URL).toString();
     await mkdir(VENDOR_DIR, { recursive: true });
     await downloadTo(zipUrl, zipDest);
@@ -198,7 +170,7 @@ async function main(): Promise<number> {
     }
 
     // 3. Extraer ZIP con adm-zip.
-    // El ZIP tiene layout: <targetId>/{tts-sidecar[.exe], libespeak-ng.*, espeak-ng-data/}
+    // El ZIP tiene layout: <targetId>/{tts-sidecar[.exe], libespeak-ng.*, espeak-ng-data/, voices/}
     // Se extrae sobre VENDOR_DIR, resultando en vendor/tts-sidecar/<targetId>/...
     const zip = new AdmZip(zipDest);
     zip.extractAllTo(VENDOR_DIR, /* overwrite */ true);
@@ -206,39 +178,6 @@ async function main(): Promise<number> {
     // 4. chmod 755 al binario (no aplica en Windows).
     if (process.platform !== 'win32' && existsSync(binaryDest)) {
       await chmod(binaryDest, 0o755);
-    }
-
-    // 5. Descargar archivos de voz por separado.
-    // La URL es: BASE_URL + voiceEntry.model (ej: BASE_URL + "voices/es_MX-claude-high/es_MX-claude-high.onnx")
-    const modelUrl = new URL(voiceEntry.model, BASE_URL).toString();
-    const configUrl = new URL(voiceEntry.config, BASE_URL).toString();
-
-    await downloadTo(modelUrl, modelDest);
-    const dlModelHash = await sha256OfFile(modelDest);
-    if (
-      dlModelHash !== voiceEntry.sha256.model &&
-      voiceEntry.sha256.model !== '0000000000000000000000000000000000000000000000000000000000000000'
-    ) {
-      await unlink(modelDest).catch(() => undefined);
-      console.error(
-        `[TTS-SIDE] SHA256 inválido para el modelo. Esperado ${voiceEntry.sha256.model}, recibido ${dlModelHash}. ` +
-          'El gateway arrancará sin voz.',
-      );
-      return 0;
-    }
-
-    await downloadTo(configUrl, configDest);
-    const dlConfigHash = await sha256OfFile(configDest);
-    if (
-      dlConfigHash !== voiceEntry.sha256.config &&
-      voiceEntry.sha256.config !== '0000000000000000000000000000000000000000000000000000000000000000'
-    ) {
-      await unlink(configDest).catch(() => undefined);
-      console.error(
-        `[TTS-SIDE] SHA256 inválido para el config. Esperado ${voiceEntry.sha256.config}, recibido ${dlConfigHash}. ` +
-          'El gateway arrancará sin voz.',
-      );
-      return 0;
     }
 
     console.log(`[TTS-SIDE] Instalación completa en ${VENDOR_DIR}.`);

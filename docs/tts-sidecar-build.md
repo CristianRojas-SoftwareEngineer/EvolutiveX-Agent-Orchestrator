@@ -68,14 +68,18 @@ CircleCI en Windows resuelve `%USERPROFILE%` a `C:\Users\circleci`. En `save_cac
 
 ## Empaquetado de artefactos
 
-Cada job produce un ZIP con el binario, `libespeak-ng` y `espeak-ng-data/`. El layout exacto dentro del ZIP es:
+Cada job produce un ZIP con el binario, `libespeak-ng`, `espeak-ng-data/` y el modelo de voz. El layout exacto dentro del ZIP es:
 
 ```
 <targetId>.zip
 └── <targetId>/
     ├── tts-sidecar[.exe]
     ├── libespeak-ng.{dll,so,dylib}
-    └── espeak-ng-data/...
+    ├── espeak-ng-data/...
+    └── voices/
+        └── es_MX-claude-high/
+            ├── es_MX-claude-high.onnx
+            └── es_MX-claude-high.onnx.json
 ```
 
 | Plataforma | Library | ZIP output |
@@ -84,7 +88,7 @@ Cada job produce un ZIP con el binario, `libespeak-ng` y `espeak-ng-data/`. El l
 | Windows amd64 | `libespeak-ng.dll` | `windows-amd64.zip` |
 | macOS Universal | `libespeak-ng.dylib` | `macos-amd64.zip` |
 
-El archivo de voz `es_MX-claude-high` (`.onnx` + `.onnx.json`) NO se incluye en el ZIP. Se publica como assets separados bajo `voices/es_MX-claude-high/`.
+El modelo de voz `es_MX-claude-high` se descarga desde Hugging Face en el job `download-model` del pipeline CircleCI y se incluye dentro del ZIP de cada plataforma. El postinstall NPM no necesita descargar la voz por separado — una sola descarga del ZIP y todo está listo.
 
 ## Configuración de CircleCI
 

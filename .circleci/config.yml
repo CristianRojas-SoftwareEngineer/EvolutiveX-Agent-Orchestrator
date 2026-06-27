@@ -143,9 +143,6 @@ jobs:
       xcode: "16.4.0"
     resource_class: m4pro.medium
     working_directory: ~/EvolutiveX-Agent-Orchestrator
-    environment:
-      CARGO_HOME: ~/.cargo
-      RUSTUP_HOME: ~/.rustup
     retention:
       caches: 1d
     steps:

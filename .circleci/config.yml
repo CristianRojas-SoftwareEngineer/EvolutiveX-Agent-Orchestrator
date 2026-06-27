@@ -27,36 +27,54 @@ jobs:
           name: "Crear cargo config (GNU toolchain paths)"
           command: |
             export PATH="$USERPROFILE/.cargo/bin:$PATH"
+            mkdir -p diagnostics
+            echo "=== Diagnostico de rustup ===" > diagnostics/rustup-info.txt
+            echo "USERPROFILE=$USERPROFILE" >> diagnostics/rustup-info.txt
+            echo "LOCALAPPDATA=$LOCALAPPDATA" >> diagnostics/rustup-info.txt
+            echo "" >> diagnostics/rustup-info.txt
+            echo "=== rustup which gcc (GNU) ===" >> diagnostics/rustup-info.txt
+            rustup which gcc --toolchain stable-x86_64-pc-windows-gnu >> diagnostics/rustup-info.txt 2>&1
+            echo "=== rustup which ar (GNU) ===" >> diagnostics/rustup-info.txt
+            rustup which ar --toolchain stable-x86_64-pc-windows-gnu >> diagnostics/rustup-info.txt 2>&1
+            echo "=== ls toolchains ===" >> diagnostics/rustup-info.txt
+            ls "$USERPROFILE/.rustup/toolchains/" >> diagnostics/rustup-info.txt 2>&1
             mkdir -p .cargo
-            # El toolchain GNU esta en USERPROFILE/.rustup, no en LOCALAPPDATA
-            # Usar --toolchain para especificar el target GNU, no el MSVC default
             GCC_PATH="$(rustup which gcc --toolchain stable-x86_64-pc-windows-gnu 2>/dev/null)"
             AR_PATH="$(rustup which ar --toolchain stable-x86_64-pc-windows-gnu 2>/dev/null)"
-            echo "gcc=$GCC_PATH"
-            echo "ar=$AR_PATH"
-            # Convertir backslashes a forward slashes para TOML
             GCC_FW="${GCC_PATH//\\//}"
             AR_FW="${AR_PATH//\\//}"
-            echo "gcc_fw=$GCC_FW"
-            echo "ar_fw=$AR_FW"
-            cat > .cargo/config.toml \<< EOF
+            echo "gcc_fw=$GCC_FW" >> diagnostics/rustup-info.txt
+            echo "ar_fw=$AR_FW" >> diagnostics/rustup-info.txt
+            cat > .cargo/config.toml \<< 'TOMLEOF'
             [target.x86_64-pc-windows-gnu]
-            ar = "$AR_FW"
-            linker = "$GCC_FW"
-            EOF
-            cat .cargo/config.toml
+            ar = "AR_PLACEHOLDER"
+            linker = "GCC_PLACEHOLDER"
+TOMLEOF
+            sed -i "s|AR_PLACEHOLDER|$AR_FW|g" .cargo/config.toml
+            sed -i "s|GCC_PLACEHOLDER|$GCC_FW|g" .cargo/config.toml
+            echo "=== .cargo/config.toml resultante ===" >> diagnostics/rustup-info.txt
+            cat .cargo/config.toml >> diagnostics/rustup-info.txt
+            cat diagnostics/rustup-info.txt
+      - store_artifacts:
+          path: diagnostics
+          destination: diagnostics
       - run:
           name: "Compilar tts-sidecar"
           command: |
             export PATH="$USERPROFILE/.cargo/bin:$PATH"
             GCC_DIR="$(dirname "$(rustup which gcc --toolchain stable-x86_64-pc-windows-gnu 2>/dev/null)" 2>/dev/null)"
-            if [ -n "$GCC_DIR" ]; then
-              export PATH="$GCC_DIR:$PATH"
-            fi
-            echo "gcc en PATH: $(which gcc 2>/dev/null || echo 'no encontrado')"
+            [ -n "$GCC_DIR" ] && export PATH="$GCC_DIR:$PATH"
+            echo "gcc en PATH: $(which gcc 2>/dev/null || echo 'NO ENCONTRADO')"
+            echo "=== Compilando ===" > diagnostics/build-output.txt
             cargo build --release \
               --manifest-path sidecar/Cargo.toml \
-              --target x86_64-pc-windows-gnu
+              --target x86_64-pc-windows-gnu \
+              2>&1 | tee -a diagnostics/build-output.txt
+            echo "=== Exit code: $? ===" >> diagnostics/build-output.txt
+      - store_artifacts:
+          path: diagnostics/build-output.txt
+          destination: diagnostics
+
       - save_cache:
           key: cargo-win-{{ checksum "sidecar/Cargo.lock" }}
           paths:

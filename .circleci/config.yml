@@ -26,38 +26,45 @@ jobs:
       - run:
           name: "Diagnosticar ubicaciones de rustup"
           command: |
-            echo "=== Variables clave ==="
+            export PATH="$USERPROFILE/.cargo/bin:$PATH"
+            echo "=== Variables ==="
             echo "USERPROFILE=$USERPROFILE"
             echo "LOCALAPPDATA=$LOCALAPPDATA"
-            echo "CARGO_HOME=${CARGO_HOME:-no-set}"
-            echo "RUSTUP_HOME=${RUSTUP_HOME:-no-set}"
+            echo "CARGO_HOME=$CARGO_HOME"
+            echo "RUSTUP_HOME=$RUSTUP_HOME"
             echo ""
-            echo "=== Buscar gcc.exe en todo el disco ==="
-            find /c -name "gcc.exe" 2>/dev/null | head -20
+            echo "=== rustup which ==="
+            rustup which gcc 2>&1 || echo "fallo"
+            rustup which ar 2>&1 || echo "fallo"
             echo ""
-            echo "=== Listar rustup toolchains en USERPROFILE ==="
-            ls "$USERPROFILE/.rustup/toolchains/" 2>/dev/null || echo "NO existe: $USERPROFILE/.rustup/toolchains/"
+            echo "=== Listar USERPROFILE/.rustup/toolchains ==="
+            ls "$USERPROFILE/.rustup/toolchains/" 2>&1 || echo "no existe"
             echo ""
-            echo "=== Listar rustup toolchains en LOCALAPPDATA ==="
-            ls "$LOCALAPPDATA/Rustup/toolchains/" 2>/dev/null || echo "NO existe: $LOCALAPPDATA/Rustup/toolchains/"
+            echo "=== Listar LOCALAPPDATA/Rustup/toolchains ==="
+            ls "$LOCALAPPDATA/Rustup/toolchains/" 2>&1 || echo "no existe"
             echo ""
-            echo "=== Listar CARGO_HOME ==="
-            ls "${CARGO_HOME:-$USERPROFILE/.cargo}/toolchains/" 2>/dev/null || echo "no toolchains en CARGO_HOME"
+            echo "=== Contenido de .cargo/bin (rustup) ==="
+            ls "$USERPROFILE/.cargo/bin/" 2>&1 | head -10
       - run:
-          name: "Crear cargo config con paths correctos"
+          name: "Crear cargo config con rustup which"
           command: |
             export PATH="$USERPROFILE/.cargo/bin:$PATH"
             mkdir -p .cargo
-            # Usar rustup which para obtener la ruta real de gcc
-            GCC_PATH=$(rustup which gcc 2>/dev/null)
-            AR_PATH=$(rustup which ar 2>/dev/null)
-            echo "gcc encontrado en: $GCC_PATH"
-            echo "ar encontrado en: $AR_PATH"
-            # Convertir a forward slashes para TOML
-            GCC_FW="${GCC_PATH//\\\\//}"
-            AR_FW="${AR_PATH//\\\\//}"
-            echo "gcc (fw): $GCC_FW"
-            echo "ar (fw): $AR_FW"
+            GCC_PATH="$(rustup which gcc 2>/dev/null)"
+            AR_PATH="$(rustup which ar 2>/dev/null)"
+            echo "gcc=$GCC_PATH"
+            echo "ar=$AR_PATH"
+            # Si rustup which falló, intentar con la ruta LOCALAPPDATA
+            if [ -z "$GCC_PATH" ]; then
+              echo "rustup which gcc falló, intentando LOCALAPPDATA"
+              GCC_PATH="$LOCALAPPDATA/Rustup/toolchains/stable-x86_64-pc-windows-gnu/bin/gcc.exe"
+              AR_PATH="$LOCALAPPDATA/Rustup/toolchains/stable-x86_64-pc-windows-gnu/bin/ar.exe"
+            fi
+            # Convertir backslashes a forward slashes para TOML
+            GCC_FW="${GCC_PATH//\\//}"
+            AR_FW="${AR_PATH//\\//}"
+            echo "gcc_fw=$GCC_FW"
+            echo "ar_fw=$AR_FW"
             cat > .cargo/config.toml \<< EOF
             [target.x86_64-pc-windows-gnu]
             ar = "$AR_FW"
@@ -68,11 +75,11 @@ jobs:
           name: "Compilar tts-sidecar"
           command: |
             export PATH="$USERPROFILE/.cargo/bin:$PATH"
-            # Agregar el directorio de gcc al PATH para cc-rs
-            GCC_DIR=$(dirname "$(rustup which gcc)")
-            export PATH="$GCC_DIR:$PATH"
-            echo "PATH=${PATH}"
-            echo "gcc disponible: $(which gcc)"
+            GCC_DIR="$(dirname "$(rustup which gcc 2>/dev/null)" 2>/dev/null)"
+            if [ -n "$GCC_DIR" ]; then
+              export PATH="$GCC_DIR:$PATH"
+            fi
+            echo "gcc en PATH: $(which gcc 2>/dev/null || echo 'no encontrado')"
             cargo build --release \
               --manifest-path sidecar/Cargo.toml \
               --target x86_64-pc-windows-gnu

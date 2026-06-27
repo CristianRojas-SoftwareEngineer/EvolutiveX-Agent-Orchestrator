@@ -15,7 +15,7 @@ jobs:
     steps:
       - restore_cache:
           keys:
-            - voice-model-es-MX-claude-high-v1
+            - voice-model-es-MX-claude-high-v2
 
       - run:
           name: "Descargar paquete oficial de sherpa-onnx y extraer todo"

@@ -65,14 +65,22 @@ fn reply(resp: &SpeakResponse) {
 fn play_audio(samples: &[f32], sample_rate: u32) -> Result<(), String> {
     let host = cpal::default_host();
     let device = host.default_output_device().ok_or("no hay dispositivo de audio de salida")?;
-    let config = cpal::StreamConfig {
-        channels: 1,
-        sample_rate: cpal::SampleRate(sample_rate),
-        buffer_size: cpal::BufferSize::Default,
+
+    // Usar la configuración por defecto del dispositivo para evitar incompatibilidades
+    let supported = device.default_output_config()
+        .map_err(|e| format!("default_output_config: {}", e))?;
+
+    // Si el sample rate del modelo no coincide, resamplear
+    let target_rate = supported.sample_rate().0;
+    let target_channels = supported.channels();
+    let samples: Vec<f32> = if sample_rate != target_rate || target_channels != 1 {
+        eprintln!("[tts-sidecar] resampleando {}Hz mono → {}Hz {}ch", sample_rate, target_rate, target_channels);
+        resample_interp(samples, sample_rate, target_rate, target_channels)?
+    } else {
+        samples.to_vec()
     };
 
-    // Copiamos las muestras para moverlas al closure del stream.
-    let samples: Vec<f32> = samples.to_vec();
+    let config = supported.config();
     let mut pos = 0usize;
     let done = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
     let done_clone = done.clone();
@@ -100,13 +108,39 @@ fn play_audio(samples: &[f32], sample_rate: u32) -> Result<(), String> {
 
     stream.play().map_err(|e| format!("stream.play: {}", e))?;
 
-    // Esperar a que se reproduzcan todas las muestras.
     while !done.load(std::sync::atomic::Ordering::Acquire) {
         std::thread::sleep(std::time::Duration::from_millis(10));
     }
-    // Dar tiempo al buffer para vaciarse.
     std::thread::sleep(std::time::Duration::from_millis(100));
     Ok(())
+}
+
+/// Resamplea audio f32 de un sample rate a otro, convirtiendo mono a stereo si es necesario.
+fn resample_interp(samples: &[f32], from_rate: u32, to_rate: u32, channels: u16) -> Result<Vec<f32>, String> {
+    if samples.is_empty() {
+        return Ok(Vec::new());
+    }
+    let ratio = to_rate as f64 / from_rate as f64;
+    let to_len = ((samples.len() as f64) * ratio) as usize;
+    let mut out = Vec::with_capacity(to_len * channels as usize);
+
+    for i in 0..to_len {
+        let src_pos = i as f64 / ratio;
+        let src_idx = src_pos as usize;
+        let frac = src_pos - src_idx as f64;
+
+        let s0 = samples.get(src_idx).copied().unwrap_or(0.0);
+        let s1 = samples.get(src_idx + 1).copied().unwrap_or(s0);
+
+        // Interpolación lineal
+        let sample = s0 * (1.0 - frac) + s1 * frac;
+
+        // Duplicar para stereo si es necesario
+        for _ in 0..channels {
+            out.push(sample);
+        }
+    }
+    Ok(out)
 }
 
 fn main() {

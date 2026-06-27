@@ -30,6 +30,7 @@ struct SpeakCmd {
     cmd: String,
     text: String,
     #[serde(default)]
+    #[allow(dead_code)]
     voice: String,
 }
 

@@ -26,38 +26,46 @@ jobs:
       - run:
           name: "Crear cargo config (GNU toolchain paths)"
           command: |
+            set +e
             export PATH="$USERPROFILE/.cargo/bin:$PATH"
             mkdir -p diagnostics
-            echo "=== Diagnostico de rustup ===" > diagnostics/rustup-info.txt
-            echo "USERPROFILE=$USERPROFILE" >> diagnostics/rustup-info.txt
-            echo "LOCALAPPDATA=$LOCALAPPDATA" >> diagnostics/rustup-info.txt
-            echo "" >> diagnostics/rustup-info.txt
-            echo "=== rustup which gcc (GNU) ===" >> diagnostics/rustup-info.txt
-            rustup which gcc --toolchain stable-x86_64-pc-windows-gnu >> diagnostics/rustup-info.txt 2>&1
-            echo "=== rustup which ar (GNU) ===" >> diagnostics/rustup-info.txt
-            rustup which ar --toolchain stable-x86_64-pc-windows-gnu >> diagnostics/rustup-info.txt 2>&1
-            echo "=== ls toolchains ===" >> diagnostics/rustup-info.txt
-            ls "$USERPROFILE/.rustup/toolchains/" >> diagnostics/rustup-info.txt 2>&1
+            {
+              echo "=== USERPROFILE ==="
+              echo "$USERPROFILE"
+              echo "=== LOCALAPPDATA ==="
+              echo "$LOCALAPPDATA"
+              echo "=== RUSTUP_HOME ==="
+              echo "$RUSTUP_HOME"
+              echo ""
+              echo "=== rustup toolchain list ==="
+              rustup toolchain list 2>&1
+              echo ""
+              echo "=== ls USERPROFILE/.rustup/toolchains ==="
+              ls "$USERPROFILE/.rustup/toolchains/" 2>&1
+              echo ""
+              echo "=== ls toolchain GNU root ==="
+              ls "$USERPROFILE/.rustup/toolchains/stable-x86_64-pc-windows-gnu/" 2>&1
+              echo ""
+              echo "=== ls toolchain GNU bin ==="
+              ls "$USERPROFILE/.rustup/toolchains/stable-x86_64-pc-windows-gnu/bin/" 2>&1
+              echo ""
+              echo "=== rustup which gcc --toolchain stable-x86_64-pc-windows-gnu ==="
+              rustup which gcc --toolchain stable-x86_64-pc-windows-gnu 2>&1
+              echo ""
+              echo "=== rustup which ar --toolchain stable-x86_64-pc-windows-gnu ==="
+              rustup which ar --toolchain stable-x86_64-pc-windows-gnu 2>&1
+            } > diagnostics/rustup-info.txt
             mkdir -p .cargo
-            # Buscar gcc.exe directamente en el directorio bin del toolchain GNU
-            GNU_TOOLCHAIN="$USERPROFILE/.rustup/toolchains/stable-x86_64-pc-windows-gnu/bin"
-            echo "=== Listar contenido de $GNU_TOOLCHAIN ===" >> diagnostics/rustup-info.txt
-            ls "$GNU_TOOLCHAIN/" >> diagnostics/rustup-info.txt 2>&1
-            GCC_PATH="$GNU_TOOLCHAIN/gcc.exe"
-            AR_PATH="$GNU_TOOLCHAIN/ar.exe"
-            echo "gcc_path=$GCC_PATH" >> diagnostics/rustup-info.txt
-            echo "ar_path=$AR_PATH" >> diagnostics/rustup-info.txt
-            if [ ! -f "$GCC_PATH" ]; then
-              echo "ERROR: gcc.exe no existe en $GCC_PATH" >> diagnostics/rustup-info.txt
-            fi
+            GCC_PATH="$USERPROFILE/.rustup/toolchains/stable-x86_64-pc-windows-gnu/bin/gcc.exe"
+            AR_PATH="$USERPROFILE/.rustup/toolchains/stable-x86_64-pc-windows-gnu/bin/ar.exe"
             GCC_FW="${GCC_PATH//\\//}"
             AR_FW="${AR_PATH//\\//}"
-            echo "gcc_fw=$GCC_FW" >> diagnostics/rustup-info.txt
-            echo "ar_fw=$AR_FW" >> diagnostics/rustup-info.txt
-            # Escribir el TOML usando printf para evitar problemas con heredocs
             printf '[target.x86_64-pc-windows-gnu]\nar = "%s"\nlinker = "%s"\n' "$AR_FW" "$GCC_FW" > .cargo/config.toml
-            echo "=== .cargo/config.toml resultante ===" >> diagnostics/rustup-info.txt
-            cat .cargo/config.toml >> diagnostics/rustup-info.txt
+            {
+              echo ""
+              echo "=== .cargo/config.toml ==="
+              cat .cargo/config.toml
+            } >> diagnostics/rustup-info.txt
             cat diagnostics/rustup-info.txt
       - store_artifacts:
           path: diagnostics
@@ -65,22 +73,24 @@ jobs:
       - run:
           name: "Compilar tts-sidecar"
           command: |
+            set +e
             export PATH="$USERPROFILE/.cargo/bin:$PATH"
             GNU_TOOLCHAIN="$USERPROFILE/.rustup/toolchains/stable-x86_64-pc-windows-gnu/bin"
             export PATH="$GNU_TOOLCHAIN:$PATH"
-            echo "gcc en PATH: $(which gcc 2>/dev/null || echo 'NO ENCONTRADO')"
-            echo "gcc version:" >> diagnostics/build-output.txt
-            gcc --version >> diagnostics/build-output.txt 2>&1
-            echo "=== Compilando ===" >> diagnostics/build-output.txt
+            mkdir -p diagnostics
+            {
+              echo "gcc en PATH: $(which gcc 2>/dev/null || echo 'NO ENCONTRADO')"
+              echo "gcc version:"
+              gcc --version 2>&1 || echo "gcc falló"
+            } > diagnostics/build-output.txt
             cargo build --release \
               --manifest-path sidecar/Cargo.toml \
               --target x86_64-pc-windows-gnu \
               2>&1 | tee -a diagnostics/build-output.txt
-            echo "=== Exit code: $? ===" >> diagnostics/build-output.txt
+            echo "Exit code: $?" >> diagnostics/build-output.txt
       - store_artifacts:
           path: diagnostics/build-output.txt
           destination: diagnostics
-
       - save_cache:
           key: cargo-win-{{ checksum "sidecar/Cargo.lock" }}
           paths:

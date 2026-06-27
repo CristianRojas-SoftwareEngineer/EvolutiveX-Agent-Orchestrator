@@ -15,18 +15,23 @@ jobs:
             - cargo-win-{{ checksum "sidecar/Cargo.lock" }}
             - cargo-win-
       - run:
-          name: "Instalar Rust y toolchain MinGW"
+          name: "Instalar Rust toolchain MinGW"
           command: |
-            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
-              | sh -s -- -y --default-toolchain stable
-            # Instalar target GNU (MinGW) — incluye gcc del entorno GNU de Windows
-            rustup target add x86_64-pc-windows-gnu
+            # Descargar rustup-init.exe directamente
+            curl --proto '=https' --tlsv1.2 -sSf https://win.rustup.rs -o rustup-init.exe
+            # Instalar en modo standalone (no detecta otras instalaciones)
+            ./rustup-init.exe -y --default-toolchain stable
+            # El instalador de rustup para Windows pone rustup en %USERPROFILE%\.cargo\bin
+            # Agregarlo al PATH para los siguientes pasos
+            export PATH="$USERPROFILE/.cargo/bin:$PATH"
+            # Instalar el toolchain MinGW (GNU) que incluye gcc
             rustup toolchain install stable-x86_64-pc-windows-gnu
+            # Agregar el target
+            rustup target add x86_64-pc-windows-gnu
       - run:
-          name: "Compilar tts-sidecar con MinGW"
+          name: "Compilar tts-sidecar"
           command: |
             export PATH="$USERPROFILE/.cargo/bin:$PATH"
-            # Usar rustup para invocar cargo con el toolchain MinGW
             rustup run stable-x86_64-pc-windows-gnu cargo build --release \
               --manifest-path sidecar/Cargo.toml \
               --target x86_64-pc-windows-gnu

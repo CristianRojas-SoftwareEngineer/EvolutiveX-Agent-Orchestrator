@@ -251,7 +251,8 @@ jobs:
             Copy-Item -Recurse "vendor\tts-sidecar\voices\es_MX-claude-high" `
               "staging\windows-amd64\vendor\tts-sidecar\voices\"
             $ProgressPreference = "SilentlyContinue"
-            Compress-Archive -Path staging\windows-amd64\* -DestinationPath windows-amd64.zip -Force
+            # Comprimir desde el padre de staging para que windows-amd64/ sea la raíz del ZIP
+            Compress-Archive -Path staging\windows-amd64 -DestinationPath windows-amd64.zip -Force
             $hash = (Get-FileHash windows-amd64.zip -Algorithm SHA256).Hash.ToLower()
             "windows-amd64=$hash" | Out-File windows-amd64.sha256.txt -Encoding ascii
       - store_artifacts:

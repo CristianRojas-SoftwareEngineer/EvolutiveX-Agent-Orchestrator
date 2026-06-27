@@ -6,11 +6,15 @@ jobs:
   # ─────────────────────────────────────────────────────────────────
   # Linux x86_64
   # ─────────────────────────────────────────────────────────────────
-  build-linux:
+  tts-sidecar-linux-x86_64:
     docker:
       - image: cimg/rust:1.88.0
     resource_class: medium
     working_directory: ~/EvolutiveX-Agent-Orchestrator
+    environment:
+      CARGO_HOME: ~/.cargo
+    retention:
+      caches: 1d
     steps:
       - checkout
       - restore_cache:
@@ -18,16 +22,16 @@ jobs:
             - cargo-linux-{{ checksum "sidecar/Cargo.lock" }}
             - cargo-linux-
       - run:
-          name: "Instalar dependencias del sistema"
+          name: "Instalar dependencias del sistema (espeak-ng, libasound2)"
           command: |
             sudo apt-get update -qq
             sudo apt-get install -y -qq zip libasound2-dev libespeak-ng-dev espeak-ng-data
       - run:
-          name: "Agregar target x86_64-unknown-linux-gnu"
+          name: "Agregar target Rust x86_64-unknown-linux-gnu"
           command: |
             rustup target add x86_64-unknown-linux-gnu
       - run:
-          name: "Compilar tts-sidecar"
+          name: "Compilar tts-sidecar (release, x86_64-unknown-linux-gnu)"
           command: |
             cargo build --release \
               --manifest-path sidecar/Cargo.toml \
@@ -39,7 +43,7 @@ jobs:
             - ~/.cargo/git
             - sidecar/target
       - run:
-          name: "Empaquetar artefacto"
+          name: "Empaquetar binario y dependencias (Linux)"
           command: |
             mkdir -p staging
             cp sidecar/target/x86_64-unknown-linux-gnu/release/tts-sidecar staging/
@@ -61,11 +65,16 @@ jobs:
   # ─────────────────────────────────────────────────────────────────
   # Windows x86_64 (MSVC, sin gcc externo)
   # ─────────────────────────────────────────────────────────────────
-  build-windows:
+  tts-sidecar-windows-x86_64:
     machine:
       image: windows-server-2022-gui:current
       shell: bash.exe
     resource_class: windows.medium
+    environment:
+      CARGO_HOME: C:\Users\circleci\.cargo
+      RUSTUP_HOME: C:\Users\circleci\.rustup
+    retention:
+      caches: 1d
     steps:
       - checkout
       - restore_cache:
@@ -77,11 +86,9 @@ jobs:
             - cargo-win-target-{{ checksum "sidecar/Cargo.lock" }}
             - cargo-win-target-
       - run:
-          name: "Instalar Rust si no está en caché"
+          name: "Instalar Rust toolchain y target MSVC"
           shell: powershell.exe
           command: |
-            $env:CARGO_HOME = "$env:USERPROFILE\.cargo"
-            $env:RUSTUP_HOME = "$env:USERPROFILE\.rustup"
             $env:PATH = "$env:CARGO_HOME\bin;$env:PATH"
             if (-not (Test-Path "$env:CARGO_HOME\bin\rustc.exe")) {
               Invoke-WebRequest -Uri https://win.rustup.rs -OutFile rustup-init.exe
@@ -89,22 +96,16 @@ jobs:
               rustup toolchain install stable --target x86_64-pc-windows-msvc
             }
       - run:
-          name: "Verificar Rust"
+          name: "Verificar instalación de Rust"
           shell: powershell.exe
           command: |
-            $env:CARGO_HOME = "$env:USERPROFILE\.cargo"
-            $env:RUSTUP_HOME = "$env:USERPROFILE\.rustup"
             $env:PATH = "$env:CARGO_HOME\bin;$env:PATH"
-            echo "CARGO_HOME: $env:CARGO_HOME"
-            echo "RUSTUP_HOME: $env:RUSTUP_HOME"
             rustc --version
             cargo --version
       - run:
-          name: "Compilar tts-sidecar"
+          name: "Compilar tts-sidecar (release, x86_64-pc-windows-msvc)"
           shell: powershell.exe
           command: |
-            $env:CARGO_HOME = "$env:USERPROFILE\.cargo"
-            $env:RUSTUP_HOME = "$env:USERPROFILE\.rustup"
             $env:PATH = "$env:CARGO_HOME\bin;$env:PATH"
             cargo build --release `
               --manifest-path sidecar/Cargo.toml `
@@ -119,10 +120,10 @@ jobs:
           paths:
             - sidecar\target
       - run:
-          name: "Empaquetar artefacto"
+          name: "Empaquetar binario y dependencias (Windows)"
           shell: powershell.exe
           command: |
-            $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
+            $env:PATH = "$env:CARGO_HOME\bin;$env:PATH"
             New-Item -ItemType Directory -Force -Path staging | Out-Null
             Copy-Item sidecar\target\x86_64-pc-windows-msvc\release\tts-sidecar.exe staging\
             $ProgressPreference = "SilentlyContinue"
@@ -137,11 +138,16 @@ jobs:
   # ─────────────────────────────────────────────────────────────────
   # macOS Universal (arm64 + x86_64)
   # ─────────────────────────────────────────────────────────────────
-  build-macos-universal:
+  tts-sidecar-macos-universal:
     macos:
       xcode: "16.4.0"
     resource_class: m4pro.medium
     working_directory: ~/EvolutiveX-Agent-Orchestrator
+    environment:
+      CARGO_HOME: ~/.cargo
+      RUSTUP_HOME: ~/.rustup
+    retention:
+      caches: 1d
     steps:
       - checkout
       - restore_cache:
@@ -149,24 +155,24 @@ jobs:
             - cargo-macos-{{ checksum "sidecar/Cargo.lock" }}
             - cargo-macos-
       - run:
-          name: "Instalar Rust si no está en caché"
+          name: "Instalar Rust toolchain y targets Apple Darwin"
           command: |
             if ! command -v rustup &> /dev/null; then
               curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
                 | sh -s -- -y
+              source $HOME/.cargo/env
+              rustup target add aarch64-apple-darwin x86_64-apple-darwin
             fi
             echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> $BASH_ENV
-            source $HOME/.cargo/env
-            rustup target add aarch64-apple-darwin x86_64-apple-darwin
       - run:
-          name: "Compilar aarch64-apple-darwin (nativo)"
+          name: "Compilar tts-sidecar (release, aarch64-apple-darwin)"
           command: |
             source $HOME/.cargo/env
             cargo build --release \
               --manifest-path sidecar/Cargo.toml \
               --target aarch64-apple-darwin
       - run:
-          name: "Compilar x86_64-apple-darwin (cross-compilation)"
+          name: "Compilar tts-sidecar (release, x86_64-apple-darwin)"
           command: |
             source $HOME/.cargo/env
             cargo build --release \
@@ -181,7 +187,7 @@ jobs:
             - ~/.rustup
             - sidecar/target
       - run:
-          name: "Crear Universal Binary con lipo"
+          name: "Crear Universal Binary (lipo)"
           command: |
             lipo -create \
               sidecar/target/aarch64-apple-darwin/release/tts-sidecar \
@@ -189,7 +195,7 @@ jobs:
               -output tts-sidecar-macos-universal
             lipo -info tts-sidecar-macos-universal
       - run:
-          name: "Empaquetar artefacto"
+          name: "Empaquetar binario y dependencias (macOS Universal)"
           command: |
             tar -czf tts-sidecar-macos-universal.tar.gz tts-sidecar-macos-universal
             shasum -a 256 tts-sidecar-macos-universal.tar.gz \
@@ -203,6 +209,6 @@ jobs:
 workflows:
   build-all:
     jobs:
-      - build-linux
-      - build-windows
-      - build-macos-universal
+      - tts-sidecar-linux-x86_64
+      - tts-sidecar-windows-x86_64
+      - tts-sidecar-macos-universal

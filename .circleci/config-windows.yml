@@ -17,21 +17,20 @@ jobs:
       - run:
           name: "Instalar Rust toolchain MinGW"
           command: |
-            # Descargar rustup-init.exe directamente
             curl --proto '=https' --tlsv1.2 -sSf https://win.rustup.rs -o rustup-init.exe
-            # Instalar en modo standalone (no detecta otras instalaciones)
             ./rustup-init.exe -y --default-toolchain stable
-            # El instalador de rustup para Windows pone rustup en %USERPROFILE%\.cargo\bin
-            # Agregarlo al PATH para los siguientes pasos
             export PATH="$USERPROFILE/.cargo/bin:$PATH"
-            # Instalar el toolchain MinGW (GNU) que incluye gcc
+            # Forzar default host triple a GNU para evitar que el settings.toml lo sobreescriba
+            rustup set default-host x86_64-pc-windows-gnu
             rustup toolchain install stable-x86_64-pc-windows-gnu
-            # Agregar el target
-            rustup target add x86_64-pc-windows-gnu
+            rustup target add x86_64-pc-windows-gnu --toolchain stable-x86_64-pc-windows-gnu
       - run:
           name: "Compilar tts-sidecar"
           command: |
             export PATH="$USERPROFILE/.cargo/bin:$PATH"
+            GCC_PATH="$USERPROFILE/.rustup/toolchains/stable-x86_64-pc-windows-gnu/bin"
+            # cc-rs busca gcc.exe — apuntar CC directamente al gcc del toolchain GNU
+            export CC="$GCC_PATH/gcc.exe"
             rustup run stable-x86_64-pc-windows-gnu cargo build --release \
               --manifest-path sidecar/Cargo.toml \
               --target x86_64-pc-windows-gnu

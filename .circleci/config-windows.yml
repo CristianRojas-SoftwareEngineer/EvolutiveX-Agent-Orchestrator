@@ -1,0 +1,56 @@
+# CircleCI CI — tts-sidecar
+# Job: Windows x86_64
+version: 2.1
+
+jobs:
+  build-windows:
+    machine:
+      image: windows-server-2022-gui:current
+    resource_class: windows.medium
+    working_directory: ~/EvolutiveX-Agent-Orchestrator
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - cargo-win-{{ checksum "sidecar/Cargo.lock" }}
+            - cargo-win-
+      - run:
+          name: "Instalar Rust via rustup"
+          command: |
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+              | sh -s -- -y --default-toolchain stable
+            echo 'export PATH="$USERPROFILE/.cargo/bin:$PATH"' >> $BASH_ENV
+      - run:
+          name: "Agregar target x86_64-pc-windows-msvc"
+          command: |
+            source $BASH_ENV
+            rustup target add x86_64-pc-windows-msvc
+      - run:
+          name: "Compilar tts-sidecar"
+          command: |
+            source $BASH_ENV
+            cargo build --release \
+              --manifest-path sidecar/Cargo.toml \
+              --target x86_64-pc-windows-msvc
+      - save_cache:
+          key: cargo-win-{{ checksum "sidecar/Cargo.lock" }}
+          paths:
+            - C:\Users\circleci\.cargo\registry
+            - C:\Users\circleci\.cargo\git
+      - run:
+          name: "Empaquetar artefacto"
+          command: |
+            mkdir -p staging
+            cp sidecar/target/x86_64-pc-windows-msvc/release/tts-sidecar.exe staging/
+            cd staging && zip -r ../tts-sidecar-windows-x86_64.zip . && cd ..
+            sha256sum tts-sidecar-windows-x86_64.zip | awk '{print "windows-x86_64=" $1}' \
+              > tts-sidecar-windows-x86_64.sha256.txt
+      - store_artifacts:
+          path: tts-sidecar-windows-x86_64.zip
+      - store_artifacts:
+          path: tts-sidecar-windows-x86_64.sha256.txt
+
+workflows:
+  build-windows:
+    jobs:
+      - build-windows

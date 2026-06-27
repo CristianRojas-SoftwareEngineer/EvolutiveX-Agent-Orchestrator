@@ -1,0 +1,70 @@
+# CircleCI CI — tts-sidecar
+# Job: macOS Universal Binary (arm64 + x86_64)
+#
+# AVISO: macOS puede no estar disponible en el plan free de CircleCI.
+# Si el job falla con "resource class not available", el plan no incluye macOS.
+version: 2.1
+
+jobs:
+  build-macos-universal:
+    macos:
+      xcode: "16.4.0"
+    resource_class: m4pro.medium
+    working_directory: ~/EvolutiveX-Agent-Orchestrator
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - cargo-macos-{{ checksum "sidecar/Cargo.lock" }}
+            - cargo-macos-
+      - run:
+          name: "Instalar Rust y targets"
+          command: |
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+              | sh -s -- -y
+            echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> $BASH_ENV
+            source $HOME/.cargo/env
+            rustup target add aarch64-apple-darwin x86_64-apple-darwin
+      - run:
+          name: "Compilar aarch64-apple-darwin (nativo)"
+          command: |
+            source $HOME/.cargo/env
+            cargo build --release \
+              --manifest-path sidecar/Cargo.toml \
+              --target aarch64-apple-darwin
+      - run:
+          name: "Compilar x86_64-apple-darwin (cross-compilation)"
+          command: |
+            source $HOME/.cargo/env
+            cargo build --release \
+              --manifest-path sidecar/Cargo.toml \
+              --target x86_64-apple-darwin
+      - save_cache:
+          key: cargo-macos-{{ checksum "sidecar/Cargo.lock" }}
+          paths:
+            - ~/.cargo/registry
+            - ~/.cargo/git
+      - run:
+          name: "Crear Universal Binary con lipo"
+          command: |
+            lipo -create \
+              sidecar/target/aarch64-apple-darwin/release/tts-sidecar \
+              sidecar/target/x86_64-apple-darwin/release/tts-sidecar \
+              -output tts-sidecar-macos-universal
+            lipo -info tts-sidecar-macos-universal
+      - run:
+          name: "Empaquetar artefacto"
+          command: |
+            tar -czf tts-sidecar-macos-universal.tar.gz tts-sidecar-macos-universal
+            shasum -a 256 tts-sidecar-macos-universal.tar.gz \
+              | awk '{print "macos-universal=" $1}' \
+              > tts-sidecar-macos-universal.sha256.txt
+      - store_artifacts:
+          path: tts-sidecar-macos-universal.tar.gz
+      - store_artifacts:
+          path: tts-sidecar-macos-universal.sha256.txt
+
+workflows:
+  build-macos-universal:
+    jobs:
+      - build-macos-universal

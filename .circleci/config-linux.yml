@@ -1,0 +1,61 @@
+# CircleCI CI — tts-sidecar
+# Job: Linux x86_64
+version: 2.1
+
+jobs:
+  build-linux:
+    docker:
+      - image: cimg/rust:1.86.0
+    resource_class: medium
+    working_directory: ~/EvolutiveX-Agent-Orchestrator
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - cargo-linux-{{ checksum "sidecar/Cargo.lock" }}
+            - cargo-linux-
+      - run:
+          name: "Instalar dependencias del sistema"
+          command: |
+            apt-get update -qq
+            apt-get install -y -qq zip libasound2-dev libespeak-ng-dev espeak-ng-data
+      - run:
+          name: "Agregar target x86_64-unknown-linux-gnu"
+          command: |
+            rustup target add x86_64-unknown-linux-gnu
+      - run:
+          name: "Compilar tts-sidecar"
+          command: |
+            cargo build --release \
+              --manifest-path sidecar/Cargo.toml \
+              --target x86_64-unknown-linux-gnu
+      - save_cache:
+          key: cargo-linux-{{ checksum "sidecar/Cargo.lock" }}
+          paths:
+            - ~/.cargo/registry
+            - ~/.cargo/git
+            - sidecar/target
+      - run:
+          name: "Empaquetar artefacto"
+          command: |
+            mkdir -p staging
+            cp sidecar/target/x86_64-unknown-linux-gnu/release/tts-sidecar staging/
+            LIB_PATH=$(find /usr -name "libespeak-ng.so*" | head -1)
+            [ -n "$LIB_PATH" ] && cp "$LIB_PATH" staging/libespeak-ng.so.1
+            if [ -d "/usr/lib/x86_64-linux-gnu/espeak-ng-data" ]; then
+              cp -r "/usr/lib/x86_64-linux-gnu/espeak-ng-data" staging/
+            elif [ -d "/usr/share/espeak-ng-data" ]; then
+              cp -r "/usr/share/espeak-ng-data" staging/
+            fi
+            cd staging && zip -r ../tts-sidecar-linux-x86_64.zip . && cd ..
+            sha256sum tts-sidecar-linux-x86_64.zip | awk '{print "linux-x86_64=" $1}' \
+              > tts-sidecar-linux-x86_64.sha256.txt
+      - store_artifacts:
+          path: tts-sidecar-linux-x86_64.zip
+      - store_artifacts:
+          path: tts-sidecar-linux-x86_64.sha256.txt
+
+workflows:
+  build-linux:
+    jobs:
+      - build-linux

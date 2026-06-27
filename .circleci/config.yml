@@ -1,61 +1,39 @@
-# CircleCI CI — tts-sidecar
-# Job: Windows x86_64
 version: 2.1
 
 jobs:
   build-windows:
     machine:
       image: windows-server-2022-gui:current
+      shell: bash.exe
     resource_class: windows.medium
-    working_directory: C:/Users/circleci/EvolutiveX-Agent-Orchestrator
-    environment:
-      CARGO_HOME: C:/Users/circleci/.cargo
-      RUSTUP_HOME: C:/Users/circleci/.rustup
     steps:
       - checkout
-      - restore_cache:
-          keys:
-            - cargo-win-{{ checksum "sidecar/Cargo.lock" }}
-            - cargo-win-
       - run:
-          name: "Instalar Rust toolchain GNU"
+          name: "Instalar Rust"
+          shell: powershell.exe
           command: |
-            curl --proto '=https' --tlsv1.2 -sSf https://win.rustup.rs -o rustup-init.exe
-            ./rustup-init.exe -y --default-toolchain stable
-            rustup toolchain install stable-x86_64-pc-windows-gnu
-            rustup target add x86_64-pc-windows-gnu --toolchain stable-x86_64-pc-windows-gnu
+            Invoke-WebRequest -Uri https://win.rustup.rs -OutFile rustup-init.exe
+            .\rustup-init.exe -y --default-toolchain stable --target x86_64-pc-windows-msvc
+            $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
       - run:
-          name: "Instalar MinGW"
+          name: "Verificar instalación"
+          shell: powershell.exe
           command: |
-            choco install mingw -y --no-progress
+            $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
+            rustc --version
+            cargo --version
       - run:
           name: "Compilar tts-sidecar"
+          shell: powershell.exe
           command: |
-            export PATH="C:/tools/mingw64/bin:C:/Users/circleci/.cargo/bin:$PATH"
-            export CC=gcc
-            export AR=ar
-            cargo build --release \
-              --manifest-path sidecar/Cargo.toml \
-              --target x86_64-pc-windows-gnu
-      - save_cache:
-          key: cargo-win-{{ checksum "sidecar/Cargo.lock" }}
-          paths:
-            - C:/Users/circleci/.cargo/registry
-            - C:/Users/circleci/.cargo/git
-      - run:
-          name: "Empaquetar"
-          command: |
-            mkdir -p staging
-            cp sidecar/target/x86_64-pc-windows-gnu/release/tts-sidecar.exe staging/
-            cd staging && zip -r ../tts-sidecar-windows-x86_64.zip . && cd ..
-            sha256sum tts-sidecar-windows-x86_64.zip | awk '{print "windows-x86_64=" $1}' \
-              > tts-sidecar-windows-x86_64.sha256.txt
+            $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
+            cargo build --release `
+              --manifest-path sidecar/Cargo.toml `
+              --target x86_64-pc-windows-msvc
       - store_artifacts:
-          path: tts-sidecar-windows-x86_64.zip
-      - store_artifacts:
-          path: tts-sidecar-windows-x86_64.sha256.txt
+          path: sidecar\target\x86_64-pc-windows-msvc\release\tts-sidecar.exe
 
 workflows:
-  build-windows:
+  build-all:
     jobs:
       - build-windows

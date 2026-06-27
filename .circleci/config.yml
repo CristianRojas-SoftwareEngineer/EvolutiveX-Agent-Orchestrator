@@ -204,19 +204,11 @@ jobs:
           paths:
             - sidecar\target
       - run:
-          name: "Descargar espeak-ng (dll + data)"
+          name: "Instalar espeak-ng vía chocolatey"
           shell: powershell.exe
           command: |
             $ProgressPreference = "SilentlyContinue"
-            $espeakVersion = "1.52.0"
-            $espeakUrl = "https://github.com/espeak-ng/espeak-ng/releases/download/$espeakVersion/espeak-ng.msi"
-            Invoke-WebRequest -Uri $espeakUrl -OutFile espeak-ng.msi
-            New-Item -ItemType Directory -Force -Path espeak-ext | Out-Null
-            msiexec /a espeak-ng.msi /qb TARGETDIR="$PWD\espeak-ext"
-            Get-ChildItem -Recurse espeak-ext -Name | Out-File espeak-contents.txt
-            Write-Host "=== Contenido de espeak-ext ==="
-            Get-Content espeak-contents.txt
-            Write-Host "=== Fin ==="
+            choco install -y espeak-ng
       - run:
           name: "Empaquetar binario y dependencias (Windows)"
           shell: powershell.exe
@@ -224,15 +216,9 @@ jobs:
             $env:PATH = "$env:CARGO_HOME\bin;$env:PATH"
             New-Item -ItemType Directory -Force -Path staging/windows-amd64 | Out-Null
             Copy-Item sidecar\target\x86_64-pc-windows-msvc\release\tts-sidecar.exe staging\windows-amd64\
-            # Copiar libespeak-ng.dll y espeak-ng-data/ desde el MSI extraído
-            $espeakDll = Get-ChildItem -Path espeak-ext -Recurse -Name "libespeak-ng.dll" | Select-Object -First 1
-            if ($espeakDll) {
-              Copy-Item "espeak-ext\$espeakDll" "staging\windows-amd64\libespeak-ng.dll"
-            }
-            $espeakData = Get-ChildItem -Path espeak-ext -Directory -Name "espeak-ng-data" | Select-Object -First 1
-            if ($espeakData) {
-              Copy-Item -Recurse "espeak-ext\$espeakData" "staging\windows-amd64\"
-            }
+            # Copiar libespeak-ng.dll y espeak-ng-data/ desde instalación de chocolatey
+            Copy-Item "C:\Program Files\eSpeak NG\libespeak-ng.dll" "staging\windows-amd64\libespeak-ng.dll" -ErrorAction SilentlyContinue
+            Copy-Item -Recurse "C:\Program Files\eSpeak NG\espeak-ng-data" "staging\windows-amd64\" -ErrorAction SilentlyContinue
             # Incluir modelo de voz desde workspace
             New-Item -ItemType Directory -Force -Path "staging\windows-amd64\vendor\tts-sidecar\voices" | Out-Null
             Copy-Item -Recurse "vendor\tts-sidecar\voices\es_MX-claude-high" `

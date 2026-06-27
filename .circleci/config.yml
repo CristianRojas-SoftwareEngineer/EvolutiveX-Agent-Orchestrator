@@ -115,31 +115,40 @@ jobs:
           name: "Instalar Rust si no está en caché"
           shell: powershell.exe
           command: |
-            if (-not (Test-Path "$env:USERPROFILE\.cargo\bin\rustc.exe")) {
+            $env:CARGO_HOME = "$env:USERPROFILE\.cargo"
+            $env:RUSTUP_HOME = "$env:USERPROFILE\.rustup"
+            $env:PATH = "$env:CARGO_HOME\bin;$env:PATH"
+            if (-not (Test-Path "$env:CARGO_HOME\bin\rustc.exe")) {
               Invoke-WebRequest -Uri https://win.rustup.rs -OutFile rustup-init.exe
-              .\rustup-init.exe -y --default-toolchain stable --target x86_64-pc-windows-msvc
+              .\rustup-init.exe -y --default-toolchain stable --profile minimal
+              rustup toolchain install stable --target x86_64-pc-windows-msvc
             }
-            $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
       - run:
           name: "Verificar Rust"
           shell: powershell.exe
           command: |
-            $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
+            $env:CARGO_HOME = "$env:USERPROFILE\.cargo"
+            $env:RUSTUP_HOME = "$env:USERPROFILE\.rustup"
+            $env:PATH = "$env:CARGO_HOME\bin;$env:PATH"
+            echo "CARGO_HOME: $env:CARGO_HOME"
+            echo "RUSTUP_HOME: $env:RUSTUP_HOME"
             rustc --version
             cargo --version
       - run:
           name: "Compilar tts-sidecar"
           shell: powershell.exe
           command: |
-            $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
+            $env:CARGO_HOME = "$env:USERPROFILE\.cargo"
+            $env:RUSTUP_HOME = "$env:USERPROFILE\.rustup"
+            $env:PATH = "$env:CARGO_HOME\bin;$env:PATH"
             cargo build --release `
               --manifest-path sidecar/Cargo.toml `
               --target x86_64-pc-windows-msvc
       - save_cache:
           key: cargo-win-registry-{{ checksum "sidecar/Cargo.lock" }}
           paths:
-            - C:\Users\CircleCI\.cargo\registry
-            - C:\Users\CircleCI\.cargo\git
+            - C:/Users/circleci/.cargo/registry
+            - C:/Users/circleci/.cargo/git
       - save_cache:
           key: cargo-win-target-{{ checksum "sidecar/Cargo.lock" }}
           paths:

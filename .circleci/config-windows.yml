@@ -15,11 +15,13 @@ jobs:
             - cargo-win-{{ checksum "sidecar/Cargo.lock" }}
             - cargo-win-
       - run:
-          name: "Instalar Rust via rustup"
+          name: "Instalar Rust y MinGW"
           command: |
             curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
               | sh -s -- -y --default-toolchain stable
             echo 'export PATH="$USERPROFILE/.cargo/bin:$PATH"' >> $BASH_ENV
+            # MinGW provee gcc.exe necesario para compilar crates con código C (bzip2-sys, etc.)
+            choco install -y mingw --no-progress
       - run:
           name: "Agregar target x86_64-pc-windows-msvc"
           command: |

@@ -80,6 +80,10 @@ jobs:
           name: "Diagnosticar estado de caché"
           shell: powershell.exe
           command: |
+            echo "USERPROFILE: $env:USERPROFILE"
+            echo "CARGO_HOME: $env:CARGO_HOME"
+            echo "USERNAME: $env:USERNAME"
+            whoami
             $cargoHome = "$env:USERPROFILE\.cargo"
             $paths = @(
               "$cargoHome\registry",
@@ -93,6 +97,18 @@ jobs:
                 echo "EXISTS: $p ($count items)"
               } else {
                 echo "MISSING: $p"
+              }
+            }
+            # Also check the hardcoded paths we tried to cache
+            $hardcoded = @(
+              "C:\Users\circleci\.cargo",
+              "C:\Users\CircleCI\.cargo"
+            )
+            foreach ($p in $hardcoded) {
+              if (Test-Path $p) {
+                echo "EXISTS (hardcoded): $p"
+              } else {
+                echo "MISSING (hardcoded): $p"
               }
             }
       - run:
@@ -122,8 +138,8 @@ jobs:
       - save_cache:
           key: cargo-win-registry-{{ checksum "sidecar/Cargo.lock" }}
           paths:
-            - C:\Users\circleci\.cargo\registry
-            - C:\Users\circleci\.cargo\git
+            - C:\Users\CircleCI\.cargo\registry
+            - C:\Users\CircleCI\.cargo\git
       - save_cache:
           key: cargo-win-target-{{ checksum "sidecar/Cargo.lock" }}
           paths:

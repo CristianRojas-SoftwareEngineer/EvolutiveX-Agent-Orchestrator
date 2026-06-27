@@ -127,7 +127,7 @@ fn resample_interp(samples: &[f32], from_rate: u32, to_rate: u32, channels: u16)
     for i in 0..to_len {
         let src_pos = i as f64 / ratio;
         let src_idx = src_pos as usize;
-        let frac = src_pos - src_idx as f64;
+        let frac = (src_pos - src_idx as f64) as f32;
 
         let s0 = samples.get(src_idx).copied().unwrap_or(0.0);
         let s1 = samples.get(src_idx + 1).copied().unwrap_or(s0);

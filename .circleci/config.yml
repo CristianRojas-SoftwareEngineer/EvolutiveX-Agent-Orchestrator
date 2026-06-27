@@ -45,13 +45,8 @@ jobs:
             AR_FW="${AR_PATH//\\//}"
             echo "gcc_fw=$GCC_FW" >> diagnostics/rustup-info.txt
             echo "ar_fw=$AR_FW" >> diagnostics/rustup-info.txt
-            cat > .cargo/config.toml \<< 'TOMLEOF'
-            [target.x86_64-pc-windows-gnu]
-            ar = "AR_PLACEHOLDER"
-            linker = "GCC_PLACEHOLDER"
-TOMLEOF
-            sed -i "s|AR_PLACEHOLDER|$AR_FW|g" .cargo/config.toml
-            sed -i "s|GCC_PLACEHOLDER|$GCC_FW|g" .cargo/config.toml
+            # Escribir el TOML usando printf para evitar problemas con heredocs
+            printf '[target.x86_64-pc-windows-gnu]\nar = "%s"\nlinker = "%s"\n' "$AR_FW" "$GCC_FW" > .cargo/config.toml
             echo "=== .cargo/config.toml resultante ===" >> diagnostics/rustup-info.txt
             cat .cargo/config.toml >> diagnostics/rustup-info.txt
             cat diagnostics/rustup-info.txt

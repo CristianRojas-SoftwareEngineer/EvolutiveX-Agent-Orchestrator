@@ -70,8 +70,31 @@ jobs:
       - checkout
       - restore_cache:
           keys:
-            - cargo-win-{{ checksum "sidecar/Cargo.lock" }}
-            - cargo-win-
+            - cargo-win-registry-{{ checksum "sidecar/Cargo.lock" }}
+            - cargo-win-registry-
+      - restore_cache:
+          keys:
+            - cargo-win-target-{{ checksum "sidecar/Cargo.lock" }}
+            - cargo-win-target-
+      - run:
+          name: "Diagnosticar estado de caché"
+          shell: powershell.exe
+          command: |
+            $cargoHome = "$env:USERPROFILE\.cargo"
+            $paths = @(
+              "$cargoHome\registry",
+              "$cargoHome\git",
+              "$cargoHome\bin",
+              "$env:USERPROFILE\.rustup"
+            )
+            foreach ($p in $paths) {
+              if (Test-Path $p) {
+                $count = (Get-ChildItem $p -Recurse -ErrorAction SilentlyContinue | Measure-Object).Count
+                echo "EXISTS: $p ($count items)"
+              } else {
+                echo "MISSING: $p"
+              }
+            }
       - run:
           name: "Instalar Rust si no está en caché"
           shell: powershell.exe
@@ -97,12 +120,13 @@ jobs:
               --manifest-path sidecar/Cargo.toml `
               --target x86_64-pc-windows-msvc
       - save_cache:
-          key: cargo-win-{{ checksum "sidecar/Cargo.lock" }}
+          key: cargo-win-registry-{{ checksum "sidecar/Cargo.lock" }}
           paths:
             - C:\Users\circleci\.cargo\registry
             - C:\Users\circleci\.cargo\git
-            - C:\Users\circleci\.cargo\bin
-            - C:\Users\circleci\.rustup
+      - save_cache:
+          key: cargo-win-target-{{ checksum "sidecar/Cargo.lock" }}
+          paths:
             - sidecar\target
       - run:
           name: "Empaquetar artefacto"

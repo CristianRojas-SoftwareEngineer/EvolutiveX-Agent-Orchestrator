@@ -8,6 +8,9 @@ jobs:
       image: windows-server-2022-gui:current
     resource_class: windows.medium
     working_directory: C:/Users/circleci/EvolutiveX-Agent-Orchestrator
+    environment:
+      CARGO_HOME: C:/Users/circleci/.cargo
+      RUSTUP_HOME: C:/Users/circleci/.rustup
     steps:
       - checkout
       - restore_cache:
@@ -15,79 +18,34 @@ jobs:
             - cargo-win-{{ checksum "sidecar/Cargo.lock" }}
             - cargo-win-
       - run:
-          name: "Instalar Rust y MinGW"
+          name: "Instalar Rust toolchain GNU"
           command: |
-            set +e
-            choco install mingw -y --no-progress 2>&1
             curl --proto '=https' --tlsv1.2 -sSf https://win.rustup.rs -o rustup-init.exe
             ./rustup-init.exe -y --default-toolchain stable
-            # Instalar toolchain GNU
-            ./rustup-init.exe -y --default-toolchain stable-x86_64-pc-windows-gnu 2>&1 || \
-              "$HOME/.cargo/bin/rustup" toolchain install stable-x86_64-pc-windows-gnu
+            ./rustup-init.exe -y --default-host x86_64-pc-windows-gnu --override
       - run:
-          name: "Diagnosticar"
+          name: "Instalar MinGW"
           command: |
-            set +e
-            mkdir -p diagnostics
-            export PATH="$HOME/.cargo/bin:/c/ProgramData/chocolatey/bin:$PATH"
-            {
-              echo "=== gcc donde? ==="
-              where gcc 2>&1 || echo "no gcc"
-              echo ""
-              echo "=== ls MinGW tools ==="
-              ls C:/ProgramData/chocolatey/lib/mingw/tools/ 2>&1 || echo "no tools dir"
-              echo ""
-              echo "=== ls MinGW install ==="
-              ls C:/ProgramData/chocolatey/lib/mingw/tools/install/ 2>&1 || echo "no install dir"
-              echo ""
-              echo "=== buscar gcc en C:/ProgramData ==="
-              where gcc 2>&1 || echo "no gcc"
-              ls C:/ProgramData/chocolatey/lib/mingw/tools/install/mingw64/bin/ 2>&1 | head -20 || echo "no bin dir"
-              echo ""
-              echo "=== rustup ==="
-              "$HOME/.cargo/bin/rustup" toolchain list 2>&1 || echo "rustup falló"
-              echo ""
-              echo "=== cargo ==="
-              "$HOME/.cargo/bin/cargo" --version 2>&1 || echo "cargo falló"
-            } > diagnostics/diag.txt
-            cat diagnostics/diag.txt
+            choco install mingw -y --no-progress
       - run:
           name: "Compilar tts-sidecar"
           command: |
-            set +e
-            export PATH="$HOME/.cargo/bin:/c/ProgramData/chocolatey/bin:/c/ProgramData/chocolatey/lib/mingw/tools/install/mingw64/bin:$PATH"
-            mkdir -p diagnostics
-            {
-              echo "=== gcc disponible ==="
-              which gcc 2>&1 || echo "NO"
-              gcc --version 2>&1 || echo "gcc falló"
-              echo ""
-              echo "=== cargo disponible ==="
-              which cargo 2>&1 || echo "NO"
-              cargo --version 2>&1 || echo "falló"
-              echo ""
-              echo "=== compilar ==="
-            } > diagnostics/build.txt
+            export PATH="C:/tools/mingw64/bin:C:/Users/circleci/.cargo/bin:$PATH"
+            export CC=gcc
+            export AR=ar
             cargo build --release \
               --manifest-path sidecar/Cargo.toml \
-              --target x86_64-pc-windows-gnu \
-              2>&1 | tee -a diagnostics/build.txt
-            echo "Exit: $?" >> diagnostics/build.txt
-      - store_artifacts:
-          path: diagnostics
-          destination: diagnostics
+              --target x86_64-pc-windows-gnu
       - save_cache:
           key: cargo-win-{{ checksum "sidecar/Cargo.lock" }}
           paths:
-            - C:\Users\circleci\.cargo\registry
-            - C:\Users\circleci\.cargo\git
+            - C:/Users/circleci/.cargo/registry
+            - C:/Users/circleci/.cargo/git
       - run:
           name: "Empaquetar"
           command: |
             mkdir -p staging
-            cp sidecar/target/x86_64-pc-windows-gnu/release/tts-sidecar.exe staging/ 2>/dev/null || \
-              cp sidecar/target/x86_64-pc-windows-gnu/release/*.exe staging/ 2>/dev/null || \
-              echo "no exe found"
+            cp sidecar/target/x86_64-pc-windows-gnu/release/tts-sidecar.exe staging/
             cd staging && zip -r ../tts-sidecar-windows-x86_64.zip . && cd ..
             sha256sum tts-sidecar-windows-x86_64.zip | awk '{print "windows-x86_64=" $1}' \
               > tts-sidecar-windows-x86_64.sha256.txt

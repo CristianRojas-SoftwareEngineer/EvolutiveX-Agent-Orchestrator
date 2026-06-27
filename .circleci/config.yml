@@ -122,10 +122,11 @@ jobs:
           shell: powershell.exe
           command: |
             $ProgressPreference = "SilentlyContinue"
-            $espeakVersion = "3.1.1"
-            $espeakUrl = "https://github.com/espeak-ng/espeak-ng/releases/download/$espeakVersion/espeak-ng-$espeakVersion-win64.zip"
-            Invoke-WebRequest -Uri $espeakUrl -OutFile espeak-ng.zip
-            Expand-Archive -Path espeak-ng.zip -DestinationPath espeak-ext -Force
+            $espeakVersion = "1.52.0"
+            $espeakUrl = "https://github.com/espeak-ng/espeak-ng/releases/download/$espeakVersion/espeak-ng.msi"
+            Invoke-WebRequest -Uri $espeakUrl -OutFile espeak-ng.msi
+            New-Item -ItemType Directory -Force -Path espeak-ext | Out-Null
+            msiexec /a espeak-ng.msi /qb TARGETDIR="$PWD\espeak-ext"
       - run:
           name: "Empaquetar binario y dependencias (Windows)"
           shell: powershell.exe
@@ -133,7 +134,7 @@ jobs:
             $env:PATH = "$env:CARGO_HOME\bin;$env:PATH"
             New-Item -ItemType Directory -Force -Path staging/windows-amd64 | Out-Null
             Copy-Item sidecar\target\x86_64-pc-windows-msvc\release\tts-sidecar.exe staging\windows-amd64\
-            # Copiar libespeak-ng.dll y espeak-ng-data/ desde el ZIP extraído
+            # Copiar libespeak-ng.dll y espeak-ng-data/ desde el MSI extraído
             $espeakDll = Get-ChildItem -Path espeak-ext -Recurse -Name "libespeak-ng.dll" | Select-Object -First 1
             if ($espeakDll) {
               Copy-Item "espeak-ext\$espeakDll" "staging\windows-amd64\libespeak-ng.dll"

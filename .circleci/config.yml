@@ -31,7 +31,7 @@ jobs:
             # cc-rs y el linker de cargo usan estos paths absolutos
             GCC="$USERPROFILE/.rustup/toolchains/stable-x86_64-pc-windows-gnu/bin/gcc.exe"
             AR="$USERPROFILE/.rustup/toolchains/stable-x86_64-pc-windows-gnu/bin/ar.exe"
-            cat > .cargo/config.toml << EOF
+            cat > .cargo/config.toml \<< EOF
             [target.x86_64-pc-windows-gnu]
             ar = "$AR"
             linker = "$GCC"

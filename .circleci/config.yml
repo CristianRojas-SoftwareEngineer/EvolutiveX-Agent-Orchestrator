@@ -99,6 +99,9 @@ jobs:
           paths:
             - C:\Users\circleci\.cargo\registry
             - C:\Users\circleci\.cargo\git
+            - C:\Users\circleci\.cargo\bin
+            - C:\Users\circleci\.rustup
+            - sidecar\target
       - run:
           name: "Empaquetar artefacto"
           shell: powershell.exe
@@ -154,6 +157,9 @@ jobs:
           paths:
             - ~/.cargo/registry
             - ~/.cargo/git
+            - ~/.cargo/bin
+            - ~/.rustup
+            - sidecar/target
       - run:
           name: "Crear Universal Binary con lipo"
           command: |

@@ -46,9 +46,10 @@ export function resolveSidecarAssets(): ITtsSidecarAssets {
 
   const binaryPath = path.join(vendorDir, targetId, sidecarBinaryName());
   const voice = process.env['TTS_SIDECAR_VOICE'] ?? 'es_MX-claude-high';
-  const voicesDir = path.join(vendorDir, 'voices');
+  const voicesDir = path.join(vendorDir, targetId, 'vendor', 'tts-sidecar', 'voices');
   const voiceModelPath = path.join(voicesDir, voice, `${voice}.onnx`);
   const voiceConfigPath = path.join(voicesDir, voice, `${voice}.onnx.json`);
+  const espeakDataDir = path.join(vendorDir, targetId, 'espeak-ng-data');
 
   if (!fs.existsSync(binaryPath)) {
     throw new SidecarNotInstalledError(
@@ -63,5 +64,5 @@ export function resolveSidecarAssets(): ITtsSidecarAssets {
     );
   }
 
-  return { binaryPath, voiceModelPath, voiceConfigPath };
+  return { binaryPath, voiceModelPath, voiceConfigPath, espeakDataDir };
 }

@@ -92,7 +92,7 @@ export class PiperSidecarService implements ITtsSidecarService {
     }
 
     return new Promise<void>((resolve, reject) => {
-      const child = this.spawnFn(assets.binaryPath, ['--model', assets.voiceModelPath, '--config', assets.voiceConfigPath], {
+      const child = this.spawnFn(assets.binaryPath, ['--model', assets.voiceModelPath, '--data-dir', assets.espeakDataDir], {
         stdio: ['pipe', 'pipe', 'pipe'],
         windowsHide: true,
       });

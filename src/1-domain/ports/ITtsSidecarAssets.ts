@@ -9,4 +9,6 @@ export interface ITtsSidecarAssets {
   voiceModelPath: string;
   /** Path al archivo de configuración del modelo (`*.onnx.json`). */
   voiceConfigPath: string;
+  /** Path al directorio `espeak-ng-data/` con lang/, dicts/, voices/. */
+  espeakDataDir: string;
 }

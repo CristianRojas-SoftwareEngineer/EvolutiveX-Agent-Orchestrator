@@ -23,6 +23,9 @@ struct Cli {
     /// Ruta al modelo ONNX de la voz
     #[arg(long)]
     model: PathBuf,
+    /// Directorio con espeak-ng-data (contiene lang/, voices/, dicts/)
+    #[arg(long)]
+    data_dir: Option<PathBuf>,
 }
 
 #[derive(Deserialize)]
@@ -113,16 +116,23 @@ fn main() {
     let tokens_path = cli.model.with_extension("onnx.json").to_string_lossy().into_owned();
 
     // Construir la configuración del sintetizador TTS con la estructura vits.
+    let mut vits_config = OfflineTtsVitsModelConfig {
+        model: Some(cli.model.to_string_lossy().into_owned()),
+        tokens: Some(tokens_path),
+        noise_scale: 0.667,
+        noise_scale_w: 0.8,
+        length_scale: 1.0,
+        ..Default::default()
+    };
+
+    // Si se provee --data-dir, usarlo para que espeak-ng convierta texto a fonemas.
+    if let Some(ref data_dir) = cli.data_dir {
+        vits_config.vits_data_dir = Some(data_dir.to_string_lossy().into_owned());
+    }
+
     let config = OfflineTtsConfig {
         model: OfflineTtsModelConfig {
-            vits: OfflineTtsVitsModelConfig {
-                model: Some(cli.model.to_string_lossy().into_owned()),
-                tokens: Some(tokens_path),
-                noise_scale: 0.667,
-                noise_scale_w: 0.8,
-                length_scale: 1.0,
-                ..Default::default()
-            },
+            vits: vits_config,
             ..Default::default()
         },
         ..Default::default()

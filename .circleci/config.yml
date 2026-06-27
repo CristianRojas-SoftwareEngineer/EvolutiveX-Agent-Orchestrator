@@ -1,6 +1,66 @@
+# CircleCI CI — tts-sidecar
+# Multi-platform: Linux x86_64, Windows x86_64, macOS Universal
 version: 2.1
 
 jobs:
+  # ─────────────────────────────────────────────────────────────────
+  # Linux x86_64
+  # ─────────────────────────────────────────────────────────────────
+  build-linux:
+    docker:
+      - image: cimg/rust:1.88.0
+    resource_class: medium
+    working_directory: ~/EvolutiveX-Agent-Orchestrator
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - cargo-linux-{{ checksum "sidecar/Cargo.lock" }}
+            - cargo-linux-
+      - run:
+          name: "Instalar dependencias del sistema"
+          command: |
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq zip libasound2-dev libespeak-ng-dev espeak-ng-data
+      - run:
+          name: "Agregar target x86_64-unknown-linux-gnu"
+          command: |
+            rustup target add x86_64-unknown-linux-gnu
+      - run:
+          name: "Compilar tts-sidecar"
+          command: |
+            cargo build --release \
+              --manifest-path sidecar/Cargo.toml \
+              --target x86_64-unknown-linux-gnu
+      - save_cache:
+          key: cargo-linux-{{ checksum "sidecar/Cargo.lock" }}
+          paths:
+            - ~/.cargo/registry
+            - ~/.cargo/git
+            - sidecar/target
+      - run:
+          name: "Empaquetar artefacto"
+          command: |
+            mkdir -p staging
+            cp sidecar/target/x86_64-unknown-linux-gnu/release/tts-sidecar staging/
+            LIB_PATH=$(find /usr -name "libespeak-ng.so*" | head -1)
+            [ -n "$LIB_PATH" ] && cp "$LIB_PATH" staging/libespeak-ng.so.1
+            if [ -d "/usr/lib/x86_64-linux-gnu/espeak-ng-data" ]; then
+              cp -r "/usr/lib/x86_64-linux-gnu/espeak-ng-data" staging/
+            elif [ -d "/usr/share/espeak-ng-data" ]; then
+              cp -r "/usr/share/espeak-ng-data" staging/
+            fi
+            cd staging && zip -r ../tts-sidecar-linux-x86_64.zip . && cd ..
+            sha256sum tts-sidecar-linux-x86_64.zip | awk '{print "linux-x86_64=" $1}' \
+              > tts-sidecar-linux-x86_64.sha256.txt
+      - store_artifacts:
+          path: tts-sidecar-linux-x86_64.zip
+      - store_artifacts:
+          path: tts-sidecar-linux-x86_64.sha256.txt
+
+  # ─────────────────────────────────────────────────────────────────
+  # Windows x86_64 (MSVC, sin gcc externo)
+  # ─────────────────────────────────────────────────────────────────
   build-windows:
     machine:
       image: windows-server-2022-gui:current
@@ -8,15 +68,19 @@ jobs:
     resource_class: windows.medium
     steps:
       - checkout
+      - restore_cache:
+          keys:
+            - cargo-win-{{ checksum "sidecar/Cargo.lock" }}
+            - cargo-win-
       - run:
-          name: "Instalar Rust"
+          name: "Instalar Rust (MSVC target)"
           shell: powershell.exe
           command: |
             Invoke-WebRequest -Uri https://win.rustup.rs -OutFile rustup-init.exe
             .\rustup-init.exe -y --default-toolchain stable --target x86_64-pc-windows-msvc
             $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
       - run:
-          name: "Verificar instalación"
+          name: "Verificar Rust"
           shell: powershell.exe
           command: |
             $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
@@ -30,10 +94,89 @@ jobs:
             cargo build --release `
               --manifest-path sidecar/Cargo.toml `
               --target x86_64-pc-windows-msvc
+      - save_cache:
+          key: cargo-win-{{ checksum "sidecar/Cargo.lock" }}
+          paths:
+            - C:\Users\circleci\.cargo\registry
+            - C:\Users\circleci\.cargo\git
+      - run:
+          name: "Empaquetar artefacto"
+          shell: powershell.exe
+          command: |
+            mkdir staging
+            cp sidecar\target\x86_64-pc-windows-msvc\release\tts-sidecar.exe staging\
+            cd staging; zip -r ../tts-sidecar-windows-x86_64.zip .; cd ..
+            sha256sum tts-sidecar-windows-x86_64.zip | % { "windows-x86_64=$($_.Split()[0])" } `
+              | Out-File tts-sidecar-windows-x86_64.sha256.txt -Encoding ascii
       - store_artifacts:
-          path: sidecar\target\x86_64-pc-windows-msvc\release\tts-sidecar.exe
+          path: tts-sidecar-windows-x86_64.zip
+      - store_artifacts:
+          path: tts-sidecar-windows-x86_64.sha256.txt
+
+  # ─────────────────────────────────────────────────────────────────
+  # macOS Universal (arm64 + x86_64)
+  # ─────────────────────────────────────────────────────────────────
+  build-macos-universal:
+    macos:
+      xcode: "16.4.0"
+    resource_class: m4pro.medium
+    working_directory: ~/EvolutiveX-Agent-Orchestrator
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - cargo-macos-{{ checksum "sidecar/Cargo.lock" }}
+            - cargo-macos-
+      - run:
+          name: "Instalar Rust y targets"
+          command: |
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+              | sh -s -- -y
+            echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> $BASH_ENV
+            source $HOME/.cargo/env
+            rustup target add aarch64-apple-darwin x86_64-apple-darwin
+      - run:
+          name: "Compilar aarch64-apple-darwin (nativo)"
+          command: |
+            source $HOME/.cargo/env
+            cargo build --release \
+              --manifest-path sidecar/Cargo.toml \
+              --target aarch64-apple-darwin
+      - run:
+          name: "Compilar x86_64-apple-darwin (cross-compilation)"
+          command: |
+            source $HOME/.cargo/env
+            cargo build --release \
+              --manifest-path sidecar/Cargo.toml \
+              --target x86_64-apple-darwin
+      - save_cache:
+          key: cargo-macos-{{ checksum "sidecar/Cargo.lock" }}
+          paths:
+            - ~/.cargo/registry
+            - ~/.cargo/git
+      - run:
+          name: "Crear Universal Binary con lipo"
+          command: |
+            lipo -create \
+              sidecar/target/aarch64-apple-darwin/release/tts-sidecar \
+              sidecar/target/x86_64-apple-darwin/release/tts-sidecar \
+              -output tts-sidecar-macos-universal
+            lipo -info tts-sidecar-macos-universal
+      - run:
+          name: "Empaquetar artefacto"
+          command: |
+            tar -czf tts-sidecar-macos-universal.tar.gz tts-sidecar-macos-universal
+            shasum -a 256 tts-sidecar-macos-universal.tar.gz \
+              | awk '{print "macos-universal=" $1}' \
+              > tts-sidecar-macos-universal.sha256.txt
+      - store_artifacts:
+          path: tts-sidecar-macos-universal.tar.gz
+      - store_artifacts:
+          path: tts-sidecar-macos-universal.sha256.txt
 
 workflows:
   build-all:
     jobs:
+      - build-linux
       - build-windows
+      - build-macos-universal

@@ -24,25 +24,55 @@ jobs:
             rustup toolchain install stable-x86_64-pc-windows-gnu
             rustup target add x86_64-pc-windows-gnu --toolchain stable-x86_64-pc-windows-gnu
       - run:
-          name: "Crear cargo config con paths absolutos"
+          name: "Diagnosticar ubicaciones de rustup"
+          command: |
+            echo "=== Variables clave ==="
+            echo "USERPROFILE=$USERPROFILE"
+            echo "LOCALAPPDATA=$LOCALAPPDATA"
+            echo "CARGO_HOME=${CARGO_HOME:-no-set}"
+            echo "RUSTUP_HOME=${RUSTUP_HOME:-no-set}"
+            echo ""
+            echo "=== Buscar gcc.exe en todo el disco ==="
+            find /c -name "gcc.exe" 2>/dev/null | head -20
+            echo ""
+            echo "=== Listar rustup toolchains en USERPROFILE ==="
+            ls "$USERPROFILE/.rustup/toolchains/" 2>/dev/null || echo "NO existe: $USERPROFILE/.rustup/toolchains/"
+            echo ""
+            echo "=== Listar rustup toolchains en LOCALAPPDATA ==="
+            ls "$LOCALAPPDATA/Rustup/toolchains/" 2>/dev/null || echo "NO existe: $LOCALAPPDATA/Rustup/toolchains/"
+            echo ""
+            echo "=== Listar CARGO_HOME ==="
+            ls "${CARGO_HOME:-$USERPROFILE/.cargo}/toolchains/" 2>/dev/null || echo "no toolchains en CARGO_HOME"
+      - run:
+          name: "Crear cargo config con paths correctos"
           command: |
             export PATH="$USERPROFILE/.cargo/bin:$PATH"
             mkdir -p .cargo
-            # cc-rs y el linker de cargo usan estos paths absolutos
-            GCC="$USERPROFILE/.rustup/toolchains/stable-x86_64-pc-windows-gnu/bin/gcc.exe"
-            AR="$USERPROFILE/.rustup/toolchains/stable-x86_64-pc-windows-gnu/bin/ar.exe"
+            # Usar rustup which para obtener la ruta real de gcc
+            GCC_PATH=$(rustup which gcc 2>/dev/null)
+            AR_PATH=$(rustup which ar 2>/dev/null)
+            echo "gcc encontrado en: $GCC_PATH"
+            echo "ar encontrado en: $AR_PATH"
+            # Convertir a forward slashes para TOML
+            GCC_FW="${GCC_PATH//\\\\//}"
+            AR_FW="${AR_PATH//\\\\//}"
+            echo "gcc (fw): $GCC_FW"
+            echo "ar (fw): $AR_FW"
             cat > .cargo/config.toml \<< EOF
             [target.x86_64-pc-windows-gnu]
-            ar = "C:/Users/circleci/.rustup/toolchains/stable-x86_64-pc-windows-gnu/bin/ar.exe"
-            linker = "C:/Users/circleci/.rustup/toolchains/stable-x86_64-pc-windows-gnu/bin/gcc.exe"
+            ar = "$AR_FW"
+            linker = "$GCC_FW"
             EOF
+            cat .cargo/config.toml
       - run:
           name: "Compilar tts-sidecar"
           command: |
             export PATH="$USERPROFILE/.cargo/bin:$PATH"
-            # cc-rs busca gcc.exe en PATH para compilar build scripts de bzip2-sys y ring
-            MINGW_DIR="$USERPROFILE/.rustup/toolchains/stable-x86_64-pc-windows-gnu/bin"
-            export PATH="$MINGW_DIR:$PATH"
+            # Agregar el directorio de gcc al PATH para cc-rs
+            GCC_DIR=$(dirname "$(rustup which gcc)")
+            export PATH="$GCC_DIR:$PATH"
+            echo "PATH=${PATH}"
+            echo "gcc disponible: $(which gcc)"
             cargo build --release \
               --manifest-path sidecar/Cargo.toml \
               --target x86_64-pc-windows-gnu

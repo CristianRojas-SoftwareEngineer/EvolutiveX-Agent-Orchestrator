@@ -30,6 +30,8 @@ jobs:
               tar -xjf /tmp/vits-piper.tar.bz2 -C /tmp/vits-piper
               # Extraer todo el contenido: modelo, tokens y espeak-ng-data
               cp -r /tmp/vits-piper/vits-piper-es_MX-claude-high/* "$MODEL_DIR/"
+              # El binary deriva el path de tokens como: model.onnx → model.onnx.tokens
+              mv "$MODEL_DIR/tokens.txt" "$MODEL_DIR/es_MX-claude-high.onnx.tokens"
               echo "Extraído del paquete oficial: modelo, tokens y espeak-ng-data"
             else
               echo "Modelo ya en caché, omitiendo descarga."

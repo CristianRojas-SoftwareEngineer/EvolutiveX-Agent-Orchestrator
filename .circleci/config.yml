@@ -322,42 +322,118 @@ jobs:
               sidecar/target/x86_64-apple-darwin/release/tts-sidecar \
               -output tts-sidecar-macos-universal
             lipo -info tts-sidecar-macos-universal
-      # FIX 4: Instalar espeak-ng solo si no fue restaurado desde caché
+      # ── Diagnóstico pre-instalación ──
+      - run:
+          name: "Diagnóstico: estado de espeak-ng antes de instalar"
+          command: |
+            echo "=== brew --prefix ==="
+            brew --prefix
+            echo "=== brew list espeak-ng (código: $?) ==="
+            brew list espeak-ng 2>&1 || true
+            echo "=== Contenido de $(brew --prefix)/lib antes ==="
+            ls -la "$(brew --prefix)/lib/" 2>/dev/null | head -20 || echo "(directorio no existe)"
+            echo "=== Contenido de $(brew --prefix)/share/ antes ==="
+            ls -la "$(brew --prefix)/share/" 2>/dev/null | head -10 || echo "(directorio no existe)"
+            echo "=== Variables de entorno relevantes ==="
+            echo "HOMEBREW_PREFIX=$(brew --prefix)"
+            echo "HOMEBREW_LIBDIR=$(brew --prefix)/lib"
+            echo "HOMEBREW_DATADIR=$(brew --prefix)/share"
+
       - run:
           name: "Instalar espeak-ng vía Homebrew"
           command: |
             if ! brew list espeak-ng &>/dev/null; then
+              echo "espeak-ng NO instalado — procediendo con brew install..."
               brew install espeak-ng
+              echo "brew install завершен (código: $?)"
             else
-              echo "espeak-ng ya en caché, omitiendo instalación."
+              echo "espeak-ng YA está instalado — omitiendo instalación."
             fi
-      # FIX 4: Guardar caché de espeak-ng tras la instalación
+
+      # ── Diagnóstico post-instalación ──
+      - run:
+          name: "Diagnóstico: estado de espeak-ng tras instalar"
+          command: |
+            echo "=== brew list espeak-ng ==="
+            brew list espeak-ng 2>&1 || true
+            echo "=== Archivos dylib en $(brew --prefix)/lib ==="
+            find "$(brew --prefix)/lib" -name "*.dylib" -type f 2>/dev/null | head -20
+            echo "=== Archivos en $(brew --prefix)/opt/espeak-ng/lib ==="
+            ls -la "$(brew --prefix)/opt/espeak-ng/lib/" 2>/dev/null || echo "(no existe)"
+            echo "=== Contenido de $(brew --prefix)/lib ==="
+            ls -la "$(brew --prefix)/lib/" 2>/dev/null | head -20
+            echo "=== Contenido de $(brew --prefix)/share/ ==="
+            ls -la "$(brew --prefix)/share/" 2>/dev/null | head -10
+
       - save_cache:
           key: brew-espeak-ng-v1
           paths:
             - /opt/homebrew/Cellar/espeak-ng
             - /opt/homebrew/opt/espeak-ng
             - /opt/homebrew/share/espeak-ng-data
+
+      # ── Diagnóstico pre-packaging ──
+      - run:
+          name: "Diagnóstico: staging yworkspace antes de empaquetar"
+          command: |
+            echo "=== Directorio staging/ (si existe) ==="
+            ls -la staging/ 2>/dev/null || echo "(no existe aún)"
+            echo "=== Contenido de vendor/tts-sidecar/voices/ (workspace) ==="
+            ls -la vendor/tts-sidecar/voices/ 2>/dev/null || echo "(no existe)"
+            echo "=== brew --prefix en este step ==="
+            BREW_PREFIX=$(brew --prefix)
+            echo "brew --prefix = $BREW_PREFIX"
+            echo "=== libespeak-ng en prefix/lib ==="
+            find "$BREW_PREFIX/lib" -name "libespeak-ng*" -type f 2>/dev/null
+            echo "=== espeak-ng-data en prefix/share ==="
+            find "$BREW_PREFIX/share" -name "espeak-ng-data" -type d 2>/dev/null
+
       - run:
           name: "Empaquetar binario y dependencias (macOS Universal)"
           command: |
             mkdir -p staging/macos-amd64
             cp tts-sidecar-macos-universal staging/macos-amd64/
-            # Copiar libespeak-ng.dylib
-            ESPEAK_LIB=$(find $(brew --prefix)/lib -name "libespeak-ng.dylib" 2>/dev/null | head -1)
-            [ -n "$ESPEAK_LIB" ] && cp "$ESPEAK_LIB" staging/macos-amd64/
+            # Diagnóstico: qué encuentra find para la dylib
+            BREW_PREFIX=$(brew --prefix)
+            echo "Brew prefix: $BREW_PREFIX"
+            echo "Buscando libespeak-ng.dylib en $BREW_PREFIX/lib..."
+            ESPEAK_LIB=$(find "$BREW_PREFIX/lib" -name "libespeak-ng.dylib" 2>/dev/null | head -1)
+            echo "ESPEAK_LIB=$ESPEAK_LIB"
+            if [ -n "$ESPEAK_LIB" ]; then
+              echo "Copiando: cp $ESPEAK_LIB staging/macos-amd64/"
+              cp "$ESPEAK_LIB" staging/macos-amd64/
+            else
+              echo "ATENCIÓN: NO se encontró libespeak-ng.dylib — el bundle NO tendrá la librería"
+            fi
             # Copiar espeak-ng-data/
-            if [ -d "$(brew --prefix)/share/espeak-ng-data" ]; then
-              cp -r "$(brew --prefix)/share/espeak-ng-data" staging/macos-amd64/
+            if [ -d "$BREW_PREFIX/share/espeak-ng-data" ]; then
+              echo "Copiando espeak-ng-data desde $BREW_PREFIX/share/espeak-ng-data"
+              cp -r "$BREW_PREFIX/share/espeak-ng-data" staging/macos-amd64/
+            else
+              echo "ATENCIÓN: NO se encontró espeak-ng-data en $BREW_PREFIX/share/"
             fi
             # Incluir modelo de voz desde workspace
             mkdir -p staging/macos-amd64/vendor/tts-sidecar/voices
             cp -r vendor/tts-sidecar/voices/es_MX-claude-high \
               staging/macos-amd64/vendor/tts-sidecar/voices/
+            echo "=== Contenido de staging/macos-amd64 antes de zip ==="
+            ls -la staging/macos-amd64/
             cd staging && zip -r ../macos-amd64.zip macos-amd64 && cd ..
+            echo "=== SHA256 del ZIP ==="
             shasum -a 256 macos-amd64.zip \
               | awk '{print "macos-amd64=" $1}' \
               > macos-amd64.sha256.txt
+
+      # ── Diagnóstico post-packaging ──
+      - run:
+          name: "Diagnóstico: verificar contenido del ZIP"
+          command: |
+            echo "=== Archivos en la raíz del ZIP ==="
+            unzip -l macos-amd64.zip | grep -v "espeak-ng-data" | tail -20
+            echo "=== Archivos espeak-ng-data en el ZIP ==="
+            unzip -l macos-amd64.zip | grep "espeak-ng-data" | head -10
+            echo "=== ¿Existe libespeak-ng.dylib en el ZIP? ==="
+            unzip -l macos-amd64.zip | grep "libespeak-ng" || echo "NO — libespeak-ng.dylib NO está en el ZIP"
       - store_artifacts:
           path: macos-amd64.zip
       - store_artifacts:

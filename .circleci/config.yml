@@ -15,79 +15,99 @@ jobs:
             - cargo-win-{{ checksum "sidecar/Cargo.lock" }}
             - cargo-win-
       - run:
-          name: "Instalar Rust toolchain MinGW"
+          name: "Instalar MinGW via Chocolatey"
           command: |
-            curl --proto '=https' --tlsv1.2 -sSf https://win.rustup.rs -o rustup-init.exe
-            ./rustup-init.exe -y --default-toolchain stable
-            export PATH="$USERPROFILE/.cargo/bin:$PATH"
-            rustup set default-host x86_64-pc-windows-gnu
-            rustup toolchain install stable-x86_64-pc-windows-gnu
-            rustup target add x86_64-pc-windows-gnu --toolchain stable-x86_64-pc-windows-gnu
+            set +e
+            choco install mingw -y --no-progress 2>&1
+            echo "=== Chocolatey install exit: $? ==="
       - run:
-          name: "Crear cargo config (GNU toolchain paths)"
+          name: "Diagnosticar MinGW y rustup"
           command: |
             set +e
             export PATH="$USERPROFILE/.cargo/bin:$PATH"
             mkdir -p diagnostics
             {
-              echo "=== USERPROFILE ==="
-              echo "$USERPROFILE"
-              echo "=== LOCALAPPDATA ==="
-              echo "$LOCALAPPDATA"
-              echo "=== RUSTUP_HOME ==="
-              echo "$RUSTUP_HOME"
+              echo "=== Describir MinGW ==="
+              choco describe mingw 2>&1 || echo "choco describe falló"
+              echo ""
+              echo "=== donde gcc.exe ==="
+              where gcc 2>&1 || echo "where gcc falló"
+              echo ""
+              echo "=== ls C:/ProgramData/chocolatey/bin ==="
+              ls C:/ProgramData/chocolatey/bin/ 2>&1 | grep -i gcc || echo "no gcc en chocolatey/bin"
+              echo ""
+              echo "=== ls C:/ProgramData/chocolatey/lib/mingw ==="
+              ls C:/ProgramData/chocolatey/lib/mingw/ 2>&1 || echo "no mingw en chocolatey/lib"
+              echo ""
+              echo "=== Buscar gcc.exe en C:/ProgramData ==="
+              find C:/ProgramData -name "gcc.exe" 2>/dev/null | head -10 || echo "find falló"
               echo ""
               echo "=== rustup toolchain list ==="
               rustup toolchain list 2>&1
               echo ""
-              echo "=== ls USERPROFILE/.rustup/toolchains ==="
-              ls "$USERPROFILE/.rustup/toolchains/" 2>&1
+              echo "=== rustup target list --toolchain stable-x86_64-pc-windows-gnu ==="
+              rustup target list --toolchain stable-x86_64-pc-windows-gnu 2>&1
               echo ""
-              echo "=== ls toolchain GNU root ==="
-              ls "$USERPROFILE/.rustup/toolchains/stable-x86_64-pc-windows-gnu/" 2>&1
-              echo ""
-              echo "=== ls toolchain GNU bin ==="
-              ls "$USERPROFILE/.rustup/toolchains/stable-x86_64-pc-windows-gnu/bin/" 2>&1
-              echo ""
-              echo "=== rustup which gcc --toolchain stable-x86_64-pc-windows-gnu ==="
-              rustup which gcc --toolchain stable-x86_64-pc-windows-gnu 2>&1
-              echo ""
-              echo "=== rustup which ar --toolchain stable-x86_64-pc-windows-gnu ==="
-              rustup which ar --toolchain stable-x86_64-pc-windows-gnu 2>&1
-            } > diagnostics/rustup-info.txt
-            mkdir -p .cargo
-            GCC_PATH="$USERPROFILE/.rustup/toolchains/stable-x86_64-pc-windows-gnu/bin/gcc.exe"
-            AR_PATH="$USERPROFILE/.rustup/toolchains/stable-x86_64-pc-windows-gnu/bin/ar.exe"
-            GCC_FW="${GCC_PATH//\\//}"
-            AR_FW="${AR_PATH//\\//}"
-            printf '[target.x86_64-pc-windows-gnu]\nar = "%s"\nlinker = "%s"\n' "$AR_FW" "$GCC_FW" > .cargo/config.toml
-            {
-              echo ""
-              echo "=== .cargo/config.toml ==="
-              cat .cargo/config.toml
-            } >> diagnostics/rustup-info.txt
-            cat diagnostics/rustup-info.txt
+              echo "=== which cargo ==="
+              which cargo 2>&1 || echo "no cargo"
+              echo "=== cargo version ==="
+              cargo --version 2>&1 || echo "falló"
+            } > diagnostics/mingw-info.txt
+            cat diagnostics/mingw-info.txt
       - store_artifacts:
           path: diagnostics
           destination: diagnostics
+      - run:
+          name: "Crear cargo config"
+          command: |
+            set +e
+            export PATH="$USERPROFILE/.cargo/bin:$PATH"
+            mkdir -p .cargo
+            # Encontrar gcc.exe de MinGW
+            GCC_PATH=""
+            for dir in C:/ProgramData/chocolatey/lib/mingw/tools/install/mingw64/bin \
+                       C:/tools/mingw64/bin \
+                       C:/ProgramData/chocolatey/bin; do
+              if [ -f "$dir/gcc.exe" ]; then
+                GCC_PATH="$dir/gcc.exe"
+                AR_PATH="${dir}/ar.exe"
+                break
+              fi
+            done
+            if [ -z "$GCC_PATH" ]; then
+              # Intentar con where como fallback
+              GCC_PATH="$(where gcc 2>/dev/null | head -1)"
+              AR_PATH="${GCC_PATH%/*}/ar.exe"
+            fi
+            echo "GCC_PATH=$GCC_PATH"
+            echo "AR_PATH=$AR_PATH"
+            # Escribir TOML con paths Unix-style
+            printf '[target.x86_64-pc-windows-gnu]\nlinker = "%s"\n' "$GCC_PATH" > .cargo/config.toml
+            printf 'ar = "%s"\n' "$AR_PATH" >> .cargo/config.toml
+            echo "=== .cargo/config.toml ==="
+            cat .cargo/config.toml
       - run:
           name: "Compilar tts-sidecar"
           command: |
             set +e
             export PATH="$USERPROFILE/.cargo/bin:$PATH"
-            GNU_TOOLCHAIN="$USERPROFILE/.rustup/toolchains/stable-x86_64-pc-windows-gnu/bin"
-            export PATH="$GNU_TOOLCHAIN:$PATH"
+            # Agregar MinGW al PATH
+            for dir in C:/ProgramData/chocolatey/lib/mingw/tools/install/mingw64/bin \
+                       C:/tools/mingw64/bin \
+                       C:/ProgramData/chocolatey/bin; do
+              if [ -f "$dir/gcc.exe" ]; then
+                export PATH="$dir:$PATH"
+                break
+              fi
+            done
             mkdir -p diagnostics
-            {
-              echo "gcc en PATH: $(which gcc 2>/dev/null || echo 'NO ENCONTRADO')"
-              echo "gcc version:"
-              gcc --version 2>&1 || echo "gcc falló"
-            } > diagnostics/build-output.txt
+            echo "gcc: $(which gcc 2>/dev/null || echo NO ENCONTRADO)" > diagnostics/build-output.txt
+            gcc --version >> diagnostics/build-output.txt 2>&1 || echo "gcc falló" >> diagnostics/build-output.txt
             cargo build --release \
               --manifest-path sidecar/Cargo.toml \
               --target x86_64-pc-windows-gnu \
               2>&1 | tee -a diagnostics/build-output.txt
-            echo "Exit code: $?" >> diagnostics/build-output.txt
+            echo "Exit: $?" >> diagnostics/build-output.txt
       - store_artifacts:
           path: diagnostics/build-output.txt
           destination: diagnostics

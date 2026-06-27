@@ -108,11 +108,13 @@ jobs:
           name: "Empaquetar artefacto"
           shell: powershell.exe
           command: |
-            mkdir staging
-            cp sidecar\target\x86_64-pc-windows-msvc\release\tts-sidecar.exe staging\
-            cd staging; zip -r ../tts-sidecar-windows-x86_64.zip .; cd ..
-            sha256sum tts-sidecar-windows-x86_64.zip | % { "windows-x86_64=$($_.Split()[0])" } `
-              | Out-File tts-sidecar-windows-x86_64.sha256.txt -Encoding ascii
+            $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
+            New-Item -ItemType Directory -Force -Path staging | Out-Null
+            Copy-Item sidecar\target\x86_64-pc-windows-msvc\release\tts-sidecar.exe staging\
+            $ProgressPreference = "SilentlyContinue"
+            Compress-Archive -Path staging\* -DestinationPath tts-sidecar-windows-x86_64.zip -Force
+            $hash = (Get-FileHash tts-sidecar-windows-x86_64.zip -Algorithm SHA256).Hash.ToLower()
+            "windows-x86_64=$hash" | Out-File tts-sidecar-windows-x86_64.sha256.txt -Encoding ascii
       - store_artifacts:
           path: tts-sidecar-windows-x86_64.zip
       - store_artifacts:

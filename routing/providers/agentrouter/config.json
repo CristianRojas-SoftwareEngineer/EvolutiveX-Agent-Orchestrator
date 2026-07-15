@@ -1,0 +1,9 @@
+{
+  "AUTH_METHOD": "bearer",
+  "ANTHROPIC_BASE_URL": "https://agentrouter.org",
+  "ANTHROPIC_DEFAULT_HAIKU_MODEL": "models/glm-5.2",
+  "ANTHROPIC_DEFAULT_SONNET_MODEL": "models/gpt-5.5",
+  "ANTHROPIC_DEFAULT_OPUS_MODEL": "models/opus-4.8",
+  "ANTHROPIC_DEFAULT_FABLE_MODEL": "models/opus-4.8",
+  "CLAUDE_CODE_SUBAGENT_MODEL": "models/gpt-5.5"
+}

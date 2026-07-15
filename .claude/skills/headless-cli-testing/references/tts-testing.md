@@ -36,7 +36,7 @@ independiente del provider de sesión. El flujo es:
 ```
 Stop hook → POST /hooks → AuditHookEventHandler
   → generateSpeechText → fetch('https://openrouter.ai/api/v1/messages')
-       model: poolside/laguna-xs.2:free
+       model: poolside/laguna-xs-2.1:free
        auth:  routing/providers/openrouter/secrets.json ANTHROPIC_AUTH_TOKEN
        (NUNCA a través del proxy local)
   → [TTS-SPEECH] log entry (éxito) OR [TTS-FALLBACK] log entry (cualquier error)
@@ -63,7 +63,7 @@ usa OpenRouter (provider dedicado).
 
 | Provider | Flujo de sesión | Flujo TTS |
 |---|---|---|
-| `anthropic` (default) | `https://api.anthropic.com` con Bearer OAuth | OpenRouter dedicado (`poolside/laguna-xs.2:free`) |
+| `anthropic` (default) | `https://api.anthropic.com` con Bearer OAuth | OpenRouter dedicado (`poolside/laguna-xs-2.1:free`) |
 | `minimax` | Endpoint Minimax con Bearer API key | OpenRouter dedicado |
 | `openrouter` | Endpoint OpenRouter | OpenRouter dedicado |
 | `ollama` | Endpoint local Ollama | OpenRouter dedicado |

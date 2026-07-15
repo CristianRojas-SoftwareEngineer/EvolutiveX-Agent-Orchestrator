@@ -3,7 +3,7 @@
 ## ADDED Requirements
 
 ### Requirement: Provider dedicado de inferencia TTS (OpenRouter)
-La generación del texto de resumen TTS SHALL usar siempre un provider dedicado, independiente del provider activo de la sesión: OpenRouter (`https://openrouter.ai/api/v1/messages`) con el modelo fijo `poolside/laguna-xs.2:free`, `max_tokens: 512` y `reasoning: { effort: 'none' }`. La credencial SHALL ser el `ANTHROPIC_AUTH_TOKEN` de `routing/providers/openrouter/secrets.json`, resuelta en el arranque e inyectada por el composition root. La llamada SHALL ir directa al upstream de OpenRouter (no a través del proxy local) con headers `Authorization: Bearer <key>`, `HTTP-Referer` y `X-Title`.
+La generación del texto de resumen TTS SHALL usar siempre un provider dedicado, independiente del provider activo de la sesión: OpenRouter (`https://openrouter.ai/api/v1/messages`) con el modelo fijo `poolside/laguna-xs-2.1:free`, `max_tokens: 512` y `reasoning: { effort: 'none' }`. La credencial SHALL ser el `ANTHROPIC_AUTH_TOKEN` de `routing/providers/openrouter/secrets.json`, resuelta en el arranque e inyectada por el composition root. La llamada SHALL ir directa al upstream de OpenRouter (no a través del proxy local) con headers `Authorization: Bearer <key>`, `HTTP-Referer` y `X-Title`.
 
 Si la credencial no está disponible, el sistema SHALL emitir `[TTS-FALLBACK]` con `reason: no-openrouter-key` y usar el mensaje genérico de fallback sin intentar ninguna llamada. No SHALL haber validación proactiva de la clave ni fallback al provider de la sesión: cualquier fallo de la llamada (HTTP no-2xx, timeout, respuesta sin bloques `text`) SHALL caer al fallback genérico con su `reason` correspondiente.
 
@@ -11,7 +11,7 @@ Si la credencial no está disponible, el sistema SHALL emitir `[TTS-FALLBACK]` c
 - **GIVEN** que la sesión activa usa MiniMax (o Anthropic, u Ollama) como provider
 - **AND** `routing/providers/openrouter/secrets.json` contiene una API key
 - **WHEN** el handler procesa un evento `Stop`
-- **THEN** SHALL llamar a `https://openrouter.ai/api/v1/messages` con el modelo `poolside/laguna-xs.2:free` y bearer de OpenRouter
+- **THEN** SHALL llamar a `https://openrouter.ai/api/v1/messages` con el modelo `poolside/laguna-xs-2.1:free` y bearer de OpenRouter
 - **AND** el provider de la sesión NO SHALL recibir ninguna petición de inferencia TTS
 
 #### Scenario: Sin clave de OpenRouter usa fallback genérico
@@ -101,5 +101,5 @@ Cada vez que el sistema active un fallback TTS, SHALL emitir una entrada de log 
 **Migration**: Cubierta por el requisito nuevo "Provider dedicado de inferencia TTS (OpenRouter)". Eliminar `isAnthropic`, la selección `capturedToken`/env y los headers condicionales del handler.
 
 ### Requirement: Presupuesto de tokens de inferencia TTS según el provider activo
-**Reason**: Con un único modelo fijo (`poolside/laguna-xs.2:free`, thinking) el presupuesto es constante (`512`); ya no existe la rama Anthropic (150) ni el cap de Ollama local.
+**Reason**: Con un único modelo fijo (`poolside/laguna-xs-2.1:free`, thinking) el presupuesto es constante (`512`); ya no existe la rama Anthropic (150) ni el cap de Ollama local.
 **Migration**: Cubierta por el requisito nuevo "Provider dedicado de inferencia TTS (OpenRouter)". Eliminar `isOllama` y el `max_tokens` condicional del handler.

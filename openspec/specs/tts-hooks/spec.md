@@ -70,7 +70,7 @@ Al recibir `Stop`, `SubagentStop` o `StopFailure`, el sistema SHALL extraer los 
 ---
 
 ### Requirement: Provider dedicado de inferencia TTS (OpenRouter → Gemini)
-La generación del texto de intención/resumen TTS SHALL usar el puerto `ITtsTextProvider` inyectado por el composition root. La implementación por defecto SHALL seguir una cadena de dos providers: primero `GeminiTtsTextProvider` con el modelo `gemini-3.1-flash-lite`, y si Gemini falla (429, 5xx, error de red o respuesta vacía), SHALL caer a `OpenRouterTtsTextProvider` con el modelo `poolside/laguna-xs.2:free` usando la API Anthropic-compatible de OpenRouter (`https://openrouter.ai/api`, bearer `ANTHROPIC_AUTH_TOKEN` leído de `routing/providers/openrouter/secrets.json`). Si ambos providers fallan, SHALL devolver el texto de fallback estático según el tipo de evento. La credencial de Gemini SHALL seguir leyéndose de `routing/providers/gemini/secrets.json`. El campo `ttsApiKey` inyectado directamente en el handler SHALL ser eliminado; las implementaciones de los providers gestionan sus propias credenciales. La **síntesis de voz** continúa en el sidecar local (sin cambio). El provider de la sesión activa NO SHALL recibir ninguna petición de inferencia TTS.
+La generación del texto de intención/resumen TTS SHALL usar el puerto `ITtsTextProvider` inyectado por el composition root. La implementación por defecto SHALL seguir una cadena de dos providers: primero `GeminiTtsTextProvider` con el modelo `gemini-3.1-flash-lite`, y si Gemini falla (429, 5xx, error de red o respuesta vacía), SHALL caer a `OpenRouterTtsTextProvider` con el modelo `poolside/laguna-xs-2.1:free` usando la API Anthropic-compatible de OpenRouter (`https://openrouter.ai/api`, bearer `ANTHROPIC_AUTH_TOKEN` leído de `routing/providers/openrouter/secrets.json`). Si ambos providers fallan, SHALL devolver el texto de fallback estático según el tipo de evento. La credencial de Gemini SHALL seguir leyéndose de `routing/providers/gemini/secrets.json`. El campo `ttsApiKey` inyectado directamente en el handler SHALL ser eliminado; las implementaciones de los providers gestionan sus propias credenciales. La **síntesis de voz** continúa en el sidecar local (sin cambio). El provider de la sesión activa NO SHALL recibir ninguna petición de inferencia TTS.
 
 #### Scenario: Gemini responde con éxito en el primer intento
 - **GIVEN** que `GeminiTtsTextProvider` está configurado con una clave Gemini válida
@@ -82,7 +82,7 @@ La generación del texto de intención/resumen TTS SHALL usar el puerto `ITtsTex
 #### Scenario: Gemini falla con 429 activa el fallback a OpenRouter
 - **GIVEN** que `GeminiTtsTextProvider` recibe un HTTP 429 de Gemini
 - **WHEN** el handler invoca `generateText`
-- **THEN** SHALL intentar la generación con `OpenRouterTtsTextProvider` (modelo `poolside/laguna-xs.2:free`)
+- **THEN** SHALL intentar la generación con `OpenRouterTtsTextProvider` (modelo `poolside/laguna-xs-2.1:free`)
 - **AND** si OpenRouter responde con éxito SHALL devolver ese texto
 - **AND** SHALL emitir `[TTS-SPEECH]` con `usedFallback: false`
 

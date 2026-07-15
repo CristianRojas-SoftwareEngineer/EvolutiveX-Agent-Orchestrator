@@ -2,7 +2,7 @@
 
 ## Context
 
-El change `fix-tts-multi-provider-compat` (archivado 2026-06-10) hizo funcionar el TTS dinámico con los 5 providers heredando el provider de la sesión. El precio fue una matriz de compatibilidad dentro de `AuditHookEventHandler.generateSpeechText`: detección por `upstreamOrigin` (`isAnthropic`, `isOllama`), selección de token (capturado OAuth vs `ANTHROPIC_AUTH_TOKEN`), headers condicionales (`anthropic-version` vs `HTTP-Referer`/`X-Title`), presupuesto condicional (150/512) y modelo desde `ANTHROPIC_DEFAULT_HAIKU_MODEL`. Este change reemplaza todo eso por un único camino: OpenRouter + `poolside/laguna-xs.2:free`.
+El change `fix-tts-multi-provider-compat` (archivado 2026-06-10) hizo funcionar el TTS dinámico con los 5 providers heredando el provider de la sesión. El precio fue una matriz de compatibilidad dentro de `AuditHookEventHandler.generateSpeechText`: detección por `upstreamOrigin` (`isAnthropic`, `isOllama`), selección de token (capturado OAuth vs `ANTHROPIC_AUTH_TOKEN`), headers condicionales (`anthropic-version` vs `HTTP-Referer`/`X-Title`), presupuesto condicional (150/512) y modelo desde `ANTHROPIC_DEFAULT_HAIKU_MODEL`. Este change reemplaza todo eso por un único camino: OpenRouter + `poolside/laguna-xs-2.1:free`.
 
 ## Goals / Non-Goals
 
@@ -28,8 +28,8 @@ Alternativa descartada: leer el secrets.json en cada evento Stop (I/O innecesari
 `generateSpeechText` hace `fetch('https://openrouter.ai/api/v1/messages', ...)` con el formato Anthropic-compatible que OpenRouter ya acepta (verificado en el change anterior). Ventajas: no contamina la auditoría/logs de la sesión con tráfico sintético, no depende del `PORT` del proxy, y funciona idéntico en el harness aislado (puerto 8788) y en producción (8787).
 
 ### D3 — Constantes fijas del camino TTS
-- Modelo: `poolside/laguna-xs.2:free` (constante en el handler o módulo de constantes TTS; no se lee `ANTHROPIC_DEFAULT_HAIKU_MODEL`).
-- `max_tokens: 512` (laguna-xs.2 es thinking; <512 produce `empty-response`, verificado).
+- Modelo: `poolside/laguna-xs-2.1:free` (constante en el handler o módulo de constantes TTS; no se lee `ANTHROPIC_DEFAULT_HAIKU_MODEL`).
+- `max_tokens: 512` (laguna-xs-2.1 es thinking; <512 produce `empty-response`, verificado).
 - `reasoning: { effort: 'none' }` (reduce el razonamiento; OpenRouter lo acepta).
 - Headers: `Authorization: Bearer`, `content-type`, `HTTP-Referer: https://smartcodeproxy.local`, `X-Title: Smart Code Proxy`.
 
@@ -46,9 +46,9 @@ Se eliminan del handler: `isAnthropic`, `isOllama`, `capturedToken` y `setAuthTo
 
 - **Rate limits de los modelos `:free` de OpenRouter** (429 en horas pico) → degradación a fallback genérico, observable vía `[TTS-FALLBACK] reason: http-429`. Aceptado: la función es cosmética.
 - **Privacidad**: el historial del turno viaja siempre a OpenRouter, incluso con sesiones Ollama locales. Aceptado explícitamente por el usuario: el producto no promete ser local-first.
-- **Disponibilidad del modelo**: si OpenRouter retira `laguna-xs.2:free`, el TTS degrada a fallback permanente (visible en logs). Mitigación futura: cambiar la constante.
+- **Disponibilidad del modelo**: si OpenRouter retira `laguna-xs-2.1:free`, el TTS degrada a fallback permanente (visible en logs). Mitigación futura: cambiar la constante.
 - **Dependencia de secrets.json de OpenRouter** aunque no se use OpenRouter para sesiones: documentado en el SKILL/spec; sin clave el sistema funciona con mensajes genéricos.
-- **Latencia**: laguna-xs.2 piensa antes de responder; el resumen puede tardar unos segundos más que un modelo no-thinking. Aceptado (el TTS ya es asíncrono respecto al hook).
+- **Latencia**: laguna-xs-2.1 piensa antes de responder; el resumen puede tardar unos segundos más que un modelo no-thinking. Aceptado (el TTS ya es asíncrono respecto al hook).
 
 ## Divergencias documentadas (post-archivo)
 

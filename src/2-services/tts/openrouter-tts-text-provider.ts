@@ -49,7 +49,7 @@ export class OpenRouterTtsTextProvider implements ITtsTextProvider {
         authorization: `Bearer ${this.bearerToken}`,
       },
       body: JSON.stringify({
-        model: 'poolside/laguna-xs.2:free',
+        model: 'poolside/laguna-xs-2.1:free',
         max_tokens: TTS_MAX_TOKENS,
         system: systemPrompt,
         messages: anthropicMessages,

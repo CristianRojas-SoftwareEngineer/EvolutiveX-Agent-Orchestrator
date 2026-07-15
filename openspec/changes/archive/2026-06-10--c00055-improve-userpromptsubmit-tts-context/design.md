@@ -19,7 +19,7 @@ Adicionalmente, los `IContextExtractor` actuales y los tests cubren el caso gen�
 **Non-Goals:**
 
 - No se modifica el `CONTINUITY_SYSTEM_PROMPT` ni el flujo de resumen (`mode='summary'`).
-- No se añade un segundo LLM ni un pipeline paralelo. La inferencia sigue yendo a OpenRouter vía `poolside/laguna-xs.2:free`.
+- No se añade un segundo LLM ni un pipeline paralelo. La inferencia sigue yendo a OpenRouter vía `poolside/laguna-xs-2.1:free`.
 - No se cambia la API del puerto `ITTSService` ni la implementación de `SapiTTSService`.
 - No se introduce configuración nueva. `TTS_CONTEXT_N` sigue gobernando solo la rama `summary`.
 - No se cambia el comportamiento de fallback cuando hay clave y respuesta exitosa. Solo cambia **qué** mensajes se mandan al LLM en `mode='prompt'`.
@@ -104,7 +104,7 @@ Cuando `previousUserMessage` y `lastAssistantResponse` son `undefined`, `extract
 
 ## Risks / Trade-offs
 
-- **[Riesgo] El LLM ignora el system prompt y responde al primer mensaje user (el prompt anterior).** → Mitigación: el system prompt es explícito sobre "responder SOLO al tercer mensaje"; los tests del handler validan el array `chatHistory` enviado a fetch para evitar regresiones silenciosas. Si el modelo elegido (`poolside/laguna-xs.2:free`) no respeta la instrucción, se considerará cambiar de modelo o añadir un sufijo explícito al prompt actual en una iteración posterior.
+- **[Riesgo] El LLM ignora el system prompt y responde al primer mensaje user (el prompt anterior).** → Mitigación: el system prompt es explícito sobre "responder SOLO al tercer mensaje"; los tests del handler validan el array `chatHistory` enviado a fetch para evitar regresiones silenciosas. Si el modelo elegido (`poolside/laguna-xs-2.1:free`) no respeta la instrucción, se considerará cambiar de modelo o añadir un sufijo explícito al prompt actual en una iteración posterior.
 
 - **[Riesgo] El transcript tiene muchos `assistant` consecutivos y el "último assistant" no es realmente la respuesta final al turno anterior.** → Mitigación: el filtro `filter(m => m.role === 'assistant').at(-1)` toma el último. Si hay bloques `tool_use` + `tool_result` + `assistant` final, el filtro ya aísla el último assistant. Documentado en el helper.
 
@@ -125,4 +125,4 @@ Rollback: si el nuevo comportamiento resulta problemático, basta con revertir e
 ## Open Questions
 
 - ¿Conviene añadir `TTS_PROMPT_CONTEXT_N` como variable de entorno para ajustar la ventana de 10 mensajes, o mantenerla hardcodeada? Pendiente: por ahora se mantiene hardcodeada por parsimonia (§2 Simplicity First de `CLAUDE.md`).
-- ¿El modelo `poolside/laguna-xs.2:free` respeta correctamente la instrucción "responder SOLO al tercer mensaje" en español? Esto se validará empíricamente con un test de integración (`tests/scripting/headless-tts-*.test.ts`).
+- ¿El modelo `poolside/laguna-xs-2.1:free` respeta correctamente la instrucción "responder SOLO al tercer mensaje" en español? Esto se validará empíricamente con un test de integración (`tests/scripting/headless-tts-*.test.ts`).

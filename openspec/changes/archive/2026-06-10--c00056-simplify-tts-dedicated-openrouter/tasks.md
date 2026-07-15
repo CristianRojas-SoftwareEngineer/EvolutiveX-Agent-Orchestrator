@@ -10,7 +10,7 @@
 ## 2. Implementación del provider TTS dedicado
 
 - [x] 2.1 `src/4-api/composition-root.ts`: resolver en el arranque la API key desde `routing/providers/openrouter/secrets.json` (campo `ANTHROPIC_AUTH_TOKEN`; archivo ausente o malformado → `undefined`, sin lanzar) e inyectarla al handler como `ttsApiKey`.
-- [x] 2.2 Handler: reescribir `generateSpeechText` con el camino único — sin `ttsApiKey` → `[TTS-FALLBACK] reason: no-openrouter-key`; con clave → `fetch('https://openrouter.ai/api/v1/messages')` con modelo `poolside/laguna-xs.2:free`, `max_tokens: 512`, `reasoning: { effort: 'none' }`, headers fijos (`Authorization: Bearer`, `content-type`, `HTTP-Referer`, `X-Title`).
+- [x] 2.2 Handler: reescribir `generateSpeechText` con el camino único — sin `ttsApiKey` → `[TTS-FALLBACK] reason: no-openrouter-key`; con clave → `fetch('https://openrouter.ai/api/v1/messages')` con modelo `poolside/laguna-xs-2.1:free`, `max_tokens: 512`, `reasoning: { effort: 'none' }`, headers fijos (`Authorization: Bearer`, `content-type`, `HTTP-Referer`, `X-Title`).
 - [x] 2.3 Conservar sin cambios: extracción solo de bloques `text`, fallbacks `http-NNN`/`empty-response`/`exception`/`no-messages`, logs `[TTS-FALLBACK]`/`[TTS-SPEECH]`, `FALLBACK_SPEECH`.
 - [x] 2.4 Definir las constantes del camino TTS (URL, modelo, budget, headers) junto a las constantes existentes del handler o en `src/2-services/tts/` — sin variables de entorno nuevas.
 

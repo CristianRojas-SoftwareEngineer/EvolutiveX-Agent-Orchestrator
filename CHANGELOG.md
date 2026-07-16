@@ -4,6 +4,8 @@ All notable changes are derived from conventional commits. Do not edit by hand.
 
 ## [Unreleased]
 ### Added
+- modelo de voz dentro del ZIP por plataforma
+- añadir bundle de libespeak-ng en Windows y macOS
 - diagnóstico profundo de rutas y usuario del executor
 - unificar los 3 jobs en un solo workflow multi-plataforma
 - configs separados para windows, linux y macos
@@ -108,6 +110,7 @@ All notable changes are derived from conventional commits. Do not edit by hand.
 - migración a arquitectura SOLID con Fastify y documentación completa en español
 - initial commit for Fastify + TypeScript SOLID API
 ### Changed
+- usar paquete oficial de sherpa-onnx para modelo y tokens
 - renombrar jobs y steps; retención 1d; CARGO_HOME en environment
 - separar configs por target para ejecución aislada
 - reorganizar scripting/ por dominio
@@ -163,6 +166,20 @@ All notable changes are derived from conventional commits. Do not edit by hand.
 - implementar PKA de 6 capas, ports, inyección de dependencias y hardening de tooling
 - reemplazar 'any' por tipos estrictos del SDK de Anthropic
 ### Fixed
+- reducir speed de 1.0 a 0.85 para mejor prosodia
+- corregir tipo de frac de f64 a f32 en resample_interp
+- usar default_output_config de CPAL y resamplear si es necesario
+- renombrar tokens.txt a .onnx.tokens para que el binary lo encuentre
+- invalidar cache de modelo antiguo con key v2
+- adoptar archivo de tokens .tokens descargado de HuggingFace
+- corregir nombre del campo data_dir en OfflineTtsVitsModelConfig
+- agregar --data-dir para especificar espeak-ng-data
+- buscar libespeak-ng.dylib en opt/ antes que en lib/
+- corregir estructura del ZIP — raíz debe ser windows-amd64/
+- usar chocolatey en lugar de msiexec /a para instalar espeak-ng
+- patch metadatos ONNX en CI y diagnóstico espeak-ng Windows
+- usar msiexec /a para extraer espeak-ng.msi en lugar de zip
+- corregir layout ZIP en los 3 jobs para que coincida con spec
 - eliminar CARGO_HOME del environment
 - eliminar CARGO_HOME y RUSTUP_HOME del environment
 - forward slashes en save_cache; CARGO_HOME/RUSTUP_HOME explícitos; rustup minimal profile
@@ -311,6 +328,8 @@ All notable changes are derived from conventional commits. Do not edit by hand.
 - corregir omisión de cuerpos de petición en logs de auditoría
 - migrar ts-node a tsx por compatibilidad con Node.js 24
 ### Documentation
+- plan de eliminación de rastro TTS legacy (Fase 2)
+- sincronizar specs y docs del bundle con el pipeline CircleCI actual
 - documentar pipeline de build multi-plataforma de tts-sidecar
 - reparar enlaces y anclas internas rotas en documentación
 - documentar arquitectura de tres niveles del orquestador

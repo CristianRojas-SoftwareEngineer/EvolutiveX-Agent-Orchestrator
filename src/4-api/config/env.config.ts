@@ -45,8 +45,7 @@ export const config: ProxyEnvironmentConfig = {
   LOG_LEVEL: process.env.LOG_LEVEL || 'info',
   PROXY_UNREDACT_THINKING: process.env.PROXY_UNREDACT_THINKING === 'true',
   FILTERED_TOOLS: parseFilteredTools(process.env.FILTERED_TOOLS),
-  TTS_ENABLED: process.env.TTS_ENABLED !== 'false',
-  TTS_CONTEXT_N: process.env.TTS_CONTEXT_N ? parseInt(process.env.TTS_CONTEXT_N, 10) : 3,
+  TRANSCRIPT_CONTEXT_N: process.env.TRANSCRIPT_CONTEXT_N ? parseInt(process.env.TRANSCRIPT_CONTEXT_N, 10) : 3,
   LOG_HTTP_BODIES: process.env.LOG_HTTP_BODIES === 'true',
   LOG_HTTP_HEADERS: process.env.LOG_HTTP_HEADERS !== 'false',
 };

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "fs";
 import * as path from "path";
 import { readPhaseMarker, validatePhaseMarker, writePhaseMarker, MarkerAbsent, MarkerCorrupt, MarkerEmpty, MarkerWrongChange } from "../../../scripting/openspec/read-phase-marker.js";

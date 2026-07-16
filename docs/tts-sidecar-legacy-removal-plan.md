@@ -258,6 +258,6 @@ En términos prácticos, cualquier artefacto que todavía describa, instancie, c
 
 ## Importante
 
-No todo el código relacionado con TTS debe eliminarse de inmediato. Lo que debe desaparecer es la implementación concreta del motor local y cualquier dependencia que asuma que este repositorio es quien lo ejecuta. La narración debe quedar fuera de este repositorio; la parte que permanezca debe limitarse a la experiencia de usuario y a la gestión de eventos, sin referirse a un runtime ni a un binario específico de voz.
+Lo que debe desaparecer es la implementación concreta del motor local y cualquier dependencia que asuma que este repositorio es quien lo ejecuta. La narración debe quedar fuera de este repositorio; la parte que permanezca debe limitarse a la experiencia de usuario y a la gestión de eventos, sin referirse a un runtime ni a un binario específico de voz.
 
 El objetivo final no es solo quitar código, sino dejar una arquitectura limpia en la que la experiencia de usuario se separe por completo de la síntesis de voz y de la narración.

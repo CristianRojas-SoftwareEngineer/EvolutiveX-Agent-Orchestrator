@@ -159,34 +159,22 @@ import { buildIsolatedProviderEnv } from './scripting/headless/session-lib/provi
 Internal layout for contributors and consumers that need fine-grained lifecycle control.
 
 ```
-scripting/headless/
-├── gateway-test.ts         ← TTS test suite entry point (npm run test:headless-tts)
-├── session-lib/
-│   ├── proxy-lifecycle.ts  ← startProxy, stopProxy, waitHealth, killProcessOnPort, sleep, getLogPath
-│   ├── run-claude.ts       ← runClaudeHeadless, buildClaudeHeadlessArgs, resolveClaudeExecutable
-│   ├── provider-env.ts     ← buildIsolatedProviderEnv (resolves provider config in memory)
-│   └── env-utils.ts        ← getProxyPort (reads configs/.env), getLogByteOffset
-└── modules/
-    └── ...                 ← TTS-specific modules (verify-prompt, wait-for-tts, providers, …)
+scripting/headless/session-lib/
+├── proxy-lifecycle.ts  ← startProxy, stopProxy, waitHealth, killProcessOnPort, sleep, getLogPath
+├── run-claude.ts       ← runClaudeHeadless, buildClaudeHeadlessArgs, resolveClaudeExecutable
+├── provider-env.ts     ← buildIsolatedProviderEnv (resuelve config de provider en memoria)
+└── env-utils.ts        ← getProxyPort (read configs/.env), getLogByteOffset
 ```
 
-The TTS test suite (`scripting/headless/gateway-test.ts`) imports from `session-lib/` directly
-and adds TTS-specific assertions on top of the same lifecycle.
+The headless testing session library is imported directly when needed for isolated test scenarios.
 
 ---
 
-## TTS testing reference
+## Referencia para notificaciones (toasts)
 
-Use this reference when you want to validate the **TTS** cycle specifically
-(Stop hook → OpenRouter → SAPI), not just the generic proxy/claude cycle.
-
-See [references/tts-testing.md](./references/tts-testing.md) for:
-- The TTS cycle (Stop hook → OpenRouter dedicated provider → SAPI)
-- `[TTS-SPEECH]` / `[TTS-FALLBACK]` log tags and their fields
-- Provider matrix (session flow vs. dedicated TTS flow)
-- The drain loop and how to observe TTS completion
-- The `no-openrouter-key` fallback scenario
-- `npm run test:headless-tts` suite reference
+Usar esta referencia cuando se quiera validar el ciclo de **notificaciones** (toasts) del proxy.
+El handler `AuditHookEventHandler` emite toasts contextuales sin voz, leyendo el transcript
+de la sesión para enriquecer los mensajes.
 
 <!-- <<constraints> -->
 All user-facing output, explanations, questions, and summaries MUST be in Spanish.

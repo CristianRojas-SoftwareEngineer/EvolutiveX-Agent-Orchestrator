@@ -123,11 +123,11 @@ El sistema SHALL implementar un handler `AuditHookEventHandler` en capa 3 (`src/
 
 | Evento | Acción |
 |--------|--------|
-| `UserPromptSubmit` | Locución por voz; toast con preview del `prompt`. No crea ni alinea workflows (la apertura del turno corresponde a `ensureTurnWorkflow` en el primer hop HTTP) |
+| `UserPromptSubmit` | Toast con preview del `prompt`. No crea ni alinea workflows (la apertura del turno corresponde a `ensureTurnWorkflow` en el primer hop HTTP) |
 | `SubagentStart` | **`confirmSubagentFromHook(agentId, toolUseId?)`**; toast `"Subagente iniciado"` |
-| `Stop` | **`readyToClose` → si true: `close`** (§15.4); voz + toast de continuidad (generado por LLM). Si no se encuentra workflow: **log `warn`** con `sessionId` |
-| `SubagentStop` | **`readyToClose` para sub-workflow → si true: `close`** (§15.4); voz; toast `"Subagente terminado"`. Si no se encuentra entrada por `agentId`: **log `warn`**. Si `agentId` existe en índice wire pero no en lifecycle: **log `error`** |
-| `StopFailure` | **`close` directamente** (§15.4: siempre cierra en error); voz; toast con detalle del error (vía `formatStopFailureMessage`). Si no se encuentra workflow: **log `warn`** con `sessionId` |
+| `Stop` | **`readyToClose` → si true: `close`** (§15.4); toast de continuidad (generado por LLM desde transcript). Si no se encuentra workflow: **log `warn`** con `sessionId` |
+| `SubagentStop` | **`readyToClose` para sub-workflow → si true: `close`** (§15.4); toast `"Subagente terminado"`. Si no se encuentra entrada por `agentId`: **log `warn`**. Si `agentId` existe en índice wire pero no en lifecycle: **log `error`** |
+| `StopFailure` | **`close` directamente** (§15.4: siempre cierra en error); toast con detalle del error (vía `formatStopFailureMessage`). Si no se encuentra workflow: **log `warn`** con `sessionId` |
 | `PreToolUse` | Log informativo; toast condicional si `toolName === 'AskUserQuestion' && toolInput.questions` (vía `formatPreToolUseAskMessage`) |
 | `PostToolUse` | **`completeToolUse` solo si `completionAuthority === 'hook'`**; ignorar para tools `continuation`; toast condicional si `toolName === 'TaskUpdate' && toolInput.status === 'in_progress'` (vía `formatTaskInProgressMessage`); **proyección al board** si `toolName ∈ { TaskCreate, TaskUpdate }` y `toolInput.metadata.source === 'spec-delta'` (vía `KanbanBoardProjector`, opcional) |
 | `PostToolUseFailure` | **`completeToolUse` con `isError: true` solo si `completionAuthority === 'hook'`**; ignorar para tools `continuation` |

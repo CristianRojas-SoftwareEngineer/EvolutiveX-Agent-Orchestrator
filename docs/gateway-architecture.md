@@ -366,7 +366,7 @@ Un **Step** no es solo una llamada HTTP aislada: incluye la fase de tools observ
 
 | Evento             | Acción                                                                                 |
 | ------------------ | -------------------------------------------------------------------------------------- |
-| `UserPromptSubmit` | Notificaciones (toast/voz); el main lo abre `ensureTurnWorkflow` en el primer hop HTTP |
+Notificaciones (toast); el main lo abre `ensureTurnWorkflow` en el primer hop HTTP |
 | `SubagentStart`    | Abre `Workflow` con `kind: 'subagent'`                                                 |
 | `Stop`             | Cierra main si `stop_hook_active === false` y sin `background_tasks` pendientes        |
 | `SubagentStop`     | Cierra sub-workflow                                                                    |
@@ -1110,7 +1110,7 @@ El registro de tools pending en SSE:
 | -------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
 | `SessionStart`       | Crear/reconciliar metadata de sesión (`externalSessionId`).                                                                  |
 | `SessionEnd`         | Marcar sesión inactiva.                                                                                                      |
-| `UserPromptSubmit`   | Notificaciones (toast con preview del prompt, locución). No crea ni alinea workflows.                                        |
+Notificaciones (toast con preview del prompt). No crea ni alinea workflows.                                        |
 | `SubagentStart`      | `confirmSubagentFromHook(agentId, toolUseId?)` — confirma sub-workflow; enlaza `ToolUse.childWorkflowId` si join ya ocurrió. |
 | `PreToolUse`         | `ToolUse.status = 'running'`; registrar `startedAt`.                                                                         |
 | `PostToolUse`        | Completar `ToolUse`; si `name === 'Agent'`, enriquecer metadata del enlace hijo.                                             |

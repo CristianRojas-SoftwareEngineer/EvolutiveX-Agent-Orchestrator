@@ -3,7 +3,7 @@
 El gateway proxy implementa TTS de salida (lectura en voz alta de continuidad/intención) mediante dos mecanismos que actualmente están acoplados a Windows y a OpenRouter:
 
 1. **Motor de síntesis**: `SapiTTSService` invoca PowerShell con `System.Speech.Synthesis`, que solo existe en Windows.
-2. **Generación de intención**: `AuditHookEventHandler` llama a `poolside/laguna-xs.2:free` vía OpenRouter para generar el texto que sintetiza la voz.
+2. **Generación de intención**: `AuditHookEventHandler` llama a `poolside/laguna-xs-2.1:free` vía OpenRouter para generar el texto que sintetiza la voz.
 
 Ambos mecanismos viven dentro de la arquitectura PKA del gateway: el adaptador `SapiTTSService` implementa el puerto `ITTSService` (capa 1-domain), es usado por `AuditHookEventHandler` (capa 3-operations) que recibe los eventos de hook, y está cableado en `composition-root.ts` (capa 4-api).
 

@@ -49,12 +49,6 @@ const scripts: NpmScript[] = [
     category: 'local',
   },
   {
-    name: 'test:headless-tts',
-    description:
-      'Pruebas headless TTS por proveedor (catálogo menos opencode/xiaomi, claude -p sin shell). Flags: --providers, --exclude-providers, --no-voice-announce, --json',
-    category: 'local',
-  },
-  {
     name: 'create:agents-reference',
     description: 'Crea hardlink AGENTS.md → CLAUDE.md (multiplataforma)',
     category: 'local',
@@ -62,13 +56,13 @@ const scripts: NpmScript[] = [
   {
     name: 'setup:install',
     description:
-      'Instala las features de SCP en ~/.claude (statusline, voz, hooks). Flags: --statusline --voice --hooks --force --dry-run --root',
+      'Instala las features de SCP en ~/.claude (statusline, hooks). Flags: --statusline --hooks --force --dry-run --root',
     category: 'local',
   },
   {
     name: 'setup:uninstall',
     description:
-      'Desinstala las features de SCP de ~/.claude. Flags: --statusline --voice --hooks --force --dry-run --root',
+      'Desinstala las features de SCP de ~/.claude. Flags: --statusline --hooks --force --dry-run --root',
     category: 'local',
   },
   {

@@ -410,7 +410,7 @@ El CLI SHALL escribir un mensaje de error en `stderr` y terminar con código de 
 
 ### Requirement: Hook `Stop` — relay genérico + gateway
 
-El hook `Stop` SHALL usar `scripting/hooks/post-hook-event.ts` como relay (igual que los demás 12 eventos gestionados por SCP). El gateway (`AuditHookEventHandler`) es el único punto de decisión de efectos: voz (TTS vía OpenRouter dedicado), toast de continuidad y audit. El relay no emite toasts propios ni genera mensajes de continuidad. Ver spec `hooks-lifecycle-correlation` para el contrato completo del relay.
+El hook `Stop` SHALL usar `scripting/hooks/post-hook-event.ts` como relay (igual que los demás 12 eventos gestionados por SCP). El gateway (`AuditHookEventHandler`) es el único punto de decisión de efectos: toast de continuidad y audit. El relay no emite toasts propios ni genera mensajes de continuidad. Ver spec `hooks-lifecycle-correlation` para el contrato completo del relay.
 
 #### Scenario: CLI con payload inválido → error en stderr y exit 1
 
@@ -454,9 +454,9 @@ El repositorio SHALL exponer **un único** relay en `scripting/` que reenvía el
 
 | Módulo | Eventos | Secuencia |
 |--------|---------|-----------|
-| `post-hook-event.ts` | Los **13** eventos gestionados por SCP (`UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PostToolUseFailure`, `SubagentStart`, `SubagentStop`, `Stop`, `StopFailure`, `SessionStart`, `SessionEnd`, `PermissionRequest`, `TaskCreated`, `TaskCompleted`) | stdin → `POST /hooks` (el gateway decide todos los efectos: toast, TTS, audit) |
+| `post-hook-event.ts` | Los **13** eventos gestionados por SCP (`UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PostToolUseFailure`, `SubagentStart`, `SubagentStop`, `Stop`, `StopFailure`, `SessionStart`, `SessionEnd`, `PermissionRequest`, `TaskCreated`, `TaskCompleted`) | stdin → `POST /hooks` (el gateway decide todos los efectos: toast, audit) |
 
-Los relays antiguos `gateway-hook-notify.ts` y `pre-tool-use-hook-ux.ts` se eliminaron en el change `consolidate-hooks-in-gateway`. Sus lógicas de formateo y filtrado migraron al gateway, que ahora es el único punto que decide qué toast emitir y qué voz sintetizar.
+Los relays antiguos `gateway-hook-notify.ts` y `pre-tool-use-hook-ux.ts` se eliminaron en el change `consolidate-hooks-in-gateway`. Sus lógicas de formateo y filtrado migraron al gateway, que ahora es el único punto que decide qué toast emitir.
 
 Este relay SHALL leer stdin con el mismo criterio UTF-8 que `post-hook-event.ts` (`readStdinBuffer` + `utf-8`).
 

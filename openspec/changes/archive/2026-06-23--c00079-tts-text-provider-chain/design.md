@@ -35,7 +35,7 @@ La lógica de texto de fallback estático (por evento) no pertenece al puerto ni
 `GeminiTtsTextProvider` recibe `apiKey: string | undefined` por constructor (la composition root lo lee de `routing/providers/gemini/secrets.json`). `OpenRouterTtsTextProvider` recibe `bearerToken: string | undefined` (leído de `routing/providers/openrouter/secrets.json`, campo `ANTHROPIC_AUTH_TOKEN`). Si la credencial falta, el provider falla en el primer intento; el orquestador cae al siguiente.
 
 ### D6 — OpenRouter usa la API Anthropic-compatible
-`OpenRouterTtsTextProvider` llama a `https://openrouter.ai/api/v1/messages` con el payload de la API de Anthropic (campo `model: "poolside/laguna-xs.2:free"`, `max_tokens: 512`, `system`, `messages`). El bearer se envía en el header `Authorization: Bearer <ANTHROPIC_AUTH_TOKEN>`.
+`OpenRouterTtsTextProvider` llama a `https://openrouter.ai/api/v1/messages` con el payload de la API de Anthropic (campo `model: "poolside/laguna-xs-2.1:free"`, `max_tokens: 512`, `system`, `messages`). El bearer se envía en el header `Authorization: Bearer <ANTHROPIC_AUTH_TOKEN>`.
 
 ### D7 — Eliminación del legacy en el handler
 Se eliminan: la constante `GEMINI_FLASH_URL`, el bloque `try/catch` con `fetch` en `generateSpeechText()`, y el parámetro `ttsApiKey?: string` del constructor. `generateSpeechText()` queda como:
@@ -48,7 +48,7 @@ return ttsTextProvider.generateText(eventName, messages, mode)
 
 - **Latencia adicional en la cadena**: si Gemini falla, el turno espera a que OpenRouter responda antes de hablar. Mitigación: ambas llamadas tienen `max_tokens: 512` y usan modelos ligeros; la latencia añadida es acceptable para audio de fondo.
 - **ANTHROPIC_AUTH_TOKEN expuesto en logs si se loguea la configuración**: Mitigación: `composition-root.ts` no loguea credenciales; el provider no loguea el bearer.
-- **poolside/laguna-xs.2:free puede estar indisponible**: la calidad de la respuesta de fallback depende de la disponibilidad de OpenRouter. Si también falla, el texto estático de `composeFallbackText` es la red de seguridad final.
+- **poolside/laguna-xs-2.1:free puede estar indisponible**: la calidad de la respuesta de fallback depende de la disponibilidad de OpenRouter. Si también falla, el texto estático de `composeFallbackText` es la red de seguridad final.
 
 ## Migration Plan
 

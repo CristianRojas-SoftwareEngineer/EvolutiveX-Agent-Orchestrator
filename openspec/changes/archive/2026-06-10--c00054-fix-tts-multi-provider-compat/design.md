@@ -73,7 +73,7 @@ Bearer     → ANTHROPIC_AUTH_TOKEN ?? capturedToken
 
 **Decisión**: la llamada TTS usa `max_tokens: 150` para Anthropic, `512` para providers no-Anthropic, y `150` para Ollama local (`upstreamOrigin` contiene `localhost:11434`). En la rama no-Anthropic se envía además `reasoning: { effort: 'none' }`.
 
-**Razón**: los modelos thinking (MiniMax-M2.5, laguna-xs.2) consumen tokens en razonamiento antes de emitir bloques `text`; con 150 tokens devuelven `empty-response`. Con 512, ambos producen el bloque `text` de forma fiable (verificado vía REST directa y suite headless). Ollama cloud rechaza `max_tokens > 150` (404), por eso conserva el cap. `reasoning: { effort: 'none' }` reduce el thinking en OpenRouter pero no lo elimina de forma fiable; MiniMax y Ollama lo ignoran sin error.
+**Razón**: los modelos thinking (MiniMax-M2.5, laguna-xs-2.1) consumen tokens en razonamiento antes de emitir bloques `text`; con 150 tokens devuelven `empty-response`. Con 512, ambos producen el bloque `text` de forma fiable (verificado vía REST directa y suite headless). Ollama cloud rechaza `max_tokens > 150` (404), por eso conserva el cap. `reasoning: { effort: 'none' }` reduce el thinking en OpenRouter pero no lo elimina de forma fiable; MiniMax y Ollama lo ignoran sin error.
 
 **Alternativa descartada**: desactivar el thinking por completo (no existe mecanismo fiable en los modelos free de OpenRouter) o elegir solo modelos sin thinking (Gemma 4 falla en sesiones reales vía gateway).
 

@@ -228,15 +228,8 @@ program
       return;
     }
 
-    const validProviders = [
-      'default',
-      'anthropic',
-      'minimax',
-      'ollama',
-      'openrouter',
-      'xiaomi',
-      'opencode',
-    ];
+    const availableProviders = getAvailableProviders(PROVIDERS_BASE_PATH);
+    const validProviders = ['default', ...availableProviders];
     if (!validProviders.includes(provider)) {
       console.error(
         chalk.red(`Proveedor inválido: "${provider}". Opciones: ${validProviders.join(', ')}`),

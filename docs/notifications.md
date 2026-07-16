@@ -19,7 +19,7 @@ configuración externa, y no introduce dependencias Windows-specific.
 
 ## Instalación global (`~/.claude`)
 
-Para recibir toasts en **cualquier proyecto** (no solo Smart Code Proxy), registre los hooks en el perfil de usuario con el mismo patrón que el statusline (`npx --prefix` + `tsx`). Para instalar las **14 claves** (lifecycle + UX) junto con statusline y voz en un único paso:
+Para recibir toasts en **cualquier proyecto** (no solo Smart Code Proxy), registre los hooks en el perfil de usuario con el mismo patrón que el statusline (`npx --prefix` + `tsx`). Para instalar las **14 claves** (lifecycle + UX) junto con statusline en un único paso:
 
 ```bash
 npm run setup:install
@@ -39,21 +39,17 @@ Requisitos: `npm install` en la raíz del proxy (para `tsx` en `node_modules`). 
 
 **Nota:** el [`.claude/settings.json`](../../.claude/settings.json) del **proyecto** puede definir las mismas claves de hook (p. ej. lifecycle con `POST /hooks`); el merge de Claude Code da prioridad al proyecto y puede anular toasts globales en esas claves dentro de este repo. Para toasts + gateway en Smart Code Proxy, ampliar el settings del proyecto según [hooks-lifecycle-correlation](../openspec/specs/hooks-lifecycle-correlation/spec.md). Solo `.claude/settings.json` está en `.gitignore` (configuración local del proyecto); skills, comandos y memoria bajo `.claude/` sí se versionan. Los fragmentos canónicos de hooks viven en [`configs/hooks.json`](../configs/hooks.json), esta guía y el [README § Configuración de hooks](../README.md#configuracion-de-hooks).
 
-## Hook `Stop`: voz y toast de continuidad desde el gateway
+## Hook `Stop`: toast de continuidad desde el gateway
 
-En Smart Code Proxy, el evento **`Stop`** usa el relay genérico [`post-hook-event.ts`](../scripting/hooks/post-hook-event.ts) (igual que los demás eventos auditados). La voz y el toast de continuidad se generan **dentro del proceso del proxy** (`AuditHookEventHandler`).
+En Smart Code Proxy, el evento **`Stop`** usa el relay genérico [`post-hook-event.ts`](../scripting/hooks/post-hook-event.ts) (igual que los demás eventos auditados). El toast de continuidad se genera **dentro del proceso del proxy** (`AuditHookEventHandler`), sin voz.
 
-| Paso | Qué hace                                                                                                                                                                                                                                                                                                                                                             |
-| ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1    | `post-hook-event.ts` envía `POST /hooks` al proxy (fire-and-forget; respuesta en milisegundos)                                                                                                                                                                                                                                                                       |
-| 2    | `AuditHookEventHandler` extrae contexto del transcript (`transcript_path`) vía `IContextExtractor`                                                                                                                                                                                                                                                                   |
-| 3    | Genera el texto de continuidad **una sola vez** vía la cadena `ITtsTextProvider`: primero `GeminiTtsTextProvider` (`gemini-3.1-flash-lite`, clave de `routing/providers/gemini/secrets.json`); si Gemini falla (429/5xx/red), cae a `OpenRouterTtsTextProvider` (`poolside/laguna-xs.2:free`, bearer de `routing/providers/openrouter/secrets.json`); si ambos fallan, usa el mensaje de fallback estático y emite `[TTS-FALLBACK]` |
-| 4    | Emite **voz** (TTS vía sidecar local `tts-sidecar`, binario que embebe Piper + CPAL) y **toast** (`INotificationService` inyectado) en paralelo desde el mismo texto                                                                                                                                                                                                                                                        |
-| 5    | Si el toast falla, la voz y la respuesta HTTP del hook continúan sin errores (degradación con gracia)                                                                                                                                                                                                                                                                |
+| Paso | Qué hace                                                                                             |
+| ---- | ---------------------------------------------------------------------------------------------------- |
+| 1    | `post-hook-event.ts` envía `POST /hooks` al proxy (fire-and-forget; respuesta en milisegundos) |
+| 2    | `AuditHookEventHandler` extrae el último mensaje del asistente del transcript vía `IContextExtractor` |
+| 3    | Emite **toast** (`INotificationService` inyectado) con el mensaje del asistente (o fallback estático) |
 
-**Sin persistencia en disco:** el archivo `sessions/.last-continuity-message.txt` se retiró. Voz y toast se emiten en memoria desde el mismo texto en el mismo proceso.
-
-**Consistencia voz↔toast:** al usar el mismo texto generado vía el provider TTS dedicado (OpenRouter, independiente del provider de sesión), voz y toast siempre tienen el mismo contenido, independientemente del provider configurado para el flujo agéntico.
+**Fallback sin transcript:** si no hay transcript disponible, el toast usa `"El asistente terminó su turno."`.
 
 **Fragmento canónico para `configs/hooks.json`** (ya aplicado; sin `timeout`):
 
@@ -70,7 +66,7 @@ En Smart Code Proxy, el evento **`Stop`** usa el relay genérico [`post-hook-eve
 ]
 ```
 
-**Depuración:** iniciar el proxy con logs (`npm run dev`), provocar un `Stop` desde Claude Code y observar las líneas `[TTS/Toast]` en la salida del proxy. Canal **Hooks** en Claude Code (`/hooks`) para verificar que el relay llegó.
+**Depuración:** iniciar el proxy con logs (`npm run dev`), provocar un `Stop` desde Claude Code y observar las líneas `[Toast]` en la salida del proxy. Canal **Hooks** en Claude Code (`/hooks`) para verificar que el relay llegó.
 
 Los **prompt hooks** (`type: "prompt"`) de Claude Code no pueden invocar toasts; el resumen con modelo va en el handler del gateway, no en un `type: "prompt"` aparte.
 
@@ -538,8 +534,8 @@ del roadmap `claude-code-hooks-implementation`, los hooks han dejado
 de invocarlo. La consolidación posterior unificó todos los hooks en un
 **único relay** (`scripting/hooks/post-hook-event.ts`) que delega en el
 gateway (`AuditHookEventHandler`) la decisión de efectos: el gateway
-es el único punto que decide qué toast emitir (estático o dinámico) y
-qué locución sintetizar. Los eventos `UserPromptSubmit`, `StopFailure`,
+es el único punto que decide qué toast emitir (estático o dinámico).
+Los eventos `UserPromptSubmit`, `StopFailure`,
 `SubagentStart`, `SubagentStop`, `SessionStart`, `SessionEnd`,
 `PermissionRequest`, `TaskCreated`, `TaskCompleted` y los condicionales
 `PreToolUse[AskUserQuestion]` / `PostToolUse[TaskUpdate+in_progress]`
@@ -577,7 +573,7 @@ Esta tabla reemplaza las anteriores (`gateway-hook-notify.ts`, `pre-tool-use-hoo
 | `PostToolUseFailure` | —       | `npx tsx scripting/hooks/post-hook-event.ts`                                                             |
 | `SubagentStart`      | —       | `npx tsx scripting/hooks/post-hook-event.ts` (gateway emite toast `"Subagente iniciado"`)                |
 | `SubagentStop`       | —       | `npx tsx scripting/hooks/post-hook-event.ts` (gateway emite toast `"Subagente terminado"`)               |
-| `Stop`               | —       | `npx tsx scripting/hooks/post-hook-event.ts` (gateway genera voz y toast de continuidad internamente)    |
+| `Stop`               | —       | `npx tsx scripting/hooks/post-hook-event.ts` (gateway genera toast de continuidad internamente)    |
 | `StopFailure`        | —       | `npx tsx scripting/hooks/post-hook-event.ts` (gateway emite toast con detalle del error)                 |
 | `SessionStart`       | —       | `npx tsx scripting/hooks/post-hook-event.ts` (gateway emite toast `"Sesión iniciada"`)                   |
 | `SessionEnd`         | —       | `npx tsx scripting/hooks/post-hook-event.ts` (gateway emite toast `"Sesión finalizada"`)                 |

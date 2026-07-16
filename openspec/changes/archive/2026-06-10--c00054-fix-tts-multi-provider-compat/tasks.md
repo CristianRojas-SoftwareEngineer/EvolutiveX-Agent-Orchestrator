@@ -26,7 +26,7 @@
 
 ## 5. Configuración de provider OpenRouter
 
-- [x] 5.1 En `routing/providers/openrouter/config.json`, confirmar `ANTHROPIC_DEFAULT_HAIKU_MODEL = models/laguna-xs.2` (Gemma 4 fue descartado: falla en sesiones reales vía gateway; laguna-xs.2 funciona con TTS al subir `max_tokens` a 512 para absorber su thinking)
+- [x] 5.1 En `routing/providers/openrouter/config.json`, confirmar `ANTHROPIC_DEFAULT_HAIKU_MODEL = models/laguna-xs-2.1` (Gemma 4 fue descartado: falla en sesiones reales vía gateway; laguna-xs-2.1 funciona con TTS al subir `max_tokens` a 512 para absorber su thinking)
 
 ## 6. Harness de pruebas headless
 

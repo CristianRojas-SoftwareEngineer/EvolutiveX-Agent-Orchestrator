@@ -314,7 +314,6 @@ describe('AuditHookEventHandler', () => {
   it('Stop con notifier inyectado → notify llamado con title Stop y message no vacío', async () => {
     const notify = vi.fn().mockResolvedValue(undefined);
     const notifier = { notify };
-    const tts = { speak: vi.fn().mockResolvedValue(undefined), initialize: vi.fn() };
     const wf = stubWorkflow();
     const getWorkflowBySessionId = vi.fn().mockReturnValue(wf);
     const readyToClose = vi.fn().mockReturnValue(false);
@@ -324,7 +323,6 @@ describe('AuditHookEventHandler', () => {
       '/tmp/sessions',
       makeSessionMetrics(),
       undefined,
-      tts,
       undefined,
       3,
       notifier,
@@ -342,11 +340,9 @@ describe('AuditHookEventHandler', () => {
     expect(call.message.length).toBeGreaterThan(0);
   });
 
-  it('Stop no lanza si notifier.notify rechaza y TTS sigue invocándose', async () => {
-    const notify = vi.fn().mockRejectedValue(new Error('toast fail'));
+  it('Stop sin transcript → toast de fallback sin voz ("El asistente terminó su turno.")', async () => {
+    const notify = vi.fn().mockResolvedValue(undefined);
     const notifier = { notify };
-    const speak = vi.fn().mockResolvedValue(undefined);
-    const tts = { speak, initialize: vi.fn() };
     const wf = stubWorkflow();
     const getWorkflowBySessionId = vi.fn().mockReturnValue(wf);
     const readyToClose = vi.fn().mockReturnValue(false);
@@ -356,144 +352,38 @@ describe('AuditHookEventHandler', () => {
       '/tmp/sessions',
       makeSessionMetrics(),
       undefined,
-      tts,
       undefined,
       3,
       notifier,
     );
-
     handler.execute({ eventName: 'Stop', sessionId: 'session-1' });
     await new Promise((r) => setTimeout(r, 100));
 
-    expect(speak).toHaveBeenCalledOnce();
-  });
-});
-
-describe('AuditHookEventHandler UserPromptSubmit con TTS', () => {
-  it('UserPromptSubmit con transcript previo delega al provider con la tríada user/assistant/user', async () => {
-    const speak = vi.fn().mockResolvedValue(undefined);
-    const tts = { speak, initialize: vi.fn() };
-    const extractUserPromptSubmitContext = vi.fn().mockResolvedValue({
-      previousUserMessage: 'petición anterior del usuario',
-      lastAssistantResponse: 'respuesta del turno previo',
-      currentPrompt: 'prompt actual',
-    });
-    const contextExtractor = { extractUserPromptSubmitContext, extractLastNMessages: vi.fn() };
-    const repo = makeRepo();
-    const generateText = vi.fn().mockResolvedValue('Voy a refactorizar');
-    const ttsTextProvider = { generateText };
-    const handler = new AuditHookEventHandler(
-      repo,
-      '/tmp/sessions',
-      makeSessionMetrics(),
-      undefined,
-      tts,
-      contextExtractor,
-      3,
-      undefined,
-      undefined,
-      ttsTextProvider,
-    );
-
-    handler.execute({
-      eventName: 'UserPromptSubmit',
-      sessionId: 'session-1',
-      agentId: 'agent-root',
-      transcriptPath: '/tmp/transcript.jsonl',
-      prompt: 'prompt actual',
-    });
-
-    await new Promise((r) => setTimeout(r, 100));
-
-    expect(generateText).toHaveBeenCalledOnce();
-    const [, messages, mode] = generateText.mock.calls[0] as [string, unknown[], string];
-    expect(mode).toBe('prompt');
-    expect(messages).toEqual([
-      { role: 'user', text: 'petición anterior del usuario' },
-      { role: 'assistant', text: 'respuesta del turno previo' },
-      { role: 'user', text: 'prompt actual' },
-    ]);
-    expect(speak).toHaveBeenCalledWith('Voy a refactorizar');
+    expect(notify).toHaveBeenCalledOnce();
+    const call = notify.mock.calls[0][0] as { title: string; message: string };
+    expect(call.title).toBe('Stop');
+    expect(call.message).toBe('El asistente terminó su turno.');
   });
 
-  it('UserPromptSubmit sin contexto previo delega al provider solo el prompt actual', async () => {
-    const speak = vi.fn().mockResolvedValue(undefined);
-    const tts = { speak, initialize: vi.fn() };
-    const extractUserPromptSubmitContext = vi.fn().mockResolvedValue({
-      previousUserMessage: undefined,
-      lastAssistantResponse: undefined,
-      currentPrompt: 'primer mensaje',
-    });
-    const contextExtractor = { extractUserPromptSubmitContext, extractLastNMessages: vi.fn() };
-    const repo = makeRepo();
-    const generateText = vi.fn().mockResolvedValue('Entendido, voy a investigar');
-    const ttsTextProvider = { generateText };
-    const handler = new AuditHookEventHandler(
-      repo,
-      '/tmp/sessions',
-      makeSessionMetrics(),
-      undefined,
-      tts,
-      contextExtractor,
-      3,
-      undefined,
-      undefined,
-      ttsTextProvider,
-    );
-
-    handler.execute({
-      eventName: 'UserPromptSubmit',
-      sessionId: 'session-1',
-      agentId: 'agent-root',
-      transcriptPath: '/tmp/transcript.jsonl',
-      prompt: 'primer mensaje',
-    });
-
-    await new Promise((r) => setTimeout(r, 100));
-
-    expect(generateText).toHaveBeenCalledOnce();
-    const [, messages, mode] = generateText.mock.calls[0] as [string, unknown[], string];
-    expect(mode).toBe('prompt');
-    expect(messages).toEqual([{ role: 'user', text: 'primer mensaje' }]);
-    expect(speak).toHaveBeenCalledWith('Entendido, voy a investigar');
-  });
-
-  it('UserPromptSubmit sin clave OpenRouter reproduce fallback sin llamar a fetch', async () => {
-    const fetchMock = vi.fn();
-    vi.stubGlobal('fetch', fetchMock);
-
-    const speak = vi.fn().mockResolvedValue(undefined);
-    const tts = { speak, initialize: vi.fn() };
-    const contextExtractor = {
-      extractUserPromptSubmitContext: vi.fn(),
-      extractLastNMessages: vi.fn(),
-    };
+  it('SessionStart con sessionId → toast enriquecido con el id de sesión', async () => {
+    const notify = vi.fn().mockResolvedValue(undefined);
+    const notifier = { notify };
     const repo = makeRepo();
     const handler = new AuditHookEventHandler(
       repo,
       '/tmp/sessions',
       makeSessionMetrics(),
       undefined,
-      tts,
-      contextExtractor,
+      undefined,
       3,
-      undefined,
-      undefined,
-      undefined, // sin API key
+      notifier,
     );
+    handler.execute({ eventName: 'SessionStart', sessionId: 'abc-123' });
+    await new Promise((r) => setTimeout(r, 50));
 
-    handler.execute({
-      eventName: 'UserPromptSubmit',
-      sessionId: 'session-1',
-      agentId: 'agent-root',
-      prompt: 'hola',
-    });
-
-    await new Promise((r) => setTimeout(r, 100));
-
-    expect(fetchMock).not.toHaveBeenCalled();
-    expect(speak).toHaveBeenCalledWith('Solicitud recibida. Procesando con Claude.');
-
-    vi.unstubAllGlobals();
+    expect(notify).toHaveBeenCalledOnce();
+    const call = notify.mock.calls[0][0] as { title: string; message: string };
+    expect(call.title).toBe('SessionStart');
+    expect(call.message).toBe('Sesión iniciada (abc-123)');
   });
 });

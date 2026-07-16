@@ -1,9 +1,7 @@
 import type { IWorkflowRepository } from '../1-domain/repositories/IWorkflowRepository.js';
 import type { Logger } from '../1-domain/types/logger.types.js';
 import type { ClaudeHookEvent } from '../1-domain/types/hook.types.js';
-import type { ITTSService } from '../1-domain/ports/ITTSService.js';
-import type { IContextExtractor, SessionMessage } from '../1-domain/ports/IContextExtractor.js';
-import type { ITtsTextProvider } from '../1-domain/ports/ITtsTextProvider.js';
+import type { IContextExtractor } from '../1-domain/ports/IContextExtractor.js';
 import type { INotificationService } from '../2-services/notifications/INotificationService.js';
 import type { NotificationEvent } from '../2-services/notifications/types.js';
 import {
@@ -26,12 +24,10 @@ export class AuditHookEventHandler {
     private readonly auditBaseDir: string,
     private readonly sessionMetrics: SessionMetricsService,
     private readonly logger?: Logger,
-    private readonly tts?: ITTSService,
     private readonly contextExtractor?: IContextExtractor,
     private readonly contextN: number = 3,
     private readonly notifier?: INotificationService,
     private readonly toastBranding?: { appId?: string; icon?: string },
-    private readonly ttsTextProvider?: ITtsTextProvider,
     private readonly kanbanProjector?: KanbanBoardProjector,
   ) {}
 
@@ -45,14 +41,15 @@ export class AuditHookEventHandler {
         if (event.agentId) {
           this.workflowRepo.confirmSubagentFromHook(event.agentId, event.toolUseId);
         }
-        void this.emitToast('SubagentStart', 'Subagente iniciado');
+        void this.emitToast(
+          'SubagentStart',
+          event.agentId ? `Subagente iniciado (${event.agentId})` : 'Subagente iniciado',
+        );
         break;
 
       case 'UserPromptSubmit': {
         // El workflow del turno lo crea exclusivamente `ensureTurnWorkflow` al llegar
         // la request HTTP real; crear aquí produciría workflows sin request body.
-        // Locución asíncrona como asistente de voz
-        void this.speakAsync(event, 'prompt');
         // Toast con preview del prompt (mismo texto que el script relay)
         const userPromptMsg =
           event.prompt !== undefined
@@ -106,9 +103,8 @@ export class AuditHookEventHandler {
           this.workflowRepo.close(wfId, event);
           await this.delegateClosure(event.sessionId, wfId);
         }
-        // Resumen de cierre de subagente por voz
-        void this.speakAsync(event, 'summary');
-        void this.emitToast('SubagentStop', 'Subagente terminado');
+        // Toast de cierre de subagente enriquecido con el último mensaje del asistente
+        void this.emitContextualToast('SubagentStop', event, 'Subagente terminado');
         break;
       }
 
@@ -123,8 +119,6 @@ export class AuditHookEventHandler {
         }
         this.workflowRepo.close(wf.id, event);
         await this.delegateClosure(event.sessionId, wf.id);
-        // Alerta de fallo por voz
-        void this.speakAsync(event, 'summary');
         // Toast con detalle del error (último mensaje o tipo de error)
         const stopFailurePayload: Record<string, unknown> = {};
         if (event.lastAssistantMessage) {
@@ -159,20 +153,36 @@ export class AuditHookEventHandler {
         break;
 
       case 'SessionStart':
-        void this.emitToast('SessionStart', 'Sesión iniciada');
+        void this.emitToast(
+          'SessionStart',
+          event.sessionId ? `Sesión iniciada (${event.sessionId})` : 'Sesión iniciada',
+        );
         break;
 
-      case 'SessionEnd':
-        void this.emitToast('SessionEnd', 'Sesión finalizada');
+      case 'SessionEnd': {
+        // Enriquecimiento con el último mensaje del asistente leído del transcript.
+        const recap = await this.lastAssistantText(event.transcriptPath);
+        void this.emitToast(
+          'SessionEnd',
+          recap ? `Sesión finalizada: ${recap}` : 'Sesión finalizada',
+        );
         break;
+      }
 
-      case 'TaskCreated':
-        void this.emitToast('TaskCreated', 'Tarea creada');
+      case 'TaskCreated': {
+        const subject = this.taskSubject(event);
+        void this.emitToast('TaskCreated', subject ? `Tarea creada: ${subject}` : 'Tarea creada');
         break;
+      }
 
-      case 'TaskCompleted':
-        void this.emitToast('TaskCompleted', 'Tarea completada');
+      case 'TaskCompleted': {
+        const subject = this.taskSubject(event);
+        void this.emitToast(
+          'TaskCompleted',
+          subject ? `Tarea completada: ${subject}` : 'Tarea completada',
+        );
         break;
+      }
 
       case 'PermissionRequest': {
         const permPayload: Record<string, unknown> = {};
@@ -192,155 +202,47 @@ export class AuditHookEventHandler {
   }
 
   /**
-   * Genera un texto mediante LLM usando el contexto del transcript y lo sintetiza por voz.
-   * Se ejecuta siempre en segundo plano; nunca propaga errores al flujo principal.
-   *
-   * @param mode 'prompt' — responde al último mensaje como asistente de voz
-   *             'summary' — resume lo ejecutado en el turno finalizado
+   * Lee el último mensaje del asistente desde el transcript de la sesión.
+   * Devuelve `undefined` si no hay transcript, extractor o mensaje de asistente.
+   * Es lectura de contexto para toasts (UX no-voz); nunca propaga errores.
    */
-  private async speakAsync(event: ClaudeHookEvent, mode: 'prompt' | 'summary'): Promise<void> {
-    if (!this.tts) return;
-
+  private async lastAssistantText(transcriptPath: string | undefined): Promise<string | undefined> {
+    if (!transcriptPath || !this.contextExtractor) return undefined;
     try {
-      // 1. Extraer contexto del transcript si está disponible
-      //    - 'prompt' (UserPromptSubmit): tríada curada (user + assistant + prompt actual)
-      //    - 'summary' (Stop/SubagentStop/StopFailure): últimos N mensajes del turno
-      const messages =
-        mode === 'prompt'
-          ? await this.extractUserPromptContext(event)
-          : await this.extractContext(event.transcriptPath);
-
-      // 2. Generar texto con LLM o usar fallback
-      const text = await this.generateSpeechText(event.eventName, messages, mode);
-
-      // 3. Sintetizar y reproducir
-      await this.tts.speak(text);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      this.logger?.error({ eventName: event.eventName, err: msg }, '[TTS] Error en speakAsync');
-    }
-  }
-
-  /** Extrae los últimos N mensajes del transcript si la ruta está disponible. */
-  private async extractContext(transcriptPath: string | undefined): Promise<SessionMessage[]> {
-    if (!transcriptPath || !this.contextExtractor) return [];
-    try {
-      return await this.contextExtractor.extractLastNMessages(transcriptPath, this.contextN);
+      const messages = await this.contextExtractor.extractLastNMessages(transcriptPath, this.contextN);
+      const lastAssistant = [...messages].reverse().find((m) => m.role === 'assistant');
+      return lastAssistant?.text?.trim() || undefined;
     } catch {
-      return [];
+      return undefined;
     }
+  }
+
+  /** Extrae el `subject` del `tool_input` de los eventos de tarea (TaskCreated/TaskCompleted). */
+  private taskSubject(event: ClaudeHookEvent): string | undefined {
+    const subject = event.toolInput?.['subject'];
+    return typeof subject === 'string' && subject.trim() ? subject.trim() : undefined;
   }
 
   /**
-   * Extrae la tríada curada para `UserPromptSubmit`:
-   *   [penúltimo user del transcript, último assistant, prompt actual].
-   * Mapea el `UserPromptContext` del extractor a `SessionMessage[]` (0-3 elementos).
-   * Si el extractor o el transcript no están disponibles, devuelve solo el prompt actual.
+   * Emite un toast enriquecido con el último mensaje del asistente del transcript.
+   * Si el transcript no aporta contexto, usa el texto de fallback provisto.
    */
-  private async extractUserPromptContext(event: ClaudeHookEvent): Promise<SessionMessage[]> {
-    const messages: SessionMessage[] = [];
-
-    if (this.contextExtractor && event.transcriptPath) {
-      try {
-        const ctx = await this.contextExtractor.extractUserPromptSubmitContext(
-          event.transcriptPath,
-          event.prompt ?? '',
-        );
-        if (ctx.previousUserMessage) {
-          messages.push({ role: 'user', text: ctx.previousUserMessage });
-        }
-        if (ctx.lastAssistantResponse) {
-          messages.push({ role: 'assistant', text: ctx.lastAssistantResponse });
-        }
-      } catch {
-        /* extracción fallida: continuar con lo que tengamos */
-      }
-    }
-
-    messages.push({ role: 'user', text: event.prompt ?? '' });
-    return messages;
+  private async emitContextualToast(
+    title: string,
+    event: ClaudeHookEvent,
+    fallback: string,
+  ): Promise<void> {
+    const recap = await this.lastAssistantText(event.transcriptPath);
+    await this.emitToast(title, recap ? `${fallback}: ${recap}` : fallback);
   }
 
-  /**
-   * Construye el prompt para el LLM y obtiene el texto a sintetizar.
-   * Si el LLM no está disponible o falla, devuelve el mensaje de fallback.
-   */
-  private logTtsFallback(eventName: string, reason: string, fallbackText: string): void {
-    this.logger?.warn(
-      {
-        tag: '[TTS-FALLBACK]',
-        eventName,
-        usedFallback: true,
-        reason,
-        fallbackText,
-      },
-      '[TTS] Mensaje genérico de fallback (audio y toast)',
-    );
-  }
-
-  /**
-   * Fallback textual usado cuando el LLM (Gemini Flash) no puede generar el texto
-   * a sintetizar. No es un mensaje de TTS: es el texto que se muestra en stdout y
-   * en el toast de continuidad cuando la generación de texto falla. La decisión
-   * de hablarlo o no la toma el sidecar; este método solo aporta el contenido.
-   */
-  private composeFallbackText(eventName: string): string {
-    switch (eventName) {
-      case 'UserPromptSubmit':
-        return 'Solicitud recibida. Procesando con Claude.';
-      case 'Stop':
-        return 'El asistente terminó su turno.';
-      case 'SubagentStop':
-        return 'El subagente completó su trabajo.';
-      case 'StopFailure':
-        return 'Ocurrió un error durante la ejecución.';
-      default:
-        return 'Procesando.';
-    }
-  }
-
-  private logTtsDynamic(eventName: string, text: string): void {
-    this.logger?.info(
-      {
-        tag: '[TTS-SPEECH]',
-        eventName,
-        usedFallback: false,
-        textPreview: text.slice(0, 120),
-      },
-      '[TTS] Mensaje dinámico generado',
-    );
-  }
-
-  private async generateSpeechText(
-    eventName: string,
-    messages: SessionMessage[],
-    mode: 'prompt' | 'summary',
-  ): Promise<string> {
-    const fallback = this.composeFallbackText(eventName);
-
-    if (!this.ttsTextProvider || messages.length === 0) {
-      this.logTtsFallback(eventName, !this.ttsTextProvider ? 'no-provider' : 'no-messages', fallback);
-      return fallback;
-    }
-
-    try {
-      const text = await this.ttsTextProvider.generateText(eventName, messages, mode);
-      this.logTtsDynamic(eventName, text);
-      return text;
-    } catch {
-      this.logTtsFallback(eventName, 'exception', fallback);
-      return fallback;
-    }
-  }
-
+  /** Toast de cierre del turno: último mensaje del asistente del transcript, sin voz. */
   private async announceStop(event: ClaudeHookEvent): Promise<void> {
     try {
-      const messages = await this.extractContext(event.transcriptPath);
-      const text = await this.generateSpeechText('Stop', messages, 'summary');
-      await Promise.allSettled([this.tts?.speak(text), this.emitToast('Stop', text)]);
+      const recap = await this.lastAssistantText(event.transcriptPath);
+      await this.emitToast('Stop', recap ?? 'El asistente terminó su turno.');
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      this.logger?.error({ eventName: 'Stop', err: msg }, '[TTS/Toast] Error en announceStop');
+      this.logger?.error({ err }, '[Toast] fallo en announceStop');
     }
   }
 

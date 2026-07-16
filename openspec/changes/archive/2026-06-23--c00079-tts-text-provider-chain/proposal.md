@@ -6,7 +6,7 @@ El handler `AuditHookEventHandler` realiza un `fetch` inline a Gemini Flash para
 
 - Se introduce el puerto de dominio `ITtsTextProvider` en `src/1-domain/ports/` con un único método `generateText(eventName, messages, mode)` que siempre devuelve un `string` no vacío.
 - Se implementa `GeminiTtsTextProvider` en `src/2-services/tts/` usando el modelo `gemini-3.1-flash-lite` (mayor cuota libre que el anterior `gemini-2.5-flash`).
-- Se implementa `OpenRouterTtsTextProvider` en `src/2-services/tts/` usando `poolside/laguna-xs.2:free` con la API Anthropic-compatible de OpenRouter (`https://openrouter.ai/api`, bearer `ANTHROPIC_AUTH_TOKEN`).
+- Se implementa `OpenRouterTtsTextProvider` en `src/2-services/tts/` usando `poolside/laguna-xs-2.1:free` con la API Anthropic-compatible de OpenRouter (`https://openrouter.ai/api`, bearer `ANTHROPIC_AUTH_TOKEN`).
 - Se implementa `TtsTextProviderChain` en `src/2-services/tts/`: intenta Gemini y, ante cualquier fallo (429, 5xx, red, respuesta vacía), cae a OpenRouter; si ambos fallan, devuelve el texto de fallback estático según el tipo de evento.
 - El constructor de `AuditHookEventHandler` reemplaza el parámetro `ttsApiKey?: string` por `ttsTextProvider?: ITtsTextProvider`. La lógica de `fetch` inline desaparece del handler.
 - `composition-root.ts` instancia los dos providers y la cadena, y resuelve las credenciales de Gemini (`routing/providers/gemini/secrets.json`) y OpenRouter (`routing/providers/openrouter/secrets.json`).
@@ -14,7 +14,7 @@ El handler `AuditHookEventHandler` realiza un `fetch` inline a Gemini Flash para
 ## Capabilities
 
 ### Modified Capabilities
-- `tts-hooks`: el requisito "Provider dedicado de inferencia TTS" cambia de un `fetch` inline a Gemini `gemini-2.5-flash` inyectado vía `ttsApiKey`, a un puerto `ITtsTextProvider` que encapsula la cadena Gemini `gemini-3.1-flash-lite` → OpenRouter `poolside/laguna-xs.2:free`, con fallback estático ante fallo de ambos providers.
+- `tts-hooks`: el requisito "Provider dedicado de inferencia TTS" cambia de un `fetch` inline a Gemini `gemini-2.5-flash` inyectado vía `ttsApiKey`, a un puerto `ITtsTextProvider` que encapsula la cadena Gemini `gemini-3.1-flash-lite` → OpenRouter `poolside/laguna-xs-2.1:free`, con fallback estático ante fallo de ambos providers.
 
 ## Impact
 

@@ -11,7 +11,7 @@
 ## 3. Implementación OpenRouterTtsTextProvider
 
 - [x] 3.1 Crear `src/2-services/tts/openrouter-tts-text-provider.ts` con la clase `OpenRouterTtsTextProvider` que recibe `bearerToken: string | undefined` por constructor e implementa `ITtsTextProvider` ~doing
-- [x] 3.2 Implementar `generateText()` llamando a `https://openrouter.ai/api/v1/messages` con payload Anthropic-compatible (`model: "poolside/laguna-xs.2:free"`, `max_tokens: 512`, `system`, `messages`), header `Authorization: Bearer <bearerToken>`, `content-type: application/json` ~doing
+- [x] 3.2 Implementar `generateText()` llamando a `https://openrouter.ai/api/v1/messages` con payload Anthropic-compatible (`model: "poolside/laguna-xs-2.1:free"`, `max_tokens: 512`, `system`, `messages`), header `Authorization: Bearer <bearerToken>`, `content-type: application/json` ~doing
 - [x] 3.3 Lanzar error ante ausencia de bearer, respuesta HTTP no-ok o texto vacío en la respuesta ~doing
 
 ## 4. Orquestador TtsTextProviderChain

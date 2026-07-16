@@ -30,11 +30,8 @@ export interface ProxyEnvironmentConfig {
    */
   FILTERED_TOOLS: string[];
 
-  /** Activar o desactivar las notificaciones por voz (TTS). Env: `TTS_ENABLED`. */
-  TTS_ENABLED?: boolean;
-
-  /** Número de últimos mensajes a leer del transcript para contexto. Env: `TTS_CONTEXT_N`. */
-  TTS_CONTEXT_N?: number;
+  /** Número de últimos mensajes a leer del transcript para enriquecer los toasts. Env: `TRANSCRIPT_CONTEXT_N`. */
+  TRANSCRIPT_CONTEXT_N?: number;
 
   /** Activar logging del body de request. Default: false. Env: `LOG_HTTP_BODIES`. */
   LOG_HTTP_BODIES?: boolean;

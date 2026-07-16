@@ -1,7 +1,6 @@
 /**
  * Resolución de configuración de providers (routing/providers/<name>/).
- * Compartido entre configure-provider.ts (mutación de settings.json) y el
- * harness headless-tts (inyección de entorno en memoria, sin tocar estado global).
+ * Compartido entre configure-provider.ts (mutación de settings.json) y herramientas de CLI.
  */
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';

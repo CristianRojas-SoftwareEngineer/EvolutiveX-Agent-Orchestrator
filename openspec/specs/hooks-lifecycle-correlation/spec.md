@@ -323,7 +323,7 @@ El repositorio SHALL registrar las entradas del lifecycle de hooks de Claude Cod
 
 ### Requirement: Todos los eventos de hook ciclan por `POST /hooks`
 
-Todos los **13 eventos** de Claude Code gestionados por SCP SHALL ciclar por el endpoint `POST /hooks`. Doce eventos SHALL usar `scripting/hooks/post-hook-event.ts` como comando relay en `configs/hooks.json`; el evento `SessionEnd` SHALL usar `scripting/hooks/session-end-hook.ts` (cliente HTTP autocontenido invocado con `node` directo). El gateway (`AuditHookEventHandler`) es el único punto de decisión de efectos (toast, TTS, audit): los scripts relay nunca deciden efectos locales.
+Todos los **13 eventos** de Claude Code gestionados por SCP SHALL ciclar por el endpoint `POST /hooks`. Doce eventos SHALL usar `scripting/hooks/post-hook-event.ts` como comando relay en `configs/hooks.json`; el evento `SessionEnd` SHALL usar `scripting/hooks/session-end-hook.ts` (cliente HTTP autocontenido invocado con `node` directo). El gateway (`AuditHookEventHandler`) es el único punto de decisión de efectos (toast, audit): los scripts relay nunca deciden efectos locales.
 
 Los eventos que antes emitían toast directamente desde scripts (`gateway-hook-notify.ts`, `pre-tool-use-hook-ux.ts`, `task-in-progress-hook-ux.ts`) o desde `notifications/cli.ts` (`SessionStart`, `SessionEnd`, `PermissionRequest`, `TaskCreated`, `TaskCompleted`) ahora ciclan por el gateway: el relay → `POST /hooks` → `AuditHookEventHandler.executeAsync` → `emitToast`.
 

@@ -74,7 +74,7 @@ export class AuditHookEventHandler {
           this.workflowRepo.close(wf.id, event);
           await this.delegateClosure(event.sessionId, wf.id);
         }
-        // Resumen de cierre por voz y toast
+        // Toast de cierre del turno
         void this.announceStop(event);
         break;
       }
@@ -204,7 +204,7 @@ export class AuditHookEventHandler {
   /**
    * Lee el último mensaje del asistente desde el transcript de la sesión.
    * Devuelve `undefined` si no hay transcript, extractor o mensaje de asistente.
-   * Es lectura de contexto para toasts (UX no-voz); nunca propaga errores.
+   * No propaga errores — cualquier fallo se silencia y se usa fallback.
    */
   private async lastAssistantText(transcriptPath: string | undefined): Promise<string | undefined> {
     if (!transcriptPath || !this.contextExtractor) return undefined;
@@ -236,7 +236,7 @@ export class AuditHookEventHandler {
     await this.emitToast(title, recap ? `${fallback}: ${recap}` : fallback);
   }
 
-  /** Toast de cierre del turno: último mensaje del asistente del transcript, sin voz. */
+  /** Toast de cierre del turno: último mensaje del asistente del transcript. */
   private async announceStop(event: ClaudeHookEvent): Promise<void> {
     try {
       const recap = await this.lastAssistantText(event.transcriptPath);

@@ -9,7 +9,6 @@ export interface SessionMessage {
 /**
  * Puerto de dominio para la extracción de contexto desde el transcript de sesión.
  * Permite a las capas externas leer el historial de mensajes sin acoplarse al formato JSONL.
- * Su uso es agnóstico a la voz: hoy alimenta los toasts contextuales (UX no-voz).
  */
 export interface IContextExtractor {
   /**

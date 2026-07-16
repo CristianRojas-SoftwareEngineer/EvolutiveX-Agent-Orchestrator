@@ -19,7 +19,7 @@ import { AuditSseResponseHandler } from '../3-operations/audit-sse-response.hand
 import { AuditStandardResponseHandler } from '../3-operations/audit-standard-response.handler.js';
 import { AuditUpstreamErrorHandler } from '../3-operations/audit-upstream-error.handler.js';
 import { FilterToolsHandler } from '../3-operations/filter-tools.handler.js';
-import { TranscriptContextExtractor } from '../2-services/tts/transcript-extractor.service.js';
+import { TranscriptContextExtractor } from '../2-services/context-extraction/transcript-extractor.service.js';
 import { DesktopNotificationAdapter } from '../2-services/notifications/DesktopNotificationAdapter.js';
 import { resolveBranding } from '../2-services/notifications/cli.js';
 import { ProxyEnvironmentConfig } from '../1-domain/types/config.types.js';
@@ -98,8 +98,8 @@ export async function createProxyDependencies(
   const auditUpstreamErrorHandler = new AuditUpstreamErrorHandler(workflowRepo);
   const filterToolsHandler = new FilterToolsHandler(config);
 
-  // Lectura del transcript para enriquecer los toasts contextuales (UX no-voz).
-  // Se instancia siempre; ya no depende de ningún flag de voz.
+  // Lectura del transcript para enriquecer los toasts contextuales.
+  // Se instancia siempre; ya no depende de ningún flag.
   const contextExtractor = new TranscriptContextExtractor();
 
   // Branding por defecto para el toast del Stop (appId + icono fallback global)

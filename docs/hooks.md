@@ -6,7 +6,7 @@
 
 ## Tabla de contenidos
 
-- [1. Visión general](#1-visión-general)
+- [1. Clasificación de hooks](#1-clasificación-de-hooks)
 - [2. Configuración de hooks](#2-configuración-de-hooks)
 - [3. Relays de eventos](#3-relays-de-eventos)
 - [4. Mensaje de notificación por hook](#4-mensaje-de-notificación-por-hook)
@@ -17,25 +17,33 @@
 
 ---
 
-## 1. Visión general
+## 1. Clasificación de hooks
 
-Claude Code emite hooks en 13 puntos del ciclo de vida. Smart Code Proxy los intercepta mediante `POST /hooks`:
+Claude Code emite hooks en 13 puntos del ciclo de vida. Smart Code Proxy los clasifica en tres grupos según su función en el gateway:
 
-| Hook | Categoría | Descripción |
-|------|-----------|-------------|
-| `UserPromptSubmit` | Lifecycle | Usuario envía un prompt |
-| `PreToolUse` | Lifecycle | Antes de ejecutar una herramienta |
-| `PostToolUse` | Lifecycle | Después de ejecutar una herramienta |
-| `PostToolUseFailure` | Lifecycle | Herramienta fallida o rechazada |
-| `SubagentStart` | Lifecycle | Spawn de subagente |
-| `SubagentStop` | Lifecycle | Subagente terminó |
-| `Stop` | Lifecycle | Turno terminado (main workflow) |
-| `StopFailure` | Lifecycle | Turno fallido (error API) |
-| `SessionStart` | UX | Sesión iniciada |
-| `SessionEnd` | UX | Sesión finalizada |
-| `PermissionRequest` | UX | Prompt de permiso |
-| `TaskCreated` | UX | Tarea creada |
-| `TaskCompleted` | UX | Tarea completada |
+| Hook | Tipo | Correlación workflow | Toast |
+|------|------|---------------------|-------|
+| `UserPromptSubmit` | Lifecycle | No (solo notificación) | Sí (dinámico si hay prompt) |
+| `PreToolUse` | Lifecycle | Sí (ToolUse.status) | Sí (solo AskUserQuestion) |
+| `PostToolUse` | Lifecycle | Sí (completar ToolUse) | Sí (condicional TaskInProgress) |
+| `PostToolUseFailure` | Lifecycle | Sí (ToolUse.status) | No |
+| `SubagentStart` | Lifecycle | Sí (confirmar sub-workflow) | Sí (estático) |
+| `SubagentStop` | Lifecycle | Sí (cerrar workflow) | Sí (contextual) |
+| `Stop` | Lifecycle | Sí (cerrar workflow main) | Sí (contextual) |
+| `StopFailure` | Lifecycle | Sí (cerrar con error) | Sí (dinámico) |
+| `PermissionRequest` | UX + Lifecycle | No (solo notificación) | Sí (dinámico) |
+| `TaskCreated` | UX + Lifecycle | No (solo notificación) | Sí (estático) |
+| `TaskCompleted` | UX + Lifecycle | No (solo notificación) | Sí (estático) |
+| `SessionStart` | UX | No | Sí (estático) |
+| `SessionEnd` | UX | No | Sí (contextual) |
+
+**Resumen por tipo:**
+
+| Tipo | Hooks | Cantidad |
+|------|-------|----------|
+| **Lifecycle puro** | UserPromptSubmit, PreToolUse, PostToolUse, PostToolUseFailure, SubagentStart, SubagentStop, Stop, StopFailure | 8 |
+| **UX puro** | SessionStart, SessionEnd | 2 |
+| **Ambos (UX + Lifecycle)** | PermissionRequest, TaskCreated, TaskCompleted | 3 |
 
 ---
 

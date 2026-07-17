@@ -116,7 +116,12 @@ Estos son los mensajes por defecto del catálogo en `event-notification-profile.
 | `TaskCreated` | Tarea creada | task-created.png | Reminder |
 | `TaskCompleted` | Tarea completada | task-completed.png | Default |
 
-**Título del toast:** El `emitToast(title, text)` usa el nombre del hook como título (ej: `"Stop"`, `"SubagentStop"`). Para `TaskCreated/TaskCompleted`, el título es `"Tarea creada"` o `"Tarea completada"` directamente.
+**Título del toast:** El `emitToast(title, text)` recibe el título como primer parámetro:
+- Para la mayoría de hooks, el título es el nombre del evento (ej: `"Stop"`, `"SubagentStop"`)
+- Para `TaskCreated`: `"Tarea creada"` (o `"Tarea creada: [subject]"` si hay subject)
+- Para `TaskCompleted`: `"Tarea completada"` (o `"Tarea completada: [subject]"`)
+- Para `SessionStart`: `"Sesión iniciada"` (o `"Sesión iniciada (sessionId)"`)
+- Para `SessionEnd`: `"Sesión finalizada"` (o `"Sesión finalizada: [recap]"`)
 
 **Implementación:** `AuditHookEventHandler.emitToast(título, mensaje)` donde el segundo parámetro es el texto ya construido.
 

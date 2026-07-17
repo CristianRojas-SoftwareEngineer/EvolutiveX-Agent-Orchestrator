@@ -153,10 +153,10 @@ Estos hooks enriquecen el toast con el último mensaje del asistente, leído del
 - Si hay texto del transcript: `"Título del evento: [texto]"`
 - Si no: `"Título del evento"` (texto fijo del catálogo)
 
-**Ejemplos:**
-- `Stop`: "Tu turno — El asistente terminó. Escribe tu siguiente mensaje.: [último mensaje]" o solo el mensaje estático
-- `SubagentStop`: "Subagente terminado: [último mensaje]" o "Subagente terminado"
-- `SessionEnd`: "Sesión finalizada: [último mensaje]" o "Sesión finalizada"
+**Ejemplos de mensajes contextuales:**
+- `Stop`: título `"Stop"`, mensaje `"[text]"` o `"El asistente terminó su turno."` (sin transcript)
+- `SubagentStop`: título `"Subagente terminado"`, mensaje `"[text]"` o `"Subagente terminado"` (mensaje estático)
+- `SessionEnd`: título `"Sesión finalizada"`, mensaje `"Sesión finalizada: [preview]"` o `"Sesión finalizada"`
 
 ---
 

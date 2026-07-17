@@ -27,15 +27,15 @@ Claude Code emite hooks en 13 puntos del **ciclo de vida del turno** (desde que 
 | `PreToolUse` | Ciclo de turno | Sí (ToolUse.status) | Sí (solo AskUserQuestion) |
 | `PostToolUse` | Ciclo de turno | Sí (completar ToolUse) | Sí (condicional TaskInProgress) |
 | `PostToolUseFailure` | Ciclo de turno | Sí (ToolUse.status) | No |
-| `SubagentStart` | Subagente | Sí (confirmar sub-workflow) | Sí |
+| `SubagentStart` | Subagente | Sí (confirmar sub-workflow) | Sí (estático) |
 | `SubagentStop` | Subagente | Sí (cerrar workflow) | Sí (contextual) |
 | `Stop` | Ciclo de turno | Sí (cerrar workflow main) | Sí (contextual) |
 | `StopFailure` | Ciclo de turno | Sí (cerrar con error) | Sí (`error` + `last_assistant_message`) |
-| `SessionStart` | Sesión | No | Sí |
-| `SessionEnd` | Sesión | No | Sí (contextual) |
+| `SessionStart` | Session | No | Sí (estático) |
+| `SessionEnd` | Session | No | Sí (contextual) |
 | `PermissionRequest` | UX | No | Sí (`tool_name` + preview) |
-| `TaskCreated` | UX | No | Sí |
-| `TaskCompleted` | UX | No | Sí |
+| `TaskCreated` | UX | No | Sí (estático) |
+| `TaskCompleted` | UX | No | Sí (estático) |
 
 **Nota:** `TaskInProgress` no es un hook de Claude Code. Es un caso especial dentro de `PostToolUse` cuando `toolName === 'TaskUpdate' && toolInput.status === 'in_progress'`. El gateway evalúa esta condición y emite un toast distinto.
 
@@ -116,12 +116,10 @@ Estos son los mensajes por defecto del catálogo en `event-notification-profile.
 | `TaskCreated` | Tarea creada | task-created.png | Reminder |
 | `TaskCompleted` | Tarea completada | task-completed.png | Default |
 
-**Título del toast:** El `emitToast(title, text)` recibe el título como primer parámetro:
-- Para la mayoría de hooks, el título es el nombre del evento (ej: `"Stop"`, `"SubagentStop"`)
-- Para `TaskCreated`: `"Tarea creada"` (o `"Tarea creada: [subject]"` si hay subject)
-- Para `TaskCompleted`: `"Tarea completada"` (o `"Tarea completada: [subject]"`)
-- Para `SessionStart`: `"Sesión iniciada"` (o `"Sesión iniciada (sessionId)"`)
-- Para `SessionEnd`: `"Sesión finalizada"` (o `"Sesión finalizada: [recap]"`)
+**Título del toast:** El `emitToast(title, text)` recibe el título como primer parámetro. Para la mayoría de hooks, es el nombre del evento (ej: `"Stop"`, `"SubagentStop"`). Excepciones:
+- `TaskCreated/TaskCompleted`: título es `"Tarea creada"` o `"Tarea completada"` (o con `: [subject]`)
+- `SessionStart`: título es `"Sesión iniciada"` (opcional `(sessionId)`)
+- `SessionEnd`: título es `"Sesión finalizada"` (mensaje incluye `: [recap]` si hay transcript)
 
 **Implementación:** `AuditHookEventHandler.emitToast(título, mensaje)` donde el segundo parámetro es el texto ya construido.
 

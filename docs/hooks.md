@@ -23,27 +23,29 @@ Claude Code emite hooks en 13 puntos del **ciclo de vida del turno** (desde que 
 
 | Hook | Origen | Correlación workflow | Toast |
 |------|--------|----------------------|-------|
-| `UserPromptSubmit` | Ciclo de turno | No (workflow creado por wire) | Sí (dinámico) |
+| `UserPromptSubmit` | Ciclo de turno | No (workflow creado por wire) | Sí (`prompt` → preview) |
 | `PreToolUse` | Ciclo de turno | Sí (ToolUse.status) | Sí (solo AskUserQuestion) |
-| `PostToolUse` | Ciclo de turno | Sí (completar ToolUse) | Sí (condicional) |
+| `PostToolUse` | Ciclo de turno | Sí (completar ToolUse) | Sí (condicional TaskInProgress) |
 | `PostToolUseFailure` | Ciclo de turno | Sí (ToolUse.status) | No |
-| `SubagentStart` | Subagente | Sí (confirmar sub-workflow) | Sí (estático) |
+| `SubagentStart` | Subagente | Sí (confirmar sub-workflow) | Sí |
 | `SubagentStop` | Subagente | Sí (cerrar workflow) | Sí (contextual) |
 | `Stop` | Ciclo de turno | Sí (cerrar workflow main) | Sí (contextual) |
-| `StopFailure` | Ciclo de turno | Sí (cerrar con error) | Sí (dinámico) |
-| `SessionStart` | Sesión | No | Sí (estático) |
+| `StopFailure` | Ciclo de turno | Sí (cerrar con error) | Sí (`error` + `last_assistant_message`) |
+| `SessionStart` | Sesión | No | Sí |
 | `SessionEnd` | Sesión | No | Sí (contextual) |
-| `PermissionRequest` | UX | No | Sí (dinámico) |
-| `TaskCreated` | UX | No | Sí (estático) |
-| `TaskCompleted` | UX | No | Sí (estático) |
-| `TaskInProgress` | UX | No | Sí (dinámico) |
+| `PermissionRequest` | UX | No | Sí (`tool_name` + preview) |
+| `TaskCreated` | UX | No | Sí |
+| `TaskCompleted` | UX | No | Sí |
+
+**Nota:** `TaskInProgress` no es un hook de Claude Code. Es un caso especial dentro de `PostToolUse` cuando `toolName === 'TaskUpdate' && toolInput.status === 'in_progress'`. El gateway evalúa esta condición y emite un toast distinto.
 
 **Resumen por función:**
 
 | Función | Hooks | Cantidad |
 |---------|-------|----------|
 | **Correlación workflows** | PreToolUse, PostToolUse, PostToolUseFailure, SubagentStart, SubagentStop, Stop, StopFailure | 7 |
-| **Solo notificación** | UserPromptSubmit, SessionStart, SessionEnd, PermissionRequest, TaskCreated, TaskCompleted, TaskInProgress | 7 |
+| **Solo notificación** | UserPromptSubmit, SessionStart, SessionEnd, PermissionRequest, TaskCreated, TaskCompleted | 6 |
+| **Caso especial (PostToolUse)** | TaskInProgress (interno) | 1 |
 
 ---
 
@@ -86,50 +88,51 @@ Este relay **NO** decide efectos. Solo reenvía al gateway, que centraliza toda 
 
 Cliente autocontenido que usa `node` directo (type-stripping nativo, sin `npx`/`tsx`). Es equivalente al genérico pero más rápido en el teardown de sesión.
 
-### 3.3. Relay de hook secundario (Stop)
+### 3.3. Hook secundario en Stop (pipeline AUTO)
 
 **`scripting/openspec/enforce-auto-pipeline.mts`**
 
-Comando adicional en `Stop` que ejecuta después del relay principal. No emite notificaciones.
+Hook **secundario** que corre después de `post-hook-event.ts` en el evento `Stop`. Su propósito es controlar el flujo del pipeline specification-delta en modo AUTO: bloquea el cierre del turno hasta que el pipeline complete o se alcance una parada admisible. **No emite notificaciones**; solo devuelve `{ "decision": "block" }` para bloquear el stop o permite el cierre.
 
 ---
 
 ## 4. Mensaje de notificación por hook
 
-### 4.1. Hooks con mensaje estático
+### 4.1. Mensajes estáticos (catálogo)
 
-Estos hooks emiten siempre el mismo texto definido en `event-notification-profile.ts`. El mensaje estático se usa **solo si no hay formatter aplicable o como fallback**:
+Estos son los mensajes por defecto del catálogo en `event-notification-profile.ts`. **Nota clave:** El mensaje estático de `Stop`, `SubagentStop` y `SessionEnd` es reemplazado por el contenido del transcript cuando está disponible (ver 4.3):
 
-| Hook | Título del toast | Mensaje estático | Imagen | Sonido (Windows) |
-|------|------------------|------------------|--------|------------------|
-| `UserPromptSubmit` | UserPromptSubmit | Procesando tu solicitud... | user-prompt-submit.png | Reminder |
-| `PreToolUse` | PreToolUse | Pregunta pendiente — Responde en la ventana del cliente. | pre-tool-use-ask.png | SMS |
-| `SubagentStart` | Subagente iniciado | Subagente iniciado | subagent-start.png | IM |
-| `SubagentStop` | Subagente terminado | Subagente terminado | subagent-stop.png | Default |
-| `Stop` | Stop | Tu turno — El asistente terminó. Escribe tu siguiente mensaje. | stop.png | IM |
-| `StopFailure` | StopFailure | Error de API — No se completó la respuesta. | stop-failure.png | LoopingAlarm7 |
-| `SessionStart` | Sesión iniciada | Sesión iniciada | session-start.png | Default |
-| `SessionEnd` | Sesión finalizada | Sesión finalizada | session-end.png | Default |
-| `PermissionRequest` | PermissionRequest | Permiso requerido — Confirma la herramienta en el cliente. | permission-request.png | SMS |
-| `TaskCreated` | Tarea creada | Tarea creada | task-created.png | Reminder |
-| `TaskCompleted` | Tarea completada | Tarea completada | task-completed.png | Default |
-| `TaskInProgress` | TaskInProgress | Tarea iniciada | task-in-progress.png | IM |
+| Hook | Mensaje estático | Imagen | Sonido (Windows) |
+|------|------------------|--------|------------------|
+| `UserPromptSubmit` | Procesando tu solicitud... | user-prompt-submit.png | Reminder |
+| `PreToolUse` | Pregunta pendiente — Responde en la ventana del cliente. | pre-tool-use-ask.png | SMS |
+| `SubagentStart` | Subagente iniciado | subagent-start.png | IM |
+| `SubagentStop` | Subagente terminado | subagent-stop.png | Default |
+| `Stop` | Tu turno — El asistente terminó. Escribe tu siguiente mensaje. | stop.png | IM |
+| `StopFailure` | Error de API — No se completó la respuesta. | stop-failure.png | LoopingAlarm7 |
+| `SessionStart` | Sesión iniciada | session-start.png | Default |
+| `SessionEnd` | Sesión finalizada | session-end.png | Default |
+| `PermissionRequest` | Permiso requerido — Confirma la herramienta en el cliente. | permission-request.png | SMS |
+| `TaskCreated` | Tarea creada | task-created.png | Reminder |
+| `TaskCompleted` | Tarea completada | task-completed.png | Default |
+
+**Título del toast:** El `emitToast(title, text)` usa el nombre del hook como título (ej: `"Stop"`, `"SubagentStop"`). Para `TaskCreated/TaskCompleted`, el título es `"Tarea creada"` o `"Tarea completada"` directamente.
 
 **Implementación:** `AuditHookEventHandler.emitToast(título, mensaje)` donde el segundo parámetro es el texto ya construido.
 
-### 4.2. Hooks con mensaje dinámico desde payload
+### 4.2. Mensajes dinámicos desde payload
 
-Estos hooks usan formatters que pueden sustituir el mensaje estático:
+Estos mensajes se construyen leyendo campos del payload del hook. Algunos hooks (AskUserQuestion, TaskUpdate) son **condicionales** → el formatter devuelve `null` si no aplican:
 
-| Hook | Formatter | Campos relevantes | Formato del mensaje |
-|------|-----------|-------------------|---------------------|
-| `UserPromptSubmit` | `formatUserPromptSubmitMessage` | `prompt` | Preview truncado del prompt (120 chars) → sustituye "Procesando tu solicitud..." |
-| `StopFailure` | `formatStopFailureMessage` | `error`, `last_assistant_message` | "Límite de tasa (API)\n[preview]" o solo el tipo de error |
-| `PreToolUse` | `formatPreToolUseAskMessage` | `tool_input.questions[]` | "N preguntas pendientes\n[preview]" → solo si AskUserQuestion |
+| Hook + Condición | Formatter | Campos relevantes | Formato del mensaje |
+|------------------|-----------|-------------------|---------------------|
+| `UserPromptSubmit` | `formatUserPromptSubmitMessage` | `prompt` | Preview truncado (120 chars) del prompt |
+| `StopFailure` | `formatStopFailureMessage` | `error`, `last_assistant_message` | "Límite de tasa (API)\n[preview]" o solo tipo de error |
+| `PreToolUse` (AskUserQuestion) | `formatPreToolUseAskMessage` | `tool_input.questions[]` | "N preguntas pendientes\n[preview de la primera]" |
 | `PermissionRequest` | `formatPermissionRequestMessage` | `tool_name`, `tool_input` | "Permiso para: [tool]\n[preview]" |
-| `TaskInProgress` | `formatTaskInProgressMessage` | `tool_input.subject` | "Tarea iniciada: [subject]" → solo si TaskUpdate status=in_progress |
+| `PostToolUse` (TaskUpdate in_progress) | `formatTaskInProgressMessage` | `tool_input.subject` | "Tarea iniciada: [subject]" |
 
-**Implementación:** `resolveHookNotificationMessage(eventKey, payload)` devuelve el texto formateado o `null` si no aplica. La CLI usa `--stdin-json` para activar este path.
+**Implementación:** `resolveHookNotificationMessage(eventKey, payload)` devuelve el texto formateado o `null`. La CLI usa `--stdin-json` para activar este path.
 
 ### 4.3. Hooks con mensaje contextual (transcript)
 

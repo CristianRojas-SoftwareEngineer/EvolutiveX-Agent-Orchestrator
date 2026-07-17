@@ -1,17 +1,15 @@
 # Servicio de notificaciones de escritorio
 
-> Servicio migrado al repositorio en la fase N1 del roadmap
-> `claude-code-hooks-implementation`. Reemplaza — funcionalmente — al
-> script externo `C:\AI\claude-code-notifications.ts`, que queda intacto
-> durante N1 como fallback y será marcado `@deprecated` en N2. La
-> cobertura actual de `.claude/settings.json` (14 claves) usa este
-> servicio para todas las notificaciones de UX desde el repositorio.
+> Servicio del repositorio que emite toasts nativos del sistema operativo
+> para los eventos de ciclo de vida de Claude Code. La cobertura de
+> `.claude/settings.json` (14 claves) usa este servicio para todas las
+> notificaciones de UX del repositorio.
 
 ## Propósito
 
 Permitir que un hook de Claude Code (u otro llamante del repo) emita un
 toast nativo del sistema operativo (Windows, macOS, Linux) con un título y
-un mensaje, opcionalmente con sonido. La primera versión (`v1`) es
+El servicio (`v1`) es
 deliberadamente mínima: no admite personalización visual, no carga
 configuración externa, y no introduce dependencias Windows-specific.
 
@@ -41,7 +39,7 @@ Requisitos: `npm install` en la raíz del proxy (para `tsx` en `node_modules`). 
 
 ## Hook `Stop`: toast de continuidad desde el gateway
 
-En Smart Code Proxy, el evento **`Stop`** usa el relay genérico [`post-hook-event.ts`](../scripting/hooks/post-hook-event.ts) (igual que los demás eventos auditados). El toast de continuidad se genera **dentro del proceso del proxy** (`AuditHookEventHandler`), sin voz.
+En Smart Code Proxy, el evento **`Stop`** usa el relay genérico [`post-hook-event.ts`](../scripting/hooks/post-hook-event.ts). El toast de continuidad se genera **dentro del proceso del proxy** (`AuditHookEventHandler`).
 
 | Paso | Qué hace                                                                                             |
 | ---- | ---------------------------------------------------------------------------------------------------- |
@@ -78,7 +76,7 @@ Los **prompt hooks** (`type: "prompt"`) de Claude Code no pueden invocar toasts;
 | `INotificationService.ts`                    | 1 (puerto)                      | Interfaz del servicio (un único método `notify`)                                                                                                                                 |
 | `DesktopNotificationAdapter.ts`              | 2 (adaptador concreto)          | Implementa el puerto delegando en `node-notifier.notify()`                                                                                                                       |
 | `index.ts`                                   | 2 (exports)                     | Re-exports públicos del paquete                                                                                                                                                  |
-| `cli.ts`                                     | 4 (composition root standalone) | Entry point CLI invocable desde hooks de Claude Code                                                                                                                             |
+| `cli.ts`                                     | 2/4 (CLI autónoma + branding) | Entry point CLI autónomo (utilidad manual); exporta `resolveBranding` para el branding del gateway. No es comando de hook.                                                                                                                             |
 | `register.ts`                                | 4 (composition root standalone) | Helper de AUMID Windows (opt-in, idempotente) — orquesta `.lnk` + registro (apunta directamente a los assets del repo)                                                           |
 | `snoretoast-shortcut.ts`                     | 4 (helper de orquestación)      | Invoca `snoretoast-x64.exe -install` para crear el `.lnk` con la metadata AUMID que Windows espera, y luego parchea el `IconLocation` con `patchIconLocation` de `lnk-format.ts` |
 | `lnk-format.ts`                              | 2 (helper)                      | Generador/parser del formato MS-SHLLINK (escritura binaria pura del `.lnk`)                                                                                                      |
@@ -183,25 +181,24 @@ node src/2-services/notifications/cli.ts --event-type UserPromptSubmit --silent
 
 Los errores se imprimen en `stderr`.
 
-## Exclusiones explícitas de v1
+## Alcance de la implementación
 
-La primera versión **NO** incluye ninguno de los siguientes elementos del
-sistema externo `C:\AI\claude-code-notifications.ts` (decisión tomada en
-exploración previa al L1 y formalizada en la spec
-`desktop-notifications-service`):
+El servicio se diseñó con las siguientes exclusiones deliberadas; el
+catálogo y los formatters residen en el repositorio, no en archivos de
+configuración externos:
 
-- **`config.ts`** ni carga de `JSON` externo (p. ej.
+- **Sin carga de `JSON` de configuración externo** (p. ej.
   `notifications-config.json`). La configuración es por código.
-- **`builders.ts`** (nombre del legacy en `C:\AI\`; en el repo se usa
-  `hook-payload-notification-message.ts` en su lugar).
-- **Subdirectorio `sound/`** ni perfiles de sonido OS-specific
+- **Mensajes dinámicos en `hook-payload-notification-message.ts`**, no en
+  un módulo `builders.ts` aparte.
+- **Sin subdirectorio `sound/`** ni perfiles de sonido OS-specific
   (`resolve.ts`, `token-to-profile.ts`, `windows.ts`, `darwin.ts`,
-  `linux.ts`).
-- **`windows-toast.ts`** (sin registro de SnoreToast desde el adaptador,
-  sin AUMID en el flujo de `notify`, sin `heroImage`).
-- **Personalización visual más allá de `appId` + `icon`**: sin
-  `defaultIcon`, sin `brandTitle`, sin `subtitle`, sin `contentImage`.
-- **Acceso a `C:\AI/`** desde el servicio.
+  `linux.ts`): el sonido se resuelve en `resolve-notification-sound.ts`.
+- **El adaptador (`DesktopNotificationAdapter`) no registra SnoreToast** ni
+  inyecta AUMID en el flujo de `notify`, ni usa `heroImage`.
+- **Personalización visual limitada a `appId` + `icon`**: sin
+  `defaultIcon`, `brandTitle`, `subtitle` ni `contentImage`.
+- **Sin acceso a rutas externas** fuera del repo.
 
 > **Nota:** el helper `register.ts` (ver "Branding (icon + appId)" abajo)
 > **sí** accede a `%APPDATA%` y crea archivos `.lnk`, pero solo se
@@ -213,19 +210,19 @@ en un change posterior sin romper el contrato actual del puerto.
 
 ## Branding (icon + appId)
 
-A partir del change `add-notifications-branding`, el servicio aplica
+El servicio aplica por defecto la marca "AI Assistant" en los toasts:
 por defecto la marca "AI Assistant" en los toasts:
 
 - **`appId` default = `AIAssistant.Proxy`** (AUMID Windows; convención
   `[Compañía].[App]`, sin espacios, ≤ 129 caracteres). Lo inyecta la CLI
   en `buildEvent()` si el usuario no pasa `--app-id`. El adaptador lo
   reenvía a `node-notifier` solo si está presente.
-- **`icon` por evento** (change `add-notification-event-profiles`): el CLI
+**`icon` por evento**:
   resuelve un PNG distinto por `--event-type` desde el catálogo en
   `event-notification-profile.ts`. Prioridad: `--icon` explícito →
   `%LOCALAPPDATA%\AIAssistant\events\<archivo>.png` (tras `--install`) →
   `<repo>/assets/notifications/events/<archivo>.png` → fallback global
-  `ai-assistant.png` (misma prioridad estable/repo que antes). Si ningún
+misma prioridad estable/repo
   archivo existe, se omite `icon` (degradación con gracia).
 
 ### Copy del toast (catálogo + formatters stdin)
@@ -233,13 +230,13 @@ por defecto la marca "AI Assistant" en los toasts:
 Dos capas en el composition root (`buildEvent`):
 
 1. **Estático** — `message` en `event-notification-profile.ts` (cuerpo por defecto).
-2. **Dinámico** — con `--stdin-json`, `resolveHookNotificationMessage(eventKey, payload)` puede sustituir solo el **cuerpo** (paridad `C:\AI\src\notifications\builders.ts`).
+2. **Dinámico** — con `--stdin-json`, `resolveHookNotificationMessage(eventKey, payload)` puede sustituir solo el **cuerpo**.
 
 **Precedencia del título:** `--title` → `eventKey` resuelto (`--event-type` o `hook_event_name` en stdin). La marca «AI Assistant» solo aparece en el **header** del toast (AUMID), no se repite en el título del cuerpo.
 
 **Precedencia del mensaje:** `--message` → formatter stdin → `profile.message`.
 
-**Privacidad:** los formatters pueden incluir previews de comandos, rutas o preguntas en el Centro de actividades de Windows (mismo trade-off que el legacy). No hay redacción automática de secretos.
+**Privacidad:** los formatters pueden incluir previews de comandos, rutas o preguntas en el Centro de actividades de Windows. No hay redacción automática de secretos.
 
 **Reparación de mojibake (Cursor):** algunos clientes que también leen `~/.claude/settings.json` (p. ej. Cursor) envían el payload del hook doblemente codificado —bytes UTF-8 reinterpretados como Latin-1 y reserializados—, por lo que «¿qué» llega como `Â¿quÃ©`. `resolveHookNotificationMessage` aplica `repairMojibake` al mensaje del formatter: detecta esa firma y reinterpreta con `latin1 → utf8`. Los payloads UTF-8 correctos (Claude Code) y el ASCII puro pasan intactos.
 
@@ -274,8 +271,7 @@ ni `--message` en settings: el CLI aplica título (= nombre del hook), mensaje, 
 
 Con `--stdin-json`, los seis eventos con formatter (`StopFailure`, `PermissionRequest`, `PreToolUse`, `UserPromptSubmit`, `Stop`, `TaskInProgress`) pueden sustituir el cuerpo; el resto usa siempre el mensaje estático de la tabla.
 
-**Paridad legacy:** los tokens del catálogo (`Default`, `IM`, `SMS`, …) heredan
-`claude-notifications-enhanced.ps1` (BurntToast). El resolvedor los traduce a
+Los tokens del catálogo (`Default`, `IM`, `SMS`, …) se traducen a
 `Notification.*` porque `node-notifier`/`SnoreToast` ignoran tokens sin ese
 prefijo y usan siempre `Notification.Default`.
 
@@ -298,7 +294,7 @@ Linux solo admite `sound: true` / `false` (best-effort vía
 **Limitaciones:**
 
 - `LoopingAlarm7` en SnoreToast puede no replicar el loop corto del
-  script BurntToast legacy; tras smoke test documentar si hace falta
+  script BurntToast; tras smoke test documentar si hace falta
   fallback `sound: true` solo para `StopFailure`.
 - En Linux, `sound: true` depende del entorno de escritorio y la
   configuración del usuario; no garantiza audio audible.
@@ -306,7 +302,7 @@ Linux solo admite `sound: true` / `false` (best-effort vía
 ### Imagen de cuerpo del toast (`-p` / SnoreToast)
 
 En Windows, `node-notifier` pasa `icon` a SnoreToast como **`-p`**. SnoreToast no
-usa `ToastGeneric` ni `appLogoOverride` (48×48): usa la plantilla legacy
+usa `ToastGeneric` ni `appLogoOverride` (48×48): usa la plantilla
 **`ToastImageAndText02`** — imagen **cuadrada a la izquierda** del bloque de
 título y mensaje (ver `KDE/snoretoast`, `displayToast()`).
 
@@ -322,7 +318,7 @@ Los PNG en `assets/notifications/events/*.png` y `assets/notifications/ai-assist
 
 - **256×256**, **32-bit RGBA** (fondo transparente y borde claro permitidos).
 - Curación **manual** o con herramientas externas; el CLI los usa tal cual vía `resolveEventImagePath`.
-- SnoreToast puede escalar 256→hueco del toast; si el resultado visual es correcto, no hace falta redimensionar (validado en smoke test de los 11 eventos).
+validado en smoke test de los 12 eventos
 
 **Cabecera vs cuerpo:** el icono redondo «AI Assistant» del header viene de `ai-assistant.ico` / registro AUMID, no del PNG del evento. Si actualizas solo `ai-assistant.png`, regenera también el `.ico` (ver nota «Regeneración de assets» más abajo) para mantener paridad.
 
@@ -433,9 +429,8 @@ El helper es:
 | **Linux**   | "AI Assistant" (vía `appName` en `notify-send`)              | AI Assistant (cosmético vía `icon` en `node-notifier`) | Ninguno                                                |
 
 > **Limitación macOS:** el icono sí se muestra vía `node-notifier`, pero
-> la fuente sigue siendo "node" porque el change no aborda el bundle
-> `.app` (fuera de scope). Resolverlo requiere empaquetar la app como
-> `.app`, lo que se considera iteración futura.
+> la fuente sigue siendo "node" (el bundle `.app` está fuera del scope de
+> esta implementación).
 
 > **Regeneración de assets:** los archivos
 > `assets/notifications/ai-assistant.png` y `assets/notifications/ai-assistant.ico`
@@ -526,20 +521,8 @@ Si el cuerpo se ve bien pero el header sigue “roto” (p. ej. tres cubos blanc
 
 Referencias: [Enable desktop toast with AppUserModelID](https://learn.microsoft.com/en-us/windows/win32/shell/enable-desktop-toast-with-appusermodelid), registros de ejemplo con `IconUri` en [BurntToast #236](https://github.com/Windos/BurntToast/issues/236).
 
-## Estado del script externo
+## CLI autónoma y relays al gateway
 
-`C:\AI\claude-code-notifications.ts` está marcado como **`@deprecated`**
-con fecha de retirada prevista **2026-09-01**. A partir de la fase N2
-del roadmap `claude-code-hooks-implementation`, los hooks han dejado
-de invocarlo. La consolidación posterior unificó todos los hooks en un
-**único relay** (`scripting/hooks/post-hook-event.ts`) que delega en el
-gateway (`AuditHookEventHandler`) la decisión de efectos: el gateway
-es el único punto que decide qué toast emitir (estático o dinámico).
-Los eventos `UserPromptSubmit`, `StopFailure`,
-`SubagentStart`, `SubagentStop`, `SessionStart`, `SessionEnd`,
-`PermissionRequest`, `TaskCreated`, `TaskCompleted` y los condicionales
-`PreToolUse[AskUserQuestion]` / `PostToolUse[TaskUpdate+in_progress]`
-llegan todos al gateway vía `POST /hooks` y disparan toast desde allí.
 
 **Ruta final del CLI** (relativa a la raíz del proyecto):
 
@@ -547,23 +530,24 @@ llegan todos al gateway vía `POST /hooks` y disparan toast desde allí.
 ./node_modules/tsx/dist/cli.mjs ./src/2-services/notifications/cli.ts
 ```
 
-> **Nota:** `src/2-services/notifications/cli.ts` ya no se usa como
-> comando de hook directo. Permanece en el repositorio como utilidad
-> standalone para invocación manual desde la terminal; sus formatters
-> (`formatUserPromptSubmitMessage`, `formatStopFailureMessage`,
-> `formatPermissionRequestMessage`, `formatPreToolUseAskMessage`,
-> `formatTaskInProgressMessage`) los importa el gateway para construir
-> los mensajes de toast.
+> **Nota:** `src/2-services/notifications/cli.ts` es una utilidad de
+> línea de comandos autónoma para emitir un toast manual desde la
+> terminal; no es comando de hook. Exporta `resolveBranding`, que el
+> composition root usa para aplicar el branding (AUMID + icon) de los
+> toasts del gateway. Los formatters de mensaje (`formatUserPromptSubmitMessage`,
+> …) los importa el gateway directamente desde
+> `hook-payload-notification-message.ts`.
 
-**Relays al gateway (`POST /hooks`):** en [`.claude/settings.json`](../.claude/settings.json) del proyecto y en [`configs/hooks.json`](../configs/hooks.json) (plantilla canónica), **todos los hooks** usan un único relay TypeScript que lee stdin **una vez** (UTF-8) y reenvía con `fetch` a `$ANTHROPIC_BASE_URL/hooks` (sin `curl` ni `@-`, incompatible con PowerShell):
+**Relays al gateway (`POST /hooks`):** en [`.claude/settings.json`](../.claude/settings.json) del proyecto y en [`configs/hooks.json`](../configs/hooks.json) (plantilla canónica), los hooks reenvían el payload a `$ANTHROPIC_BASE_URL/hooks` con `fetch` (sin `curl` ni `@-`, incompatible con PowerShell). La mayoría usan `scripting/hooks/post-hook-event.ts` (lee stdin una vez, UTF-8); `SessionEnd` usa `scripting/hooks/session-end-hook.ts` (cliente `node` directo, equivalente, para el teardown sin `npx`); y `Stop` añade un segundo comando `scripting/openspec/enforce-auto-pipeline.mts`:
 
 | Relay                                                         | Hooks                                                        | Rol                                                                                  |
 | ------------------------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------ |
-| [`post-hook-event.ts`](../scripting/hooks/post-hook-event.ts) | Los **13** eventos gestionados por SCP (ver tabla siguiente) | Relay genérico: `POST /hooks` único por evento. El gateway decide todos los efectos. |
+| [`post-hook-event.ts`](../scripting/hooks/post-hook-event.ts) | 12 eventos (todos excepto `SessionEnd`)                     | Relay genérico: `POST /hooks` por evento. El gateway decide todos los efectos.      |
+| [`session-end-hook.ts`](../scripting/hooks/session-end-hook.ts) | `SessionEnd`                                              | Cliente `node` directo que reenvía a `POST /hooks`; equivalente a `post-hook-event.ts` para el teardown. |
 
-Esta tabla reemplaza las anteriores (`gateway-hook-notify.ts`, `pre-tool-use-hook-ux.ts`, `task-in-progress-hook-ux.ts`): esos relays se eliminaron. La lógica que contenían (filtrado por tool/condición, formateo de mensaje) migró al gateway, que ahora es el único punto que conoce los detalles de UX.
+Relación canónica de relays: la lógica de filtrado por tool/condición y el formateo de mensaje viven en el gateway (`AuditHookEventHandler`), que es el único punto que conoce los detalles de UX.
 
-**Comando canónico por hook (13 claves con relay único):**
+**Comando canónico por hook (13 claves):**
 
 | Hook                 | Matcher | Comando                                                                                                  |
 | -------------------- | ------- | -------------------------------------------------------------------------------------------------------- |
@@ -573,31 +557,25 @@ Esta tabla reemplaza las anteriores (`gateway-hook-notify.ts`, `pre-tool-use-hoo
 | `PostToolUseFailure` | —       | `npx tsx scripting/hooks/post-hook-event.ts`                                                             |
 | `SubagentStart`      | —       | `npx tsx scripting/hooks/post-hook-event.ts` (gateway emite toast `"Subagente iniciado"`)                |
 | `SubagentStop`       | —       | `npx tsx scripting/hooks/post-hook-event.ts` (gateway emite toast `"Subagente terminado"`)               |
-| `Stop`               | —       | `npx tsx scripting/hooks/post-hook-event.ts` (gateway genera toast de continuidad internamente)    |
+| `Stop`               | —       | `npx tsx scripting/hooks/post-hook-event.ts` + `npx tsx scripting/openspec/enforce-auto-pipeline.mts` (gateway genera toast de continuidad internamente) |
 | `StopFailure`        | —       | `npx tsx scripting/hooks/post-hook-event.ts` (gateway emite toast con detalle del error)                 |
 | `SessionStart`       | —       | `npx tsx scripting/hooks/post-hook-event.ts` (gateway emite toast `"Sesión iniciada"`)                   |
-| `SessionEnd`         | —       | `npx tsx scripting/hooks/post-hook-event.ts` (gateway emite toast `"Sesión finalizada"`)                 |
+| `SessionEnd`         | —       | `node scripting/hooks/session-end-hook.ts` (cliente `node` directo → gateway emite toast `"Sesión finalizada"`) |
 | `PermissionRequest`  | —       | `npx tsx scripting/hooks/post-hook-event.ts` (gateway emite toast con `tool_name` + preview)             |
 | `TaskCreated`        | —       | `npx tsx scripting/hooks/post-hook-event.ts` (gateway emite toast `"Tarea creada"`)                      |
 | `TaskCompleted`      | —       | `npx tsx scripting/hooks/post-hook-event.ts` (gateway emite toast `"Tarea completada"`)                  |
 
-**Justificación del relay único:** los eventos de tool tienen frecuencia alta (5–50 invocaciones por turno en sesiones largas). El gateway necesita `matcher: "*"` para correlacionar todas las tools. Antes había 3 scripts distintos (`gateway-hook-notify.ts`, `pre-tool-use-hook-ux.ts`, `task-in-progress-hook-ux.ts`) que leían stdin y decidían efectos locales. Esto provocaba:
-
-- Race condition de Windows cuando dos procesos leían stdin en paralelo.
-- Lógica de decisión de efectos duplicada entre scripts y gateway.
-- Imposibilidad de extender el gateway con capacidades futuras (audit enriquecido, correlación con workflows) para los 5 eventos de sesión.
-
-La consolidación elimina los 3 scripts y mueve toda la decisión de efectos al gateway, que tiene acceso al contexto del workflow, al provider activo y al log de auditoría.
+**Por qué el gateway decide los efectos:** los eventos de tool tienen frecuencia alta (5–50 invocaciones por turno en sesiones largas) y el gateway usa `matcher: "*"` para correlacionar todas las tools. Centralizar la decisión de efectos en el gateway (no en scripts relay) evita competencia por stdin en Windows y permite que el gateway, con acceso al contexto del workflow, al provider activo y al log de auditoría, emita el toast adecuado (estático, dinámico o condicional) para cada evento.
 
 ### Notificaciones de UX no-lifecycle
 
-Las 5 claves de UX `SessionStart`, `SessionEnd`, `PermissionRequest`, `TaskCreated` y `TaskCompleted` **sí invocan** `POST /hooks` (al contrario de lo que indicaba la versión anterior de esta sección). El `AuditHookEventHandler` las recibe y emite toast desde el gateway. La decisión de toasts (estático vs. dinámico) la toma el gateway inspeccionando `event.toolName` y `event.toolInput` (campos añadidos a `ClaudeHookEvent` por el change `consolidate-hooks-in-gateway`).
+Las 5 claves de UX `SessionStart`, `SessionEnd`, `PermissionRequest`, `TaskCreated` y `TaskCompleted` **sí invocan** `POST /hooks`. El `AuditHookEventHandler` las recibe y emite toast desde el gateway. La decisión de toasts (estático vs. dinámico) la toma el gateway inspeccionando `event.toolName` y `event.toolInput` (campos de `ClaudeHookEvent`).
 
 > **Nota sobre `TaskCreated` / `TaskCompleted`:** son hooks nativos de
 > Claude Code confirmados en
 > [code.claude.com/docs/en/hooks](https://code.claude.com/docs/en/hooks).
 > El `AuditHookEventHandler` los procesa (su `switch` extendido los
-> cubre tras la consolidación de hooks) y emite toast estático. Estos
+> cubre) y emite toast estático. Estos
 > hooks no admiten campo `matcher` (la documentación oficial indica que
 > se ignora silenciosamente para estos eventos); las entradas omiten
 > el campo. En sesiones con planificación activa (p. ej.
@@ -608,7 +586,7 @@ Las 5 claves de UX `SessionStart`, `SessionEnd`, `PermissionRequest`, `TaskCreat
 > nativa es retirar las entradas.
 
 > **Nota sobre `TaskInProgress` (toast en transición `pending → in_progress`):**
-> tras la consolidación, este toast ya no usa un relay externo. El
+> este toast no usa un relay externo. El
 > gateway evalúa `event.toolName === 'TaskUpdate' && event.toolInput?.status === 'in_progress'`
 > dentro de `handlePostToolUse` y emite el toast vía
 > `formatTaskInProgressMessage`. Los `TaskUpdate` con `status: "completed"`,
@@ -616,7 +594,7 @@ Las 5 claves de UX `SessionStart`, `SessionEnd`, `PermissionRequest`, `TaskCreat
 > en ~75 % de las invocaciones de `TaskUpdate`, aunque las sesiones con
 > planificación activa siguen generando múltiples toasts por turno.
 
-### Notas operativas (post-consolidación)
+### Notas operativas
 
 - **Todos los eventos llegan al gateway.** No hay ningún `eventName`
   que el `AuditHookEventHandler` desconozca o descarte: el `switch`
@@ -627,10 +605,9 @@ Las 5 claves de UX `SessionStart`, `SessionEnd`, `PermissionRequest`, `TaskCreat
   matcher del lado de Claude Code ni un script relay. El
   `matcher: "*"` en `PreToolUse` y `PostToolUse` envía todos los
   eventos al gateway; el gateway decide a posteriori si emitir toast.
-- **Cero competencia por stdin.** Un único relay (`post-hook-event.ts`)
-  por evento elimina la race condition de Windows que existía cuando
-  dos procesos leían stdin en paralelo (p. ej. `post-hook-event.ts` +
-  `cli.ts --stdin-json` en `SubagentStart` antes de la consolidación).
+- **Cero competencia por stdin.** Cada evento de tool usa un único relay
+  de lectura (`post-hook-event.ts` con `matcher: "*"`), de modo que un
+  solo proceso lee stdin por evento y no hay condición de carrera en Windows.
 
 ### Override del user-level
 
@@ -650,28 +627,9 @@ Implicaciones operativas dentro de este repositorio:
 2. La cobertura del ciclo de vida completo de una sesión (arranque,
    permission prompt, AskUserQuestion, spawn/cierre de subagente,
    creación/completado de tareas, cierre) queda servida desde el
-   servicio migrado al repo, sin depender de `C:\AI\claude-code-notifications.ts`.
-3. Cuando el script externo se retire el **2026-09-01**, el proyecto
-   no pierde notificaciones: ya está autosuficiente. Otros directorios
-   del usuario sí dependerán del reemplazo definitivo del user-level
-   (fuera del scope de este repo).
-
-El hook `SubagentStart` / `SubagentStop` también pasa a ser
-responsabilidad del proyecto (el user-level podría tener un comando de
-notificación que ahora se descarta); al pasar de "solo `POST /hooks`" a
-"`POST /hooks` + notificación", el proyecto absorbe la responsabilidad
-completa del spawn/cierre de subagentes en este directorio.
-
-El hook `PostToolUseFailure` y los 2 hooks de tool (`PreToolUse`
-matcher `*`, `PostToolUse` matcher `*`) conservan únicamente el comando
-`POST /hooks` (sin segundo comando de notificación).
-
-El script externo `C:\AI\claude-code-notifications.ts` se mantiene
-intacto en el sistema de archivos del usuario; la eliminación efectiva
-queda fuera del scope de este roadmap (vive fuera del repositorio y no
-es versionable aquí). El plazo de deprecación de **3 meses** desde N2
-(2026-06-02 → 2026-09-01) da margen para migrar cualquier llamante
-externo que aún dependa del script.
+   servicio del repositorio, sin depender de configuración de notificaciones de usuario externa.
+3. El proyecto es autosuficiente: cubre todo el ciclo de vida de una sesión sin depender de
+   configuración de notificaciones de user-level externa.
 
 ## Restricción operativa: `.claude/settings.json` está en `.gitignore`
 

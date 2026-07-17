@@ -19,7 +19,7 @@
 
 ## 1. Clasificación de hooks
 
-Claude Code emite hooks en 13 puntos del ciclo de vida. Smart Code Proxy los clasifica en tres grupos según su función en el gateway:
+Claude Code emite hooks en 13 puntos del **ciclo de vida del turno** (desde que el usuario envía un prompt hasta que el asistente termina, incluyendo spawn/cierre de subagentes y eventos de tareas). Smart Code Proxy los clasifica según su función en el gateway:
 
 | Hook | Tipo | Correlación workflow | Toast |
 |------|------|---------------------|-------|

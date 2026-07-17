@@ -37,13 +37,16 @@ Claude Code emite hooks en 13 puntos del ciclo de vida. Smart Code Proxy los cla
 | `SessionStart` | UX | No | Sí (estático) |
 | `SessionEnd` | UX | No | Sí (contextual) |
 
-**Resumen por tipo:**
+**Nota sobre UserPromptSubmit**: Es un evento del lifecycle del turno, pero **no correlaciona workflows**. La apertura del workflow la realiza el primer `POST /v1/messages` en el wire, no el hook. El handler incluye una explicación:
 
-| Tipo | Hooks | Cantidad |
-|------|-------|----------|
-| **Lifecycle puro** | UserPromptSubmit, PreToolUse, PostToolUse, PostToolUseFailure, SubagentStart, SubagentStop, Stop, StopFailure | 8 |
-| **UX puro** | SessionStart, SessionEnd | 2 |
-| **Ambos (UX + Lifecycle)** | PermissionRequest, TaskCreated, TaskCompleted | 3 |
+> "El workflow del turno lo crea exclusivamente `ensureTurnWorkflow` al llegar la request HTTP real; crear aquí produciría workflows sin request body."
+
+**Resumen por función:**
+
+| Función | Hooks | Cantidad |
+|---------|-------|----------|
+| **Correlación de workflows** | PreToolUse, PostToolUse, PostToolUseFailure, SubagentStart, SubagentStop, Stop, StopFailure | 7 |
+| **Notificación únicamente** | UserPromptSubmit, SessionStart, SessionEnd, PermissionRequest, TaskCreated, TaskCompleted, TaskInProgress | 7 |
 
 ---
 
@@ -146,16 +149,7 @@ Estos hooks enriquecen el toast con el último mensaje del asistente, leído del
 - Si no: `"Título del evento"` (texto fijo del catálogo)
 
 **Ejemplos:**
-- `Stop`: "Tu turno — El asistente terminó. Escribe tu siguiente mensaje." o "Tu turno — El asistente terminó. Escribe tu siguiente mensaje.: [último mensaje]"
-- `SubagentStop`: "Subagente terminado: [último mensaje]" o "Subagente terminado"
-- `SessionEnd`: "Sesión finalizada: [último mensaje]" o "Sesión finalizada"
-
-**Formato del mensaje contextual:**
-- Si hay texto del transcript: `"Título del evento: [texto]"`
-- Si no: `"Título del evento"` (texto fijo)
-
-**Ejemplos:**
-- `Stop`: "El asistente terminó su turno." o "El asistente terminó su turno: [último mensaje]"
+- `Stop`: "Tu turno — El asistente terminó. Escribe tu siguiente mensaje.: [último mensaje]" o solo el mensaje estático
 - `SubagentStop`: "Subagente terminado: [último mensaje]" o "Subagente terminado"
 - `SessionEnd`: "Sesión finalizada: [último mensaje]" o "Sesión finalizada"
 

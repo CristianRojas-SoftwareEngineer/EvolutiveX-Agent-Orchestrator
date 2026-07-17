@@ -21,32 +21,29 @@
 
 Claude Code emite hooks en 13 puntos del **ciclo de vida del turno** (desde que el usuario envía un prompt hasta que el asistente termina, incluyendo spawn/cierre de subagentes y eventos de tareas). Smart Code Proxy los clasifica según su función en el gateway:
 
-| Hook | Tipo | Correlación workflow | Toast |
-|------|------|---------------------|-------|
-| `UserPromptSubmit` | Lifecycle | No (solo notificación) | Sí (dinámico si hay prompt) |
-| `PreToolUse` | Lifecycle | Sí (ToolUse.status) | Sí (solo AskUserQuestion) |
-| `PostToolUse` | Lifecycle | Sí (completar ToolUse) | Sí (condicional TaskInProgress) |
-| `PostToolUseFailure` | Lifecycle | Sí (ToolUse.status) | No |
-| `SubagentStart` | Lifecycle | Sí (confirmar sub-workflow) | Sí (estático) |
-| `SubagentStop` | Lifecycle | Sí (cerrar workflow) | Sí (contextual) |
-| `Stop` | Lifecycle | Sí (cerrar workflow main) | Sí (contextual) |
-| `StopFailure` | Lifecycle | Sí (cerrar con error) | Sí (dinámico) |
-| `PermissionRequest` | UX + Lifecycle | No (solo notificación) | Sí (dinámico) |
-| `TaskCreated` | UX + Lifecycle | No (solo notificación) | Sí (estático) |
-| `TaskCompleted` | UX + Lifecycle | No (solo notificación) | Sí (estático) |
-| `SessionStart` | UX | No | Sí (estático) |
-| `SessionEnd` | UX | No | Sí (contextual) |
-
-**Nota sobre UserPromptSubmit**: Es un evento del lifecycle del turno, pero **no correlaciona workflows**. La apertura del workflow la realiza el primer `POST /v1/messages` en el wire, no el hook. El handler incluye una explicación:
-
-> "El workflow del turno lo crea exclusivamente `ensureTurnWorkflow` al llegar la request HTTP real; crear aquí produciría workflows sin request body."
+| Hook | Origen | Correlación workflow | Toast |
+|------|--------|----------------------|-------|
+| `UserPromptSubmit` | Ciclo de turno | No (workflow creado por wire) | Sí (dinámico) |
+| `PreToolUse` | Ciclo de turno | Sí (ToolUse.status) | Sí (solo AskUserQuestion) |
+| `PostToolUse` | Ciclo de turno | Sí (completar ToolUse) | Sí (condicional) |
+| `PostToolUseFailure` | Ciclo de turno | Sí (ToolUse.status) | No |
+| `SubagentStart` | Subagente | Sí (confirmar sub-workflow) | Sí (estático) |
+| `SubagentStop` | Subagente | Sí (cerrar workflow) | Sí (contextual) |
+| `Stop` | Ciclo de turno | Sí (cerrar workflow main) | Sí (contextual) |
+| `StopFailure` | Ciclo de turno | Sí (cerrar con error) | Sí (dinámico) |
+| `SessionStart` | Sesión | No | Sí (estático) |
+| `SessionEnd` | Sesión | No | Sí (contextual) |
+| `PermissionRequest` | UX | No | Sí (dinámico) |
+| `TaskCreated` | UX | No | Sí (estático) |
+| `TaskCompleted` | UX | No | Sí (estático) |
+| `TaskInProgress` | UX | No | Sí (dinámico) |
 
 **Resumen por función:**
 
 | Función | Hooks | Cantidad |
 |---------|-------|----------|
-| **Correlación de workflows** | PreToolUse, PostToolUse, PostToolUseFailure, SubagentStart, SubagentStop, Stop, StopFailure | 7 |
-| **Notificación únicamente** | UserPromptSubmit, SessionStart, SessionEnd, PermissionRequest, TaskCreated, TaskCompleted, TaskInProgress | 7 |
+| **Correlación workflows** | PreToolUse, PostToolUse, PostToolUseFailure, SubagentStart, SubagentStop, Stop, StopFailure | 7 |
+| **Solo notificación** | UserPromptSubmit, SessionStart, SessionEnd, PermissionRequest, TaskCreated, TaskCompleted, TaskInProgress | 7 |
 
 ---
 

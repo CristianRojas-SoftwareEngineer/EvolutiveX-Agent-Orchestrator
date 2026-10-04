@@ -19,6 +19,7 @@ import { AuditSseResponseHandler } from '../3-operations/audit-sse-response.hand
 import { AuditStandardResponseHandler } from '../3-operations/audit-standard-response.handler.js';
 import { AuditUpstreamErrorHandler } from '../3-operations/audit-upstream-error.handler.js';
 import { FilterToolsHandler } from '../3-operations/filter-tools.handler.js';
+import { NormalizeGemini37ModelTailHandler } from '../3-operations/normalize-gemini-37-model-tail.handler.js';
 import { TranscriptContextExtractor } from '../2-services/context-extraction/transcript-extractor.service.js';
 import { DesktopNotificationAdapter } from '../2-services/notifications/DesktopNotificationAdapter.js';
 import { resolveBranding } from '../2-services/notifications/cli.js';
@@ -97,6 +98,7 @@ export async function createProxyDependencies(
   );
   const auditUpstreamErrorHandler = new AuditUpstreamErrorHandler(workflowRepo);
   const filterToolsHandler = new FilterToolsHandler(config);
+  const normalizeGemini37ModelTailHandler = new NormalizeGemini37ModelTailHandler(config);
 
   // Lectura del transcript para enriquecer los toasts contextuales.
   // Se instancia siempre; ya no depende de ningún flag.
@@ -128,6 +130,7 @@ export async function createProxyDependencies(
     auditStandardResponseHandler,
     auditUpstreamErrorHandler,
     filterToolsHandler,
+    normalizeGemini37ModelTailHandler,
     hookEventHandler,
     streamTee,
     providerCatalog,

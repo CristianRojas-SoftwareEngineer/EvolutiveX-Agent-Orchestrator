@@ -28,22 +28,22 @@ export class ProxyController {
       rawBody = Buffer.alloc(0);
     }
 
-    // Filtrar tools antes de auditoría y envío al upstream
-    const filteredBody = this.deps.filterToolsHandler.execute(rawBody);
+    // Filtrar tools y normalizar cola de Gemini 3.7 Flash antes de auditoría y envío al upstream
+    let processedBody = this.deps.filterToolsHandler.execute(rawBody);
+    processedBody = this.deps.normalizeGemini37ModelTailHandler.execute(processedBody);
 
-    // Actualizar request.body y content-length si el filtrado produjo cambios
-    if (filteredBody !== rawBody) {
-      (request as unknown as { body: unknown }).body = Readable.from(filteredBody);
-      (request.headers as Record<string, string | string[] | undefined>)['content-length'] = String(
-        filteredBody.length,
-      );
+    // Actualizar request.body y content-length si alguna mutación produjo cambios
+    if (processedBody !== rawBody) {
+      (request as unknown as { body: unknown }).body = Readable.from(processedBody);
+      (request.headers as Record<string, string | string[] | undefined>)['content-length'] =
+        String(processedBody.length);
     }
 
-    request.rawBodyBytes = filteredBody.length;
+    request.rawBodyBytes = processedBody.length;
 
     const result = await this.deps.auditWorkflowHandler.execute({
       headers: request.headers,
-      rawBody: filteredBody,
+      rawBody: processedBody,
       requestId: request.id,
     });
 

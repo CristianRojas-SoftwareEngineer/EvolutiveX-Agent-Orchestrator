@@ -4,6 +4,7 @@ All notable changes are derived from conventional commits. Do not edit by hand.
 
 ## [Unreleased]
 ### Added
+- agregar config de glm-free vía tokenrouter
 - mover TranscriptContextExtractor a context-extraction; eliminar .gitlab-ci.yml huérfano
 - eliminar código legacy TTS del orchestrator
 - modelo de voz dentro del ZIP por plataforma
@@ -112,6 +113,7 @@ All notable changes are derived from conventional commits. Do not edit by hand.
 - migración a arquitectura SOLID con Fastify y documentación completa en español
 - initial commit for Fastify + TypeScript SOLID API
 ### Changed
+- chunks SSE en streaming.ndjson, layout v2
 - usar paquete oficial de sherpa-onnx para modelo y tokens
 - renombrar jobs y steps; retención 1d; CARGO_HOME en environment
 - separar configs por target para ejecución aislada
@@ -169,6 +171,7 @@ All notable changes are derived from conventional commits. Do not edit by hand.
 - implementar PKA de 6 capas, ports, inyección de dependencias y hardening de tooling
 - reemplazar 'any' por tipos estrictos del SDK de Anthropic
 ### Fixed
+- reemplazar rimraf por fs.rmSync en clean:sessions
 - reducir speed de 1.0 a 0.85 para mejor prosodia
 - corregir tipo de frac de f64 a f32 en resample_interp
 - usar default_output_config de CPAL y resamplear si es necesario
@@ -331,6 +334,8 @@ All notable changes are derived from conventional commits. Do not edit by hand.
 - corregir omisión de cuerpos de petición en logs de auditoría
 - migrar ts-node a tsx por compatibilidad con Node.js 24
 ### Documentation
+- regenerar changelog desde conventional commits
+- alinear docs vivos con el catálogo de providers
 - corregir origen de SessionStart/End y aclarar título toast
 - corregir ejemplos de mensajes contextuales con título vs texto
 - corregir títulos de toast para TaskCreated/Completed y SessionStart/End

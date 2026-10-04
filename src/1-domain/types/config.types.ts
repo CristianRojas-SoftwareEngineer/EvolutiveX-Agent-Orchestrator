@@ -37,4 +37,15 @@ export interface ProxyEnvironmentConfig {
   LOG_HTTP_BODIES?: boolean;
   /** Activar logging de headers request+response. Default: true. Env: `LOG_HTTP_HEADERS`. */
   LOG_HTTP_HEADERS?: boolean;
+
+  /**
+   * Patrón regex (case-insensitive) de modelos que requieren normalización de
+   * la cola de mensajes antes de reenviar al upstream (evita el 400 de
+   * "Requests ending with a model turn are not supported" en Gemini 3.7 Flash
+   * vía OmniRoute/LiteLLM). Env: `GEMINI_37_TAIL_PATTERN`.
+   *
+   * Default: `gemini-3\.7-flash` — cubre tanto `vertex/gemini-3.7-flash`
+   * como `vertex/gemini-3.7-flash[1m]` y variantes por proveedor.
+   */
+  GEMINI_37_TAIL_PATTERN?: string;
 }

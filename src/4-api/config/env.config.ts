@@ -48,4 +48,8 @@ export const config: ProxyEnvironmentConfig = {
   TRANSCRIPT_CONTEXT_N: process.env.TRANSCRIPT_CONTEXT_N ? parseInt(process.env.TRANSCRIPT_CONTEXT_N, 10) : 3,
   LOG_HTTP_BODIES: process.env.LOG_HTTP_BODIES === 'true',
   LOG_HTTP_HEADERS: process.env.LOG_HTTP_HEADERS !== 'false',
+  // Normalización de cola de mensajes para Gemini 3.7 Flash vía OmniRoute/LiteLLM.
+  // El patrón matchea el campo `model` del request; por defecto cubre
+  // vertex/gemini-3.7-flash y vertex/gemini-3.7-flash[1m] sin tocar otros modelos.
+  GEMINI_37_TAIL_PATTERN: process.env.GEMINI_37_TAIL_PATTERN || 'gemini-3\\.7-flash',
 };

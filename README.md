@@ -245,25 +245,25 @@ routing/providers/
 │   ├── secrets.json     # API keys (no versionado)
 │   ├── secrets.json.example
 │   └── models/          # Metadatos por modelo
-│       ├── claude-haiku-4-5/metadata.json
-│       ├── claude-opus-4-6/metadata.json
-│       └── claude-sonnet-4-6/metadata.json
+│       ├── claude-haiku-4.5/metadata.json
+│       ├── claude-sonnet-5.5/metadata.json
+│       └── claude-opus-5.5/metadata.json
 ├── openrouter/          # AUTH_METHOD: bearer
 │   ├── config.json      # Configuración del proveedor
 │   ├── secrets.json     # API keys (no versionado)
 │   ├── secrets.json.example
 │   └── models/          # Metadatos por modelo
-│       ├── deepseek-v4-flash/metadata.json
-│       ├── deepseek-v4-pro/metadata.json
-│       └── minimax-m2-5/metadata.json
+│       ├── laguna-s-2.1/metadata.json
+│       ├── laguna-xs-2.1/metadata.json
+│       └── ling-3.0-flash-sante/metadata.json
 ├── ollama/              # AUTH_METHOD: bearer
 │   ├── config.json      # Configuración del proveedor
 │   ├── secrets.json     # API keys (no versionado)
 │   ├── secrets.json.example
 │   └── models/          # Metadatos por modelo
-│       ├── gemini-3-flash-preview/metadata.json
+│       ├── gemma-4-31b/metadata.json
 │       ├── minimax-m2.5/metadata.json
-│       └── minimax-m2.7/metadata.json
+│       └── minimax-m3/metadata.json
 └── xiaomi/              # AUTH_METHOD: bearer
     ├── config.json      # Configuración del proveedor
     └── models/          # Metadatos por modelo

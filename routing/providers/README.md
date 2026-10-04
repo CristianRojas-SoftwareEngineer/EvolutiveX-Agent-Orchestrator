@@ -63,10 +63,11 @@ npx tsx scripting/provider/configure-provider.ts --show-current
 | `anthropic` | `https://api.anthropic.com` | api_key / oauth | API oficial de Anthropic |
 | `agentrouter` | `https://agentrouter.org` | bearer | Gateway multi-provider que enruta a Claude |
 | `openrouter` | `https://openrouter.ai/api` | bearer | Gateway con múltiples modelos |
-| `minimax` | `https://api.minimax.io/anthropic` | bearer | API compatible con cuota integrada |
+| `omniroute` | `http://localhost:20128/v1` | bearer | Proxy litellm local multi-proveedor |
+| `tokenrouter` | `https://api.tokenrouter.com/v1` | bearer | Gateway de modelos gratuitos |
+| `xkiro` | `https://api.xkiro.com` | bearer | Gateway multi-proveedor gratuito |
 | `ollama` | `http://localhost:11434` | bearer | LLM local |
 | `xiaomi` | `https://token-plan-sgp.xiaomimimo.com/anthropic` | bearer | Xiaomi MiniMax |
-| `opencode` | `https://opencode.ai/zen/v1/messages` | bearer | OpenCode Zen |
 
 ## Nota sobre Gemini
 

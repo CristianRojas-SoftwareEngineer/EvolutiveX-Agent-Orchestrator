@@ -4,26 +4,8 @@ All notable changes are derived from conventional commits. Do not edit by hand.
 
 ## [Unreleased]
 ### Added
-- endurecer fase close y sync gate
-### Fixed
-- corregir dos agujeros del backstop AUTO
-- corregir contrato de marcadores de fase del pipeline
-
-## [tts-sidecar-v0.1.3] -- 2026-06-26
-### Fixed
-- corregir API sherpa-onnx vits y PATH Windows en CI
-- heredoc directo como metodo canonico, sin Write tool ni scripts
-- hacer write-prompt.ts multiplataforma y corregir SKILL.md
-
-## [tts-sidecar-v0.1.2] -- 2026-06-26
-### Fixed
-- usar change=null en sentinel y canonicalizar ID solo tras handoff del planner
-- corregir errores de compilacion y config CI Windows
-- hacer continuity:write multiplataforma (PowerShell/Windows)
-- crear writePhaseMarker y usarla en subagente planner
-
-## [tts-sidecar-v0.1.1] -- 2026-06-25
-### Added
+- mover TranscriptContextExtractor a context-extraction; eliminar .gitlab-ci.yml huérfano
+- eliminar código legacy TTS del orchestrator
 - modelo de voz dentro del ZIP por plataforma
 - añadir bundle de libespeak-ng en Windows y macOS
 - diagnóstico profundo de rutas y usuario del executor
@@ -133,6 +115,7 @@ All notable changes are derived from conventional commits. Do not edit by hand.
 - usar paquete oficial de sherpa-onnx para modelo y tokens
 - renombrar jobs y steps; retención 1d; CARGO_HOME en environment
 - separar configs por target para ejecución aislada
+- pipeline mínimo solo windows-amd64 para prueba aislada
 - reorganizar scripting/ por dominio
 - sincronizar skills compartidas con versión refinada del Workbench
 - reemplazar script apply-sequential por versión refinada del Workbench
@@ -348,6 +331,17 @@ All notable changes are derived from conventional commits. Do not edit by hand.
 - corregir omisión de cuerpos de petición en logs de auditoría
 - migrar ts-node a tsx por compatibilidad con Node.js 24
 ### Documentation
+- corregir origen de SessionStart/End y aclarar título toast
+- corregir ejemplos de mensajes contextuales con título vs texto
+- corregir títulos de toast para TaskCreated/Completed y SessionStart/End
+- corregir título del toast (nombre del hook) y mensajes estáticos
+- agregar TaskInProgress a tabla y una columna de origen más clara
+- especificar que lifecycle se refiere al ciclo de vida del turno
+- aclarar clasificación de hooks y eliminar duplicados en ejemplos
+- clasificar hooks por tipo (lifecycle/ux/ambos) en documentación
+- agregar documentación canónica de hooks de Claude Code -- diseño, relays y construcción de mensajes
+- canonizar notifications.md sin lenguaje histórico
+- limpiar referencias TTS residuales
 - plan de eliminación de rastro TTS legacy (Fase 2)
 - sincronizar specs y docs del bundle con el pipeline CircleCI actual
 - documentar pipeline de build multi-plataforma de tts-sidecar

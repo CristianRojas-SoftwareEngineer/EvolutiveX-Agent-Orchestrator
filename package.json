@@ -22,7 +22,7 @@
     "clean:all": "concurrently \"npm run clean:dist\" \"npm run clean:modules\" \"npm run clean:sessions\" \"npm run clean:logs\"",
     "clean:dist": "rimraf dist",
     "clean:modules": "tsx scripting/maintenance/clean-modules.ts",
-    "clean:sessions": "rimraf sessions",
+    "clean:sessions": "node -e \"require('fs').rmSync('sessions',{recursive:true,force:true,maxRetries:5})\"",
     "clean:logs": "rimraf server",
     "changelog:generate": "tsx scripting/changelog/generate-changelog.ts",
     "changelog:install-hook": "tsx scripting/changelog/install-changelog-hook.ts",

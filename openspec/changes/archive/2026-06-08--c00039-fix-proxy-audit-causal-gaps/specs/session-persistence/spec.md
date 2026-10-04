@@ -2,7 +2,7 @@
 
 ### Requirement: SessionPersistence — suscripción al bus y proyección a disco
 
-El sistema SHALL proveer `SessionPersistence` en `src/2-services/session-persistence.service.ts` como suscriptor del `EventBus` que, al recibir eventos del correlador y handlers, proyecta la estructura de directorios y archivos del layout `causal-workflows-v1` bajo `sessions/`.
+El sistema SHALL proveer `SessionPersistence` en `src/2-services/session-persistence.service.ts` como suscriptor del `EventBus` que, al recibir eventos del correlador y handlers, proyecta la estructura de directorios y archivos del layout `causal-workflows-v2` bajo `sessions/`.
 
 `SessionPersistence` SHALL suscribirse a los siguientes eventos en su constructor:
 
@@ -16,7 +16,7 @@ El sistema SHALL proveer `SessionPersistence` en `src/2-services/session-persist
 | `tool_result` | Escribir `result.json` en `tools/KK-slug/`; actualizar `meta.json` del tool |
 | `workflow_complete` | Actualizar `meta.json` (status: `completed`); escribir `output/result.json` + `output/result.parsed.md`; actualizar `workflow-sequence.json` |
 | `workflow_cancel` | Actualizar `meta.json` (status: `cancelled`, `cancellationReason`); actualizar `workflow-sequence.json` |
-| `stream_chunk` | Escribir `steps/MM/response/streaming/NNNN-chunk.ndjson`; al cierre del step con `coalescedDelegationStepIndex`, generar `body.coalesced.json` y `body.coalesced.parsed.md` |
+| `stream_chunk` | Append línea a `steps/MM/response/streaming/streaming.ndjson` (único archivo por respuesta de step); al cierre del step con `coalescedDelegationStepIndex`, generar `body.coalesced.json` y `body.coalesced.parsed.md` |
 | `*` (wildcard) | Append-only a `sessions/<sessionId>/events.ndjson` por cada evento recibido |
 
 En `workflow_start`, `meta.json` SHALL incluir `workflowKind` (estructural: `main` | `subagent`) y `interactionType` (semántico: `agentic` | `side-request` | `client-preflight`, desde payload `workflowKind` del correlador).

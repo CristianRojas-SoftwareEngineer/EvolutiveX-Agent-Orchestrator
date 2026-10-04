@@ -1,6 +1,6 @@
 ## Context
 
-El proxy audita sesiones Claude Code bajo layout `causal-workflows-v1`. Los tools se registran por dos caminos estructurales ya existentes en `AuditSseResponseHandler`:
+El proxy audita sesiones Claude Code bajo layout `causal-workflows-v2`. Los tools se registran por dos caminos estructurales ya existentes en `AuditSseResponseHandler`:
 
 | Camino | API repositorio | Tools típicos | Coalescing server-side |
 |--------|-----------------|---------------|------------------------|

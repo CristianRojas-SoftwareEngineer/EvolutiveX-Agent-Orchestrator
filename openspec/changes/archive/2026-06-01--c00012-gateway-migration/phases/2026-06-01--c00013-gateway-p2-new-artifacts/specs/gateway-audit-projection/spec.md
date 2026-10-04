@@ -4,7 +4,7 @@
 
 El sistema SHALL retirar `SessionStoreService`, `WorkflowResultProjector`, el puerto `ISessionStore` y el puerto `IAuditWriter`. Los handlers L3 SHALL usar `IWorkflowRepository` + `EventBus`. La forensia SSE SHALL materializarse vía eventos `stream_chunk` y proyección en `SessionPersistence`; NO SHALL usar `ISseAuditWriter`, `AuditWriterService` ni `response/sse.jsonl` en código de producción tras P2.
 
-#### Scenario: Sesiones nuevas usan layout causal-workflows-v1
+#### Scenario: Sesiones nuevas usan layout causal-workflows-v2
 
 - **GIVEN** un proxy con P1 implementado
 - **WHEN** se procesa una solicitud completa (workflow + steps + tools)

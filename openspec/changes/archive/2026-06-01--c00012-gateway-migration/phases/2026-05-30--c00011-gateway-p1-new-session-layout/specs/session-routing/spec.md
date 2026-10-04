@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Funciones puras de mapeo de eventos a rutas de directorio para el layout `causal-workflows-v1`. Reemplaza las constantes flat de `audit-paths.ts` (`DIR_MAIN_AGENT`, `DIR_INTERACTIONS`, `PREFIX_SUB_AGENT`).
+Funciones puras de mapeo de eventos a rutas de directorio para el layout `causal-workflows-v2`. Reemplaza las constantes flat de `audit-paths.ts` (`DIR_MAIN_AGENT`, `DIR_INTERACTIONS`, `PREFIX_SUB_AGENT`).
 
 ## ADDED Requirements
 

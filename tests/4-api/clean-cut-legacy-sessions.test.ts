@@ -34,7 +34,7 @@ describe('cleanCutLegacySessions', () => {
     expect(await exists('.gitkeep')).toBe(true);
   });
 
-  it('es idempotente: no toca un layout causal-workflows-v1', async () => {
+  it('es idempotente: no toca un layout causal-workflows-v2', async () => {
     await fs.mkdir(path.join(dir, 'sess-new', 'workflows', '01'), { recursive: true });
     await cleanCutLegacySessions(dir, logger);
     expect(await exists('sess-new/workflows/01')).toBe(true);

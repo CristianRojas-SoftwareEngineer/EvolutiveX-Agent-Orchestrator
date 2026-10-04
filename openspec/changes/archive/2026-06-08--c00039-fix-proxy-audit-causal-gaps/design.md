@@ -6,7 +6,7 @@ Proyección causal vía EventBus → SessionPersistence. Workflows wire (`sessio
 
 **Goals:** Restaurar trazabilidad causal tool→respuesta; cerrar workflows wire; body.json completo.
 
-**Non-Goals:** Reescribir métricas de sesión; cambiar layout causal-workflows-v1.
+**Non-Goals:** Reescribir métricas de sesión; cambiar layout causal-workflows-v2.
 
 ## Decisions
 

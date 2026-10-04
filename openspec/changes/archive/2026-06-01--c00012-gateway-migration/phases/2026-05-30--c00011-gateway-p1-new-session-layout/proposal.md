@@ -4,7 +4,7 @@
 
 El gateway proyecta datos de auditoría a disco mediante escritura directa desde handlers de capa 3 (`AuditWriterService`, `SessionStoreService`), generando un layout flat (interacciones, pasos, sub-agentes anidados). Este diseño viola §28b.4 regla 1 — los handlers no deben escribir disco directamente — y genera acoplamiento entre lógica de negocio y persistencia.
 
-La fase G4 ya proyecta `WorkflowResult` a disco, pero lo hace a través del layout flat heredado. P1 reemplaza toda la pila de persistencia por la arquitectura EventBus + SessionPersistence (Opción A ratificada, §28b/§40), donde el correlador emite eventos a un bus y `SessionPersistence` los consume como suscriptor independiente para producir el layout `causal-workflows-v1` (`workflows/NN/steps/MM/tools/KK/`).
+La fase G4 ya proyecta `WorkflowResult` a disco, pero lo hace a través del layout flat heredado. P1 reemplaza toda la pila de persistencia por la arquitectura EventBus + SessionPersistence (Opción A ratificada, §28b/§40), donde el correlador emite eventos a un bus y `SessionPersistence` los consume como suscriptor independiente para producir el layout `causal-workflows-v2` (`workflows/NN/steps/MM/tools/KK/`).
 
 Adicionalmente, P1 migra los 6 handlers de capa 3 que aún dependen de los tipos legacy (`ActiveInteraction`, `InteractionMetadata`) y los puertos legacy (`ISessionStore`, `IAuditWriter`) a los tipos gateway (`IWorkflow`, `IStep`, `IToolUse`, `IWorkflowResult`) y al patrón EventBus. Esto permite la eliminación completa del modelo `Interaction` legacy.
 
@@ -12,7 +12,7 @@ Adicionalmente, P1 migra los 6 handlers de capa 3 que aún dependen de los tipos
 
 - **Nueva pila de persistencia (Opción A):** crear `IEventBus` (port L1), `EventBus` (adapter L2), `SessionPersistence` (suscriptor L2) y conectar el correlador al bus para que cada mutación de estado emita el evento §28b.3 correspondiente.
 - **Nuevo método `completeToolUse()`** en el correlador: completa `ToolUse` (por timeout §24.1 o por hook `PostToolUse`/`PostToolUseFailure`) y emite `tool_result` al bus.
-- **Layout `causal-workflows-v1`:** las sesiones nuevas adoptan la estructura `workflows/NN/steps/MM/tools/KK/` con `meta.json` (identidad+estado fusionado, sin `state.json` separado — decisión D2) y `output/result.json` (IWorkflowResult + steps[] — decisión D1/D3).
+- **Layout `causal-workflows-v2`:** las sesiones nuevas adoptan la estructura `workflows/NN/steps/MM/tools/KK/` con `meta.json` (identidad+estado fusionado, sin `state.json` separado — decisión D2) y `output/result.json` (IWorkflowResult + steps[] — decisión D1/D3).
 - **Corte limpio:** sesiones anteriores al layout se eliminan al arranque; no hay migración de datos en reposo.
 - **Migración de handlers L3 a tipos gateway:** los 6 handlers (`audit-interaction`, `audit-standard-response`, `audit-sse-response`, `audit-upstream-error`, `audit-workflow-closure`, `gateway-wire-step`) migran de `ActiveInteraction`/`InteractionMetadata`/`ISessionStore`/`IAuditWriter` a `IWorkflow`/`IStep`/`IToolUse`/`IWorkflowResult`/`IWorkflowRepository`/`EventBus`.
 - **Ampliación del catálogo de eventos:** nuevos eventos para escrituras de contenido (`step_request`, `step_response`, `tool_call`, `tool_result`) que `SessionPersistence` consume para escribir a disco.
@@ -29,7 +29,7 @@ Adicionalmente, P1 migra los 6 handlers de capa 3 que aún dependen de los tipos
 ### New Capabilities
 
 - `event-bus`: Bus de eventos async in-process (IEventBus port + EventBus adapter) con pattern matching de suscripciones (`*`, `prefix_*`, `*_suffix`).
-- `session-persistence`: Suscriptor del bus que proyecta eventos a disco bajo la estructura `causal-workflows-v1` (meta.json, output/result.json, steps/, tools/).
+- `session-persistence`: Suscriptor del bus que proyecta eventos a disco bajo la estructura `causal-workflows-v2` (meta.json, output/result.json, steps/, tools/).
 - `session-routing`: Funciones de mapeo de eventos a rutas de directorio (`getWorkflowDir`, `getStepDir`, `getToolsDir`).
 
 ### Modified Capabilities

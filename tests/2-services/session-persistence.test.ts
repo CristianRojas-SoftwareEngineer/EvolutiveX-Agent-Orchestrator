@@ -62,7 +62,7 @@ describe('SessionPersistence', () => {
     const meta = await readJson('sessions/sess-1/workflows/01/meta.json');
     expect(meta.status).toBe('running');
     expect(meta.workflowKind).toBe('main');
-    expect(meta.layoutVersion).toBe('causal-workflows-v1');
+    expect(meta.layoutVersion).toBe('causal-workflows-v2');
   });
 
   it('workflow_start con request escribe request/body.json', async () => {
@@ -206,7 +206,7 @@ describe('SessionPersistence', () => {
   });
 });
 
-// ── P2-b: stream_chunk → streaming/NNNN-chunk.ndjson ─────────────────────────
+// ── P2-b: stream_chunk → streaming/streaming.ndjson ──────────────────────────
 
 describe('SessionPersistence — P2-b stream_chunk', () => {
   it('§37b #13: ping no genera archivo en streaming/', async () => {
@@ -226,7 +226,7 @@ describe('SessionPersistence — P2-b stream_chunk', () => {
     expect(await exists('sessions/sess-1/workflows/01/steps/01/response/streaming')).toBe(false);
   });
 
-  it('línea SSE real se persiste como NNNN-chunk.ndjson', async () => {
+  it('línea SSE real se persiste como streaming/streaming.ndjson', async () => {
     emit('workflow_start', 'sess-1', { workflowId: 'wf-1', kind: 'main' });
     emit('stream_chunk', 'sess-1', {
       seq: 1,
@@ -240,15 +240,15 @@ describe('SessionPersistence — P2-b stream_chunk', () => {
       },
     });
     await persistence.flush();
-    const chunkPath = 'sessions/sess-1/workflows/01/steps/01/response/streaming/0001-chunk.ndjson';
-    expect(await exists(chunkPath)).toBe(true);
-    const raw = await fs.readFile(path.join(rootDir, chunkPath), 'utf8');
+    const streamPath = 'sessions/sess-1/workflows/01/steps/01/response/streaming/streaming.ndjson';
+    expect(await exists(streamPath)).toBe(true);
+    const raw = await fs.readFile(path.join(rootDir, streamPath), 'utf8');
     const parsed = JSON.parse(raw.trim()) as Record<string, unknown>;
     expect(parsed.line).toBe('data: {"type":"message_start"}');
     expect(parsed.phase).toBe('delegation');
   });
 
-  it('tope MAX_STREAMING_CHUNKS: seq 10001 no genera archivo', async () => {
+  it('sin tope: seq 10001 sí persiste su línea en streaming.ndjson', async () => {
     emit('workflow_start', 'sess-1', { workflowId: 'wf-1', kind: 'main' });
     emit('stream_chunk', 'sess-1', {
       seq: 10001,
@@ -262,7 +262,38 @@ describe('SessionPersistence — P2-b stream_chunk', () => {
       },
     });
     await persistence.flush();
-    expect(await exists('sessions/sess-1/workflows/01/steps/01/response/streaming')).toBe(false);
+    const streamPath = 'sessions/sess-1/workflows/01/steps/01/response/streaming/streaming.ndjson';
+    expect(await exists(streamPath)).toBe(true);
+    const raw = await fs.readFile(path.join(rootDir, streamPath), 'utf8');
+    const parsed = JSON.parse(raw.trim()) as Record<string, unknown>;
+    expect(parsed.line).toBe('data: {"type":"content_block_delta"}');
+  });
+
+  it('ordena líneas en streaming.ndjson por seq (append serializado)', async () => {
+    emit('workflow_start', 'sess-1', { workflowId: 'wf-1', kind: 'main' });
+    for (const seq of [1, 2]) {
+      emit('stream_chunk', 'sess-1', {
+        seq,
+        stepIndex: 1,
+        workflowId: 'wf-1',
+        chunk: {
+          i: seq,
+          ts: '2026-01-01T00:00:00Z',
+          line: `data: {"type":"content_block_delta","index":0,"seq":${seq}}`,
+          phase: 'delegation',
+        },
+      });
+    }
+    await persistence.flush();
+    const streamPath = 'sessions/sess-1/workflows/01/steps/01/response/streaming/streaming.ndjson';
+    const raw = await fs.readFile(path.join(rootDir, streamPath), 'utf8');
+    const lines = raw
+      .split('\n')
+      .filter((l) => l.length > 0)
+      .map((l) => JSON.parse(l) as Record<string, unknown>);
+    expect(lines).toHaveLength(2);
+    expect(lines[0].line).toContain('"seq":1');
+    expect(lines[1].line).toContain('"seq":2');
   });
 });
 

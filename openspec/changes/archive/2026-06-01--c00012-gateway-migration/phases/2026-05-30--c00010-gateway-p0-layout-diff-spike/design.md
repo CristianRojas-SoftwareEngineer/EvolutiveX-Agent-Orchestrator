@@ -2,7 +2,7 @@
 
 El gateway actual proyecta datos de auditoría a disco mediante `AuditWriterService` (escritura directa desde capa 3), `SessionStoreService` (registry en memoria) y `WorkflowResultProjector` (mapeo a `InteractionMetadata`). El layout en disco es flat (interacciones, pasos, sub-agentes anidados) con archivos como `meta.json`, `state.json`, `sse.jsonl` y `body.json`.
 
-El layout objetivo (`causal-workflows-v1`, §29–§31) reemplaza esto por un árbol causal (`workflows/NN/steps/MM/tools/KK/`) proyectado por `SessionPersistence` como suscriptor de un `EventBus` interno. Las decisiones D1/D2/D3 del orquestador ya fijan: `output/result.json` (no `response.json` ni `body.json`), fusión de `state.json` en `meta.json`, y separación estricta entre `meta.json` (identidad+estado) y `output/result.json` (resultado+contenido).
+El layout objetivo (`causal-workflows-v2`, §29–§31) reemplaza esto por un árbol causal (`workflows/NN/steps/MM/tools/KK/`) proyectado por `SessionPersistence` como suscriptor de un `EventBus` interno. Las decisiones D1/D2/D3 del orquestador ya fijan: `output/result.json` (no `response.json` ni `body.json`), fusión de `state.json` en `meta.json`, y separación estricta entre `meta.json` (identidad+estado) y `output/result.json` (resultado+contenido).
 
 La Opción A (`EventBus` + `SessionPersistence`) está ratificada (§28b/§40). Este spike confirma las ubicaciones concretas de código, no decide entre opciones.
 
@@ -111,15 +111,15 @@ Razones:
 
 ### D-S5: Estrategia de corte limpio
 
-**Regla:** Las sesiones anteriores al layout `causal-workflows-v1` se eliminan antes del corte. No hay migración de datos en reposo.
+**Regla:** Las sesiones anteriores al layout `causal-workflows-v2` se eliminan antes del corte. No hay migración de datos en reposo.
 
 **Estrategia:**
 
 1. **Punto de invocación:** Al arranque del proxy (en `createProxyDependencies()` o en `index.ts`), antes de registrar rutas.
 2. **Lógica:** Si existe `sessions/` con layout anterior (detectado por la presencia de `main-agent/` o `interaction-sequence.json`), eliminar recursivamente todo el contenido de `sessions/` y recrear `.gitkeep`.
 3. **No hay migración:** No se convierten archivos antiguos al nuevo layout. Las sesiones en curso se pierden (son volátiles por diseño).
-4. **Sesiones nuevas:** Desde el corte en adelante, todas las sesiones usan `causal-workflows-v1` (`workflows/NN/steps/MM/tools/KK/`).
-5. **Idempotencia:** La detección y eliminación es idempotente; si el layout ya es `causal-workflows-v1`, no hace nada.
+4. **Sesiones nuevas:** Desde el corte en adelante, todas las sesiones usan `causal-workflows-v2` (`workflows/NN/steps/MM/tools/KK/`).
+5. **Idempotencia:** La detección y eliminación es idempotente; si el layout ya es `causal-workflows-v2`, no hace nada.
 
 ## Risks / Trade-offs
 

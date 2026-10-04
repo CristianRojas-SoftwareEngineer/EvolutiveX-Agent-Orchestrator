@@ -1,6 +1,6 @@
 ## Context
 
-P1 dejó `SessionPersistence` suscrito a eventos del correlador para el árbol estructural `causal-workflows-v1`. `AuditSseResponseHandler` sigue escribiendo `sse.jsonl` vía `ISseAuditWriter` (`@deprecated-p2`). P0 ratificó que `stream_chunk` lo emite capa 3 al bus, no el correlador.
+P1 dejó `SessionPersistence` suscrito a eventos del correlador para el árbol estructural `causal-workflows-v2`. `AuditSseResponseHandler` sigue escribiendo `sse.jsonl` vía `ISseAuditWriter` (`@deprecated-p2`). P0 ratificó que `stream_chunk` lo emite capa 3 al bus, no el correlador.
 
 Referencias: [§28b](../../../docs/proposals/gateway-design.md), [§33](../../../docs/proposals/gateway-design.md), spike P0 archivado, change P1 archivado.
 
@@ -13,7 +13,7 @@ sequenceDiagram
 
   H->>B: stream_chunk por evento SSE
   B->>SP: onStreamChunk
-  SP->>Disk: streaming/NNNN-chunk.ndjson
+  SP->>Disk: streaming/streaming.ndjson
   Note over SP,Disk: Al message_stop reconstruye body.json
   B->>SP: wildcard append
   SP->>Disk: events.ndjson

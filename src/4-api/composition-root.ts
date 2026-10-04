@@ -155,7 +155,7 @@ async function ensureAuditSessionsRoot(auditBaseDir: string): Promise<void> {
  * legacy (presencia de `main-agent/`, `side-interactions/` o
  * `interaction-sequence.json` bajo cualquier sesión), elimina todo el contenido
  * y recrea `.gitkeep`. Idempotente: no hace nada si el layout ya es
- * `causal-workflows-v1` o si no hay sesiones.
+ * `causal-workflows-v2` o si no hay sesiones.
  */
 export async function cleanCutLegacySessions(sessionsDir: string, logger: Logger): Promise<void> {
   let entries: import('node:fs').Dirent[];
@@ -190,5 +190,5 @@ export async function cleanCutLegacySessions(sessionsDir: string, logger: Logger
     await fs.rm(path.join(sessionsDir, entry.name), { recursive: true, force: true });
   }
   await fs.writeFile(path.join(sessionsDir, '.gitkeep'), '', 'utf8');
-  logger.info('corte limpio: sesiones con layout legacy eliminadas (causal-workflows-v1)');
+  logger.info('corte limpio: sesiones con layout legacy eliminadas (causal-workflows-v2)');
 }

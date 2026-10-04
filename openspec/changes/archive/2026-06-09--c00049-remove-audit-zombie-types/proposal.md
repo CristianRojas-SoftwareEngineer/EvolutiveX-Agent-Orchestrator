@@ -35,6 +35,6 @@ _(ninguna — retiro de deuda y alineación documental, sin comportamiento nuevo
 | **docs** | `docs/session-audit-model.md` §7 y referencias cruzadas a tipos retirados |
 | **openspec/specs** | deltas en `gateway-domain-types`, `gateway-step-assembly`, `session-routing` |
 
-Sin impacto en runtime del proxy, layout `causal-workflows-v1`, correlación wire ni `sessions/` existentes. **BREAKING** solo para consumidores externos del paquete que importaran tipos eliminados (ninguno en este repo).
+Sin impacto en runtime del proxy, layout `causal-workflows-v2`, correlación wire ni `sessions/` existentes. **BREAKING** solo para consumidores externos del paquete que importaran tipos eliminados (ninguno en este repo).
 
 Verificación: `npm run test:quick`.

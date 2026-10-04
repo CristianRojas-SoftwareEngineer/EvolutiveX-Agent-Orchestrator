@@ -210,9 +210,9 @@
 
 ---
 
-## P1 — Reescribir proyección: bus + estructura de directorios `causal-workflows-v1`
+## P1 — Reescribir proyección: bus + estructura de directorios `causal-workflows-v2`
 
-> Objetivo: crear la pila `IEventBus` → `EventBus` → `SessionPersistence`, conectar el correlador al bus y que las sesiones nuevas produzcan el árbol `causal-workflows-v1`. Retirar el layout flat completo. No se transforman sesiones anteriores.
+> Objetivo: crear la pila `IEventBus` → `EventBus` → `SessionPersistence`, conectar el correlador al bus y que las sesiones nuevas produzcan el árbol `causal-workflows-v2`. Retirar el layout flat completo. No se transforman sesiones anteriores.
 
 - [x] Verificar dependencias §43: P0 y G4 en estado `validada` o `archivada`
   - _Criterio: columnas Estado de P0 y G4 = `validada` o `archivada`_
@@ -226,7 +226,7 @@
   - _Matcher de patrones (`*`, `prefix_*`, `*_suffix`) en `src/1-domain/services/gateway/`_
 - [x] Componentes de infraestructura creados (capa 2):
   - _`EventBus` adapter (pub/sub async in-process, fire-and-forget) en `src/2-services/event-bus.service.ts`_
-  - _Funciones de rutas de sesión (`getWorkflowDir`, `getStepDir`, `getToolsDir`) para layout `causal-workflows-v1`_
+  - _Funciones de rutas de sesión (`getWorkflowDir`, `getStepDir`, `getToolsDir`) para layout `causal-workflows-v2`_
   - _Utilidades de aislamiento async (`fireAndForget`, `withTimeout`) en `src/2-services/utils/`_
   - _`SessionPersistence` (parte estructural): suscriptores `session_start`, `workflow_start`, `workflow_spawn`, `workflow_complete`, `workflow_cancel`, `step_request`, `tool_call`, `tool_result` → escribe `meta.json` (estado fusionado, sin `state.json`), `output/result.json` + `output/result.parsed.md` (en `workflow_complete`), `request/body.json`, `tools/NN-name/{input,result,meta}.json` en `src/2-services/session-persistence.service.ts`_
 - [x] Correlador conectado al bus:
@@ -264,7 +264,7 @@
   - _P2-a…P2-h completados en commit 2026-06-01_
 - [x] Suscripciones y emisión SSE implementadas (resumen; detalle en change hijo):
   - _Wildcard `*` → `sessions/<id>/events.ndjson` (§33.1) ✓_
-  - _`stream_chunk` → `streaming/NNNN-chunk.ndjson`; `body.coalesced.json` al cierre del step coalesced ✓_
+  - _`stream_chunk` → `streaming/streaming.ndjson`; `body.coalesced.json` al cierre del step coalesced ✓_
   - _`AuditSseResponseHandler` publica `stream_chunk` al bus (sin `sse.jsonl` inline) ✓_
   - _`workflow-sequence.json` en `workflow_start` / `workflow_complete` / `workflow_cancel` ✓_
   - _Coalesced (§37b #18): chunks por bus; `body.coalesced.json` / `.parsed.md` vía `SessionPersistence` (Opción A) ✓_

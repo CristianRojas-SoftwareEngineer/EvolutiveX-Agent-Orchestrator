@@ -4,7 +4,7 @@ El gateway proyecta datos de auditoría a disco mediante `AuditWriterService` (e
 
 La fase G4 ya proyecta `WorkflowResult` a disco, pero lo hace a través del layout flat heredado, usando `AuditWorkflowClosureHandler` + `AuditProjectionFs`. El correlador (`WorkflowRepositoryService`) no emite eventos; los handlers de capa 3 orquestan la persistencia directamente.
 
-El layout objetivo (`causal-workflows-v1`, §30) reemplaza esto por un árbol causal (`workflows/NN/steps/MM/tools/KK/`) proyectado por `SessionPersistence` como suscriptor de un `EventBus` interno. Las decisiones D1/D2/D3 del orquestador fijan: `output/result.json` (no `response.json` ni `body.json`), fusión de `state.json` en `meta.json`, y separación estricta entre `meta.json` (identidad+estado) y `output/result.json` (resultado+contenido).
+El layout objetivo (`causal-workflows-v2`, §30) reemplaza esto por un árbol causal (`workflows/NN/steps/MM/tools/KK/`) proyectado por `SessionPersistence` como suscriptor de un `EventBus` interno. Las decisiones D1/D2/D3 del orquestador fijan: `output/result.json` (no `response.json` ni `body.json`), fusión de `state.json` en `meta.json`, y separación estricta entre `meta.json` (identidad+estado) y `output/result.json` (resultado+contenido).
 
 La Opción A (`EventBus` + `SessionPersistence`) está ratificada (§28b/§40). El spike P0 confirmó las ubicaciones concretas de código, puntos de emisión, ownership del timer y estrategia de composition root.
 
@@ -17,7 +17,7 @@ Adicionalmente, 6 handlers de capa 3 dependen de los tipos legacy (`ActiveIntera
 1. Crear la pila `IEventBus` → `EventBus` → `SessionPersistence` según §28b.1 y §40.
 2. Conectar el correlador al bus: cada mutación de estado emite el evento §28b.3 correspondiente.
 3. Crear `completeToolUse()` en el correlador (no existe actualmente; P0 lo confirmó).
-4. Que `SessionPersistence` proyecte el árbol `causal-workflows-v1` para sesiones nuevas: `meta.json` (estado fusionado), `output/result.json`, `steps/MM/`, `tools/KK/`.
+4. Que `SessionPersistence` proyecte el árbol `causal-workflows-v2` para sesiones nuevas: `meta.json` (estado fusionado), `output/result.json`, `steps/MM/`, `tools/KK/`.
 5. Cablear `EventBus` en `composition-root.ts` (capa 4, §42).
 6. Implementar corte limpio de sesiones anteriores.
 7. Migrar los 6 handlers L3 a tipos gateway (`IWorkflow`, `IStep`, `IToolUse`, `IWorkflowResult`) + `IWorkflowRepository` + EventBus.
@@ -148,14 +148,14 @@ findStaleWorkflows(sessionId: string, maxAgeMs: number): IWorkflow[]
 
 ### D-5: Corte limpio de sesiones anteriores
 
-**Regla:** Las sesiones anteriores al layout `causal-workflows-v1` se eliminan antes del corte. No hay migración de datos en reposo.
+**Regla:** Las sesiones anteriores al layout `causal-workflows-v2` se eliminan antes del corte. No hay migración de datos en reposo.
 
 **Estrategia:**
 
 1. **Punto de invocación:** Al arranque del proxy, en `createProxyDependencies()`, antes de registrar rutas.
 2. **Detección:** Si existe `sessions/` con layout anterior (detectado por la presencia de `main-agent/` o `interaction-sequence.json`), se considera layout legacy.
 3. **Eliminación:** Se elimina recursivamente todo el contenido de `sessions/` y se recrea `.gitkeep`.
-4. **Idempotencia:** Si el layout ya es `causal-workflows-v1` (o `sessions/` está vacío), no hace nada.
+4. **Idempotencia:** Si el layout ya es `causal-workflows-v2` (o `sessions/` está vacío), no hace nada.
 5. **Sesiones en curso:** Se pierden (son volátiles por diseño).
 
 ### D-6: Retiro de legacy
@@ -167,7 +167,7 @@ findStaleWorkflows(sessionId: string, maxAgeMs: number): IWorkflow[]
 | `SessionStoreService` | `src/2-services/session-store.service.ts` | `WorkflowRepositoryService` (métodos de lookup) + `EventBus` |
 | `WorkflowResultProjector` | `src/2-services/workflow-result-projector.service.ts` | `SessionPersistence` (proyecta `output/result.json`) |
 | Puerto `ISessionStore` | `src/2-services/ports/session-store.port.ts` | `IWorkflowRepository` ampliado |
-| Constantes flat | `src/1-domain/constants/audit-paths.ts` | Constantes del layout `causal-workflows-v1` en `session-routing.ts` |
+| Constantes flat | `src/1-domain/constants/audit-paths.ts` | Constantes del layout `causal-workflows-v2` en `session-routing.ts` |
 | Tipos `ActiveInteraction`, `InteractionMetadata`, `StepMeta`, `InteractionType`, `InteractionState`, `InteractionOutcome`, `ParentContext`, `SideRequestKind`, `PendingAgentToolUse`, `PendingWebSearchToolUse`, `PendingWebFetchToolUse`, `ResolvedInternalTool` | `src/1-domain/types/audit.types.ts` | Tipos gateway (`IWorkflow`, `IStep`, `IToolUse`, `IWorkflowResult`, `WorkflowKind`, `WorkflowStatus`, `WorkflowOutcome`) |
 | `AuditWorkflowClosureHandler` (escritura a disco) | `src/3-operations/audit-workflow-closure.handler.ts` | `SessionPersistence` (proyecta vía bus). Handler se conserva como coordinador de métricas de sesión. |
 | Llamadas directas a disco en handlers L3 | `src/3-operations/*.handler.ts` | Delegación en `SessionPersistence` vía bus |
@@ -177,7 +177,7 @@ findStaleWorkflows(sessionId: string, maxAgeMs: number): IWorkflow[]
 ### D-7: Decisiones D1/D2/D3 del orquestador aplicadas
 
 - **D1:** `output/response.json` → `output/result.json` (naming de resultado de workflow).
-- **D2:** `state.json` se fusiona en `meta.json`. No existe `state.json` en el layout `causal-workflows-v1`.
+- **D2:** `state.json` se fusiona en `meta.json`. No existe `state.json` en el layout `causal-workflows-v2`.
 - **D3:** Separación estricta: `meta.json` = identidad+estado; `output/result.json` = IWorkflowResult + steps[].
 
 ### D-8: Migración de handlers L3 a tipos gateway

@@ -1,6 +1,6 @@
 # Smart Code Proxy — Arquitectura del Gateway
 
-Documento de referencia del **gateway tal como está implementado**: el modelo de dominio (vocabulario gateway), la correlación runtime Wire + Hooks, la estrategia de persistencia en disco (`causal-workflows-v1`) y la composición PKA en `src/`. Describe el sistema en presente; la historia de cómo se llegó a esta arquitectura vive en los changes archivados (ver §41).
+Documento de referencia del **gateway tal como está implementado**: el modelo de dominio (vocabulario gateway), la correlación runtime Wire + Hooks, la estrategia de persistencia en disco (`causal-workflows-v2`) y la composición PKA en `src/`. Describe el sistema en presente; la historia de cómo se llegó a esta arquitectura vive en los changes archivados (ver §41).
 
 ---
 
@@ -41,7 +41,7 @@ Documento de referencia del **gateway tal como está implementado**: el modelo d
 ### [Parte IV — Persistencia](#parte-iv--persistencia)
 
 - [24. Terminología de entradas y salidas](#24-terminología-de-entradas-y-salidas)
-- [25. Estructura de directorios `causal-workflows-v1`](#25-estructura-de-directorios-causal-workflows-v1)
+- [25. Estructura de directorios `causal-workflows-v2`](#25-estructura-de-directorios-causal-workflows-v2)
 - [26. Reglas adaptativas](#26-reglas-adaptativas)
 - [27. Escenarios de workflows](#27-escenarios-de-workflows)
 - [28. Artefactos de persistencia](#28-artefactos-de-persistencia)
@@ -81,7 +81,7 @@ Documento de referencia del **gateway tal como está implementado**: el modelo d
 | **Proxy transparente**            | Reenviar `POST /v1/messages` (y rutas afines) al upstream con latencia mínima; reenviar streams SSE al cliente.                                                                                          |
 | **Auditoría orientada al humano** | Persistir bajo `sessions/<session-id>/` una jerarquía legible: workflows, steps HTTP, subagentes, reconstrucción de mensajes. No es un event store exhaustivo de cada delta SSE como entidad de dominio. |
 
-El gateway eleva la observabilidad a un **modelo de dominio propio** (vocabulario gateway) y distribuye responsabilidades según PKA, proyectando en disco la estructura `causal-workflows-v1` (Parte IV, §24–§33) y exponiendo un segundo borde normativo (hooks Claude Code). La proyección a `sessions/` es coherente con `session-audit-model.md`.
+El gateway eleva la observabilidad a un **modelo de dominio propio** (vocabulario gateway) y distribuye responsabilidades según PKA, proyectando en disco la estructura `causal-workflows-v2` (Parte IV, §24–§33) y exponiendo un segundo borde normativo (hooks Claude Code). La proyección a `sessions/` es coherente con `session-audit-model.md`.
 
 **Documentos hermanos (profundidad, no prerequisito):**
 
@@ -747,7 +747,7 @@ stateDiagram-v2
 
 **Tabla de proyección:**
 
-| Concepto   | Dominio (§10)                                       | Disco `causal-workflows-v1` (Parte IV)        |
+| Concepto   | Dominio (§10)                                       | Disco `causal-workflows-v2` (Parte IV)        |
 | ---------- | --------------------------------------------------- | --------------------------------------------- |
 | Step       | Ciclo inferencia + tools                            | `steps/MM/` (1 POST + `tools/`)               |
 | Fase tools | Estado `AwaitingTools` en correlador                | Directorios `tools/KK-slug/` bajo el step     |
@@ -1611,9 +1611,9 @@ flowchart TB
 
 # Parte IV — Persistencia
 
-> Esta parte describe el **layout de persistencia** `causal-workflows-v1`. La conexión entre el correlador runtime (Parte III) y la persistencia se define en **§23**: el correlador emite eventos de telemetría al bus; `SessionPersistence` los consume y proyecta a disco. Esta parte se centra en el **layout de disco** y las **reglas de proyección**.
+> Esta parte describe el **layout de persistencia** `causal-workflows-v2`. La conexión entre el correlador runtime (Parte III) y la persistencia se define en **§23**: el correlador emite eventos de telemetría al bus; `SessionPersistence` los consume y proyecta a disco. Esta parte se centra en el **layout de disco** y las **reglas de proyección**.
 >
-> **`causal-workflows-v1`** es el identificador de versión de este layout. Se llama _causal_ porque modela cada sesión LLM como un árbol causal en disco: cada workflow contiene steps, cada step contiene tools, y las tools de tipo Agent anidan un sub-workflow hijo bajo la tool invocadora — reflejando la cadena causa→efecto. El sufijo _v1_ permite evoluciones futuras del schema sin romper retrocompatibilidad (cada `meta.json` declara su `layoutVersion`).
+> **`causal-workflows-v2`** es el identificador de versión de este layout. Se llama _causal_ porque modela cada sesión LLM como un árbol causal en disco: cada workflow contiene steps, cada step contiene tools, y las tools de tipo Agent anidan un sub-workflow hijo bajo la tool invocadora — reflejando la cadena causa→efecto. El sufijo _v1_ permite evoluciones futuras del schema sin romper retrocompatibilidad (cada `meta.json` declara su `layoutVersion`).
 >
 > `SessionPersistence` se suscribe al bus de eventos (§23) y reacciona a eventos de telemetría (`session_start`, `workflow_start`, `workflow_spawn`, `step_request`, `tool_call`, `tool_result`, `stream_chunk`, `workflow_complete`, `workflow_cancel`, `session_complete`, `token_usage`). No hay acoplamiento directo con handlers de transporte ni con el correlador; la persistencia solo consume eventos del bus.
 
@@ -1710,7 +1710,7 @@ La terminología es **deliberadamente no homogénea**. Cada par (`input/output`,
 
 ---
 
-## 25. Estructura de directorios `causal-workflows-v1`
+## 25. Estructura de directorios `causal-workflows-v2`
 
 ### 25.1. Árbol canónico
 
@@ -1762,7 +1762,7 @@ sessions/<session-id>/
 
 ### 25.2. Versionado
 
-Cada `meta.json` (workflow, step, tool-use) incluye `layoutVersion: "causal-workflows-v1"` para permitir evolución futura sin romper retrocompatibilidad.
+Cada `meta.json` (workflow, step, tool-use) incluye `layoutVersion: "causal-workflows-v2"` para permitir evolución futura sin romper retrocompatibilidad.
 
 ---
 
@@ -1795,7 +1795,7 @@ Cada turno LLM = un step = un directorio `workflows/NN/steps/MM/`.
 | **Solicitud**           | `steps/MM/request/body.json`                    | Cuerpo JSON enviado al endpoint LLM (`step_request.body`)                                      |
 | **Respuesta (final)**   | `steps/MM/response/body.json`                   | Reconstruido por `aggregateSseChunks` desde chunks SSE; o escrito directamente si no-streaming |
 | **Respuesta (legible)** | `steps/MM/response/body.parsed.md`              | Render Markdown del body vía `MarkdownRendererService`                                         |
-| **Respuesta (forense)** | `steps/MM/response/streaming/NNNN-chunk.ndjson` | Cada evento `stream_chunk` como artefacto individual                                           |
+| **Respuesta (forense)** | `steps/MM/response/streaming/streaming.ndjson` | Un único archivo por respuesta de step; cada `stream_chunk` apende una línea ndjson           |
 
 **Numeración de steps:**
 
@@ -2087,7 +2087,7 @@ workflow se marca como huérfano.
 
 ```typescript
 {
-  layoutVersion: "causal-workflows-v1",
+  layoutVersion: "causal-workflows-v2",
   workflowKind: "main" | "subagent",
   workflowIndex: number,               // Sólo top-level; null si nested
   workflowId: string,
@@ -2111,7 +2111,7 @@ workflow se marca como huérfano.
 
 ### 28.4. Estado runtime en `meta.json` (sin `state.json` separado)
 
-El layout `causal-workflows-v1` **no genera `state.json`**. El estado mutable del workflow
+El layout `causal-workflows-v2` **no genera `state.json`**. El estado mutable del workflow
 (`status`, `lastActivity`, `cancellationReason`) vive directamente en `meta.json` (§28.3).
 
 **Justificación de la fusión:** las transiciones de `WorkflowStatus` son ≤ 3 por workflow
@@ -2134,7 +2134,7 @@ duplica.
 
 ```typescript
 {
-  layoutVersion: "causal-workflows-v1",
+  layoutVersion: "causal-workflows-v2",
   // --- IWorkflowResult ---
   outcome: "success" | "api_error" | "aborted" | "unknown",
   finalText?: string,          // Passthrough de last_assistant_message del hook de cierre;
@@ -2170,7 +2170,7 @@ Cada vez que se detecta un reintento (mismo `tool_use_id`), el escritor lee la m
 
 ```typescript
 {
-  layoutVersion: "causal-workflows-v1",
+  layoutVersion: "causal-workflows-v2",
   toolUseIndex: number,            // KK (orden de aparición)
   toolUseId: string,               // tu-* (correlación)
   toolName: string,                // "Read", "Grep", "Agent", ...
@@ -2233,9 +2233,9 @@ Se añaden propiedades al schema `StepMetadata`. Un monitor dinámico asíncrono
 
 ## 29. Reconstrucción de bodies
 
-### 29.1. Chunks streaming (`streaming/NNNN-chunk.ndjson`)
+### 29.1. Chunks streaming (`streaming/streaming.ndjson`)
 
-Cada `stream_chunk` se persiste como artefacto independiente en `response/streaming/NNNN-chunk.ndjson` (numerado con 4 dígitos). Esto proporciona:
+Cada `stream_chunk` apende una línea ndjson a `response/streaming/streaming.ndjson` (un único archivo por respuesta de step, líneas en orden de `seq`; sin tope de líneas). Esto proporciona:
 
 | Aspecto                   | Beneficio                                |
 | ------------------------- | ---------------------------------------- |
@@ -2328,7 +2328,7 @@ Todos usan `resolveWorkflowLocation(sessionId, workflowId)` para obtener el `wor
 
 ### 32.1. Mapeo de entidades
 
-| Entidad                  | Ruta `causal-workflows-v1`           |
+| Entidad                  | Ruta `causal-workflows-v2`           |
 | ------------------------ | ------------------------------------ |
 | Session                  | `sessions/<id>/`                     |
 | Workflow main            | `workflows/NN/`                      |
@@ -2341,11 +2341,11 @@ Todos usan `resolveWorkflowLocation(sessionId, workflowId)` para obtener el `wor
 
 ### 32.2. Doble persistencia SSE (decisión explícita)
 
-El layout adopta `streaming/*.ndjson` (un archivo por chunk SSE) para forensia:
+El layout adopta `streaming/streaming.ndjson` (único archivo por respuesta de step, append por línea) para forensia:
 
-| Aspecto           | `streaming/*.ndjson`                     |
+| Aspecto           | `streaming/streaming.ndjson`             |
 | ----------------- | ---------------------------------------- |
-| Granularidad      | Un archivo por chunk SSE                 |
+| Granularidad      | Una línea ndjson por chunk SSE (append)  |
 | Crash recovery    | Total (chunks atómicos)                  |
 | Timeline forense  | Cada chunk es un artefacto independiente |
 | Filtrado de pings | Pings descartados antes de persistir     |
@@ -2374,7 +2374,7 @@ Este artefacto proporciona:
 
 ## 33. Checklist de conformidad E2E del layout
 
-Criterios de conformidad para validar que la persistencia cumple el layout `causal-workflows-v1`. Derivados del test suite de referencia (`tests/2-services/session-persistence.test.ts`). Los casos marcados **Fuera de v1** se documentan en §40 y no son requisito de conformidad del layout vigente.
+Criterios de conformidad para validar que la persistencia cumple el layout `causal-workflows-v2`. Derivados del test suite de referencia (`tests/2-services/session-persistence.test.ts`). Los casos marcados **Fuera de v1** se documentan en §40 y no son requisito de conformidad del layout vigente.
 
 | #   | Caso                                             | Qué valida                                                                                                                                                                                  | Conformidad       |
 | --- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- |
@@ -2545,7 +2545,7 @@ flowchart TB
 | ----------------------- | ------------------------------------------------------------- | -------------------------------------------------------------------------------- |
 | Correlador              | `workflow-repository.service.ts`                              | Estado en memoria de workflows/steps/tools; índices `tool_use_id`; emite al bus. |
 | Bus de eventos          | `event-bus.service.ts`                                        | Pub/sub in-process del port `IEventBus`.                                         |
-| Persistencia            | `session-persistence.service.ts`                              | Suscriptor del bus; proyecta layout `causal-workflows-v1`.                       |
+| Persistencia            | `session-persistence.service.ts`                              | Suscriptor del bus; proyecta layout `causal-workflows-v2`.                       |
 | Métricas                | `session-metrics.service.ts`                                  | `session-metrics.json` por modelo (§28.2).                                       |
 | Catálogo de proveedores | `provider-catalog.service.ts`                                 | Deriva `Provider` / `LanguageModel`.                                             |
 | StepBuffer              | `step-assembler.service.ts`                                   | SSE → `assistantMessage`, `usage`, `stopReason` (§20).                           |
@@ -2614,7 +2614,7 @@ La capa 1 contiene tipos primitivos, interfaces DTO, modelos de clase anémicos,
 | ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
 | `WorkflowRepositoryService` (memoria) | `Session`, workflows activos, steps abiertos, índices `tool_use_id`; emite eventos al bus                                               | Correlador §14                                 |
 | `EventBusService`                     | Adapter async in-process del port `IEventBus`; pub/sub unidireccional                                                                   | Bus de eventos §23                             |
-| `SessionPersistenceService`           | Suscriptor del bus; proyecta eventos de telemetría a disco `sessions/` (`causal-workflows-v1`)                                          | §23, Parte IV                                  |
+| `SessionPersistenceService`           | Suscriptor del bus; proyecta eventos de telemetría a disco `sessions/` (`causal-workflows-v2`)                                          | §23, Parte IV                                  |
 | `SessionMetricsService`               | Escritura atómica de `session-metrics.json` (`billable_hops`, `finalized_runs`, tokens); workflows agénticos `main` y `subagent` (G16′) | §28.2                                          |
 | `StepAssemblerService`                | RAM: SSE → `assistantMessage`, `usage`, `stopReason`; callback `onInferenceComplete`                                                    | StepBuffer §20                                 |
 | `SseReconstructService`               | Forense / `response/body.json` desde chunks SSE                                                                                         | Complemento; no sustituye `finalText` de hooks |
@@ -2833,7 +2833,7 @@ El gateway de Smart Code Proxy:
 - Modela **subagentes** como workflows hijos (`kind: 'subagent'`) enlazados desde `ToolUse.childWorkflowId`.
 - Cierra cada workflow con **WorkflowResult**: snapshot E2E inmutable (hooks + agregación de Steps cerrados).
 - Trata streaming SSE con **reenvío transparente, StepBuffer obligatorio, y persistencia solo en Steps cerrados**.
-- Proyecta el layout en disco **`causal-workflows-v1`** (`workflows/NN/`, `tools/KK/`, `streaming/*.ndjson`, `events.ndjson`, `workflow-sequence.json`).
+- Proyecta el layout en disco **`causal-workflows-v2`** (`workflows/NN/`, `tools/KK/`, `streaming/streaming.ndjson`, `events.ndjson`, `workflow-sequence.json`).
 - Correlaciona **Wire + Hooks** con tres planos de señal (A: headers identidad agente, B: SSE `tool_use_id` join, C: hooks lifecycle).
 - Integra correlador y persistencia mediante **bus de eventos unidireccional** (§23): el correlador emite eventos de telemetría; `SessionPersistence` consume y proyecta a disco sin acoplar capas.
 - Ubica el timeout de tools como **decisión del correlador** (§18.1), no de persistencia; precedencia hook > timeout con inmutabilidad de cierre.

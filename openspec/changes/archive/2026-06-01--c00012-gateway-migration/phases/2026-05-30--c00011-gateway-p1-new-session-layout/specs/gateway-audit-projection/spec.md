@@ -14,7 +14,7 @@ Delta de P1 sobre el spec `gateway-audit-projection`: la proyección de `Workflo
 2. El correlador emite `workflow_complete` (o `workflow_cancel`) al `EventBus`.
 3. `SessionPersistence` recibe el evento y proyecta `meta.json` + `output/result.json` a disco.
 
-El layout de directorios bajo `sessions/` SHALL cambiar de flat (`sessions/{sessionId}/{interactionId}/`) a `causal-workflows-v1` (`sessions/{sessionId}/workflows/NN/`).
+El layout de directorios bajo `sessions/` SHALL cambiar de flat (`sessions/{sessionId}/{interactionId}/`) a `causal-workflows-v2` (`sessions/{sessionId}/workflows/NN/`).
 
 #### Scenario: Hook Stop cierra workflow y persistencia proyecta vía bus
 
@@ -85,7 +85,7 @@ Los 6 handlers de capa 3 SHALL migrar a tipos gateway antes de la eliminación:
 - **AND** los tipos `ActiveInteraction`, `InteractionMetadata`, `StepMeta`, `InteractionType`, `InteractionState`, `InteractionOutcome` NO SHALL existir en código de producción
 - **AND** los handlers L3 SHALL usar exclusivamente tipos gateway (`IWorkflow`, `IStep`, `IToolUse`, `IWorkflowResult`)
 
-#### Scenario: Sesiones nuevas usan layout causal-workflows-v1
+#### Scenario: Sesiones nuevas usan layout causal-workflows-v2
 
 - **GIVEN** un proxy con P1 implementado
 - **WHEN** se procesa una solicitud completa (workflow + steps + tools)

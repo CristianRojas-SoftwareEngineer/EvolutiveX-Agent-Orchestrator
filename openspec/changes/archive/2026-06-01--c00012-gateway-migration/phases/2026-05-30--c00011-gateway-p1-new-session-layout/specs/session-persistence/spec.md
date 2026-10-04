@@ -2,13 +2,13 @@
 
 ## Purpose
 
-Suscriptor del `EventBus` que proyecta eventos del correlador y handlers a disco bajo la estructura `causal-workflows-v1` (`workflows/NN/steps/MM/tools/KK/`). Reemplaza la escritura directa desde handlers de capa 3 (`AuditWriterService`, `SessionStoreService`, `WorkflowResultProjector`).
+Suscriptor del `EventBus` que proyecta eventos del correlador y handlers a disco bajo la estructura `causal-workflows-v2` (`workflows/NN/steps/MM/tools/KK/`). Reemplaza la escritura directa desde handlers de capa 3 (`AuditWriterService`, `SessionStoreService`, `WorkflowResultProjector`).
 
 ## ADDED Requirements
 
 ### Requirement: SessionPersistence — suscripción al bus y proyección a disco
 
-El sistema SHALL proveer `SessionPersistence` en `src/2-services/session-persistence.service.ts` como suscriptor del `EventBus` que, al recibir eventos del correlador y handlers, proyecta la estructura de directorios y archivos del layout `causal-workflows-v1` bajo `sessions/`.
+El sistema SHALL proveer `SessionPersistence` en `src/2-services/session-persistence.service.ts` como suscriptor del `EventBus` que, al recibir eventos del correlador y handlers, proyecta la estructura de directorios y archivos del layout `causal-workflows-v2` bajo `sessions/`.
 
 `SessionPersistence` SHALL suscribirse a los siguientes eventos en su constructor:
 
@@ -28,7 +28,7 @@ El sistema SHALL proveer `SessionPersistence` en `src/2-services/session-persist
 - **GIVEN** una sesión `'sess-1'` sin directorio de workflow
 - **WHEN** `SessionPersistence` recibe un evento `{ type: 'workflow_start', sessionId: 'sess-1', payload: { workflowId: 'wf-1', kind: 'main' } }`
 - **THEN** SHALL crearse el directorio `sessions/sess-1/workflows/00/`
-- **AND** SHALL escribirse `meta.json` con `status: 'running'`, `workflowKind: 'main'`, `layoutVersion: 'causal-workflows-v1'`
+- **AND** SHALL escribirse `meta.json` con `status: 'running'`, `workflowKind: 'main'`, `layoutVersion: 'causal-workflows-v2'`
 
 #### Scenario: workflow_start con request escribe request/body.json
 
@@ -95,7 +95,7 @@ El sistema SHALL proveer `SessionPersistence` en `src/2-services/session-persist
 
 ---
 
-### Requirement: Directorio causal-workflows-v1 con naming correcto
+### Requirement: Directorio causal-workflows-v2 con naming correcto
 
 `SessionPersistence` SHALL crear directorios siguiendo la convención de §30:
 

@@ -50,7 +50,7 @@ Solo las peticiones con sesión identificada (cabecera override o fallback prese
 
 - `sessions/<sessionId>/workflows/NN/` — cada ciclo auditado (turno `agentic`, preflight o `side-request` como workflow hermano)
 
-`AuditWorkflowHandler` abre o continúa workflows vía `IWorkflowRepository.openWorkflow()`; no existe un “directorio de interacción” flat separado. Ver [`session-audit-model.md` §0](./session-audit-model.md#0-layout-vigente-causal-workflows-v1).
+`AuditWorkflowHandler` abre o continúa workflows vía `IWorkflowRepository.openWorkflow()`; no existe un “directorio de interacción” flat separado. Ver [`session-audit-model.md` §0](./session-audit-model.md#0-layout-vigente-causal-workflows-v2).
 
 No se crea `sessions/_unknown/`.
 

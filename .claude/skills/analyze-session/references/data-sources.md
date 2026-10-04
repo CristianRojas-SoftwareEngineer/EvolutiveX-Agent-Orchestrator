@@ -12,7 +12,7 @@ Relevant files:
 - `C:\Users\user\.claude\projects\C--Users-user-Desktop-Proyectos-Smart-Code-Proxy\{session-id}.jsonl`: Main session log recorded by the harness
 - `C:\Users\user\.claude\projects\C--Users-user-Desktop-Proyectos-Smart-Code-Proxy\{session-id}\`: Directory with subagent files created during the session
 
-## 2. Smart Code Proxy audit trail (layout `causal-workflows-v1`)
+## 2. Smart Code Proxy audit trail (layout `causal-workflows-v2`)
 
 Location: `sessions/{session-id}` (relative to project CWD)
 
@@ -24,7 +24,7 @@ Structure (single `workflows/` tree, all kinds share the same root):
 - `workflows/NN/output/result.json`: `IWorkflowResult` written when the workflow closes
 - `workflows/NN/steps/MM/request/body.json`: Step request body
 - `workflows/NN/steps/MM/response/body.json`, `headers.json`, `parsed.md`: Step response
-- `workflows/NN/steps/MM/response/streaming/NNNN-chunk.ndjson`: Per-chunk SSE audit (P2)
+- `workflows/NN/steps/MM/response/streaming/streaming.ndjson`: Per-chunk SSE audit (P2; append, un archivo por respuesta de step. Sesiones previas pueden tener `NNNN-chunk.ndjson`).
 - `workflows/NN/steps/MM/tools/KK-<slug>/meta.json`, `input.json`, `result.json`: Tool invocation
 - `workflows/NN/steps/MM/tools/KK-Agent/sub-agent/workflow/`: Nested subagent (same structure, recursively)
 

@@ -1,6 +1,6 @@
 ## Why
 
-El gateway opera hoy con el modelo `Interaction`/wire-only (ver [§44 comparativa actual vs objetivo](../../../docs/proposals/gateway-design.md#44-comparativa-lado-a-lado-actual-vs-objetivo)): un único borde HTTP/SSE, correlación heurística de subagentes y layout de disco `sessions/{session}/{interaction}/` flat. El modelo objetivo requiere `Workflow/Step/ToolUse`, dos bordes coordinados (Wire + Hooks), correlación determinista de planos A/B/C y convergencia a `causal-workflows-v1` (ver [§43 catálogo de fases](../../../docs/proposals/gateway-design.md#43-fases-de-implementación)).
+El gateway opera hoy con el modelo `Interaction`/wire-only (ver [§44 comparativa actual vs objetivo](../../../docs/proposals/gateway-design.md#44-comparativa-lado-a-lado-actual-vs-objetivo)): un único borde HTTP/SSE, correlación heurística de subagentes y layout de disco `sessions/{session}/{interaction}/` flat. El modelo objetivo requiere `Workflow/Step/ToolUse`, dos bordes coordinados (Wire + Hooks), correlación determinista de planos A/B/C y convergencia a `causal-workflows-v2` (ver [§43 catálogo de fases](../../../docs/proposals/gateway-design.md#43-fases-de-implementación)).
 
 Migrar de golpe es inviable por el riesgo de regresión y la amplitud del cambio. Se necesita un marco de gobernanza que divida la migración en fases iterativas, validadas y sin acumular código ni documentación zombie.
 
@@ -32,7 +32,7 @@ _(ninguna — este change no modifica comportamiento acordado existente en `open
 
 - **`openspec/changes/`**: changes hijos `gateway-<faseid>-<slug>` creados de forma incremental.
 - **`docs/`**: mantenimiento continuo tras cada fase (`README.md`, `docs/session-audit-model.md`, `docs/proposals/gateway-design.md`).
-- **`sessions/`** (futuro, fases P): convergencia del layout a `causal-workflows-v1`.
+- **`sessions/`** (futuro, fases P): convergencia del layout a `causal-workflows-v2`.
 - **Capas PKA implicadas por bloque:**
   - Bloque C (correlación Wire+Hooks, C1–C3): capas 2 (adapters/ports), 3 (handlers), 5 (HTTP delivery — nueva ruta `POST /hooks`).
   - Bloque G (refactor dominio **incluido el cierre E2E**): capas 1→2→3→4 en cadena; domain services de cierre en G1 (capa 1), lifecycle de cierre en G2 (capas 1+2), `AuditWorkflowClosureHandler` y proyección `WorkflowResult` en G4 (capas 2+3).

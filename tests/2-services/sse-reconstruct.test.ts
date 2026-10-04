@@ -564,6 +564,25 @@ describe('SseReconstructService — P2-f: lectura desde streaming/*.ndjson', () 
     }
   }
 
+  /** Escribe un único streaming/streaming.ndjson multi-línea (layout v2; limpia antes). */
+  async function writeSingleStreamingFile(lines: Array<{ line: string; phase?: string }>): Promise<void> {
+    const streamingDir = path.join(stepDir, 'response', 'streaming');
+    await fs.rm(streamingDir, { recursive: true, force: true });
+    await fs.mkdir(streamingDir, { recursive: true });
+    const ndjson = lines
+      .map((entry, i) => {
+        const chunkObj: Record<string, unknown> = {
+          i: i + 1,
+          ts: '2026-01-01T00:00:00Z',
+          line: entry.line,
+          ...(entry.phase ? { phase: entry.phase } : {}),
+        };
+        return JSON.stringify(chunkObj);
+      })
+      .join('\n') + '\n';
+    await fs.writeFile(path.join(streamingDir, 'streaming.ndjson'), ndjson, 'utf8');
+  }
+
   beforeAll(async () => {
     tempDir = path.join(os.tmpdir(), `scp-sse-p2f-${Date.now()}`);
     stepDir = path.join(tempDir, 'step');
@@ -629,6 +648,61 @@ describe('SseReconstructService — P2-f: lectura desde streaming/*.ndjson', () 
 
     const msg = await service.reconstructStepPhaseMessage(stepDir, 'delegation');
     expect(msg.id).toBe('msg_deleg');
+    expect(msg.stop_reason).toBe('tool_use');
+  });
+
+  it('layout v2: reconstructStepMessage reconstruye desde streaming/streaming.ndjson único', async () => {
+    await writeSingleStreamingFile([
+      { line: 'event: message_start' },
+      {
+        line: 'data: {"type":"message_start","message":{"id":"msg_v2","type":"message","role":"assistant","content":[],"model":"claude-sonnet","stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":5,"output_tokens":0}}}',
+      },
+      { line: 'event: content_block_start' },
+      {
+        line: 'data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}',
+      },
+      { line: 'event: content_block_delta' },
+      {
+        line: 'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hola V2"}}',
+      },
+      { line: 'event: content_block_stop' },
+      { line: 'data: {"type":"content_block_stop","index":0}' },
+      { line: 'event: message_delta' },
+      {
+        line: 'data: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null},"usage":{"output_tokens":5}}',
+      },
+      { line: 'event: message_stop' },
+      { line: 'data: {"type":"message_stop"}' },
+    ]);
+
+    const msg = await service.reconstructStepMessage(stepDir);
+    expect(msg.id).toBe('msg_v2');
+    expect((msg as { stop_reason: string }).stop_reason).toBe('end_turn');
+  });
+
+  it('layout v2: reconstructStepPhaseMessage reconstruye fase delegation desde streaming.ndjson único', async () => {
+    await writeSingleStreamingFile([
+      { line: 'event: message_start', phase: 'delegation' },
+      {
+        line: 'data: {"type":"message_start","message":{"id":"msg_deleg_v2","model":"claude","role":"assistant","content":[],"stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":5,"output_tokens":0}}}',
+        phase: 'delegation',
+      },
+      { line: 'event: content_block_start', phase: 'delegation' },
+      {
+        line: 'data: {"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"tu_02","name":"Agent","input":{}}}',
+        phase: 'delegation',
+      },
+      { line: 'event: content_block_stop', phase: 'delegation' },
+      { line: 'data: {"type":"content_block_stop","index":0}', phase: 'delegation' },
+      { line: 'event: message_delta', phase: 'delegation' },
+      {
+        line: 'data: {"type":"message_delta","delta":{"stop_reason":"tool_use"}}',
+        phase: 'delegation',
+      },
+    ]);
+
+    const msg = await service.reconstructStepPhaseMessage(stepDir, 'delegation');
+    expect(msg.id).toBe('msg_deleg_v2');
     expect(msg.stop_reason).toBe('tool_use');
   });
 });

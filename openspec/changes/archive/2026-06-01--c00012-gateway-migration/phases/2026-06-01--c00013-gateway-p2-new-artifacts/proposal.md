@@ -2,9 +2,9 @@
 
 > **Orquestador:** `gateway-migration` | **Fase:** p2 (P)
 
-P1 materializó el árbol `causal-workflows-v1` vía `EventBus` + `SessionPersistence`, pero la forensia SSE sigue en un shim (`ISseAuditWriter` / `AuditWriterService`) que escribe `sse.jsonl` directamente desde `AuditSseResponseHandler`, en conflicto con §28b.4 regla 1 para el camino de streaming.
+P1 materializó el árbol `causal-workflows-v2` vía `EventBus` + `SessionPersistence`, pero la forensia SSE sigue en un shim (`ISseAuditWriter` / `AuditWriterService`) que escribe `sse.jsonl` directamente desde `AuditSseResponseHandler`, en conflicto con §28b.4 regla 1 para el camino de streaming.
 
-P2 completa la persistencia objetivo: log cronológico (`events.ndjson`), chunks forenses (`streaming/NNNN-chunk.ndjson`), índice `workflow-sequence.json` y retiro del shim SSE. Las sesiones nuevas cumplen **persistencia y forensia SSE** del diseño §33; los casos §37b marcados «fuera v1» en [§45](../../../docs/proposals/gateway-design.md#45-fuera-de-alcance-v1) no son requisito de esta fase.
+P2 completa la persistencia objetivo: log cronológico (`events.ndjson`), chunks forenses (`streaming/streaming.ndjson`), índice `workflow-sequence.json` y retiro del shim SSE. Las sesiones nuevas cumplen **persistencia y forensia SSE** del diseño §33; los casos §37b marcados «fuera v1» en [§45](../../../docs/proposals/gateway-design.md#45-fuera-de-alcance-v1) no son requisito de esta fase.
 
 ## What Changes
 

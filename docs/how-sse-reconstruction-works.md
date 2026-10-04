@@ -2,7 +2,7 @@
 
 Esta nota técnica explica por qué y cómo Smart Code Proxy reconstruye el mensaje final del asistente a partir de un stream SSE grabado, documenta la **fuente de bytes** y la constante `REPLAY_MODEL` para que nadie la "mejore" confundiéndola con una configuración real.
 
-**Estado P2 (implementado):** cada chunk SSE se publica como `stream_chunk` al **EventBus**; `SessionPersistence` escribe `response/streaming/NNNN-chunk.ndjson` por step. `SseReconstructService.reconstructStepMessage(stepDir)` lee esos archivos ordenados por nombre. `sse.jsonl` y `sse.txt` ya no se generan; `ISseAuditWriter` y `AuditWriterService` han sido retirados.
+**Estado P2 (implementado):** cada chunk SSE se publica como `stream_chunk` al **EventBus**; `SessionPersistence` apende cada línea a `response/streaming/streaming.ndjson` (un único archivo por respuesta de step, líneas en orden de `seq`). `SseReconstructService.reconstructStepMessage(stepDir)` lee los archivos `streaming/*.ndjson` ordenados por nombre (tolerante a sesiones viejas con `NNNN-chunk.ndjson`). `sse.jsonl` y `sse.txt` ya no se generan; `ISseAuditWriter` y `AuditWriterService` han sido retirados.
 
 ## Por qué reusar el SDK oficial
 
@@ -12,9 +12,9 @@ Smart Code Proxy toma un atajo: **reusa `@anthropic-ai/sdk` como parser**. El SD
 
 ## Fuente de bytes SSE (P2+)
 
-### `streaming/NNNN-chunk.ndjson`
+### `streaming/streaming.ndjson`
 
-La reconstrucción lee `steps/MM/response/streaming/*.ndjson` ordenados alfabéticamente. Cada archivo contiene una línea JSON `{i, ts, line, phase?}` escrita atómicamente por `SessionPersistence.onStreamChunk`. Los pings (`data: {"type":"ping"}`) se filtran antes de escribir.
+La reconstrucción lee `steps/MM/response/streaming/*.ndjson` ordenados alfabéticamente. El layout actual es un único `streaming/streaming.ndjson` por respuesta de step: cada línea es un JSON `{i, ts, line, phase?}` apendido (en orden de `seq`) por `SessionPersistence.onStreamChunk`. Las sesiones anteriores pueden tener `NNNN-chunk.ndjson` (un archivo por chunk), que el lector sigue tolerando. Los pings (`data: {"type":"ping"}`) se filtran antes de escribir.
 
 ### Reensamblado del wire-format
 

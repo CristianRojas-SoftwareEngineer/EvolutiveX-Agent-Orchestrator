@@ -2,11 +2,11 @@
 
 ## Purpose
 
-Suscriptor del `EventBus` que proyecta eventos del correlador y handlers a disco bajo la estructura `causal-workflows-v1` (`workflows/NN/steps/MM/tools/KK/`). Reemplaza la escritura directa desde handlers de capa 3 (`SessionStoreService`, `WorkflowResultProjector`). P1 (2026-05-30): árbol causal estructural. P2 (2026-06-01): chunks SSE (`streaming/`), `events.ndjson`, `workflow-sequence.json`, vistas coalesced; retiro de `ISseAuditWriter`.
+Suscriptor del `EventBus` que proyecta eventos del correlador y handlers a disco bajo la estructura `causal-workflows-v2` (`workflows/NN/steps/MM/tools/KK/`). Reemplaza la escritura directa desde handlers de capa 3 (`SessionStoreService`, `WorkflowResultProjector`). P1 (2026-05-30): árbol causal estructural. P2 (2026-06-01): chunks SSE (`streaming/`), `events.ndjson`, `workflow-sequence.json`, vistas coalesced; retiro de `ISseAuditWriter`.
 ## Requirements
 ### Requirement: SessionPersistence — suscripción al bus y proyección a disco
 
-El sistema SHALL proveer `SessionPersistence` en `src/2-services/session-persistence.service.ts` como suscriptor del `EventBus` que, al recibir eventos del correlador y handlers, proyecta la estructura de directorios y archivos del layout `causal-workflows-v1` bajo `sessions/`.
+El sistema SHALL proveer `SessionPersistence` en `src/2-services/session-persistence.service.ts` como suscriptor del `EventBus` que, al recibir eventos del correlador y handlers, proyecta la estructura de directorios y archivos del layout `causal-workflows-v2` bajo `sessions/`.
 
 `SessionPersistence` SHALL suscribirse a los siguientes eventos en su constructor:
 
@@ -20,7 +20,7 @@ El sistema SHALL proveer `SessionPersistence` en `src/2-services/session-persist
 | `tool_result` | Escribir `result.json` en `tools/KK-slug/`; actualizar `meta.json` del tool |
 | `workflow_complete` | Actualizar `meta.json` (status: `completed`); escribir `output/result.json` + `output/result.parsed.md`; actualizar `workflow-sequence.json` |
 | `workflow_cancel` | Actualizar `meta.json` (status: `cancelled`, `cancellationReason`); actualizar `workflow-sequence.json` |
-| `stream_chunk` | Escribir `steps/MM/response/streaming/NNNN-chunk.ndjson`; al cierre del step con `coalescedDelegationStepIndex`, generar `body.coalesced.json` y `body.coalesced.parsed.md` |
+| `stream_chunk` | Append línea a `steps/MM/response/streaming/streaming.ndjson` (único archivo por respuesta de step); pings filtrados; sin tope; al cierre del step con `coalescedDelegationStepIndex`, generar `body.coalesced.json` y `body.coalesced.parsed.md` |
 | `*` (wildcard) | Append-only a `sessions/<sessionId>/events.ndjson` por cada evento recibido |
 
 En `workflow_start`, `meta.json` SHALL incluir `workflowKind` (estructural: `main` | `subagent`) y `interactionType` (semántico: `agentic` | `side-request`, desde payload `workflowKind` del correlador). Los valores `session-shell` y `client-preflight` SHALL NOT persistirse como `interactionType`.
@@ -98,7 +98,7 @@ En Windows, `fs.rename` puede fallar con `EPERM` cuando un proceso externo (anti
 
 ---
 
-### Requirement: Directorio causal-workflows-v1 con naming correcto
+### Requirement: Directorio causal-workflows-v2 con naming correcto
 
 `SessionPersistence` SHALL crear directorios siguiendo la convención de §30:
 
@@ -157,13 +157,13 @@ Los directorios SHALL crearse lazy (§31): solo cuando hay contenido real que ju
 
 ### Requirement: stream_chunk — chunks forenses
 
-`SessionPersistence` SHALL persistir cada evento `stream_chunk` como `steps/MM/response/streaming/NNNN-chunk.ndjson` (numeración de 4 dígitos por step). Los eventos SSE de tipo `ping` SHALL NOT persistirse como chunks.
+`SessionPersistence` SHALL persistir cada evento `stream_chunk` como línea ndjson apendida a `steps/MM/response/streaming/streaming.ndjson` (un único archivo por respuesta de step, en orden de `seq`). Los eventos SSE de tipo `ping` SHALL NOT persistirse. No hay tope de líneas por archivo.
 
-#### Scenario: ping no genera chunk en disco
+#### Scenario: ping no genera línea en streaming.ndjson
 
 - **GIVEN** un step con suscripción activa a `stream_chunk`
 - **WHEN** llega un chunk cuyo evento SSE es `ping`
-- **THEN** NO SHALL crearse un nuevo archivo bajo `response/streaming/`
+- **THEN** NO SHALL escribirse ninguna línea en `streaming.ndjson`
 
 ---
 

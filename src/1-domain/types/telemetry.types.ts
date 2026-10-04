@@ -1,6 +1,6 @@
 /**
  * Evento de telemetría emitido por el correlador (y handlers L3) al `EventBus`.
- * `SessionPersistence` lo consume para proyectar el layout `causal-workflows-v1`.
+ * `SessionPersistence` lo consume para proyectar el layout `causal-workflows-v2`.
  */
 export interface TelemetryEvent {
   /** Tipo del evento (`workflow_start`, `step_request`, `tool_result`, …). */

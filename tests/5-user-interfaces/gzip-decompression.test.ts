@@ -149,7 +149,7 @@ describe('Test de Integración - Decompresión Gzip', () => {
     expect(bodyPaths.length).toBeGreaterThanOrEqual(1);
     const content = await fs.readFile(bodyPaths[0], 'utf8');
 
-    // Assert 4: SessionPersistence proyectó el body de respuesta en layout causal-workflows-v1
+    // Assert 4: SessionPersistence proyectó el body de respuesta en layout causal-workflows-v2
     const parsed = JSON.parse(content) as { message?: string };
     expect(parsed.message).toBe('Hola desde upstream comprimido');
   });

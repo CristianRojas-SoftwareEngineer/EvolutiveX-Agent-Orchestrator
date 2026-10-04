@@ -7,7 +7,7 @@
 ## 2. Persistencia de chunks (P2-b)
 
 - [x] 2.1 Suscribir `stream_chunk` en `SessionPersistence`
-- [x] 2.2 Escribir `steps/MM/response/streaming/NNNN-chunk.ndjson` (secuencia monotónica, 4 dígitos)
+- [x] 2.2 Escribir `steps/MM/response/streaming/streaming.ndjson` (append, una línea por `stream_chunk`, secuencia monotónica)
 - [x] 2.3 Excluir eventos `ping` de la persistencia (test unitario §37b #13) ✓
 
 ## 3. Reconstrucción de body (P2-c)

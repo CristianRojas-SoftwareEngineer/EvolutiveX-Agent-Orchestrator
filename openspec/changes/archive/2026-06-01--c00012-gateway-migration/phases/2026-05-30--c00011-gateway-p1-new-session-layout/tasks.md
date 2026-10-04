@@ -19,7 +19,7 @@
   - Suscribirse a eventos del bus en constructor: `workflow_start`, `workflow_spawn`, `step_request`, `step_response`, `tool_call`, `tool_result`, `workflow_complete`, `workflow_cancel`
   - Proyectar a disco: `meta.json` (atómico, write temp + rename, serializado con `writeQueue`), `output/result.json` + `result.parsed.md`, `request/body.json`, `response/body.json`, `response/headers.json`, `response/parsed.md`, `tools/KK-slug/{input,result,meta}.json`
   - Directorios lazy (§31): solo crear cuando hay contenido
-  - Layout `causal-workflows-v1`: `workflows/NN/steps/MM/tools/KK-slug/`
+  - Layout `causal-workflows-v2`: `workflows/NN/steps/MM/tools/KK-slug/`
   - _Criterio: `npm run test:quick` pasa; 9 escenarios de persistencia del spec `session-persistence` cubiertos_
 
 ## 3. Correlador: emisión al bus + completeToolUse + lookup (capa 2)
@@ -78,10 +78,10 @@
 - [x] 7.1 Ejecutar `npm run test` completo — suite verde sin errores
   - _Criterio: todos los tests pasan_
 - [x] 7.2 Verificar subconjunto estructural del checklist §37b (casos 3–7, 16, 19): nuevas sesiones en tests adoptan `workflows/NN/`, `steps/MM/`, `tools/KK/`
-  - _Criterio: 7 casos del checklist verificados con el layout `causal-workflows-v1`_
-- [x] 7.3 Actualizar `docs/session-audit-model.md`: describir layout `causal-workflows-v1`, `meta.json` (estado fusionado), `output/result.json`, ausencia de `state.json`, migración de handlers a tipos gateway
+  - _Criterio: 7 casos del checklist verificados con el layout `causal-workflows-v2`_
+- [x] 7.3 Actualizar `docs/session-audit-model.md`: describir layout `causal-workflows-v2`, `meta.json` (estado fusionado), `output/result.json`, ausencia de `state.json`, migración de handlers a tipos gateway
   - _Criterio: documento refleja el layout vigente para sesiones nuevas_
-- [x] 7.4 Actualizar `README.md`: describir EventBus + SessionPersistence, layout `causal-workflows-v1`
+- [x] 7.4 Actualizar `README.md`: describir EventBus + SessionPersistence, layout `causal-workflows-v2`
   - _Criterio: README describe la nueva arquitectura de persistencia_
 - [x] 7.5 Actualizar `docs/proposals/gateway-design.md` §29, §30, §33, §37b, §40, §46.4: marcar como implementado
   - _Criterio: secciones referenciadas reflejan el estado implementado_

@@ -2,7 +2,7 @@
 
 ### Requirement: SessionPersistence — suscripción al bus y proyección a disco
 
-El sistema SHALL proveer `SessionPersistence` en `src/2-services/session-persistence.service.ts` como suscriptor del `EventBus` que, al recibir eventos del correlador y handlers, proyecta la estructura de directorios y archivos del layout `causal-workflows-v1` bajo `sessions/`.
+El sistema SHALL proveer `SessionPersistence` en `src/2-services/session-persistence.service.ts` como suscriptor del `EventBus` que, al recibir eventos del correlador y handlers, proyecta la estructura de directorios y archivos del layout `causal-workflows-v2` bajo `sessions/`.
 
 `SessionPersistence` SHALL suscribirse a los siguientes eventos en su constructor:
 
@@ -16,7 +16,7 @@ El sistema SHALL proveer `SessionPersistence` en `src/2-services/session-persist
 | `tool_result` | Escribir `result.json` en `tools/KK-slug/`; actualizar `meta.json` del tool |
 | `workflow_complete` | Actualizar `meta.json` (status: `completed`); escribir `output/result.json` + `output/result.parsed.md`; actualizar `workflow-sequence.json` |
 | `workflow_cancel` | Actualizar `meta.json` (status: `cancelled`, `cancellationReason`); actualizar `workflow-sequence.json` |
-| `stream_chunk` | Escribir `steps/MM/response/streaming/NNNN-chunk.ndjson`; al cierre del step reconstruir `response/body.json` y `response/parsed.md` |
+| `stream_chunk` | Append línea a `steps/MM/response/streaming/streaming.ndjson` (único archivo por respuesta de step); al cierre del step reconstruir `response/body.json` y `response/parsed.md` |
 | `*` (wildcard) | Append-only a `sessions/<sessionId>/events.ndjson` por cada evento recibido |
 
 #### Scenario: workflow_start crea directorio y meta.json inicial
@@ -24,7 +24,7 @@ El sistema SHALL proveer `SessionPersistence` en `src/2-services/session-persist
 - **GIVEN** una sesión `'sess-1'` sin directorio de workflow
 - **WHEN** `SessionPersistence` recibe un evento `{ type: 'workflow_start', sessionId: 'sess-1', payload: { workflowId: 'wf-1', kind: 'main' } }`
 - **THEN** SHALL crearse el directorio `sessions/sess-1/workflows/00/`
-- **AND** SHALL escribirse `meta.json` con `status: 'running'`, `workflowKind: 'main'`, `layoutVersion: 'causal-workflows-v1'`
+- **AND** SHALL escribirse `meta.json` con `status: 'running'`, `workflowKind: 'main'`, `layoutVersion: 'causal-workflows-v2'`
 
 #### Scenario: workflow_start con request escribe request/body.json
 
@@ -97,7 +97,7 @@ El sistema SHALL proveer `SessionPersistence` en `src/2-services/session-persist
 
 ### Requirement: stream_chunk — chunks forenses y reconstrucción de body
 
-`SessionPersistence` SHALL persistir cada evento `stream_chunk` como `steps/MM/response/streaming/NNNN-chunk.ndjson` (numeración de 4 dígitos por step). Los eventos SSE de tipo `ping` SHALL NOT persistirse como chunks.
+`SessionPersistence` SHALL persistir cada evento `stream_chunk` como línea ndjson apendida a `steps/MM/response/streaming/streaming.ndjson` (un único archivo por respuesta de step, en orden de `seq`). Los eventos SSE de tipo `ping` SHALL NOT persistirse como chunks.
 
 Al recibir el cierre del step (último chunk que indica `message_stop` o señal equivalente en payload), `SessionPersistence` SHALL reconstruir y escribir `response/body.json` y `response/parsed.md` a partir de los chunks ordenados del step.
 

@@ -50,7 +50,7 @@ Hay **dos contadores de workflow por sesión** (`layoutIndices` en el repositori
 - `workflow-sequence.json` con **una** entrada por turno (`workflowIndex` base 1, alineado con carpeta `workflows/01/`).
 - Numeración en disco **desde `01`** para workflows, steps y tools (`NN`, `MM`, `KK`), coherente con la documentación canónica — **incluidos** los árboles bajo `tools/…/sub-agent/workflow/`.
 - Eliminar el tipo de workflow `session-shell` del modelo activo.
-- **Paridad de layout** entre workflow de turno principal y sub-workflow de subagente: misma forma `causal-workflows-v1` (`meta.json`, `request/`, `steps/MM/`, `output/result.json`), mismas reglas de numeración y de step vs workflow.
+- **Paridad de layout** entre workflow de turno principal y sub-workflow de subagente: misma forma `causal-workflows-v2` (`meta.json`, `request/`, `steps/MM/`, `output/result.json`), mismas reglas de numeración y de step vs workflow.
 - Exclusión documentada de preflights del árbol `sessions/` (el proxy **sigue reenviando** a Anthropic; solo la capa de auditoría causal no persiste — ver R9).
 
 **Non-Goals:**
@@ -103,7 +103,7 @@ Workflow principal (turno)
 
 | Aspecto | Workflow de turno (main) | Sub-workflow (subagente) |
 | ------- | ------------------------ | ------------------------ |
-| Forma en disco | `causal-workflows-v1` | **Idéntica** (recursiva) |
+| Forma en disco | `causal-workflows-v2` | **Idéntica** (recursiva) |
 | Numeración steps/tools | Base 1 (`01`, `02`, …) | **Idéntica** dentro de su árbol |
 | Delimitación E2E | `UserPromptSubmit` → `Stop` | `SubagentStart` / apertura wire → `SubagentStop` |
 | Anclaje en sesión | `workflows/NN/` | `…/tools/KK-Agent/sub-agent/workflow/` |
@@ -339,7 +339,7 @@ Toda mutación del correlador disparada desde `AuditWorkflowHandler` (apertura d
 
 ### D9 — Paridad de layout main / sub-workflow
 
-**Decisión:** Los sub-workflows de subagente SHALL seguir el mismo contrato de layout `causal-workflows-v1` y las mismas reglas de este change (steps como hops HTTP, cierre E2E por hook de ciclo, numeración base 1 de D8). La única excepción estructural es el **anclaje** bajo `tools/KK-Agent/sub-agent/workflow/` y la **no inclusión** en `workflow-sequence.json` de sesión.
+**Decisión:** Los sub-workflows de subagente SHALL seguir el mismo contrato de layout `causal-workflows-v2` y las mismas reglas de este change (steps como hops HTTP, cierre E2E por hook de ciclo, numeración base 1 de D8). La única excepción estructural es el **anclaje** bajo `tools/KK-Agent/sub-agent/workflow/` y la **no inclusión** en `workflow-sequence.json` de sesión.
 
 **Rationale:** Un subagente es un agente con el mismo proceso de inferencia; diferenciar el esquema de persistencia introduciría deuda y contradice `session-audit-model.md` §0 («misma forma recursiva»). La redacción anterior en Non-Goals («no cambiar layout de sub-workflows») era incorrecta: no significa excluirlos del refactor, sino no **reubicarlos** al árbol `workflows/NN/` de sesión.
 

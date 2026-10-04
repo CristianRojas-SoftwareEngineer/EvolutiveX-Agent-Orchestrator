@@ -4,7 +4,7 @@
 
 El bloque P (Persistencia) necesita reescribir la proyección a disco del layout de sesiones. Antes de que P1 ejecute la pila `EventBus` + `SessionPersistence` (Opción A ratificada, §28b/§40), es necesario confirmar las ubicaciones concretas de código en `src/` para cada componente, los puntos de emisión del correlador, el ownership del timer, la estrategia de composition root y el corte limpio. Sin este spike, P1 tendría que resolver ambigüedades de implementación durante la fase de código, con riesgo de retrabajo.
 
-El diseño del layout objetivo (`causal-workflows-v1`) ya está fijado por las decisiones D1/D2/D3 del orquestador: `output/result.json`, fusión de `state.json` en `meta.json`, schemas de §33.3 y §33.4b. Este spike no reabre esas decisiones.
+El diseño del layout objetivo (`causal-workflows-v2`) ya está fijado por las decisiones D1/D2/D3 del orquestador: `output/result.json`, fusión de `state.json` en `meta.json`, schemas de §33.3 y §33.4b. Este spike no reabre esas decisiones.
 
 ## What Changes
 

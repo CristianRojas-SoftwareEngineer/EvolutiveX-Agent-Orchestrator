@@ -21,7 +21,7 @@ G4 cierra el gap correlador→persistencia **sin cambiar el layout flat** (`sess
 
 **Non-Goals:**
 
-- Layout `causal-workflows-v1`, `EventBus`, `SessionPersistence` como suscriptor completo.
+- Layout `causal-workflows-v2`, `EventBus`, `SessionPersistence` como suscriptor completo.
 - `PreToolUse`/`PostToolUse` ToolUse.status (stubs permanecen).
 - `duration_ms`/`outcome` en `session-metrics.json`; `totalCostUsd`.
 - Apertura de workflow en `AuditInteractionHandler` al wire-request.

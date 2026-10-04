@@ -1,6 +1,6 @@
 ## Context
 
-El gateway actual implementa el modelo `Interaction`/wire-only. El modelo objetivo requiere `Workflow/Step/ToolUse`, correlación Wire+Hooks y layout `causal-workflows-v1`, según [§43–§44](../../../docs/proposals/gateway-design.md#43-fases-de-implementación) de `docs/proposals/gateway-design.md`. Este change no implementa ninguna fase; define únicamente cómo se gobierna la migración.
+El gateway actual implementa el modelo `Interaction`/wire-only. El modelo objetivo requiere `Workflow/Step/ToolUse`, correlación Wire+Hooks y layout `causal-workflows-v2`, según [§43–§44](../../../docs/proposals/gateway-design.md#43-fases-de-implementación) de `docs/proposals/gateway-design.md`. Este change no implementa ninguna fase; define únicamente cómo se gobierna la migración.
 
 ## Goals / Non-Goals
 
@@ -78,7 +78,7 @@ Componentes a crear, alineados con §28b.1 y §40. Los destinos siguen las conve
 **Legacy a retirar (detalle):**
 
 - **P1:** `audit-writer.service.ts` · `session-store.service.ts` · `workflow-result-projector.service.ts` · constantes flat de `audit-paths.ts` (`DIR_MAIN_AGENT`, `DIR_INTERACTIONS`, `PREFIX_SUB_AGENT`) · tipos `ActiveInteraction`/`InteractionMetadata` · llamadas directas a disco en handlers de capa 3
-- **P2:** `ISseAuditWriter` / `AuditWriterService`; lectura/escritura de `sse.jsonl` y `sse.txt` inline; `SseReconstructService` acoplado a `sse.jsonl` (sustituido por `streaming/NNNN-chunk.ndjson` y reconstrucción vía persistencia)
+- **P2:** `ISseAuditWriter` / `AuditWriterService`; lectura/escritura de `sse.jsonl` y `sse.txt` inline; `SseReconstructService` acoplado a `sse.jsonl` (sustituido por `streaming/streaming.ndjson` y reconstrucción vía persistencia)
 
 ### Gate P2-core vs cierre de migración
 
@@ -133,7 +133,7 @@ El refactor no debe romper comportamiento observable. Si una fase G toca integra
 
 ### Bloque P — Persistencia / convergencia layout
 
-Gate de aceptación del layout `causal-workflows-v1`:
+Gate de aceptación del layout `causal-workflows-v2`:
 
 ```bash
 npm run test   # lint + typecheck + unit + build
@@ -184,7 +184,7 @@ El legacy a retirar de cada fase se lista en el registro. La política es:
 
 ### D1 — Archivo de salida del workflow: `output/result.json`
 
-**Decisión:** el artefacto de salida del workflow en `causal-workflows-v1` se denomina
+**Decisión:** el artefacto de salida del workflow en `causal-workflows-v2` se denomina
 `output/result.json` (y su render Markdown `output/result.parsed.md`). Los nombres
 `output/response.json` y `output/body.json`, que aparecían en distintas secciones del
 diseño, quedan **descartados**.
@@ -202,7 +202,7 @@ incorrecto).
 
 ### D2 — Fusión de `state.json` en `meta.json`
 
-**Decisión:** el layout `causal-workflows-v1` **no incluye `state.json`**. Los campos que
+**Decisión:** el layout `causal-workflows-v2` **no incluye `state.json`**. Los campos que
 `state.json` iba a alojar (`status`, `lastActivity`, `parentContext`) se incorporan
 directamente en `meta.json`.
 

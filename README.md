@@ -39,7 +39,7 @@ Las capas internas **nunca** importan de capas externas. Esta regla garantiza qu
 
 ### Persistencia causal (P1)
 
-Los handlers de capa 3 **no escriben disco** directamente. El correlador publica eventos (`workflow_start`, `step_request`, `step_response`, `stream_chunk`, `tool_call`, `tool_result`, `workflow_complete`, …) en un **EventBus** in-process; **SessionPersistence** es el único suscriptor que proyecta el layout `causal-workflows-v1` bajo `sessions/<id>/workflows/NN/`. Ver [`docs/session-audit-model.md`](docs/session-audit-model.md#0-layout-vigente-causal-workflows-v1-sesiones-nuevas).
+Los handlers de capa 3 **no escriben disco** directamente. El correlador publica eventos (`workflow_start`, `step_request`, `step_response`, `stream_chunk`, `tool_call`, `tool_result`, `workflow_complete`, …) en un **EventBus** in-process; **SessionPersistence** es el único suscriptor que proyecta el layout `causal-workflows-v2` bajo `sessions/<id>/workflows/NN/`. Ver [`docs/session-audit-model.md`](docs/session-audit-model.md#0-layout-vigente-causal-workflows-v2-sesiones-nuevas).
 
 ---
 
@@ -71,7 +71,7 @@ graph TD
 
 A diferencia de un proxy genérico, este sistema "entiende" los flujos binarios de Anthropic.
 
-- Persiste cada chunk SSE en `steps/NN/response/streaming/*.ndjson` (fuente canónica de reconstrucción; P2 implementado).
+- Persiste cada línea SSE en `steps/NN/response/streaming/streaming.ndjson` (append, un archivo por respuesta; fuente canónica de reconstrucción; P2 implementado).
 - Mantiene un volcado binario crudo (`steps/NN/response/sse.txt`) para depuración de paridad de protocolos. **No** es la fuente de la reconstrucción y puede truncarse por `MAX_AUDIT_BYTES` sin afectar al mensaje final reconstruido.
 
 ### 🛡️ Privacidad Avanzada
@@ -104,7 +104,7 @@ Ideal para depurar comportamientos erráticos en herramientas de CLI (como `clau
 
 ## Referencia de Archivos de Auditoría
 
-Layout vigente (`causal-workflows-v1`) bajo `./sessions/<session-id>/`:
+Layout vigente (`causal-workflows-v2`) bajo `./sessions/<session-id>/`:
 
 ```
 sessions/<session-id>/
@@ -145,7 +145,7 @@ Personaliza el comportamiento ajustando estas variables en tu entorno o en un ar
 | **Filtrado** | `FILTERED_TOOLS`          | Tool names a excluir del request (coma-separado). Omitir la variable = default abajo. Desactivar filtrado: `FILTERED_TOOLS=""`. | `ScheduleWakeup,NotebookEdit,ExitWorktree,EnterWorktree,CronList,CronDelete,CronCreate` |
 |   **Logs**   | `LOG_LEVEL`               | Nivel de log de Pino (consola y `server/logs.jsonl`).                                                                           | `info`                                                                                  |
 
-> **Auditoría por defecto.** El árbol causal se escribe vía **EventBus → SessionPersistence**. Para SSE, los chunks se persisten en `steps/MM/response/streaming/*.ndjson` (fuente canónica de reconstrucción); `sse.txt` es raw dump opcional acotado por `MAX_AUDIT_BYTES`; el cierre del workflow persiste `output/result.json`. Detalle en [`docs/how-sse-reconstruction-works.md`](docs/how-sse-reconstruction-works.md).
+> **Auditoría por defecto.** El árbol causal se escribe vía **EventBus → SessionPersistence**. Para SSE, los chunks se persisten en `steps/MM/response/streaming/streaming.ndjson` (append, un archivo por respuesta; fuente canónica de reconstrucción); `sse.txt` es raw dump opcional acotado por `MAX_AUDIT_BYTES`; el cierre del workflow persiste `output/result.json`. Detalle en [`docs/how-sse-reconstruction-works.md`](docs/how-sse-reconstruction-works.md).
 
 <a name="configuracion-de-hooks"></a>
 

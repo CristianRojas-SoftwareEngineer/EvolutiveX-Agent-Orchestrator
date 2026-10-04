@@ -42,7 +42,7 @@ Tras G3, el correlador (`IWorkflowRepository`) acumula lifecycle en memoria y el
 
 ## No objetivos
 
-- Migración de layout a `causal-workflows-v1` (fases P0–P2).
+- Migración de layout a `causal-workflows-v2` (fases P0–P2).
 - `EventBus` / `SessionPersistence` como bus completo (§28b) — handlers llaman correlador y closure directamente.
 - Tracking completo de `ToolUse.status` vía `PreToolUse`/`PostToolUse` (stubs permanecen diferidos).
 - Campos `duration_ms` y `outcome` en `session-metrics.json`; `totalCostUsd` en `WorkflowResult`.

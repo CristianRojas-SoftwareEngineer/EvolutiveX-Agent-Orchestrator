@@ -76,7 +76,7 @@ Read these only when the active step requires them:
 
 Read these two files to correctly interpret PKA architecture, interaction taxonomy, and disk layout before analyzing any session:
 
-- `docs/session-audit-model.md` — canonical layout `causal-workflows-v1`, event→persistence mapping, `meta.json` fields, `IWorkflow`/`IStep`/`IToolUse` types.
+- `docs/session-audit-model.md` — canonical layout `causal-workflows-v2`, event→persistence mapping, `meta.json` fields, `IWorkflow`/`IStep`/`IToolUse` types.
 - `README.md` § "Gestión de sesiones persistentes" and § "Referencia de archivos de auditoría" — workflow kinds (`agentic`, `client-preflight`, `side-request`), correlation by agent headers, subagent coalescing.
 
 Key concepts to internalize before proceeding:
@@ -99,7 +99,7 @@ Run this single command to obtain the complete directory and file hierarchy:
 tree /F "C:\Users\user\Desktop\Proyectos\Smart Code Proxy\sessions\{session-id}"
 ```
 
-**Expected output (typical format — layout `causal-workflows-v1`):**
+**Expected output (typical format — layout `causal-workflows-v2`):**
 ```
 {session-id}
 ├── session-metrics.json

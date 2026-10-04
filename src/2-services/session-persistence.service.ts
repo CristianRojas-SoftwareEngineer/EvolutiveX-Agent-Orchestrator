@@ -9,15 +9,7 @@ import type { MarkdownRendererService } from '../1-domain/services/markdown-rend
 import { getWorkflowDir, slugifyToolName } from './session-routing.js';
 
 /** Versión del layout de directorios proyectado por este servicio. */
-const LAYOUT_VERSION = 'causal-workflows-v1';
-
-/** Tope máximo de chunks por step (§33.8). */
-const MAX_STREAMING_CHUNKS = 10_000;
-
-/** Índice con zero-padding a 4 dígitos (para nombres de archivos de chunks). */
-function pad4(n: number): string {
-  return String(n).padStart(4, '0');
-}
+const LAYOUT_VERSION = 'causal-workflows-v2';
 
 /** Estado en disco que `SessionPersistence` mantiene por tool_use. */
 interface ToolEntry {
@@ -51,7 +43,7 @@ interface WorkflowEntry {
 
 /**
  * Suscriptor del `EventBus` que proyecta los eventos del correlador y handlers
- * a disco bajo el layout `causal-workflows-v1` (`workflows/NN/steps/MM/tools/KK-slug/`).
+ * a disco bajo el layout `causal-workflows-v2` (`workflows/NN/steps/MM/tools/KK-slug/`).
  *
  * No conoce el correlador: toda la información proviene del payload de los eventos.
  * Las escrituras de un mismo archivo se serializan con un `writeQueue` por ruta
@@ -415,8 +407,6 @@ export class SessionPersistence {
     };
     const entry = this.workflows.get(p.workflowId);
     if (!entry) return;
-    if (p.seq > MAX_STREAMING_CHUNKS) return;
-
     // Filtrar pings: línea comentario SSE o evento de tipo ping
     const line = p.chunk.line;
     if (line.startsWith(': ping') || line.startsWith(':ping')) return;
@@ -429,11 +419,9 @@ export class SessionPersistence {
       }
     }
 
-    const chunkFile = `${this.stepDir(entry, p.stepIndex)}response/streaming/${pad4(p.seq)}-chunk.ndjson`;
-    const lineData = JSON.stringify(p.chunk);
-    this.enqueue(chunkFile, () =>
-      this.atomicWrite(chunkFile, Buffer.from(`${lineData}\n`, 'utf8')),
-    );
+    // Un único archivo por respuesta de step; el orden por seq lo preserva el encolado por ruta.
+    const streamFile = `${this.stepDir(entry, p.stepIndex)}response/streaming/streaming.ndjson`;
+    this.enqueue(streamFile, () => this.appendLine(streamFile, JSON.stringify(p.chunk)));
   }
 
   private onAnyEvent(event: TelemetryEvent): void {

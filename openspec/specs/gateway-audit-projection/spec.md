@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Proyección de auditoría vía `EventBus` + `SessionPersistence` al layout `causal-workflows-v1` (`sessions/{sessionId}/workflows/NN/`).
+Proyección de auditoría vía `EventBus` + `SessionPersistence` al layout `causal-workflows-v2` (`sessions/{sessionId}/workflows/NN/`).
 Los handlers L3 publican eventos; `SessionPersistence` escribe `meta.json`, steps, tools y `output/result.json`.
 `AuditWorkflowClosureHandler` conserva métricas de sesión sin escribir disco. Actualizado en fase P1 (2026-05-30).
 ## Requirements
@@ -14,7 +14,7 @@ Los handlers L3 publican eventos; `SessionPersistence` escribe `meta.json`, step
 2. El correlador emite `workflow_complete` (o `workflow_cancel`) al `EventBus`.
 3. `SessionPersistence` recibe el evento y proyecta `meta.json` + `output/result.json` a disco.
 
-El layout bajo `sessions/` SHALL ser `causal-workflows-v1` (`sessions/{sessionId}/workflows/NN/`).
+El layout bajo `sessions/` SHALL ser `causal-workflows-v2` (`sessions/{sessionId}/workflows/NN/`).
 
 #### Scenario: Hook Stop cierra workflow y persistencia proyecta vía bus
 
@@ -85,7 +85,7 @@ Los handlers wire (`AuditSseResponseHandler`, `AuditStandardResponseHandler`) NO
 
 El sistema SHALL retirar `SessionStoreService`, `WorkflowResultProjector`, el puerto `ISessionStore` y el puerto `IAuditWriter`. Los handlers L3 SHALL usar `IWorkflowRepository` + `EventBus`. La forensia SSE SHALL materializarse vía eventos `stream_chunk` y proyección en `SessionPersistence`; NO SHALL usar `ISseAuditWriter`, `AuditWriterService` ni `response/sse.jsonl` en código de producción tras P2.
 
-#### Scenario: Sesiones nuevas usan layout causal-workflows-v1
+#### Scenario: Sesiones nuevas usan layout causal-workflows-v2
 
 - **GIVEN** un proxy con P1 implementado
 - **WHEN** se procesa una solicitud completa (workflow + steps + tools)

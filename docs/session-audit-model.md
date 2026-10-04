@@ -1,12 +1,12 @@
 # Session Audit Model — Smart Code Proxy
 
-Referencia canónica del modelo de auditoría en `sessions/` para sesiones **nuevas** (layout `causal-workflows-v1`, fase P1). Describe el modelo de ejecución agéntico, el árbol en disco, la correlación HTTP y el mapeo a tipos TypeScript del gateway.
+Referencia canónica del modelo de auditoría en `sessions/` para sesiones **nuevas** (layout `causal-workflows-v2`, fase P1). Describe el modelo de ejecución agéntico, el árbol en disco, la correlación HTTP y el mapeo a tipos TypeScript del gateway.
 
 Para la arquitectura completa del gateway, véase [`gateway-architecture.md`](./gateway-architecture.md) §24, §25, §28 y §41.4.
 
 ---
 
-## 0. Layout vigente: `causal-workflows-v1`
+## 0. Layout vigente: `causal-workflows-v2`
 
 Las sesiones nuevas persisten bajo un único árbol `workflows/` por sesión. No existe `main-agent/`, `side-interactions/` ni `state.json` separado.
 
@@ -27,7 +27,7 @@ sessions/<session-id>/
                 │   ├── body.json
                 │   ├── headers.json
                 │   ├── parsed.md
-                │   ├── streaming/       # P2: NNNN-chunk.ndjson por stream_chunk
+                │   ├── streaming/       # P2: streaming.ndjson (append, una línea por stream_chunk)
                 │   ├── body.coalesced.json   # P2: step coalesced (sin sse.jsonl)
                 │   └── body.coalesced.parsed.md
                 # Pre-P2 (retirado en P2): sse.jsonl, sse.txt vía ISseAuditWriter
@@ -52,7 +52,7 @@ sessions/<session-id>/
 | `tool_result`                                                          | Correlador / hooks          | `tools/KK-slug/result.json`; actualiza `meta.json`                                   |
 | `workflow_complete`                                                    | Cierre de workflow          | `output/result.json`, `output/result.parsed.md`; `meta.json` final                   |
 | `workflow_cancel`                                                      | Timeout / cancelación       | `meta.json` con `status: cancelled`                                                  |
-| `stream_chunk`                                                         | `AuditSseResponseHandler`   | `steps/MM/response/streaming/NNNN-chunk.ndjson`; pings filtrados; tope 10 000 chunks |
+| `stream_chunk`                                                         | `AuditSseResponseHandler`   | `steps/MM/response/streaming/streaming.ndjson` (append, un archivo por respuesta de step); pings filtrados; sin tope |
 | `step_response` (con `coalescedDelegationStepIndex`)                   | `AuditSseResponseHandler`   | además: `body.coalesced.json` + `body.coalesced.parsed.md` en el step continuation   |
 | `*` (wildcard)                                                         | cualquier evento            | `sessions/<id>/events.ndjson` (append-only)                                          |
 | `workflow_start` / `workflow_complete` / `workflow_cancel` (kind=main) | Correlador / cierre         | `sessions/<id>/workflows/workflow-sequence.json` (array)                             |
@@ -85,7 +85,7 @@ sessions/<session-id>/
 ### Qué cubre este documento
 
 - Modelo conceptual: sesión → workflows → steps → tools → sub-workflows.
-- Layout `causal-workflows-v1` y reglas de nomenclatura.
+- Layout `causal-workflows-v2` y reglas de nomenclatura.
 - Clasificación HTTP (`fresh`, `continuation`, preflights, `side-request`) y su proyección como **steps** bajo el turno activo (o exclusión para preflights).
 - Entidades gateway (`IWorkflow`, `IStep`, `IToolUse`, `IWorkflowResult`) y artefactos en disco.
 - Correlación de subagentes, tools pendientes y hooks.

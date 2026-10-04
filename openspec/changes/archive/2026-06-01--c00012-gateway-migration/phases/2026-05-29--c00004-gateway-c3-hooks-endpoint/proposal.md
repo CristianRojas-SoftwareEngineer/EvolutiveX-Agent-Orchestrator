@@ -32,7 +32,7 @@ C3 abre el segundo canal de entrada: el endpoint `POST /hooks` (capa 5) y el `Au
 - Mutaciones de estado de `ToolUse` (`running`/`completed`/`error`) y lifecycle `readyToClose` → requieren el modelo `Workflow/Step/ToolUse` de **G1–G2/C4**; diferidas. C3 corre antes del refactor G.
 - Timer de timeout `ToolUse` §24.1 → **diferido** (no asignado en el registro; ligado a cierre/proyección §32.9).
 - Migración de pendings de `ISessionStore` a `IWorkflowRepository` → **G2**.
-- Layout de disco nuevo (`causal-workflows-v1`) → **fases P**.
+- Layout de disco nuevo (`causal-workflows-v2`) → **fases P**.
 - Modificación de la ruta `/v1/messages` o del proxy catch-all existente.
 
 ## Impact

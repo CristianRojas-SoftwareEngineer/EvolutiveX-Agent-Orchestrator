@@ -3,7 +3,7 @@
 ### Requirement: Retiro del módulo audit-paths.ts
 
 El sistema SHALL NOT incluir el archivo `src/1-domain/constants/audit-paths.ts`. Las constantes
-de rutas del layout `causal-workflows-v1` SHALL provenir exclusivamente de
+de rutas del layout `causal-workflows-v2` SHALL provenir exclusivamente de
 `src/2-services/session-routing.ts` y de literales locales en servicios que lo requieran.
 
 El comentario de cabecera en `session-routing.ts` SHALL describir que `audit-paths.ts` fue
@@ -24,4 +24,4 @@ Referencia: spec vigente en `openspec/specs/session-routing/spec.md` — funcion
 #### Scenario: Routing sigue operativo
 
 - **WHEN** se invocan `getWorkflowDir`, `getStepDir` y `getToolDir` desde `session-routing.ts`
-- **THEN** las rutas generadas SHALL coincidir con el layout `causal-workflows-v1` documentado en `session-audit-model.md`
+- **THEN** las rutas generadas SHALL coincidir con el layout `causal-workflows-v2` documentado en `session-audit-model.md`

@@ -1,0 +1,7 @@
+{
+  "name": "transcript-plus",
+  "version": "0.4.0",
+  "description": "Añade marca de tiempo h:mm:ss a.m./p.m. con icono 🕐 dentro de recuadros box-drawing con líneas verticales │ sobre cada render site del transcript: UserMessage, AssistantMessage, ToolUse, ToolResult, ToolGroup, CommandOutput, AskUserQuestion, Spinner y TurnDuration; el header marca la hora de inicio del trabajo medido y un footer su duración, atribuida a quien hizo el trabajo (🧠 modelo, 🔧 herramienta o comando, 👤 usuario, 🪝 hooks); mientras una herramienta corre, ToolGroup y ToolUse muestran un contador de ejecución en vivo que avanza cada segundo; ambas se fijan desde los eventos, también en las vistas de subagentes y en ctrl+o, y se persisten para sesiones reanudadas",
+  "author": { "name": "Cristian Rojas" },
+  "types": "./types/index.d.ts"
+}

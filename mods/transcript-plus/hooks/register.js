@@ -594,8 +594,8 @@ const RESOLVER = {
   ToolGroup: e => ({ ...group(e.props.calls), icon: '🔧' }),
   // 🔧 intervalo de command.run. Su salida no trae margen superior propio.
   CommandOutput: e => ({ ...entryFor(e.requestId), icon: '🔧', noMargin: true }),
-  // Diálogo: solo header, con el inicio de su tool.call; el espaciador hace
-  // que el engine rechace el árbol.
+  // Diálogo: solo header, con el inicio de su tool.call; va en flujo y sin
+  // recuadro porque el engine rechaza `position` alrededor del diálogo.
   AskUserQuestion: e => ({
     time: runningCalls.get(e.requestId) ?? entryFor(`r:${e.requestId}`).time,
     dialog: true,

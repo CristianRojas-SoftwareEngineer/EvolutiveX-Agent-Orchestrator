@@ -17,8 +17,9 @@
 //        dentro de un Box con marginTop: -1 que absorbe el margen superior
 //        propio del engine (si no, queda una fila vacía bajo el header)
 //        y de un espaciador de alto 0 que fija el ancho mínimo del recuadro
-//     2. Un Box absoluto (top: 1, left: 2, right: 2) con el Text del header,
-//        que se superpone sobre el borde superior:  ╭─ 🕐 hora | ComponentType ─╮
+//     2. Una fila en flujo (marginBottom: -1; el Box exterior es column-reverse)
+//        con el Text del header, que se superpone sobre el borde superior:
+//        ╭─ 🕐 hora | ComponentType ─╮
 //     3. Cuando su dato es definitivo, un Box absoluto (bottom: 0, left: 2,
 //        right: 2) con la duración del trabajo que representa el bloque,
 //        alineada a la derecha sobre el borde inferior:  ╰──── 🔧 1m 05s ─╯
@@ -63,10 +64,12 @@
 //   (DRAWN_DOORS) y las claves de llamadas, así que una sesión reanudada
 //   (--continue / --resume) muestra las mismas que la original.
 //
-//   El header no puede ir dentro del Box con borde: ahí los offsets se miden
-//   desde el interior del borde y lo que cae sobre la fila del borde no se
-//   pinta. Como hermano en el Box exterior, top: 1 (tras el paddingTop) es la
-//   fila de `╭───╮`.
+//   El header no puede ir dentro del Box con borde: ahí lo que cae sobre la
+//   fila del borde no se pinta. Va como hermano en el Box exterior, que es
+//   `column-reverse`: así la fila del header se pinta después del recuadro y
+//   marginBottom: -1 la sube sobre la fila de `╭───╮`. Al ir en flujo, y no
+//   absoluto, el scroll la recorta y no se reubica en la primera fila visible
+//   cuando el borde superior sale de pantalla.
 //
 //   El marco (╭─╮ │ ╰─╯) lo dibuja borderStyle al ancho del engine, que se
 //   adapta al viewport; no se calcula ningún borde a mano. El espaciador
@@ -610,11 +613,12 @@ const RESOLVER = {
 //   ╰─...─╯  ← borde inferior
 //
 // Ese Box va dentro de un Box exterior sin borde (paddingTop: 1 separa un
-// mensaje del anterior), cuyo segundo hijo es el timestamp en un Box con
-// position: 'absolute' (top: 1, left: 2, right: 2),
-// que se pinta sobre la fila del borde superior tras `╭─`. Con `right` el
-// Box queda acotado al ancho del recuadro y `wrap: 'truncate'` recorta el
-// header con `…` cuando el viewport es más angosto que el header:
+// mensaje del anterior) con flexDirection: 'column-reverse', cuyo segundo hijo
+// es el timestamp en un Box en flujo (marginLeft/marginRight: 2,
+// marginBottom: -1) que se pinta sobre la fila del borde superior tras `╭─`.
+// Al ir en flujo, el scroll lo recorta como a cualquier otra línea. Con los
+// márgenes el Box queda acotado al ancho del recuadro y `wrap: 'truncate'`
+// recorta el header con `…` cuando el viewport es más angosto que el header:
 //   🕐 hora | ComponentType
 //
 // NOTA sobre `width`: el render engine RECHAZA la prop `width` en un Box que
@@ -656,8 +660,9 @@ async function withTimestamp($, e, next) {
 
   // Header con el timestamp, superpuesto sobre la línea del borde superior.
   // El Box con borderStyle: 'round' envuelve el engine y genera el marco;
-  // el header es su hermano posterior en el Box exterior, en un Box absoluto
-  // que se pinta encima del borde superior tras `╭─`.
+  // el header es su hermano posterior en el Box exterior (column-reverse), en
+  // una fila en flujo que se pinta tras el recuadro y que marginBottom: -1
+  // sube sobre el borde superior, tras `╭─`.
   const headerText = ` 🕐 ${formatClockTime(b.time)} | ${e.component} `
 
   // El engine rechaza `position` alrededor del diálogo, y dentro de un borde
@@ -693,7 +698,7 @@ async function withTimestamp($, e, next) {
 
   return {
     type: 'Box',
-    props: { flexDirection: 'column', paddingTop: 1 },
+    props: { flexDirection: 'column-reverse', paddingTop: 1 },
     children: [
       {
         type: 'Box',
@@ -718,7 +723,7 @@ async function withTimestamp($, e, next) {
       },
       {
         type: 'Box',
-        props: { position: 'absolute', top: 1, left: 2, right: 2 },
+        props: { marginLeft: 2, marginRight: 2, marginBottom: -1 },
         children: [
           { type: 'Text', props: { wrap: 'truncate' }, children: [headerText] },
         ],

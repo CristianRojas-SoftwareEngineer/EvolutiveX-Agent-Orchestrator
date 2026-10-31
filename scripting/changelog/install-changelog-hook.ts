@@ -7,7 +7,8 @@
 
 import { execFileSync } from 'child_process';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 // ---------------------------------------------------------------------------
 // Tipos públicos
@@ -81,4 +82,9 @@ function main(): void {
   console.log(`Hook post-commit instalado en ${hookPath}`);
 }
 
-main();
+// Solo se ejecuta como CLI: importar el módulo (p. ej. desde tests) no debe reescribir .git/hooks/post-commit.
+const entryPath = fileURLToPath(import.meta.url);
+const invokedPath = process.argv[1] ? resolve(process.argv[1]) : '';
+if (entryPath === invokedPath) {
+  main();
+}

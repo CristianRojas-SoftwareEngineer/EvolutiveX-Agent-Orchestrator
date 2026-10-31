@@ -8,7 +8,8 @@
 
 import { execFileSync } from 'child_process';
 import { writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 // ---------------------------------------------------------------------------
 // Tipos públicos
@@ -204,4 +205,9 @@ function main(): void {
   writeFileSync(outPath, changelog, 'utf-8');
 }
 
-main();
+// Solo se ejecuta como CLI: importar el módulo (p. ej. desde tests) no debe reescribir CHANGELOG.md.
+const entryPath = fileURLToPath(import.meta.url);
+const invokedPath = process.argv[1] ? resolve(process.argv[1]) : '';
+if (entryPath === invokedPath) {
+  main();
+}

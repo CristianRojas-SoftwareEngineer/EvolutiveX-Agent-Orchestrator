@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { describe, it, expect } from 'vitest';
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
@@ -7,13 +7,11 @@ import {
   classifyKey,
   mergeHooks,
   unmergeHooks,
-  backupSettings,
   readCanonicalHooks,
   validateScpRoot,
   type HooksBlock,
 } from '../../../../scripting/install/features/hooks.js';
 import {
-  setClaudeSettingsPathForTests,
   EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT_KEY,
   type ClaudeSettings,
 } from '../../../../scripting/shared/claude-settings.js';
@@ -221,29 +219,6 @@ describe('unmergeHooks', () => {
     const result = unmergeHooks(settings, canonical, scpRoot);
     const hooks = result.hooks as Record<string, HooksBlock[string]>;
     expect(hooks['UserPromptSubmit'][0].hooks[0].command).toBe('echo other');
-  });
-});
-
-describe('backupSettings', () => {
-  let settingsDir: string;
-  let settingsPath: string;
-
-  beforeEach(() => {
-    settingsDir = mkdtempSync(join(tmpdir(), 'backup-test-'));
-    settingsPath = join(settingsDir, 'settings.json');
-    writeFileSync(settingsPath, JSON.stringify({ env: { TEST: 'value' } }), 'utf-8');
-    setClaudeSettingsPathForTests(settingsPath);
-  });
-
-  afterEach(() => {
-    setClaudeSettingsPathForTests(undefined);
-    rmSync(settingsDir, { recursive: true, force: true });
-  });
-
-  it('crea archivo de backup con timestamp', () => {
-    const backupPath = backupSettings({});
-    expect(existsSync(backupPath)).toBe(true);
-    expect(backupPath).toMatch(/settings-backup-\d{4}-\d{2}-\d{2}T/);
   });
 });
 

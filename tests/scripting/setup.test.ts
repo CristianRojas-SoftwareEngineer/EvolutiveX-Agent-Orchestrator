@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { runSetup } from '../../scripting/install/setup.js';
@@ -247,14 +247,17 @@ describe('runSetup — garantías S2 y S3', () => {
     expect(writeSpy).toHaveBeenCalledTimes(1);
   });
 
-  it('S2: backupSettings se invoca antes de writeClaudeSettings', () => {
-    // Verificar que el backup se crea: el orquestador llama a backupSettings
-    // que copia settings.json en ~/.claude/settings-backup-<timestamp>.json.
-    // Como setClaudeSettingsPathForTests redirige la ruta, no podemos afirmar
-    // el path real. Verificamos mediante spy que writeClaudeSettings se llama
-    // exactamente una vez (sin escrituras intermedias).
-    const writeSpy = vi.spyOn(claudeSettings, 'writeClaudeSettings');
+  it('S2: crea un único backup del settings previo junto al settings activo', () => {
     runSetup({ ...DEFAULT_OPTS, root: proxyRoot });
-    expect(writeSpy).toHaveBeenCalledTimes(1);
+    const backups = readdirSync(settingsDir).filter((f) => f.startsWith('settings-backup-'));
+    expect(backups).toHaveLength(1);
+    expect(readFileSync(join(settingsDir, backups[0]!), 'utf-8')).toBe(JSON.stringify({}));
+    expect(readFileSync(settingsPath, 'utf-8')).not.toBe(JSON.stringify({}));
+  });
+
+  it('S2: dry-run no crea backup', () => {
+    runSetup({ ...DEFAULT_OPTS, root: proxyRoot, dryRun: true });
+    const backups = readdirSync(settingsDir).filter((f) => f.startsWith('settings-backup-'));
+    expect(backups).toHaveLength(0);
   });
 });

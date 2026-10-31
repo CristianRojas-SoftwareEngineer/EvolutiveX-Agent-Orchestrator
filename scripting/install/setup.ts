@@ -17,6 +17,7 @@ import { resolvePosixAbsolutePath } from '../shared/npx-tsx-command.js';
 import {
   readClaudeSettings,
   writeClaudeSettings,
+  backupClaudeSettings,
   CLAUDE_SETTINGS_PATH,
 } from '../shared/claude-settings.js';
 import {
@@ -30,7 +31,6 @@ import {
   mergeHooks,
   unmergeHooks,
   readCanonicalHooks,
-  backupSettings,
 } from './features/hooks.js';
 
 export interface SetupRunOptions {
@@ -85,7 +85,7 @@ export function runSetup(options: SetupRunOptions): number {
     }
 
     // S2: Backup único antes de escribir
-    backupSettings(settings);
+    backupClaudeSettings();
     // S3: Escribir una sola vez
     writeClaudeSettings(settings);
 
@@ -126,7 +126,7 @@ export function runSetup(options: SetupRunOptions): number {
   }
 
   // S2: Backup único antes de escribir
-  backupSettings(settings);
+  backupClaudeSettings();
   // S3: Escribir una sola vez
   writeClaudeSettings(settings);
 

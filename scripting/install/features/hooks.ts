@@ -16,9 +16,8 @@
  *   `unmergeHooks` que solo quita comandos SCP.
  * - S5: `isScpManagedCommand` normaliza backslashes.
  */
-import { existsSync, readFileSync, copyFileSync, mkdirSync } from 'node:fs';
-import { join, resolve } from 'node:path';
-import { homedir } from 'node:os';
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import {
   EVOLUTIVEX_AGENT_ORCHESTRATOR_ROOT_KEY,
   type ClaudeSettings,
@@ -125,24 +124,6 @@ export function readCanonicalHooks(scpRoot: string): HooksBlock {
     const msg = err instanceof Error ? err.message : String(err);
     throw new Error(`Error al leer ${HOOKS_JSON_SEGMENT}: ${msg}`, { cause: err });
   }
-}
-
-/**
- * Crea backup de `settings.json` en `~/.claude/settings-backup-<timestamp>.json`.
- * Devuelve la ruta del backup creado.
- */
-export function backupSettings(_settings: ClaudeSettings): string {
-  const backupDir = join(homedir(), '.claude');
-  if (!existsSync(backupDir)) {
-    mkdirSync(backupDir, { recursive: true });
-  }
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-  const backupPath = join(backupDir, `settings-backup-${timestamp}.json`);
-  const settingsPath = join(backupDir, 'settings.json');
-  if (existsSync(settingsPath)) {
-    copyFileSync(settingsPath, backupPath);
-  }
-  return backupPath;
 }
 
 /**

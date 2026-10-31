@@ -16,7 +16,7 @@
  * - `router-status.ts` — lectura de `env` (auth, modelos, resolución de rutas del proxy)
  */
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { homedir } from 'node:os';
 
@@ -95,4 +95,18 @@ export function writeClaudeSettings(settings: ClaudeSettings): void {
     mkdirSync(dir, { recursive: true });
   }
   writeFileSync(path, JSON.stringify(settings, null, 2) + '\n', 'utf-8');
+}
+
+/**
+ * Copia el settings activo a `settings-backup-<timestamp>.json` en su mismo directorio
+ * (`~/.claude` en runtime; el directorio del override en tests). Devuelve la ruta del
+ * backup, o `undefined` si no existe settings que respaldar.
+ */
+export function backupClaudeSettings(): string | undefined {
+  const path = effectiveSettingsPath();
+  if (!existsSync(path)) return undefined;
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  const backupPath = join(dirname(path), `settings-backup-${timestamp}.json`);
+  copyFileSync(path, backupPath);
+  return backupPath;
 }

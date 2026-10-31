@@ -4,7 +4,7 @@
 // CHANGELOG.md a mano. Fuente de verdad = historial git.
 //
 // Uso: tsx scripting/changelog/generate-changelog.ts
-// No hace commit ni amend. El hook post-commit se encarga.
+// No hace commit. Se ejecuta bajo demanda con `npm run changelog:generate`.
 
 import { execFileSync } from 'child_process';
 import { writeFileSync } from 'node:fs';

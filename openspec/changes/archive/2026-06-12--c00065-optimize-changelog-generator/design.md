@@ -1,3 +1,5 @@
+> **Nota de retirada (2026-10-31):** el hook `post-commit` descrito aquí se retiró porque nunca llegó a funcionar tras la migración a TypeScript. `CHANGELOG.md` se regenera ahora bajo demanda con `npm run changelog:generate`.
+
 ## Context
 
 `scripting/generate-changelog` es un script bash que regenera `CHANGELOG.md` desde cero leyendo el historial git. Fue diseñado originalmente como el artefacto de salida de la fase 10 del subsistema sm-* (ya eliminado). Tiene tres problemas:

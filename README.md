@@ -204,7 +204,7 @@ Todo volcado que se trunca genera un archivo `.omitted.txt` documentando la omis
 ### Instrucciones de Inicio Rápido
 
 1.  **Instalar dependencias**: `npm install`
-2.  **Hook de changelog** (opcional): `bash scripting/changelog/install-changelog-hook` instala el hook git `post-commit` que mantiene `CHANGELOG.md` sincronizado tras cada commit. El hook no se versiona — reinstalar tras cada clone.
+2.  **Changelog** (bajo demanda): `npm run changelog:generate` regenera `CHANGELOG.md` desde el historial git de conventional commits. No editar el archivo a mano.
 3.  **Configurar proveedor** (opcional): `npm run configure:provider` (asistente interactivo para configurar API keys y modelos de diferentes proveedores).
 4.  **Integraciones Claude Code** (opcional): `npm run setup:install` instala statusline y hooks en `~/.claude/settings.json` en un único paso (admite `--dry-run`, `--force`, flags `--statusline`/`--hooks`). Para desinstalar: `npm run setup:uninstall`. Ver [`docs/notifications.md`](docs/notifications.md) y [`docs/router-statusline.md`](docs/router-statusline.md).
 5.  **Referencia multi-agente** (opcional): `npm run create:agents-reference` (Crea hardlink `AGENTS.md` → `CLAUDE.md` para compatibilidad con otros agentes de código).

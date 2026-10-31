@@ -347,6 +347,7 @@ All notable changes are derived from conventional commits. Do not edit by hand.
 - corregir omisión de cuerpos de petición en logs de auditoría
 - migrar ts-node a tsx por compatibilidad con Node.js 24
 ### Documentation
+- regenerar changelog desde conventional commits
 - corregir comentario obsoleto del resolver de AskUserQuestion en transcript-plus
 - regenerar changelog desde conventional commits
 - alinear docs vivos con el catálogo de providers

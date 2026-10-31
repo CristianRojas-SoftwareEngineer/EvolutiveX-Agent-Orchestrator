@@ -4,6 +4,16 @@ All notable changes are derived from conventional commits. Do not edit by hand.
 
 ## [Unreleased]
 ### Added
+- añadir nemotron-3.5-super-vl a openrouter
+- reasignar alias de omniroute a la familia gpt-6 vía cx
+- unificar alias de ollama en deepseek-v4.1-flash
+- reasignar alias de agentrouter a gpt-6.1-sol y gpt-6-astra
+- añadir proveedor tokenharbor
+- unificar alias de openrouter en laguna-s-2.1
+- reasignar alias de omniroute y añadir space-bunny-alpha[1m]
+- usar claude-haiku-5.5 como haiku por defecto en anthropic
+- versionar el mod transcript-plus
+- normalizar cola de mensajes para Gemini 3.7 en OmniRoute
 - agregar config de glm-free vía tokenrouter
 - mover TranscriptContextExtractor a context-extraction; eliminar .gitlab-ci.yml huérfano
 - eliminar código legacy TTS del orchestrator
@@ -171,6 +181,9 @@ All notable changes are derived from conventional commits. Do not edit by hand.
 - implementar PKA de 6 capas, ports, inyección de dependencias y hardening de tooling
 - reemplazar 'any' por tipos estrictos del SDK de Anthropic
 ### Fixed
+- ejecutar main solo cuando el script se invoca como CLI
+- respetar el override de tests en el backup de settings.json
+- mantener el header de transcript-plus en flujo para que el scroll lo recorte
 - reemplazar rimraf por fs.rmSync en clean:sessions
 - reducir speed de 1.0 a 0.85 para mejor prosodia
 - corregir tipo de frac de f64 a f32 en resample_interp
@@ -334,6 +347,7 @@ All notable changes are derived from conventional commits. Do not edit by hand.
 - corregir omisión de cuerpos de petición en logs de auditoría
 - migrar ts-node a tsx por compatibilidad con Node.js 24
 ### Documentation
+- corregir comentario obsoleto del resolver de AskUserQuestion en transcript-plus
 - regenerar changelog desde conventional commits
 - alinear docs vivos con el catálogo de providers
 - corregir origen de SessionStart/End y aclarar título toast

@@ -1,9 +1,9 @@
 {
   "AUTH_METHOD": "bearer",
   "ANTHROPIC_BASE_URL": "http://localhost:20128/v1",
-  "ANTHROPIC_DEFAULT_HAIKU_MODEL": "models/laguna-s-2.1",
-  "ANTHROPIC_DEFAULT_SONNET_MODEL": "models/space-bunny-alpha[1m]",
-  "ANTHROPIC_DEFAULT_OPUS_MODEL": "models/gemini-3.7-flash[1m]",
-  "ANTHROPIC_DEFAULT_FABLE_MODEL": "models/gemini-3.7-flash[1m]",
-  "CLAUDE_CODE_SUBAGENT_MODEL": "models/laguna-s-2.1"
+  "ANTHROPIC_DEFAULT_HAIKU_MODEL": "models/gpt-6-luna",
+  "ANTHROPIC_DEFAULT_SONNET_MODEL": "models/gpt-6-luna",
+  "ANTHROPIC_DEFAULT_OPUS_MODEL": "models/gpt-6-sol-medium",
+  "ANTHROPIC_DEFAULT_FABLE_MODEL": "models/gpt-6-sol-xhigh",
+  "CLAUDE_CODE_SUBAGENT_MODEL": "models/gpt-6-luna"
 }

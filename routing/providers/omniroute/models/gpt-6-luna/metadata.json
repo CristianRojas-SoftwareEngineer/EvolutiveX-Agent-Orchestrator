@@ -1,4 +1,4 @@
 {
-  "modelId": "pol/openai/gpt-6-luna",
-  "displayName": "GPT-6-Luna"
+  "modelId": "cx/gpt-6-luna-medium[1m]",
+  "displayName": "GPT 6 Luna"
 }

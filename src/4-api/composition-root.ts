@@ -20,9 +20,6 @@ import { AuditStandardResponseHandler } from '../3-operations/audit-standard-res
 import { AuditUpstreamErrorHandler } from '../3-operations/audit-upstream-error.handler.js';
 import { FilterToolsHandler } from '../3-operations/filter-tools.handler.js';
 import { NormalizeGemini37ModelTailHandler } from '../3-operations/normalize-gemini-37-model-tail.handler.js';
-import { TranscriptContextExtractor } from '../2-services/context-extraction/transcript-extractor.service.js';
-import { DesktopNotificationAdapter } from '../2-services/notifications/DesktopNotificationAdapter.js';
-import { resolveBranding } from '../2-services/notifications/cli.js';
 import { ProxyEnvironmentConfig } from '../1-domain/types/config.types.js';
 import type { Logger } from '../1-domain/types/logger.types.js';
 
@@ -100,13 +97,6 @@ export async function createProxyDependencies(
   const filterToolsHandler = new FilterToolsHandler(config);
   const normalizeGemini37ModelTailHandler = new NormalizeGemini37ModelTailHandler(config);
 
-  // Lectura del transcript para enriquecer los toasts contextuales.
-  // Se instancia siempre; ya no depende de ningún flag.
-  const contextExtractor = new TranscriptContextExtractor();
-
-  // Branding por defecto para el toast del Stop (appId + icono fallback global)
-  const toastBranding = resolveBranding({ sound: false, silent: false, stdinJson: false });
-
   const kanbanProjector = new KanbanBoardProjector(
     path.join(process.cwd(), '.agentkanban'),
     logger,
@@ -117,10 +107,6 @@ export async function createProxyDependencies(
     auditBaseDir,
     sessionMetrics,
     logger,
-    contextExtractor,
-    config.TRANSCRIPT_CONTEXT_N ?? 3,
-    new DesktopNotificationAdapter(),
-    toastBranding,
     kanbanProjector,
   );
 

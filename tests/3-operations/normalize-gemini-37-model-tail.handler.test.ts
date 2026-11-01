@@ -11,7 +11,6 @@ const baseConfig: ProxyEnvironmentConfig = {
   LOG_LEVEL: 'info',
   PROXY_UNREDACT_THINKING: false,
   FILTERED_TOOLS: [],
-  TRANSCRIPT_CONTEXT_N: 3,
   LOG_HTTP_BODIES: false,
   LOG_HTTP_HEADERS: false,
   GEMINI_37_TAIL_PATTERN: 'gemini-3\\.7-flash',

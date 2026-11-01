@@ -30,9 +30,6 @@ export interface ProxyEnvironmentConfig {
    */
   FILTERED_TOOLS: string[];
 
-  /** Número de últimos mensajes a leer del transcript para enriquecer los toasts. Env: `TRANSCRIPT_CONTEXT_N`. */
-  TRANSCRIPT_CONTEXT_N?: number;
-
   /** Activar logging del body de request. Default: false. Env: `LOG_HTTP_BODIES`. */
   LOG_HTTP_BODIES?: boolean;
   /** Activar logging de headers request+response. Default: true. Env: `LOG_HTTP_HEADERS`. */

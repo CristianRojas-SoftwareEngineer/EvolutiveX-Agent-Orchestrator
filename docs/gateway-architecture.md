@@ -364,13 +364,13 @@ Un **Step** no es solo una llamada HTTP aislada: incluye la fase de tools observ
 
 **Delimitadores (hooks):**
 
-| Evento             | Acción                                                                                 |
-| ------------------ | -------------------------------------------------------------------------------------- |
-Notificaciones (toast); el main lo abre `ensureTurnWorkflow` en el primer hop HTTP |
-| `SubagentStart`    | Abre `Workflow` con `kind: 'subagent'`                                                 |
-| `Stop`             | Cierra main si `stop_hook_active === false` y sin `background_tasks` pendientes        |
-| `SubagentStop`     | Cierra sub-workflow                                                                    |
-| `StopFailure`      | Cierra con `WorkflowResult.outcome: 'api_error'`                                       |
+| Evento             | Acción                                                                          |
+| ------------------ | ------------------------------------------------------------------------------- |
+| `UserPromptSubmit` | No-op en repo; el main lo abre `ensureTurnWorkflow` en el primer hop HTTP       |
+| `SubagentStart`    | Abre `Workflow` con `kind: 'subagent'`                                          |
+| `Stop`             | Cierra main si `stop_hook_active === false` y sin `background_tasks` pendientes |
+| `SubagentStop`     | Cierra sub-workflow                                                             |
+| `StopFailure`      | Cierra con `WorkflowResult.outcome: 'api_error'`                                |
 
 **Cardinalidad:** `Session` 1 — \* `Workflow`. Cada prompt significativo abre un workflow; reanudar sesión puede abrir un workflow nuevo.
 
@@ -1031,7 +1031,7 @@ sequenceDiagram
 | Concern                          | Autoridad primaria                                                            | Fallback / complemento                                                                                                         |
 | -------------------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
 | **Sesión**                       | Header HTTP `x-cc-audit-session` + reconciliar `session_id` en payload hook.  | Si hook llega antes de primer POST: crear sesión desde hook.                                                                   |
-| **Abrir workflow main**          | Wire request `fresh` (abre en disco vía `ensureTurnWorkflow`; creador único). | Hook `UserPromptSubmit` no participa en la apertura (solo notificaciones).                                                     |
+| **Abrir workflow main**          | Wire request `fresh` (abre en disco vía `ensureTurnWorkflow`; creador único). | Hook `UserPromptSubmit` no participa en la apertura del workflow.                                                              |
 | **Abrir workflow subagente**     | Plano A: cabeceras `agent-id` + `parent-agent-id` en POST `fresh`.            | Legacy: `findInteractionWithPendingAgents` + prompt si CC < 2.1.139. Hook `SubagentStart` confirma y enlaza `childWorkflowId`. |
 | **Enlazar `tool_use_id` ↔ hijo** | Plano B: SSE `registerPendingTool` + `joinToolUseToSubagent`.                 | Hook `PreToolUse`/`PostToolUse` enriquecen `ToolUse.status` y timing.                                                          |
 | **Cerrar workflow**              | **Plano C**: hook `Stop` / `SubagentStop` (autoritativo).                     | Wire `stop_reason` como cierre **transitorio** solo si hook no llega (ventana documentada).                                    |
@@ -1102,7 +1102,7 @@ El registro de tools pending en SSE:
 
 **Endpoint:** `POST /hooks` en capa 5 (excluido de side-interactions).
 
-**Configuración operativa:** Claude Code hooks apuntan al proxy vía `.claude/settings.json` del proyecto. El archivo del proyecto registra **13 claves**, todas con un único comando: [`post-hook-event.ts`](../scripting/hooks/post-hook-event.ts) (relay puro — lee stdin una vez, hace `POST` a `$ANTHROPIC_BASE_URL/hooks`, sale). Las 13 claves son: `UserPromptSubmit`, `PreToolUse`, `PostToolUse` (`matcher: "*"`), `PostToolUseFailure`, `SubagentStart`, `SubagentStop`, `Stop`, `StopFailure`, `SessionStart`, `SessionEnd`, `PermissionRequest`, `TaskCreated`, `TaskCompleted`. Las 13 sobrescriben las entradas equivalentes del user-level `C:\Users\user\.claude\settings.json` (merge por clave: el proyecto tiene precedencia). El gateway (`AuditHookEventHandler.executeAsync`) es el **único punto de decisión de efectos**: toast (estático, dinámico o condicional) y audit. Los relays antiguos `gateway-hook-notify.ts`, `pre-tool-use-hook-ux.ts` y `task-in-progress-hook-ux.ts` se eliminaron en el change `consolidate-hooks-in-gateway`; sus lógicas migraron al handler. Tabla completa: [`docs/notifications.md`](notifications.md).
+**Configuración operativa:** Claude Code hooks apuntan al proxy vía `.claude/settings.json` del proyecto. El archivo del proyecto registra **13 claves**, doce con [`post-hook-event.ts`](../scripting/hooks/post-hook-event.ts) y `SessionEnd` con [`session-end-hook.ts`](../scripting/hooks/session-end-hook.ts). Las 13 claves son: `UserPromptSubmit`, `PreToolUse`, `PostToolUse` (`matcher: "*"`), `PostToolUseFailure`, `SubagentStart`, `SubagentStop`, `Stop`, `StopFailure`, `SessionStart`, `SessionEnd`, `PermissionRequest`, `TaskCreated`, `TaskCompleted`. Las 13 sobrescriben las entradas equivalentes del user-level `C:\Users\user\.claude\settings.json` (merge por clave: el proyecto tiene precedencia). El gateway (`AuditHookEventHandler.executeAsync`) despacha los efectos de auditoría, correlación de workflows, métricas y proyección Kanban. Detalle: [`docs/hooks.md`](hooks.md).
 
 **Mapa de eventos hook → acción en dominio:**
 
@@ -1110,7 +1110,7 @@ El registro de tools pending en SSE:
 | -------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
 | `SessionStart`       | Crear/reconciliar metadata de sesión (`externalSessionId`).                                                                  |
 | `SessionEnd`         | Marcar sesión inactiva.                                                                                                      |
-Notificaciones (toast con preview del prompt). No crea ni alinea workflows.                                        |
+| `UserPromptSubmit`   | No crea ni alinea workflows (el turno se abre en `ensureTurnWorkflow`).                                                      |
 | `SubagentStart`      | `confirmSubagentFromHook(agentId, toolUseId?)` — confirma sub-workflow; enlaza `ToolUse.childWorkflowId` si join ya ocurrió. |
 | `PreToolUse`         | `ToolUse.status = 'running'`; registrar `startedAt`.                                                                         |
 | `PostToolUse`        | Completar `ToolUse`; si `name === 'Agent'`, enriquecer metadata del enlace hijo.                                             |
@@ -1449,7 +1449,7 @@ stateDiagram-v2
 | --- | ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | POST subagent (headers) → `SubagentStart` → steps → `SubagentStop` | Caso nominal: wire abre `sub-agent/workflow/`, hook confirma y cierra.                                                                                   |
 | 2   | `SubagentStart` → POST subagent (headers)                          | Crear workflow `status: pending` indexado por `agent_id`; al llegar POST, reconciliar con carpeta en disco.                                              |
-| 3   | Main: wire `fresh` → `UserPromptSubmit`                            | Wire abre interacción (`ensureTurnWorkflow`); el hook no toca el repo (solo notificaciones).                                                             |
+| 3   | Main: wire `fresh` → `UserPromptSubmit`                            | Wire abre interacción (`ensureTurnWorkflow`); el hook no toca el repo.                                                                                   |
 | 4   | Wire cierra por `stop_reason` → hook `Stop` llega después          | Hook **gana**: reescribir `output/result.json` con `finalText` del orquestador; `closedByEvent: 'Stop'`; actualizar `meta.json` con `status: completed`. |
 | 5   | Hook `Stop` llega → wire `stop_reason` en request posterior        | Hook ya cerró; wire posterior se ignora para cierre (workflow ya inmutable).                                                                             |
 | 6   | CC < 2.1.139: sin cabeceras ni hooks configurados                  | Fallback completo a heurística (pending+prompt + cierre por wire).                                                                                       |
@@ -1790,12 +1790,12 @@ Estos contadores viven en memoria dentro del servicio de persistencia y se reini
 
 Cada turno LLM = un step = un directorio `workflows/NN/steps/MM/`.
 
-| Lado del turno          | Artefacto                                       | Origen                                                                                         |
-| ----------------------- | ----------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| **Solicitud**           | `steps/MM/request/body.json`                    | Cuerpo JSON enviado al endpoint LLM (`step_request.body`)                                      |
-| **Respuesta (final)**   | `steps/MM/response/body.json`                   | Reconstruido por `aggregateSseChunks` desde chunks SSE; o escrito directamente si no-streaming |
-| **Respuesta (legible)** | `steps/MM/response/body.parsed.md`              | Render Markdown del body vía `MarkdownRendererService`                                         |
-| **Respuesta (forense)** | `steps/MM/response/streaming/streaming.ndjson` | Un único archivo por respuesta de step; cada `stream_chunk` apende una línea ndjson           |
+| Lado del turno          | Artefacto                                      | Origen                                                                                         |
+| ----------------------- | ---------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| **Solicitud**           | `steps/MM/request/body.json`                   | Cuerpo JSON enviado al endpoint LLM (`step_request.body`)                                      |
+| **Respuesta (final)**   | `steps/MM/response/body.json`                  | Reconstruido por `aggregateSseChunks` desde chunks SSE; o escrito directamente si no-streaming |
+| **Respuesta (legible)** | `steps/MM/response/body.parsed.md`             | Render Markdown del body vía `MarkdownRendererService`                                         |
+| **Respuesta (forense)** | `steps/MM/response/streaming/streaming.ndjson` | Un único archivo por respuesta de step; cada `stream_chunk` apende una línea ndjson            |
 
 **Numeración de steps:**
 

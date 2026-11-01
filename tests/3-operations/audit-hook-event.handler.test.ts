@@ -311,79 +311,19 @@ describe('AuditHookEventHandler', () => {
     expect(close).not.toHaveBeenCalled();
   });
 
-  it('Stop con notifier inyectado → notify llamado con title Stop y message no vacío', async () => {
-    const notify = vi.fn().mockResolvedValue(undefined);
-    const notifier = { notify };
-    const wf = stubWorkflow();
-    const getWorkflowBySessionId = vi.fn().mockReturnValue(wf);
-    const readyToClose = vi.fn().mockReturnValue(false);
-    const repo = makeRepo({ getWorkflowBySessionId, readyToClose });
-    const handler = new AuditHookEventHandler(
-      repo,
-      '/tmp/sessions',
-      makeSessionMetrics(),
-      undefined,
-      undefined,
-      3,
-      notifier,
-    );
-    handler.execute({
-      eventName: 'Stop',
-      sessionId: 'session-1',
-      transcriptPath: '/tmp/fake-transcript.jsonl',
-    });
-    await new Promise((r) => setTimeout(r, 100));
-
-    expect(notify).toHaveBeenCalledOnce();
-    const call = notify.mock.calls[0][0] as { title: string; message: string };
-    expect(call.title).toBe('Stop');
-    expect(call.message.length).toBeGreaterThan(0);
-  });
-
-  it('Stop sin transcript → toast de fallback sin voz ("El asistente terminó su turno.")', async () => {
-    const notify = vi.fn().mockResolvedValue(undefined);
-    const notifier = { notify };
-    const wf = stubWorkflow();
-    const getWorkflowBySessionId = vi.fn().mockReturnValue(wf);
-    const readyToClose = vi.fn().mockReturnValue(false);
-    const repo = makeRepo({ getWorkflowBySessionId, readyToClose });
-    const handler = new AuditHookEventHandler(
-      repo,
-      '/tmp/sessions',
-      makeSessionMetrics(),
-      undefined,
-      undefined,
-      3,
-      notifier,
-    );
-    handler.execute({ eventName: 'Stop', sessionId: 'session-1' });
-    await new Promise((r) => setTimeout(r, 100));
-
-    expect(notify).toHaveBeenCalledOnce();
-    const call = notify.mock.calls[0][0] as { title: string; message: string };
-    expect(call.title).toBe('Stop');
-    expect(call.message).toBe('El asistente terminó su turno.');
-  });
-
-  it('SessionStart con sessionId → toast enriquecido con el id de sesión', async () => {
-    const notify = vi.fn().mockResolvedValue(undefined);
-    const notifier = { notify };
+  it('SessionStart, SessionEnd, TaskCreated, TaskCompleted y PermissionRequest se aceptan sin efectos visuales en el gateway', () => {
     const repo = makeRepo();
-    const handler = new AuditHookEventHandler(
-      repo,
-      '/tmp/sessions',
-      makeSessionMetrics(),
-      undefined,
-      undefined,
-      3,
-      notifier,
-    );
-    handler.execute({ eventName: 'SessionStart', sessionId: 'abc-123' });
-    await new Promise((r) => setTimeout(r, 50));
+    const handler = makeHandler(repo);
 
-    expect(notify).toHaveBeenCalledOnce();
-    const call = notify.mock.calls[0][0] as { title: string; message: string };
-    expect(call.title).toBe('SessionStart');
-    expect(call.message).toBe('Sesión iniciada (abc-123)');
+    for (const eventName of [
+      'SessionStart',
+      'SessionEnd',
+      'TaskCreated',
+      'TaskCompleted',
+      'PermissionRequest',
+    ] as const) {
+      expect(() => handler.execute({ eventName, sessionId: 'session-1' })).not.toThrow();
+    }
+    expect(repo.close).not.toHaveBeenCalled();
   });
 });

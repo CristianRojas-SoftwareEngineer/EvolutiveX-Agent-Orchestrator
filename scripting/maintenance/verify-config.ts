@@ -250,13 +250,6 @@ export const VERIFY_STEPS: VerifyStep[] = [
     skipReason: 'Auto-referencia: este paso es el script mismo; lo emite la pipeline al invocarse.',
   },
   {
-    id: 'notifications-register',
-    script: 'notifications:register',
-    args: ['run', 'notifications:register'],
-    kind: 'blocking',
-    verifier: 'expect-stdout',
-  },
-  {
     id: 'lint',
     script: 'lint',
     args: ['run', 'lint'],

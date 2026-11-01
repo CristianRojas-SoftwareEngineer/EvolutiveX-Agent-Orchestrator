@@ -155,27 +155,23 @@ Para instalar las **13 claves** de hooks de SCP en `~/.claude/settings.json` (us
 
 Adicionalmente, el archivo `.claude/settings.json` del proyecto registra **13 claves** de hooks de Claude Code (8 del lifecycle + 5 de sesión/tareas que antes bypaseaban el gateway), sobrescribiendo las entradas equivalentes del user-level (`C:\Users\user\.claude\settings.json`) para esas claves (mecanismo de merge de Claude Code: el proyecto tiene precedencia). Las 13 claves son:
 
-| Hook                 | Matcher           | Comando                                                                                           |
-| -------------------- | ----------------- | ------------------------------------------------------------------------------------------------- |
-| `UserPromptSubmit`   | —                 | `post-hook-event.ts` (gateway emite toast del prompt)                                             |
-| `PreToolUse`         | `*`               | `post-hook-event.ts` (gateway decide toast `AskUserQuestion`)                                     |
-| `PostToolUse`        | `*`               | `post-hook-event.ts` (gateway decide toast `TaskUpdate+in_progress`)                              |
-| `PostToolUseFailure` | —                 | `post-hook-event.ts`                                                                              |
-| `SubagentStart`      | —                 | `post-hook-event.ts` (gateway emite toast `"Subagente iniciado"`)                                 |
-| `SubagentStop`       | —                 | `post-hook-event.ts` (gateway emite toast `"Subagente terminado"`)                                |
-| `Stop`               | —                 | `post-hook-event.ts` (gateway genera toast de continuidad)                                  |
-| `StopFailure`        | —                 | `post-hook-event.ts` (gateway emite toast con detalle del error)                                  |
-| `SessionStart`       | `startup\|resume` | `post-hook-event.ts` (gateway emite toast `"Sesión iniciada"`)                                    |
-| `SessionEnd`         | —                 | `hooks/session-end-hook.ts` (`node` directo, síncrono; gateway emite toast `"Sesión finalizada"`) |
-| `PermissionRequest`  | —                 | `post-hook-event.ts` (gateway emite toast con `tool_name` + preview)                              |
-| `TaskCreated`        | —                 | `post-hook-event.ts` (gateway emite toast `"Tarea creada"`)                                       |
-| `TaskCompleted`      | —                 | `post-hook-event.ts` (gateway emite toast `"Tarea completada"`)                                   |
+| Hook                 | Matcher           | Comando                                                         |
+| -------------------- | ----------------- | --------------------------------------------------------------- |
+| `UserPromptSubmit`   | —                 | `post-hook-event.ts`                                            |
+| `PreToolUse`         | `*`               | `post-hook-event.ts`                                            |
+| `PostToolUse`        | `*`               | `post-hook-event.ts` (correlación tool_use y proyección Kanban) |
+| `PostToolUseFailure` | —                 | `post-hook-event.ts`                                            |
+| `SubagentStart`      | —                 | `post-hook-event.ts` (confirmación de sub-workflow)             |
+| `SubagentStop`       | —                 | `post-hook-event.ts` (cierre de sub-workflow y métricas)        |
+| `Stop`               | —                 | `post-hook-event.ts` (cierre de workflow principal y métricas)  |
+| `StopFailure`        | —                 | `post-hook-event.ts` (cierre de workflow con error y métricas)  |
+| `SessionStart`       | `startup\|resume` | `post-hook-event.ts`                                            |
+| `SessionEnd`         | —                 | `hooks/session-end-hook.ts` (`node` directo, síncrono)          |
+| `PermissionRequest`  | —                 | `post-hook-event.ts`                                            |
+| `TaskCreated`        | —                 | `post-hook-event.ts`                                            |
+| `TaskCompleted`      | —                 | `post-hook-event.ts`                                            |
 
-**Patrón de relay único:** 12 de los 13 hooks apuntan al mismo script [`scripting/hooks/post-hook-event.ts`](scripting/hooks/post-hook-event.ts) — un proceso que lee stdin **una vez** (UTF-8) y reenvía con `fetch` a `$ANTHROPIC_BASE_URL/hooks` (default `http://127.0.0.1:8787`). `SessionEnd` es la excepción: usa [`scripting/hooks/session-end-hook.ts`](scripting/hooks/session-end-hook.ts), un cliente HTTP autocontenido invocado con `node` directo (sin `npx`/`tsx`) para eliminar el cold-start y entregar el `POST /hooks` de forma síncrona dentro de la ventana de teardown; requiere Node con type-stripping nativo de TypeScript (≥ 22.18 / 23.6). El gateway (`AuditHookEventHandler`) es el único punto que decide qué toast emitir (estático, dinámico, condicional). Esto elimina la race condition de Windows (varios procesos leyendo el mismo stdin), elimina 3 scripts de relay (`gateway-hook-notify.ts`, `pre-tool-use-hook-ux.ts`, `task-in-progress-hook-ux.ts`) y reduce el instalador a reconocer los scripts gestionados. Detalle: [`docs/notifications.md`](docs/notifications.md) y [`docs/gateway-architecture.md` §18](docs/gateway-architecture.md#18-plano-c--hooks-claude-code).
-
-### Notifications
-
-El servicio de notificaciones de escritorio vive bajo `src/2-services/notifications/`: un puerto `INotificationService` (capa 1) y un adaptador `DesktopNotificationAdapter` (capa 2) que delega en `node-notifier.notify()` con un subset mínimo de opciones. El entry point CLI (`src/2-services/notifications/cli.ts`) acepta `--event-type`, `--message`, `--title`, `--sound`, `--silent`, `--stdin-json`, `--app-id` e `--icon`. **Branding:** el CLI aplica por defecto el AUMID `AIAssistant.Proxy` y el icono `<repo>/assets/notifications/ai-assistant.png` (256×256 + ICO multi-resolución). En Windows, ejecutar opcionalmente `npm run notifications:register -- --install` para que SnoreToast firme los toasts como "AI Assistant" en lugar de "SnoreToast" (helper idempotente, opt-in; no-op en macOS/Linux). Detalle operativo y exclusiones explícitas: [`docs/notifications.md`](docs/notifications.md). Spec canónica: [`openspec/specs/desktop-notifications-service/spec.md`](openspec/specs/desktop-notifications-service/spec.md).
+**Patrón de relay único:** 12 de los 13 hooks apuntan al mismo script [`scripting/hooks/post-hook-event.ts`](scripting/hooks/post-hook-event.ts) — un proceso que lee stdin **una vez** (UTF-8) y reenvía con `fetch` a `$ANTHROPIC_BASE_URL/hooks` (default `http://127.0.0.1:8787`). `SessionEnd` es la excepción: usa [`scripting/hooks/session-end-hook.ts`](scripting/hooks/session-end-hook.ts), un cliente HTTP autocontenido invocado con `node` directo (sin `npx`/`tsx`) para eliminar el cold-start y entregar el `POST /hooks` de forma síncrona dentro de la ventana de teardown; requiere Node con type-stripping nativo de TypeScript (≥ 22.18 / 23.6). El gateway (`AuditHookEventHandler`) procesa exclusivamente auditoría, correlación de workflows, métricas y proyección Kanban. Detalle: [`docs/hooks.md`](docs/hooks.md) y [`docs/gateway-architecture.md` §18](docs/gateway-architecture.md#18-plano-c--hooks-claude-code).
 
 <a name="correlación-de-sesión-sessionid"></a>
 
@@ -206,7 +202,7 @@ Todo volcado que se trunca genera un archivo `.omitted.txt` documentando la omis
 1.  **Instalar dependencias**: `npm install`
 2.  **Changelog** (bajo demanda): `npm run changelog:generate` regenera `CHANGELOG.md` desde el historial git de conventional commits. No editar el archivo a mano.
 3.  **Configurar proveedor** (opcional): `npm run configure:provider` (asistente interactivo para configurar API keys y modelos de diferentes proveedores).
-4.  **Integraciones Claude Code** (opcional): `npm run setup:install` instala statusline y hooks en `~/.claude/settings.json` en un único paso (admite `--dry-run`, `--force`, flags `--statusline`/`--hooks`). Para desinstalar: `npm run setup:uninstall`. Ver [`docs/notifications.md`](docs/notifications.md) y [`docs/router-statusline.md`](docs/router-statusline.md).
+4.  **Integraciones Claude Code** (opcional): `npm run setup:install` instala statusline y hooks en `~/.claude/settings.json` en un único paso (admite `--dry-run`, `--force`, flags `--statusline`/`--hooks`/`--voice`). Para desinstalar: `npm run setup:uninstall`. Ver [`docs/hooks.md`](docs/hooks.md) y [`docs/router-statusline.md`](docs/router-statusline.md).
 5.  **Referencia multi-agente** (opcional): `npm run create:agents-reference` (Crea hardlink `AGENTS.md` → `CLAUDE.md` para compatibilidad con otros agentes de código).
 6.  **Modo Desarrollo**: `npm run dev` (Carga `configs/.env` mediante flag nativo de Node v22.9+; **v24 LTS recomendado**).
 7.  **Compilación**: `npm run build` (Genera `/dist` optimizado).

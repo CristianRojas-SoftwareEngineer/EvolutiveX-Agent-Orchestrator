@@ -50,15 +50,15 @@ Sigue estos pasos en orden:
 
    Escribe variables como `ANTHROPIC_BASE_URL` en el entorno de Claude Code para que el tráfico pase por este proxy. Detalle de proveedores soportados en el [README](../README.md#enrutamiento-de-proveedores).
 
-5. **Opcional — instalación unificada (statusline + notificaciones + voz):** para instalar las tres integraciones con Claude Code en un solo paso:
+5. **Opcional — instalación unificada (statusline + hooks + voz):** para instalar las tres integraciones con Claude Code en un solo paso:
 
    ```bash
-   npm run setup
+   npm run setup:install
    ```
 
-   Escribe `statusLine`, hooks de notificación y claves de voz en `~/.claude/settings.json`. **Reinicie Claude Code** tras instalar. Admite `--dry-run` (previsualizar sin escribir), `--uninstall` y flags de feature (`--statusline`, `--notifications`, `--voice`) para operar de forma selectiva. Instaladores individuales para statusline y notificaciones: `npm run install:statusline` y `npm run install:notifications`. La voz no tiene instalador individual: usa `npm run setup --voice`.
+   Escribe `statusLine`, los relays de hooks del gateway y las claves de voz en `~/.claude/settings.json`. **Reinicie Claude Code** tras instalar. Admite `--dry-run` (previsualizar sin escribir), `--uninstall` y flags de feature (`--statusline`, `--hooks`, `--voice`) para operar de forma selectiva.
 
-   El diseño del statusline está en [router-statusline.md](./router-statusline.md); el servicio de notificaciones en [notifications.md](./notifications.md).
+   El diseño del statusline está en [router-statusline.md](./router-statusline.md) y la arquitectura de hooks en [hooks.md](./hooks.md).
 
 6. **Opcional:** configura variables de entorno para desarrollo local usando un archivo `.env`:
 

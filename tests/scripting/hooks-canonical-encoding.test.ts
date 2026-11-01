@@ -1,8 +1,23 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { NOTIFICATION_EVENT_KEYS } from '../../src/2-services/notifications/event-notification-profile.js';
 import { readCanonicalHooks } from '../../scripting/install/features/hooks.js';
+
+const CANONICAL_HOOK_KEYS = [
+  'UserPromptSubmit',
+  'PreToolUse',
+  'PostToolUse',
+  'PostToolUseFailure',
+  'SubagentStart',
+  'SubagentStop',
+  'Stop',
+  'StopFailure',
+  'SessionStart',
+  'SessionEnd',
+  'PermissionRequest',
+  'TaskCreated',
+  'TaskCompleted',
+] as const;
 
 const ACCENT_SAMPLE = 'Prueba tildes: sesión, configuración, acción, niño';
 
@@ -39,11 +54,10 @@ describe('hooks canónicos y encoding', () => {
     expect(JSON.parse(text)).toBeTruthy();
   });
 
-  it('todas las claves de notificación lifecycle están en hooks.json con relay unificado', () => {
+  it('todas las claves de lifecycle están en hooks.json con relay unificado', () => {
     const root = resolve(import.meta.dirname, '../..');
     const hooks = readCanonicalHooks(root);
-    for (const key of NOTIFICATION_EVENT_KEYS) {
-      if (key === 'TaskInProgress') continue; // implementada como PostToolUse[matcher=TaskUpdate]
+    for (const key of CANONICAL_HOOK_KEYS) {
       expect(hooks[key], `falta hook para ${key}`).toBeDefined();
       const allCmds = hooks[key]!.flatMap((b) => b.hooks.map((h) => h.command)).join(' ');
       if (key === 'SessionEnd') {

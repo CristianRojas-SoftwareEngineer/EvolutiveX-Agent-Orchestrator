@@ -66,12 +66,6 @@ const scripts: NpmScript[] = [
     category: 'local',
   },
   {
-    name: 'notifications:register',
-    description:
-      'Helper de AUMID Windows (--install, --uninstall, --status). Idempotente y opt-in; no-op con mensaje informativo en macOS/Linux.',
-    category: 'local',
-  },
-  {
     name: 'sessions:list',
     description: 'Lista sesiones Claude Code del proyecto (--project)',
     category: 'local',

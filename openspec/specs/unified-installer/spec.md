@@ -237,7 +237,7 @@ La función `applyStatuslineUninstall` SHALL aceptar un parámetro `force: boole
 
 ### Requirement: Indivisibilidad de --hooks
 
-El flag `--hooks` SHALL instalar el conjunto indivisible de las **13 claves** de hooks declaradas en `configs/hooks.json`, cada una con un único comando que apunta a `scripting/hooks/post-hook-event.ts`. Este es el patrón de relay único: el script de transporte no decide efectos (toast, TTS, audit) — solo reenvía el payload a `POST /hooks`; el gateway (`AuditHookEventHandler`) es el único punto de despacho de efectos.
+El flag `--hooks` SHALL instalar el conjunto indivisible de las **13 claves** de hooks declaradas en `configs/hooks.json`, doce apuntando a `scripting/hooks/post-hook-event.ts` y `SessionEnd` apuntando a `scripting/hooks/session-end-hook.ts`. Este es el patrón de relay único: el script de transporte no decide efectos locales — solo reenvía el payload a `POST /hooks`; el gateway (`AuditHookEventHandler`) es el punto de despacho de auditoría y correlación.
 
 No SHALL existir ningún bloque de hook en `configs/hooks.json` que use un script diferente a `post-hook-event.ts` como comando directo. Los scripts antiguos `gateway-hook-notify.ts`, `pre-tool-use-hook-ux.ts` y `task-in-progress-hook-ux.ts` fueron eliminados (sus lógicas de filtrado y formateo migraron al gateway).
 

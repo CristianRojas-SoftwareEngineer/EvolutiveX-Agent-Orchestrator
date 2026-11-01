@@ -116,7 +116,7 @@ El sistema SHALL actualizar `AuditHookEventHandler` en `src/3-operations/audit-h
 
 | Evento | Acción en G2 |
 |--------|-------------|
-| `UserPromptSubmit` | Notificaciones (toast/voz); el main lo abre `ensureTurnWorkflow` al llegar el primer hop HTTP |
+| `UserPromptSubmit` | No-op en repo; el main lo abre `ensureTurnWorkflow` al llegar el primer hop HTTP |
 | `Stop` | Invoca `readyToClose`; si `true`, invoca `close` |
 | `SubagentStop` | Invoca `readyToClose` para el sub-workflow del agente; si `true`, invoca `close` |
 | `StopFailure` | Invoca `close` directamente (no `readyToClose`; §15.4: siempre cierra) |
@@ -285,7 +285,7 @@ Cuando el hook no incluye `last_assistant_message`, `finalText` SHALL ser `undef
 
 ### Requirement: Apertura de workflow de turno en el primer hop HTTP
 
-El workflow de turno (`kind: 'main'`, `workflowKind: 'agentic'`) SHALL abrirse exclusivamente desde `ensureTurnWorkflow` al llegar el primer hop HTTP del turno (fresh o side-request). El hook `UserPromptSubmit` NO SHALL invocar `openWorkflow` ni tocar `IWorkflowRepository`; su responsabilidad se limita a notificaciones (toast/voz).
+El workflow de turno (`kind: 'main'`, `workflowKind: 'agentic'`) SHALL abrirse exclusivamente desde `ensureTurnWorkflow` al llegar el primer hop HTTP del turno (fresh o side-request). El hook `UserPromptSubmit` NO SHALL invocar `openWorkflow` ni tocar `IWorkflowRepository`.
 
 **Esquema de ids por turno:**
 - El **primer turno** de la sesión usa `id === sessionId`.
@@ -308,7 +308,6 @@ Como máximo **un** workflow de turno `running` por `sessionId` SHALL existir en
 - **GIVEN** cualquier estado del repositorio (sin turno o con turno abierto)
 - **WHEN** llega un hook `UserPromptSubmit`
 - **THEN** `AuditHookEventHandler` SHALL NOT invocar `openWorkflow` ni modificar `IWorkflowRepository`
-- **AND** el handler SHALL despachar únicamente las notificaciones (toast con preview del prompt, locución por voz)
 
 #### Scenario: Segundo turno no reutiliza workflow cerrado
 

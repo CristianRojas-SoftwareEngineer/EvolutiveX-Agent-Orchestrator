@@ -123,19 +123,19 @@ El sistema SHALL implementar un handler `AuditHookEventHandler` en capa 3 (`src/
 
 | Evento | Acción |
 |--------|--------|
-| `UserPromptSubmit` | Toast con preview del `prompt`. No crea ni alinea workflows (la apertura del turno corresponde a `ensureTurnWorkflow` en el primer hop HTTP) |
-| `SubagentStart` | **`confirmSubagentFromHook(agentId, toolUseId?)`**; toast `"Subagente iniciado"` |
-| `Stop` | **`readyToClose` → si true: `close`** (§15.4); toast de continuidad (generado por LLM desde transcript). Si no se encuentra workflow: **log `warn`** con `sessionId` |
-| `SubagentStop` | **`readyToClose` para sub-workflow → si true: `close`** (§15.4); toast `"Subagente terminado"`. Si no se encuentra entrada por `agentId`: **log `warn`**. Si `agentId` existe en índice wire pero no en lifecycle: **log `error`** |
-| `StopFailure` | **`close` directamente** (§15.4: siempre cierra en error); toast con detalle del error (vía `formatStopFailureMessage`). Si no se encuentra workflow: **log `warn`** con `sessionId` |
-| `PreToolUse` | Log informativo; toast condicional si `toolName === 'AskUserQuestion' && toolInput.questions` (vía `formatPreToolUseAskMessage`) |
-| `PostToolUse` | **`completeToolUse` solo si `completionAuthority === 'hook'`**; ignorar para tools `continuation`; toast condicional si `toolName === 'TaskUpdate' && toolInput.status === 'in_progress'` (vía `formatTaskInProgressMessage`); **proyección al board** si `toolName ∈ { TaskCreate, TaskUpdate }` y `toolInput.metadata.source === 'spec-delta'` (vía `KanbanBoardProjector`, opcional) |
+| `UserPromptSubmit` | No crea ni alinea workflows (la apertura del turno corresponde a `ensureTurnWorkflow` en el primer hop HTTP) |
+| `SubagentStart` | **`confirmSubagentFromHook(agentId, toolUseId?)`** |
+| `Stop` | **`readyToClose` → si true: `close`** (§15.4) y finalización de métricas. Si no se encuentra workflow: **log `warn`** con `sessionId` |
+| `SubagentStop` | **`readyToClose` para sub-workflow → si true: `close`** (§15.4) y finalización de métricas. Si no se encuentra entrada por `agentId`: **log `warn`**. Si `agentId` existe en índice wire pero no en lifecycle: **log `error`** |
+| `StopFailure` | **`close` directamente** (§15.4: siempre cierra en error) y finalización de métricas. Si no se encuentra workflow: **log `warn`** con `sessionId` |
+| `PreToolUse` | Log informativo |
+| `PostToolUse` | **`completeToolUse` solo si `completionAuthority === 'hook'`**; ignorar para tools `continuation`; **proyección al board** si `toolName ∈ { TaskCreate, TaskUpdate }` y `toolInput.metadata.source === 'spec-delta'` (vía `KanbanBoardProjector`, opcional) |
 | `PostToolUseFailure` | **`completeToolUse` con `isError: true` solo si `completionAuthority === 'hook'`**; ignorar para tools `continuation` |
-| `SessionStart` | Toast `"Sesión iniciada"` |
-| `SessionEnd` | Toast `"Sesión finalizada"` |
-| `PermissionRequest` | Toast dinámico con `tool_name` y preview de `tool_input` (vía `formatPermissionRequestMessage`) |
-| `TaskCreated` | Toast `"Tarea creada"` |
-| `TaskCompleted` | Toast `"Tarea completada"` |
+| `SessionStart` | Sin mutación de estado en el repositorio |
+| `SessionEnd` | Sin mutación de estado en el repositorio |
+| `PermissionRequest` | Sin mutación de estado en el repositorio |
+| `TaskCreated` | Sin mutación de estado en el repositorio |
+| `TaskCompleted` | Sin mutación de estado en el repositorio |
 
 Los hooks `PostToolUse` / `PostToolUseFailure` siguen recibiéndose en `POST /hooks` (relay activo); la restricción es sobre **mutación de estado**, no sobre recepción del evento.
 
@@ -215,42 +215,6 @@ Los hooks `PostToolUse` / `PostToolUseFailure` siguen recibiéndose en `POST /ho
 - **AND** `workflowRepo.close` NO SHALL haberse llamado
 - **AND** ningún workflow en el repo SHALL haber cambiado de estado
 
-#### Scenario: `PreToolUse[AskUserQuestion]` → toast con preview de la pregunta
-
-- **GIVEN** un `ClaudeHookEvent` con `eventName: 'PreToolUse'`, `toolName: 'AskUserQuestion'` y `toolInput.questions`
-- **WHEN** `AuditHookEventHandler.execute(event)` se invoca
-- **THEN** SHALL emitirse un toast con el preview de la primera pregunta (vía `formatPreToolUseAskMessage`)
-
-#### Scenario: `PreToolUse[Bash]` sin `tool_input.questions` → sin toast
-
-- **GIVEN** un `ClaudeHookEvent` con `eventName: 'PreToolUse'`, `toolName: 'Bash'`
-- **WHEN** `AuditHookEventHandler.execute(event)` se invoca
-- **THEN** NO SHALL emitirse toast (filtro condicional no satisfecho)
-
-#### Scenario: `PostToolUse[TaskUpdate+in_progress]` → toast de tarea iniciada
-
-- **GIVEN** un `ClaudeHookEvent` con `eventName: 'PostToolUse'`, `toolName: 'TaskUpdate'` y `toolInput.status: 'in_progress'`
-- **WHEN** `AuditHookEventHandler.execute(event)` se invoca
-- **THEN** SHALL emitirse un toast `"Tarea iniciada: <subject>"` (vía `formatTaskInProgressMessage`)
-
-#### Scenario: `PostToolUse[TaskUpdate+completed]` → sin toast
-
-- **GIVEN** un `ClaudeHookEvent` con `eventName: 'PostToolUse'`, `toolName: 'TaskUpdate'` y `toolInput.status: 'completed'`
-- **WHEN** `AuditHookEventHandler.execute(event)` se invoca
-- **THEN** NO SHALL emitirse toast (filtro `in_progress` no satisfecho)
-
-#### Scenario: `SessionStart` → toast de sesión iniciada
-
-- **GIVEN** un `ClaudeHookEvent` con `eventName: 'SessionStart'`, `sessionId: 's1'`
-- **WHEN** `AuditHookEventHandler.execute(event)` se invoca
-- **THEN** SHALL emitirse un toast con título `SessionStart` y mensaje `"Sesión iniciada"`
-
-#### Scenario: `PermissionRequest[Bash]` → toast con preview del comando
-
-- **GIVEN** un `ClaudeHookEvent` con `eventName: 'PermissionRequest'`, `toolName: 'Bash'`, `toolInput.command: 'rm -rf /tmp/test'`
-- **WHEN** `AuditHookEventHandler.execute(event)` se invoca
-- **THEN** SHALL emitirse un toast `"Permiso para: Bash\n<command preview>"` (vía `formatPermissionRequestMessage`)
-
 #### Scenario: `PostToolUse[TaskCreate+spec-delta]` → proyección al board
 
 - **GIVEN** un `ClaudeHookEvent` con `eventName: 'PostToolUse'`, `toolName: 'TaskCreate'`, `toolInput.metadata.source: 'spec-delta'`, `toolResponse.task.id: '7'`
@@ -310,11 +274,11 @@ El repositorio SHALL registrar las entradas del lifecycle de hooks de Claude Cod
 - **THEN** el comando configurado SHALL ejecutarse
 - **AND** SHALL llegar una request `POST /hooks` al proxy con el payload del evento
 
-> **Nota sobre el matcher `*`:** El `matcher: "*"` aplica únicamente a la entrada que contiene el comando `POST /hooks` (la que el gateway necesita para correlacionar todas las tools). El filtrado por tool específica (p. ej. `PreToolUse:AskUserQuestion` para toast) lo hace el **gateway** sobre el payload parseado, no un matcher del lado de Claude Code.
+> **Nota sobre el matcher `*`:** El `matcher: "*"` aplica únicamente a la entrada que contiene el comando `POST /hooks` (la que el gateway necesita para correlacionar todas las tools).
 
 #### Scenario: Las entradas del proyecto sobrescriben las del user-level
 
-- **GIVEN** el archivo `C:\Users\user\.claude\settings.json` (user-level) contiene una entrada `SubagentStart` con un comando de notificación
+- **GIVEN** el archivo `C:\Users\user\.claude\settings.json` (user-level) contiene una entrada `SubagentStart` con un comando ajeno
 - **AND** el archivo `.claude/settings.json` del proyecto contiene una entrada `SubagentStart` con un comando que invoca `POST /hooks`
 - **WHEN** Claude Code dispara el hook `SubagentStart`
 - **THEN** SHALL ejecutarse únicamente el comando del proyecto, no el del user-level
@@ -323,15 +287,11 @@ El repositorio SHALL registrar las entradas del lifecycle de hooks de Claude Cod
 
 ### Requirement: Todos los eventos de hook ciclan por `POST /hooks`
 
-Todos los **13 eventos** de Claude Code gestionados por SCP SHALL ciclar por el endpoint `POST /hooks`. Doce eventos SHALL usar `scripting/hooks/post-hook-event.ts` como comando relay en `configs/hooks.json`; el evento `SessionEnd` SHALL usar `scripting/hooks/session-end-hook.ts` (cliente HTTP autocontenido invocado con `node` directo). El gateway (`AuditHookEventHandler`) es el único punto de decisión de efectos (toast, audit): los scripts relay nunca deciden efectos locales.
-
-Los eventos que antes emitían toast directamente desde scripts (`gateway-hook-notify.ts`, `pre-tool-use-hook-ux.ts`, `task-in-progress-hook-ux.ts`) o desde `notifications/cli.ts` (`SessionStart`, `SessionEnd`, `PermissionRequest`, `TaskCreated`, `TaskCompleted`) ahora ciclan por el gateway: el relay → `POST /hooks` → `AuditHookEventHandler.executeAsync` → `emitToast`.
-
-Los eventos condicionales (`PreToolUse[AskUserQuestion]`, `PostToolUse[TaskUpdate+in_progress]`) también ciclan por el gateway, que aplica el filtro (`toolName === 'AskUserQuestion' && toolInput.questions`; `toolName === 'TaskUpdate' && toolInput.status === 'in_progress'`) antes de emitir el toast.
+Todos los **13 eventos** de Claude Code gestionados por SCP SHALL ciclar por el endpoint `POST /hooks`. Doce eventos SHALL usar `scripting/hooks/post-hook-event.ts` como comando relay en `configs/hooks.json`; el evento `SessionEnd` SHALL usar `scripting/hooks/session-end-hook.ts` (cliente HTTP autocontenido invocado con `node` directo). El gateway (`AuditHookEventHandler`) despacha únicamente los efectos de auditoría, correlación de workflows, métricas y proyección Kanban; las notificaciones de escritorio viven fuera de SCP en el plugin `Agent-Voice-InterConnector`.
 
 Ninguna clave SHALL contener un segundo comando en paralelo que lea stdin por separado (race condition de Windows eliminada de raíz: un solo relay por evento).
 
-**Módulos normativos:** `scripting/hooks/post-hook-event.ts` (relay de los 12 eventos); `scripting/hooks/session-end-hook.ts` (relay de `SessionEnd`); `src/3-operations/audit-hook-event.handler.ts` (único punto de despacho de efectos).
+**Módulos normativos:** `scripting/hooks/post-hook-event.ts` (relay de los 12 eventos); `scripting/hooks/session-end-hook.ts` (relay de `SessionEnd`); `src/3-operations/audit-hook-event.handler.ts` (despacho de auditoría y correlación).
 
 #### Scenario: Todos los eventos en hooks.json usan el relay canónico como comando
 
@@ -355,30 +315,12 @@ Ninguna clave SHALL contener un segundo comando en paralelo que lea stdin por se
 - **THEN** SHALL existir exactamente un comando por bloque de hook
 - **AND** el comando SHALL referenciar `post-hook-event.ts`
 
-#### Scenario: PreToolUse → gateway decide toast condicional para AskUserQuestion
-
-- **GIVEN** `configs/hooks.json` con `PreToolUse[matcher=*]` apuntando a `post-hook-event.ts`
-- **AND** el gateway recibe un payload `PreToolUse` con `tool_name: 'AskUserQuestion'` y `tool_input.questions`
-- **WHEN** el gateway procesa el evento
-- **THEN** SHALL emitir toast con preview de la primera pregunta (vía `formatPreToolUseAskMessage`)
-- **WHEN** el gateway recibe un payload `PreToolUse` con otra tool o sin `questions`
-- **THEN** SHALL ejecutar `POST /hooks` y NO SHALL emitir toast
-
-#### Scenario: PostToolUse → gateway decide toast condicional para TaskUpdate+in_progress
-
-- **GIVEN** `configs/hooks.json` con `PostToolUse[matcher=*]` apuntando a `post-hook-event.ts`
-- **AND** el gateway recibe un payload `PostToolUse` con `tool_name: 'TaskUpdate'` y `tool_input.status: 'in_progress'`
-- **WHEN** el gateway procesa el evento
-- **THEN** SHALL emitir toast con `"Tarea iniciada: <subject>"` (vía `formatTaskInProgressMessage`)
-- **WHEN** el gateway recibe `tool_input.status` distinto a `in_progress`
-- **THEN** SHALL ejecutar el audit sin emitir toast
-
-#### Scenario: Eventos lifecycle y de sesión llegan al gateway
+#### Scenario: Eventos lifecycle y de sesión llegan al gateway sin emitir toasts
 
 - **GIVEN** `configs/hooks.json` con entradas para los 13 eventos (12 vía `post-hook-event.ts`, `SessionEnd` vía `scripting/hooks/session-end-hook.ts`)
-- **WHEN** Claude Code dispara `SessionStart`, `SessionEnd`, `TaskCreated`, `TaskCompleted` o `PermissionRequest`
+- **WHEN** Claude Code dispara cualquiera de los 13 eventos
 - **THEN** SHALL llegar `POST /hooks` al gateway con el payload completo
-- **AND** el gateway SHALL emitir el toast correspondiente (texto estático para sesión/tareas; dinámico para `PermissionRequest`)
+- **AND** el gateway SHALL procesar la correlación de workflows, métricas y proyección Kanban sin emitir notificaciones de escritorio
 
 ---
 

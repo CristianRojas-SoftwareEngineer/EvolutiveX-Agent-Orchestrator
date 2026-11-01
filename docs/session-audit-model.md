@@ -42,20 +42,20 @@ sessions/<session-id>/
 
 ### Tabla EventBus → persistencia
 
-| Evento (`TelemetryEvent.type`)                                         | Emisor típico               | Rutas escritas por `SessionPersistence`                                              |
-| ---------------------------------------------------------------------- | --------------------------- | ------------------------------------------------------------------------------------ |
-| `workflow_start`                                                       | Correlador (`openWorkflow`) | `workflows/NN/meta.json`; opcional `request/body.json`                               |
-| `workflow_spawn`                                                       | Correlador (subagente)      | `…/tools/KK-slug/sub-agent/workflow/meta.json` (+ request)                           |
-| `step_request`                                                         | Handlers L3 / correlador    | `steps/MM/request/body.json`                                                         |
-| `step_response`                                                        | Handlers L3                 | `steps/MM/response/body.json`, `headers.json`, `parsed.md`                           |
-| `tool_call`                                                            | Correlador                  | `tools/KK-slug/input.json`, `meta.json`                                              |
-| `tool_result`                                                          | Correlador / hooks          | `tools/KK-slug/result.json`; actualiza `meta.json`                                   |
-| `workflow_complete`                                                    | Cierre de workflow          | `output/result.json`, `output/result.parsed.md`; `meta.json` final                   |
-| `workflow_cancel`                                                      | Timeout / cancelación       | `meta.json` con `status: cancelled`                                                  |
+| Evento (`TelemetryEvent.type`)                                         | Emisor típico               | Rutas escritas por `SessionPersistence`                                                                              |
+| ---------------------------------------------------------------------- | --------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `workflow_start`                                                       | Correlador (`openWorkflow`) | `workflows/NN/meta.json`; opcional `request/body.json`                                                               |
+| `workflow_spawn`                                                       | Correlador (subagente)      | `…/tools/KK-slug/sub-agent/workflow/meta.json` (+ request)                                                           |
+| `step_request`                                                         | Handlers L3 / correlador    | `steps/MM/request/body.json`                                                                                         |
+| `step_response`                                                        | Handlers L3                 | `steps/MM/response/body.json`, `headers.json`, `parsed.md`                                                           |
+| `tool_call`                                                            | Correlador                  | `tools/KK-slug/input.json`, `meta.json`                                                                              |
+| `tool_result`                                                          | Correlador / hooks          | `tools/KK-slug/result.json`; actualiza `meta.json`                                                                   |
+| `workflow_complete`                                                    | Cierre de workflow          | `output/result.json`, `output/result.parsed.md`; `meta.json` final                                                   |
+| `workflow_cancel`                                                      | Timeout / cancelación       | `meta.json` con `status: cancelled`                                                                                  |
 | `stream_chunk`                                                         | `AuditSseResponseHandler`   | `steps/MM/response/streaming/streaming.ndjson` (append, un archivo por respuesta de step); pings filtrados; sin tope |
-| `step_response` (con `coalescedDelegationStepIndex`)                   | `AuditSseResponseHandler`   | además: `body.coalesced.json` + `body.coalesced.parsed.md` en el step continuation   |
-| `*` (wildcard)                                                         | cualquier evento            | `sessions/<id>/events.ndjson` (append-only)                                          |
-| `workflow_start` / `workflow_complete` / `workflow_cancel` (kind=main) | Correlador / cierre         | `sessions/<id>/workflows/workflow-sequence.json` (array)                             |
+| `step_response` (con `coalescedDelegationStepIndex`)                   | `AuditSseResponseHandler`   | además: `body.coalesced.json` + `body.coalesced.parsed.md` en el step continuation                                   |
+| `*` (wildcard)                                                         | cualquier evento            | `sessions/<id>/events.ndjson` (append-only)                                                                          |
+| `workflow_start` / `workflow_complete` / `workflow_cancel` (kind=main) | Correlador / cierre         | `sessions/<id>/workflows/workflow-sequence.json` (array)                                                             |
 
 **Precedencia `completionAuthority` (determinista, fijada al registrar el tool):**
 
@@ -243,7 +243,7 @@ El turno de usuario es un workflow con **`interactionType: agentic`** (`workflow
 ### 5.2 Invariantes del turno
 
 - Como máximo **un** workflow de turno `running` por `sessionId`. El primer turno usa `id === sessionId`; los turnos posteriores usan `id === ${sessionId}-turn-${layoutIndex}` (los workflows cerrados permanecen en el repo pero no se reutilizan: lookups y reuse filtran por `result == null`).
-- El workflow de turno se abre siempre desde el primer hop HTTP (`ensureTurnWorkflow`); el hook `UserPromptSubmit` solo dispara notificaciones (toast/voz).
+- El workflow de turno se abre siempre desde el primer hop HTTP (`ensureTurnWorkflow`); el hook `UserPromptSubmit` no abre ni modifica workflows en el correlador.
 - Mutaciones HTTP del turno se serializan con `withSessionLock(sessionId)` en `AuditWorkflowHandler` (evita cross-wiring cuando `side-request` y `agentic` arrancan en paralelo).
 
 ---

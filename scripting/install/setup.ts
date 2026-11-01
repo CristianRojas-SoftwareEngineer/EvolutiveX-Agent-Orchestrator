@@ -26,12 +26,7 @@ import {
   applyStatuslineUninstall,
 } from './features/statusline.js';
 import { applyVoiceInstall, applyVoiceUninstall } from './features/voice.js';
-import {
-  validateScpRoot,
-  mergeHooks,
-  unmergeHooks,
-  readCanonicalHooks,
-} from './features/hooks.js';
+import { validateScpRoot, mergeHooks, unmergeHooks, readCanonicalHooks } from './features/hooks.js';
 
 export interface SetupRunOptions {
   root: string;
@@ -148,7 +143,7 @@ program
   .option('--uninstall', 'Desinstalar las features seleccionadas')
   .option('--statusline', 'Operar solo sobre statusline')
   .option('--voice', 'Operar solo sobre voz')
-  .option('--hooks', 'Operar solo sobre hooks (gateway + stop UX + notificaciones)')
+  .option('--hooks', 'Operar solo sobre hooks del gateway')
   .option('--voice-mode <hold|tap>', 'Modo de activación de voz', 'hold')
   .option('--no-voice-auto-submit', 'Desactiva autoSubmit de voz')
   .option('--dry-run', 'Muestra los valores sin escribir en settings.json')

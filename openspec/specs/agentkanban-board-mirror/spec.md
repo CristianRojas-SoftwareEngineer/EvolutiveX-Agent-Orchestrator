@@ -44,7 +44,7 @@ El `KanbanBoardProjector` SHALL ser una dependencia opcional inyectada por const
 - **AND** un `ClaudeHookEvent` con `eventName: 'PostToolUse'`, `toolName: 'TaskCreate'`, `toolInput.metadata.source: 'spec-delta'`
 - **WHEN** el handler procesa el evento
 - **THEN** no SHALL lanzarse ninguna excepción
-- **AND** el resto del procesamiento (completeToolUse, toast) SHALL continuar normalmente
+- **AND** el resto del procesamiento (`completeToolUse`) SHALL continuar normalmente
 
 ---
 

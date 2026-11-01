@@ -343,7 +343,7 @@ El script usa únicamente Node.js APIs estándar (`fs`, `path`, `process.stdin`)
 
 ### Instalación recomendada
 
-Desde la raíz del repositorio del proxy, puede instalar el statusline junto con notificaciones y voz en un único paso:
+Desde la raíz del repositorio del proxy, puede instalar el statusline junto con hooks y voz en un único paso:
 
 ```bash
 npm run setup

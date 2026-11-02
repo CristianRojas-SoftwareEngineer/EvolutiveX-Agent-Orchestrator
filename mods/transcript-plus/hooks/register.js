@@ -12,23 +12,28 @@
 //   `withTimestamp` (sin distinción entre componentes con o sin prop `text`).
 //   Se llama a `next(e)` para obtener el árbol RenderElement del engine
 //   (`{ type: 'engine', ref: 0 }`), y se envuelve en un Box exterior sin
-//   borde (paddingTop: 1, la separación entre mensajes) que contiene:
-//     1. Un Box con borderStyle: 'round' que envuelve el árbol del engine,
-//        dentro de un Box con marginTop: -1 que absorbe el margen superior
-//        propio del engine (si no, queda una fila vacía bajo el header)
-//        y de un espaciador de alto 0 que fija el ancho mínimo del recuadro
-//     2. Una fila en flujo (marginBottom: -1; el Box exterior es column-reverse)
-//        con el Text del header, que se superpone sobre el borde superior:
-//        ╭─ 🕐 hora | ComponentType ─╮
-//     3. Cuando su dato es definitivo, un Box absoluto (bottom: 0, left: 2,
-//        right: 2) con la duración del trabajo que representa el bloque,
-//        alineada a la derecha sobre el borde inferior:  ╰──── 🔧 1m 05s ─╯
+//   borde (`flexDirection: 'column', paddingTop: 1, flexGrow: 1`) que contiene:
+//     1. Un Box `column-reverse` con:
+//        a) Un Box con borderStyle: 'round' que envuelve el árbol del engine,
+//           dentro de un Box con marginTop: -1 que absorbe el margen superior
+//           propio del engine (si no, queda una fila vacía bajo el header)
+//           y de un espaciador de alto 0 (`e.viewport?.columns - 2`) que fija
+//           el ancho del recuadro al 100% del viewport incluso cuando un
+//           ToolGroup desmonta su subfila activa
+//        b) Una fila en flujo (marginBottom: -1) con el Text del header, que
+//           se superpone sobre el borde superior:  ╭─ 🕐 hora | ComponentType ─╮
+//     2. Cuando su dato es definitivo, una fila en flujo (marginTop: -1,
+//        marginLeft: 2, marginRight: 2, justifyContent: 'flex-end') sin
+//        `position: 'absolute'`, con la duración del trabajo alineada a la
+//        derecha sobre el borde inferior:  ╰──── 🔧 1m 05s ─╯
 //
 //   Regla de hora: el header muestra el inicio del trabajo que mide el
 //   footer (header + footer = fin). Footer por tipo, con el icono de quien
-//   hizo el trabajo (🧠 modelo, 🔧 herramienta o comando, 👤 usuario, 🪝 hooks):
-//     UserMessage       🪝  prompt.submit → turn.start (hooks UserPromptSubmit)
-//     AssistantMessage  🧠  generación del bloque de texto, thinking previo incluido
+//   hizo el trabajo (🧠 modelo, 🔧 herramienta o comando, 👤 usuario, 🔌 hooks):
+//     UserMessage       🔌  prompt.submit → turn.start (hooks UserPromptSubmit,
+//                           solo para origin.kind === 'composer' | 'bridge')
+//     AssistantMessage  🧠  generación del bloque de texto o narración en
+//                           adaptive thinking, thinking previo incluido
 //     ToolUse           🧠  escritura de la llamada por el modelo; mientras su
 //                           tool.call corre, añade `· 🔧 n s…` (counter de
 //                           ejecución, que comparte con el ToolGroup el reloj
@@ -56,26 +61,28 @@
 //   Vistas tardías: un bloque que se dibuja más tarde (grupo expandido,
 //   ctrl+o, vista de un subagente en curso, terminado o en segundo plano,
 //   sesión reanudada) solo lee lo fijado y muestra las mismas cifras que la
-//   vista en vivo. La vista ctrl+o se deduce de `isExpanded` de UserMessage:
-//   en ella AssistantMessage no trae margen superior propio.
+//   vista en vivo. La vista ctrl+o se deduce de `isExpanded` en mensajes de
+//   usuario reales, ToolResult y TurnDuration: en ella AssistantMessage no
+//   trae margen superior propio.
 //
 //   Horas y duraciones se persisten en `$.store` (un bucket por día, 30 días
-//   de retención), solo para las filas que se dibujan como componente
-//   (DRAWN_DOORS) y las claves de llamadas, así que una sesión reanudada
-//   (--continue / --resume) muestra las mismas que la original.
+//   de retención y presupuesto máximo MAX_STORE_BYTES = 3.5 MiB con poda FIFO
+//   de los días más antiguos), solo para las filas que se dibujan como
+//   componente (DRAWN_DOORS) y las claves de llamadas, así que una sesión
+//   reanudada (--continue / --resume) muestra las mismas que la original.
 //
-//   El header no puede ir dentro del Box con borde: ahí lo que cae sobre la
-//   fila del borde no se pinta. Va como hermano en el Box exterior, que es
-//   `column-reverse`: así la fila del header se pinta después del recuadro y
-//   marginBottom: -1 la sube sobre la fila de `╭───╮`. Al ir en flujo, y no
-//   absoluto, el scroll la recorta y no se reubica en la primera fila visible
-//   cuando el borde superior sale de pantalla.
+//   Ni el header ni el footer pueden ir dentro del Box con borde (ahí lo que
+//   cae sobre la fila del borde no se pinta) ni usar `position: 'absolute'`
+//   (que induce `overflow: 'hidden'` en el motor). Ambos van en flujo: el
+//   header en un Box `column-reverse` con marginBottom: -1 sobre `╭───╮` y el
+//   footer en el Box `column` exterior con marginTop: -1 sobre `╰───╯`. Al ir
+//   en flujo, el scroll los recorta sin reubicarlos ni dejar residuos.
 //
-//   El marco (╭─╮ │ ╰─╯) lo dibuja borderStyle al ancho del engine, que se
-//   adapta al viewport; no se calcula ningún borde a mano. El espaciador
-//   (un Text de espacios con wrap: 'truncate' en un Box height: 0) ensancha
-//   los recuadros angostos hasta caber header y footer, y se encoge con el
-//   viewport; si aun así no caben, ambos se truncan con `…`.
+//   El marco (╭─╮ │ ╰─╯) lo dibuja borderStyle al ancho del viewport gracias
+//   a `flexGrow: 1` en el Box exterior y al espaciador de alto 0 dimensionado
+//   a `e.viewport?.columns - 2` (un Text de espacios con wrap: 'truncate' en
+//   un Box height: 0). Si el viewport es más angosto que header o footer,
+//   ambos se truncan con `…`.
 //
 //   AskUserQuestion es la excepción: su ToolUse se dibuja vacío mientras
 //   espera, así que se deja sin envolver; y el engine rechaza `position`
@@ -84,16 +91,17 @@
 //
 //   NOTA: No se usa la prop `width` en el Box — el render engine rechaza
 //   "engine node under a Box with prop width", cayendo al rendering original
-//   sin el timestamp. Con borderStyle y sin width, el Box auto-dimensiona su
-//   border al ancho del engine content (viewport width), generando líneas
-//   verticales │ en los laterales de forma dinámica. borderStyle: 'round'
-//   es aceptado y funciona correctamente.
+//   sin el timestamp. Con borderStyle, flexGrow: 1 y el espaciador height: 0
+//   sin width, el Box ocupa todo el ancho del viewport (incluyendo ToolGroup
+//   dentro de contenedores flexDirection: 'row'), generando líneas verticales │
+//   en los laterales de forma invariante. borderStyle: 'round' es aceptado y
+//   funciona correctamente.
 //
 //   Spinner y TurnDuration usan handlers dedicados (withSpinner,
-//   withTurnDuration) que modifican props.suffix y props.word directamente,
+//   withTurnDuration) que modifican props.word y props.message directamente,
 //   ya que no necesitan tree-wrapping: el Spinner muestra el inicio del
-//   turno en curso de su agente (sin persistir) y TurnDuration el fin del
-//   turno (persistido).
+//   turno en curso de su agente (sin persistir, conservándolo incluso cuando
+//   hay tareas in_progress) y TurnDuration el fin del turno (persistido).
 //
 // Uso:
 //   claude --plugin-dir ./mods/transcript-plus    (o vía CLAUDE_CODE_PLUGIN_DIRS)
@@ -124,15 +132,34 @@ const pad2 = n => String(n).padStart(2, '0')
 // origen), y un evento posterior la corrige. Las entradas persistidas viven
 // en `$.store` agrupadas por día local (`days/AAAA-MM-DD` → `{ [blockKey]: { h, d? } }`)
 // para que una sesión reanudada muestre las mismas horas y footers; los días
-// con más de RETENTION_DAYS se borran al cargar.
+// con más de RETENTION_DAYS o que hagan superar el presupuesto MAX_STORE_BYTES
+// (3.5 MiB, bajo el límite duro de 4 MiB del motor) se desalojan en orden FIFO.
 
 const RETENTION_DAYS = 30
+const MAX_STORE_BYTES = 3_670_016
 const DAY_PREFIX = 'days/'
 
 const blocks = new Map()
+const dayBuckets = new Map()
 let storeLoaded
 const pendingKeys = new Set()
 let flushTimer
+
+const bucketBytes = (key, data) => key.length + JSON.stringify(data).length + 4
+
+// Desaloja en orden cronológico (FIFO) los buckets diarios más antiguos
+// mientras el peso estimado del store supere MAX_STORE_BYTES (3.5 MiB).
+async function enforceStoreBudget($, keepDay) {
+  let total = 0
+  for (const b of dayBuckets.values()) total += b.bytes
+  while (total > MAX_STORE_BYTES) {
+    const oldestKey = [...dayBuckets.keys()].sort().find(k => k !== keepDay)
+    if (!oldestKey) break
+    total -= dayBuckets.get(oldestKey).bytes
+    dayBuckets.delete(oldestKey)
+    await $.store.delete(oldestKey)
+  }
+}
 
 // Día local AAAA-MM-DD de un instante en epoch ms.
 function dayOf(ms) {
@@ -141,17 +168,23 @@ function dayOf(ms) {
 }
 
 // Carga el store una sola vez por carga del módulo: borra los días vencidos
-// y vuelca el resto en `blocks` sin pisar lo que ya haya en memoria.
+// o que excedan el presupuesto de bytes y vuelca el resto en `blocks` sin
+// pisar lo que ya haya en memoria.
 function loadStore($) {
   storeLoaded ??= (async () => {
     const cutoff = dayOf(Date.now() - RETENTION_DAYS * 86_400_000)
-    for (const key of await $.store.keys()) {
-      if (!key.startsWith(DAY_PREFIX)) continue
+    const dayKeys = (await $.store.keys()).filter(k => k.startsWith(DAY_PREFIX)).sort()
+    for (const key of dayKeys) {
       if (key.slice(DAY_PREFIX.length) < cutoff) {
         await $.store.delete(key)
         continue
       }
-      for (const [blockKey, { h, d }] of Object.entries((await $.store.get(key)) ?? {})) {
+      const data = (await $.store.get(key)) ?? {}
+      dayBuckets.set(key, { data, bytes: bucketBytes(key, data) })
+    }
+    await enforceStoreBudget($)
+    for (const { data } of dayBuckets.values()) {
+      for (const [blockKey, { h, d }] of Object.entries(data)) {
         if (!blocks.has(blockKey) || !blocks.get(blockKey).fromEvent) {
           blocks.set(blockKey, { time: h, duration: d, fromEvent: true })
         }
@@ -197,19 +230,35 @@ function markForSave($, blockKey) {
 }
 
 // Escribe las claves pendientes en el bucket del día de su hora. Relee cada
-// bucket y lo fusiona antes de escribir, para no pisar otra sesión concurrente.
+// bucket y lo fusiona antes de escribir, para no pisar otra sesión concurrente,
+// garantizando que el store no supere MAX_STORE_BYTES.
 async function flush($) {
   flushTimer = undefined
   const byDay = new Map()
   for (const blockKey of pendingKeys) {
-    const { time, duration } = blocks.get(blockKey)
+    const entry = blocks.get(blockKey)
+    if (!entry) continue
+    const { time, duration } = entry
     const day = DAY_PREFIX + dayOf(time)
     if (!byDay.has(day)) byDay.set(day, {})
     byDay.get(day)[blockKey] = { h: time, d: duration }
   }
   pendingKeys.clear()
   for (const [day, entries] of byDay) {
-    await $.store.set(day, { ...((await $.store.get(day)) ?? {}), ...entries })
+    const base = dayBuckets.get(day)?.data ?? (await $.store.get(day)) ?? {}
+    const merged = { ...base, ...entries }
+    dayBuckets.set(day, { data: merged, bytes: bucketBytes(day, merged) })
+    await enforceStoreBudget($, day)
+    try {
+      await $.store.set(day, merged)
+    } catch {
+      const oldest = (await $.store.keys()).filter(k => k.startsWith(DAY_PREFIX) && k !== day).sort()[0]
+      if (oldest) {
+        dayBuckets.delete(oldest)
+        await $.store.delete(oldest)
+        try { await $.store.set(day, merged) } catch {}
+      }
+    }
   }
 }
 
@@ -245,6 +294,7 @@ function formatRunning(ms) {
 // Agente de un evento: el subagente que lo emite, o el loop principal.
 const MAIN = 'main'
 const agentOf = e => e.agentId ?? MAIN
+const isUserOrigin = origin => origin?.kind === 'composer' || origin?.kind === 'bridge'
 
 // Lo no consumido de más de PRUNE_MS se descarta.
 const PRUNE_MS = 3_600_000
@@ -316,6 +366,12 @@ const turns = new Map()
 // el siguiente bloque de texto y el fin del turno. El ToolGroup que la
 // contiene es la cola del agente y aún puede recibir llamadas.
 const lastCall = new Map()
+// Registro en sesión de tareas (TaskCreate / TaskUpdate / TodoWrite) para
+// preservar el prefijo de hora en Spinner cuando props.message === null.
+const taskRegistry = new Map()
+let todoActiveLabel
+const getActiveTaskLabel = () =>
+  todoActiveLabel ?? [...taskRegistry.values()].find(t => t.status === 'in_progress' && t.label)?.label ?? null
 
 // Descarta los bloques del modelo y comandos no consumidos de más de PRUNE_MS.
 function prune() {
@@ -329,12 +385,14 @@ function prune() {
 }
 
 async function onSubmit($, e, next) {
-  pendingSubmit = Date.now()
-  currentPrompt = { submittedAt: pendingSubmit }
+  if (isUserOrigin(e.origin)) {
+    pendingSubmit = Date.now()
+    currentPrompt = { submittedAt: pendingSubmit }
+  }
   return next(e)
 }
 
-// 🪝 de un UserMessage: prompt.submit → turn.start. Lo fija el último en
+// 🔌 de un UserMessage: prompt.submit → turn.start. Lo fija el último en
 // llegar de su fila y turn.start; la hora (envío) se fija ya con la fila.
 function completePrompt($) {
   const { submittedAt, rowKey, turnStart } = currentPrompt
@@ -352,7 +410,7 @@ async function onTurnStart($, e, next) {
     const drawn = currentPrompt.rowKey !== undefined
     completePrompt($)
     // Su UserMessage ya se dibujó con la fila y el engine no lo redibuja
-    // solo: se pide un redibujado para que muestre el 🪝 recién fijado.
+    // solo: se pide un redibujado para que muestre el 🔌 recién fijado.
     if (drawn) $.ui.invalidate('ui.render')
   }
   return next(e)
@@ -390,24 +448,45 @@ async function* onStep($, e, next) {
       const now = Date.now()
       let b = byIndex.get(chunk.index)
       if (!b) {
-        b = { kind: chunk.kind, text: '', first: now, last: now, attributedStart: previous?.last ?? stepStart }
+        b = { kind: chunk.kind, text: '', first: now, last: now, attributedStart: previous?.last ?? stepStart, visible: false }
         byIndex.set(chunk.index, b)
-        if (b.kind !== 'thinking') {
+        if (b.kind === 'tool') {
+          b.visible = true
           previous = b
-          // Un bloque de texto cierra el ToolGroup abierto de su agente.
-          if (b.kind === 'text') {
-            lastCall.delete(agent)
-            void $.state.set({ plugin: 'transcript-plus', key: 'second' }, now)
-          }
           // La lista se crea aquí y no al empezar el paso: prune() borra
           // las listas vacías, también las de pasos de otros agentes en curso.
           if (!modelBlocks.has(agent)) modelBlocks.set(agent, [])
           modelBlocks.get(agent).push(b)
         }
       }
+      if (b.kind === 'text' && !b.visible) {
+        if (previous?.kind === 'thinking') {
+          b.attributedStart = previous.attributedStart
+          const list = modelBlocks.get(agent)
+          const idx = list ? list.indexOf(previous) : -1
+          if (idx >= 0) list.splice(idx, 1)
+        }
+        b.visible = true
+        previous = b
+        // Un bloque de texto cierra el ToolGroup abierto de su agente.
+        lastCall.delete(agent)
+        void $.state.set({ plugin: 'transcript-plus', key: 'second' }, now)
+        if (!modelBlocks.has(agent)) modelBlocks.set(agent, [])
+        modelBlocks.get(agent).push(b)
+      } else if (b.kind === 'thinking' && !b.visible && chunk.text.trim()) {
+        b.visible = true
+        b.attributedStart = previous?.last ?? stepStart
+        previous = b
+        // Un bloque thinking de narración (adaptive thinking) también cierra
+        // el ToolGroup abierto de su agente y se dibuja como AssistantMessage.
+        lastCall.delete(agent)
+        void $.state.set({ plugin: 'transcript-plus', key: 'second' }, now)
+        if (!modelBlocks.has(agent)) modelBlocks.set(agent, [])
+        modelBlocks.get(agent).push(b)
+      }
       b.last = now
       if (chunk.kind === 'tool') b.toolId = chunk.id
-      if (chunk.kind === 'text') b.text += chunk.text
+      if (chunk.kind === 'text' || chunk.kind === 'thinking') b.text += chunk.text
     }
     yield chunk
   }
@@ -432,9 +511,30 @@ async function onToolCall($, e, next) {
   scheduleClock($)
   const b = consumeBlock(agentOf(e), b => b.toolId === e.tool_use_id)
   if (b) pinTiming($, `u:${e.tool_use_id}`, { time: b.attributedStart, duration: b.last - b.attributedStart, persist: true })
+  if (e.tool === 'TodoWrite' && Array.isArray(e.input?.todos)) {
+    const active = e.input.todos.find(t => t?.status === 'in_progress')
+    todoActiveLabel = active ? (active.activeForm ?? active.content) : undefined
+  } else if (e.tool === 'TaskUpdate' && e.input?.taskId !== undefined) {
+    const id = String(e.input.taskId)
+    const prev = taskRegistry.get(id) ?? {}
+    const label = e.input.activeForm ?? e.input.subject ?? prev.label
+    const status = e.input.status ?? prev.status
+    if (status === 'deleted') taskRegistry.delete(id)
+    else taskRegistry.set(id, { label, status })
+  }
   void $.state.set({ plugin: 'transcript-plus', key: 'second' }, start)
   try {
-    return await next(e)
+    const out = await next(e)
+    if (e.tool === 'TaskCreate') {
+      const id = out?.result?.task?.id ?? /^Task #(\S+)/.exec(out?.text ?? '')?.[1]
+      if (id !== undefined) {
+        taskRegistry.set(String(id), {
+          label: e.input?.activeForm ?? e.input?.subject,
+          status: e.input?.status ?? 'pending',
+        })
+      }
+    }
+    return out
   } finally {
     runningCalls.delete(e.tool_use_id)
     pinTiming($, `r:${e.tool_use_id}`, { time: start, duration: Date.now() - start, persist: true })
@@ -452,13 +552,13 @@ async function onCommandRun($, e, next) {
   }
 }
 
-const textOf = message => message.content.filter(b => b.type === 'text').map(b => b.text).join('')
+const textOf = message => message.content.map(b => b.type === 'text' ? (b.text ?? '') : b.type === 'thinking' ? (b.thinking ?? '') : '').join('')
 
 // Fija cada fila dibujada del transcript bajo su uuid (el requestId de su
 // componente), antes de `next`, porque el engine puede dibujarla mientras se
 // guarda:
-//   prompt principal  hora = envío; el 🪝 lo completa turn.start
-//   response con texto  hora y 🧠 de su bloque de texto, que se consume
+//   prompt principal  hora = envío; el 🔌 lo completa turn.start
+//   response con texto  hora y 🧠 de su bloque de texto o narración, que se consume
 //   command stdout  hora y 🔧 del comando nombrado en la fila eco anterior
 //   resto (prompt de subagente o notificación, delivery, turn_duration)
 //     hora = la de la fila, sin duración
@@ -469,7 +569,7 @@ async function onAppend($, e, next) {
   const row = { time: now, persist: true }
   switch (e.door) {
     case 'prompt':
-      if (!e.agentId && currentPrompt && currentPrompt.rowKey === undefined) {
+      if (!e.agentId && isUserOrigin(e.origin) && currentPrompt && currentPrompt.rowKey === undefined) {
         currentPrompt.rowKey = e.uuid
         completePrompt($)
       } else {
@@ -478,8 +578,11 @@ async function onAppend($, e, next) {
       break
     case 'response': {
       if (!text.trim()) break
-      const b = consumeBlock(agentOf(e), b => b.kind === 'text' && b.text.trim() === text.trim())
+      lastCall.delete(agentOf(e))
+      const b = consumeBlock(agentOf(e), b => (b.kind === 'text' || b.kind === 'thinking') && b.text.trim() === text.trim())
       pinTiming($, e.uuid, b ? { time: b.attributedStart, duration: b.last - b.attributedStart, persist: true } : row)
+      $.ui.invalidate('ui.render')
+      void $.state.set({ plugin: 'transcript-plus', key: 'second' }, now)
       break
     }
     case 'command': {
@@ -530,11 +633,11 @@ function awaitsAnotherCall(calls) {
 // se vuelve a guardar si cambia). Sin entradas `r:` (fuera de la retención
 // del store), lo guardado bajo `g:`. `toSave` pide a withTimestamp
 // persistir la clave recalculada.
-function group(calls) {
+function group(calls, isActive) {
   const blockKey = `g:${calls[0].tool_use_id}`
   const now = Date.now()
   const rs = calls.map(c => blocks.get(`r:${c.tool_use_id}`))
-  if (calls.some(c => c.isRunning || runningCalls.has(c.tool_use_id)) || awaitsAnotherCall(calls)) {
+  if (calls.some(c => c.isRunning || runningCalls.has(c.tool_use_id)) || (isActive !== false && awaitsAnotherCall(calls))) {
     const starts = calls
       .map((c, i) => runningCalls.get(c.tool_use_id) ?? (rs[i]?.duration !== undefined ? rs[i].time : undefined))
       .filter(h => h !== undefined)
@@ -562,14 +665,22 @@ function group(calls) {
 const NO_CONTENT = new Set(['SubagentHandback'])
 
 const RESOLVER = {
-  // 🪝 prompt.submit → turn.start (hooks UserPromptSubmit); hora = envío.
-  // Sin turno aún (placeholder), la hora de envío pendiente.
-  UserMessage: e => e.requestId === 'placeholder'
-    ? { time: pendingSubmit ?? Date.now() }
-    : { ...entryFor(e.requestId), icon: '🪝' },
+  // 🔌 prompt.submit → turn.start (hooks UserPromptSubmit); hora = envío.
+  // Sin turno aún (placeholder), la hora de envío pendiente. Notificaciones
+  // de tareas u otros orígenes no humanos solo muestran su hora de creación.
+  UserMessage: e => {
+    if (e.requestId === 'placeholder') return { time: pendingSubmit ?? Date.now() }
+    if (!isUserOrigin(e.props.origin)) return { time: entryFor(e.requestId).time }
+    return { ...entryFor(e.requestId), icon: '🔌' }
+  },
   // 🧠 generación del bloque de texto, thinking previo incluido. En ctrl+o
   // no trae margen superior propio.
-  AssistantMessage: e => ({ ...entryFor(e.requestId), icon: '🧠', noMargin: expandedView }),
+  AssistantMessage: e => ({
+    ...entryFor(e.requestId),
+    icon: '🧠',
+    noMargin: expandedView,
+    subscribed: blocks.get(e.requestId)?.duration === undefined,
+  }),
   // 🧠 escritura de la llamada; la fija onToolCall al arrancar tool.call.
   // Mientras su llamada corre, `counter` es el tiempo desde el inicio de
   // tool.call y el footer añade `🔧 n s…` a la cifra 🧠; `subscribed` mantiene la instancia
@@ -591,7 +702,7 @@ const RESOLVER = {
     noMargin: e.props.tool === 'Agent',
   },
   // 🔧 inicio de la primera tool.call hasta el fin de la última.
-  ToolGroup: e => ({ ...group(e.props.calls), icon: '🔧' }),
+  ToolGroup: e => ({ ...group(e.props.calls, e.props.isActive), icon: '🔧' }),
   // 🔧 intervalo de command.run. Su salida no trae margen superior propio.
   CommandOutput: e => ({ ...entryFor(e.requestId), icon: '🔧', noMargin: true }),
   // Diálogo: solo header, con el inicio de su tool.call; va en flujo y sin
@@ -612,20 +723,25 @@ const RESOLVER = {
 //   │ ... │  ← líneas verticales en los laterales
 //   ╰─...─╯  ← borde inferior
 //
-// Ese Box va dentro de un Box exterior sin borde (paddingTop: 1 separa un
-// mensaje del anterior) con flexDirection: 'column-reverse', cuyo segundo hijo
-// es el timestamp en un Box en flujo (marginLeft/marginRight: 2,
-// marginBottom: -1) que se pinta sobre la fila del borde superior tras `╭─`.
-// Al ir en flujo, el scroll lo recorta como a cualquier otra línea. Con los
-// márgenes el Box queda acotado al ancho del recuadro y `wrap: 'truncate'`
-// recorta el header con `…` cuando el viewport es más angosto que el header:
+// Ese Box va dentro de un Box `column-reverse` cuyo segundo hijo es el
+// timestamp en un Box en flujo (marginLeft/marginRight: 2, marginBottom: -1)
+// que se pinta sobre la fila del borde superior tras `╭─`. A su vez, el Box
+// raíz exterior (`flexDirection: 'column', paddingTop: 1, flexGrow: 1`)
+// añade como segundo hijo condicional el footer en flujo (marginLeft/marginRight: 2,
+// marginTop: -1, justifyContent: 'flex-end'), superpuesto sobre la fila del
+// borde inferior `╰─...─╯` sin usar `position: 'absolute'`. Al ir ambos en
+// flujo, el scroll los recorta como a cualquier otra línea y el motor no
+// fuerza `overflow: 'hidden'`. Con los márgenes ambos quedan acotados al ancho
+// del recuadro y `wrap: 'truncate'` los recorta con `…` si el viewport es más
+// angosto:
 //   🕐 hora | ComponentType
 //
 // NOTA sobre `width`: el render engine RECHAZA la prop `width` en un Box que
-// contiene un nodo engine ("engine node under a Box with prop width"). Sin
-// `width`, el Box auto-dimensiona su border al ancho del engine content, que ya
-// renderiza al ancho del viewport. Las líneas verticales │ cubren todo el
-// ancho disponible de forma dinámica.
+// contiene un nodo engine ("engine node under a Box with prop width"). En su
+// lugar, `flexGrow: 1` en el Box raíz y el espaciador `height: 0` con
+// `e.viewport?.columns - 2` espacios fijan el ancho del recuadro al 100% del
+// viewport en todos los componentes (incluido ToolGroup cuando desmonta su
+// subfila en vivo dentro de un contenedor flexDirection: 'row').
 //
 // El margen superior que el engine da a cada mensaje se absorbe con un Box
 // marginTop: -1 alrededor del árbol, para que no quede una fila vacía entre
@@ -635,7 +751,7 @@ const RESOLVER = {
 // La hora y el footer de cada bloque los da RESOLVER, que solo lee lo fijado
 // por los hooks de ciclo de vida (o el store en sesiones reanudadas). Lo
 // único que se decide al dibujar es el recuadro, la vista (ctrl+o) y, en un
-// ToolGroup, ocultar el footer mientras alguna llamada sigue en curso.
+// ToolGroup, el contador o la duración cerrada.
 //
 // Visualmente:
 //
@@ -643,7 +759,11 @@ const RESOLVER = {
 //   │  Read 1 file, ran 1 shell command │
 //   ╰─────────────────────────── 🔧 7s ─╯
 async function withTimestamp($, e, next) {
-  if (e.component === 'UserMessage') expandedView = e.props.isExpanded
+  if (e.component === 'UserMessage' && isUserOrigin(e.props.origin) && !e.props.from && !e.props.task) {
+    expandedView = Boolean(e.props.isExpanded)
+  } else if (e.component === 'ToolResult' && typeof e.props.isExpanded === 'boolean') {
+    expandedView = e.props.isExpanded
+  }
   await loadStore($)
   const b = RESOLVER[e.component](e)
   if (b.unwrapped) return next(e)
@@ -660,9 +780,9 @@ async function withTimestamp($, e, next) {
 
   // Header con el timestamp, superpuesto sobre la línea del borde superior.
   // El Box con borderStyle: 'round' envuelve el engine y genera el marco;
-  // el header es su hermano posterior en el Box exterior (column-reverse), en
-  // una fila en flujo que se pinta tras el recuadro y que marginBottom: -1
-  // sube sobre el borde superior, tras `╭─`.
+  // el header es su hermano posterior en el Box column-reverse, en una fila
+  // en flujo que se pinta tras el recuadro y que marginBottom: -1 sube sobre
+  // el borde superior, tras `╭─`.
   const headerText = ` 🕐 ${formatClockTime(b.time)} | ${e.component} `
 
   // El engine rechaza `position` alrededor del diálogo, y dentro de un borde
@@ -671,7 +791,7 @@ async function withTimestamp($, e, next) {
   if (b.dialog) {
     return {
       type: 'Box',
-      props: { flexDirection: 'column', paddingTop: 1 },
+      props: { flexDirection: 'column', paddingTop: 1, flexGrow: 1 },
       children: [
         { type: 'Text', props: { wrap: 'truncate' }, children: [headerText] },
         tree,
@@ -679,8 +799,8 @@ async function withTimestamp($, e, next) {
     }
   }
 
-  // Footer con la duración del bloque una vez definitiva; si no, el borde
-  // inferior queda liso.
+  // Footer en flujo con la duración del bloque una vez definitiva (o con el
+  // contador en vivo); si no hay cifra, el borde inferior queda liso.
   // Con contador en curso: la cifra ya fijada (🧠 en el ToolUse) y `🔧 n s…`.
   const figures = []
   if (b.counter !== undefined) {
@@ -691,46 +811,55 @@ async function withTimestamp($, e, next) {
   }
   const footerText = figures.length ? ` ${figures.join(' · ')} ` : ''
 
-  // Espaciador de alto 0: obliga al recuadro a ser al menos tan ancho como
-  // header y footer (+2 por `─` a cada lado) sin usar `width`. Como Text en
-  // flujo con wrap: 'truncate', se encoge si el viewport es más angosto.
-  const minWidth = Math.max(headerText.length, footerText.length) + 2
+  // Espaciador de alto 0: fija el ancho interno del recuadro a
+  // `e.viewport.columns - 2` (+2 por los bordes verticales `│` = 100% del
+  // viewport) sin usar `width`, evitando que ToolGroup se encoja al cerrarse.
+  // Como Text en flujo con wrap: 'truncate', se adapta a viewports estrechos.
+  const minWidth = e.viewport?.columns
+    ? Math.max(0, e.viewport.columns - 2)
+    : Math.max(headerText.length, footerText.length) + 2
 
   return {
     type: 'Box',
-    props: { flexDirection: 'column-reverse', paddingTop: 1 },
+    props: { flexDirection: 'column', paddingTop: 1, flexGrow: 1 },
     children: [
       {
         type: 'Box',
-        props: {
-          flexDirection: 'column',
-          borderStyle: 'round',
-        },
+        props: { flexDirection: 'column-reverse' },
         children: [
           {
             type: 'Box',
-            props: { flexDirection: 'column', marginTop: b.noMargin ? 0 : -1 },
-            children: [tree],
+            props: {
+              flexDirection: 'column',
+              borderStyle: 'round',
+            },
+            children: [
+              {
+                type: 'Box',
+                props: { flexDirection: 'column', marginTop: b.noMargin ? 0 : -1 },
+                children: [tree],
+              },
+              {
+                type: 'Box',
+                props: { height: 0, overflow: 'hidden' },
+                children: [
+                  { type: 'Text', props: { wrap: 'truncate' }, children: [' '.repeat(minWidth)] },
+                ],
+              },
+            ],
           },
           {
             type: 'Box',
-            props: { height: 0, overflow: 'hidden' },
+            props: { marginLeft: 2, marginRight: 2, marginBottom: -1 },
             children: [
-              { type: 'Text', props: { wrap: 'truncate' }, children: [' '.repeat(minWidth)] },
+              { type: 'Text', props: { wrap: 'truncate' }, children: [headerText] },
             ],
           },
         ],
       },
-      {
-        type: 'Box',
-        props: { marginLeft: 2, marginRight: 2, marginBottom: -1 },
-        children: [
-          { type: 'Text', props: { wrap: 'truncate' }, children: [headerText] },
-        ],
-      },
       ...(footerText ? [{
         type: 'Box',
-        props: { position: 'absolute', bottom: 0, left: 2, right: 2, justifyContent: 'flex-end' },
+        props: { marginLeft: 2, marginRight: 2, marginTop: -1, justifyContent: 'flex-end' },
         children: [
           { type: 'Text', props: { wrap: 'truncate' }, children: [footerText] },
         ],
@@ -749,12 +878,13 @@ async function withSpinner($, e, next) {
   const turn = turns.get(e.requestId) ?? turns.get(MAIN)
   if (!turn) return next(e)
   const prefix = `🕐 ${formatClockTime(turn.start)} · `
+  const baseMessage = e.props.message ?? getActiveTaskLabel()
   return next({
     ...e,
     props: {
       ...e.props,
       word: prefix + e.props.word,
-      message: e.props.message === null ? null : prefix + e.props.message,
+      message: baseMessage === null ? null : prefix + baseMessage,
     },
   })
 }
@@ -764,6 +894,7 @@ async function withSpinner($, e, next) {
 // persistida por onAppend.
 // Ejemplo: "🕐 2:23:20 p.m. · Completed in"
 async function withTurnDuration($, e, next) {
+  if (typeof e.props.isExpanded === 'boolean') expandedView = e.props.isExpanded
   await loadStore($)
   const { time } = entryFor(e.requestId)
   return next({

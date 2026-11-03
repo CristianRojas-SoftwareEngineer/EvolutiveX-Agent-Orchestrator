@@ -1,4 +1,0 @@
-{
-  "description": "Módulo de hooks para transcript-plus",
-  "modules": ["./register.js"]
-}
